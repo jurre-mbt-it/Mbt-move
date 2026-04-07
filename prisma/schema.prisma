@@ -1,0 +1,249 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  ADMIN
+  THERAPIST
+  PATIENT
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum ProgramStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum ExerciseCategory {
+  STRENGTH
+  MOBILITY
+  STABILITY
+  CARDIO
+  BALANCE
+  FLEXIBILITY
+  SPORT_SPECIFIC
+}
+
+enum BodyRegion {
+  CERVICAL
+  THORACIC
+  LUMBAR
+  SHOULDER
+  ELBOW
+  WRIST
+  HIP
+  KNEE
+  ANKLE
+  FOOT
+  FULL_BODY
+}
+
+enum SessionStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  role          UserRole  @default(PATIENT)
+  avatarUrl     String?
+  phone         String?
+  dateOfBirth   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Therapist fields
+  specialty     String?
+  bio           String?
+  licenseNumber String?
+
+  // MFA
+  mfaEnabled    Boolean   @default(false)
+  mfaSecret     String?
+
+  // Relations
+  therapistPatients     PatientTherapist[] @relation("TherapistRelation")
+  patientTherapists     PatientTherapist[] @relation("PatientRelation")
+  createdPrograms       Program[]          @relation("ProgramCreator")
+  patientPrograms       Program[]          @relation("ProgramPatient")
+  exercises             Exercise[]
+  appointments          Appointment[]      @relation("PatientAppointments")
+  therapistAppointments Appointment[]      @relation("TherapistAppointments")
+  sessionLogs           SessionLog[]
+  notifications         Notification[]
+  messages              Message[]
+
+  @@map("users")
+}
+
+model PatientTherapist {
+  id          String   @id @default(cuid())
+  therapist   User     @relation("TherapistRelation", fields: [therapistId], references: [id])
+  therapistId String
+  patient     User     @relation("PatientRelation", fields: [patientId], references: [id])
+  patientId   String
+  createdAt   DateTime @default(now())
+  isActive    Boolean  @default(true)
+  notes       String?
+
+  @@unique([therapistId, patientId])
+  @@map("patient_therapists")
+}
+
+model Exercise {
+  id           String           @id @default(cuid())
+  name         String
+  description  String?
+  category     ExerciseCategory
+  bodyRegion   BodyRegion[]
+  videoUrl     String?
+  thumbnailUrl String?
+  instructions String[]
+  tips         String[]
+  createdBy    User             @relation(fields: [createdById], references: [id])
+  createdById  String
+  isPublic     Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  programExercises ProgramExercise[]
+
+  @@map("exercises")
+}
+
+model Program {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  status      ProgramStatus @default(DRAFT)
+  startDate   DateTime?
+  endDate     DateTime?
+
+  creator   User   @relation("ProgramCreator", fields: [creatorId], references: [id])
+  creatorId String
+  patient   User   @relation("ProgramPatient", fields: [patientId], references: [id])
+  patientId String
+
+  exercises   ProgramExercise[]
+  sessionLogs SessionLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("programs")
+}
+
+model ProgramExercise {
+  id        String   @id @default(cuid())
+  program   Program  @relation(fields: [programId], references: [id])
+  programId String
+  exercise  Exercise @relation(fields: [exerciseId], references: [id])
+  exerciseId String
+  order     Int
+  sets      Int?
+  reps      Int?
+  duration  Int? // seconds
+  restTime  Int? // seconds
+  notes     String?
+  dayOfWeek Int[] // 0=Sunday, 6=Saturday
+
+  @@map("program_exercises")
+}
+
+model SessionLog {
+  id          String        @id @default(cuid())
+  program     Program       @relation(fields: [programId], references: [id])
+  programId   String
+  patient     User          @relation(fields: [patientId], references: [id])
+  patientId   String
+  status      SessionStatus @default(PENDING)
+  scheduledAt DateTime
+  completedAt DateTime?
+  duration    Int? // seconds
+  notes       String?
+  painLevel   Int? // 0-10
+  exertionLevel Int? // 0-10 RPE
+
+  exerciseLogs ExerciseLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("session_logs")
+}
+
+model ExerciseLog {
+  id            String     @id @default(cuid())
+  session       SessionLog @relation(fields: [sessionId], references: [id])
+  sessionId     String
+  exerciseId    String
+  setsCompleted Int?
+  repsCompleted Int?
+  duration      Int?
+  notes         String?
+  painLevel     Int?
+
+  @@map("exercise_logs")
+}
+
+model Appointment {
+  id          String            @id @default(cuid())
+  patient     User              @relation("PatientAppointments", fields: [patientId], references: [id])
+  patientId   String
+  therapist   User              @relation("TherapistAppointments", fields: [therapistId], references: [id])
+  therapistId String
+  status      AppointmentStatus @default(SCHEDULED)
+  scheduledAt DateTime
+  duration    Int // minutes
+  notes       String?
+  location    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("appointments")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  type      String
+  data      Json?
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  sender      User     @relation(fields: [senderId], references: [id])
+  senderId    String
+  recipientId String
+  content     String
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@map("messages")
+}
