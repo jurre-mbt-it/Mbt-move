@@ -22,6 +22,7 @@ import {
 import { cn } from '@/lib/utils'
 import { Save, X, ChevronDown, ChevronUp } from 'lucide-react'
 import { toast } from 'sonner'
+import { trpc } from '@/lib/trpc/client'
 
 interface ExerciseFormData {
   name: string
@@ -84,7 +85,10 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
   const router = useRouter()
   const [form, setForm] = useState<ExerciseFormData>({ ...defaultData, ...initialData })
   const [tagDraft, setTagDraft] = useState('')
-  const [saving, setSaving] = useState(false)
+
+  const createMutation = trpc.exercises.create.useMutation()
+  const updateMutation = trpc.exercises.update.useMutation()
+  const saving = createMutation.isPending || updateMutation.isPending
 
   const set = <K extends keyof ExerciseFormData>(key: K, val: ExerciseFormData[K]) =>
     setForm(f => ({ ...f, [key]: val }))
@@ -102,14 +106,37 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
 
   const handleSave = async () => {
     if (!form.name.trim()) { toast.error('Naam is verplicht'); return }
-    setSaving(true)
-    // In production: call tRPC/API to persist
-    await new Promise(r => setTimeout(r, 800))
-    setSaving(false)
-    toast.success(mode === 'create' ? 'Oefening aangemaakt' : 'Oefening opgeslagen', {
-      description: 'Werkt volledig zodra Supabase is gekoppeld.',
-    })
-    router.push('/therapist/exercises')
+
+    const payload = {
+      name: form.name,
+      description: form.description || undefined,
+      category: form.category as never,
+      bodyRegion: form.bodyRegion as never,
+      difficulty: form.difficulty as never,
+      mediaType: form.mediaType ?? null,
+      videoUrl: form.videoUrl || undefined,
+      thumbnailUrl: undefined,
+      instructions: form.instructions,
+      tips: form.tips,
+      tags: form.tags,
+      isPublic: form.isPublic,
+      muscleLoads: form.muscleLoads as Record<string, number>,
+      easierVariantId: form.easierVariantId ?? null,
+      harderVariantId: form.harderVariantId ?? null,
+    }
+
+    try {
+      if (mode === 'create') {
+        await createMutation.mutateAsync(payload)
+        toast.success('Oefening aangemaakt')
+      } else {
+        await updateMutation.mutateAsync({ id: exerciseId!, ...payload })
+        toast.success('Oefening opgeslagen')
+      }
+      router.push('/therapist/exercises')
+    } catch {
+      toast.error('Opslaan mislukt')
+    }
   }
 
   return (

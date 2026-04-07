@@ -10,9 +10,9 @@ import {
   EXERCISE_CATEGORIES,
   BODY_REGIONS,
   DIFFICULTIES,
-  MOCK_EXERCISES,
   COLLECTION_COLORS,
 } from '@/lib/exercise-constants'
+import { trpc } from '@/lib/trpc/client'
 import { cn } from '@/lib/utils'
 import {
   Plus,
@@ -41,16 +41,20 @@ export default function ExercisesPage() {
   const [activeCollection, setActiveCollection] = useState<string | null>(null)
   const [showFilters, setShowFilters] = useState(true)
 
+  const { data: exercises = [], isLoading } = trpc.exercises.list.useQuery(undefined, {
+    staleTime: 30_000,
+  })
+
   const filtered = useMemo(() => {
-    return MOCK_EXERCISES.filter(ex => {
+    return exercises.filter(ex => {
       if (query && !ex.name.toLowerCase().includes(query.toLowerCase()) &&
-          !ex.tags.some(t => t.includes(query.toLowerCase()))) return false
+          !ex.tags.some((t: string) => t.includes(query.toLowerCase()))) return false
       if (selectedCategory && ex.category !== selectedCategory) return false
-      if (selectedRegion && !ex.bodyRegion.includes(selectedRegion as never)) return false
+      if (selectedRegion && !(ex.bodyRegion as string[]).includes(selectedRegion)) return false
       if (selectedDifficulty && ex.difficulty !== selectedDifficulty) return false
       return true
     })
-  }, [query, selectedCategory, selectedRegion, selectedDifficulty])
+  }, [exercises, query, selectedCategory, selectedRegion, selectedDifficulty])
 
   const activeFilterCount = [selectedCategory, selectedRegion, selectedDifficulty].filter(Boolean).length
 
@@ -82,7 +86,7 @@ export default function ExercisesPage() {
         >
           <FolderOpen className="w-4 h-4" />
           Alle oefeningen
-          <span className="ml-auto text-xs text-muted-foreground">{MOCK_EXERCISES.length}</span>
+          <span className="ml-auto text-xs text-muted-foreground">{exercises.length}</span>
         </button>
 
         {MOCK_COLLECTIONS.map(col => (
@@ -123,7 +127,7 @@ export default function ExercisesPage() {
             )}
             style={activeCollection === null ? { background: '#3ECF6A' } : {}}
           >
-            Alle ({MOCK_EXERCISES.length})
+            Alle ({exercises.length})
           </button>
           {MOCK_COLLECTIONS.map(col => (
             <button
@@ -284,7 +288,13 @@ export default function ExercisesPage() {
         )}
 
         {/* Exercise grid / list */}
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-40 rounded-xl bg-zinc-100 animate-pulse" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-14 h-14 rounded-full bg-zinc-100 flex items-center justify-center mb-4">
               <Search className="w-6 h-6 text-zinc-400" />

@@ -18,12 +18,30 @@ const CATEGORY_COLORS: Record<string, string> = {
   STABILITY:   '#a78bfa',
 }
 
+interface LibraryExercise {
+  id: string
+  name: string
+  category: string
+  bodyRegion: string[]
+  difficulty: string
+  mediaType?: string | null
+  videoUrl?: string | null
+  thumbnailUrl?: string | null
+  description?: string | null
+  tags: string[]
+  instructions: string[]
+  muscleLoads: Record<string, number>
+  isPublic: boolean
+  createdById: string
+  createdAt: Date
+}
+
 function DraggableLibraryItem({
   exercise,
   onAdd,
 }: {
-  exercise: typeof MOCK_EXERCISES[number]
-  onAdd: (ex: typeof MOCK_EXERCISES[number]) => void
+  exercise: LibraryExercise
+  onAdd: (ex: LibraryExercise) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `library-${exercise.id}`,
@@ -66,19 +84,22 @@ function DraggableLibraryItem({
 }
 
 interface ExerciseLibraryPanelProps {
-  onAdd: (ex: typeof MOCK_EXERCISES[number]) => void
+  onAdd: (ex: LibraryExercise) => void
+  exercises?: LibraryExercise[]
 }
 
-export function ExerciseLibraryPanel({ onAdd }: ExerciseLibraryPanelProps) {
+export function ExerciseLibraryPanel({ onAdd, exercises: propExercises }: ExerciseLibraryPanelProps) {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<string | null>(null)
 
+  const allExercises = (propExercises && propExercises.length > 0 ? propExercises : MOCK_EXERCISES) as LibraryExercise[]
+
   const filtered = useMemo(() =>
-    MOCK_EXERCISES.filter(e => {
+    allExercises.filter(e => {
       if (category && e.category !== category) return false
       if (query && !e.name.toLowerCase().includes(query.toLowerCase())) return false
       return true
-    }), [query, category])
+    }), [allExercises, query, category])
 
   return (
     <div className="flex flex-col h-full">

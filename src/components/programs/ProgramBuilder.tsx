@@ -26,7 +26,8 @@ import { SupersetGroupBlock } from './SupersetGroupBlock'
 import { MuscleBalancePanel } from './MuscleBalancePanel'
 import type { BuilderExercise, ProgramState } from './types'
 import { SUPERSET_LETTERS, DAY_LABELS } from '@/lib/program-constants'
-import type { MOCK_EXERCISES } from '@/lib/exercise-constants'
+import { MOCK_EXERCISES, EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
+import { trpc } from '@/lib/trpc/client'
 import { cn } from '@/lib/utils'
 
 import {
@@ -34,7 +35,6 @@ import {
   ChevronLeft, ChevronRight, Layers, Search, CheckCircle2, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { MOCK_EXERCISES, EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
 
 // ─── Drop zone for a single day column ────────────────────────────────────────
 function DayDropZone({
@@ -83,17 +83,17 @@ interface ProgramBuilderProps {
 export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps) {
   const router = useRouter()
 
-  const [program, setProgram] = useState<ProgramState>({
+  const [program, setProgram] = useState<ProgramState>(() => ({
     name: initialState?.name ?? 'Nieuw programma',
     description: initialState?.description ?? '',
-    patientId: null,
+    patientId: initialState?.patientId ?? null,
     weeks: initialState?.weeks ?? 1,
     daysPerWeek: initialState?.daysPerWeek ?? 3,
     currentWeek: 1,
     currentDay: 1,
-    isTemplate: false,
-    ...initialState,
-  })
+    isTemplate: initialState?.isTemplate ?? false,
+    exercises: initialState?.exercises ?? [],
+  }))
   const [exercises, setExercises] = useState<BuilderExercise[]>(
     initialState?.exercises ?? []
   )
@@ -103,7 +103,10 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
   const [mobileSelected, setMobileSelected] = useState<Set<string>>(new Set())
   const [mobileQuery, setMobileQuery] = useState('')
   const [mobileCategory, setMobileCategory] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
+  const createProgram = trpc.programs.create.useMutation()
+  const saveProgram = trpc.programs.save.useMutation()
+  const { data: libraryExercises = [] } = trpc.exercises.list.useQuery(undefined, { staleTime: 60_000 })
+  const saving = createProgram.isPending || saveProgram.isPending
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
@@ -173,14 +176,14 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
     }))
   }, [])
 
-  const addFromLibrary = useCallback((ex: typeof MOCK_EXERCISES[number]) => {
+  const addFromLibrary = useCallback((ex: { id: string; name: string; category: string; difficulty: string; muscleLoads: unknown; videoUrl?: string | null; easierVariantId?: string | null; harderVariantId?: string | null }) => {
     const newEx: BuilderExercise = {
       uid: `uid-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       exerciseId: ex.id,
       name: ex.name,
       category: ex.category,
       difficulty: ex.difficulty,
-      muscleLoads: ex.muscleLoads as Record<string, number>,
+      muscleLoads: ex.muscleLoads as unknown as Record<string, number>,
       easierVariantId: null,
       harderVariantId: null,
       videoUrl: ex.videoUrl,
@@ -233,7 +236,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
 
     // Library item dropped anywhere in the canvas (day column or on top of an existing exercise)
     if (activeData?.type === 'library-exercise') {
-      const ex = activeData.exercise as typeof MOCK_EXERCISES[number]
+      const ex = activeData.exercise as { id: string; name: string; category: string; difficulty: string; muscleLoads: unknown; videoUrl?: string | null }
       // Resolve target day/week: prefer explicit day-column data, fall back to current view
       const targetDay = overData?.type === 'day-column' ? overData.day : program.currentDay
       const targetWeek = overData?.type === 'day-column' ? overData.week : program.currentWeek
@@ -243,7 +246,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
         name: ex.name,
         category: ex.category,
         difficulty: ex.difficulty,
-        muscleLoads: ex.muscleLoads as Record<string, number>,
+        muscleLoads: ex.muscleLoads as unknown as Record<string, number>,
         easierVariantId: null,
         harderVariantId: null,
         videoUrl: ex.videoUrl,
@@ -272,10 +275,55 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
 
   // ── Save ─────────────────────────────────────────────────────────────────────
   const handleSave = async () => {
-    setSaving(true)
-    await new Promise(r => setTimeout(r, 600))
-    setSaving(false)
-    toast.success('Programma opgeslagen', { description: 'Werkt volledig zodra Supabase is gekoppeld.' })
+    const exercisePayload = exercises.map((ex, i) => ({
+      exerciseId: ex.exerciseId,
+      week: ex.week,
+      day: ex.day,
+      order: i,
+      sets: ex.sets,
+      reps: ex.reps,
+      repUnit: ex.repUnit,
+      restTime: ex.rest,
+      supersetGroup: ex.supersetGroup ?? null,
+      supersetOrder: ex.supersetOrder,
+      notes: null,
+    }))
+
+    try {
+      if (programId) {
+        await saveProgram.mutateAsync({
+          id: programId,
+          name: program.name,
+          description: program.description ?? undefined,
+          weeks: program.weeks,
+          daysPerWeek: program.daysPerWeek,
+          isTemplate: program.isTemplate,
+          exercises: exercisePayload,
+        })
+      } else {
+        const created = await createProgram.mutateAsync({
+          name: program.name,
+          description: program.description ?? undefined,
+          weeks: program.weeks,
+          daysPerWeek: program.daysPerWeek,
+          isTemplate: program.isTemplate,
+          patientId: program.patientId ?? null,
+        })
+        // Save exercises to the newly created program
+        if (exercises.length > 0) {
+          await saveProgram.mutateAsync({
+            id: created.id,
+            exercises: exercisePayload,
+          })
+        }
+        router.push(`/therapist/programs/${created.id}/edit`)
+        toast.success('Programma aangemaakt')
+        return
+      }
+      toast.success('Programma opgeslagen')
+    } catch {
+      toast.error('Opslaan mislukt')
+    }
   }
 
   const handleSaveAsTemplate = () => {
@@ -394,7 +442,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
 
           {/* LEFT: library — desktop only */}
           <div className="hidden md:flex w-56 shrink-0 border-r overflow-hidden flex-col">
-            <ExerciseLibraryPanel onAdd={addFromLibrary} />
+            <ExerciseLibraryPanel onAdd={addFromLibrary} exercises={libraryExercises.length > 0 ? libraryExercises as never : undefined} />
           </div>
 
           {/* CENTER: canvas */}
@@ -583,7 +631,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
 
           {/* Exercise list */}
           <div className="flex-1 overflow-y-auto px-4 pb-2 space-y-1.5">
-            {MOCK_EXERCISES
+            {(libraryExercises.length > 0 ? libraryExercises : MOCK_EXERCISES)
               .filter(ex => {
                 if (mobileCategory && ex.category !== mobileCategory) return false
                 if (mobileQuery && !ex.name.toLowerCase().includes(mobileQuery.toLowerCase())) return false
@@ -626,7 +674,8 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
               style={{ background: '#3ECF6A' }}
               disabled={mobileSelected.size === 0}
               onClick={() => {
-                MOCK_EXERCISES
+                const source = libraryExercises.length > 0 ? libraryExercises : MOCK_EXERCISES
+                source
                   .filter(ex => mobileSelected.has(ex.id))
                   .forEach(ex => addFromLibrary(ex))
                 toast.success(`${mobileSelected.size} oefening${mobileSelected.size > 1 ? 'en' : ''} toegevoegd`)

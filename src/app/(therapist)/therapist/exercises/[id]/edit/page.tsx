@@ -1,35 +1,50 @@
+'use client'
+
+import { use } from 'react'
 import { ExerciseForm } from '@/components/exercises/ExerciseForm'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
-import { MOCK_EXERCISES } from '@/lib/exercise-constants'
+import { trpc } from '@/lib/trpc/client'
 import { notFound } from 'next/navigation'
-
-export const metadata = { title: 'Oefening bewerken – MBT Gym' }
 
 interface Props {
   params: Promise<{ id: string }>
 }
 
-export default async function EditExercisePage({ params }: Props) {
-  const { id } = await params
-  const exercise = MOCK_EXERCISES.find(e => e.id === id)
-  if (!exercise) notFound()
+export default function EditExercisePage({ params }: Props) {
+  const { id } = use(params)
+  const { data: exercise, isLoading } = trpc.exercises.get.useQuery({ id })
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-8 w-48 bg-zinc-100 rounded animate-pulse" />
+        <div className="space-y-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-12 bg-zinc-100 rounded-xl animate-pulse" />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (!exercise) return notFound()
 
   const initialData = {
     name: exercise.name,
     description: exercise.description ?? '',
-    category: exercise.category,
+    category: exercise.category as string,
     bodyRegion: exercise.bodyRegion as string[],
-    difficulty: exercise.difficulty,
+    difficulty: exercise.difficulty as string,
     mediaType: (exercise.mediaType ?? null) as 'UPLOAD' | 'YOUTUBE' | 'VIMEO' | null,
     videoUrl: exercise.videoUrl ?? '',
     instructions: exercise.instructions,
-    tips: [],
+    tips: exercise.tips,
     tags: exercise.tags,
     isPublic: exercise.isPublic,
     muscleLoads: exercise.muscleLoads as Record<string, number>,
-    easierVariantId: null,
-    harderVariantId: null,
+    easierVariantId: exercise.easierVariantId ?? null,
+    harderVariantId: exercise.harderVariantId ?? null,
   }
 
   return (

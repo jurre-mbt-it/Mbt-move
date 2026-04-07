@@ -97,7 +97,7 @@ export function buildMockProgram() {
     name: e.name,
     category: e.category,
     difficulty: e.difficulty,
-    muscleLoads: e.muscleLoads as Record<string, number>,
+    muscleLoads: e.muscleLoads as unknown as Record<string, number>,
     easierVariantId: null,
     harderVariantId: null,
     videoUrl: e.videoUrl,
