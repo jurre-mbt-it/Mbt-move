@@ -1,7 +1,7 @@
 import { LoginForm } from '@/components/auth/LoginForm'
 
 export const metadata = {
-  title: 'Sign In – MBT Move',
+  title: 'Sign In – MBT Gym',
 }
 
 export default function LoginPage() {

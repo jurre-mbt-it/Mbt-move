@@ -36,11 +36,15 @@ export function Header({ title, userName, userEmail, userAvatar }: HeaderProps) 
 
   return (
     <header
-      className="h-14 flex items-center justify-between px-6 border-b shrink-0"
+      className="h-14 flex items-center justify-between px-4 md:px-6 border-b shrink-0"
       style={{ background: '#FFFFFF', borderColor: '#E4E4E7' }}
     >
+      {/* Logo op mobiel (sidebar is verborgen) */}
+      <div className="flex items-center md:hidden">
+        <img src="/Logo.jpg" alt="MBT Gym" className="h-7 w-auto" />
+      </div>
       {title && (
-        <h1 className="font-semibold text-lg">{title}</h1>
+        <h1 className="hidden md:block font-semibold text-lg">{title}</h1>
       )}
       <div className="flex items-center gap-3 ml-auto">
         <button className="relative p-2 rounded-lg hover:bg-zinc-100 transition-colors">

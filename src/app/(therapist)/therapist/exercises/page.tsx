@@ -61,9 +61,9 @@ export default function ExercisesPage() {
   }
 
   return (
-    <div className="flex h-full gap-0">
-      {/* Collections sidebar */}
-      <aside className="w-52 shrink-0 border-r pr-4 mr-6 space-y-4">
+    <div className="flex gap-0">
+      {/* Collections sidebar — desktop only */}
+      <aside className="hidden md:block w-52 shrink-0 border-r pr-4 mr-6 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-sm">Collecties</h3>
           <Link href="/therapist/exercises/collections">
@@ -113,10 +113,38 @@ export default function ExercisesPage() {
 
       {/* Main content */}
       <div className="flex-1 min-w-0 space-y-5">
+        {/* Mobile collection chips */}
+        <div className="flex md:hidden gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-none">
+          <button
+            onClick={() => setActiveCollection(null)}
+            className={cn(
+              'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
+              activeCollection === null ? 'text-white border-transparent' : 'border-zinc-200 text-muted-foreground'
+            )}
+            style={activeCollection === null ? { background: '#3ECF6A' } : {}}
+          >
+            Alle ({MOCK_EXERCISES.length})
+          </button>
+          {MOCK_COLLECTIONS.map(col => (
+            <button
+              key={col.id}
+              onClick={() => setActiveCollection(col.id)}
+              className={cn(
+                'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
+                activeCollection === col.id ? 'text-white border-transparent' : 'border-zinc-200 text-muted-foreground'
+              )}
+              style={activeCollection === col.id ? { background: col.color } : {}}
+            >
+              <span className="w-2 h-2 rounded-full" style={{ background: col.color }} />
+              {col.name}
+            </button>
+          ))}
+        </div>
+
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Oefeningen</h1>
+            <h1 className="text-xl md:text-2xl font-bold">Oefeningen</h1>
             <p className="text-muted-foreground text-sm mt-0.5">
               {filtered.length} oefening{filtered.length !== 1 ? 'en' : ''}
               {activeCollection && ` in collectie`}
@@ -125,7 +153,7 @@ export default function ExercisesPage() {
           <Link href="/therapist/exercises/new">
             <Button style={{ background: '#3ECF6A' }} className="gap-2">
               <Plus className="w-4 h-4" />
-              Nieuwe oefening
+              <span className="hidden sm:inline">Nieuwe oefening</span>
             </Button>
           </Link>
         </div>

@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Users, Activity, ShieldCheck, Server } from 'lucide-react'
 
 export const metadata = {
-  title: 'Admin Dashboard – MBT Move',
+  title: 'Admin Dashboard – MBT Gym',
 }
 
 const stats = [

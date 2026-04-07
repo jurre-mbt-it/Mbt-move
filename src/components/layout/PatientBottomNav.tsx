@@ -7,10 +7,10 @@ import { cn } from '@/lib/utils'
 
 const navItems = [
   { href: '/patient/dashboard', label: 'Home', icon: Home },
-  { href: '/patient/program', label: 'Program', icon: ClipboardList },
-  { href: '/patient/sessions', label: 'Sessions', icon: Activity },
-  { href: '/patient/messages', label: 'Messages', icon: MessageSquare },
-  { href: '/patient/profile', label: 'Profile', icon: User },
+  { href: `/patient/program/p1`, label: 'Programma', icon: ClipboardList },
+  { href: '/patient/session', label: 'Sessie', icon: Activity },
+  { href: '/patient/history', label: 'Geschiedenis', icon: MessageSquare },
+  { href: '/patient/profile', label: 'Profiel', icon: User },
 ]
 
 export function PatientBottomNav() {

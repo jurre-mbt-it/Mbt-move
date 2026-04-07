@@ -1,4 +1,5 @@
 import { PatientBottomNav } from '@/components/layout/PatientBottomNav'
+import { PageTransition } from '@/components/layout/PageTransition'
 
 export default function PatientLayout({
   children,
@@ -7,7 +8,7 @@ export default function PatientLayout({
 }) {
   return (
     <div className="min-h-screen pb-16" style={{ background: '#FAFAFA' }}>
-      <main>{children}</main>
+      <main><PageTransition>{children}</PageTransition></main>
       <PatientBottomNav />
     </div>
   )

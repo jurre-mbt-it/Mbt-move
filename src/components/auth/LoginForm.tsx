@@ -7,7 +7,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client'
+
+function getRoleRedirect(role?: string) {
+  if (role === 'PATIENT') return '/patient/dashboard'
+  return '/therapist/dashboard'
+}
 
 export function LoginForm() {
   const router = useRouter()
@@ -28,16 +33,19 @@ export function LoginForm() {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
       if (error) {
-        setError(error.message)
+        setError(error.message === 'Invalid login credentials'
+          ? 'Ongeldig e-mailadres of wachtwoord'
+          : error.message)
         return
       }
 
       if (data.user) {
-        router.push('/therapist/dashboard')
+        const role = data.user.user_metadata?.role
+        router.push(getRoleRedirect(role))
         router.refresh()
       }
     } catch {
-      setError('An unexpected error occurred. Please try again.')
+      setError('Er is een onverwachte fout opgetreden. Probeer opnieuw.')
     } finally {
       setLoading(false)
     }
@@ -63,7 +71,7 @@ export function LoginForm() {
 
       setMagicLinkSent(true)
     } catch {
-      setError('An unexpected error occurred. Please try again.')
+      setError('Er is een onverwachte fout opgetreden. Probeer opnieuw.')
     } finally {
       setLoading(false)
     }
@@ -72,35 +80,27 @@ export function LoginForm() {
   return (
     <Card className="w-full max-w-md shadow-lg" style={{ borderRadius: '12px' }}>
       <CardHeader className="space-y-1">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: '#3ECF6A' }}>
-            <span className="text-white font-bold text-sm">M</span>
-          </div>
-          <span className="font-bold text-lg">MBT Move</span>
+        <div className="flex items-center mb-2">
+          <img src="/Logo.jpg" alt="MBT Gym" className="h-8 w-auto" />
         </div>
-        <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
-        <CardDescription>Sign in to your account to continue</CardDescription>
+        <CardTitle className="text-2xl font-bold">Welkom terug</CardTitle>
+        <CardDescription>Log in op je account om verder te gaan</CardDescription>
       </CardHeader>
       <CardContent>
-        {!isSupabaseConfigured && (
-          <div className="mb-4 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: '#3ECF6A40', background: '#3ECF6A10', color: '#1A1A1A' }}>
-            <strong>Dev mode:</strong> Supabase is not connected yet. Auth won&apos;t work until you fill in <code>.env.local</code>.
-          </div>
-        )}
         <Tabs defaultValue="password">
           <TabsList className="w-full mb-4">
-            <TabsTrigger value="password" className="flex-1">Password</TabsTrigger>
+            <TabsTrigger value="password" className="flex-1">Wachtwoord</TabsTrigger>
             <TabsTrigger value="magic-link" className="flex-1">Magic Link</TabsTrigger>
           </TabsList>
 
           <TabsContent value="password">
             <form onSubmit={handleEmailPassword} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">E-mailadres</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="you@example.com"
+                  placeholder="jij@voorbeeld.nl"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -108,7 +108,7 @@ export function LoginForm() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">Wachtwoord</Label>
                 <Input
                   id="password"
                   type="password"
@@ -119,16 +119,14 @@ export function LoginForm() {
                   disabled={loading}
                 />
               </div>
-              {error && (
-                <p className="text-sm text-destructive">{error}</p>
-              )}
+              {error && <p className="text-sm text-destructive">{error}</p>}
               <Button
                 type="submit"
                 className="w-full"
                 style={{ background: '#3ECF6A' }}
                 disabled={loading}
               >
-                {loading ? 'Signing in…' : 'Sign in'}
+                {loading ? 'Inloggen…' : 'Inloggen'}
               </Button>
             </form>
           </TabsContent>
@@ -136,35 +134,33 @@ export function LoginForm() {
           <TabsContent value="magic-link">
             {magicLinkSent ? (
               <div className="text-center py-4 space-y-2">
-                <p className="font-medium">Check your email!</p>
+                <p className="font-medium">Controleer je e-mail!</p>
                 <p className="text-sm text-muted-foreground">
-                  We sent a magic link to <strong>{email}</strong>
+                  We hebben een magic link gestuurd naar <strong>{email}</strong>
                 </p>
               </div>
             ) : (
               <form onSubmit={handleMagicLink} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="magic-email">Email</Label>
+                  <Label htmlFor="magic-email">E-mailadres</Label>
                   <Input
                     id="magic-email"
                     type="email"
-                    placeholder="you@example.com"
+                    placeholder="jij@voorbeeld.nl"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     disabled={loading}
                   />
                 </div>
-                {error && (
-                  <p className="text-sm text-destructive">{error}</p>
-                )}
+                {error && <p className="text-sm text-destructive">{error}</p>}
                 <Button
                   type="submit"
                   className="w-full"
                   style={{ background: '#3ECF6A' }}
                   disabled={loading}
                 >
-                  {loading ? 'Sending…' : 'Send magic link'}
+                  {loading ? 'Versturen…' : 'Stuur magic link'}
                 </Button>
               </form>
             )}
@@ -172,9 +168,9 @@ export function LoginForm() {
         </Tabs>
 
         <p className="text-center text-sm text-muted-foreground mt-4">
-          Don&apos;t have an account?{' '}
+          Nog geen account?{' '}
           <a href="/register" className="underline" style={{ color: '#3ECF6A' }}>
-            Sign up
+            Registreren
           </a>
         </p>
       </CardContent>

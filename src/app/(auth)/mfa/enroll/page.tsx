@@ -1,7 +1,7 @@
 import { MfaEnrollForm } from '@/components/auth/MfaEnrollForm'
 
 export const metadata = {
-  title: 'Enable 2FA – MBT Move',
+  title: 'Enable 2FA – MBT Gym',
 }
 
 export default function MfaEnrollPage() {

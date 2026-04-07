@@ -304,21 +304,23 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
 
       <Separator />
 
-      {/* Actions */}
-      <div className="flex gap-3 pb-8">
+      {/* Actions — sticky on mobile, inline on desktop */}
+      <div className="fixed md:relative bottom-16 md:bottom-auto left-0 md:left-auto right-0 md:right-auto z-10 md:z-auto bg-white md:bg-transparent border-t md:border-t-0 px-4 py-3 md:px-0 md:py-0 flex gap-3">
         <Button
           onClick={handleSave}
           disabled={saving}
-          className="gap-2"
+          className="gap-2 flex-1 md:flex-none"
           style={{ background: '#3ECF6A' }}
         >
           <Save className="w-4 h-4" />
           {saving ? 'Opslaan...' : mode === 'create' ? 'Oefening aanmaken' : 'Wijzigingen opslaan'}
         </Button>
-        <Button variant="outline" onClick={() => router.push('/therapist/exercises')}>
+        <Button variant="outline" onClick={() => router.push('/therapist/exercises')} className="flex-1 md:flex-none">
           Annuleren
         </Button>
       </div>
+      {/* Spacer so content isn't hidden behind sticky bar on mobile */}
+      <div className="h-20 md:hidden" />
     </div>
   )
 }

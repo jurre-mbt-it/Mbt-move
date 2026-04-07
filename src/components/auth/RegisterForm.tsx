@@ -16,7 +16,7 @@ export function RegisterForm() {
     password: '',
     confirmPassword: '',
     name: '',
-    role: 'PATIENT',
+    role: 'THERAPIST',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -28,12 +28,12 @@ export function RegisterForm() {
     setError(null)
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match')
+      setError('Wachtwoorden komen niet overeen')
       return
     }
 
     if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters')
+      setError('Wachtwoord moet minimaal 8 tekens lang zijn')
       return
     }
 
@@ -58,10 +58,28 @@ export function RegisterForm() {
       }
 
       if (data.user) {
-        router.push('/login?message=Check your email to confirm your account')
+        // Sync user to public.users table
+        await fetch('/api/auth/sync-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: data.user.id,
+            email: data.user.email,
+            name: formData.name,
+            role: formData.role,
+          }),
+        })
+
+        if (data.session) {
+          const role = data.user.user_metadata?.role
+          router.push(role === 'PATIENT' ? '/patient/dashboard' : '/therapist/dashboard')
+          router.refresh()
+        } else {
+          router.push('/login?message=Controleer je e-mail om je account te bevestigen')
+        }
       }
     } catch {
-      setError('An unexpected error occurred. Please try again.')
+      setError('Er is een onverwachte fout opgetreden. Probeer opnieuw.')
     } finally {
       setLoading(false)
     }
@@ -70,23 +88,20 @@ export function RegisterForm() {
   return (
     <Card className="w-full max-w-md shadow-lg" style={{ borderRadius: '12px' }}>
       <CardHeader className="space-y-1">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: '#3ECF6A' }}>
-            <span className="text-white font-bold text-sm">M</span>
-          </div>
-          <span className="font-bold text-lg">MBT Move</span>
+        <div className="flex items-center mb-2">
+          <img src="/Logo.jpg" alt="MBT Gym" className="h-8 w-auto" />
         </div>
-        <CardTitle className="text-2xl font-bold">Create account</CardTitle>
-        <CardDescription>Join MBT Move to start your recovery journey</CardDescription>
+        <CardTitle className="text-2xl font-bold">Account aanmaken</CardTitle>
+        <CardDescription>Maak een account aan voor MBT Gym</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Full Name</Label>
+            <Label htmlFor="name">Volledige naam</Label>
             <Input
               id="name"
               type="text"
-              placeholder="Jane Smith"
+              placeholder="Emma Bakker"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
@@ -94,11 +109,11 @@ export function RegisterForm() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">E-mailadres</Label>
             <Input
               id="email"
               type="email"
-              placeholder="you@example.com"
+              placeholder="jij@voorbeeld.nl"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
@@ -106,7 +121,7 @@ export function RegisterForm() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="role">I am a</Label>
+            <Label htmlFor="role">Ik ben een</Label>
             <Select
               value={formData.role}
               onValueChange={(value) => setFormData({ ...formData, role: value })}
@@ -116,13 +131,13 @@ export function RegisterForm() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="PATIENT">Patient</SelectItem>
-                <SelectItem value="THERAPIST">Therapist / Clinician</SelectItem>
+                <SelectItem value="THERAPIST">Fysiotherapeut / Clinicus</SelectItem>
+                <SelectItem value="PATIENT">Patiënt</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">Wachtwoord</Label>
             <Input
               id="password"
               type="password"
@@ -134,7 +149,7 @@ export function RegisterForm() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <Label htmlFor="confirmPassword">Wachtwoord bevestigen</Label>
             <Input
               id="confirmPassword"
               type="password"
@@ -145,23 +160,21 @@ export function RegisterForm() {
               disabled={loading}
             />
           </div>
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
+          {error && <p className="text-sm text-destructive">{error}</p>}
           <Button
             type="submit"
             className="w-full"
             style={{ background: '#3ECF6A' }}
             disabled={loading}
           >
-            {loading ? 'Creating account…' : 'Create account'}
+            {loading ? 'Account aanmaken…' : 'Account aanmaken'}
           </Button>
         </form>
 
         <p className="text-center text-sm text-muted-foreground mt-4">
-          Already have an account?{' '}
+          Al een account?{' '}
           <a href="/login" className="underline" style={{ color: '#3ECF6A' }}>
-            Sign in
+            Inloggen
           </a>
         </p>
       </CardContent>

@@ -2,7 +2,7 @@ import { ExerciseForm } from '@/components/exercises/ExerciseForm'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 
-export const metadata = { title: 'Nieuwe oefening – MBT Move' }
+export const metadata = { title: 'Nieuwe oefening – MBT Gym' }
 
 export default function NewExercisePage() {
   return (

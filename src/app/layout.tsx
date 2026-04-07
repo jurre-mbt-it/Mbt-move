@@ -5,8 +5,8 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: {
-    template: '%s – MBT Move',
-    default: 'MBT Move',
+    template: '%s – MBT Gym',
+    default: 'MBT Gym',
   },
   description: 'Exercise prescription and rehabilitation platform for clinicians and patients.',
 }
@@ -18,7 +18,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full">
-      <body className="min-h-full flex flex-col antialiased">
+      <body className="min-h-full flex flex-col antialiased overflow-x-hidden">
         <TRPCProvider>
           {children}
         </TRPCProvider>

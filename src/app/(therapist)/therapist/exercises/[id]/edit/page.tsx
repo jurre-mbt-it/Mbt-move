@@ -4,7 +4,7 @@ import { ChevronLeft } from 'lucide-react'
 import { MOCK_EXERCISES } from '@/lib/exercise-constants'
 import { notFound } from 'next/navigation'
 
-export const metadata = { title: 'Oefening bewerken – MBT Move' }
+export const metadata = { title: 'Oefening bewerken – MBT Gym' }
 
 interface Props {
   params: Promise<{ id: string }>
