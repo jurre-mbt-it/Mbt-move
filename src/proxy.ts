@@ -6,13 +6,12 @@ const protectedPrefixes = ['/therapist', '/patient', '/admin']
 // Routes that should redirect to dashboard if already authenticated
 const authRoutes = ['/login', '/register']
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Refresh the session cookie
+  // Refresh the session cookie (no-ops if Supabase not configured)
   const response = await updateSession(request)
 
-  // Check if we're on a protected route
   const isProtected = protectedPrefixes.some((prefix) => pathname.startsWith(prefix))
   const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
 
@@ -42,7 +41,7 @@ export async function middleware(request: NextRequest) {
       }
 
       if (isAuthRoute && user) {
-        return NextResponse.redirect(new URL('/dashboard', request.url))
+        return NextResponse.redirect(new URL('/therapist/dashboard', request.url))
       }
     } catch {
       // Supabase not configured — allow all routes in development

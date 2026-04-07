@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { createClient } from '@/lib/supabase/client'
+import { createClient, isSupabaseConfigured } from '@/lib/supabase/client'
 
 export function LoginForm() {
   const router = useRouter()
@@ -33,7 +33,7 @@ export function LoginForm() {
       }
 
       if (data.user) {
-        router.push('/dashboard')
+        router.push('/therapist/dashboard')
         router.refresh()
       }
     } catch {
@@ -82,6 +82,11 @@ export function LoginForm() {
         <CardDescription>Sign in to your account to continue</CardDescription>
       </CardHeader>
       <CardContent>
+        {!isSupabaseConfigured && (
+          <div className="mb-4 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: '#3ECF6A40', background: '#3ECF6A10', color: '#1A1A1A' }}>
+            <strong>Dev mode:</strong> Supabase is not connected yet. Auth won&apos;t work until you fill in <code>.env.local</code>.
+          </div>
+        )}
         <Tabs defaultValue="password">
           <TabsList className="w-full mb-4">
             <TabsTrigger value="password" className="flex-1">Password</TabsTrigger>

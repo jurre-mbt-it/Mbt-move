@@ -1,12 +1,20 @@
 import { createServerClient, type CookieOptions } from '@supabase/auth-helpers-nextjs'
 import { type NextRequest, NextResponse } from 'next/server'
 
+const isSupabaseConfigured =
+  process.env.NEXT_PUBLIC_SUPABASE_URL?.startsWith('http') &&
+  !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
+  !process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('your-supabase')
+
 export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
+  const response = NextResponse.next({
+    request: { headers: request.headers },
   })
+
+  // Skip if Supabase isn't configured yet (local dev without credentials)
+  if (!isSupabaseConfigured) {
+    return response
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,27 +26,17 @@ export async function updateSession(request: NextRequest) {
         },
         set(name: string, value: string, options: CookieOptions) {
           request.cookies.set(name, value)
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
           response.cookies.set({ name, value, ...options })
         },
         remove(name: string, options: CookieOptions) {
           request.cookies.set(name, '')
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
           response.cookies.set({ name, value: '', ...options })
         },
       },
     }
   )
 
-  // Refresh the session — important for keeping auth tokens fresh
+  // Refresh the session token
   await supabase.auth.getUser()
 
   return response
