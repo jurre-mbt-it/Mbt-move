@@ -1,0 +1,310 @@
+'use client'
+
+import { useState, useMemo } from 'react'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { ExerciseCard } from '@/components/exercises/ExerciseCard'
+import {
+  EXERCISE_CATEGORIES,
+  BODY_REGIONS,
+  DIFFICULTIES,
+  MOCK_EXERCISES,
+  COLLECTION_COLORS,
+} from '@/lib/exercise-constants'
+import { cn } from '@/lib/utils'
+import {
+  Plus,
+  Search,
+  LayoutGrid,
+  List,
+  Filter,
+  FolderOpen,
+  ChevronRight,
+  X,
+} from 'lucide-react'
+
+// Mock collections
+const MOCK_COLLECTIONS = [
+  { id: 'c1', name: 'Knie revalidatie', color: '#3ECF6A', count: 3 },
+  { id: 'c2', name: 'Schouder protocol', color: '#60a5fa', count: 2 },
+  { id: 'c3', name: 'Warming-up basis', color: '#f59e0b', count: 4 },
+]
+
+export default function ExercisesPage() {
+  const [view, setView] = useState<'grid' | 'list'>('grid')
+  const [query, setQuery] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [selectedRegion, setSelectedRegion] = useState<string | null>(null)
+  const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null)
+  const [activeCollection, setActiveCollection] = useState<string | null>(null)
+  const [showFilters, setShowFilters] = useState(true)
+
+  const filtered = useMemo(() => {
+    return MOCK_EXERCISES.filter(ex => {
+      if (query && !ex.name.toLowerCase().includes(query.toLowerCase()) &&
+          !ex.tags.some(t => t.includes(query.toLowerCase()))) return false
+      if (selectedCategory && ex.category !== selectedCategory) return false
+      if (selectedRegion && !ex.bodyRegion.includes(selectedRegion as never)) return false
+      if (selectedDifficulty && ex.difficulty !== selectedDifficulty) return false
+      return true
+    })
+  }, [query, selectedCategory, selectedRegion, selectedDifficulty])
+
+  const activeFilterCount = [selectedCategory, selectedRegion, selectedDifficulty].filter(Boolean).length
+
+  const clearFilters = () => {
+    setSelectedCategory(null)
+    setSelectedRegion(null)
+    setSelectedDifficulty(null)
+  }
+
+  return (
+    <div className="flex h-full gap-0">
+      {/* Collections sidebar */}
+      <aside className="w-52 shrink-0 border-r pr-4 mr-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-sm">Collecties</h3>
+          <Link href="/therapist/exercises/collections">
+            <Button variant="ghost" size="icon" className="h-6 w-6">
+              <Plus className="w-3.5 h-3.5" />
+            </Button>
+          </Link>
+        </div>
+
+        <button
+          onClick={() => setActiveCollection(null)}
+          className={cn(
+            'w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-colors',
+            activeCollection === null ? 'bg-zinc-100 font-medium' : 'text-muted-foreground hover:bg-zinc-50'
+          )}
+        >
+          <FolderOpen className="w-4 h-4" />
+          Alle oefeningen
+          <span className="ml-auto text-xs text-muted-foreground">{MOCK_EXERCISES.length}</span>
+        </button>
+
+        {MOCK_COLLECTIONS.map(col => (
+          <button
+            key={col.id}
+            onClick={() => setActiveCollection(col.id)}
+            className={cn(
+              'w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-colors',
+              activeCollection === col.id ? 'bg-zinc-100 font-medium' : 'text-muted-foreground hover:bg-zinc-50'
+            )}
+          >
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: col.color }} />
+            <span className="truncate">{col.name}</span>
+            <span className="ml-auto text-xs text-muted-foreground">{col.count}</span>
+          </button>
+        ))}
+
+        <div className="pt-2 border-t">
+          <Link
+            href="/therapist/exercises/collections"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Beheer collecties
+            <ChevronRight className="w-3 h-3" />
+          </Link>
+        </div>
+      </aside>
+
+      {/* Main content */}
+      <div className="flex-1 min-w-0 space-y-5">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Oefeningen</h1>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              {filtered.length} oefening{filtered.length !== 1 ? 'en' : ''}
+              {activeCollection && ` in collectie`}
+            </p>
+          </div>
+          <Link href="/therapist/exercises/new">
+            <Button style={{ background: '#3ECF6A' }} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Nieuwe oefening
+            </Button>
+          </Link>
+        </div>
+
+        {/* Search + view toggle */}
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Zoek oefeningen, tags..."
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              className="pl-9"
+            />
+            {query && (
+              <button className="absolute right-3 top-1/2 -translate-y-1/2" onClick={() => setQuery('')}>
+                <X className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+              </button>
+            )}
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => setShowFilters(f => !f)}
+          >
+            <Filter className="w-4 h-4" />
+            Filters
+            {activeFilterCount > 0 && (
+              <Badge className="h-4 w-4 p-0 text-xs flex items-center justify-center" style={{ background: '#3ECF6A' }}>
+                {activeFilterCount}
+              </Badge>
+            )}
+          </Button>
+
+          <div className="flex border rounded-lg overflow-hidden">
+            <button
+              onClick={() => setView('grid')}
+              className={cn('px-3 py-2 transition-colors', view === 'grid' ? 'bg-zinc-900 text-white' : 'hover:bg-zinc-50')}
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setView('list')}
+              className={cn('px-3 py-2 transition-colors', view === 'list' ? 'bg-zinc-900 text-white' : 'hover:bg-zinc-50')}
+            >
+              <List className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Filters */}
+        {showFilters && (
+          <div className="flex flex-wrap gap-4 p-4 bg-zinc-50 rounded-xl border">
+            {/* Category filter */}
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Categorie</p>
+              <div className="flex flex-wrap gap-1.5">
+                {EXERCISE_CATEGORIES.map(c => (
+                  <button
+                    key={c.value}
+                    onClick={() => setSelectedCategory(selectedCategory === c.value ? null : c.value)}
+                    className={cn(
+                      'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
+                      selectedCategory === c.value
+                        ? 'border-transparent text-white'
+                        : 'border-zinc-200 bg-white text-muted-foreground hover:border-zinc-400'
+                    )}
+                    style={selectedCategory === c.value ? { background: '#3ECF6A' } : {}}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Region filter */}
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Lichaamsdeel</p>
+              <div className="flex flex-wrap gap-1.5">
+                {BODY_REGIONS.slice(0, 6).map(r => (
+                  <button
+                    key={r.value}
+                    onClick={() => setSelectedRegion(selectedRegion === r.value ? null : r.value)}
+                    className={cn(
+                      'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
+                      selectedRegion === r.value
+                        ? 'bg-zinc-900 text-white border-zinc-900'
+                        : 'border-zinc-200 bg-white text-muted-foreground hover:border-zinc-400'
+                    )}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Difficulty filter */}
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Niveau</p>
+              <div className="flex gap-1.5">
+                {DIFFICULTIES.map(d => (
+                  <button
+                    key={d.value}
+                    onClick={() => setSelectedDifficulty(selectedDifficulty === d.value ? null : d.value)}
+                    className={cn(
+                      'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
+                      selectedDifficulty === d.value
+                        ? 'bg-zinc-900 text-white border-zinc-900'
+                        : 'border-zinc-200 bg-white text-muted-foreground hover:border-zinc-400'
+                    )}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {activeFilterCount > 0 && (
+              <div className="flex items-end">
+                <button onClick={clearFilters} className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1">
+                  <X className="w-3 h-3" /> Wis filters
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Exercise grid / list */}
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-14 h-14 rounded-full bg-zinc-100 flex items-center justify-center mb-4">
+              <Search className="w-6 h-6 text-zinc-400" />
+            </div>
+            <h3 className="font-medium">Geen oefeningen gevonden</h3>
+            <p className="text-sm text-muted-foreground mt-1">Probeer andere zoektermen of filters</p>
+            {activeFilterCount > 0 && (
+              <Button variant="outline" size="sm" className="mt-4" onClick={clearFilters}>
+                Filters wissen
+              </Button>
+            )}
+          </div>
+        ) : view === 'grid' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map(ex => (
+              <ExerciseCard key={ex.id} exercise={ex} />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filtered.map(ex => (
+              <Link key={ex.id} href={`/therapist/exercises/${ex.id}/edit`}>
+                <div className="flex items-center gap-4 p-4 rounded-xl border hover:border-zinc-300 hover:bg-zinc-50 transition-colors cursor-pointer">
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-white font-bold text-sm"
+                    style={{ background: '#3ECF6A' }}
+                  >
+                    {ex.name[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm">{ex.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{ex.description}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge variant="secondary" className="text-xs">
+                      {EXERCISE_CATEGORIES.find(c => c.value === ex.category)?.label}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs">
+                      {DIFFICULTIES.find(d => d.value === ex.difficulty)?.label}
+                    </Badge>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

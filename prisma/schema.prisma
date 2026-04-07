@@ -31,25 +31,36 @@ enum ProgramStatus {
 enum ExerciseCategory {
   STRENGTH
   MOBILITY
-  STABILITY
+  PLYOMETRICS
   CARDIO
-  BALANCE
-  FLEXIBILITY
-  SPORT_SPECIFIC
+  STABILITY
 }
 
 enum BodyRegion {
+  KNEE
+  SHOULDER
+  BACK
+  ANKLE
+  HIP
+  FULL_BODY
   CERVICAL
   THORACIC
   LUMBAR
-  SHOULDER
   ELBOW
   WRIST
-  HIP
-  KNEE
-  ANKLE
   FOOT
-  FULL_BODY
+}
+
+enum Difficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum MediaType {
+  UPLOAD
+  YOUTUBE
+  VIMEO
 }
 
 enum SessionStatus {
@@ -80,13 +91,14 @@ model User {
   mfaSecret     String?
 
   // Relations
-  therapistPatients     PatientTherapist[] @relation("TherapistRelation")
-  patientTherapists     PatientTherapist[] @relation("PatientRelation")
-  createdPrograms       Program[]          @relation("ProgramCreator")
-  patientPrograms       Program[]          @relation("ProgramPatient")
+  therapistPatients     PatientTherapist[]     @relation("TherapistRelation")
+  patientTherapists     PatientTherapist[]     @relation("PatientRelation")
+  createdPrograms       Program[]              @relation("ProgramCreator")
+  patientPrograms       Program[]              @relation("ProgramPatient")
   exercises             Exercise[]
-  appointments          Appointment[]      @relation("PatientAppointments")
-  therapistAppointments Appointment[]      @relation("TherapistAppointments")
+  collections           ExerciseCollection[]
+  appointments          Appointment[]          @relation("PatientAppointments")
+  therapistAppointments Appointment[]          @relation("TherapistAppointments")
   sessionLogs           SessionLog[]
   notifications         Notification[]
   messages              Message[]
@@ -109,24 +121,76 @@ model PatientTherapist {
 }
 
 model Exercise {
-  id           String           @id @default(cuid())
-  name         String
-  description  String?
-  category     ExerciseCategory
-  bodyRegion   BodyRegion[]
-  videoUrl     String?
-  thumbnailUrl String?
-  instructions String[]
-  tips         String[]
-  createdBy    User             @relation(fields: [createdById], references: [id])
-  createdById  String
-  isPublic     Boolean          @default(false)
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id             String           @id @default(cuid())
+  name           String
+  description    String?
+  category       ExerciseCategory
+  bodyRegion     BodyRegion[]
+  difficulty     Difficulty       @default(BEGINNER)
+  mediaType      MediaType?
+  videoUrl       String?
+  thumbnailUrl   String?
+  instructions   String[]
+  tips           String[]
+  tags           String[]
+  isPublic       Boolean          @default(false)
+  createdBy      User             @relation(fields: [createdById], references: [id])
+  createdById    String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  // Muscle loading (1-5 per muscle group)
+  muscleLoads    MuscleLoad[]
+
+  // Progression variants (self-referential)
+  easierVariantId String?
+  easierVariant   Exercise?  @relation("ProgressionEasier", fields: [easierVariantId], references: [id])
+  easierOf        Exercise[] @relation("ProgressionEasier")
+  harderVariantId String?
+  harderVariant   Exercise?  @relation("ProgressionHarder", fields: [harderVariantId], references: [id])
+  harderOf        Exercise[] @relation("ProgressionHarder")
 
   programExercises ProgramExercise[]
+  collectionItems  ExerciseCollectionItem[]
 
   @@map("exercises")
+}
+
+model MuscleLoad {
+  id         String   @id @default(cuid())
+  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  exerciseId String
+  muscle     String   // e.g. "Quadriceps", "Hamstrings"
+  load       Int      // 1-5
+
+  @@unique([exerciseId, muscle])
+  @@map("muscle_loads")
+}
+
+model ExerciseCollection {
+  id          String   @id @default(cuid())
+  name        String
+  color       String?  // hex color label
+  therapist   User     @relation(fields: [therapistId], references: [id])
+  therapistId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items ExerciseCollectionItem[]
+
+  @@map("exercise_collections")
+}
+
+model ExerciseCollectionItem {
+  id           String             @id @default(cuid())
+  collection   ExerciseCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  collectionId String
+  exercise     Exercise           @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  exerciseId   String
+  addedAt      DateTime           @default(now())
+
+  @@unique([collectionId, exerciseId])
+  @@map("exercise_collection_items")
 }
 
 model Program {
@@ -152,35 +216,35 @@ model Program {
 }
 
 model ProgramExercise {
-  id        String   @id @default(cuid())
-  program   Program  @relation(fields: [programId], references: [id])
-  programId String
-  exercise  Exercise @relation(fields: [exerciseId], references: [id])
+  id         String   @id @default(cuid())
+  program    Program  @relation(fields: [programId], references: [id])
+  programId  String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id])
   exerciseId String
-  order     Int
-  sets      Int?
-  reps      Int?
-  duration  Int? // seconds
-  restTime  Int? // seconds
-  notes     String?
-  dayOfWeek Int[] // 0=Sunday, 6=Saturday
+  order      Int
+  sets       Int?
+  reps       Int?
+  duration   Int?     // seconds
+  restTime   Int?     // seconds
+  notes      String?
+  dayOfWeek  Int[]    // 0=Sunday, 6=Saturday
 
   @@map("program_exercises")
 }
 
 model SessionLog {
-  id          String        @id @default(cuid())
-  program     Program       @relation(fields: [programId], references: [id])
-  programId   String
-  patient     User          @relation(fields: [patientId], references: [id])
-  patientId   String
-  status      SessionStatus @default(PENDING)
-  scheduledAt DateTime
-  completedAt DateTime?
-  duration    Int? // seconds
-  notes       String?
-  painLevel   Int? // 0-10
-  exertionLevel Int? // 0-10 RPE
+  id            String        @id @default(cuid())
+  program       Program       @relation(fields: [programId], references: [id])
+  programId     String
+  patient       User          @relation(fields: [patientId], references: [id])
+  patientId     String
+  status        SessionStatus @default(PENDING)
+  scheduledAt   DateTime
+  completedAt   DateTime?
+  duration      Int?          // seconds
+  notes         String?
+  painLevel     Int?          // 0-10
+  exertionLevel Int?          // 0-10 RPE
 
   exerciseLogs ExerciseLog[]
 
@@ -212,7 +276,7 @@ model Appointment {
   therapistId String
   status      AppointmentStatus @default(SCHEDULED)
   scheduledAt DateTime
-  duration    Int // minutes
+  duration    Int               // minutes
   notes       String?
   location    String?
 
