@@ -60,7 +60,7 @@ export default function PatientsPage() {
   )
 
   const activeCount = MOCK_PATIENTS.filter(p => p.programStatus === 'ACTIVE').length
-  const lowComplianceCount = MOCK_PATIENTS.filter(p => p.compliance > 0 && p.compliance < 70).length
+  const lowComplianceCount = MOCK_PATIENTS.filter(p => (p.compliance ?? 0) > 0 && (p.compliance ?? 0) < 70).length
 
   return (
     <div className="space-y-6 max-w-3xl">

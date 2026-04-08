@@ -167,12 +167,20 @@ export function LoginForm() {
           </TabsContent>
         </Tabs>
 
-        <p className="text-center text-sm text-muted-foreground mt-4">
-          Nog geen account?{' '}
-          <a href="/register" className="underline" style={{ color: '#3ECF6A' }}>
-            Registreren
-          </a>
-        </p>
+        <div className="mt-4 space-y-2 text-center text-sm text-muted-foreground">
+          <p>
+            Nog geen account?{' '}
+            <a href="/register" className="underline" style={{ color: '#3ECF6A' }}>
+              Registreren
+            </a>
+          </p>
+          <p>
+            Patiënt?{' '}
+            <a href="/login/code" className="underline" style={{ color: '#3ECF6A' }}>
+              Inloggen met toegangscode
+            </a>
+          </p>
+        </div>
       </CardContent>
     </Card>
   )
