@@ -72,7 +72,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       </Link>
 
       {/* Patient header */}
-      <div className="flex items-start gap-4">
+      <div className="flex items-start gap-3 flex-wrap">
         <div
           className="w-14 h-14 rounded-full flex items-center justify-center font-bold text-xl text-white shrink-0"
           style={{ background: '#1A1A1A' }}
@@ -95,7 +95,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         </div>
 
         {/* Access code + actions */}
-        <div className="flex flex-col items-end gap-2 shrink-0">
+        <div className="flex flex-col items-end gap-2 ml-auto">
           <button
             className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg font-mono font-medium border"
             style={{ background: '#f4f4f5', borderColor: '#e4e4e7' }}
@@ -107,21 +107,21 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             {patient.accessCode}
             <Copy className="w-3 h-3 text-zinc-400" />
           </button>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-1.5">
             <Link href="/therapist/messages">
-              <Button variant="outline" size="sm" className="gap-1.5">
+              <Button variant="outline" size="sm" className="gap-1.5 w-full">
                 <MessageSquare className="w-3.5 h-3.5" /> Bericht
               </Button>
             </Link>
             {patient.programId ? (
               <Link href={`/therapist/programs/${patient.programId}/edit`}>
-                <Button size="sm" className="gap-1.5" style={{ background: '#3ECF6A' }}>
+                <Button size="sm" className="gap-1.5 w-full" style={{ background: '#3ECF6A' }}>
                   <ClipboardList className="w-3.5 h-3.5" /> Programma
                 </Button>
               </Link>
             ) : (
               <Link href="/therapist/programs/new">
-                <Button size="sm" className="gap-1.5" style={{ background: '#3ECF6A' }}>
+                <Button size="sm" className="gap-1.5 w-full" style={{ background: '#3ECF6A' }}>
                   <Plus className="w-3.5 h-3.5" /> Programma
                 </Button>
               </Link>
@@ -131,7 +131,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <StatCard
           icon={<Activity className="w-4 h-4" style={{ color: '#3ECF6A' }} />}
           value={`${patient.compliance}%`}
@@ -165,10 +165,10 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       {/* Tabs */}
       <Tabs defaultValue="profiel" className="space-y-4">
         <TabsList className="w-full grid grid-cols-4">
-          <TabsTrigger value="profiel">Profiel</TabsTrigger>
-          <TabsTrigger value="programmas">Programma's</TabsTrigger>
-          <TabsTrigger value="voortgang">Voortgang</TabsTrigger>
-          <TabsTrigger value="berichten">Berichten</TabsTrigger>
+          <TabsTrigger value="profiel" className="text-xs px-1">Profiel</TabsTrigger>
+          <TabsTrigger value="programmas" className="text-xs px-1">Programma's</TabsTrigger>
+          <TabsTrigger value="voortgang" className="text-xs px-1">Voortgang</TabsTrigger>
+          <TabsTrigger value="berichten" className="text-xs px-1">Berichten</TabsTrigger>
         </TabsList>
 
         {/* ── TAB: Profiel ─────────────────────────────────────── */}

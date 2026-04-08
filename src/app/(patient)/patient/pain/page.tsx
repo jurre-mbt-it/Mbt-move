@@ -106,7 +106,7 @@ export default function PainReportPage() {
                 <button
                   key={i}
                   onClick={() => setNrs(nrs === i ? null : i)}
-                  className="flex-1 h-10 rounded-xl text-xs font-bold transition-all"
+                  className="flex-1 h-11 rounded-xl text-xs font-bold transition-all"
                   style={{
                     background: nrs === i ? NRS_COLORS[i] : '#f4f4f5',
                     color: nrs === i ? 'white' : '#71717a',

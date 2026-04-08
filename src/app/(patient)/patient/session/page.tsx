@@ -162,7 +162,7 @@ function FeedbackModal({
               <button
                 key={i}
                 onClick={() => onChange({ pain: feedback.pain === i ? null : i })}
-                className="flex-1 h-8 rounded-lg text-xs font-semibold transition-all"
+                className="flex-1 h-9 rounded-lg text-xs font-semibold transition-all"
                 style={{
                   background: feedback.pain === i
                     ? i <= 3 ? '#22c55e' : i <= 6 ? '#f97316' : '#ef4444'
@@ -529,7 +529,7 @@ export default function SessionPage() {
             )}
 
             {/* Params grid */}
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <ParamPill label="Sets" value={String(e.sets)} />
               <ParamPill label="Reps" value={`${e.reps} ${e.repUnit}`} />
               <ParamPill label="Rust" value={`${e.rest}s`} />
