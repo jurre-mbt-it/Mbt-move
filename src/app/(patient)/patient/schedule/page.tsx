@@ -1,182 +1,185 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
-import { trpc } from '@/lib/trpc/client'
-import { CalendarDays, Dumbbell, Moon } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { getWeekSchedule, DAY_NAMES, TODAY_DAY } from '@/lib/patient-constants'
+import { Dumbbell, Moon, Play, ChevronRight } from 'lucide-react'
 
-const DAY_LABELS = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
 const DAY_SHORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 
-// 0=Mon in our system; JS getDay() is 0=Sun
-function getTodayIndex() {
-  const jsDay = new Date().getDay() // 0=Sun
-  return jsDay === 0 ? 6 : jsDay - 1 // convert to 0=Mon
-}
-
 export default function PatientSchedulePage() {
-  const { data: schedule, isLoading } = trpc.weekSchedules.mySchedule.useQuery(undefined, { staleTime: 60_000 })
-  const today = getTodayIndex()
+  const weekSchedule = getWeekSchedule()
+  const [selectedDay, setSelectedDay] = useState(TODAY_DAY)
 
-  if (isLoading) {
-    return (
-      <div className="px-4 pt-6 space-y-4">
-        <div className="h-7 w-40 bg-zinc-100 rounded animate-pulse" />
-        <div className="flex gap-2">
-          {Array.from({ length: 7 }).map((_, i) => (
-            <div key={i} className="flex-1 h-14 bg-zinc-100 rounded-xl animate-pulse" />
-          ))}
-        </div>
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-16 bg-zinc-100 rounded-xl animate-pulse" />
-        ))}
-      </div>
-    )
-  }
+  const selectedExercises = weekSchedule[selectedDay] ?? []
+  const hasExercises = selectedExercises.length > 0
+  const isToday = selectedDay === TODAY_DAY
 
-  if (!schedule) {
-    return (
-      <div className="px-4 pt-6 flex flex-col items-center justify-center min-h-[60vh] text-center">
-        <CalendarDays className="w-12 h-12 text-zinc-200 mb-4" />
-        <h2 className="font-bold text-lg">Nog geen weekschema</h2>
-        <p className="text-sm text-muted-foreground mt-1 max-w-xs">
-          Je therapeut heeft nog geen weekschema voor je aangemaakt. Neem contact op als je vragen hebt.
-        </p>
-      </div>
-    )
-  }
-
-  const todayData = schedule.days.find(d => d.dayOfWeek === today)
+  // Group exercises by superset
+  const groups: { key: string; exercises: typeof selectedExercises }[] = []
+  const seen = new Set<string>()
+  selectedExercises.forEach(e => {
+    if (e.supersetGroup && !seen.has(e.supersetGroup)) {
+      seen.add(e.supersetGroup)
+      groups.push({ key: e.supersetGroup, exercises: selectedExercises.filter(x => x.supersetGroup === e.supersetGroup) })
+    } else if (!e.supersetGroup) {
+      groups.push({ key: e.uid, exercises: [e] })
+    }
+  })
 
   return (
-    <div className="px-4 pt-6 pb-6 space-y-5">
-      <div>
-        <h1 className="text-xl font-bold">{schedule.name}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Jouw weekschema</p>
+    <div className="min-h-screen pb-6" style={{ background: '#FAFAFA' }}>
+      {/* Header */}
+      <div className="px-4 pt-12 pb-4" style={{ background: '#1A1A1A' }}>
+        <h1 className="text-white text-xl font-bold">Weekschema</h1>
+        <p className="text-zinc-400 text-xs mt-0.5">Week 1 · Knie Revalidatie</p>
       </div>
 
       {/* 7-day strip */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
-        {Array.from({ length: 7 }).map((_, i) => {
-          const day = schedule.days.find(d => d.dayOfWeek === i)
-          const hasProgram = !!day?.program
-          const isToday = i === today
-          return (
-            <Link
-              key={i}
-              href={`/patient/schedule/${i}`}
-              className="flex flex-col items-center gap-1 min-w-[44px] rounded-xl p-2 transition-all"
-              style={{
-                background: isToday ? '#3ECF6A' : hasProgram ? '#f0fdf4' : '#f4f4f5',
-                color: isToday ? '#fff' : hasProgram ? '#15803d' : '#a1a1aa',
-              }}
-            >
-              <span className="text-[11px] font-semibold">{DAY_SHORT[i]}</span>
-              <div className="w-5 h-5 flex items-center justify-center">
-                {hasProgram
-                  ? <Dumbbell className="w-3.5 h-3.5" />
-                  : <Moon className="w-3.5 h-3.5" />
-                }
-              </div>
-            </Link>
-          )
-        })}
+      <div className="px-4 pt-4">
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {Array.from({ length: 7 }).map((_, i) => {
+            const dayNum = i + 1
+            const hasSession = !!weekSchedule[dayNum]?.length
+            const isSelected = selectedDay === dayNum
+            const isTd = dayNum === TODAY_DAY
+            return (
+              <button
+                key={i}
+                onClick={() => setSelectedDay(dayNum)}
+                className="flex flex-col items-center gap-1.5 min-w-[44px] rounded-2xl p-2.5 transition-all"
+                style={{
+                  background: isSelected
+                    ? '#1A1A1A'
+                    : isTd
+                      ? '#f0fdf4'
+                      : hasSession
+                        ? '#fff'
+                        : '#f4f4f5',
+                  border: isSelected
+                    ? '2px solid #3ECF6A'
+                    : isTd
+                      ? '2px solid #3ECF6A'
+                      : '2px solid transparent',
+                  color: isSelected ? '#fff' : hasSession ? '#1A1A1A' : '#a1a1aa',
+                }}
+              >
+                <span className="text-[11px] font-bold">{DAY_SHORT[i]}</span>
+                <div className="w-6 h-6 flex items-center justify-center">
+                  {hasSession
+                    ? <Dumbbell className="w-3.5 h-3.5" style={{ color: isSelected ? '#3ECF6A' : '#52525b' }} />
+                    : <Moon className="w-3.5 h-3.5" />
+                  }
+                </div>
+                {hasSession && (
+                  <span className="text-[10px] font-medium" style={{ color: isSelected ? '#3ECF6A' : '#71717a' }}>
+                    {weekSchedule[dayNum]?.length}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
-      {/* Today's program */}
-      <div>
-        <h2 className="font-semibold text-sm mb-2">
-          Vandaag — {DAY_LABELS[today]}
-        </h2>
-        {todayData?.program ? (
-          <ProgramDayCard program={todayData.program} />
+      {/* Day detail */}
+      <div className="px-4 pt-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-bold text-base">{DAY_NAMES[selectedDay - 1]}{isToday ? ' · Vandaag' : ''}</h2>
+          {hasExercises && isToday && (
+            <Link href="/patient/session">
+              <Button size="sm" className="gap-1.5 text-xs font-semibold h-8" style={{ background: '#3ECF6A' }}>
+                <Play className="w-3 h-3 fill-current" /> Start sessie
+              </Button>
+            </Link>
+          )}
+        </div>
+
+        {hasExercises ? (
+          <div className="space-y-2">
+            {groups.map(({ key, exercises }) => (
+              <div key={key}>
+                {exercises.length > 1 ? (
+                  // Superset block
+                  <div
+                    className="rounded-2xl overflow-hidden"
+                    style={{ border: '2px solid #93c5fd', background: '#eff6ff' }}
+                  >
+                    <div className="px-3 py-1.5 flex items-center gap-1.5" style={{ background: '#dbeafe' }}>
+                      <span className="text-[10px] font-bold tracking-wider" style={{ color: '#1d4ed8' }}>
+                        SUPERSET {exercises[0].supersetGroup}
+                      </span>
+                    </div>
+                    <div className="divide-y divide-blue-100">
+                      {exercises.map(e => (
+                        <ExerciseRow key={e.uid} exercise={e} isToday={isToday} />
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <Card style={{ borderRadius: '14px' }}>
+                    <CardContent className="p-0">
+                      <ExerciseRow exercise={exercises[0]} isToday={isToday} />
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            ))}
+
+            {isToday && (
+              <Link href="/patient/session">
+                <div
+                  className="flex items-center justify-center gap-2 py-4 rounded-2xl mt-2"
+                  style={{ background: '#3ECF6A' }}
+                >
+                  <Play className="w-4 h-4 fill-white text-white" />
+                  <span className="text-white font-bold text-sm">Start sessie — {selectedExercises.length} oefeningen</span>
+                </div>
+              </Link>
+            )}
+          </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-8 rounded-xl text-center"
-            style={{ background: '#f0fdf4' }}>
-            <Moon className="w-8 h-8 mb-2" style={{ color: '#86efac' }} />
-            <p className="font-semibold text-sm" style={{ color: '#15803d' }}>Rustdag 😴</p>
-            <p className="text-xs text-muted-foreground mt-1">Neem even de tijd om te herstellen. Goed gedaan!</p>
+          // Rest day
+          <div
+            className="rounded-2xl px-5 py-8 flex flex-col items-center text-center gap-3"
+            style={{ background: '#f0fdf4', border: '2px solid #bbf7d0' }}
+          >
+            <div className="text-4xl">🌿</div>
+            <div>
+              <p className="font-bold text-base" style={{ color: '#15803d' }}>Rustdag</p>
+              <p className="text-sm mt-1.5 leading-relaxed" style={{ color: '#166534' }}>
+                Vandaag is een rustdag. Goed herstel is onderdeel van je programma.
+              </p>
+            </div>
+            <p className="text-xs text-zinc-400 mt-1">
+              Lichaam en geest herstellen terwijl je rust — dat is training.
+            </p>
           </div>
         )}
-      </div>
-
-      {/* Rest of week */}
-      <div>
-        <h2 className="font-semibold text-sm mb-2">Deze week</h2>
-        <div className="space-y-2">
-          {schedule.days
-            .filter(d => d.dayOfWeek !== today)
-            .map(d => (
-              <Link
-                key={d.id}
-                href={`/patient/schedule/${d.dayOfWeek}`}
-                className="flex items-center gap-3 p-3 rounded-xl border bg-white hover:shadow-sm transition-shadow"
-              >
-                <div
-                  className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 font-bold text-xs"
-                  style={{
-                    background: d.program ? '#f0fdf4' : '#f4f4f5',
-                    color: d.program ? '#15803d' : '#a1a1aa',
-                  }}
-                >
-                  {DAY_SHORT[d.dayOfWeek]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  {d.program ? (
-                    <>
-                      <p className="font-semibold text-sm truncate">{d.program.name}</p>
-                      <p className="text-xs text-muted-foreground">{d.program.exercises?.length ?? 0} oefeningen</p>
-                    </>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">Rustdag</p>
-                  )}
-                </div>
-                {d.program && (
-                  <Dumbbell className="w-4 h-4 text-zinc-300 shrink-0" />
-                )}
-              </Link>
-            ))}
-        </div>
       </div>
     </div>
   )
 }
 
-type ProgramWithExercises = {
-  id: string
-  name: string
-  exercises?: {
-    id: string
-    sets: number
-    reps: number
-    repUnit: string
-    restTime: number
-    exercise: { id: string; name: string; category: string }
-  }[]
-}
-
-function ProgramDayCard({ program }: { program: ProgramWithExercises }) {
+function ExerciseRow({ exercise, isToday }: { exercise: ReturnType<typeof getWeekSchedule>[number][number]; isToday: boolean }) {
   return (
-    <div className="rounded-xl border bg-white overflow-hidden">
-      <div className="px-4 py-3 border-b" style={{ background: '#f0fdf4' }}>
-        <h3 className="font-bold text-sm" style={{ color: '#15803d' }}>{program.name}</h3>
-        <p className="text-xs text-muted-foreground">{program.exercises?.length ?? 0} oefeningen</p>
+    <div className="flex items-center gap-3 px-4 py-3">
+      <div
+        className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+        style={{ background: '#f4f4f5' }}
+      >
+        <Dumbbell className="w-4 h-4 text-zinc-500" />
       </div>
-      <div className="divide-y">
-        {(program.exercises ?? []).slice(0, 5).map(pe => (
-          <div key={pe.id} className="flex items-center gap-3 px-4 py-2.5">
-            <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#3ECF6A' }} />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{pe.exercise.name}</p>
-              <p className="text-xs text-muted-foreground">{pe.sets}×{pe.reps} {pe.repUnit} · {pe.restTime}s rust</p>
-            </div>
-          </div>
-        ))}
-        {(program.exercises?.length ?? 0) > 5 && (
-          <div className="px-4 py-2 text-xs text-muted-foreground">
-            +{(program.exercises?.length ?? 0) - 5} meer oefeningen
-          </div>
-        )}
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-sm truncate">{exercise.name}</p>
+        <p className="text-xs text-muted-foreground">
+          {exercise.sets} × {exercise.reps} {exercise.repUnit}
+          {exercise.rest > 0 ? ` · ${exercise.rest}s rust` : ''}
+        </p>
       </div>
+      {isToday && <ChevronRight className="w-4 h-4 text-zinc-300 shrink-0" />}
     </div>
   )
 }

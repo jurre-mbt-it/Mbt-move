@@ -4,8 +4,9 @@
     {
       "name": "mbt-move",
       "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["/Users/eva/mbt-move/.claude/worktrees/eloquent-hoover/dev-worktree.sh"],
-      "port": 3000
+      "runtimeArgs": ["-c", "cd /Users/eva/mbt-move/.claude/worktrees/nifty-bassi && PATH=/usr/local/bin:$PATH npm run dev"],
+      "port": 3000,
+      "autoPort": true
     }
   ]
 }

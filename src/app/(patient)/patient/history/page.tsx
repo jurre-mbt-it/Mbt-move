@@ -4,7 +4,13 @@ import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { MOCK_SESSION_HISTORY } from '@/lib/patient-constants'
-import { CheckCircle2, Clock, ChevronDown, ChevronUp, TrendingDown } from 'lucide-react'
+import { PATIENTS } from '@/lib/mock-data'
+import { CheckCircle2, Clock, ChevronDown, ChevronUp, Flame, TrendingUp } from 'lucide-react'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+} from 'recharts'
+
+const patient = PATIENTS.find(p => p.id === 'pat1')!
 
 function PainDot({ level }: { level: number }) {
   const color = level <= 3 ? '#22c55e' : level <= 6 ? '#f97316' : '#ef4444'
@@ -16,8 +22,31 @@ function PainDot({ level }: { level: number }) {
   )
 }
 
+// Build chart data from session history
+const chartData = [...MOCK_SESSION_HISTORY].reverse().map((s, i) => ({
+  name: new Date(s.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }),
+  sessieNr: i + 1,
+  duur: s.duration,
+  pain: s.painLevel ?? 0,
+  volume: Math.round(s.duration * (s.exercisesCompleted / s.exercisesTotal)),
+  completion: Math.round((s.exercisesCompleted / s.exercisesTotal) * 100),
+}))
+
+function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{value: number; name: string}>; label?: string }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-xl px-3 py-2 shadow-lg text-xs" style={{ background: '#1A1A1A', color: '#fff' }}>
+      <p className="font-semibold mb-1">{label}</p>
+      {payload.map(p => (
+        <p key={p.name}>{p.name}: <span className="font-bold">{p.value}</span></p>
+      ))}
+    </div>
+  )
+}
+
 export default function HistoryPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [activeChart, setActiveChart] = useState<'volume' | 'pain'>('volume')
 
   const avgPain = MOCK_SESSION_HISTORY
     .filter(s => s.painLevel !== null)
@@ -29,49 +58,131 @@ export default function HistoryPage() {
       MOCK_SESSION_HISTORY.length) * 100
   )
 
+  const streak = patient.compliance >= 80 ? 5 : 3
+
   return (
     <div className="min-h-screen pb-6" style={{ background: '#FAFAFA' }}>
       {/* Header */}
       <div className="px-4 pt-12 pb-5" style={{ background: '#1A1A1A' }}>
-        <h1 className="text-white text-xl font-bold">Sessiegeschiedenis</h1>
-        <p className="text-zinc-400 text-xs mt-0.5">{MOCK_SESSION_HISTORY.length} sessies gelogd</p>
+        <h1 className="text-white text-xl font-bold">Voortgang</h1>
+        <p className="text-zinc-400 text-xs mt-0.5">{MOCK_SESSION_HISTORY.length} sessies · Week {patient.weeksCurrent} van {patient.weeksTotal}</p>
       </div>
 
       <div className="px-4 py-4 space-y-4">
-        {/* Summary stats */}
+        {/* Stats row */}
         <div className="grid grid-cols-3 gap-3">
-          <StatTile value={`${Math.round(avgPain * 10) / 10}`} label="Gem. pijn" sub="/10" color="#f97316" />
-          <StatTile value={`${totalMin}`} label="Totaal" sub="min" color="#6366f1" />
-          <StatTile value={`${compliance}%`} label="Compliance" sub="" color="#3ECF6A" />
+          <Card style={{ borderRadius: '14px' }}>
+            <CardContent className="px-3 py-3 text-center">
+              <div className="flex justify-center mb-1">
+                <Flame className="w-4 h-4" style={{ color: '#f97316' }} />
+              </div>
+              <p className="text-xl font-bold" style={{ color: '#f97316' }}>{streak}</p>
+              <p className="text-xs text-muted-foreground">Streak</p>
+            </CardContent>
+          </Card>
+          <Card style={{ borderRadius: '14px' }}>
+            <CardContent className="px-3 py-3 text-center">
+              <div className="flex justify-center mb-1">
+                <CheckCircle2 className="w-4 h-4" style={{ color: '#3ECF6A' }} />
+              </div>
+              <p className="text-xl font-bold" style={{ color: '#3ECF6A' }}>{compliance}%</p>
+              <p className="text-xs text-muted-foreground">Adherence</p>
+            </CardContent>
+          </Card>
+          <Card style={{ borderRadius: '14px' }}>
+            <CardContent className="px-3 py-3 text-center">
+              <div className="flex justify-center mb-1">
+                <Clock className="w-4 h-4" style={{ color: '#6366f1' }} />
+              </div>
+              <p className="text-xl font-bold" style={{ color: '#6366f1' }}>{totalMin}</p>
+              <p className="text-xs text-muted-foreground">Minuten</p>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Pain trend (simple visual) */}
+        {/* Adherence progress */}
         <Card style={{ borderRadius: '14px' }}>
           <CardContent className="px-4 py-4">
-            <div className="flex items-center gap-2 mb-3">
-              <TrendingDown className="w-4 h-4" style={{ color: '#3ECF6A' }} />
-              <p className="font-semibold text-sm">Pijnverloop</p>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" style={{ color: '#3ECF6A' }} />
+                <p className="font-semibold text-sm">Programma voortgang</p>
+              </div>
+              <span className="text-xs text-muted-foreground">W{patient.weeksCurrent}/{patient.weeksTotal}</span>
             </div>
-            <div className="flex items-end gap-1 h-16">
-              {[...MOCK_SESSION_HISTORY].reverse().map((s, i) => {
-                const pain = s.painLevel ?? 0
-                const heightPct = (pain / 10) * 100
-                const color = pain <= 3 ? '#3ECF6A' : pain <= 6 ? '#f97316' : '#ef4444'
-                return (
-                  <div key={s.id} className="flex-1 flex flex-col items-center gap-1">
-                    <div
-                      className="w-full rounded-t-sm transition-all"
-                      style={{ height: `${heightPct}%`, background: color, minHeight: 4 }}
-                    />
-                    <span className="text-xs text-zinc-400">S{i + 1}</span>
-                  </div>
-                )
-              })}
+            <div className="w-full h-2 rounded-full" style={{ background: '#f4f4f5' }}>
+              <div
+                className="h-2 rounded-full transition-all"
+                style={{
+                  width: `${(patient.weeksCurrent / patient.weeksTotal) * 100}%`,
+                  background: '#3ECF6A'
+                }}
+              />
+            </div>
+            <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+              <span>{patient.sessionsCompleted} sessies voltooid</span>
+              <span>{patient.sessionsTotal - patient.sessionsCompleted} resterend</span>
             </div>
           </CardContent>
         </Card>
 
+        {/* Chart toggle */}
+        <Card style={{ borderRadius: '14px' }}>
+          <CardContent className="px-4 py-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="font-semibold text-sm">Grafiek</p>
+              <div className="flex rounded-xl overflow-hidden border text-xs font-semibold">
+                <button
+                  onClick={() => setActiveChart('volume')}
+                  className="px-3 py-1.5 transition-all"
+                  style={{
+                    background: activeChart === 'volume' ? '#1A1A1A' : 'transparent',
+                    color: activeChart === 'volume' ? '#fff' : '#71717a',
+                  }}
+                >
+                  Volume
+                </button>
+                <button
+                  onClick={() => setActiveChart('pain')}
+                  className="px-3 py-1.5 transition-all"
+                  style={{
+                    background: activeChart === 'pain' ? '#1A1A1A' : 'transparent',
+                    color: activeChart === 'pain' ? '#fff' : '#71717a',
+                  }}
+                >
+                  Pijn
+                </button>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={chartData} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f4f4f5' }} />
+                <Bar
+                  dataKey={activeChart === 'volume' ? 'volume' : 'pain'}
+                  name={activeChart === 'volume' ? 'Volume (min)' : 'Pijn (/10)'}
+                  radius={[4, 4, 0, 0]}
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={
+                        activeChart === 'volume'
+                          ? entry.completion === 100 ? '#3ECF6A' : '#6ddb91'
+                          : entry.pain <= 3 ? '#3ECF6A' : entry.pain <= 6 ? '#f97316' : '#ef4444'
+                      }
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
         {/* Session list */}
+        <p className="font-semibold text-sm px-1">Sessiegeschiedenis</p>
         <div className="space-y-2">
           {MOCK_SESSION_HISTORY.map(session => {
             const isOpen = expanded === session.id
@@ -94,7 +205,7 @@ export default function HistoryPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm">{session.dayLabel}</p>
-                      <p className="text-xs text-muted-foreground">W{session.week + 1}D{session.day} · {dateStr}</p>
+                      <p className="text-xs text-muted-foreground">W{session.week + 1}D{session.day} · {dateStr} · {session.duration} min</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {session.painLevel !== null && <PainDot level={session.painLevel} />}
@@ -109,12 +220,9 @@ export default function HistoryPage() {
                           <p className="text-sm font-semibold">{session.exercisesCompleted}/{session.exercisesTotal}</p>
                           <p className="text-xs text-muted-foreground">Oefeningen</p>
                         </div>
-                        <div className="flex flex-col items-center">
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                            <p className="text-sm font-semibold">{session.duration}</p>
-                          </div>
-                          <p className="text-xs text-muted-foreground">Minuten</p>
+                        <div>
+                          <p className="text-sm font-semibold">{session.duration} min</p>
+                          <p className="text-xs text-muted-foreground">Duur</p>
                         </div>
                         <div>
                           <p className="text-sm font-semibold">{session.exertionLevel ?? '—'}/10</p>
@@ -140,16 +248,5 @@ export default function HistoryPage() {
         </div>
       </div>
     </div>
-  )
-}
-
-function StatTile({ value, label, sub, color }: { value: string; label: string; sub: string; color: string }) {
-  return (
-    <Card style={{ borderRadius: '14px' }}>
-      <CardContent className="px-3 py-3 text-center">
-        <p className="text-xl font-bold" style={{ color }}>{value}<span className="text-xs font-normal text-muted-foreground ml-0.5">{sub}</span></p>
-        <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
-      </CardContent>
-    </Card>
   )
 }
