@@ -1,550 +1,173 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
 import { getTodayExercises, TODAY_DAY, DAY_NAMES } from '@/lib/patient-constants'
 import { SUPERSET_COLORS } from '@/lib/program-constants'
-import { VideoPlayer } from '@/components/exercises/VideoPlayer'
 import {
-  CheckCircle2, ChevronLeft, Clock, Minus, Plus,
-  ChevronDown, ChevronUp, SkipForward, MessageCircle,
-  TrendingDown, TrendingUp, Lightbulb,
+  ChevronLeft, Clock, ChevronDown, ChevronUp, Lightbulb,
+  TrendingUp, TrendingDown, CheckCircle2, SkipForward, Minus, Plus
 } from 'lucide-react'
 
-// ─── Smiley config ───────────────────────────────────────────────────────────
-const SMILEYS = [
-  { value: 1 as const, emoji: '😫', label: 'Veel te zwaar' },
-  { value: 2 as const, emoji: '😕', label: 'Zwaar' },
-  { value: 3 as const, emoji: '😐', label: 'Oké' },
-  { value: 4 as const, emoji: '🙂', label: 'Goed' },
-  { value: 5 as const, emoji: '😄', label: 'Uitstekend' },
-]
+const ReactPlayer = dynamic(() => import('react-player'), { ssr: false })
 
-// ─── Variant suggestions (mock) ───────────────────────────────────────────────
-const VARIANTS: Record<string, { easier: string | null; harder: string | null }> = {
-  'uid-1': { easier: 'Goblet Squat', harder: 'Pistol Squat' },
-  'uid-2': { easier: 'Leg Curl machine', harder: 'Nordic + gewichten' },
-  'uid-3': { easier: 'Seated hip rotation', harder: 'Hip 90/90 + forward lean' },
-  'uid-4': { easier: 'Romanian Deadlift', harder: 'Single Leg DL + gewichten' },
-  'uid-5': { easier: 'Squat jump', harder: 'Depth jump' },
-  'uid-6': { easier: 'Band rotatie (zittend)', harder: 'Cable externe rotatie' },
+// ─── Static coaching data ─────────────────────────────────────────────────────
+
+const COACHING_CUES: Record<string, string[]> = {
+  '1': ['Houd de romp recht, borst omhoog', 'Knie over de tweede teen', 'Druk door de hiel van het voorste been', 'Stabiel bekken — niet laten draaien'],
+  '2': ['Gecontroleerde val — niet laten crashen', 'Core strak tijdens de hele beweging', 'Vang jezelf op met de handen bij de bodem', 'Krachtige push terug naar startpositie'],
+  '3': ['Beide zitknobbels in contact met de grond', 'Roteer vanuit de heup, niet de romp', 'Houd de rug recht bij het voorover leunen'],
+  '4': ['Staand been licht gebogen, niet vergrendeld', 'Hinge vanuit de heup — niet buigen vanuit de rug', 'Houd het zwevende been in lijn met de romp', 'Blik naar de grond — neutrale nek'],
+  '5': ['Soft landing — knieën veren mee', 'Land op het midden van de voet', 'Spring omhoog en iets naar voren', 'Stap terug af — spring niet terug'],
+  '6': ['Elleboog gefixeerd tegen het lichaam', 'Langzame gecontroleerde beweging', 'Geen compensatie van de schouder of romp'],
 }
 
-// ─── Coaching cues (mock) ────────────────────────────────────────────────────
-const COACHING: Record<string, string[]> = {
-  'uid-1': ['Knie over de teen houden', 'Romp rechtop, niet voorover leunen', 'Zak gecontroleerd en explosief omhoog'],
-  'uid-2': ['Enkels goed gefixeerd op de bank', 'Excentrische fase: 3-4 seconden', 'Gebruik handen bij val om te stabiliseren'],
-  'uid-3': ['Beide zitknobbels op de grond', 'Adem uit bij het voorover leunen', 'Houd elke positie 30 seconden'],
-  'uid-4': ['Blik 45° omlaag gericht', 'Achterste been recht naar achteren', 'Hinge vanuit de heup — niet de rug'],
-  'uid-5': ['Land zacht op de bal van de voet', 'Knieën niet naar binnen laten zakken', 'Spring direct terug omhoog voor reactiesnelheid'],
-  'uid-6': ['Elleboog 90° vast langs het lichaam', 'Beweging alleen in de schouder', 'Geen compensatie met de romp of schouderblad'],
+const VARIANTS: Record<string, { easier?: string; harder?: string }> = {
+  '1': { easier: 'Goblet Squat', harder: 'Bulgarian Split Squat + kettlebell' },
+  '2': { easier: 'Lying Leg Curl machine', harder: 'Nordic met weerstandsband' },
+  '3': { easier: 'Liggende heupstretching', harder: 'Hip 90/90 met actieve rotatie' },
+  '4': { easier: 'Romanian Deadlift (bilateral)', harder: 'Single Leg DL + kettlebell' },
+  '5': { easier: 'Step-up op box', harder: 'Box Jump + squat hold landing' },
+  '6': { easier: 'Interne rotatie met band', harder: 'Externe rotatie met dumbbell' },
 }
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-type SmileyValue = 1 | 2 | 3 | 4 | 5
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-type ExerciseLog = {
-  exerciseId: string
-  setsCompleted: number
-  repsCompleted: number
+type FeedbackEntry = {
+  smiley: number | null
+  pain: number | null
   weight: number | null
-  painLevel: number | null
-  done: boolean
-  smiley: SmileyValue | null
+  rpe: number | null
 }
 
-type RestTimer = { uid: string; seconds: number; total: number }
+const SMILIES = ['😫', '😕', '😐', '🙂', '😄']
+const SMILEY_LABELS = ['Zwaar', 'Moeilijk', 'Oké', 'Goed', 'Super']
+const SMILEY_COLORS = ['#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e']
 
-// ─── Main session page ────────────────────────────────────────────────────────
-export default function SessionPage() {
-  const router = useRouter()
-  const exercises = getTodayExercises()
+// ─── Circular Timer SVG ───────────────────────────────────────────────────────
 
-  const [logs, setLogs] = useState<Record<string, ExerciseLog>>(() =>
-    Object.fromEntries(exercises.map(e => [e.uid, {
-      exerciseId: e.exerciseId,
-      setsCompleted: e.sets,
-      repsCompleted: e.reps,
-      weight: null,
-      painLevel: null,
-      done: false,
-      smiley: null,
-    }]))
-  )
-  const [expanded, setExpanded] = useState<string | null>(exercises[0]?.uid ?? null)
-  const [elapsed, setElapsed] = useState(0)
-  const [smileyModal, setSmileyModal] = useState<{ uid: string } | null>(null)
-  const [pendingSmiley, setPendingSmiley] = useState<SmileyValue | null>(null)
-  const [pendingPain, setPendingPain] = useState<number | null>(null)
-  const [autoTimer, setAutoTimer] = useState(3)
-  const [restTimer, setRestTimer] = useState<RestTimer | null>(null)
-  const [showSummary, setShowSummary] = useState(false)
-
-  // Session clock
-  useEffect(() => {
-    const t = setInterval(() => setElapsed(s => s + 1), 1000)
-    return () => clearInterval(t)
-  }, [])
-
-  // Smiley auto-dismiss
-  useEffect(() => {
-    if (!smileyModal) return
-    setAutoTimer(3)
-    const interval = setInterval(() => {
-      setAutoTimer(t => {
-        if (t <= 1) {
-          clearInterval(interval)
-          return 0
-        }
-        return t - 1
-      })
-    }, 1000)
-    const timeout = setTimeout(() => handleSmileyDone(), 3000)
-    return () => { clearInterval(interval); clearTimeout(timeout) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [smileyModal?.uid])
-
-  // Rest timer countdown
-  useEffect(() => {
-    if (!restTimer || restTimer.seconds <= 0) {
-      if (restTimer?.seconds === 0) setRestTimer(null)
-      return
-    }
-    const t = setTimeout(() => setRestTimer(r => r ? { ...r, seconds: r.seconds - 1 } : null), 1000)
-    return () => clearTimeout(t)
-  }, [restTimer])
-
-  const doneCount = Object.values(logs).filter(l => l.done).length
-  const allDone = doneCount === exercises.length && exercises.length > 0
-  const progress = exercises.length > 0 ? (doneCount / exercises.length) * 100 : 0
-  const mins = Math.floor(elapsed / 60)
-  const secs = elapsed % 60
-
-  function handleMarkDone(uid: string) {
-    setLogs(prev => ({ ...prev, [uid]: { ...prev[uid], done: true } }))
-    setSmileyModal({ uid })
-    setPendingSmiley(null)
-    setPendingPain(null)
-  }
-
-  function handleSmileyDone() {
-    if (!smileyModal) return
-    const { uid } = smileyModal
-    const exercise = exercises.find(e => e.uid === uid)
-    setLogs(prev => ({
-      ...prev,
-      [uid]: {
-        ...prev[uid],
-        painLevel: pendingPain,
-        smiley: pendingSmiley ?? 3,
-      }
-    }))
-    setSmileyModal(null)
-    // Start rest timer
-    if (exercise && exercise.rest > 0) {
-      setRestTimer({ uid, seconds: exercise.rest, total: exercise.rest })
-    }
-    // Advance to next
-    const next = exercises.find(e => !logs[e.uid]?.done && e.uid !== uid)
-    if (next) setExpanded(next.uid)
-    // Check all done
-    const nowDone = doneCount + 1
-    if (nowDone === exercises.length) {
-      setTimeout(() => setShowSummary(true), exercise?.rest ? exercise.rest * 1000 + 300 : 300)
-    }
-  }
-
-  function updateLog(uid: string, field: keyof ExerciseLog, value: number | null) {
-    setLogs(prev => ({ ...prev, [uid]: { ...prev[uid], [field]: value } }))
-  }
-
-  // Group by superset
-  const groups: Array<{ supersetGroup: string | null; exercises: typeof exercises }> = []
-  for (const e of exercises) {
-    if (e.supersetGroup) {
-      const existing = groups.find(g => g.supersetGroup === e.supersetGroup)
-      if (existing) existing.exercises.push(e)
-      else groups.push({ supersetGroup: e.supersetGroup, exercises: [e] })
-    } else {
-      groups.push({ supersetGroup: null, exercises: [e] })
-    }
-  }
-
-  if (showSummary) {
-    return (
-      <SessionSummary
-        exercises={exercises}
-        logs={logs}
-        elapsed={elapsed}
-        onFinish={() => router.push('/patient/dashboard')}
-      />
-    )
-  }
+function CircularTimer({ seconds, total, onSkip }: { seconds: number; total: number; onSkip: () => void }) {
+  const r = 52
+  const circ = 2 * Math.PI * r
+  const progress = seconds / total
+  const offset = circ * (1 - progress)
 
   return (
-    <div className="min-h-screen pb-28" style={{ background: '#FAFAFA' }}>
-      {/* Top bar */}
-      <div className="sticky top-0 z-20 px-4 pt-12 pb-3 border-b bg-white">
-        <div className="flex items-center justify-between mb-2">
-          <button onClick={() => router.back()} className="p-1 -ml-1 rounded-lg">
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <div className="text-center">
-            <p className="text-xs text-muted-foreground">{DAY_NAMES[TODAY_DAY - 1]} · Week 1</p>
-            <p className="font-semibold text-sm">{doneCount}/{exercises.length} gedaan</p>
-          </div>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Clock className="w-3.5 h-3.5" />
-            <span className="tabular-nums">{mins}:{secs.toString().padStart(2, '0')}</span>
-          </div>
-        </div>
-        <Progress value={progress} className="h-1.5" />
-      </div>
-
-      {/* Rest timer banner */}
-      {restTimer && (
-        <div className="mx-4 mt-3 rounded-2xl px-4 py-3 flex items-center justify-between"
-          style={{ background: '#1A1A1A' }}>
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4" style={{ color: '#3ECF6A' }} />
-            <span className="text-white text-sm font-semibold">Rusttijd</span>
-            <div className="w-24 h-1 rounded-full overflow-hidden" style={{ background: '#333' }}>
-              <div
-                className="h-full rounded-full transition-all duration-1000"
-                style={{
-                  background: '#3ECF6A',
-                  width: `${(restTimer.seconds / restTimer.total) * 100}%`,
-                }}
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-2xl font-bold tabular-nums" style={{ color: '#3ECF6A' }}>
-              {restTimer.seconds}s
-            </span>
-            <button
-              onClick={() => setRestTimer(null)}
-              className="flex items-center gap-1 text-xs text-zinc-400"
-            >
-              <SkipForward className="w-4 h-4" /> Skip
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Exercise groups */}
-      <div className="px-4 pt-4 space-y-3">
-        {groups.map((group, gi) => {
-          const colors = group.supersetGroup ? SUPERSET_COLORS[group.supersetGroup] : null
-          const cards = group.exercises.map(e => (
-            <ExerciseCard
-              key={e.uid}
-              exercise={e}
-              log={logs[e.uid]}
-              isExpanded={expanded === e.uid}
-              cues={COACHING[e.uid] ?? []}
-              variants={VARIANTS[e.uid] ?? { easier: null, harder: null }}
-              onToggleExpand={() => setExpanded(expanded === e.uid ? null : e.uid)}
-              onUpdateLog={(field, value) => updateLog(e.uid, field, value)}
-              onMarkDone={() => handleMarkDone(e.uid)}
-              onUnmark={() => setLogs(prev => ({ ...prev, [e.uid]: { ...prev[e.uid], done: false, smiley: null } }))}
-            />
-          ))
-
-          if (colors) {
-            return (
-              <div key={gi} className="rounded-2xl border-2 overflow-hidden"
-                style={{ borderColor: colors.border, background: colors.bg }}>
-                <div className="px-4 py-2 flex items-center gap-2 border-b"
-                  style={{ borderColor: colors.border }}>
-                  <span className="text-xs font-bold uppercase tracking-wide" style={{ color: colors.text }}>
-                    Superset {group.supersetGroup}
-                  </span>
-                  <span className="text-xs" style={{ color: colors.text }}>
-                    · {group.exercises.length} oefeningen
-                  </span>
-                </div>
-                <div className="p-2 space-y-2">{cards}</div>
-              </div>
-            )
-          }
-          return <div key={gi}>{cards}</div>
-        })}
-      </div>
-
-      {/* Bottom action */}
-      {doneCount > 0 && (
-        <div className="fixed bottom-16 left-0 right-0 px-4 pb-2 pt-3
-          bg-gradient-to-t from-[#FAFAFA] via-[#FAFAFA] to-transparent">
-          <button
-            onClick={() => setShowSummary(true)}
-            className="w-full h-12 rounded-xl text-base font-semibold text-white transition-all"
-            style={{ background: allDone ? '#3ECF6A' : '#1A1A1A' }}
-          >
-            {allDone ? '🎉 Sessie afronden' : `Samenvatting bekijken (${doneCount}/${exercises.length})`}
-          </button>
-        </div>
-      )}
-
-      {/* Smiley modal */}
-      {smileyModal && (
-        <SmileyModal
-          autoTimer={autoTimer}
-          pendingSmiley={pendingSmiley}
-          pendingPain={pendingPain}
-          onSelectSmiley={setPendingSmiley}
-          onSelectPain={setPendingPain}
-          onSubmit={handleSmileyDone}
-        />
-      )}
-    </div>
-  )
-}
-
-// ─── Exercise card ────────────────────────────────────────────────────────────
-function ExerciseCard({
-  exercise, log, isExpanded, cues, variants,
-  onToggleExpand, onUpdateLog, onMarkDone, onUnmark,
-}: {
-  exercise: ReturnType<typeof getTodayExercises>[number]
-  log: ExerciseLog
-  isExpanded: boolean
-  cues: string[]
-  variants: { easier: string | null; harder: string | null }
-  onToggleExpand: () => void
-  onUpdateLog: (field: keyof ExerciseLog, value: number | null) => void
-  onMarkDone: () => void
-  onUnmark: () => void
-}) {
-  const [showCues, setShowCues] = useState(false)
-  const [showVariants, setShowVariants] = useState(false)
-
-  return (
-    <div
-      className="rounded-2xl border bg-white overflow-hidden"
-      style={{
-        borderColor: log.done ? '#bbf7d0' : '#e4e4e7',
-        background: log.done ? '#f0fdf4' : 'white',
-      }}
-    >
-      {/* Header */}
-      <button
-        className="w-full flex items-center gap-3 px-4 py-3.5 text-left"
-        onClick={onToggleExpand}
-      >
-        <button
-          className="shrink-0"
-          onClick={e => { e.stopPropagation(); log.done ? onUnmark() : onMarkDone() }}
-        >
-          <CheckCircle2
-            className="w-6 h-6 transition-colors"
-            style={{ color: log.done ? '#3ECF6A' : '#d4d4d8' }}
-            fill={log.done ? '#3ECF6A' : 'none'}
+    <div className="flex flex-col items-center gap-4">
+      <div className="relative w-32 h-32">
+        <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r={r} fill="none" stroke="#f4f4f5" strokeWidth="8" />
+          <circle
+            cx="60" cy="60" r={r} fill="none" stroke="#3ECF6A" strokeWidth="8"
+            strokeLinecap="round"
+            strokeDasharray={circ}
+            strokeDashoffset={offset}
+            style={{ transition: 'stroke-dashoffset 1s linear' }}
           />
-        </button>
-        <div className="flex-1 min-w-0">
-          <p className={cn('font-semibold text-sm', log.done && 'line-through text-muted-foreground')}>
-            {exercise.name}
-          </p>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-xs text-muted-foreground">
-              {exercise.sets} sets × {exercise.reps} {exercise.repUnit}
-            </span>
-            <span className="text-xs text-muted-foreground">·</span>
-            <span className="text-xs text-muted-foreground">{exercise.rest}s rust</span>
-            {log.smiley && (
-              <span className="text-sm ml-1">
-                {SMILEYS.find(s => s.value === log.smiley)?.emoji}
-              </span>
-            )}
-          </div>
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-3xl font-bold tabular-nums">{seconds}</span>
+          <span className="text-xs text-muted-foreground">sec</span>
         </div>
-        {isExpanded
-          ? <ChevronUp className="w-4 h-4 text-zinc-400 shrink-0" />
-          : <ChevronDown className="w-4 h-4 text-zinc-400 shrink-0" />}
+      </div>
+      <button
+        onClick={onSkip}
+        className="flex items-center gap-1.5 text-sm text-zinc-400 font-medium"
+      >
+        <SkipForward className="w-4 h-4" /> Sla rust over
       </button>
-
-      {/* Expanded content */}
-      {isExpanded && (
-        <div className="border-t" style={{ borderColor: log.done ? '#bbf7d0' : '#f4f4f5' }}>
-          {/* Video */}
-          {exercise.videoUrl && (
-            <VideoPlayer url={exercise.videoUrl} />
-          )}
-
-          <div className="px-4 py-4 space-y-4">
-            {/* Log inputs */}
-            <div className="grid grid-cols-3 gap-3">
-              <LogInput
-                label="Sets"
-                value={log.setsCompleted}
-                min={0} max={20}
-                onChange={v => onUpdateLog('setsCompleted', v)}
-              />
-              <LogInput
-                label={`Reps (${exercise.repUnit})`}
-                value={log.repsCompleted}
-                min={0} max={100}
-                onChange={v => onUpdateLog('repsCompleted', v)}
-              />
-              <LogInput
-                label="Gewicht (kg)"
-                value={log.weight ?? 0}
-                min={0} max={500} step={2.5}
-                onChange={v => onUpdateLog('weight', v)}
-              />
-            </div>
-
-            {/* Coaching cues */}
-            {cues.length > 0 && (
-              <div>
-                <button
-                  className="flex items-center gap-1.5 text-xs font-semibold w-full text-left"
-                  style={{ color: '#6366f1' }}
-                  onClick={() => setShowCues(v => !v)}
-                >
-                  <Lightbulb className="w-3.5 h-3.5" />
-                  Coaching cues
-                  {showCues ? <ChevronUp className="w-3 h-3 ml-auto" /> : <ChevronDown className="w-3 h-3 ml-auto" />}
-                </button>
-                {showCues && (
-                  <ul className="mt-2 space-y-1">
-                    {cues.map((cue, i) => (
-                      <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
-                        <span className="mt-0.5 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#6366f1', marginTop: 4 }} />
-                        {cue}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-
-            {/* Variant suggestions */}
-            {(variants.easier || variants.harder) && (
-              <div>
-                <button
-                  className="flex items-center gap-1.5 text-xs font-semibold w-full text-left text-amber-600"
-                  onClick={() => setShowVariants(v => !v)}
-                >
-                  <TrendingUp className="w-3.5 h-3.5" />
-                  Varianten
-                  {showVariants ? <ChevronUp className="w-3 h-3 ml-auto" /> : <ChevronDown className="w-3 h-3 ml-auto" />}
-                </button>
-                {showVariants && (
-                  <div className="mt-2 space-y-1.5">
-                    {variants.easier && (
-                      <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs"
-                        style={{ background: '#f0fdf4' }}>
-                        <TrendingDown className="w-3.5 h-3.5 shrink-0" style={{ color: '#22c55e' }} />
-                        <span className="text-muted-foreground">Te zwaar?</span>
-                        <span className="font-semibold" style={{ color: '#15803d' }}>{variants.easier}</span>
-                      </div>
-                    )}
-                    {variants.harder && (
-                      <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs"
-                        style={{ background: '#fefce8' }}>
-                        <TrendingUp className="w-3.5 h-3.5 shrink-0" style={{ color: '#ca8a04' }} />
-                        <span className="text-muted-foreground">Te makkelijk?</span>
-                        <span className="font-semibold" style={{ color: '#a16207' }}>{variants.harder}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Mark done / message */}
-            <div className="flex gap-2">
-              <button
-                onClick={log.done ? onUnmark : onMarkDone}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-                style={{
-                  background: log.done ? '#f0fdf4' : '#3ECF6A',
-                  color: log.done ? '#15803d' : 'white',
-                }}
-              >
-                {log.done ? '✓ Afgerond' : 'Afgerond →'}
-              </button>
-              <button
-                className="px-3 py-2.5 rounded-xl border flex items-center justify-center"
-                style={{ borderColor: '#e4e4e7' }}
-                onClick={() => {/* navigate to messages */}}
-                title="Bericht aan therapeut"
-              >
-                <MessageCircle className="w-4 h-4 text-zinc-400" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
 
-// ─── Smiley modal ─────────────────────────────────────────────────────────────
-function SmileyModal({
-  autoTimer, pendingSmiley, pendingPain,
-  onSelectSmiley, onSelectPain, onSubmit,
+// ─── Smiley Feedback Modal ────────────────────────────────────────────────────
+
+function FeedbackModal({
+  exerciseName,
+  feedback,
+  onChange,
+  onSave,
+  autoCloseIn,
 }: {
-  autoTimer: number
-  pendingSmiley: SmileyValue | null
-  pendingPain: number | null
-  onSelectSmiley: (v: SmileyValue) => void
-  onSelectPain: (v: number | null) => void
-  onSubmit: () => void
+  exerciseName: string
+  feedback: FeedbackEntry
+  onChange: (f: Partial<FeedbackEntry>) => void
+  onSave: () => void
+  autoCloseIn: number
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end">
-      <div className="absolute inset-0 bg-black/40" onClick={onSubmit} />
-      <div className="relative w-full bg-white rounded-t-3xl px-6 pt-5 pb-10 shadow-2xl">
+      <div className="absolute inset-0 bg-black/40" onClick={onSave} />
+      <div
+        className="relative w-full rounded-t-3xl px-5 pt-5 pb-8 space-y-5"
+        style={{ background: '#fff', maxWidth: 480, margin: '0 auto' }}
+      >
         {/* Handle */}
-        <div className="w-10 h-1 bg-zinc-200 rounded-full mx-auto mb-4" />
+        <div className="w-10 h-1 bg-zinc-200 rounded-full mx-auto mb-1" />
 
-        <p className="text-center font-bold text-base mb-1">Hoe voelde dat?</p>
-        <p className="text-center text-xs text-muted-foreground mb-4">
-          Auto-door in {autoTimer}s
-        </p>
-
-        {/* Smileys */}
-        <div className="flex justify-between gap-2 mb-5">
-          {SMILEYS.map(s => (
-            <button
-              key={s.value}
-              onClick={() => { onSelectSmiley(s.value); onSubmit() }}
-              className="flex-1 flex flex-col items-center gap-1 py-2 rounded-xl transition-all"
-              style={{
-                background: pendingSmiley === s.value ? '#f0fdf4' : '#f4f4f5',
-                border: pendingSmiley === s.value ? '2px solid #3ECF6A' : '2px solid transparent',
-                transform: pendingSmiley === s.value ? 'scale(1.08)' : 'scale(1)',
-              }}
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="font-bold text-base">Hoe voelde het?</p>
+            <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[200px]">{exerciseName}</p>
+          </div>
+          {autoCloseIn > 0 && (
+            <div
+              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
+              style={{ background: '#3ECF6A' }}
             >
-              <span className="text-2xl">{s.emoji}</span>
-              <span className="text-[10px] text-muted-foreground leading-tight text-center px-0.5">
-                {s.label}
-              </span>
-            </button>
-          ))}
+              {autoCloseIn}
+            </div>
+          )}
         </div>
 
-        {/* Pain NRS */}
+        {/* Smilies */}
+        <div className="flex gap-2 justify-between">
+          {SMILIES.map((emoji, i) => {
+            const val = i + 1
+            const selected = feedback.smiley === val
+            return (
+              <button
+                key={val}
+                onClick={() => onChange({ smiley: selected ? null : val })}
+                className="flex-1 flex flex-col items-center gap-1 py-2 rounded-2xl transition-all"
+                style={{
+                  background: selected ? SMILEY_COLORS[i] + '22' : '#f4f4f5',
+                  border: selected ? `2px solid ${SMILEY_COLORS[i]}` : '2px solid transparent',
+                }}
+              >
+                <span className="text-2xl">{emoji}</span>
+                <span className="text-[10px] font-medium" style={{ color: selected ? SMILEY_COLORS[i] : '#71717a' }}>
+                  {SMILEY_LABELS[i]}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* NRS Pain slider */}
         <div>
-          <p className="text-xs font-semibold text-muted-foreground mb-2">
-            Pijn? (optioneel, NRS 0-10)
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-medium">Pijn tijdens oefening</p>
+            <span className="text-sm font-bold" style={{ color: feedback.pain !== null && feedback.pain > 5 ? '#ef4444' : '#3ECF6A' }}>
+              {feedback.pain !== null ? `${feedback.pain}/10` : 'Geen'}
+            </span>
+          </div>
           <div className="flex gap-1">
             {Array.from({ length: 11 }, (_, i) => (
               <button
                 key={i}
-                onClick={() => onSelectPain(pendingPain === i ? null : i)}
+                onClick={() => onChange({ pain: feedback.pain === i ? null : i })}
                 className="flex-1 h-8 rounded-lg text-xs font-semibold transition-all"
                 style={{
-                  background: pendingPain === i
+                  background: feedback.pain === i
                     ? i <= 3 ? '#22c55e' : i <= 6 ? '#f97316' : '#ef4444'
                     : '#f4f4f5',
-                  color: pendingPain === i ? 'white' : '#71717a',
+                  color: feedback.pain === i ? 'white' : '#71717a',
                 }}
               >
                 {i}
@@ -553,184 +176,541 @@ function SmileyModal({
           </div>
         </div>
 
-        <button
-          onClick={onSubmit}
-          className="w-full mt-4 py-3 rounded-xl text-sm font-semibold text-white"
-          style={{ background: '#1A1A1A' }}
-        >
-          Verder →
-        </button>
+        {/* Optional weight / RPE */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-xs font-medium text-muted-foreground mb-1.5">Gewicht (kg)</p>
+            <div className="flex items-center gap-2 justify-between border rounded-xl px-3 py-2">
+              <button onClick={() => onChange({ weight: Math.max(0, (feedback.weight ?? 0) - 2.5) })}>
+                <Minus className="w-3.5 h-3.5" />
+              </button>
+              <span className="font-semibold text-sm">{feedback.weight ?? 0}</span>
+              <button onClick={() => onChange({ weight: (feedback.weight ?? 0) + 2.5 })}>
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-muted-foreground mb-1.5">RPE (/10)</p>
+            <div className="flex items-center gap-2 justify-between border rounded-xl px-3 py-2">
+              <button onClick={() => onChange({ rpe: Math.max(1, (feedback.rpe ?? 5) - 1) })}>
+                <Minus className="w-3.5 h-3.5" />
+              </button>
+              <span className="font-semibold text-sm">{feedback.rpe ?? 5}</span>
+              <button onClick={() => onChange({ rpe: Math.min(10, (feedback.rpe ?? 5) + 1) })}>
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <Button onClick={onSave} className="w-full h-12 font-semibold text-base" style={{ background: '#3ECF6A' }}>
+          Opslaan
+        </Button>
       </div>
     </div>
   )
 }
 
-// ─── Session summary ──────────────────────────────────────────────────────────
+// ─── Session Summary ──────────────────────────────────────────────────────────
+
 function SessionSummary({
-  exercises, logs, elapsed, onFinish,
+  exercises,
+  feedback,
+  elapsed,
+  onFinish,
 }: {
   exercises: ReturnType<typeof getTodayExercises>
-  logs: Record<string, ExerciseLog>
+  feedback: Record<string, FeedbackEntry>
   elapsed: number
   onFinish: () => void
 }) {
-  const doneCount = Object.values(logs).filter(l => l.done).length
+  const router = useRouter()
+  const [sessionSmiley, setSessionSmiley] = useState<number | null>(null)
   const mins = Math.floor(elapsed / 60)
   const secs = elapsed % 60
 
-  const smileys = Object.values(logs).map(l => l.smiley).filter(Boolean) as SmileyValue[]
-  const avgSmiley = smileys.length > 0
-    ? Math.round(smileys.reduce((a, b) => a + b, 0) / smileys.length)
+  const smiliesGiven = Object.values(feedback).filter(f => f.smiley !== null)
+  const avgSmiley = smiliesGiven.length > 0
+    ? smiliesGiven.reduce((sum, f) => sum + (f.smiley ?? 0), 0) / smiliesGiven.length
     : null
-  const avgSmileyObj = SMILEYS.find(s => s.value === avgSmiley)
-
-  const pains = Object.values(logs).map(l => l.painLevel).filter(v => v !== null) as number[]
-  const avgPain = pains.length > 0
-    ? Math.round(pains.reduce((a, b) => a + b, 0) / pains.length * 10) / 10
-    : null
+  const avgSmileyIdx = avgSmiley !== null ? Math.round(avgSmiley) - 1 : null
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#FAFAFA' }}>
       {/* Header */}
-      <div className="px-6 pt-16 pb-6 text-center" style={{ background: '#1A1A1A' }}>
-        <div className="text-5xl mb-3">
-          {doneCount === exercises.length ? '🎉' : '✅'}
-        </div>
-        <h1 className="text-white text-2xl font-bold">
-          {doneCount === exercises.length ? 'Sessie voltooid!' : 'Goed gedaan!'}
-        </h1>
-        <p className="text-zinc-400 text-sm mt-1">
-          {doneCount} van {exercises.length} oefeningen · {mins}:{secs.toString().padStart(2, '0')} min
-        </p>
+      <div className="px-5 pt-14 pb-6 text-center" style={{ background: '#1A1A1A' }}>
+        <div className="text-5xl mb-3">🎉</div>
+        <h1 className="text-white text-2xl font-bold">Sessie voltooid!</h1>
+        <p className="text-zinc-400 text-sm mt-1">{mins}:{secs.toString().padStart(2, '0')} · {exercises.length} oefeningen</p>
       </div>
 
-      <div className="flex-1 px-4 py-5 space-y-4">
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-3">
-          <StatTile
-            value={`${mins}:${secs.toString().padStart(2, '0')}`}
-            label="Duur"
-            icon="⏱️"
-          />
-          <StatTile
-            value={avgSmileyObj?.emoji ?? '—'}
-            label="Gem. gevoel"
-            icon={null}
-            isEmoji
-          />
-          <StatTile
-            value={avgPain !== null ? `${avgPain}/10` : '—'}
-            label="Gem. pijn"
-            icon="🦵"
-          />
-        </div>
+      <div className="flex-1 px-4 py-4 space-y-4">
+        {/* Avg feeling */}
+        {avgSmileyIdx !== null && (
+          <Card style={{ borderRadius: '14px' }}>
+            <CardContent className="px-4 py-4 flex items-center gap-3">
+              <div className="text-3xl">{SMILIES[avgSmileyIdx]}</div>
+              <div>
+                <p className="font-semibold text-sm">Gemiddeld gevoel</p>
+                <p className="text-xs text-muted-foreground">{SMILEY_LABELS[avgSmileyIdx]} · {avgSmiley?.toFixed(1)}/5</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Exercise breakdown */}
-        <div className="bg-white rounded-2xl border overflow-hidden">
-          <div className="px-4 py-3 border-b">
-            <p className="font-semibold text-sm">Oefeningen</p>
-          </div>
-          <div className="divide-y">
+        {/* Exercise recap */}
+        <Card style={{ borderRadius: '14px' }}>
+          <CardContent className="px-4 py-3 space-y-2">
+            <p className="font-semibold text-sm mb-3">Oefeningen</p>
             {exercises.map(e => {
-              const log = logs[e.uid]
-              const smileyObj = SMILEYS.find(s => s.value === log.smiley)
+              const fb = feedback[e.uid]
               return (
-                <div key={e.uid} className="flex items-center gap-3 px-4 py-3">
-                  <CheckCircle2
-                    className="w-4 h-4 shrink-0"
-                    style={{ color: log.done ? '#3ECF6A' : '#d4d4d8' }}
-                    fill={log.done ? '#3ECF6A' : 'none'}
-                  />
+                <div key={e.uid} className="flex items-center gap-3">
+                  <div
+                    className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-lg"
+                    style={{ background: '#f4f4f5' }}
+                  >
+                    {fb?.smiley ? SMILIES[fb.smiley - 1] : '—'}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{e.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {log.setsCompleted}×{log.repsCompleted}
-                      {log.weight ? ` · ${log.weight}kg` : ''}
+                      {e.sets} sets · {fb?.weight ? `${fb.weight}kg` : 'geen gewicht'}
+                      {fb?.pain !== null && fb?.pain !== undefined ? ` · pijn ${fb.pain}/10` : ''}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {smileyObj && <span className="text-lg">{smileyObj.emoji}</span>}
-                    {log.painLevel !== null && (
-                      <span className="text-xs text-muted-foreground">
-                        pijn {log.painLevel}
-                      </span>
-                    )}
-                  </div>
+                  {fb?.pain !== null && fb?.pain !== undefined && (
+                    <div
+                      className="w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center text-white shrink-0"
+                      style={{ background: (fb.pain ?? 0) <= 3 ? '#22c55e' : (fb.pain ?? 0) <= 6 ? '#f97316' : '#ef4444' }}
+                    >
+                      {fb.pain}
+                    </div>
+                  )}
                 </div>
               )
             })}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        {/* Motivational message */}
-        {avgSmileyObj && (
-          <div className="rounded-2xl px-4 py-3 text-sm"
-            style={{ background: '#f0fdf4', color: '#15803d' }}>
-            {avgSmiley && avgSmiley >= 4
-              ? '💪 Je voelde je goed vandaag — dat is een geweldige sessie!'
-              : avgSmiley && avgSmiley <= 2
-                ? '🫂 Zwaar gevoel vandaag? Dat is normaal. Bespreek het met je therapeut.'
-                : '👍 Solide sessie. Blijf zo doorgaan!'}
-          </div>
-        )}
+        {/* Overall session smiley */}
+        <Card style={{ borderRadius: '14px' }}>
+          <CardContent className="px-4 py-4">
+            <p className="font-semibold text-sm mb-3">Hoe was de sessie overall?</p>
+            <div className="flex gap-2 justify-between">
+              {SMILIES.map((emoji, i) => {
+                const val = i + 1
+                const selected = sessionSmiley === val
+                return (
+                  <button
+                    key={val}
+                    onClick={() => setSessionSmiley(selected ? null : val)}
+                    className="flex-1 flex flex-col items-center gap-1 py-2 rounded-2xl transition-all"
+                    style={{
+                      background: selected ? SMILEY_COLORS[i] + '22' : '#f4f4f5',
+                      border: selected ? `2px solid ${SMILEY_COLORS[i]}` : '2px solid transparent',
+                    }}
+                  >
+                    <span className="text-2xl">{emoji}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="px-4 pb-8">
-        <button
-          onClick={onFinish}
-          className="w-full h-12 rounded-xl text-base font-semibold text-white"
+        <Button
+          onClick={() => { onFinish(); router.push('/patient/dashboard') }}
+          className="w-full h-12 text-base font-semibold"
           style={{ background: '#3ECF6A' }}
         >
-          Sessie opslaan
-        </button>
+          Opslaan & afsluiten
+        </Button>
       </div>
     </div>
   )
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function LogInput({
-  label, value, min = 0, max = 999, step = 1, onChange,
-}: {
-  label: string
-  value: number
-  min?: number
-  max?: number
-  step?: number
-  onChange: (v: number) => void
-}) {
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <p className="text-[10px] text-muted-foreground text-center leading-tight">{label}</p>
-      <div className="flex items-center gap-1.5">
+// ─── Main Session Page ────────────────────────────────────────────────────────
+
+export default function SessionPage() {
+  const router = useRouter()
+  const exercises = getTodayExercises()
+
+  const [expanded, setExpanded] = useState<string | null>(exercises[0]?.uid ?? null)
+  const [setsCompleted, setSetsCompleted] = useState<Record<string, number>>({})
+  const [done, setDone] = useState<Set<string>>(new Set())
+  const [feedback, setFeedback] = useState<Record<string, FeedbackEntry>>({})
+  const [showFeedbackFor, setShowFeedbackFor] = useState<string | null>(null)
+  const [feedbackTimer, setFeedbackTimer] = useState(3)
+  const [showRestTimer, setShowRestTimer] = useState(false)
+  const [restSecondsLeft, setRestSecondsLeft] = useState(60)
+  const [restDuration, setRestDuration] = useState(60)
+  const [elapsed, setElapsed] = useState(0)
+  const [phase, setPhase] = useState<'session' | 'summary'>('session')
+  const [showCuesFor, setShowCuesFor] = useState<string | null>(null)
+
+  const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const feedbackTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Session elapsed timer
+  useEffect(() => {
+    const t = setInterval(() => setElapsed(s => s + 1), 1000)
+    return () => clearInterval(t)
+  }, [])
+
+  // Feedback auto-close
+  useEffect(() => {
+    if (showFeedbackFor === null) return
+    setFeedbackTimer(3)
+    feedbackTimerRef.current = setInterval(() => {
+      setFeedbackTimer(prev => {
+        if (prev <= 1) {
+          clearInterval(feedbackTimerRef.current!)
+          handleFeedbackSave()
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(feedbackTimerRef.current!)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showFeedbackFor])
+
+  // Rest timer countdown
+  useEffect(() => {
+    if (!showRestTimer) return
+    restTimerRef.current = setInterval(() => {
+      setRestSecondsLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(restTimerRef.current!)
+          setShowRestTimer(false)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(restTimerRef.current!)
+  }, [showRestTimer])
+
+  const doneCount = done.size
+  const progress = exercises.length > 0 ? (doneCount / exercises.length) * 100 : 0
+  const mins = Math.floor(elapsed / 60)
+  const secs = elapsed % 60
+
+  const startRestTimer = (restSec: number) => {
+    setRestDuration(restSec)
+    setRestSecondsLeft(restSec)
+    setShowRestTimer(true)
+  }
+
+  const skipRest = useCallback(() => {
+    clearInterval(restTimerRef.current!)
+    setShowRestTimer(false)
+  }, [])
+
+  const markSetDone = (uid: string, restSec: number, totalSets: number) => {
+    const current = setsCompleted[uid] ?? 0
+    const next = current + 1
+    setSetsCompleted(prev => ({ ...prev, [uid]: next }))
+    if (next < totalSets) {
+      startRestTimer(restSec)
+    }
+  }
+
+  const markExerciseDone = (uid: string) => {
+    const entry: FeedbackEntry = { smiley: null, pain: null, weight: null, rpe: null }
+    setFeedback(prev => ({ ...prev, [uid]: entry }))
+    clearInterval(feedbackTimerRef.current!)
+    setShowFeedbackFor(uid)
+  }
+
+  const handleFeedbackChange = (uid: string, partial: Partial<FeedbackEntry>) => {
+    clearInterval(feedbackTimerRef.current!)
+    setFeedbackTimer(0)
+    setFeedback(prev => ({ ...prev, [uid]: { ...prev[uid], ...partial } }))
+  }
+
+  const handleFeedbackSave = useCallback(() => {
+    if (!showFeedbackFor) return
+    const uid = showFeedbackFor
+    setDone(prev => new Set(prev).add(uid))
+    setShowFeedbackFor(null)
+    clearInterval(feedbackTimerRef.current!)
+    // Auto-expand next undone exercise
+    const next = exercises.find(e => !done.has(e.uid) && e.uid !== uid)
+    setExpanded(next?.uid ?? null)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showFeedbackFor, done, exercises])
+
+  if (phase === 'summary') {
+    return (
+      <SessionSummary
+        exercises={exercises}
+        feedback={feedback}
+        elapsed={elapsed}
+        onFinish={() => {}}
+      />
+    )
+  }
+
+  // Group exercises by superset for visual grouping
+  const supersetGroups = new Map<string, typeof exercises>()
+  const standalones: typeof exercises = []
+  exercises.forEach(e => {
+    if (e.supersetGroup) {
+      const g = supersetGroups.get(e.supersetGroup) ?? []
+      g.push(e)
+      supersetGroups.set(e.supersetGroup, g)
+    } else {
+      standalones.push(e)
+    }
+  })
+
+  const renderExercise = (e: typeof exercises[number], inSuperset = false) => {
+    const isDone = done.has(e.uid)
+    const isExpanded = expanded === e.uid
+    const sets = setsCompleted[e.uid] ?? 0
+    const allSetsDone = sets >= e.sets
+    const cues = COACHING_CUES[e.exerciseId] ?? []
+    const variants = VARIANTS[e.exerciseId] ?? {}
+    const showCues = showCuesFor === e.uid
+
+    return (
+      <div key={e.uid}>
+        {/* Header row */}
         <button
-          onClick={() => onChange(Math.max(min, +(value - step).toFixed(1)))}
-          className="w-7 h-7 rounded-full flex items-center justify-center"
-          style={{ background: '#f4f4f5' }}
+          className="w-full flex items-center gap-3 text-left px-4 py-3"
+          onClick={() => setExpanded(isExpanded ? null : e.uid)}
         >
-          <Minus className="w-3 h-3" />
+          <div
+            className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-sm font-bold transition-all"
+            style={{
+              background: isDone ? '#3ECF6A' : '#f4f4f5',
+              color: isDone ? 'white' : '#52525b',
+            }}
+          >
+            {isDone ? '✓' : e.sets > 0 ? `${sets}/${e.sets}` : '—'}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className={cn('font-semibold text-sm truncate', isDone && 'line-through text-muted-foreground')}>
+              {e.name}
+            </p>
+            <p className="text-xs text-muted-foreground">{e.sets} × {e.reps} {e.repUnit}</p>
+          </div>
+          {isExpanded
+            ? <ChevronUp className="w-4 h-4 text-zinc-400 shrink-0" />
+            : <ChevronDown className="w-4 h-4 text-zinc-400 shrink-0" />
+          }
         </button>
-        <span className="w-10 text-center font-bold text-sm tabular-nums">{value}</span>
-        <button
-          onClick={() => onChange(Math.min(max, +(value + step).toFixed(1)))}
-          className="w-7 h-7 rounded-full flex items-center justify-center"
-          style={{ background: '#f4f4f5' }}
-        >
-          <Plus className="w-3 h-3" />
-        </button>
+
+        {/* Expanded content */}
+        {isExpanded && !isDone && (
+          <div className="border-t px-4 pb-4 pt-3 space-y-4">
+            {/* Video player */}
+            {e.videoUrl && (
+              <div className="rounded-2xl overflow-hidden bg-black aspect-video">
+                <ReactPlayer
+                  url={e.videoUrl}
+                  width="100%"
+                  height="100%"
+                  controls
+                  light
+                  playIcon={
+                    <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: '#3ECF6A' }}>
+                      <span className="text-white text-xl ml-1">▶</span>
+                    </div>
+                  }
+                />
+              </div>
+            )}
+
+            {/* Params grid */}
+            <div className="grid grid-cols-4 gap-2">
+              <ParamPill label="Sets" value={String(e.sets)} />
+              <ParamPill label="Reps" value={`${e.reps} ${e.repUnit}`} />
+              <ParamPill label="Rust" value={`${e.rest}s`} />
+              <ParamPill label="Sets klaar" value={`${sets}/${e.sets}`} highlight />
+            </div>
+
+            {/* Coaching cues */}
+            {cues.length > 0 && (
+              <div>
+                <button
+                  onClick={() => setShowCuesFor(showCues ? null : e.uid)}
+                  className="flex items-center gap-1.5 text-xs font-semibold mb-2"
+                  style={{ color: '#3ECF6A' }}
+                >
+                  <Lightbulb className="w-3.5 h-3.5" />
+                  Coaching cues {showCues ? '▲' : '▼'}
+                </button>
+                {showCues && (
+                  <ul className="space-y-1.5">
+                    {cues.map((cue, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                        <span className="font-bold" style={{ color: '#3ECF6A' }}>·</span>
+                        {cue}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {/* Variants */}
+            {(variants.easier || variants.harder) && (
+              <div className="space-y-1.5">
+                {variants.easier && (
+                  <div className="flex items-center gap-2 text-xs rounded-xl px-3 py-2" style={{ background: '#fefce8' }}>
+                    <TrendingDown className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span className="text-amber-700"><span className="font-semibold">Te moeilijk?</span> Probeer: {variants.easier}</span>
+                  </div>
+                )}
+                {variants.harder && (
+                  <div className="flex items-center gap-2 text-xs rounded-xl px-3 py-2" style={{ background: '#f0fdf4' }}>
+                    <TrendingUp className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                    <span className="text-green-700"><span className="font-semibold">Te makkelijk?</span> Probeer: {variants.harder}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Set tracker */}
+            {!allSetsDone ? (
+              <button
+                onClick={() => markSetDone(e.uid, e.rest || 60, e.sets)}
+                className="w-full py-3 rounded-2xl text-white text-sm font-bold transition-all"
+                style={{ background: '#1A1A1A' }}
+              >
+                Set {sets + 1} van {e.sets} klaar →
+              </button>
+            ) : (
+              <button
+                onClick={() => markExerciseDone(e.uid)}
+                className="w-full py-3 rounded-2xl text-white text-sm font-bold transition-all"
+                style={{ background: '#3ECF6A' }}
+              >
+                <CheckCircle2 className="inline w-4 h-4 mr-1.5 mb-0.5" />
+                Oefening afgerond
+              </button>
+            )}
+          </div>
+        )}
       </div>
+    )
+  }
+
+  // Build ordered list of cards (supersets grouped)
+  const processedSupersets = new Set<string>()
+  const cards: JSX.Element[] = []
+
+  exercises.forEach(e => {
+    if (e.supersetGroup) {
+      if (processedSupersets.has(e.supersetGroup)) return
+      processedSupersets.add(e.supersetGroup)
+      const group = supersetGroups.get(e.supersetGroup)!
+      const colors = SUPERSET_COLORS[e.supersetGroup] ?? SUPERSET_COLORS.A
+      cards.push(
+        <div
+          key={`superset-${e.supersetGroup}`}
+          className="rounded-2xl overflow-hidden"
+          style={{ border: `2px solid ${colors.border}`, background: colors.bg }}
+        >
+          <div className="px-4 py-1.5 flex items-center gap-1.5" style={{ background: colors.border + '44' }}>
+            <span className="text-[10px] font-bold tracking-wider" style={{ color: colors.text }}>
+              SUPERSET {e.supersetGroup}
+            </span>
+          </div>
+          <div className="divide-y" style={{ borderColor: colors.border + '44' }}>
+            {group.map(ex => renderExercise(ex, true))}
+          </div>
+        </div>
+      )
+    } else {
+      cards.push(
+        <Card key={e.uid} style={{ borderRadius: '14px' }}>
+          <CardContent className="p-0">
+            {renderExercise(e)}
+          </CardContent>
+        </Card>
+      )
+    }
+  })
+
+  return (
+    <div className="min-h-screen pb-6" style={{ background: '#FAFAFA' }}>
+      {/* Top bar */}
+      <div className="sticky top-0 z-10 px-4 pt-12 pb-3 border-b" style={{ background: '#fff' }}>
+        <div className="flex items-center justify-between mb-2">
+          <button onClick={() => router.back()} className="p-1 -ml-1">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div className="text-center">
+            <p className="text-xs text-muted-foreground">{DAY_NAMES[TODAY_DAY - 1]} · Week 1</p>
+            <p className="font-semibold text-sm">{doneCount}/{exercises.length} gedaan</p>
+          </div>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground tabular-nums">
+            <Clock className="w-3.5 h-3.5" />
+            {mins}:{secs.toString().padStart(2, '0')}
+          </div>
+        </div>
+        <Progress value={progress} className="h-1.5" />
+      </div>
+
+      {/* Exercise cards */}
+      <div className="px-4 pt-4 space-y-3">
+        {cards}
+      </div>
+
+      {/* Finish CTA */}
+      {doneCount > 0 && (
+        <div className="px-4 pt-4">
+          <Button
+            onClick={() => setPhase('summary')}
+            className="w-full h-12 text-base font-semibold"
+            style={{ background: doneCount === exercises.length ? '#3ECF6A' : '#1A1A1A' }}
+          >
+            {doneCount === exercises.length ? 'Sessie afronden 🎉' : `Doorgaan (${doneCount}/${exercises.length})`}
+          </Button>
+        </div>
+      )}
+
+      {/* Rest Timer overlay */}
+      {showRestTimer && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.6)' }}>
+          <div className="rounded-3xl px-8 py-8 text-center space-y-2 mx-4 w-full max-w-xs" style={{ background: '#fff' }}>
+            <p className="font-bold text-lg">Rust</p>
+            <p className="text-xs text-muted-foreground mb-4">Adem rustig door je neus</p>
+            <CircularTimer seconds={restSecondsLeft} total={restDuration} onSkip={skipRest} />
+          </div>
+        </div>
+      )}
+
+      {/* Smiley feedback modal */}
+      {showFeedbackFor && (
+        <FeedbackModal
+          exerciseName={exercises.find(e => e.uid === showFeedbackFor)?.name ?? ''}
+          feedback={feedback[showFeedbackFor] ?? { smiley: null, pain: null, weight: null, rpe: null }}
+          onChange={partial => handleFeedbackChange(showFeedbackFor, partial)}
+          onSave={handleFeedbackSave}
+          autoCloseIn={feedbackTimer}
+        />
+      )}
     </div>
   )
 }
 
-function StatTile({ value, label, icon, isEmoji = false }: {
-  value: string; label: string; icon: string | null; isEmoji?: boolean
-}) {
+function ParamPill({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className="bg-white rounded-2xl border px-3 py-3 text-center">
-      <p className={isEmoji ? 'text-2xl mb-0.5' : 'text-base font-bold'}>{value}</p>
-      {icon && !isEmoji && <p className="text-xs text-muted-foreground">{icon}</p>}
-      <p className="text-[11px] text-muted-foreground mt-0.5">{label}</p>
+    <div
+      className="rounded-xl p-2 text-center"
+      style={{ background: highlight ? '#f0fdf4' : '#f4f4f5' }}
+    >
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-sm font-bold mt-0.5" style={{ color: highlight ? '#15803d' : undefined }}>{value}</p>
     </div>
   )
 }

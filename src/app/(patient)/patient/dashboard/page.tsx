@@ -13,7 +13,7 @@ import {
   DAY_NAMES,
   TODAY_DAY,
 } from '@/lib/patient-constants'
-import { Play, CheckCircle2, Flame, TrendingUp, Calendar, ChevronRight } from 'lucide-react'
+import { Play, CheckCircle2, Flame, TrendingUp, Calendar, ChevronRight, AlertCircle } from 'lucide-react'
 import { DAY_LABELS } from '@/lib/program-constants'
 
 export default function PatientDashboard() {
@@ -24,8 +24,8 @@ export default function PatientDashboard() {
   const lastSession = MOCK_SESSION_HISTORY[0]
   const streak = 5
 
-  const weekCompleted = Math.min(MOCK_SESSION_HISTORY.filter(s => s.week === 1).length, weekTotal)
   const weekTotal = activeDays.length
+  const weekCompleted = Math.min(MOCK_SESSION_HISTORY.filter(s => s.week === 1).length, weekTotal)
   const weekProgress = weekTotal > 0 ? (weekCompleted / weekTotal) * 100 : 0
 
   const hour = new Date().getHours()
@@ -112,6 +112,23 @@ export default function PatientDashboard() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Pain report quick link */}
+        <Link href="/patient/pain">
+          <div
+            className="flex items-center gap-3 px-4 py-3 rounded-2xl"
+            style={{ background: '#fef2f2', border: '1.5px solid #fecaca' }}
+          >
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#fee2e2' }}>
+              <AlertCircle className="w-4 h-4" style={{ color: '#ef4444' }} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold" style={{ color: '#991b1b' }}>Pijn rapporteren</p>
+              <p className="text-xs" style={{ color: '#dc2626' }}>Meld klachten aan je therapeut</p>
+            </div>
+            <ChevronRight className="w-4 h-4 shrink-0" style={{ color: '#fca5a5' }} />
+          </div>
+        </Link>
 
         {/* Last session recap */}
         {lastSession && (

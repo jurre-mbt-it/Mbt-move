@@ -1,148 +1,147 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { MESSAGES } from '@/lib/mock-data'
+import { getMessagesByPatient } from '@/lib/mock-data'
 import { MOCK_PATIENT } from '@/lib/patient-constants'
-import { Send, ChevronLeft } from 'lucide-react'
-import Link from 'next/link'
+import { Send } from 'lucide-react'
 
-// Patient is always pat1 (Jan de Vries) in mock
-const PATIENT_ID = 'pat1'
+const THERAPIST_NAME = MOCK_PATIENT.therapistName
 
-export default function PatientMessagesPage() {
-  const initialMessages = MESSAGES.filter(m => m.patientId === PATIENT_ID)
-    .sort((a, b) => a.date.localeCompare(b.date))
+function formatTime(dateStr: string) {
+  const d = new Date(dateStr)
+  const now = new Date()
+  const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
+  if (diffDays === 0) return d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
+  if (diffDays === 1) return 'Gisteren'
+  return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+}
 
-  const [messages, setMessages] = useState(initialMessages)
-  const [draft, setDraft] = useState('')
+type Message = {
+  id: string
+  patientId: string
+  from: 'therapist' | 'patient'
+  content: string
+  date: string
+  read: boolean
+}
+
+export default function MessagesPage() {
+  const initial = getMessagesByPatient('pat1')
+  const [messages, setMessages] = useState<Message[]>(initial)
+  const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  function sendMessage() {
-    const text = draft.trim()
+  const send = () => {
+    const text = input.trim()
     if (!text) return
-    const newMsg = {
-      id: `m-new-${Date.now()}`,
-      patientId: PATIENT_ID,
-      from: 'patient' as const,
-      content: text,
-      date: new Date().toISOString(),
-      read: true,
-    }
-    setMessages(prev => [...prev, newMsg])
-    setDraft('')
+    setMessages(prev => [
+      ...prev,
+      {
+        id: `new-${Date.now()}`,
+        patientId: 'pat1',
+        from: 'patient',
+        content: text,
+        date: new Date().toISOString(),
+        read: true,
+      },
+    ])
+    setInput('')
   }
 
-  function formatTime(isoDate: string) {
-    const d = new Date(isoDate)
-    return d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
-  }
-
-  function formatDay(isoDate: string) {
-    const d = new Date(isoDate)
-    return d.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
-  }
-
-  // Group messages by day
-  const grouped: { day: string; msgs: typeof messages }[] = []
-  for (const msg of messages) {
-    const day = formatDay(msg.date)
-    const last = grouped[grouped.length - 1]
-    if (last && last.day === day) last.msgs.push(msg)
-    else grouped.push({ day, msgs: [msg] })
-  }
+  const unread = messages.filter(m => m.from === 'therapist' && !m.read).length
 
   return (
-    <div className="flex flex-col h-screen" style={{ background: '#FAFAFA' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: '#FAFAFA' }}>
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 pt-12 pb-4 border-b bg-white shrink-0">
-        <Link href="/patient/dashboard" className="p-1 -ml-1">
-          <ChevronLeft className="w-5 h-5" />
-        </Link>
-        <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
-          style={{ background: '#1A1A1A' }}>
-          EB
+      <div className="px-4 pt-12 pb-4 flex items-center gap-3" style={{ background: '#1A1A1A' }}>
+        <div
+          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
+          style={{ background: '#3ECF6A' }}
+        >
+          {THERAPIST_NAME.split(' ').map(n => n[0]).join('').slice(0, 2)}
         </div>
         <div>
-          <p className="font-semibold text-sm">Emma Bakker</p>
-          <p className="text-xs text-muted-foreground">Therapeut · MBT Gym</p>
+          <p className="text-white font-bold text-base">{THERAPIST_NAME}</p>
+          <p className="text-zinc-400 text-xs">Jouw therapeut</p>
         </div>
+        {unread > 0 && (
+          <div
+            className="ml-auto w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold"
+            style={{ background: '#ef4444' }}
+          >
+            {unread}
+          </div>
+        )}
       </div>
 
-      {/* Message thread */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-32">
-        {grouped.map(group => (
-          <div key={group.day}>
-            <div className="flex items-center justify-center mb-3">
-              <span className="text-xs text-muted-foreground px-3 py-1 rounded-full bg-zinc-100 capitalize">
-                {group.day}
-              </span>
-            </div>
-            <div className="space-y-2">
-              {group.msgs.map(msg => {
-                const isPatient = msg.from === 'patient'
-                return (
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 pb-28">
+        {messages.map((msg, i) => {
+          const isPatient = msg.from === 'patient'
+          const showDate = i === 0 || new Date(msg.date).toDateString() !== new Date(messages[i - 1].date).toDateString()
+          return (
+            <div key={msg.id}>
+              {showDate && (
+                <div className="flex justify-center my-2">
+                  <span className="text-[11px] text-zinc-400 bg-zinc-100 rounded-full px-3 py-1">
+                    {new Date(msg.date).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  </span>
+                </div>
+              )}
+              <div className={`flex ${isPatient ? 'justify-end' : 'justify-start'}`}>
+                <div className="max-w-[80%]">
                   <div
-                    key={msg.id}
-                    className={`flex ${isPatient ? 'justify-end' : 'justify-start'}`}
+                    className="rounded-2xl px-4 py-3 text-sm leading-relaxed"
+                    style={{
+                      background: isPatient ? '#3ECF6A' : '#fff',
+                      color: isPatient ? '#fff' : '#1A1A1A',
+                      borderBottomRightRadius: isPatient ? 4 : undefined,
+                      borderBottomLeftRadius: !isPatient ? 4 : undefined,
+                      boxShadow: !isPatient ? '0 1px 3px rgba(0,0,0,0.08)' : undefined,
+                    }}
                   >
-                    <div
-                      className="max-w-[80%] rounded-2xl px-4 py-2.5"
-                      style={
-                        isPatient
-                          ? { background: '#1A1A1A', color: 'white', borderBottomRightRadius: 4 }
-                          : { background: 'white', border: '1px solid #e4e4e7', borderBottomLeftRadius: 4 }
-                      }
-                    >
-                      <p className="text-sm leading-relaxed">{msg.content}</p>
-                      <p
-                        className="text-[10px] mt-1 text-right"
-                        style={{ color: isPatient ? 'rgba(255,255,255,0.5)' : '#a1a1aa' }}
-                      >
-                        {formatTime(msg.date)}
-                      </p>
-                    </div>
+                    {msg.content}
                   </div>
-                )
-              })}
+                  <p className={`text-[10px] text-zinc-400 mt-1 ${isPatient ? 'text-right' : 'text-left'}`}>
+                    {formatTime(msg.date)}
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
         <div ref={bottomRef} />
       </div>
 
-      {/* Compose */}
-      <div className="fixed bottom-16 left-0 right-0 px-4 pb-3 pt-2 border-t bg-white">
-        <div className="flex items-end gap-2">
-          <textarea
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                sendMessage()
-              }
-            }}
-            placeholder="Stuur een bericht..."
-            rows={1}
-            className="flex-1 resize-none border rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-200"
-            style={{ maxHeight: 120 }}
-          />
-          <button
-            onClick={sendMessage}
-            disabled={!draft.trim()}
-            className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all"
-            style={{
-              background: draft.trim() ? '#3ECF6A' : '#e4e4e7',
-              color: draft.trim() ? 'white' : '#a1a1aa',
-            }}
-          >
-            <Send className="w-4 h-4" />
-          </button>
-        </div>
+      {/* Input bar */}
+      <div
+        className="fixed bottom-16 left-0 right-0 px-4 py-3 flex items-center gap-3"
+        style={{ background: '#fff', borderTop: '1px solid #e4e4e7' }}
+      >
+        <input
+          type="text"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && send()}
+          placeholder="Typ een bericht..."
+          className="flex-1 rounded-2xl px-4 py-2.5 text-sm outline-none"
+          style={{ background: '#f4f4f5', border: 'none' }}
+        />
+        <button
+          onClick={send}
+          disabled={!input.trim()}
+          className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all"
+          style={{
+            background: input.trim() ? '#3ECF6A' : '#f4f4f5',
+            color: input.trim() ? 'white' : '#a1a1aa',
+          }}
+        >
+          <Send className="w-4 h-4" />
+        </button>
       </div>
     </div>
   )

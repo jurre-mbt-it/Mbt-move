@@ -2,22 +2,29 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { ChevronLeft, CheckCircle2 } from 'lucide-react'
 
 const LOCATIONS = [
   'Knie links', 'Knie rechts',
-  'Schouder links', 'Schouder rechts',
-  'Rug (lumbaal)', 'Rug (thoracaal)',
   'Enkel links', 'Enkel rechts',
   'Heup links', 'Heup rechts',
-  'Nek / cervicaal',
-  'Anders',
+  'Rug (laag)', 'Rug (midden)',
+  'Schouder links', 'Schouder rechts',
+  'Nek', 'Anders',
 ]
 
 const CONTEXTS = [
-  'In rust', 'Bij bewegen', 'Na training',
-  'Tijdens training', 'Bij traplopen', 'Bij slapen',
+  { value: 'rest', label: 'In rust', icon: '🛋️' },
+  { value: 'movement', label: 'Bij beweging', icon: '🚶' },
+  { value: 'exercise', label: 'Tijdens oefening', icon: '🏋️' },
+  { value: 'after', label: 'Na inspanning', icon: '😴' },
+  { value: 'always', label: 'Altijd', icon: '🔄' },
 ]
+
+const NRS_COLORS = ['#22c55e', '#22c55e', '#84cc16', '#84cc16', '#eab308', '#eab308', '#f97316', '#f97316', '#ef4444', '#ef4444', '#dc2626']
+const NRS_LABELS: Record<number, string> = { 0: 'Geen pijn', 3: 'Mild', 5: 'Matig', 7: 'Ernstig', 10: 'Ondraaglijk' }
 
 export default function PainReportPage() {
   const router = useRouter()
@@ -27,158 +34,173 @@ export default function PainReportPage() {
   const [notes, setNotes] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
-  function handleSubmit() {
-    if (nrs === null || !location) return
+  const canSubmit = nrs !== null && location !== null && context !== null
+
+  const handleSubmit = () => {
+    if (!canSubmit) return
     setSubmitted(true)
-    setTimeout(() => router.push('/patient/progress'), 2000)
   }
 
   if (submitted) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center"
-        style={{ background: '#FAFAFA' }}>
-        <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
-          style={{ background: '#f0fdf4' }}>
-          <CheckCircle2 className="w-8 h-8" style={{ color: '#3ECF6A' }} />
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center gap-4" style={{ background: '#FAFAFA' }}>
+        <div
+          className="w-20 h-20 rounded-full flex items-center justify-center text-white"
+          style={{ background: '#3ECF6A' }}
+        >
+          <CheckCircle2 className="w-10 h-10" />
         </div>
-        <h2 className="text-xl font-bold mb-1">Geregistreerd</h2>
-        <p className="text-sm text-muted-foreground">
-          Je therapeut kan dit inzien bij je volgende sessie.
+        <h2 className="text-xl font-bold">Pijn geregistreerd</h2>
+        <p className="text-sm text-muted-foreground max-w-xs">
+          Jouw therapeut kan dit zien in het dossier. Neem contact op als de pijn erger wordt.
         </p>
+        {nrs !== null && nrs >= 7 && (
+          <div
+            className="rounded-2xl px-4 py-3 text-sm max-w-xs text-center"
+            style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b' }}
+          >
+            <strong>Hoge pijnscore</strong> — Je therapeut wordt op de hoogte gesteld.
+          </div>
+        )}
+        <Button
+          onClick={() => router.push('/patient/dashboard')}
+          className="mt-2 w-full max-w-xs h-12 font-semibold"
+          style={{ background: '#3ECF6A' }}
+        >
+          Terug naar Home
+        </Button>
       </div>
     )
   }
 
-  const canSubmit = nrs !== null && location !== null
-
   return (
     <div className="min-h-screen pb-8" style={{ background: '#FAFAFA' }}>
       {/* Header */}
-      <div className="px-4 pt-12 pb-5" style={{ background: '#1A1A1A' }}>
-        <button onClick={() => router.back()} className="flex items-center gap-1.5 text-zinc-400 text-sm mb-3">
-          <ChevronLeft className="w-4 h-4" /> Terug
+      <div className="px-4 pt-12 pb-4 flex items-center gap-3" style={{ background: '#1A1A1A' }}>
+        <button onClick={() => router.back()} className="p-1 -ml-1">
+          <ChevronLeft className="w-5 h-5 text-white" />
         </button>
-        <h1 className="text-white text-xl font-bold">Pijn rapporteren</h1>
-        <p className="text-zinc-400 text-xs mt-0.5">Los van een oefensessie</p>
+        <div>
+          <h1 className="text-white font-bold text-lg">Pijn rapporteren</h1>
+          <p className="text-zinc-400 text-xs">Registreer je pijn voor je therapeut</p>
+        </div>
       </div>
 
-      <div className="px-4 py-5 space-y-6">
-        {/* NRS score */}
-        <div>
-          <p className="font-semibold text-sm mb-1">
-            Pijnniveau (NRS 0-10)
-            <span className="text-muted-foreground font-normal"> — verplicht</span>
-          </p>
-          <p className="text-xs text-muted-foreground mb-3">
-            0 = geen pijn · 10 = ergst denkbare pijn
-          </p>
-          <div className="flex gap-1.5 flex-wrap">
-            {Array.from({ length: 11 }, (_, i) => {
-              const color = i === 0 ? '#22c55e' : i <= 3 ? '#84cc16' : i <= 6 ? '#f97316' : '#ef4444'
-              const selected = nrs === i
-              return (
+      <div className="px-4 py-4 space-y-4">
+        {/* NRS Scale */}
+        <Card style={{ borderRadius: '14px' }}>
+          <CardContent className="px-4 py-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="font-semibold text-sm">Pijnniveau (NRS 0–10)</p>
+              {nrs !== null && (
+                <span
+                  className="text-sm font-bold px-2 py-0.5 rounded-lg text-white"
+                  style={{ background: NRS_COLORS[nrs] }}
+                >
+                  {nrs}/10
+                </span>
+              )}
+            </div>
+            <div className="flex gap-1 mb-2">
+              {Array.from({ length: 11 }, (_, i) => (
                 <button
                   key={i}
-                  onClick={() => setNrs(selected ? null : i)}
-                  className="flex-1 min-w-[36px] h-12 rounded-xl text-sm font-bold transition-all"
+                  onClick={() => setNrs(nrs === i ? null : i)}
+                  className="flex-1 h-10 rounded-xl text-xs font-bold transition-all"
                   style={{
-                    background: selected ? color : '#f4f4f5',
-                    color: selected ? 'white' : '#71717a',
-                    transform: selected ? 'scale(1.08)' : 'scale(1)',
-                    border: selected ? `2px solid ${color}` : '2px solid transparent',
+                    background: nrs === i ? NRS_COLORS[i] : '#f4f4f5',
+                    color: nrs === i ? 'white' : '#71717a',
+                    transform: nrs === i ? 'scale(1.15)' : 'scale(1)',
                   }}
                 >
                   {i}
                 </button>
-              )
-            })}
-          </div>
-          {nrs !== null && (
-            <p className="text-xs mt-2 font-medium"
-              style={{ color: nrs <= 3 ? '#15803d' : nrs <= 6 ? '#c2410c' : '#b91c1c' }}>
-              {nrs === 0 ? 'Geen pijn'
-                : nrs <= 3 ? 'Milde pijn'
-                  : nrs <= 6 ? 'Matige pijn'
-                    : 'Ernstige pijn'}
-              {' '} — score {nrs}/10
-            </p>
-          )}
-        </div>
+              ))}
+            </div>
+            <div className="flex justify-between text-[10px] text-zinc-400">
+              {Object.entries(NRS_LABELS).map(([k, v]) => (
+                <span key={k}>{v}</span>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Location */}
-        <div>
-          <p className="font-semibold text-sm mb-3">
-            Locatie
-            <span className="text-muted-foreground font-normal"> — verplicht</span>
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {LOCATIONS.map(loc => (
-              <button
-                key={loc}
-                onClick={() => setLocation(location === loc ? null : loc)}
-                className="px-3 py-1.5 rounded-full text-xs font-medium border transition-all"
-                style={
-                  location === loc
-                    ? { background: '#1A1A1A', color: 'white', borderColor: '#1A1A1A' }
-                    : { background: 'white', color: '#52525b', borderColor: '#e4e4e7' }
-                }
-              >
-                {loc}
-              </button>
-            ))}
-          </div>
-        </div>
+        <Card style={{ borderRadius: '14px' }}>
+          <CardContent className="px-4 py-4">
+            <p className="font-semibold text-sm mb-3">Locatie</p>
+            <div className="flex flex-wrap gap-2">
+              {LOCATIONS.map(loc => {
+                const selected = location === loc
+                return (
+                  <button
+                    key={loc}
+                    onClick={() => setLocation(selected ? null : loc)}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+                    style={{
+                      background: selected ? '#1A1A1A' : '#f4f4f5',
+                      color: selected ? '#3ECF6A' : '#52525b',
+                      border: selected ? '1.5px solid #3ECF6A' : '1.5px solid transparent',
+                    }}
+                  >
+                    {loc}
+                  </button>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Context */}
-        <div>
-          <p className="font-semibold text-sm mb-3">
-            Wanneer?
-            <span className="text-muted-foreground font-normal"> — optioneel</span>
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {CONTEXTS.map(ctx => (
-              <button
-                key={ctx}
-                onClick={() => setContext(context === ctx ? null : ctx)}
-                className="px-3 py-1.5 rounded-full text-xs font-medium border transition-all"
-                style={
-                  context === ctx
-                    ? { background: '#3ECF6A', color: 'white', borderColor: '#3ECF6A' }
-                    : { background: 'white', color: '#52525b', borderColor: '#e4e4e7' }
-                }
-              >
-                {ctx}
-              </button>
-            ))}
-          </div>
-        </div>
+        <Card style={{ borderRadius: '14px' }}>
+          <CardContent className="px-4 py-4">
+            <p className="font-semibold text-sm mb-3">Wanneer heb je pijn?</p>
+            <div className="grid grid-cols-2 gap-2">
+              {CONTEXTS.map(c => {
+                const selected = context === c.value
+                return (
+                  <button
+                    key={c.value}
+                    onClick={() => setContext(selected ? null : c.value)}
+                    className="flex items-center gap-2 px-3 py-3 rounded-2xl text-sm font-medium transition-all text-left"
+                    style={{
+                      background: selected ? '#f0fdf4' : '#f4f4f5',
+                      border: selected ? '2px solid #3ECF6A' : '2px solid transparent',
+                      color: selected ? '#15803d' : '#52525b',
+                    }}
+                  >
+                    <span className="text-lg">{c.icon}</span>
+                    {c.label}
+                  </button>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Notes */}
-        <div>
-          <p className="font-semibold text-sm mb-2">
-            Notitie
-            <span className="text-muted-foreground font-normal"> — optioneel</span>
-          </p>
-          <textarea
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            placeholder="Beschrijf de pijn, wanneer het begon, wat het verergert..."
-            className="w-full border rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-zinc-200"
-            rows={3}
-          />
-        </div>
+        <Card style={{ borderRadius: '14px' }}>
+          <CardContent className="px-4 py-4">
+            <p className="font-semibold text-sm mb-3">Toelichting (optioneel)</p>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Beschrijf de pijn in eigen woorden..."
+              className="w-full rounded-xl px-3 py-2.5 text-sm resize-none outline-none"
+              style={{ background: '#f4f4f5', border: 'none' }}
+              rows={3}
+            />
+          </CardContent>
+        </Card>
 
-        <button
+        <Button
           onClick={handleSubmit}
           disabled={!canSubmit}
-          className="w-full h-12 rounded-xl text-sm font-semibold text-white transition-all"
-          style={{
-            background: canSubmit ? '#3ECF6A' : '#e4e4e7',
-            color: canSubmit ? 'white' : '#a1a1aa',
-          }}
+          className="w-full h-12 text-base font-semibold"
+          style={{ background: canSubmit ? '#3ECF6A' : undefined }}
         >
-          Rapportage opslaan
-        </button>
+          Rapporteer pijn
+        </Button>
       </div>
     </div>
   )
