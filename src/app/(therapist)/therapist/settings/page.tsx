@@ -1,10 +1,11 @@
-import Link from 'next/link'
-import { Card, CardContent } from '@/components/ui/card'
-import { User, SlidersHorizontal, ChevronRight } from 'lucide-react'
+'use client'
 
-export const metadata = {
-  title: 'Instellingen – MBT Gym',
-}
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { User, SlidersHorizontal, ChevronRight, LogOut } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 const sections = [
   {
@@ -22,6 +23,15 @@ const sections = [
 ]
 
 export default function SettingsPage() {
+  const router = useRouter()
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
+
   return (
     <div className="space-y-5 max-w-lg">
       <div>
@@ -50,6 +60,15 @@ export default function SettingsPage() {
           </Link>
         ))}
       </div>
+
+      <Button
+        variant="outline"
+        className="w-full gap-2 text-red-600 border-red-200 hover:bg-red-50"
+        onClick={handleSignOut}
+      >
+        <LogOut className="w-4 h-4" />
+        Uitloggen
+      </Button>
     </div>
   )
 }

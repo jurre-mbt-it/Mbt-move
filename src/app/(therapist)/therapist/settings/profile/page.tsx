@@ -1,12 +1,22 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { User, Mail, Phone, Building2, ChevronLeft } from 'lucide-react'
-import Link from 'next/link'
+'use client'
 
-export const metadata = {
-  title: 'Profiel – MBT Gym',
-}
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { User, Mail, Phone, Building2, ChevronLeft, LogOut } from 'lucide-react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 export default function ProfilePage() {
+  const router = useRouter()
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
+
   return (
     <div className="space-y-5 max-w-lg">
       <Link
@@ -33,13 +43,14 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card style={{ borderRadius: '12px' }}>
-        <CardContent className="flex items-center justify-center py-10 text-center">
-          <p className="text-sm text-muted-foreground">
-            Profielbewerking beschikbaar zodra de database is gekoppeld.
-          </p>
-        </CardContent>
-      </Card>
+      <Button
+        variant="outline"
+        className="w-full gap-2 text-red-600 border-red-200 hover:bg-red-50"
+        onClick={handleSignOut}
+      >
+        <LogOut className="w-4 h-4" />
+        Uitloggen
+      </Button>
     </div>
   )
 }

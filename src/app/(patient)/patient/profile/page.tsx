@@ -1,22 +1,54 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { MOCK_PATIENT } from '@/lib/patient-constants'
-import { User, Mail, Stethoscope, ClipboardList } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { User, Mail, Stethoscope, ClipboardList, LogOut } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 export default function PatientProfilePage() {
+  const router = useRouter()
+  const [user, setUser] = useState<{ name: string; email: string } | null>(null)
+
+  useEffect(() => {
+    async function loadUser() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setUser({
+          name: user.user_metadata?.name || user.email?.split('@')[0] || '',
+          email: user.email || '',
+        })
+      }
+    }
+    loadUser()
+  }, [])
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
+
+  const initials = user?.name
+    ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+    : '...'
+
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
-      {/* Header */}
       <div className="px-4 pt-12 pb-8" style={{ background: '#1A3A3A' }}>
         <div className="flex flex-col items-center gap-3">
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center font-bold text-2xl text-white"
             style={{ background: '#4ECDC4' }}
           >
-            {MOCK_PATIENT.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+            {initials}
           </div>
           <div className="text-center">
-            <h1 className="text-white text-xl font-bold">{MOCK_PATIENT.name}</h1>
-            <p className="text-zinc-400 text-sm mt-0.5">{MOCK_PATIENT.email}</p>
+            <h1 className="text-white text-xl font-bold">{user?.name || '...'}</h1>
+            <p className="text-zinc-400 text-sm mt-0.5">{user?.email || ''}</p>
           </div>
         </div>
       </div>
@@ -27,20 +59,19 @@ export default function PatientProfilePage() {
             <CardTitle className="text-sm font-semibold">Mijn gegevens</CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4 space-y-4">
-            <InfoRow icon={<User className="w-4 h-4" />} label="Naam" value={MOCK_PATIENT.name} />
-            <InfoRow icon={<Mail className="w-4 h-4" />} label="E-mail" value={MOCK_PATIENT.email} />
-            <InfoRow icon={<Stethoscope className="w-4 h-4" />} label="Therapeut" value={MOCK_PATIENT.therapistName} />
-            <InfoRow icon={<ClipboardList className="w-4 h-4" />} label="Programma" value={MOCK_PATIENT.programName} />
+            <InfoRow icon={<User className="w-4 h-4" />} label="Naam" value={user?.name || '—'} />
+            <InfoRow icon={<Mail className="w-4 h-4" />} label="E-mail" value={user?.email || '—'} />
           </CardContent>
         </Card>
 
-        <Card style={{ borderRadius: '14px' }}>
-          <CardContent className="flex items-center justify-center py-10 text-center">
-            <p className="text-sm text-muted-foreground">
-              Profielbewerking beschikbaar zodra de database is gekoppeld.
-            </p>
-          </CardContent>
-        </Card>
+        <Button
+          variant="outline"
+          className="w-full gap-2 text-red-600 border-red-200 hover:bg-red-50"
+          onClick={handleSignOut}
+        >
+          <LogOut className="w-4 h-4" />
+          Uitloggen
+        </Button>
       </div>
     </div>
   )
