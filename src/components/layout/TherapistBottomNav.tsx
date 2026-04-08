@@ -10,7 +10,7 @@ const navItems = [
   { href: '/therapist/patients',   label: 'Patiënten', icon: Users },
   { href: '/therapist/programs',   label: "Programma's", icon: ClipboardList },
   { href: '/therapist/exercises',  label: 'Oefeningen', icon: Dumbbell },
-  { href: '/therapist/settings/parameters', label: 'Instellingen', icon: Settings },
+  { href: '/therapist/settings', label: 'Instellingen', icon: Settings },
 ]
 
 export function TherapistBottomNav() {
