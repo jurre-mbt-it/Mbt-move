@@ -1,10 +1,10 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
-  MOCK_PATIENT,
   MOCK_SESSION_HISTORY,
   getTodayExercises,
   getWeekSchedule,
@@ -18,8 +18,22 @@ import { getMockWorkloadSessions } from '@/lib/workload-monitoring'
 import { Play, CheckCircle2, Flame, TrendingUp, Calendar, ChevronRight, Plus, Dumbbell, Zap } from 'lucide-react'
 import { DAY_LABELS } from '@/lib/program-constants'
 import { Progress } from '@/components/ui/progress'
+import { createClient } from '@/lib/supabase/client'
 
 export default function AthleteDashboard() {
+  const [userName, setUserName] = useState('')
+
+  useEffect(() => {
+    async function loadUser() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setUserName(user.user_metadata?.name || user.email?.split('@')[0] || '')
+      }
+    }
+    loadUser()
+  }, [])
+
   const todayExercises = getTodayExercises()
   const weekSchedule = getWeekSchedule()
   const recoverySessions = getMockRecoverySessions()
@@ -40,7 +54,7 @@ export default function AthleteDashboard() {
       {/* Header */}
       <div className="px-4 pt-12 pb-8" style={{ background: '#1A3A3A' }}>
         <p className="text-zinc-400 text-sm">{greeting}</p>
-        <h1 className="text-white text-2xl font-bold mt-0.5">{MOCK_PATIENT.name.split(' ')[0]} 💪</h1>
+        <h1 className="text-white text-2xl font-bold mt-0.5">{userName ? userName.split(' ')[0] : ''} 💪</h1>
         <p className="text-zinc-400 text-xs mt-1">Atleet Dashboard</p>
       </div>
 
