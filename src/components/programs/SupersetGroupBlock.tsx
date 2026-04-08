@@ -3,7 +3,7 @@
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { ProgramExerciseBlock } from './ProgramExerciseBlock'
-import type { BuilderExercise } from './types'
+import type { BuilderExercise, CustomParameter } from './types'
 import { SUPERSET_COLORS } from '@/lib/program-constants'
 
 interface Props {
@@ -13,9 +13,11 @@ interface Props {
   onRemove: (uid: string) => void
   onToggleSelect: (uid: string) => void
   onSwapVariant: (uid: string, direction: 'easier' | 'harder') => void
+  allExercises?: { id: string; name: string; category: string; difficulty: string; videoUrl?: string | null; easierVariantId?: string | null; harderVariantId?: string | null; muscleLoads: Record<string, number> }[]
+  customParams?: CustomParameter[]
 }
 
-export function SupersetGroupBlock({ groupLetter, exercises, onUpdate, onRemove, onToggleSelect, onSwapVariant }: Props) {
+export function SupersetGroupBlock({ groupLetter, exercises, onUpdate, onRemove, onToggleSelect, onSwapVariant, allExercises, customParams }: Props) {
   const colors = SUPERSET_COLORS[groupLetter] ?? SUPERSET_COLORS.A
 
   const { setNodeRef, isOver } = useDroppable({
@@ -59,6 +61,8 @@ export function SupersetGroupBlock({ groupLetter, exercises, onUpdate, onRemove,
             onToggleSelect={onToggleSelect}
             onSwapVariant={onSwapVariant}
             isInSuperset
+            allExercises={allExercises}
+            customParams={customParams}
           />
         ))}
       </SortableContext>

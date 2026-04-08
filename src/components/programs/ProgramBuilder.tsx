@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { Label } from '@/components/ui/label'
+import { useCustomParams } from '@/hooks/useCustomParams'
 import {
   DndContext, DragOverlay, closestCenter, PointerSensor,
   useSensor, useSensors, type DragEndEvent, type DragOverEvent,
@@ -32,7 +34,7 @@ import { cn } from '@/lib/utils'
 
 import {
   Save, Eye, Copy, FileDown, Plus, Trash2,
-  ChevronLeft, ChevronRight, Layers, Search, CheckCircle2, X,
+  ChevronLeft, Layers, Search, CheckCircle2, X, BarChart2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -99,12 +101,20 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
   )
   const [activeId, setActiveId] = useState<string | null>(null)
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+  const [templateCategory, setTemplateCategory] = useState('')
+  const [templateSaving, setTemplateSaving] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [mobileLibraryOpen, setMobileLibraryOpen] = useState(false)
+  const [mobileBalanceOpen, setMobileBalanceOpen] = useState(false)
   const [mobileSelected, setMobileSelected] = useState<Set<string>>(new Set())
   const [mobileQuery, setMobileQuery] = useState('')
   const [mobileCategory, setMobileCategory] = useState<string | null>(null)
+
+  const { params: customParams } = useCustomParams()
   const createProgram = trpc.programs.create.useMutation()
   const saveProgram = trpc.programs.save.useMutation()
+  const duplicateProgram = trpc.programs.duplicate.useMutation()
   const { data: libraryExercises = [] } = trpc.exercises.list.useQuery(undefined, { staleTime: 60_000 })
   const saving = createProgram.isPending || saveProgram.isPending
 
@@ -170,11 +180,25 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
   const swapVariant = useCallback((uid: string, direction: 'easier' | 'harder') => {
     setExercises(prev => prev.map(e => {
       if (e.uid !== uid) return e
-      // In production: look up the variant exercise and replace
-      toast.info('Variant wisselen werkt met live data')
-      return e
+      const targetId = direction === 'easier' ? e.easierVariantId : e.harderVariantId
+      if (!targetId) return e
+      const source = libraryExercises.length > 0 ? libraryExercises : MOCK_EXERCISES
+      const target = source.find((le: { id: string }) => le.id === targetId) as typeof MOCK_EXERCISES[number] | undefined
+      if (!target) { toast.error('Variant niet gevonden in bibliotheek'); return e }
+      toast.success(`Gewisseld naar: ${target.name}`)
+      return {
+        ...e,
+        exerciseId: target.id,
+        name: target.name,
+        category: target.category as string,
+        difficulty: target.difficulty as string,
+        muscleLoads: target.muscleLoads as unknown as Record<string, number>,
+        videoUrl: target.videoUrl,
+        easierVariantId: (target as { easierVariantId?: string | null }).easierVariantId ?? null,
+        harderVariantId: (target as { harderVariantId?: string | null }).harderVariantId ?? null,
+      }
     }))
-  }, [])
+  }, [libraryExercises])
 
   const addFromLibrary = useCallback((ex: { id: string; name: string; category: string; difficulty: string; muscleLoads: unknown; videoUrl?: string | null; easierVariantId?: string | null; harderVariantId?: string | null }) => {
     const newEx: BuilderExercise = {
@@ -326,9 +350,43 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
     }
   }
 
-  const handleSaveAsTemplate = () => {
-    setTemplateDialogOpen(false)
-    toast.success('Opgeslagen als template')
+  const handleSaveAsTemplate = async () => {
+    const name = templateName.trim() || program.name
+    const exercisePayload = exercises.map((ex, i) => ({
+      exerciseId: ex.exerciseId,
+      week: ex.week, day: ex.day, order: i,
+      sets: ex.sets, reps: ex.reps, repUnit: ex.repUnit, restTime: ex.rest,
+      supersetGroup: ex.supersetGroup ?? null,
+      supersetOrder: ex.supersetOrder, notes: null,
+    }))
+    setTemplateSaving(true)
+    try {
+      if (programId) {
+        // If this already is a program, duplicate it as template
+        await duplicateProgram.mutateAsync({
+          id: programId,
+          name: templateCategory ? `[${templateCategory}] ${name}` : name,
+          isTemplate: true,
+          patientId: null,
+        })
+      } else {
+        const created = await createProgram.mutateAsync({
+          name: templateCategory ? `[${templateCategory}] ${name}` : name,
+          description: program.description ?? undefined,
+          weeks: program.weeks, daysPerWeek: program.daysPerWeek,
+          isTemplate: true, patientId: null,
+        })
+        if (exercises.length > 0) {
+          await saveProgram.mutateAsync({ id: created.id, exercises: exercisePayload })
+        }
+      }
+      toast.success('Opgeslagen als template in de bibliotheek')
+      setTemplateDialogOpen(false)
+    } catch {
+      toast.error('Opslaan mislukt')
+    } finally {
+      setTemplateSaving(false)
+    }
   }
 
   // ── Week/day navigation ───────────────────────────────────────────────────────
@@ -391,9 +449,13 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
 
           <div className="hidden md:flex items-center gap-1">
             <Separator orientation="vertical" className="h-5 mx-1" />
-            <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={() => setTemplateDialogOpen(true)}>
+            <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={() => { setTemplateName(program.name); setTemplateCategory(''); setTemplateDialogOpen(true) }}>
               <Layers className="w-3.5 h-3.5" />
-              Als template
+              Template
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={() => setPreviewOpen(true)}>
+              <Eye className="w-3.5 h-3.5" />
+              Preview
             </Button>
             <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={() => toast.info('PDF export werkt met Supabase')}>
               <FileDown className="w-3.5 h-3.5" />
@@ -413,7 +475,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
           </Button>
         </div>
 
-        {/* Mobile week tabs */}
+        {/* Mobile action row: week tabs + balance toggle */}
         <div className="flex md:hidden items-center gap-1 px-3 py-2 border-b bg-white overflow-x-auto">
           {weeks.map(w => (
             <button
@@ -435,6 +497,20 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
               + Week
             </button>
           )}
+          <div className="ml-auto flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => setMobileBalanceOpen(true)}
+              className="p-1.5 rounded bg-zinc-100 text-muted-foreground"
+            >
+              <BarChart2 className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setPreviewOpen(true)}
+              className="p-1.5 rounded bg-zinc-100 text-muted-foreground"
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* ── Layout ── */}
@@ -517,6 +593,8 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
                             onRemove={removeEx}
                             onToggleSelect={toggleSelect}
                             onSwapVariant={swapVariant}
+                            allExercises={libraryExercises.length > 0 ? libraryExercises as never : MOCK_EXERCISES as never}
+                            customParams={customParams}
                           />
                           <button
                             onClick={() => dissolveSuperset(item.group)}
@@ -539,6 +617,8 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
                           onRemove={removeEx}
                           onToggleSelect={toggleSelect}
                           onSwapVariant={swapVariant}
+                          allExercises={libraryExercises.length > 0 ? libraryExercises as never : MOCK_EXERCISES as never}
+                          customParams={customParams}
                         />
                       </SortableContext>
                     )
@@ -694,24 +774,135 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
         </DialogContent>
       </Dialog>
 
-      {/* Template dialog */}
+      {/* Template / Bibliotheek dialog */}
       <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Opslaan als template</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 pt-2">
+          <div className="space-y-4 pt-2">
             <p className="text-sm text-muted-foreground">
-              Dit programma wordt opgeslagen als herbruikbaar template voor de praktijk.
+              Sla dit programma op als herbruikbaar template in de praktijkbibliotheek.
             </p>
-            <div className="flex gap-2">
-              <Button style={{ background: '#3ECF6A' }} onClick={handleSaveAsTemplate} className="flex-1">
-                Opslaan als template
-              </Button>
-              <Button variant="outline" onClick={() => setTemplateDialogOpen(false)}>
-                Annuleren
-              </Button>
+            <div>
+              <Label className="text-xs">Naam template</Label>
+              <input
+                className="w-full mt-1.5 h-9 rounded-md border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#3ECF6A]"
+                value={templateName}
+                onChange={e => setTemplateName(e.target.value)}
+                placeholder={program.name}
+              />
             </div>
+            <div>
+              <Label className="text-xs">Categorie (optioneel)</Label>
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {['Knie', 'Schouder', 'Rug', 'Heup', 'Enkel', 'Full Body', 'Revalidatie', 'Preventie'].map(cat => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setTemplateCategory(templateCategory === cat ? '' : cat)}
+                    className={cn(
+                      'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
+                      templateCategory === cat
+                        ? 'text-white border-transparent'
+                        : 'border-zinc-200 text-muted-foreground hover:border-zinc-400'
+                    )}
+                    style={templateCategory === cat ? { background: '#3ECF6A' } : {}}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button
+                style={{ background: '#3ECF6A' }}
+                onClick={handleSaveAsTemplate}
+                disabled={templateSaving}
+                className="flex-1"
+              >
+                {templateSaving ? 'Opslaan...' : 'Opslaan als template'}
+              </Button>
+              <Button variant="outline" onClick={() => setTemplateDialogOpen(false)}>Annuleren</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview dialog */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0" style={{ borderRadius: '16px' }}>
+          <DialogHeader className="px-5 pt-5 pb-3 border-b shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="w-4 h-4" />
+              Preview — {program.name}
+            </DialogTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Zo ziet de patiënt het programma · {program.weeks} weken · {program.daysPerWeek}×/week
+            </p>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
+            {Array.from({ length: program.weeks }, (_, wi) => wi + 1).map(week => (
+              <div key={week}>
+                <h3 className="font-semibold text-sm mb-3 text-muted-foreground uppercase tracking-wide">Week {week}</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {Array.from({ length: program.daysPerWeek }, (_, di) => di + 1).map(day => {
+                    const dayExs = exercises.filter(e => e.week === week && e.day === day)
+                    return (
+                      <div key={day} className="border rounded-xl p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-muted-foreground">{DAY_LABELS[day - 1]}</span>
+                          <span className="text-xs text-muted-foreground">{dayExs.length} oef.</span>
+                        </div>
+                        {dayExs.length === 0 ? (
+                          <p className="text-xs text-zinc-300 italic">Rustdag</p>
+                        ) : (
+                          dayExs.map((ex, i) => (
+                            <div key={ex.uid} className="text-xs space-y-0.5">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-zinc-400 w-4 shrink-0">{i + 1}.</span>
+                                <span className="font-medium truncate">{ex.name}</span>
+                              </div>
+                              <div className="pl-5 text-muted-foreground">
+                                {ex.sets}×{ex.reps} {ex.repUnit} · {ex.rest}s rust
+                              </div>
+                              {ex.extraParams.length > 0 && (
+                                <div className="pl-5 flex flex-wrap gap-1">
+                                  {ex.extraParams.map(p => (
+                                    <span key={p.id} className="bg-zinc-100 rounded px-1.5 py-0.5 text-xs">
+                                      {p.label}: {p.value}{p.unit}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mobile muscle balance dialog */}
+      <Dialog open={mobileBalanceOpen} onOpenChange={setMobileBalanceOpen}>
+        <DialogContent className="max-w-sm max-h-[80vh] overflow-hidden flex flex-col p-0" style={{ borderRadius: '16px' }}>
+          <DialogHeader className="px-4 pt-4 pb-2 border-b shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <BarChart2 className="w-4 h-4" />
+              Spiergroep balans
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden">
+            <MuscleBalancePanel
+              exercises={exercises}
+              currentDay={program.currentDay}
+              currentWeek={program.currentWeek}
+            />
           </div>
         </DialogContent>
       </Dialog>

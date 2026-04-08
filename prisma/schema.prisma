@@ -192,17 +192,20 @@ model ExerciseCollectionItem {
 }
 
 model Program {
-  id          String        @id @default(cuid())
-  name        String
-  description String?
-  status      ProgramStatus @default(DRAFT)
-  startDate   DateTime?
-  endDate     DateTime?
+  id           String        @id @default(cuid())
+  name         String
+  description  String?
+  status       ProgramStatus @default(DRAFT)
+  isTemplate   Boolean       @default(false)
+  weeks        Int           @default(4)
+  daysPerWeek  Int           @default(3)
+  startDate    DateTime?
+  endDate      DateTime?
 
-  creator   User   @relation("ProgramCreator", fields: [creatorId], references: [id])
+  creator   User    @relation("ProgramCreator", fields: [creatorId], references: [id])
   creatorId String
-  patient   User   @relation("ProgramPatient", fields: [patientId], references: [id])
-  patientId String
+  patient   User?   @relation("ProgramPatient", fields: [patientId], references: [id])
+  patientId String?
 
   exercises   ProgramExercise[]
   sessionLogs SessionLog[]
@@ -214,18 +217,21 @@ model Program {
 }
 
 model ProgramExercise {
-  id         String   @id @default(cuid())
-  program    Program  @relation(fields: [programId], references: [id])
-  programId  String
-  exercise   Exercise @relation(fields: [exerciseId], references: [id])
-  exerciseId String
-  order      Int
-  sets       Int?
-  reps       Int?
-  duration   Int?     // seconds
-  restTime   Int?     // seconds
-  notes      String?
-  dayOfWeek  Int[]    // 0=Sunday, 6=Saturday
+  id             String   @id @default(cuid())
+  program        Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  programId      String
+  exercise       Exercise @relation(fields: [exerciseId], references: [id])
+  exerciseId     String
+  week           Int      @default(1)
+  day            Int      @default(1)
+  order          Int      @default(0)
+  sets           Int      @default(3)
+  reps           Int      @default(10)
+  repUnit        String   @default("reps")
+  restTime       Int      @default(60)
+  supersetGroup  String?
+  supersetOrder  Int      @default(0)
+  notes          String?
 
   @@map("program_exercises")
 }

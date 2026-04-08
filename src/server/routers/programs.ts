@@ -146,6 +146,57 @@ export const programsRouter = createTRPCRouter({
       })
     }),
 
+  duplicate: therapistProcedure
+    .input(z.object({
+      id: z.string(),
+      name: z.string().min(1).optional(),
+      patientId: z.string().nullable().optional(),
+      isTemplate: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const source = await ctx.prisma.program.findUnique({
+        where: { id: input.id },
+        include: { exercises: true },
+      })
+      if (!source) throw new TRPCError({ code: 'NOT_FOUND' })
+      if (source.creatorId !== ctx.user!.id && ctx.user!.role !== 'ADMIN') {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+      const newId = createId()
+      const targetPatientId = input.patientId !== undefined
+        ? (input.patientId != null ? input.patientId : undefined)
+        : (source.patientId ?? undefined)
+      return ctx.prisma.program.create({
+        data: {
+          id: newId,
+          name: input.name ?? `${source.name} (kopie)`,
+          description: source.description ?? undefined,
+          weeks: source.weeks,
+          daysPerWeek: source.daysPerWeek,
+          isTemplate: input.isTemplate ?? source.isTemplate,
+          ...(targetPatientId ? { patientId: targetPatientId } : {}),
+          creatorId: ctx.user!.id,
+          status: 'DRAFT',
+          exercises: {
+            create: source.exercises.map(ex => ({
+              id: createId(),
+              exerciseId: ex.exerciseId,
+              week: ex.week,
+              day: ex.day,
+              order: ex.order,
+              sets: ex.sets,
+              reps: ex.reps,
+              repUnit: ex.repUnit,
+              restTime: ex.restTime,
+              supersetGroup: ex.supersetGroup,
+              supersetOrder: ex.supersetOrder,
+              notes: ex.notes,
+            })),
+          },
+        },
+      })
+    }),
+
   delete: therapistProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {

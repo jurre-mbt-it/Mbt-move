@@ -1,16 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import type { BuilderExercise, ExtraParam, RepUnit } from './types'
 import { STANDARD_PARAMS, REP_UNITS } from '@/lib/program-constants'
-import { MOCK_EXERCISES } from '@/lib/exercise-constants'
 import { cn } from '@/lib/utils'
 import {
-  GripVertical, X, ChevronDown, Plus, ArrowUpDown,
-  ArrowUp, ArrowDown, MoreHorizontal, Play,
+  GripVertical, X, Plus, ArrowUp, ArrowDown, MoreHorizontal, Play,
 } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -22,10 +18,22 @@ import {
 import { VideoPlayer } from '@/components/exercises/VideoPlayer'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import type { CustomParameter } from './types'
 
 const CATEGORY_COLORS: Record<string, string> = {
   STRENGTH: '#3ECF6A', MOBILITY: '#60a5fa', PLYOMETRICS: '#f59e0b',
   CARDIO: '#f87171', STABILITY: '#a78bfa',
+}
+
+interface LibraryExerciseLike {
+  id: string
+  name: string
+  category: string
+  difficulty: string
+  videoUrl?: string | null
+  easierVariantId?: string | null
+  harderVariantId?: string | null
+  muscleLoads: Record<string, number>
 }
 
 interface Props {
@@ -35,6 +43,8 @@ interface Props {
   onToggleSelect: (uid: string) => void
   onSwapVariant: (uid: string, direction: 'easier' | 'harder') => void
   isInSuperset?: boolean
+  allExercises?: LibraryExerciseLike[]
+  customParams?: CustomParameter[]
 }
 
 function InlineNumber({
@@ -54,8 +64,10 @@ function InlineNumber({
   )
 }
 
-export function ProgramExerciseBlock({ exercise, onUpdate, onRemove, onToggleSelect, onSwapVariant, isInSuperset = false }: Props) {
-  const [showParams, setShowParams] = useState(exercise.extraParams.length > 0)
+export function ProgramExerciseBlock({
+  exercise, onUpdate, onRemove, onToggleSelect, onSwapVariant,
+  isInSuperset = false, allExercises = [], customParams = [],
+}: Props) {
   const [videoOpen, setVideoOpen] = useState(false)
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -63,28 +75,22 @@ export function ProgramExerciseBlock({ exercise, onUpdate, onRemove, onToggleSel
     data: { type: 'canvas-exercise', exercise },
   })
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  }
-
+  const style = { transform: CSS.Transform.toString(transform), transition }
   const color = CATEGORY_COLORS[exercise.category] ?? '#3ECF6A'
 
-  const addParam = (tpl: typeof STANDARD_PARAMS[number]) => {
-    const already = exercise.extraParams.find(p => p.label === tpl.label)
-    if (already) return
+  const addParam = (tpl: { label: string; type: 'number' | 'text' | 'select' | 'slider'; unit?: string; options?: string[]; min?: number; max?: number; defaultValue?: string | number }) => {
+    if (exercise.extraParams.find(p => p.label === tpl.label)) return
     const newParam: ExtraParam = {
       id: `p-${Date.now()}`,
       label: tpl.label,
       type: tpl.type,
-      value: (tpl as { defaultValue?: string | number }).defaultValue ?? (tpl.type === 'number' || tpl.type === 'slider' ? 0 : ''),
-      unit: (tpl as { unit?: string }).unit,
-      options: (tpl as { options?: string[] }).options,
-      min: (tpl as { min?: number }).min,
-      max: (tpl as { max?: number }).max,
+      value: tpl.defaultValue ?? (tpl.type === 'number' || tpl.type === 'slider' ? 0 : ''),
+      unit: tpl.unit,
+      options: tpl.options,
+      min: tpl.min,
+      max: tpl.max,
     }
     onUpdate(exercise.uid, { extraParams: [...exercise.extraParams, newParam] })
-    setShowParams(true)
   }
 
   const removeParam = (id: string) =>
@@ -95,8 +101,20 @@ export function ProgramExerciseBlock({ exercise, onUpdate, onRemove, onToggleSel
       extraParams: exercise.extraParams.map(p => p.id === id ? { ...p, value } : p),
     })
 
-  const easierEx = exercise.easierVariantId ? MOCK_EXERCISES.find(e => e.id === exercise.easierVariantId) : null
-  const harderEx = exercise.harderVariantId ? MOCK_EXERCISES.find(e => e.id === exercise.harderVariantId) : null
+  const easierEx = exercise.easierVariantId
+    ? allExercises.find(e => e.id === exercise.easierVariantId)
+    : null
+  const harderEx = exercise.harderVariantId
+    ? allExercises.find(e => e.id === exercise.harderVariantId)
+    : null
+
+  // All available custom params not already added
+  const availableCustom = customParams.filter(
+    cp => !exercise.extraParams.find(ep => ep.label === cp.label)
+  )
+  const availableStandard = STANDARD_PARAMS.filter(
+    p => !exercise.extraParams.find(ep => ep.label === p.label)
+  )
 
   return (
     <div
@@ -111,7 +129,7 @@ export function ProgramExerciseBlock({ exercise, onUpdate, onRemove, onToggleSel
     >
       {/* Header row */}
       <div className="flex flex-col px-2 pt-2 pb-1 gap-1">
-        {/* Top line: drag + checkbox + name + actions */}
+        {/* Top line: drag + checkbox + color + name + menu + X */}
         <div className="flex items-center gap-2">
           <button
             {...attributes}
@@ -129,6 +147,7 @@ export function ProgramExerciseBlock({ exercise, onUpdate, onRemove, onToggleSel
           />
 
           <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+
           <button
             type="button"
             onClick={() => setVideoOpen(true)}
@@ -137,38 +156,57 @@ export function ProgramExerciseBlock({ exercise, onUpdate, onRemove, onToggleSel
             {exercise.name}
           </button>
 
-          {/* Actions — always visible on mobile, hover on desktop */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-6 w-6 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
                 <MoreHorizontal className="w-3.5 h-3.5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuContent align="end" className="w-52 max-h-80 overflow-y-auto">
+              {/* Variant swap */}
               {easierEx && (
                 <DropdownMenuItem onClick={() => onSwapVariant(exercise.uid, 'easier')} className="gap-2 text-blue-600">
                   <ArrowDown className="w-3.5 h-3.5" />
-                  Wissel → {easierEx.name}
+                  Regressie → {easierEx.name}
                 </DropdownMenuItem>
               )}
               {harderEx && (
                 <DropdownMenuItem onClick={() => onSwapVariant(exercise.uid, 'harder')} className="gap-2 text-amber-600">
                   <ArrowUp className="w-3.5 h-3.5" />
-                  Wissel → {harderEx.name}
+                  Progressie → {harderEx.name}
                 </DropdownMenuItem>
               )}
               {(easierEx || harderEx) && <DropdownMenuSeparator />}
-              <DropdownMenuLabel className="text-xs">Parameter toevoegen</DropdownMenuLabel>
-              {STANDARD_PARAMS.map(p => (
-                <DropdownMenuItem
-                  key={p.label}
-                  onClick={() => addParam(p)}
-                  disabled={!!exercise.extraParams.find(ep => ep.label === p.label)}
-                  className="text-xs"
-                >
-                  + {p.label} {(p as { unit?: string }).unit && <span className="text-muted-foreground ml-1">{(p as { unit?: string }).unit}</span>}
-                </DropdownMenuItem>
-              ))}
+
+              {/* Standard params */}
+              {availableStandard.length > 0 && (
+                <>
+                  <DropdownMenuLabel className="text-xs">Standaard parameters</DropdownMenuLabel>
+                  {availableStandard.map(p => (
+                    <DropdownMenuItem key={p.label} onClick={() => addParam(p)} className="text-xs">
+                      + {p.label}
+                      {(p as { unit?: string }).unit && (
+                        <span className="text-muted-foreground ml-1">{(p as { unit?: string }).unit}</span>
+                      )}
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
+
+              {/* Custom params */}
+              {availableCustom.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs">Custom parameters</DropdownMenuLabel>
+                  {availableCustom.map(cp => (
+                    <DropdownMenuItem key={cp.id} onClick={() => addParam(cp)} className="text-xs">
+                      + {cp.label}
+                      {cp.unit && <span className="text-muted-foreground ml-1">{cp.unit}</span>}
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
+
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onRemove(exercise.uid)} className="text-destructive gap-2">
                 <X className="w-3.5 h-3.5" />
@@ -177,15 +215,12 @@ export function ProgramExerciseBlock({ exercise, onUpdate, onRemove, onToggleSel
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <button
-            onClick={() => onRemove(exercise.uid)}
-            className="text-zinc-300 hover:text-destructive shrink-0"
-          >
+          <button onClick={() => onRemove(exercise.uid)} className="text-zinc-300 hover:text-destructive shrink-0">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* Second line: inline params */}
+        {/* Second line: sets × reps · rest */}
         <div className="flex items-center gap-1 pl-10 text-xs text-muted-foreground pb-1">
           <InlineNumber value={exercise.sets} onChange={v => onUpdate(exercise.uid, { sets: v })} min={1} />
           <span>×</span>
@@ -242,14 +277,17 @@ export function ProgramExerciseBlock({ exercise, onUpdate, onRemove, onToggleSel
                   className="w-10 text-center bg-transparent border-0 focus:outline-none font-semibold"
                 />
               ) : param.type === 'slider' ? (
-                <input
-                  type="range"
-                  min={param.min ?? 0}
-                  max={param.max ?? 10}
-                  value={param.value as number}
-                  onChange={e => updateParam(param.id, Number(e.target.value))}
-                  className="w-16 h-1 accent-[#3ECF6A]"
-                />
+                <div className="flex items-center gap-1">
+                  <input
+                    type="range"
+                    min={param.min ?? 0}
+                    max={param.max ?? 10}
+                    value={param.value as number}
+                    onChange={e => updateParam(param.id, Number(e.target.value))}
+                    className="w-16 h-1 accent-[#3ECF6A]"
+                  />
+                  <span className="font-semibold w-4 text-center">{param.value}</span>
+                </div>
               ) : param.type === 'select' && param.options ? (
                 <select
                   value={param.value as string}
