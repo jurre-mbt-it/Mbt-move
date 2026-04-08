@@ -21,7 +21,15 @@ export default function RootPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        const role = user.user_metadata?.role
+        // Get role from DB (more reliable than user_metadata)
+        let role = user.user_metadata?.role
+        try {
+          const res = await fetch('/api/auth/me')
+          if (res.ok) {
+            const data = await res.json()
+            if (data.role) role = data.role
+          }
+        } catch { /* fallback to metadata role */ }
         if (role === 'PATIENT') router.replace('/patient/dashboard')
         else if (role === 'ATHLETE') router.replace('/athlete/dashboard')
         else router.replace('/therapist/dashboard')

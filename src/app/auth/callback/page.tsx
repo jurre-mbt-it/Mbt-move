@@ -65,7 +65,15 @@ function CallbackHandler() {
       console.log('[auth/callback] user:', user?.id, 'role:', user?.user_metadata?.role)
 
       if (user) {
-        const role = user.user_metadata?.role
+        // Try to get role from DB (more reliable than user_metadata)
+        let role = user.user_metadata?.role
+        try {
+          const res = await fetch('/api/auth/me')
+          if (res.ok) {
+            const data = await res.json()
+            if (data.role) role = data.role
+          }
+        } catch { /* fallback to metadata role */ }
         const next = searchParams.get('next')
         router.replace(next || getRoleRedirect(role))
       } else {
