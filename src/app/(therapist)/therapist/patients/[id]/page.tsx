@@ -100,9 +100,11 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5 flex-1 sm:flex-none">
-            <MessageSquare className="w-4 h-4" /> Bericht
-          </Button>
+          <Link href="/therapist/messages" className="flex-1 sm:flex-none">
+            <Button variant="outline" size="sm" className="gap-1.5 w-full">
+              <MessageSquare className="w-4 h-4" /> Bericht
+            </Button>
+          </Link>
           {patient.programId ? (
             <Link href={`/therapist/programs/${patient.programId}/edit`} className="flex-1 sm:flex-none">
               <Button size="sm" className="gap-1.5 w-full" style={{ background: '#3ECF6A' }}>

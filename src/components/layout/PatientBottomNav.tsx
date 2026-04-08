@@ -4,17 +4,21 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Home, ClipboardList, CalendarDays, MessageSquare, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { MOCK_PATIENT } from '@/lib/patient-constants'
 
-const navItems = [
-  { href: '/patient/dashboard', label: 'Home', icon: Home },
-  { href: '/patient/schedule', label: 'Schema', icon: CalendarDays },
-  { href: '/patient/program/p1', label: 'Programma', icon: ClipboardList },
-  { href: '/patient/history', label: 'Geschiedenis', icon: MessageSquare },
-  { href: '/patient/profile', label: 'Profiel', icon: User },
-]
+function getNavItems() {
+  return [
+    { href: '/patient/dashboard', label: 'Home', icon: Home },
+    { href: '/patient/schedule', label: 'Schema', icon: CalendarDays },
+    { href: `/patient/program/${MOCK_PATIENT.programId}`, label: 'Programma', icon: ClipboardList },
+    { href: '/patient/history', label: 'Geschiedenis', icon: MessageSquare },
+    { href: '/patient/profile', label: 'Profiel', icon: User },
+  ]
+}
 
 export function PatientBottomNav() {
   const pathname = usePathname()
+  const navItems = getNavItems()
 
   return (
     <nav
