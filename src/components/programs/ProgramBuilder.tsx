@@ -33,7 +33,7 @@ import { trpc } from '@/lib/trpc/client'
 import { cn } from '@/lib/utils'
 
 import {
-  Save, Eye, Copy, FileDown, Plus, Trash2,
+  Save, Eye, Copy, FileDown, Plus, Trash2, Rocket,
   ChevronLeft, Layers, Search, CheckCircle2, X, BarChart2,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -350,6 +350,29 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
     }
   }
 
+  const handleDeploy = async () => {
+    if (exercises.length === 0) {
+      toast.error('Voeg eerst oefeningen toe voordat je deployt')
+      return
+    }
+    // Save first, then set status to ACTIVE
+    await handleSave()
+    try {
+      if (programId) {
+        await saveProgram.mutateAsync({
+          id: programId,
+          status: 'ACTIVE',
+          startDate: new Date().toISOString(),
+        })
+        toast.success('Programma gedeployed! Het is nu zichtbaar voor de patiënt.', { duration: 4000 })
+      } else {
+        toast.error('Sla het programma eerst op')
+      }
+    } catch {
+      toast.error('Deployen mislukt')
+    }
+  }
+
   const handleSaveAsTemplate = async () => {
     const name = templateName.trim() || program.name
     const exercisePayload = exercises.map((ex, i) => ({
@@ -465,13 +488,23 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
 
           <Button
             size="sm"
+            variant="outline"
             className="gap-1.5 h-7 text-xs shrink-0"
-            style={{ background: '#4ECDC4' }}
             onClick={handleSave}
             disabled={saving}
           >
             <Save className="w-3.5 h-3.5" />
             {saving ? '...' : 'Opslaan'}
+          </Button>
+          <Button
+            size="sm"
+            className="gap-1.5 h-7 text-xs shrink-0"
+            style={{ background: '#4ECDC4' }}
+            onClick={handleDeploy}
+            disabled={saving}
+          >
+            <Rocket className="w-3.5 h-3.5" />
+            {saving ? '...' : 'Deployen'}
           </Button>
         </div>
 

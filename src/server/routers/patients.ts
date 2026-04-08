@@ -167,6 +167,31 @@ export const patientsRouter = createTRPCRouter({
       return { success: true }
     }),
 
+  delete: therapistProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // Verify this is a patient of the current therapist
+      const relation = await ctx.prisma.patientTherapist.findFirst({
+        where: { therapistId: ctx.user.id, patientId: input.id },
+      })
+      if (!relation) throw new Error('Patiënt niet gevonden')
+
+      // Remove the therapist-patient relation
+      await ctx.prisma.patientTherapist.deleteMany({
+        where: { therapistId: ctx.user.id, patientId: input.id },
+      })
+
+      // Delete associated programs created by this therapist
+      await ctx.prisma.program.deleteMany({
+        where: { patientId: input.id, creatorId: ctx.user.id },
+      })
+
+      // Delete the user record
+      await ctx.prisma.user.delete({ where: { id: input.id } })
+
+      return { success: true }
+    }),
+
   // Get all patients (including unlinked) for the therapist to invite/link
   search: therapistProcedure
     .input(z.object({ query: z.string().optional() }))

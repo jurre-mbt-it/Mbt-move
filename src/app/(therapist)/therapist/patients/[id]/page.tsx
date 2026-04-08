@@ -2,6 +2,7 @@
 
 import { use, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { notFound } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -20,6 +21,8 @@ import {
   Phone,
   RefreshCw,
   UserCog,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react'
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
@@ -46,8 +49,10 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const { id } = use(params)
   const utils = trpc.useUtils()
   const { data: patient, isLoading } = trpc.patients.get.useQuery({ id })
+  const router = useRouter()
   const [showRoleMenu, setShowRoleMenu] = useState(false)
   const [resending, setResending] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const changeRole = trpc.patients.changeRole.useMutation({
     onSuccess: () => {
@@ -59,6 +64,12 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const resendInvite = trpc.patients.resendInvite.useMutation({
     onSuccess: () => setResending(false),
     onError: () => setResending(false),
+  })
+
+  const deletePatient = trpc.patients.delete.useMutation({
+    onSuccess: () => {
+      router.push('/therapist/patients')
+    },
   })
 
   if (isLoading) {
@@ -224,6 +235,48 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           </CardContent>
         </Card>
       </div>
+
+      {/* Delete patient */}
+      <Card style={{ borderRadius: '12px', borderColor: '#fecaca' }}>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-red-600">Patiënt verwijderen</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Dit verwijdert de patiënt en alle bijbehorende programma&apos;s permanent.</p>
+            </div>
+            {!showDeleteConfirm ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Verwijderen
+              </Button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs h-7"
+                  onClick={() => setShowDeleteConfirm(false)}
+                >
+                  Annuleren
+                </Button>
+                <Button
+                  size="sm"
+                  className="gap-1.5 text-xs h-7 bg-red-600 hover:bg-red-700 text-white"
+                  onClick={() => deletePatient.mutate({ id: patient.id })}
+                  disabled={deletePatient.isPending}
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  {deletePatient.isPending ? 'Verwijderen...' : 'Bevestigen'}
+                </Button>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Programs */}
       <div className="space-y-3">
