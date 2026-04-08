@@ -18,6 +18,8 @@ import {
   Loader2,
   Mail,
   Phone,
+  RefreshCw,
+  UserCog,
 } from 'lucide-react'
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
@@ -27,9 +29,30 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }>
   ARCHIVED:  { label: 'Gearchiveerd', bg: '#f1f5f9', text: '#475569' },
 }
 
+const ROLE_OPTIONS = [
+  { value: 'PATIENT', label: 'Patiënt' },
+  { value: 'ATHLETE', label: 'Atleet' },
+  { value: 'THERAPIST', label: 'Therapeut' },
+] as const
+
 export default function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const utils = trpc.useUtils()
   const { data: patient, isLoading } = trpc.patients.get.useQuery({ id })
+  const [showRoleMenu, setShowRoleMenu] = useState(false)
+  const [resending, setResending] = useState(false)
+
+  const changeRole = trpc.patients.changeRole.useMutation({
+    onSuccess: () => {
+      utils.patients.get.invalidate({ id })
+      setShowRoleMenu(false)
+    },
+  })
+
+  const resendInvite = trpc.patients.resendInvite.useMutation({
+    onSuccess: () => setResending(false),
+    onError: () => setResending(false),
+  })
 
   if (isLoading) {
     return (
@@ -90,6 +113,47 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                 </Button>
               </Link>
             )}
+          </div>
+          <div className="flex gap-2">
+            {/* Role switcher */}
+            <div className="relative">
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-xs"
+                onClick={() => setShowRoleMenu(!showRoleMenu)}
+              >
+                <UserCog className="w-3.5 h-3.5" /> Rol wijzigen
+              </Button>
+              {showRoleMenu && (
+                <div className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-lg z-20 py-1 min-w-[140px]">
+                  {ROLE_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-zinc-50 transition-colors"
+                      onClick={() => changeRole.mutate({ id: patient.id, role: opt.value })}
+                      disabled={changeRole.isPending}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* Resend invite */}
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 text-xs"
+              onClick={() => {
+                setResending(true)
+                resendInvite.mutate({ id: patient.id })
+              }}
+              disabled={resending || resendInvite.isPending}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${resending ? 'animate-spin' : ''}`} />
+              {resendInvite.isSuccess ? 'Verstuurd!' : 'Opnieuw uitnodigen'}
+            </Button>
           </div>
         </div>
       </div>

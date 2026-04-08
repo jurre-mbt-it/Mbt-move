@@ -123,6 +123,48 @@ export const patientsRouter = createTRPCRouter({
       }
     }),
 
+  changeRole: therapistProcedure
+    .input(z.object({
+      id: z.string(),
+      role: z.enum(['PATIENT', 'ATHLETE', 'THERAPIST']),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // Verify this is a patient of the current therapist
+      const relation = await ctx.prisma.patientTherapist.findFirst({
+        where: { therapistId: ctx.user.id, patientId: input.id },
+      })
+      if (!relation) {
+        throw new Error('Patiënt niet gevonden')
+      }
+      return ctx.prisma.user.update({
+        where: { id: input.id },
+        data: { role: input.role },
+      })
+    }),
+
+  resendInvite: therapistProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const patient = await ctx.prisma.user.findUnique({
+        where: { id: input.id },
+        select: { email: true, name: true },
+      })
+      if (!patient) throw new Error('Patiënt niet gevonden')
+
+      // Call the invite API internally
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+      const res = await fetch(`${baseUrl}/api/auth/invite-patient`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: patient.email, name: patient.name, resend: true }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Uitnodiging mislukt')
+      }
+      return { success: true }
+    }),
+
   // Get all patients (including unlinked) for the therapist to invite/link
   search: therapistProcedure
     .input(z.object({ query: z.string().optional() }))
