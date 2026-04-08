@@ -2,16 +2,16 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, ClipboardList, CalendarDays, MessageSquare, User } from 'lucide-react'
+import { Home, ClipboardList, TrendingUp, MessageSquare, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { MOCK_PATIENT } from '@/lib/patient-constants'
 
 function getNavItems() {
   return [
     { href: '/patient/dashboard', label: 'Home', icon: Home },
-    { href: '/patient/schedule', label: 'Schema', icon: CalendarDays },
     { href: `/patient/program/${MOCK_PATIENT.programId}`, label: 'Programma', icon: ClipboardList },
-    { href: '/patient/history', label: 'Geschiedenis', icon: MessageSquare },
+    { href: '/patient/progress', label: 'Voortgang', icon: TrendingUp },
+    { href: '/patient/messages', label: 'Berichten', icon: MessageSquare },
     { href: '/patient/profile', label: 'Profiel', icon: User },
   ]
 }
