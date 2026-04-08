@@ -241,3 +241,42 @@ EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN
   ALTER TABLE "patient_therapists" ADD CONSTRAINT "patient_therapists_patientId_fkey" FOREIGN KEY ("patientId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+-- Week Schedules (Fase 4)
+CREATE TABLE IF NOT EXISTS "week_schedules" (
+  "id" TEXT NOT NULL,
+  "name" TEXT NOT NULL,
+  "description" TEXT,
+  "creatorId" TEXT NOT NULL,
+  "patientId" TEXT,
+  "startDate" TIMESTAMP(3),
+  "endDate" TIMESTAMP(3),
+  "isTemplate" BOOLEAN NOT NULL DEFAULT false,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "week_schedules_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "week_schedule_days" (
+  "id" TEXT NOT NULL,
+  "weekScheduleId" TEXT NOT NULL,
+  "dayOfWeek" INTEGER NOT NULL,
+  "programId" TEXT,
+  CONSTRAINT "week_schedule_days_pkey" PRIMARY KEY ("id")
+);
+
+DO $$ BEGIN
+  ALTER TABLE "week_schedules" ADD CONSTRAINT "week_schedules_creatorId_fkey" FOREIGN KEY ("creatorId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "week_schedules" ADD CONSTRAINT "week_schedules_patientId_fkey" FOREIGN KEY ("patientId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "week_schedule_days" ADD CONSTRAINT "week_schedule_days_weekScheduleId_fkey" FOREIGN KEY ("weekScheduleId") REFERENCES "week_schedules"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "week_schedule_days" ADD CONSTRAINT "week_schedule_days_programId_fkey" FOREIGN KEY ("programId") REFERENCES "programs"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;

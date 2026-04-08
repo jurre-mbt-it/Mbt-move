@@ -2,13 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, ClipboardList, Activity, MessageSquare, User } from 'lucide-react'
+import { Home, ClipboardList, CalendarDays, MessageSquare, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { href: '/patient/dashboard', label: 'Home', icon: Home },
-  { href: `/patient/program/p1`, label: 'Programma', icon: ClipboardList },
-  { href: '/patient/session', label: 'Sessie', icon: Activity },
+  { href: '/patient/schedule', label: 'Schema', icon: CalendarDays },
+  { href: '/patient/program/p1', label: 'Programma', icon: ClipboardList },
   { href: '/patient/history', label: 'Geschiedenis', icon: MessageSquare },
   { href: '/patient/profile', label: 'Profiel', icon: User },
 ]

@@ -7,7 +7,8 @@ import {
   Users,
   ClipboardList,
   Dumbbell,
-  Calendar,
+  CalendarDays,
+  Library,
   MessageSquare,
   Settings,
   LogOut,
@@ -20,7 +21,9 @@ const navItems = [
   { href: '/therapist/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/therapist/patients', label: 'Patiënten', icon: Users },
   { href: '/therapist/programs', label: "Programma's", icon: ClipboardList },
+  { href: '/therapist/week-planner', label: 'Weekschema', icon: CalendarDays },
   { href: '/therapist/exercises', label: 'Oefeningen', icon: Dumbbell },
+  { href: '/therapist/programs/library', label: 'Bibliotheek', icon: Library },
   { href: '/therapist/messages', label: 'Berichten', icon: MessageSquare },
 ]
 

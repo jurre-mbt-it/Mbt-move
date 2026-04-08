@@ -89,17 +89,19 @@ model User {
   mfaSecret     String?
 
   // Relations
-  therapistPatients     PatientTherapist[]     @relation("TherapistRelation")
-  patientTherapists     PatientTherapist[]     @relation("PatientRelation")
-  createdPrograms       Program[]              @relation("ProgramCreator")
-  patientPrograms       Program[]              @relation("ProgramPatient")
-  exercises             Exercise[]
-  collections           ExerciseCollection[]
-  appointments          Appointment[]          @relation("PatientAppointments")
-  therapistAppointments Appointment[]          @relation("TherapistAppointments")
-  sessionLogs           SessionLog[]
-  notifications         Notification[]
-  messages              Message[]
+  therapistPatients      PatientTherapist[]     @relation("TherapistRelation")
+  patientTherapists      PatientTherapist[]     @relation("PatientRelation")
+  createdPrograms        Program[]              @relation("ProgramCreator")
+  patientPrograms        Program[]              @relation("ProgramPatient")
+  exercises              Exercise[]
+  collections            ExerciseCollection[]
+  appointments           Appointment[]          @relation("PatientAppointments")
+  therapistAppointments  Appointment[]          @relation("TherapistAppointments")
+  sessionLogs            SessionLog[]
+  notifications          Notification[]
+  messages               Message[]
+  createdWeekSchedules   WeekSchedule[]         @relation("CreatedWeekSchedules")
+  patientWeekSchedules   WeekSchedule[]         @relation("PatientWeekSchedules")
 
   @@map("users")
 }
@@ -207,13 +209,43 @@ model Program {
   patient   User?   @relation("ProgramPatient", fields: [patientId], references: [id])
   patientId String?
 
-  exercises   ProgramExercise[]
-  sessionLogs SessionLog[]
+  exercises        ProgramExercise[]
+  sessionLogs      SessionLog[]
+  weekScheduleDays WeekScheduleDay[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("programs")
+}
+
+model WeekSchedule {
+  id          String            @id
+  name        String
+  description String?
+  creatorId   String
+  creator     User              @relation("CreatedWeekSchedules", fields: [creatorId], references: [id])
+  patientId   String?
+  patient     User?             @relation("PatientWeekSchedules", fields: [patientId], references: [id])
+  startDate   DateTime?
+  endDate     DateTime?
+  isTemplate  Boolean           @default(false)
+  days        WeekScheduleDay[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@map("week_schedules")
+}
+
+model WeekScheduleDay {
+  id             String       @id
+  weekScheduleId String
+  weekSchedule   WeekSchedule @relation(fields: [weekScheduleId], references: [id], onDelete: Cascade)
+  dayOfWeek      Int
+  programId      String?
+  program        Program?     @relation(fields: [programId], references: [id])
+
+  @@map("week_schedule_days")
 }
 
 model ProgramExercise {
