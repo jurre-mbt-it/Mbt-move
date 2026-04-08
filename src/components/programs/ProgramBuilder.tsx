@@ -457,7 +457,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
               <Eye className="w-3.5 h-3.5" />
               Preview
             </Button>
-            <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={() => toast.info('PDF export werkt met Supabase')}>
+            <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={() => toast.info('PDF export beschikbaar zodra de database is gekoppeld')}>
               <FileDown className="w-3.5 h-3.5" />
               PDF
             </Button>

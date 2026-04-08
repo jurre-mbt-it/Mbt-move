@@ -5,22 +5,24 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Bell, Settings, LogOut, User } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 
 interface HeaderProps {
   title?: string
   userName?: string
   userEmail?: string
   userAvatar?: string
+  settingsBase?: string
 }
 
-export function Header({ title, userName, userEmail, userAvatar }: HeaderProps) {
+export function Header({ title, userName, userEmail, userAvatar, settingsBase = '/therapist/settings' }: HeaderProps) {
   const router = useRouter()
   const supabase = createClient()
 
@@ -47,10 +49,24 @@ export function Header({ title, userName, userEmail, userAvatar }: HeaderProps) 
         <h1 className="hidden md:block font-semibold text-lg">{title}</h1>
       )}
       <div className="flex items-center gap-3 ml-auto">
-        <button className="relative p-2 rounded-lg hover:bg-zinc-100 transition-colors">
-          <Bell className="w-5 h-5 text-zinc-500" />
-        </button>
+        {/* Notificaties */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="relative p-2 rounded-lg hover:bg-zinc-100 transition-colors">
+              <Bell className="w-5 h-5 text-zinc-500" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-72">
+            <DropdownMenuLabel>Notificaties</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <div className="flex flex-col items-center justify-center py-8 text-center px-4">
+              <Bell className="w-7 h-7 text-zinc-200 mb-2" />
+              <p className="text-sm text-muted-foreground">Geen nieuwe notificaties</p>
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
+        {/* Gebruikersmenu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2" style={{ '--tw-ring-color': '#3ECF6A' } as React.CSSProperties}>
@@ -69,21 +85,21 @@ export function Header({ title, userName, userEmail, userAvatar }: HeaderProps) 
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <a href="/settings/profile" className="flex items-center gap-2 cursor-pointer">
+              <Link href={`${settingsBase}/profile`} className="flex items-center gap-2 cursor-pointer">
                 <User className="w-4 h-4" />
-                Profile
-              </a>
+                Profiel
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <a href="/settings" className="flex items-center gap-2 cursor-pointer">
+              <Link href={settingsBase} className="flex items-center gap-2 cursor-pointer">
                 <Settings className="w-4 h-4" />
-                Settings
-              </a>
+                Instellingen
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive focus:text-destructive">
               <LogOut className="w-4 h-4 mr-2" />
-              Sign out
+              Uitloggen
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

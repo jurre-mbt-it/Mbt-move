@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "mbt-move",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["/Users/eva/mbt-move/.claude/worktrees/eloquent-hoover/dev-worktree.sh"],
       "port": 3000
     }
   ]

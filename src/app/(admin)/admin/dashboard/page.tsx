@@ -1,5 +1,6 @@
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, Activity, ShieldCheck, Server } from 'lucide-react'
+import { Users, Activity, ShieldCheck, Server, ClipboardList, Dumbbell, ChevronRight } from 'lucide-react'
 
 export const metadata = {
   title: 'Admin Dashboard – MBT Gym',
@@ -10,6 +11,12 @@ const stats = [
   { label: 'Active Sessions', value: '—', icon: Activity },
   { label: 'MFA Enabled', value: '—', icon: ShieldCheck },
   { label: 'System Status', value: 'OK', icon: Server },
+]
+
+const quickLinks = [
+  { href: '/therapist/patients', icon: Users, label: 'Patiënten', description: 'Beheer patiënten en hun programma\'s' },
+  { href: '/therapist/exercises', icon: Dumbbell, label: 'Oefeningen', description: 'Oefeningenbibliotheek beheren' },
+  { href: '/therapist/programs', icon: ClipboardList, label: "Programma's", description: "Revalidatieprogramma's beheren" },
 ]
 
 export default function AdminDashboard() {
@@ -38,6 +45,28 @@ export default function AdminDashboard() {
               </div>
             </CardContent>
           </Card>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {quickLinks.map(({ href, icon: Icon, label, description }) => (
+          <Link key={href} href={href}>
+            <Card style={{ borderRadius: '12px' }} className="hover:shadow-sm transition-shadow cursor-pointer h-full">
+              <CardContent className="p-5 flex items-center gap-4">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: '#f4f4f5' }}
+                >
+                  <Icon className="w-5 h-5 text-zinc-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm">{label}</p>
+                  <p className="text-xs text-muted-foreground">{description}</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-zinc-400 shrink-0" />
+              </CardContent>
+            </Card>
+          </Link>
         ))}
       </div>
 

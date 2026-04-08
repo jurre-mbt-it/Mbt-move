@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -26,6 +27,7 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }>
 }
 
 export default function PatientsPage() {
+  const router = useRouter()
   const [search, setSearch] = useState('')
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteName, setInviteName] = useState('')
@@ -60,7 +62,7 @@ export default function PatientsPage() {
   )
 
   const activeCount = MOCK_PATIENTS.filter(p => p.programStatus === 'ACTIVE').length
-  const lowComplianceCount = MOCK_PATIENTS.filter(p => p.compliance > 0 && p.compliance < 70).length
+  const lowComplianceCount = MOCK_PATIENTS.filter(p => (p.compliance ?? 0) > 0 && (p.compliance ?? 0) < 70).length
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -110,8 +112,12 @@ export default function PatientsPage() {
             : null
 
           return (
-            <Link key={patient.id} href={`/therapist/patients/${patient.id}`} className="block">
-            <Card style={{ borderRadius: '12px' }} className="hover:shadow-md transition-shadow cursor-pointer">
+            <Card
+              key={patient.id}
+              style={{ borderRadius: '12px' }}
+              className="hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => router.push(`/therapist/patients/${patient.id}`)}
+            >
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
                   {/* Avatar */}
@@ -182,25 +188,30 @@ export default function PatientsPage() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex flex-col gap-1.5 shrink-0" onClick={e => e.preventDefault()}>
+                  <div className="flex flex-col gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
                     {patient.programId ? (
-                      <Link href={`/therapist/programs/${patient.programId}/edit`}>
-                        <Button variant="outline" size="sm" className="text-xs h-7 px-3">
-                          Programma
-                        </Button>
-                      </Link>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-7 px-3"
+                        onClick={() => router.push(`/therapist/programs/${patient.programId}/edit`)}
+                      >
+                        Programma
+                      </Button>
                     ) : (
-                      <Link href="/therapist/programs/new">
-                        <Button size="sm" className="text-xs h-7 px-3" style={{ background: '#3ECF6A' }}>
-                          + Programma
-                        </Button>
-                      </Link>
+                      <Button
+                        size="sm"
+                        className="text-xs h-7 px-3"
+                        style={{ background: '#3ECF6A' }}
+                        onClick={() => router.push('/therapist/programs/new')}
+                      >
+                        + Programma
+                      </Button>
                     )}
                   </div>
                 </div>
               </CardContent>
             </Card>
-            </Link>
           )
         })}
 
