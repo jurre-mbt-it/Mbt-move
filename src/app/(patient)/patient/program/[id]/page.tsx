@@ -29,7 +29,7 @@ export default function PatientProgramPage() {
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
       {/* Header */}
-      <div className="px-4 pt-12 pb-5" style={{ background: '#1A1A1A' }}>
+      <div className="px-4 pt-12 pb-5" style={{ background: '#1A3A3A' }}>
         <Link href="/patient/dashboard" className="inline-flex items-center gap-1 text-zinc-400 text-sm mb-3">
           <ChevronLeft className="w-4 h-4" /> Terug
         </Link>
@@ -45,7 +45,7 @@ export default function PatientProgramPage() {
               className="shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors"
               style={
                 activeWeek === w
-                  ? { background: '#3ECF6A', color: 'white' }
+                  ? { background: '#4ECDC4', color: 'white' }
                   : { background: 'rgba(255,255,255,0.1)', color: '#a1a1aa' }
               }
             >
@@ -83,8 +83,8 @@ export default function PatientProgramPage() {
                     <div
                       className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
                       style={
-                        isDone ? { background: '#3ECF6A', color: 'white' }
-                          : isToday ? { background: '#1A1A1A', color: 'white' }
+                        isDone ? { background: '#4ECDC4', color: 'white' }
+                          : isToday ? { background: '#1A3A3A', color: 'white' }
                             : { background: '#f4f4f5', color: '#52525b' }
                       }
                     >
@@ -97,12 +97,12 @@ export default function PatientProgramPage() {
                   </div>
 
                   {isDone ? (
-                    <Badge className="text-xs gap-1" style={{ background: '#f0fdf4', color: '#15803d', border: 'none' }}>
+                    <Badge className="text-xs gap-1" style={{ background: '#f0fdfa', color: '#0D6B6E', border: 'none' }}>
                       <CheckCircle2 className="w-3 h-3" /> Afgerond
                     </Badge>
                   ) : isToday ? (
                     <Link href="/patient/session">
-                      <Button size="sm" className="gap-1.5 text-xs h-7" style={{ background: '#3ECF6A' }}>
+                      <Button size="sm" className="gap-1.5 text-xs h-7" style={{ background: '#4ECDC4' }}>
                         <Play className="w-3 h-3 fill-current" /> Start
                       </Button>
                     </Link>
@@ -112,7 +112,7 @@ export default function PatientProgramPage() {
                 <div className="space-y-2">
                   {dayExercises.map(e => (
                     <div key={e.uid} className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: isDone ? '#3ECF6A' : '#d4d4d8' }} />
+                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: isDone ? '#4ECDC4' : '#d4d4d8' }} />
                       <span className="text-sm flex-1 truncate">{e.name}</span>
                       <span className="text-xs text-muted-foreground shrink-0">{e.sets}×{e.reps}</span>
                     </div>

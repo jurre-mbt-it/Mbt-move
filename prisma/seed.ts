@@ -1,6 +1,20 @@
-import { PrismaClient, UserRole, ExerciseCategory, BodyRegion } from '@prisma/client'
+import { PrismaClient, UserRole, ExerciseCategory, BodyRegion, LoadType, MovementPattern } from '@prisma/client'
+import { STANDARD_EXERCISES } from './seed-exercises'
+import { PrismaPg } from '@prisma/adapter-pg'
+import { Pool } from 'pg'
+import { config } from 'dotenv'
+import { resolve } from 'path'
 
-const prisma = new PrismaClient()
+config({ path: resolve(process.cwd(), '.env.local') })
+
+function createPrisma() {
+  const url = process.env.DIRECT_URL || process.env.DATABASE_URL
+  if (!url || url.includes('localhost')) return new PrismaClient()
+  const pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } })
+  return new PrismaClient({ adapter: new PrismaPg(pool) })
+}
+
+const prisma = createPrisma()
 
 async function main() {
   console.log('Seeding database...')
@@ -145,7 +159,7 @@ async function main() {
     {
       name: 'Single-Leg Balance',
       description: 'Proprioception and ankle stability drill.',
-      category: ExerciseCategory.BALANCE,
+      category: ExerciseCategory.STABILITY,
       bodyRegion: [BodyRegion.ANKLE, BodyRegion.KNEE],
       instructions: [
         'Stand near a wall for safety.',
@@ -182,6 +196,40 @@ async function main() {
     })
   }
   console.log(`Created ${exercises.length} sample exercises`)
+
+  // Standard exercise database (50+ exercises without videos)
+  let standardCreated = 0
+  for (const stdEx of STANDARD_EXERCISES) {
+    const existing = await prisma.exercise.findFirst({
+      where: { name: { equals: stdEx.name, mode: 'insensitive' } },
+    })
+    if (existing) continue // Skip duplicates
+
+    await prisma.exercise.create({
+      data: {
+        name: stdEx.name,
+        description: stdEx.description,
+        category: stdEx.category as ExerciseCategory,
+        bodyRegion: stdEx.bodyRegion as BodyRegion[],
+        difficulty: stdEx.difficulty as never,
+        loadType: stdEx.loadType as LoadType,
+        isUnilateral: stdEx.isUnilateral,
+        movementPattern: stdEx.movementPattern as MovementPattern | null,
+        instructions: stdEx.instructions,
+        tags: stdEx.tags,
+        isPublic: true,
+        createdById: admin.id,
+        muscleLoads: {
+          create: Object.entries(stdEx.muscleLoads).map(([muscle, load]) => ({
+            muscle,
+            load,
+          })),
+        },
+      },
+    })
+    standardCreated++
+  }
+  console.log(`Created ${standardCreated} standard exercises (${STANDARD_EXERCISES.length - standardCreated} already existed)`)
 
   console.log('Seeding complete!')
 }

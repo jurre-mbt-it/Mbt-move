@@ -8,7 +8,7 @@ import { ChevronLeft, Moon, Dumbbell } from 'lucide-react'
 const DAY_LABELS = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
 
 const CATEGORY_COLORS: Record<string, string> = {
-  STRENGTH: '#3ECF6A', MOBILITY: '#60a5fa', PLYOMETRICS: '#f59e0b',
+  STRENGTH: '#4ECDC4', MOBILITY: '#60a5fa', PLYOMETRICS: '#f59e0b',
   CARDIO: '#f87171', STABILITY: '#a78bfa',
 }
 
@@ -46,26 +46,26 @@ export default function ScheduleDayPage({ params }: Props) {
 
       {!day?.program ? (
         <div className="flex flex-col items-center justify-center py-12 rounded-2xl text-center"
-          style={{ background: '#f0fdf4' }}>
+          style={{ background: '#f0fdfa' }}>
           <Moon className="w-10 h-10 mb-3" style={{ color: '#86efac' }} />
-          <p className="font-bold text-base" style={{ color: '#15803d' }}>Rustdag 😴</p>
+          <p className="font-bold text-base" style={{ color: '#0D6B6E' }}>Rustdag 😴</p>
           <p className="text-sm text-muted-foreground mt-1 max-w-xs">
             Vandaag hoef je niet te trainen. Gun je lichaam de tijd om te herstellen — dat is net zo belangrijk als trainen!
           </p>
         </div>
       ) : (
         <>
-          <div className="rounded-xl p-3 border" style={{ background: '#f0fdf4', borderColor: '#bbf7d0' }}>
+          <div className="rounded-xl p-3 border" style={{ background: '#f0fdfa', borderColor: '#bbf7d0' }}>
             <div className="flex items-center gap-2">
-              <Dumbbell className="w-4 h-4" style={{ color: '#15803d' }} />
-              <h2 className="font-bold text-sm" style={{ color: '#15803d' }}>{day.program.name}</h2>
+              <Dumbbell className="w-4 h-4" style={{ color: '#0D6B6E' }} />
+              <h2 className="font-bold text-sm" style={{ color: '#0D6B6E' }}>{day.program.name}</h2>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">{day.program.exercises?.length ?? 0} oefeningen</p>
           </div>
 
           <div className="space-y-2">
             {(day.program.exercises ?? []).map((pe, idx) => {
-              const color = CATEGORY_COLORS[pe.exercise.category] ?? '#3ECF6A'
+              const color = CATEGORY_COLORS[pe.exercise.category] ?? '#4ECDC4'
               return (
                 <div key={pe.id} className="flex items-center gap-3 p-3 rounded-xl border bg-white">
                   <div

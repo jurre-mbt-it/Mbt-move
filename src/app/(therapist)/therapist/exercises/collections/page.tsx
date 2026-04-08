@@ -29,7 +29,7 @@ interface Collection {
 }
 
 const INITIAL_COLLECTIONS: Collection[] = [
-  { id: 'c1', name: 'Knie revalidatie', color: '#3ECF6A', exerciseIds: ['1', '2', '4'] },
+  { id: 'c1', name: 'Knie revalidatie', color: '#4ECDC4', exerciseIds: ['1', '2', '4'] },
   { id: 'c2', name: 'Schouder protocol', color: '#60a5fa', exerciseIds: ['6', '4'] },
   { id: 'c3', name: 'Warming-up basis', color: '#f59e0b', exerciseIds: ['3', '4', '5', '1'] },
 ]
@@ -39,7 +39,7 @@ export default function CollectionsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Collection | null>(null)
   const [formName, setFormName] = useState('')
-  const [formColor, setFormColor] = useState(COLLECTION_COLORS[0])
+  const [formColor, setFormColor] = useState<string>(COLLECTION_COLORS[0])
   const [activeCollection, setActiveCollection] = useState<string | null>(null)
 
   const openCreate = () => {
@@ -110,7 +110,7 @@ export default function CollectionsPage() {
               Organiseer oefeningen in persoonlijke collecties
             </p>
           </div>
-          <Button onClick={openCreate} style={{ background: '#3ECF6A' }} className="gap-2">
+          <Button onClick={openCreate} style={{ background: '#4ECDC4' }} className="gap-2">
             <Plus className="w-4 h-4" />
             Nieuwe collectie
           </Button>
@@ -259,13 +259,13 @@ export default function CollectionsPage() {
                       'w-7 h-7 rounded-full transition-transform',
                       formColor === c ? 'ring-2 ring-offset-2 scale-110' : 'hover:scale-105'
                     )}
-                    style={{ background: c, ringColor: c }}
+                    style={{ background: c, '--tw-ring-color': c } as React.CSSProperties}
                   />
                 ))}
               </div>
             </div>
             <div className="flex gap-2 pt-2">
-              <Button onClick={handleSave} style={{ background: '#3ECF6A' }} className="flex-1">
+              <Button onClick={handleSave} style={{ background: '#4ECDC4' }} className="flex-1">
                 {editing ? 'Opslaan' : 'Aanmaken'}
               </Button>
               <Button variant="outline" onClick={() => setDialogOpen(false)}>

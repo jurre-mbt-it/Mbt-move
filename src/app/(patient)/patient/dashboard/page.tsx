@@ -10,15 +10,21 @@ import {
   MOCK_SESSION_HISTORY,
   getTodayExercises,
   getWeekSchedule,
+  getMockRecoverySessions,
   DAY_NAMES,
   TODAY_DAY,
 } from '@/lib/patient-constants'
+import { RecoveryPanel } from '@/components/recovery/RecoveryPanel'
+import { WorkloadPanel } from '@/components/workload/WorkloadPanel'
+import { getMockWorkloadSessions } from '@/lib/workload-monitoring'
 import { Play, CheckCircle2, Flame, TrendingUp, Calendar, ChevronRight, AlertCircle } from 'lucide-react'
 import { DAY_LABELS } from '@/lib/program-constants'
 
 export default function PatientDashboard() {
   const todayExercises = getTodayExercises()
   const weekSchedule = getWeekSchedule()
+  const recoverySessions = getMockRecoverySessions()
+  const workloadSessions = getMockWorkloadSessions()
   const activeDays = Object.keys(weekSchedule).map(Number).sort()
 
   const lastSession = MOCK_SESSION_HISTORY[0]
@@ -34,7 +40,7 @@ export default function PatientDashboard() {
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
       {/* Header */}
-      <div className="px-4 pt-12 pb-8" style={{ background: '#1A1A1A' }}>
+      <div className="px-4 pt-12 pb-8" style={{ background: '#1A3A3A' }}>
         <p className="text-zinc-400 text-sm">{greeting}</p>
         <h1 className="text-white text-2xl font-bold mt-0.5">{MOCK_PATIENT.name.split(' ')[0]} 👋</h1>
         <p className="text-zinc-400 text-xs mt-1">Programma: {MOCK_PATIENT.programName}</p>
@@ -44,19 +50,19 @@ export default function PatientDashboard() {
         {/* Stats row */}
         <div className="grid grid-cols-3 gap-3">
           <StatCard icon={<Flame className="w-4 h-4" style={{ color: '#f97316' }} />} value={streak} label="Streak" />
-          <StatCard icon={<CheckCircle2 className="w-4 h-4" style={{ color: '#3ECF6A' }} />} value={MOCK_SESSION_HISTORY.length} label="Sessies" />
+          <StatCard icon={<CheckCircle2 className="w-4 h-4" style={{ color: '#4ECDC4' }} />} value={MOCK_SESSION_HISTORY.length} label="Sessies" />
           <StatCard icon={<TrendingUp className="w-4 h-4" style={{ color: '#6366f1' }} />} value={`${Math.round(weekProgress)}%`} label="Deze week" />
         </div>
 
         {/* Today's session */}
         <Card style={{ borderRadius: '14px', overflow: 'hidden' }}>
-          <div className="px-4 py-3 flex items-center justify-between" style={{ background: '#3ECF6A' }}>
+          <div className="px-4 py-3 flex items-center justify-between" style={{ background: '#4ECDC4' }}>
             <div>
               <p className="text-white text-xs font-medium opacity-80">Vandaag · {DAY_NAMES[TODAY_DAY - 1]}</p>
               <p className="text-white font-bold text-base">{todayExercises.length} oefeningen</p>
             </div>
             <Link href="/patient/session">
-              <Button size="sm" className="bg-white gap-1.5 font-semibold text-xs" style={{ color: '#15803d' }}>
+              <Button size="sm" className="bg-white gap-1.5 font-semibold text-xs" style={{ color: '#0D6B6E' }}>
                 <Play className="w-3 h-3 fill-current" /> Start
               </Button>
             </Link>
@@ -98,8 +104,8 @@ export default function PatientDashboard() {
                     <div
                       className="w-full aspect-square rounded-full flex items-center justify-center text-xs font-medium max-w-[36px]"
                       style={
-                        isDone ? { background: '#3ECF6A', color: 'white' }
-                          : isToday ? { background: '#1A1A1A', color: 'white' }
+                        isDone ? { background: '#4ECDC4', color: 'white' }
+                          : isToday ? { background: '#1A3A3A', color: 'white' }
                             : hasSession ? { background: '#f4f4f5', color: '#52525b' }
                               : { background: 'transparent', color: '#d4d4d8' }
                       }
@@ -112,6 +118,12 @@ export default function PatientDashboard() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Recovery / supercompensation model */}
+        <RecoveryPanel sessions={recoverySessions} />
+
+        {/* ACWR workload monitoring */}
+        <WorkloadPanel sessions={workloadSessions} />
 
         {/* Pain report quick link */}
         <Link href="/patient/pain">
@@ -136,13 +148,13 @@ export default function PatientDashboard() {
             <CardContent className="px-4 py-4">
               <div className="flex items-center justify-between mb-3">
                 <p className="font-semibold text-sm">Laatste sessie</p>
-                <Link href="/patient/history" className="text-xs flex items-center gap-0.5" style={{ color: '#3ECF6A' }}>
+                <Link href="/patient/history" className="text-xs flex items-center gap-0.5" style={{ color: '#4ECDC4' }}>
                   Alles <ChevronRight className="w-3 h-3" />
                 </Link>
               </div>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#f0fdf4' }}>
-                  <Calendar className="w-5 h-5" style={{ color: '#3ECF6A' }} />
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#f0fdfa' }}>
+                  <Calendar className="w-5 h-5" style={{ color: '#4ECDC4' }} />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium">{lastSession.dayLabel} · W{lastSession.week + 1}D{lastSession.day}</p>

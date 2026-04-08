@@ -72,7 +72,7 @@ export function RegisterForm() {
 
         if (data.session) {
           const role = data.user.user_metadata?.role
-          router.push(role === 'PATIENT' ? '/patient/dashboard' : '/therapist/dashboard')
+          router.push(role === 'PATIENT' ? '/patient/dashboard' : role === 'ATHLETE' ? '/athlete/dashboard' : '/therapist/dashboard')
           router.refresh()
         } else {
           router.push('/login?message=Controleer je e-mail om je account te bevestigen')
@@ -132,6 +132,7 @@ export function RegisterForm() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="THERAPIST">Fysiotherapeut / Clinicus</SelectItem>
+                <SelectItem value="ATHLETE">Atleet</SelectItem>
                 <SelectItem value="PATIENT">Patiënt</SelectItem>
               </SelectContent>
             </Select>
@@ -164,7 +165,7 @@ export function RegisterForm() {
           <Button
             type="submit"
             className="w-full"
-            style={{ background: '#3ECF6A' }}
+            style={{ background: '#4ECDC4' }}
             disabled={loading}
           >
             {loading ? 'Account aanmaken…' : 'Account aanmaken'}
@@ -173,7 +174,7 @@ export function RegisterForm() {
 
         <p className="text-center text-sm text-muted-foreground mt-4">
           Al een account?{' '}
-          <a href="/login" className="underline" style={{ color: '#3ECF6A' }}>
+          <a href="/login" className="underline" style={{ color: '#4ECDC4' }}>
             Inloggen
           </a>
         </p>

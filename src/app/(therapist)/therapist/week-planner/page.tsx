@@ -49,7 +49,7 @@ export default function WeekPlannerPage() {
           <p className="text-muted-foreground text-sm mt-0.5">Plan per weekdag welk programma een patiënt doet</p>
         </div>
         <Link href="/therapist/week-planner/new">
-          <Button style={{ background: '#3ECF6A' }} className="gap-2">
+          <Button style={{ background: '#4ECDC4' }} className="gap-2">
             <Plus className="w-4 h-4" />
             Nieuw schema
           </Button>
@@ -135,8 +135,8 @@ function WeekScheduleCard({ schedule, onDelete }: { schedule: ScheduleItem; onDe
                     <div
                       className="w-5 h-5 rounded-sm text-[9px] flex items-center justify-center font-bold"
                       style={{
-                        background: hasProgram ? '#dcfce7' : '#f4f4f5',
-                        color: hasProgram ? '#15803d' : '#a1a1aa',
+                        background: hasProgram ? '#ccfbf1' : '#f4f4f5',
+                        color: hasProgram ? '#0D6B6E' : '#a1a1aa',
                       }}
                     >
                       {hasProgram ? '●' : '–'}

@@ -1,5 +1,6 @@
 import { buildMockProgram } from './program-constants'
 import { PATIENTS } from './mock-data'
+import type { ExerciseSession } from './recovery-estimation'
 
 // De ingelogde patiënt is Jan de Vries (pat1) in de mock
 const _patient = PATIENTS.find(p => p.id === 'pat1')!
@@ -116,6 +117,45 @@ export const MOCK_SESSION_HISTORY: SessionLog[] = [
     notes: 'Sessie vroegtijdig gestopt wegens pijn',
   },
 ]
+
+/**
+ * Mock recovery sessions — maps session history to exercise data
+ * so the recovery engine can calculate muscle-level recovery.
+ * In production this comes from SessionLog + ExerciseLog + Exercise.muscleLoads
+ */
+export function getMockRecoverySessions(): ExerciseSession[] {
+  const exercises = buildMockProgram()
+
+  // Last session (Apr 5, Day 3 Week 3) — same exercises as Day 1 of the mock program
+  // Since mock only has week 1 data, we reuse those exercises
+  const day1Exercises = exercises.filter(e => e.day === 1)
+  const day2Exercises = exercises.filter(e => e.day === 2)
+
+  return [
+    // Session 1: April 5 (2 days ago) — Day 1 exercises
+    ...day1Exercises.map(e => ({
+      exerciseId: e.exerciseId,
+      muscleLoads: e.muscleLoads,
+      sets: e.sets,
+      reps: e.reps,
+      repUnit: e.repUnit,
+      completedAt: new Date('2026-04-06T10:30:00'),
+      painLevel: 2,
+      rpe: 6,
+    })),
+    // Session 2: April 3 (4 days ago) — Day 2 exercises
+    ...day2Exercises.map(e => ({
+      exerciseId: e.exerciseId,
+      muscleLoads: e.muscleLoads,
+      sets: e.sets,
+      reps: e.reps,
+      repUnit: e.repUnit,
+      completedAt: new Date('2026-04-04T15:00:00'),
+      painLevel: 3,
+      rpe: 7,
+    })),
+  ]
+}
 
 export function getTodayExercises() {
   const all = buildMockProgram()

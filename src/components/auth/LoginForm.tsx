@@ -2,15 +2,12 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { createClient } from '@/lib/supabase/client'
+import { Mail, Lock, ArrowRight, Sparkles } from 'lucide-react'
 
 function getRoleRedirect(role?: string) {
   if (role === 'PATIENT') return '/patient/dashboard'
+  if (role === 'ATHLETE') return '/athlete/dashboard'
   return '/therapist/dashboard'
 }
 
@@ -20,6 +17,7 @@ export function LoginForm() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [mode, setMode] = useState<'password' | 'magic'>('password')
   const [magicLinkSent, setMagicLinkSent] = useState(false)
 
   const supabase = createClient()
@@ -45,7 +43,7 @@ export function LoginForm() {
         router.refresh()
       }
     } catch {
-      setError('Er is een onverwachte fout opgetreden. Probeer opnieuw.')
+      setError('Er is een onverwachte fout opgetreden.')
     } finally {
       setLoading(false)
     }
@@ -60,7 +58,7 @@ export function LoginForm() {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+          emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/auth/callback`,
         },
       })
 
@@ -71,117 +69,163 @@ export function LoginForm() {
 
       setMagicLinkSent(true)
     } catch {
-      setError('Er is een onverwachte fout opgetreden. Probeer opnieuw.')
+      setError('Er is een onverwachte fout opgetreden.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <Card className="w-full max-w-md shadow-lg" style={{ borderRadius: '12px' }}>
-      <CardHeader className="space-y-1">
-        <div className="flex items-center mb-2">
-          <img src="/Logo.jpg" alt="MBT Gym" className="h-8 w-auto" />
-        </div>
-        <CardTitle className="text-2xl font-bold">Welkom terug</CardTitle>
-        <CardDescription>Log in op je account om verder te gaan</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="password">
-          <TabsList className="w-full mb-4">
-            <TabsTrigger value="password" className="flex-1">Wachtwoord</TabsTrigger>
-            <TabsTrigger value="magic-link" className="flex-1">Magic Link</TabsTrigger>
-          </TabsList>
+    <div className="w-full max-w-sm">
+      {/* Logo */}
+      <div className="flex flex-col items-center mb-10">
+        <img src="/Logo.jpg" alt="MBT" className="h-12 w-auto mb-4 rounded-lg" />
+        <p className="text-zinc-500 text-sm tracking-wide">MOVEMENT BASED THERAPY</p>
+      </div>
 
-          <TabsContent value="password">
-            <form onSubmit={handleEmailPassword} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">E-mailadres</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="jij@voorbeeld.nl"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={loading}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Wachtwoord</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={loading}
-                />
-              </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button
-                type="submit"
-                className="w-full"
-                style={{ background: '#3ECF6A' }}
+      {magicLinkSent ? (
+        <div className="text-center py-8">
+          <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: '#4ECDC420' }}>
+            <Mail className="w-7 h-7" style={{ color: '#4ECDC4' }} />
+          </div>
+          <h2 className="text-white text-lg font-semibold mb-2">Check je e-mail</h2>
+          <p className="text-zinc-400 text-sm">
+            We hebben een magic link gestuurd naar<br />
+            <span className="text-white font-medium">{email}</span>
+          </p>
+          <button
+            onClick={() => { setMagicLinkSent(false); setMode('password') }}
+            className="mt-6 text-sm text-zinc-500 hover:text-white transition-colors"
+          >
+            Terug naar inloggen
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* Form */}
+          <form onSubmit={mode === 'password' ? handleEmailPassword : handleMagicLink} className="space-y-4">
+            {/* Email field */}
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
                 disabled={loading}
-              >
-                {loading ? 'Inloggen…' : 'Inloggen'}
-              </Button>
-            </form>
-          </TabsContent>
+                className="w-full h-14 pl-12 pr-4 rounded-xl text-white placeholder-zinc-500 outline-none transition-all focus:ring-2 focus:ring-[#4ECDC4]/50"
+                style={{ background: '#1A3A3A', border: '1px solid #2A4A4A' }}
+              />
+            </div>
 
-          <TabsContent value="magic-link">
-            {magicLinkSent ? (
-              <div className="text-center py-4 space-y-2">
-                <p className="font-medium">Controleer je e-mail!</p>
-                <p className="text-sm text-muted-foreground">
-                  We hebben een magic link gestuurd naar <strong>{email}</strong>
-                </p>
-              </div>
-            ) : (
-              <form onSubmit={handleMagicLink} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="magic-email">E-mailadres</Label>
-                  <Input
-                    id="magic-email"
-                    type="email"
-                    placeholder="jij@voorbeeld.nl"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    disabled={loading}
-                  />
-                </div>
-                {error && <p className="text-sm text-destructive">{error}</p>}
-                <Button
-                  type="submit"
-                  className="w-full"
-                  style={{ background: '#3ECF6A' }}
+            {/* Password field */}
+            {mode === 'password' && (
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
                   disabled={loading}
-                >
-                  {loading ? 'Versturen…' : 'Stuur magic link'}
-                </Button>
-              </form>
+                  className="w-full h-14 pl-12 pr-4 rounded-xl text-white placeholder-zinc-500 outline-none transition-all focus:ring-2 focus:ring-[#4ECDC4]/50"
+                  style={{ background: '#1A3A3A', border: '1px solid #2A4A4A' }}
+                />
+              </div>
             )}
-          </TabsContent>
-        </Tabs>
 
-        <div className="mt-4 space-y-2 text-center text-sm text-muted-foreground">
-          <p>
-            Nog geen account?{' '}
-            <a href="/register" className="underline" style={{ color: '#3ECF6A' }}>
-              Registreren
-            </a>
-          </p>
-          <p>
-            Patiënt?{' '}
-            <a href="/login/code" className="underline" style={{ color: '#3ECF6A' }}>
-              Inloggen met toegangscode
-            </a>
-          </p>
-        </div>
-      </CardContent>
-    </Card>
+            {/* Forgot password */}
+            {mode === 'password' && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  className="text-xs font-semibold tracking-wider uppercase transition-colors hover:text-white"
+                  style={{ color: '#4ECDC4' }}
+                  onClick={() => setMode('magic')}
+                >
+                  Wachtwoord vergeten
+                </button>
+              </div>
+            )}
+
+            {/* Error */}
+            {error && (
+              <div className="rounded-lg px-4 py-3 text-sm" style={{ background: '#2A1215', color: '#f87171', border: '1px solid #3A1A1D' }}>
+                {error}
+              </div>
+            )}
+
+            {/* Submit button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full h-14 rounded-xl font-semibold text-white flex items-center justify-center gap-2 transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
+              style={{
+                background: mode === 'password'
+                  ? 'linear-gradient(135deg, #4ECDC4, #2BA853)'
+                  : '#1A3A3A',
+                border: mode === 'magic' ? '1px solid #2A4A4A' : 'none',
+              }}
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : mode === 'password' ? (
+                <>
+                  SIGN IN
+                  <ArrowRight className="w-5 h-5" />
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-5 h-5" />
+                  STUUR MAGIC LINK
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Divider */}
+          <div className="flex items-center gap-4 my-6">
+            <div className="flex-1 h-px bg-zinc-800" />
+            <span className="text-zinc-600 text-xs font-medium tracking-wider">OF</span>
+            <div className="flex-1 h-px bg-zinc-800" />
+          </div>
+
+          {/* Toggle mode */}
+          <button
+            type="button"
+            onClick={() => setMode(mode === 'password' ? 'magic' : 'password')}
+            className="w-full h-14 rounded-xl font-semibold text-white flex items-center justify-center gap-2 transition-all hover:bg-zinc-800 active:scale-[0.98]"
+            style={{ background: '#141414', border: '1px solid #2A4A4A' }}
+          >
+            {mode === 'password' ? (
+              <>
+                <Sparkles className="w-5 h-5" style={{ color: '#4ECDC4' }} />
+                SIGN IN WITH A MAGIC LINK
+              </>
+            ) : (
+              <>
+                <Lock className="w-5 h-5" style={{ color: '#4ECDC4' }} />
+                SIGN IN WITH PASSWORD
+              </>
+            )}
+          </button>
+
+          {/* Footer links */}
+          <div className="mt-8 text-center space-y-3">
+            <p className="text-sm text-zinc-500">
+              Nog geen account?{' '}
+              <a href="/register" className="font-semibold uppercase text-xs tracking-wider hover:text-white transition-colors" style={{ color: '#4ECDC4' }}>
+                Maak een account
+              </a>
+            </p>
+          </div>
+
+          {/* Version */}
+          <p className="text-center text-zinc-700 text-xs mt-10">MBT Move v1.0.0</p>
+        </>
+      )}
+    </div>
   )
 }

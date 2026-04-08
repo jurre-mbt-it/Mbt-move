@@ -14,7 +14,8 @@ import {
   TrendingUp, TrendingDown, CheckCircle2, SkipForward, Minus, Plus
 } from 'lucide-react'
 
-const ReactPlayer = dynamic(() => import('react-player'), { ssr: false })
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ReactPlayer = dynamic(() => import('react-player') as any, { ssr: false }) as any
 
 // ─── Static coaching data ─────────────────────────────────────────────────────
 
@@ -47,7 +48,7 @@ type FeedbackEntry = {
 
 const SMILIES = ['😫', '😕', '😐', '🙂', '😄']
 const SMILEY_LABELS = ['Zwaar', 'Moeilijk', 'Oké', 'Goed', 'Super']
-const SMILEY_COLORS = ['#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e']
+const SMILEY_COLORS = ['#ef4444', '#f97316', '#eab308', '#84cc16', '#14B8A6']
 
 // ─── Circular Timer SVG ───────────────────────────────────────────────────────
 
@@ -63,7 +64,7 @@ function CircularTimer({ seconds, total, onSkip }: { seconds: number; total: num
         <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
           <circle cx="60" cy="60" r={r} fill="none" stroke="#f4f4f5" strokeWidth="8" />
           <circle
-            cx="60" cy="60" r={r} fill="none" stroke="#3ECF6A" strokeWidth="8"
+            cx="60" cy="60" r={r} fill="none" stroke="#4ECDC4" strokeWidth="8"
             strokeLinecap="round"
             strokeDasharray={circ}
             strokeDashoffset={offset}
@@ -118,7 +119,7 @@ function FeedbackModal({
           {autoCloseIn > 0 && (
             <div
               className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
-              style={{ background: '#3ECF6A' }}
+              style={{ background: '#4ECDC4' }}
             >
               {autoCloseIn}
             </div>
@@ -153,7 +154,7 @@ function FeedbackModal({
         <div>
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm font-medium">Pijn tijdens oefening</p>
-            <span className="text-sm font-bold" style={{ color: feedback.pain !== null && feedback.pain > 5 ? '#ef4444' : '#3ECF6A' }}>
+            <span className="text-sm font-bold" style={{ color: feedback.pain !== null && feedback.pain > 5 ? '#ef4444' : '#4ECDC4' }}>
               {feedback.pain !== null ? `${feedback.pain}/10` : 'Geen'}
             </span>
           </div>
@@ -165,7 +166,7 @@ function FeedbackModal({
                 className="flex-1 h-8 rounded-lg text-xs font-semibold transition-all"
                 style={{
                   background: feedback.pain === i
-                    ? i <= 3 ? '#22c55e' : i <= 6 ? '#f97316' : '#ef4444'
+                    ? i <= 3 ? '#14B8A6' : i <= 6 ? '#f97316' : '#ef4444'
                     : '#f4f4f5',
                   color: feedback.pain === i ? 'white' : '#71717a',
                 }}
@@ -204,7 +205,7 @@ function FeedbackModal({
           </div>
         </div>
 
-        <Button onClick={onSave} className="w-full h-12 font-semibold text-base" style={{ background: '#3ECF6A' }}>
+        <Button onClick={onSave} className="w-full h-12 font-semibold text-base" style={{ background: '#4ECDC4' }}>
           Opslaan
         </Button>
       </div>
@@ -239,7 +240,7 @@ function SessionSummary({
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#FAFAFA' }}>
       {/* Header */}
-      <div className="px-5 pt-14 pb-6 text-center" style={{ background: '#1A1A1A' }}>
+      <div className="px-5 pt-14 pb-6 text-center" style={{ background: '#1A3A3A' }}>
         <div className="text-5xl mb-3">🎉</div>
         <h1 className="text-white text-2xl font-bold">Sessie voltooid!</h1>
         <p className="text-zinc-400 text-sm mt-1">{mins}:{secs.toString().padStart(2, '0')} · {exercises.length} oefeningen</p>
@@ -283,7 +284,7 @@ function SessionSummary({
                   {fb?.pain !== null && fb?.pain !== undefined && (
                     <div
                       className="w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center text-white shrink-0"
-                      style={{ background: (fb.pain ?? 0) <= 3 ? '#22c55e' : (fb.pain ?? 0) <= 6 ? '#f97316' : '#ef4444' }}
+                      style={{ background: (fb.pain ?? 0) <= 3 ? '#14B8A6' : (fb.pain ?? 0) <= 6 ? '#f97316' : '#ef4444' }}
                     >
                       {fb.pain}
                     </div>
@@ -325,7 +326,7 @@ function SessionSummary({
         <Button
           onClick={() => { onFinish(); router.push('/patient/dashboard') }}
           className="w-full h-12 text-base font-semibold"
-          style={{ background: '#3ECF6A' }}
+          style={{ background: '#4ECDC4' }}
         >
           Opslaan & afsluiten
         </Button>
@@ -489,7 +490,7 @@ export default function SessionPage() {
           <div
             className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-sm font-bold transition-all"
             style={{
-              background: isDone ? '#3ECF6A' : '#f4f4f5',
+              background: isDone ? '#4ECDC4' : '#f4f4f5',
               color: isDone ? 'white' : '#52525b',
             }}
           >
@@ -520,7 +521,7 @@ export default function SessionPage() {
                   controls
                   light
                   playIcon={
-                    <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: '#3ECF6A' }}>
+                    <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: '#4ECDC4' }}>
                       <span className="text-white text-xl ml-1">▶</span>
                     </div>
                   }
@@ -542,7 +543,7 @@ export default function SessionPage() {
                 <button
                   onClick={() => setShowCuesFor(showCues ? null : e.uid)}
                   className="flex items-center gap-1.5 text-xs font-semibold mb-2"
-                  style={{ color: '#3ECF6A' }}
+                  style={{ color: '#4ECDC4' }}
                 >
                   <Lightbulb className="w-3.5 h-3.5" />
                   Coaching cues {showCues ? '▲' : '▼'}
@@ -551,7 +552,7 @@ export default function SessionPage() {
                   <ul className="space-y-1.5">
                     {cues.map((cue, i) => (
                       <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
-                        <span className="font-bold" style={{ color: '#3ECF6A' }}>·</span>
+                        <span className="font-bold" style={{ color: '#4ECDC4' }}>·</span>
                         {cue}
                       </li>
                     ))}
@@ -570,7 +571,7 @@ export default function SessionPage() {
                   </div>
                 )}
                 {variants.harder && (
-                  <div className="flex items-center gap-2 text-xs rounded-xl px-3 py-2" style={{ background: '#f0fdf4' }}>
+                  <div className="flex items-center gap-2 text-xs rounded-xl px-3 py-2" style={{ background: '#f0fdfa' }}>
                     <TrendingUp className="w-3.5 h-3.5 text-green-600 shrink-0" />
                     <span className="text-green-700"><span className="font-semibold">Te makkelijk?</span> Probeer: {variants.harder}</span>
                   </div>
@@ -583,7 +584,7 @@ export default function SessionPage() {
               <button
                 onClick={() => markSetDone(e.uid, e.rest || 60, e.sets)}
                 className="w-full py-3 rounded-2xl text-white text-sm font-bold transition-all"
-                style={{ background: '#1A1A1A' }}
+                style={{ background: '#1A3A3A' }}
               >
                 Set {sets + 1} van {e.sets} klaar →
               </button>
@@ -591,7 +592,7 @@ export default function SessionPage() {
               <button
                 onClick={() => markExerciseDone(e.uid)}
                 className="w-full py-3 rounded-2xl text-white text-sm font-bold transition-all"
-                style={{ background: '#3ECF6A' }}
+                style={{ background: '#4ECDC4' }}
               >
                 <CheckCircle2 className="inline w-4 h-4 mr-1.5 mb-0.5" />
                 Oefening afgerond
@@ -605,7 +606,7 @@ export default function SessionPage() {
 
   // Build ordered list of cards (supersets grouped)
   const processedSupersets = new Set<string>()
-  const cards: JSX.Element[] = []
+  const cards: React.ReactElement[] = []
 
   exercises.forEach(e => {
     if (e.supersetGroup) {
@@ -671,7 +672,7 @@ export default function SessionPage() {
           <Button
             onClick={() => setPhase('summary')}
             className="w-full h-12 text-base font-semibold"
-            style={{ background: doneCount === exercises.length ? '#3ECF6A' : '#1A1A1A' }}
+            style={{ background: doneCount === exercises.length ? '#4ECDC4' : '#1A3A3A' }}
           >
             {doneCount === exercises.length ? 'Sessie afronden 🎉' : `Doorgaan (${doneCount}/${exercises.length})`}
           </Button>
@@ -707,10 +708,10 @@ function ParamPill({ label, value, highlight }: { label: string; value: string; 
   return (
     <div
       className="rounded-xl p-2 text-center"
-      style={{ background: highlight ? '#f0fdf4' : '#f4f4f5' }}
+      style={{ background: highlight ? '#f0fdfa' : '#f4f4f5' }}
     >
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-sm font-bold mt-0.5" style={{ color: highlight ? '#15803d' : undefined }}>{value}</p>
+      <p className="text-sm font-bold mt-0.5" style={{ color: highlight ? '#0D6B6E' : undefined }}>{value}</p>
     </div>
   )
 }

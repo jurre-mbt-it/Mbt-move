@@ -19,8 +19,15 @@ import {
   DIFFICULTIES,
   type MuscleGroup,
 } from '@/lib/exercise-constants'
+import {
+  estimateMuscleStrain,
+  LOAD_TYPE_OPTIONS,
+  MOVEMENT_PATTERN_OPTIONS,
+  type LoadType,
+  type MovementPattern,
+} from '@/lib/strain-estimation'
 import { cn } from '@/lib/utils'
-import { Save, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { Save, X, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { trpc } from '@/lib/trpc/client'
 
@@ -39,6 +46,9 @@ interface ExerciseFormData {
   muscleLoads: Partial<Record<MuscleGroup, number>>
   easierVariantId: string | null
   harderVariantId: string | null
+  loadType: string
+  isUnilateral: boolean
+  movementPattern: string | null
 }
 
 interface ExerciseFormProps {
@@ -62,6 +72,9 @@ const defaultData: ExerciseFormData = {
   muscleLoads: {},
   easierVariantId: null,
   harderVariantId: null,
+  loadType: 'BODYWEIGHT',
+  isUnilateral: false,
+  movementPattern: null,
 }
 
 function Section({ title, children, collapsible = false }: { title: string; children: React.ReactNode; collapsible?: boolean }) {
@@ -123,6 +136,9 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
       muscleLoads: form.muscleLoads as Record<string, number>,
       easierVariantId: form.easierVariantId ?? null,
       harderVariantId: form.harderVariantId ?? null,
+      loadType: form.loadType as never,
+      isUnilateral: form.isUnilateral,
+      movementPattern: form.movementPattern as never ?? null,
     }
 
     try {
@@ -180,7 +196,7 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
                       ? 'border-transparent text-white'
                       : 'border-zinc-200 text-muted-foreground hover:border-zinc-300'
                   )}
-                  style={form.category === c.value ? { background: '#3ECF6A' } : {}}
+                  style={form.category === c.value ? { background: '#4ECDC4' } : {}}
                 >
                   {c.label}
                 </button>
@@ -308,12 +324,97 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
 
       <Separator />
 
+      {/* Exercise properties for strain estimation */}
+      <Section title="Oefening-eigenschappen" collapsible>
+        <div className="space-y-4">
+          {/* Movement Pattern */}
+          <div className="space-y-1.5">
+            <Label className="text-sm">Bewegingspatroon</Label>
+            <select
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              value={form.movementPattern ?? ''}
+              onChange={e => set('movementPattern', e.target.value || null)}
+            >
+              <option value="">Selecteer patroon...</option>
+              {MOVEMENT_PATTERN_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.emoji} {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Load Type */}
+          <div className="space-y-1.5">
+            <Label className="text-sm">Type belasting</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {LOAD_TYPE_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={cn(
+                    'rounded-lg border px-3 py-2 text-sm text-left transition-colors',
+                    form.loadType === opt.value
+                      ? 'border-[#4ECDC4] bg-[#4ECDC410] font-medium'
+                      : 'border-input hover:bg-accent'
+                  )}
+                  onClick={() => set('loadType', opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Unilateral toggle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="text-sm">Unilateraal (eenzijdig)</Label>
+              <p className="text-xs text-muted-foreground">Single leg, single arm, etc.</p>
+            </div>
+            <Switch
+              checked={form.isUnilateral}
+              onCheckedChange={v => set('isUnilateral', v)}
+            />
+          </div>
+        </div>
+      </Section>
+
+      <Separator />
+
       {/* Muscle loads */}
       <Section title="Spiergroep belasting" collapsible>
-        <MuscleLoadSliders
-          value={form.muscleLoads}
-          onChange={v => set('muscleLoads', v)}
-        />
+        <div className="space-y-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-2 w-full"
+            onClick={() => {
+              const estimated = estimateMuscleStrain({
+                movementPattern: (form.movementPattern as MovementPattern) ?? null,
+                loadType: form.loadType as LoadType,
+                isUnilateral: form.isUnilateral,
+                difficulty: form.difficulty as 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED',
+                category: form.category,
+                bodyRegions: form.bodyRegion,
+              })
+              if (Object.keys(estimated).length === 0) {
+                toast.error('Selecteer eerst een bewegingspatroon of lichaamsregio')
+                return
+              }
+              set('muscleLoads', estimated)
+              toast.success(`${Object.keys(estimated).length} spiergroepen automatisch ingeschat`)
+            }}
+          >
+            <Sparkles className="w-4 h-4" style={{ color: '#4ECDC4' }} />
+            Auto-inschatting spierbelasting
+          </Button>
+          <MuscleLoadSliders
+            value={form.muscleLoads}
+            onChange={v => set('muscleLoads', v)}
+          />
+        </div>
       </Section>
 
       <Separator />
@@ -337,7 +438,7 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
           onClick={handleSave}
           disabled={saving}
           className="gap-2 flex-1 md:flex-none"
-          style={{ background: '#3ECF6A' }}
+          style={{ background: '#4ECDC4' }}
         >
           <Save className="w-4 h-4" />
           {saving ? 'Opslaan...' : mode === 'create' ? 'Oefening aanmaken' : 'Wijzigingen opslaan'}

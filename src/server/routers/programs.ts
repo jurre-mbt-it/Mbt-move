@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { createTRPCRouter, therapistProcedure } from '@/server/trpc'
+import { createTRPCRouter, therapistProcedure, creatorProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
 
 const createId = () => crypto.randomUUID()
@@ -20,7 +20,7 @@ const ProgramExerciseInput = z.object({
 })
 
 export const programsRouter = createTRPCRouter({
-  list: therapistProcedure
+  list: creatorProcedure
     .input(z.object({
       patientId: z.string().optional(),
       isTemplate: z.boolean().optional(),
@@ -40,7 +40,7 @@ export const programsRouter = createTRPCRouter({
       })
     }),
 
-  get: therapistProcedure
+  get: creatorProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const program = await ctx.prisma.program.findUnique({
@@ -64,7 +64,7 @@ export const programsRouter = createTRPCRouter({
       return program
     }),
 
-  create: therapistProcedure
+  create: creatorProcedure
     .input(z.object({
       name: z.string().min(1),
       description: z.string().optional(),
@@ -79,14 +79,14 @@ export const programsRouter = createTRPCRouter({
         data: {
           id: createId(),
           ...rest,
-          ...(patientId != null ? { patientId } : {}),
+          patientId: patientId ?? null,
           creatorId: ctx.user!.id,
-          status: 'DRAFT',
+          status: patientId ? 'ACTIVE' : 'DRAFT',
         },
       })
     }),
 
-  save: therapistProcedure
+  save: creatorProcedure
     .input(z.object({
       id: z.string(),
       name: z.string().min(1).optional(),
@@ -146,7 +146,7 @@ export const programsRouter = createTRPCRouter({
       })
     }),
 
-  duplicate: therapistProcedure
+  duplicate: creatorProcedure
     .input(z.object({
       id: z.string(),
       name: z.string().min(1).optional(),
@@ -197,7 +197,7 @@ export const programsRouter = createTRPCRouter({
       })
     }),
 
-  delete: therapistProcedure
+  delete: creatorProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const existing = await ctx.prisma.program.findUnique({ where: { id: input.id } })

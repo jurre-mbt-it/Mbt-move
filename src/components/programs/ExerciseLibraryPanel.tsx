@@ -11,7 +11,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 
 const CATEGORY_COLORS: Record<string, string> = {
-  STRENGTH:    '#3ECF6A',
+  STRENGTH:    '#4ECDC4',
   MOBILITY:    '#60a5fa',
   PLYOMETRICS: '#f59e0b',
   CARDIO:      '#f87171',
@@ -49,7 +49,7 @@ function DraggableLibraryItem({
   })
 
   const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined
-  const color = CATEGORY_COLORS[exercise.category] ?? '#3ECF6A'
+  const color = CATEGORY_COLORS[exercise.category] ?? '#4ECDC4'
 
   return (
     <div

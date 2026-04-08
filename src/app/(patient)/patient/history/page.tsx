@@ -13,7 +13,7 @@ import {
 const patient = PATIENTS.find(p => p.id === 'pat1')!
 
 function PainDot({ level }: { level: number }) {
-  const color = level <= 3 ? '#22c55e' : level <= 6 ? '#f97316' : '#ef4444'
+  const color = level <= 3 ? '#14B8A6' : level <= 6 ? '#f97316' : '#ef4444'
   return (
     <span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color }}>
       <span className="w-2 h-2 rounded-full inline-block" style={{ background: color }} />
@@ -35,7 +35,7 @@ const chartData = [...MOCK_SESSION_HISTORY].reverse().map((s, i) => ({
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{value: number; name: string}>; label?: string }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-xl px-3 py-2 shadow-lg text-xs" style={{ background: '#1A1A1A', color: '#fff' }}>
+    <div className="rounded-xl px-3 py-2 shadow-lg text-xs" style={{ background: '#1A3A3A', color: '#fff' }}>
       <p className="font-semibold mb-1">{label}</p>
       {payload.map(p => (
         <p key={p.name}>{p.name}: <span className="font-bold">{p.value}</span></p>
@@ -63,7 +63,7 @@ export default function HistoryPage() {
   return (
     <div className="min-h-screen pb-6" style={{ background: '#FAFAFA' }}>
       {/* Header */}
-      <div className="px-4 pt-12 pb-5" style={{ background: '#1A1A1A' }}>
+      <div className="px-4 pt-12 pb-5" style={{ background: '#1A3A3A' }}>
         <h1 className="text-white text-xl font-bold">Voortgang</h1>
         <p className="text-zinc-400 text-xs mt-0.5">{MOCK_SESSION_HISTORY.length} sessies · Week {patient.weeksCurrent} van {patient.weeksTotal}</p>
       </div>
@@ -83,9 +83,9 @@ export default function HistoryPage() {
           <Card style={{ borderRadius: '14px' }}>
             <CardContent className="px-3 py-3 text-center">
               <div className="flex justify-center mb-1">
-                <CheckCircle2 className="w-4 h-4" style={{ color: '#3ECF6A' }} />
+                <CheckCircle2 className="w-4 h-4" style={{ color: '#4ECDC4' }} />
               </div>
-              <p className="text-xl font-bold" style={{ color: '#3ECF6A' }}>{compliance}%</p>
+              <p className="text-xl font-bold" style={{ color: '#4ECDC4' }}>{compliance}%</p>
               <p className="text-xs text-muted-foreground">Adherence</p>
             </CardContent>
           </Card>
@@ -105,7 +105,7 @@ export default function HistoryPage() {
           <CardContent className="px-4 py-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4" style={{ color: '#3ECF6A' }} />
+                <TrendingUp className="w-4 h-4" style={{ color: '#4ECDC4' }} />
                 <p className="font-semibold text-sm">Programma voortgang</p>
               </div>
               <span className="text-xs text-muted-foreground">W{patient.weeksCurrent}/{patient.weeksTotal}</span>
@@ -115,7 +115,7 @@ export default function HistoryPage() {
                 className="h-2 rounded-full transition-all"
                 style={{
                   width: `${(patient.weeksCurrent / patient.weeksTotal) * 100}%`,
-                  background: '#3ECF6A'
+                  background: '#4ECDC4'
                 }}
               />
             </div>
@@ -136,7 +136,7 @@ export default function HistoryPage() {
                   onClick={() => setActiveChart('volume')}
                   className="px-3 py-1.5 transition-all"
                   style={{
-                    background: activeChart === 'volume' ? '#1A1A1A' : 'transparent',
+                    background: activeChart === 'volume' ? '#1A3A3A' : 'transparent',
                     color: activeChart === 'volume' ? '#fff' : '#71717a',
                   }}
                 >
@@ -146,7 +146,7 @@ export default function HistoryPage() {
                   onClick={() => setActiveChart('pain')}
                   className="px-3 py-1.5 transition-all"
                   style={{
-                    background: activeChart === 'pain' ? '#1A1A1A' : 'transparent',
+                    background: activeChart === 'pain' ? '#1A3A3A' : 'transparent',
                     color: activeChart === 'pain' ? '#fff' : '#71717a',
                   }}
                 >
@@ -170,8 +170,8 @@ export default function HistoryPage() {
                       key={`cell-${index}`}
                       fill={
                         activeChart === 'volume'
-                          ? entry.completion === 100 ? '#3ECF6A' : '#6ddb91'
-                          : entry.pain <= 3 ? '#3ECF6A' : entry.pain <= 6 ? '#f97316' : '#ef4444'
+                          ? entry.completion === 100 ? '#4ECDC4' : '#7EDCD6'
+                          : entry.pain <= 3 ? '#4ECDC4' : entry.pain <= 6 ? '#f97316' : '#ef4444'
                       }
                     />
                   ))}
@@ -199,7 +199,7 @@ export default function HistoryPage() {
                   >
                     <div
                       className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-sm font-bold"
-                      style={{ background: completion === 100 ? '#f0fdf4' : '#f4f4f5', color: completion === 100 ? '#3ECF6A' : '#52525b' }}
+                      style={{ background: completion === 100 ? '#f0fdfa' : '#f4f4f5', color: completion === 100 ? '#4ECDC4' : '#52525b' }}
                     >
                       {completion === 100 ? '✓' : `${completion}%`}
                     </div>

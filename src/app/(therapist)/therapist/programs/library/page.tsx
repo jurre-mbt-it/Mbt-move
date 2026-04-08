@@ -110,7 +110,7 @@ export default function ProgramLibraryPage() {
               className="px-3 py-1 rounded-full text-xs font-medium transition-colors border"
               style={
                 category === cat
-                  ? { background: '#3ECF6A', color: '#fff', borderColor: '#3ECF6A' }
+                  ? { background: '#4ECDC4', color: '#fff', borderColor: '#4ECDC4' }
                   : { background: '#fff', color: '#71717a', borderColor: '#e4e4e7' }
               }
             >
@@ -171,7 +171,7 @@ export default function ProgramLibraryPage() {
               <select
                 value={copyPatientId}
                 onChange={e => setCopyPatientId(e.target.value)}
-                className="mt-1.5 w-full h-9 text-sm border rounded-md px-3 bg-white focus:outline-none focus:ring-1 focus:ring-[#3ECF6A]"
+                className="mt-1.5 w-full h-9 text-sm border rounded-md px-3 bg-white focus:outline-none focus:ring-1 focus:ring-[#4ECDC4]"
               >
                 <option value="">— Geen patiënt —</option>
                 {patients.map(p => (
@@ -181,7 +181,7 @@ export default function ProgramLibraryPage() {
             </div>
             <div className="flex gap-2">
               <Button
-                style={{ background: '#3ECF6A' }}
+                style={{ background: '#4ECDC4' }}
                 onClick={handleCopyToPatient}
                 disabled={duplicateMutation.isPending}
                 className="flex-1"
@@ -210,7 +210,7 @@ function LibraryCard({ program, onCopy }: { program: Program; onCopy: () => void
           <div className="flex-1 min-w-0">
             {category && (
               <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full mb-1.5 inline-block"
-                style={{ background: '#dcfce7', color: '#15803d' }}>
+                style={{ background: '#ccfbf1', color: '#0D6B6E' }}>
                 {category}
               </span>
             )}

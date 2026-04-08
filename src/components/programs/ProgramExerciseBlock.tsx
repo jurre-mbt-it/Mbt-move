@@ -21,7 +21,7 @@ import { CSS } from '@dnd-kit/utilities'
 import type { CustomParameter } from './types'
 
 const CATEGORY_COLORS: Record<string, string> = {
-  STRENGTH: '#3ECF6A', MOBILITY: '#60a5fa', PLYOMETRICS: '#f59e0b',
+  STRENGTH: '#4ECDC4', MOBILITY: '#60a5fa', PLYOMETRICS: '#f59e0b',
   CARDIO: '#f87171', STABILITY: '#a78bfa',
 }
 
@@ -57,7 +57,7 @@ function InlineNumber({
       value={value}
       onChange={e => onChange(Math.max(min, Number(e.target.value)))}
       className={cn(
-        'w-12 h-6 text-center text-xs font-semibold bg-zinc-100 rounded border-0 focus:outline-none focus:ring-1 focus:ring-[#3ECF6A]',
+        'w-12 h-6 text-center text-xs font-semibold bg-zinc-100 rounded border-0 focus:outline-none focus:ring-1 focus:ring-[#4ECDC4]',
         className
       )}
     />
@@ -76,7 +76,7 @@ export function ProgramExerciseBlock({
   })
 
   const style = { transform: CSS.Transform.toString(transform), transition }
-  const color = CATEGORY_COLORS[exercise.category] ?? '#3ECF6A'
+  const color = CATEGORY_COLORS[exercise.category] ?? '#4ECDC4'
 
   const addParam = (tpl: { label: string; type: 'number' | 'text' | 'select' | 'slider'; unit?: string; options?: string[]; min?: number; max?: number; defaultValue?: string | number }) => {
     if (exercise.extraParams.find(p => p.label === tpl.label)) return
@@ -123,7 +123,7 @@ export function ProgramExerciseBlock({
       className={cn(
         'group rounded-lg border bg-white transition-all',
         isDragging ? 'opacity-50 shadow-xl z-50' : 'hover:border-zinc-300',
-        exercise.selected && 'ring-2 ring-[#3ECF6A] border-[#3ECF6A]',
+        exercise.selected && 'ring-2 ring-[#4ECDC4] border-[#4ECDC4]',
         isInSuperset && 'border-transparent'
       )}
     >
@@ -143,7 +143,7 @@ export function ProgramExerciseBlock({
             type="checkbox"
             checked={exercise.selected}
             onChange={() => onToggleSelect(exercise.uid)}
-            className="w-3.5 h-3.5 shrink-0 accent-[#3ECF6A]"
+            className="w-3.5 h-3.5 shrink-0 accent-[#4ECDC4]"
           />
 
           <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
@@ -228,7 +228,7 @@ export function ProgramExerciseBlock({
           <select
             value={exercise.repUnit}
             onChange={e => onUpdate(exercise.uid, { repUnit: e.target.value as RepUnit })}
-            className="text-xs bg-zinc-100 border-0 rounded px-1 h-6 focus:outline-none focus:ring-1 focus:ring-[#3ECF6A]"
+            className="text-xs bg-zinc-100 border-0 rounded px-1 h-6 focus:outline-none focus:ring-1 focus:ring-[#4ECDC4]"
           >
             {REP_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
           </select>
@@ -284,7 +284,7 @@ export function ProgramExerciseBlock({
                     max={param.max ?? 10}
                     value={param.value as number}
                     onChange={e => updateParam(param.id, Number(e.target.value))}
-                    className="w-16 h-1 accent-[#3ECF6A]"
+                    className="w-16 h-1 accent-[#4ECDC4]"
                   />
                   <span className="font-semibold w-4 text-center">{param.value}</span>
                 </div>

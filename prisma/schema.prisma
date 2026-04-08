@@ -10,6 +10,7 @@ enum UserRole {
   ADMIN
   THERAPIST
   PATIENT
+  ATHLETE
 }
 
 enum AppointmentStatus {
@@ -59,6 +60,31 @@ enum MediaType {
   UPLOAD
   YOUTUBE
   VIMEO
+}
+
+enum LoadType {
+  BODYWEIGHT
+  WEIGHTED
+  MACHINE
+  BAND
+}
+
+enum MovementPattern {
+  SQUAT
+  LUNGE
+  HINGE
+  PUSH_HORIZONTAL
+  PUSH_VERTICAL
+  PULL_HORIZONTAL
+  PULL_VERTICAL
+  HIP_THRUST
+  CALF_RAISE
+  CORE
+  ROTATION
+  ISOLATION_UPPER
+  ISOLATION_LOWER
+  CARRY
+  FULL_BODY
 }
 
 enum SessionStatus {
@@ -134,6 +160,9 @@ model Exercise {
   tips           String[]
   tags           String[]
   isPublic       Boolean          @default(false)
+  loadType       LoadType         @default(BODYWEIGHT)
+  isUnilateral   Boolean          @default(false)
+  movementPattern MovementPattern?
   createdBy      User             @relation(fields: [createdById], references: [id])
   createdById    String
   createdAt      DateTime         @default(now())

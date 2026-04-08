@@ -6,11 +6,11 @@ export default function PatientProfilePage() {
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
       {/* Header */}
-      <div className="px-4 pt-12 pb-8" style={{ background: '#1A1A1A' }}>
+      <div className="px-4 pt-12 pb-8" style={{ background: '#1A3A3A' }}>
         <div className="flex flex-col items-center gap-3">
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center font-bold text-2xl text-white"
-            style={{ background: '#3ECF6A' }}
+            style={{ background: '#4ECDC4' }}
           >
             {MOCK_PATIENT.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
           </div>

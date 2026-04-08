@@ -54,9 +54,9 @@ export default function AccessCodeLoginPage() {
           <div className="flex flex-col items-center gap-2 text-center">
             <div
               className="w-14 h-14 rounded-2xl flex items-center justify-center"
-              style={{ background: '#f0fdf4' }}
+              style={{ background: '#f0fdfa' }}
             >
-              <KeyRound className="w-7 h-7" style={{ color: '#3ECF6A' }} />
+              <KeyRound className="w-7 h-7" style={{ color: '#4ECDC4' }} />
             </div>
             <h1 className="text-xl font-bold mt-2">Toegangscode invoeren</h1>
             <p className="text-sm text-muted-foreground">
@@ -87,7 +87,7 @@ export default function AccessCodeLoginPage() {
             <Button
               type="submit"
               className="w-full h-11 font-semibold"
-              style={{ background: '#3ECF6A' }}
+              style={{ background: '#4ECDC4' }}
               disabled={!code.trim() || loading}
             >
               {loading ? 'Controleren...' : 'Inloggen'}
@@ -96,7 +96,7 @@ export default function AccessCodeLoginPage() {
 
           <div className="text-center text-sm text-muted-foreground">
             Heb je een account?{' '}
-            <Link href="/login" className="font-medium" style={{ color: '#3ECF6A' }}>
+            <Link href="/login" className="font-medium" style={{ color: '#4ECDC4' }}>
               Inloggen met e-mail
             </Link>
           </div>

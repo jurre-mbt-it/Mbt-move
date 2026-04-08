@@ -76,6 +76,15 @@ export const therapistProcedure = protectedProcedure.use(({ ctx, next }) => {
   return next({ ctx })
 })
 
+/** Therapist OR Athlete — both can create exercises */
+export const creatorProcedure = protectedProcedure.use(({ ctx, next }) => {
+  const role = ctx.user!.role
+  if (role !== 'THERAPIST' && role !== 'ATHLETE' && role !== 'ADMIN') {
+    throw new TRPCError({ code: 'FORBIDDEN' })
+  }
+  return next({ ctx })
+})
+
 export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (ctx.user!.role !== 'ADMIN') {
     throw new TRPCError({ code: 'FORBIDDEN' })

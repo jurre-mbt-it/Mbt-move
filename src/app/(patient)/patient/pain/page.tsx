@@ -23,7 +23,7 @@ const CONTEXTS = [
   { value: 'always', label: 'Altijd', icon: '🔄' },
 ]
 
-const NRS_COLORS = ['#22c55e', '#22c55e', '#84cc16', '#84cc16', '#eab308', '#eab308', '#f97316', '#f97316', '#ef4444', '#ef4444', '#dc2626']
+const NRS_COLORS = ['#14B8A6', '#14B8A6', '#84cc16', '#84cc16', '#eab308', '#eab308', '#f97316', '#f97316', '#ef4444', '#ef4444', '#dc2626']
 const NRS_LABELS: Record<number, string> = { 0: 'Geen pijn', 3: 'Mild', 5: 'Matig', 7: 'Ernstig', 10: 'Ondraaglijk' }
 
 export default function PainReportPage() {
@@ -46,7 +46,7 @@ export default function PainReportPage() {
       <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center gap-4" style={{ background: '#FAFAFA' }}>
         <div
           className="w-20 h-20 rounded-full flex items-center justify-center text-white"
-          style={{ background: '#3ECF6A' }}
+          style={{ background: '#4ECDC4' }}
         >
           <CheckCircle2 className="w-10 h-10" />
         </div>
@@ -65,7 +65,7 @@ export default function PainReportPage() {
         <Button
           onClick={() => router.push('/patient/dashboard')}
           className="mt-2 w-full max-w-xs h-12 font-semibold"
-          style={{ background: '#3ECF6A' }}
+          style={{ background: '#4ECDC4' }}
         >
           Terug naar Home
         </Button>
@@ -76,7 +76,7 @@ export default function PainReportPage() {
   return (
     <div className="min-h-screen pb-8" style={{ background: '#FAFAFA' }}>
       {/* Header */}
-      <div className="px-4 pt-12 pb-4 flex items-center gap-3" style={{ background: '#1A1A1A' }}>
+      <div className="px-4 pt-12 pb-4 flex items-center gap-3" style={{ background: '#1A3A3A' }}>
         <button onClick={() => router.back()} className="p-1 -ml-1">
           <ChevronLeft className="w-5 h-5 text-white" />
         </button>
@@ -138,9 +138,9 @@ export default function PainReportPage() {
                     onClick={() => setLocation(selected ? null : loc)}
                     className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
                     style={{
-                      background: selected ? '#1A1A1A' : '#f4f4f5',
-                      color: selected ? '#3ECF6A' : '#52525b',
-                      border: selected ? '1.5px solid #3ECF6A' : '1.5px solid transparent',
+                      background: selected ? '#1A3A3A' : '#f4f4f5',
+                      color: selected ? '#4ECDC4' : '#52525b',
+                      border: selected ? '1.5px solid #4ECDC4' : '1.5px solid transparent',
                     }}
                   >
                     {loc}
@@ -164,9 +164,9 @@ export default function PainReportPage() {
                     onClick={() => setContext(selected ? null : c.value)}
                     className="flex items-center gap-2 px-3 py-3 rounded-2xl text-sm font-medium transition-all text-left"
                     style={{
-                      background: selected ? '#f0fdf4' : '#f4f4f5',
-                      border: selected ? '2px solid #3ECF6A' : '2px solid transparent',
-                      color: selected ? '#15803d' : '#52525b',
+                      background: selected ? '#f0fdfa' : '#f4f4f5',
+                      border: selected ? '2px solid #4ECDC4' : '2px solid transparent',
+                      color: selected ? '#0D6B6E' : '#52525b',
                     }}
                   >
                     <span className="text-lg">{c.icon}</span>
@@ -197,7 +197,7 @@ export default function PainReportPage() {
           onClick={handleSubmit}
           disabled={!canSubmit}
           className="w-full h-12 text-base font-semibold"
-          style={{ background: canSubmit ? '#3ECF6A' : undefined }}
+          style={{ background: canSubmit ? '#4ECDC4' : undefined }}
         >
           Rapporteer pijn
         </Button>

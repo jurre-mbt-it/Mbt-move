@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { createTRPCRouter, therapistProcedure, protectedProcedure } from '@/server/trpc'
+import { createTRPCRouter, therapistProcedure, creatorProcedure, protectedProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
 
 const createId = () => crypto.randomUUID()
@@ -20,6 +20,17 @@ const ExerciseInput = z.object({
   muscleLoads: z.record(z.string(), z.number().min(1).max(5)).default({}),
   easierVariantId: z.string().nullable().optional(),
   harderVariantId: z.string().nullable().optional(),
+  loadType: z.enum(['BODYWEIGHT', 'WEIGHTED', 'MACHINE', 'BAND']).default('BODYWEIGHT'),
+  isUnilateral: z.boolean().default(false),
+  movementPattern: z.enum([
+    'SQUAT', 'LUNGE', 'HINGE',
+    'PUSH_HORIZONTAL', 'PUSH_VERTICAL',
+    'PULL_HORIZONTAL', 'PULL_VERTICAL',
+    'HIP_THRUST', 'CALF_RAISE',
+    'CORE', 'ROTATION',
+    'ISOLATION_UPPER', 'ISOLATION_LOWER',
+    'CARRY', 'FULL_BODY',
+  ]).nullable().optional(),
 })
 
 export const exercisesRouter = createTRPCRouter({
@@ -76,9 +87,27 @@ export const exercisesRouter = createTRPCRouter({
       }
     }),
 
-  create: therapistProcedure
+  create: creatorProcedure
     .input(ExerciseInput)
     .mutation(async ({ ctx, input }) => {
+      // Duplicate prevention: check for exercises with same name (case-insensitive)
+      const existing = await ctx.prisma.exercise.findFirst({
+        where: {
+          name: { equals: input.name, mode: 'insensitive' },
+          OR: [
+            { createdById: ctx.user!.id },
+            { isPublic: true },
+          ],
+        },
+        select: { id: true, name: true },
+      })
+      if (existing) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: `Er bestaat al een oefening met de naam "${existing.name}". Gebruik een andere naam of bewerk de bestaande oefening.`,
+        })
+      }
+
       const { muscleLoads, ...data } = input
       const id = createId()
       const exercise = await ctx.prisma.exercise.create({
@@ -102,7 +131,7 @@ export const exercisesRouter = createTRPCRouter({
       }
     }),
 
-  update: therapistProcedure
+  update: creatorProcedure
     .input(ExerciseInput.extend({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const { id, muscleLoads, ...data } = input
@@ -135,7 +164,7 @@ export const exercisesRouter = createTRPCRouter({
       }
     }),
 
-  delete: therapistProcedure
+  delete: creatorProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const existing = await ctx.prisma.exercise.findUnique({ where: { id: input.id } })

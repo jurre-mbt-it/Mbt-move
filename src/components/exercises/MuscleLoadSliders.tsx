@@ -9,7 +9,7 @@ interface MuscleLoadSlidersProps {
 }
 
 const LOAD_LABELS = ['', 'Licht', 'Matig', 'Gemiddeld', 'Hoog', 'Maximaal']
-const LOAD_COLORS = ['', '#d1fae5', '#6ee7b7', '#3ECF6A', '#16a34a', '#14532d']
+const LOAD_COLORS = ['', '#c6f7f2', '#5eead4', '#4ECDC4', '#0D9488', '#134E4A']
 
 export function MuscleLoadSliders({ value, onChange }: MuscleLoadSlidersProps) {
   const handleChange = (muscle: MuscleGroup, load: number) => {
@@ -53,7 +53,7 @@ export function MuscleLoadSliders({ value, onChange }: MuscleLoadSlidersProps) {
                   background: load === 0
                     ? '#e4e4e7'
                     : `linear-gradient(to right, ${color} 0%, ${color} ${(load / 5) * 100}%, #e4e4e7 ${(load / 5) * 100}%, #e4e4e7 100%)`,
-                  accentColor: '#3ECF6A',
+                  accentColor: '#4ECDC4',
                 }}
               />
               <span
@@ -76,7 +76,7 @@ export function MuscleLoadSliders({ value, onChange }: MuscleLoadSlidersProps) {
               <span
                 key={muscle}
                 className="text-xs px-2 py-0.5 rounded-full text-white font-medium"
-                style={{ background: LOAD_COLORS[load ?? 0] ?? '#3ECF6A' }}
+                style={{ background: LOAD_COLORS[load ?? 0] ?? '#4ECDC4' }}
               >
                 {muscle} · {load}
               </span>

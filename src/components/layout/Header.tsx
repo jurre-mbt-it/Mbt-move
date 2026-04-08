@@ -69,10 +69,10 @@ export function Header({ title, userName, userEmail, userAvatar, settingsBase = 
         {/* Gebruikersmenu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2" style={{ '--tw-ring-color': '#3ECF6A' } as React.CSSProperties}>
+            <button className="flex items-center gap-2 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2" style={{ '--tw-ring-color': '#4ECDC4' } as React.CSSProperties}>
               <Avatar className="w-8 h-8">
                 {userAvatar && <AvatarImage src={userAvatar} alt={userName} />}
-                <AvatarFallback style={{ background: '#3ECF6A', color: '#FFFFFF' }}>
+                <AvatarFallback style={{ background: '#4ECDC4', color: '#FFFFFF' }}>
                   {initials}
                 </AvatarFallback>
               </Avatar>

@@ -1,13 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Progress } from '@/components/ui/progress'
 import {
   Dialog,
   DialogContent,
@@ -16,39 +14,54 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { MOCK_PATIENTS } from '@/lib/therapist-constants'
-import { Plus, Search, Users, CheckCircle2, AlertCircle, Clock, Mail } from 'lucide-react'
+import { trpc } from '@/lib/trpc/client'
+import { Plus, Search, Users, CheckCircle2, AlertCircle, Clock, Mail, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  ACTIVE:    { label: 'Actief',    bg: '#dcfce7', text: '#15803d' },
+  ACTIVE:    { label: 'Actief',    bg: '#ccfbf1', text: '#0D6B6E' },
   DRAFT:     { label: 'Concept',   bg: '#fef9c3', text: '#a16207' },
   COMPLETED: { label: 'Afgerond',  bg: '#f1f5f9', text: '#475569' },
+  ARCHIVED:  { label: 'Gearchiveerd', bg: '#f1f5f9', text: '#475569' },
 }
+
+type QuickFilter = 'all' | 'active' | 'low-compliance'
 
 export default function PatientsPage() {
   const router = useRouter()
   const [search, setSearch] = useState('')
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all')
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteName, setInviteName] = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteLoading, setInviteLoading] = useState(false)
+  const [inviteExists, setInviteExists] = useState(false)
 
-  async function handleInvite(e: React.FormEvent) {
+  const { data: patients = [], isLoading } = trpc.patients.list.useQuery()
+
+  async function handleInvite(e: React.FormEvent, resend = false) {
     e.preventDefault()
     setInviteLoading(true)
+    setInviteExists(false)
     try {
       const res = await fetch('/api/auth/invite-patient', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: inviteEmail, name: inviteName }),
+        body: JSON.stringify({ email: inviteEmail, name: inviteName, resend }),
       })
       const data = await res.json()
+      if (res.status === 409 && !resend) {
+        setInviteExists(true)
+        return
+      }
       if (!res.ok) throw new Error(data.error)
-      toast.success(`Uitnodiging verstuurd naar ${inviteEmail}`)
+      toast.success(resend
+        ? `Nieuwe uitnodiging verstuurd naar ${inviteEmail}`
+        : `Uitnodiging verstuurd naar ${inviteEmail}`)
       setInviteOpen(false)
       setInviteName('')
       setInviteEmail('')
+      setInviteExists(false)
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Er ging iets mis')
     } finally {
@@ -56,13 +69,19 @@ export default function PatientsPage() {
     }
   }
 
-  const filtered = MOCK_PATIENTS.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.email.toLowerCase().includes(search.toLowerCase())
-  )
+  const activeCount = patients.filter(p => p.programStatus === 'ACTIVE').length
+  const lowComplianceCount = 0 // TODO: add compliance tracking
 
-  const activeCount = MOCK_PATIENTS.filter(p => p.programStatus === 'ACTIVE').length
-  const lowComplianceCount = MOCK_PATIENTS.filter(p => (p.compliance ?? 0) > 0 && (p.compliance ?? 0) < 70).length
+  const filtered = patients
+    .filter(p => {
+      if (quickFilter === 'active') return p.programStatus === 'ACTIVE'
+      if (quickFilter === 'low-compliance') return false // TODO
+      return true
+    })
+    .filter(p =>
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.email.toLowerCase().includes(search.toLowerCase())
+    )
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -72,7 +91,7 @@ export default function PatientsPage() {
           <p className="text-muted-foreground text-sm mt-0.5">Beheer en monitor je patiënten</p>
         </div>
         <Button
-          style={{ background: '#3ECF6A' }}
+          style={{ background: '#4ECDC4' }}
           className="gap-2"
           onClick={() => setInviteOpen(true)}
         >
@@ -83,9 +102,27 @@ export default function PatientsPage() {
 
       {/* Quick stats */}
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        <QuickStat icon={<Users className="w-4 h-4" style={{ color: '#6366f1' }} />} value={MOCK_PATIENTS.length} label="Totaal" />
-        <QuickStat icon={<CheckCircle2 className="w-4 h-4" style={{ color: '#3ECF6A' }} />} value={activeCount} label="Actief" />
-        <QuickStat icon={<AlertCircle className="w-4 h-4" style={{ color: '#f97316' }} />} value={lowComplianceCount} label="Lage compliance" />
+        <QuickStat
+          icon={<Users className="w-4 h-4" style={{ color: '#6366f1' }} />}
+          value={patients.length}
+          label="Totaal"
+          active={quickFilter === 'all'}
+          onClick={() => setQuickFilter('all')}
+        />
+        <QuickStat
+          icon={<CheckCircle2 className="w-4 h-4" style={{ color: '#4ECDC4' }} />}
+          value={activeCount}
+          label="Actief"
+          active={quickFilter === 'active'}
+          onClick={() => setQuickFilter(quickFilter === 'active' ? 'all' : 'active')}
+        />
+        <QuickStat
+          icon={<AlertCircle className="w-4 h-4" style={{ color: '#f97316' }} />}
+          value={lowComplianceCount}
+          label="Lage compliance"
+          active={quickFilter === 'low-compliance'}
+          onClick={() => setQuickFilter(quickFilter === 'low-compliance' ? 'all' : 'low-compliance')}
+        />
       </div>
 
       {/* Search */}
@@ -100,130 +137,105 @@ export default function PatientsPage() {
         />
       </div>
 
+      {/* Loading state */}
+      {isLoading && (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      )}
+
       {/* Patient list */}
-      <div className="space-y-3">
-        {filtered.map(patient => {
-          const status = patient.programStatus ? STATUS_CONFIG[patient.programStatus] : null
-          const lastDate = patient.lastSessionDate
-            ? new Date(patient.lastSessionDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-            : null
-          const daysSinceSession = patient.lastSessionDate
-            ? Math.floor((Date.now() - new Date(patient.lastSessionDate).getTime()) / (1000 * 60 * 60 * 24))
-            : null
+      {!isLoading && (
+        <div className="space-y-3">
+          {filtered.map(patient => {
+            const status = patient.programStatus ? STATUS_CONFIG[patient.programStatus] : null
 
-          return (
-            <Card
-              key={patient.id}
-              style={{ borderRadius: '12px' }}
-              className="hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => router.push(`/therapist/patients/${patient.id}`)}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  {/* Avatar */}
-                  <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0"
-                    style={{ background: '#1A1A1A' }}
-                  >
-                    {patient.avatarInitials}
-                  </div>
+            return (
+              <Card
+                key={patient.id}
+                style={{ borderRadius: '12px' }}
+                className="hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => router.push(`/therapist/patients/${patient.id}`)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    {/* Avatar */}
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0"
+                      style={{ background: '#1A3A3A' }}
+                    >
+                      {patient.avatarInitials}
+                    </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold text-sm">{patient.name}</h3>
-                      {status && (
-                        <span
-                          className="text-xs px-2 py-0.5 rounded-full font-medium"
-                          style={{ background: status.bg, color: status.text }}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold text-sm">{patient.name}</h3>
+                        {status && (
+                          <span
+                            className="text-xs px-2 py-0.5 rounded-full font-medium"
+                            style={{ background: status.bg, color: status.text }}
+                          >
+                            {status.label}
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">{patient.email}</p>
+
+                      {patient.programName ? (
+                        <p className="text-xs text-muted-foreground mt-1 truncate">{patient.programName}</p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground mt-1 italic">Geen programma toegewezen</p>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex flex-col gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
+                      {patient.programId ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs h-7 px-3"
+                          onClick={() => router.push(`/therapist/programs/${patient.programId}/edit`)}
                         >
-                          {status.label}
-                        </span>
-                      )}
-                      {patient.tags.map(tag => (
-                        <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
-                      ))}
-                    </div>
-
-                    {patient.programName ? (
-                      <p className="text-xs text-muted-foreground mt-0.5 truncate">{patient.programName}</p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground mt-0.5 italic">Geen programma toegewezen</p>
-                    )}
-
-                    {/* Progress + stats */}
-                    {patient.programStatus === 'ACTIVE' && (
-                      <div className="mt-2 space-y-1.5">
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>Week {patient.weeksCurrent}/{patient.weeksTotal}</span>
-                          <span>{patient.compliance}% compliance</span>
-                        </div>
-                        <Progress
-                          value={(patient.weeksCurrent / patient.weeksTotal) * 100}
-                          className="h-1.5"
-                        />
-                      </div>
-                    )}
-
-                    {patient.programStatus === 'COMPLETED' && (
-                      <div className="mt-2 flex items-center gap-1 text-xs" style={{ color: '#3ECF6A' }}>
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Programma volledig afgerond · {patient.compliance}% compliance
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                      {lastDate && (
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          Laatste sessie: {lastDate}
-                          {daysSinceSession !== null && daysSinceSession > 7 && (
-                            <span style={{ color: '#f97316' }}> ({daysSinceSession}d geleden)</span>
-                          )}
-                        </span>
-                      )}
-                      {patient.lastPainLevel !== null && (
-                        <span>Pijn: {patient.lastPainLevel}/10</span>
+                          Programma
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="text-xs h-7 px-3"
+                          style={{ background: '#4ECDC4' }}
+                          onClick={() => router.push(`/therapist/programs/new?patientId=${patient.id}`)}
+                        >
+                          + Programma
+                        </Button>
                       )}
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+            )
+          })}
 
-                  {/* Actions */}
-                  <div className="flex flex-col gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
-                    {patient.programId ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-xs h-7 px-3"
-                        onClick={() => router.push(`/therapist/programs/${patient.programId}/edit`)}
-                      >
-                        Programma
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        className="text-xs h-7 px-3"
-                        style={{ background: '#3ECF6A' }}
-                        onClick={() => router.push('/therapist/programs/new')}
-                      >
-                        + Programma
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-
-        {filtered.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed rounded-xl text-center">
-            <p className="text-sm text-muted-foreground">Geen patiënten gevonden</p>
-          </div>
-        )}
-      </div>
+          {filtered.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed rounded-xl text-center">
+              <p className="text-sm text-muted-foreground">Geen patiënten gevonden</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3 gap-2"
+                onClick={() => setInviteOpen(true)}
+              >
+                <Plus className="w-4 h-4" />
+                Patiënt uitnodigen
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Invite modal */}
-      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+      <Dialog open={inviteOpen} onOpenChange={(open) => { setInviteOpen(open); if (!open) setInviteExists(false) }}>
         <DialogContent style={{ borderRadius: '16px' }}>
           <DialogHeader>
             <DialogTitle>Patiënt uitnodigen</DialogTitle>
@@ -238,7 +250,7 @@ export default function PatientsPage() {
                 id="invite-name"
                 placeholder="Jan de Vries"
                 value={inviteName}
-                onChange={e => setInviteName(e.target.value)}
+                onChange={e => { setInviteName(e.target.value); setInviteExists(false) }}
                 required
               />
             </div>
@@ -249,19 +261,42 @@ export default function PatientsPage() {
                 type="email"
                 placeholder="jan@example.com"
                 value={inviteEmail}
-                onChange={e => setInviteEmail(e.target.value)}
+                onChange={e => { setInviteEmail(e.target.value); setInviteExists(false) }}
                 required
               />
             </div>
-            <Button
-              type="submit"
-              className="w-full gap-2"
-              style={{ background: '#3ECF6A' }}
-              disabled={inviteLoading}
-            >
-              <Mail className="w-4 h-4" />
-              {inviteLoading ? 'Versturen...' : 'Uitnodiging versturen'}
-            </Button>
+
+            {inviteExists && (
+              <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 space-y-2">
+                <p className="text-sm text-orange-800">
+                  <AlertCircle className="w-4 h-4 inline mr-1.5 -mt-0.5" />
+                  Deze patiënt is al uitgenodigd.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2"
+                  disabled={inviteLoading}
+                  onClick={(e) => handleInvite(e, true)}
+                >
+                  <Mail className="w-4 h-4" />
+                  {inviteLoading ? 'Versturen...' : 'Uitnodiging opnieuw versturen'}
+                </Button>
+              </div>
+            )}
+
+            {!inviteExists && (
+              <Button
+                type="submit"
+                className="w-full gap-2"
+                style={{ background: '#4ECDC4' }}
+                disabled={inviteLoading}
+              >
+                <Mail className="w-4 h-4" />
+                {inviteLoading ? 'Versturen...' : 'Uitnodiging versturen'}
+              </Button>
+            )}
           </form>
         </DialogContent>
       </Dialog>
@@ -269,9 +304,15 @@ export default function PatientsPage() {
   )
 }
 
-function QuickStat({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) {
+function QuickStat({ icon, value, label, active, onClick }: {
+  icon: React.ReactNode; value: number; label: string; active?: boolean; onClick?: () => void
+}) {
   return (
-    <Card style={{ borderRadius: '12px' }}>
+    <Card
+      style={{ borderRadius: '12px', borderColor: active ? '#4ECDC4' : undefined }}
+      className={`cursor-pointer transition-all hover:shadow-md ${active ? 'ring-2 ring-[#4ECDC4] bg-[#4ECDC408]' : ''}`}
+      onClick={onClick}
+    >
       <CardContent className="p-3">
         <div className="mb-1">{icon}</div>
         <p className="text-xl font-bold">{value}</p>

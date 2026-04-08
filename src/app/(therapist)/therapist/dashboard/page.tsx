@@ -32,7 +32,7 @@ export default function TherapistDashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <StatCard icon={<Users className="w-4 h-4" style={{ color: '#3ECF6A' }} />} value={activePatients.length} label="Actieve patiënten" />
+        <StatCard icon={<Users className="w-4 h-4" style={{ color: '#4ECDC4' }} />} value={activePatients.length} label="Actieve patiënten" />
         <StatCard icon={<ClipboardList className="w-4 h-4" style={{ color: '#60a5fa' }} />} value={activePrograms.length} label="Actieve programma's" />
         <StatCard icon={<TrendingUp className="w-4 h-4" style={{ color: '#a78bfa' }} />} value={`${avgCompliance}%`} label="Gem. compliance" />
       </div>
@@ -49,7 +49,7 @@ export default function TherapistDashboard() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-sm">Actieve patiënten</h2>
-          <Link href="/therapist/patients" className="text-xs flex items-center gap-0.5" style={{ color: '#3ECF6A' }}>
+          <Link href="/therapist/patients" className="text-xs flex items-center gap-0.5" style={{ color: '#4ECDC4' }}>
             Alles <ChevronRight className="w-3 h-3" />
           </Link>
         </div>
@@ -59,7 +59,7 @@ export default function TherapistDashboard() {
             <Card style={{ borderRadius: '12px' }} className="hover:shadow-md transition-shadow cursor-pointer">
               <CardContent className="px-4 py-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0" style={{ background: '#1A1A1A' }}>
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0" style={{ background: '#1A3A3A' }}>
                     {p.avatarInitials}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -83,7 +83,7 @@ export default function TherapistDashboard() {
         <h2 className="font-semibold text-sm mb-3">Snelle acties</h2>
         <div className="grid grid-cols-2 gap-3">
           <Button variant="outline" className="h-12 gap-2 justify-start" onClick={() => router.push('/therapist/programs/new')}>
-            <Plus className="w-4 h-4" style={{ color: '#3ECF6A' }} />
+            <Plus className="w-4 h-4" style={{ color: '#4ECDC4' }} />
             Nieuw programma
           </Button>
           <Button variant="outline" className="h-12 gap-2 justify-start" onClick={() => router.push('/therapist/exercises/new')}>

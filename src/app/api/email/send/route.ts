@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       </div>
 
       <a href="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://mbt-move.nl'}/login/code"
-         style="display: inline-block; background: #3ECF6A; color: white; font-weight: 600; padding: 12px 24px; border-radius: 10px; text-decoration: none;">
+         style="display: inline-block; background: #4ECDC4; color: white; font-weight: 600; padding: 12px 24px; border-radius: 10px; text-decoration: none;">
         Inloggen met toegangscode
       </a>
 

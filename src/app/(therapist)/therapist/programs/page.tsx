@@ -15,7 +15,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }> = {
-  ACTIVE:    { bg: '#dcfce7', text: '#15803d', label: 'Actief' },
+  ACTIVE:    { bg: '#ccfbf1', text: '#0D6B6E', label: 'Actief' },
   DRAFT:     { bg: '#fef9c3', text: '#a16207', label: 'Concept' },
   COMPLETED: { bg: '#f1f5f9', text: '#475569', label: 'Afgerond' },
   ARCHIVED:  { bg: '#f1f5f9', text: '#9ca3af', label: 'Gearchiveerd' },
@@ -98,7 +98,7 @@ export default function ProgramsPage() {
           <p className="text-muted-foreground text-sm mt-0.5">Maak en beheer revalidatieprogramma&apos;s</p>
         </div>
         <Link href="/therapist/programs/new">
-          <Button style={{ background: '#3ECF6A' }} className="gap-2">
+          <Button style={{ background: '#4ECDC4' }} className="gap-2">
             <Plus className="w-4 h-4" />
             Nieuw programma
           </Button>
@@ -178,13 +178,13 @@ export default function ProgramsPage() {
                 id="asTemplate"
                 checked={duplicateAsTemplate}
                 onChange={e => setDuplicateAsTemplate(e.target.checked)}
-                className="accent-[#3ECF6A]"
+                className="accent-[#4ECDC4]"
               />
               <label htmlFor="asTemplate" className="text-sm">Opslaan als template</label>
             </div>
             <div className="flex gap-2">
               <Button
-                style={{ background: '#3ECF6A' }}
+                style={{ background: '#4ECDC4' }}
                 onClick={handleDuplicate}
                 disabled={duplicateMutation.isPending}
                 className="flex-1"

@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
-const protectedPrefixes = ['/therapist', '/patient', '/admin']
+const protectedPrefixes = ['/therapist', '/patient', '/athlete', '/admin']
 const authRoutes = ['/login', '/register']
 
 export async function proxy(request: NextRequest) {
@@ -38,7 +38,7 @@ export async function proxy(request: NextRequest) {
 
     if (isAuthRoute && user) {
       const role = user.user_metadata?.role
-      const dest = role === 'PATIENT' ? '/patient/dashboard' : '/therapist/dashboard'
+      const dest = role === 'PATIENT' ? '/patient/dashboard' : role === 'ATHLETE' ? '/athlete/dashboard' : '/therapist/dashboard'
       return NextResponse.redirect(new URL(dest, request.url))
     }
   } catch {

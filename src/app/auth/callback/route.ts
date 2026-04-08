@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
 
       if (next !== '/') return NextResponse.redirect(`${origin}${next}`)
       if (role === 'PATIENT') return NextResponse.redirect(`${origin}/patient/dashboard`)
+      if (role === 'ATHLETE') return NextResponse.redirect(`${origin}/athlete/dashboard`)
       return NextResponse.redirect(`${origin}/therapist/dashboard`)
     }
   }

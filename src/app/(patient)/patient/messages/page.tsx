@@ -57,10 +57,10 @@ export default function MessagesPage() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#FAFAFA' }}>
       {/* Header */}
-      <div className="px-4 pt-12 pb-4 flex items-center gap-3" style={{ background: '#1A1A1A' }}>
+      <div className="px-4 pt-12 pb-4 flex items-center gap-3" style={{ background: '#1A3A3A' }}>
         <div
           className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
-          style={{ background: '#3ECF6A' }}
+          style={{ background: '#4ECDC4' }}
         >
           {THERAPIST_NAME.split(' ').map(n => n[0]).join('').slice(0, 2)}
         </div>
@@ -97,8 +97,8 @@ export default function MessagesPage() {
                   <div
                     className="rounded-2xl px-4 py-3 text-sm leading-relaxed"
                     style={{
-                      background: isPatient ? '#3ECF6A' : '#fff',
-                      color: isPatient ? '#fff' : '#1A1A1A',
+                      background: isPatient ? '#4ECDC4' : '#fff',
+                      color: isPatient ? '#fff' : '#1A3A3A',
                       borderBottomRightRadius: isPatient ? 4 : undefined,
                       borderBottomLeftRadius: !isPatient ? 4 : undefined,
                       boxShadow: !isPatient ? '0 1px 3px rgba(0,0,0,0.08)' : undefined,
@@ -136,7 +136,7 @@ export default function MessagesPage() {
           disabled={!input.trim()}
           className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all"
           style={{
-            background: input.trim() ? '#3ECF6A' : '#f4f4f5',
+            background: input.trim() ? '#4ECDC4' : '#f4f4f5',
             color: input.trim() ? 'white' : '#a1a1aa',
           }}
         >

@@ -1,7 +1,24 @@
+'use client'
+
+import { Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { ProgramBuilder } from '@/components/programs/ProgramBuilder'
 
-export const metadata = { title: 'Nieuw programma – MBT Gym' }
+function NewProgramContent() {
+  const searchParams = useSearchParams()
+  const patientId = searchParams.get('patientId')
+
+  return (
+    <ProgramBuilder
+      initialState={patientId ? { patientId } : undefined}
+    />
+  )
+}
 
 export default function NewProgramPage() {
-  return <ProgramBuilder />
+  return (
+    <Suspense>
+      <NewProgramContent />
+    </Suspense>
+  )
 }

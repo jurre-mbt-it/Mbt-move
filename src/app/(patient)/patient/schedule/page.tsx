@@ -32,7 +32,7 @@ export default function PatientSchedulePage() {
   return (
     <div className="min-h-screen pb-6" style={{ background: '#FAFAFA' }}>
       {/* Header */}
-      <div className="px-4 pt-12 pb-4" style={{ background: '#1A1A1A' }}>
+      <div className="px-4 pt-12 pb-4" style={{ background: '#1A3A3A' }}>
         <h1 className="text-white text-xl font-bold">Weekschema</h1>
         <p className="text-zinc-400 text-xs mt-0.5">Week 1 · Knie Revalidatie</p>
       </div>
@@ -52,29 +52,29 @@ export default function PatientSchedulePage() {
                 className="flex flex-col items-center gap-1.5 min-w-[44px] rounded-2xl p-2.5 transition-all"
                 style={{
                   background: isSelected
-                    ? '#1A1A1A'
+                    ? '#1A3A3A'
                     : isTd
-                      ? '#f0fdf4'
+                      ? '#f0fdfa'
                       : hasSession
                         ? '#fff'
                         : '#f4f4f5',
                   border: isSelected
-                    ? '2px solid #3ECF6A'
+                    ? '2px solid #4ECDC4'
                     : isTd
-                      ? '2px solid #3ECF6A'
+                      ? '2px solid #4ECDC4'
                       : '2px solid transparent',
-                  color: isSelected ? '#fff' : hasSession ? '#1A1A1A' : '#a1a1aa',
+                  color: isSelected ? '#fff' : hasSession ? '#1A3A3A' : '#a1a1aa',
                 }}
               >
                 <span className="text-[11px] font-bold">{DAY_SHORT[i]}</span>
                 <div className="w-6 h-6 flex items-center justify-center">
                   {hasSession
-                    ? <Dumbbell className="w-3.5 h-3.5" style={{ color: isSelected ? '#3ECF6A' : '#52525b' }} />
+                    ? <Dumbbell className="w-3.5 h-3.5" style={{ color: isSelected ? '#4ECDC4' : '#52525b' }} />
                     : <Moon className="w-3.5 h-3.5" />
                   }
                 </div>
                 {hasSession && (
-                  <span className="text-[10px] font-medium" style={{ color: isSelected ? '#3ECF6A' : '#71717a' }}>
+                  <span className="text-[10px] font-medium" style={{ color: isSelected ? '#4ECDC4' : '#71717a' }}>
                     {weekSchedule[dayNum]?.length}
                   </span>
                 )}
@@ -90,7 +90,7 @@ export default function PatientSchedulePage() {
           <h2 className="font-bold text-base">{DAY_NAMES[selectedDay - 1]}{isToday ? ' · Vandaag' : ''}</h2>
           {hasExercises && isToday && (
             <Link href="/patient/session">
-              <Button size="sm" className="gap-1.5 text-xs font-semibold h-8" style={{ background: '#3ECF6A' }}>
+              <Button size="sm" className="gap-1.5 text-xs font-semibold h-8" style={{ background: '#4ECDC4' }}>
                 <Play className="w-3 h-3 fill-current" /> Start sessie
               </Button>
             </Link>
@@ -132,7 +132,7 @@ export default function PatientSchedulePage() {
               <Link href="/patient/session">
                 <div
                   className="flex items-center justify-center gap-2 py-4 rounded-2xl mt-2"
-                  style={{ background: '#3ECF6A' }}
+                  style={{ background: '#4ECDC4' }}
                 >
                   <Play className="w-4 h-4 fill-white text-white" />
                   <span className="text-white font-bold text-sm">Start sessie — {selectedExercises.length} oefeningen</span>
@@ -144,11 +144,11 @@ export default function PatientSchedulePage() {
           // Rest day
           <div
             className="rounded-2xl px-5 py-8 flex flex-col items-center text-center gap-3"
-            style={{ background: '#f0fdf4', border: '2px solid #bbf7d0' }}
+            style={{ background: '#f0fdfa', border: '2px solid #bbf7d0' }}
           >
             <div className="text-4xl">🌿</div>
             <div>
-              <p className="font-bold text-base" style={{ color: '#15803d' }}>Rustdag</p>
+              <p className="font-bold text-base" style={{ color: '#0D6B6E' }}>Rustdag</p>
               <p className="text-sm mt-1.5 leading-relaxed" style={{ color: '#166534' }}>
                 Vandaag is een rustdag. Goed herstel is onderdeel van je programma.
               </p>

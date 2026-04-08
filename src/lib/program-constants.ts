@@ -24,7 +24,7 @@ export const SUPERSET_COLORS: Record<string, { bg: string; border: string; text:
   B: { bg: '#fefce8', border: '#fde047', text: '#a16207' },
   C: { bg: '#fdf4ff', border: '#d8b4fe', text: '#7e22ce' },
   D: { bg: '#fff1f2', border: '#fda4af', text: '#be123c' },
-  E: { bg: '#f0fdf4', border: '#86efac', text: '#15803d' },
+  E: { bg: '#f0fdfa', border: '#86efac', text: '#0D6B6E' },
   F: { bg: '#fff7ed', border: '#fdba74', text: '#c2410c' },
 }
 

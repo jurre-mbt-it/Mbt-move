@@ -41,10 +41,10 @@ export function TherapistSidebar() {
   return (
     <aside
       className="w-64 min-h-screen flex flex-col shrink-0"
-      style={{ background: '#1A1A1A', color: '#FAFAFA' }}
+      style={{ background: '#1A3A3A', color: '#FAFAFA' }}
     >
       {/* Logo */}
-      <div className="p-6 border-b" style={{ borderColor: '#2A2A2A' }}>
+      <div className="p-6 border-b" style={{ borderColor: '#2A4A4A' }}>
         <div className="flex items-center gap-3">
           <img
             src="/Logo.jpg"
@@ -70,7 +70,7 @@ export function TherapistSidebar() {
                   ? 'text-white'
                   : 'text-zinc-400 hover:text-white hover:bg-white/5'
               )}
-              style={active ? { background: '#3ECF6A', color: '#FFFFFF' } : {}}
+              style={active ? { background: '#4ECDC4', color: '#FFFFFF' } : {}}
             >
               <Icon className="w-5 h-5 shrink-0" />
               {label}
@@ -80,7 +80,7 @@ export function TherapistSidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="p-4 space-y-1 border-t" style={{ borderColor: '#2A2A2A' }}>
+      <div className="p-4 space-y-1 border-t" style={{ borderColor: '#2A4A4A' }}>
         <Link
           href="/therapist/settings"
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"

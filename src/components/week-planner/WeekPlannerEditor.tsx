@@ -108,7 +108,7 @@ export function WeekPlannerEditor({ initialData }: Props) {
           <h1 className="text-xl font-bold">{isEdit ? 'Schema bewerken' : 'Nieuw weekschema'}</h1>
         </div>
         <Button
-          style={{ background: '#3ECF6A' }}
+          style={{ background: '#4ECDC4' }}
           className="gap-2"
           onClick={handleSave}
           disabled={saving}
@@ -134,7 +134,7 @@ export function WeekPlannerEditor({ initialData }: Props) {
             <select
               value={patientId}
               onChange={e => setPatientId(e.target.value)}
-              className="mt-1.5 w-full h-9 text-sm border rounded-md px-3 bg-white focus:outline-none focus:ring-1 focus:ring-[#3ECF6A]"
+              className="mt-1.5 w-full h-9 text-sm border rounded-md px-3 bg-white focus:outline-none focus:ring-1 focus:ring-[#4ECDC4]"
             >
               <option value="">— Geen patiënt —</option>
               {patientOptions.map(p => (
@@ -148,7 +148,7 @@ export function WeekPlannerEditor({ initialData }: Props) {
               id="isTemplate"
               checked={isTemplate}
               onChange={e => setIsTemplate(e.target.checked)}
-              className="accent-[#3ECF6A]"
+              className="accent-[#4ECDC4]"
             />
             <label htmlFor="isTemplate" className="text-sm">Template</label>
           </div>
@@ -176,7 +176,7 @@ export function WeekPlannerEditor({ initialData }: Props) {
                 <select
                   value={day.programId ?? ''}
                   onChange={e => setDayProgram(i, e.target.value || null)}
-                  className="flex-1 h-9 text-sm border rounded-md px-3 bg-white focus:outline-none focus:ring-1 focus:ring-[#3ECF6A]"
+                  className="flex-1 h-9 text-sm border rounded-md px-3 bg-white focus:outline-none focus:ring-1 focus:ring-[#4ECDC4]"
                 >
                   <option value="">Rustdag 😴</option>
                   {programs
@@ -189,7 +189,7 @@ export function WeekPlannerEditor({ initialData }: Props) {
                 {/* Color indicator */}
                 <div
                   className="w-3 h-3 rounded-full shrink-0"
-                  style={{ background: day.programId ? '#3ECF6A' : '#e4e4e7' }}
+                  style={{ background: day.programId ? '#4ECDC4' : '#e4e4e7' }}
                 />
               </div>
             )

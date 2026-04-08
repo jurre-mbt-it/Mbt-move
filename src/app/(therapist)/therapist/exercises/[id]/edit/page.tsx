@@ -45,6 +45,9 @@ export default function EditExercisePage({ params }: Props) {
     muscleLoads: exercise.muscleLoads as Record<string, number>,
     easierVariantId: exercise.easierVariantId ?? null,
     harderVariantId: exercise.harderVariantId ?? null,
+    loadType: (exercise as Record<string, unknown>).loadType as string ?? 'BODYWEIGHT',
+    isUnilateral: (exercise as Record<string, unknown>).isUnilateral as boolean ?? false,
+    movementPattern: (exercise as Record<string, unknown>).movementPattern as string ?? null,
   }
 
   return (

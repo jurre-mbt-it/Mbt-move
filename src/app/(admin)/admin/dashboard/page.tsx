@@ -38,9 +38,9 @@ export default function AdminDashboard() {
                 </div>
                 <div
                   className="w-10 h-10 rounded-lg flex items-center justify-center"
-                  style={{ background: '#3ECF6A20' }}
+                  style={{ background: '#4ECDC420' }}
                 >
-                  <stat.icon className="w-5 h-5" style={{ color: '#3ECF6A' }} />
+                  <stat.icon className="w-5 h-5" style={{ color: '#4ECDC4' }} />
                 </div>
               </div>
             </CardContent>

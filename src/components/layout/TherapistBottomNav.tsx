@@ -19,7 +19,7 @@ export function TherapistBottomNav() {
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 border-t md:hidden"
-      style={{ background: '#1A1A1A', borderColor: '#2A2A2A' }}
+      style={{ background: '#1A3A3A', borderColor: '#2A4A4A' }}
     >
       <div className="flex items-center justify-around h-16 px-1">
         {navItems.map(({ href, label, icon: Icon }) => {
@@ -32,7 +32,7 @@ export function TherapistBottomNav() {
                 'flex flex-col items-center gap-0.5 flex-1 py-2 text-xs font-medium transition-colors',
                 active ? '' : 'text-zinc-500'
               )}
-              style={active ? { color: '#3ECF6A' } : {}}
+              style={active ? { color: '#4ECDC4' } : {}}
             >
               <Icon className="w-5 h-5" />
               <span className="text-[10px]">{label.split("'")[0]}</span>

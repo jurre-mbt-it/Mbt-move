@@ -13,7 +13,7 @@ function Progress({ className, value = 0, ...props }: ProgressProps) {
     >
       <div
         className="h-full rounded-full transition-all duration-300"
-        style={{ width: `${Math.min(100, Math.max(0, value))}%`, background: '#3ECF6A' }}
+        style={{ width: `${Math.min(100, Math.max(0, value))}%`, background: '#4ECDC4' }}
       />
     </div>
   )

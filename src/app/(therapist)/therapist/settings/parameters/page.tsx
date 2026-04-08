@@ -62,7 +62,7 @@ function SortableParamCard({
                 <Badge variant="secondary" className="text-xs">{TYPE_LABELS[p.type]}</Badge>
                 {p.unit && <span className="text-xs text-muted-foreground">{p.unit}</span>}
                 {p.isGlobal && (
-                  <span className="text-xs px-1.5 py-0 rounded-full font-medium text-white" style={{ background: '#3ECF6A' }}>
+                  <span className="text-xs px-1.5 py-0 rounded-full font-medium text-white" style={{ background: '#4ECDC4' }}>
                     Globaal
                   </span>
                 )}
@@ -188,7 +188,7 @@ export default function ParametersPage() {
               Definieer eigen parameters · Sleep om volgorde te wijzigen
             </p>
           </div>
-          <Button onClick={openCreate} style={{ background: '#3ECF6A' }} className="gap-2 shrink-0">
+          <Button onClick={openCreate} style={{ background: '#4ECDC4' }} className="gap-2 shrink-0">
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">Nieuwe parameter</span>
           </Button>
@@ -334,7 +334,7 @@ export default function ParametersPage() {
             </div>
 
             <div className="flex gap-2 pt-1">
-              <Button style={{ background: '#3ECF6A' }} onClick={handleSave} className="flex-1">
+              <Button style={{ background: '#4ECDC4' }} onClick={handleSave} className="flex-1">
                 {editing ? 'Opslaan' : 'Aanmaken'}
               </Button>
               <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuleren</Button>

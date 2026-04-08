@@ -86,7 +86,7 @@ export function VideoInput({ value, onChange }: VideoInputProps) {
           <div
             className={cn(
               'border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors',
-              dragging ? 'border-[#3ECF6A] bg-[#3ECF6A10]' : 'border-zinc-200 hover:border-[#3ECF6A] hover:bg-[#3ECF6A05]'
+              dragging ? 'border-[#4ECDC4] bg-[#4ECDC410]' : 'border-zinc-200 hover:border-[#4ECDC4] hover:bg-[#4ECDC405]'
             )}
             onDragOver={e => { e.preventDefault(); setDragging(true) }}
             onDragLeave={() => setDragging(false)}
@@ -117,7 +117,7 @@ export function VideoInput({ value, onChange }: VideoInputProps) {
               <div className="h-1.5 bg-zinc-100 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-300"
-                  style={{ width: `${uploadProgress}%`, background: '#3ECF6A' }}
+                  style={{ width: `${uploadProgress}%`, background: '#4ECDC4' }}
                 />
               </div>
               {uploadProgress < 100 && (

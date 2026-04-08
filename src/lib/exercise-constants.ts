@@ -52,7 +52,7 @@ export const MUSCLE_GROUPS = [
 export type MuscleGroup = (typeof MUSCLE_GROUPS)[number]
 
 export const COLLECTION_COLORS = [
-  '#3ECF6A', // MBT groen
+  '#4ECDC4', // MBT groen
   '#60a5fa', // blauw
   '#f59e0b', // amber
   '#a78bfa', // paars

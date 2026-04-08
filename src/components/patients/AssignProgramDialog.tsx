@@ -111,7 +111,7 @@ export function AssignProgramDialog({ open, onOpenChange, patient }: AssignProgr
                     className="flex items-center gap-3 p-3 rounded-xl border transition-colors"
                     style={
                       selectedProgram?.id === p.id
-                        ? { borderColor: '#3ECF6A', background: '#f0fdf4' }
+                        ? { borderColor: '#4ECDC4', background: '#f0fdfa' }
                         : { borderColor: '#e4e4e7' }
                     }
                   >
@@ -132,7 +132,7 @@ export function AssignProgramDialog({ open, onOpenChange, patient }: AssignProgr
             </div>
             <Button
               className="w-full"
-              style={{ background: '#3ECF6A' }}
+              style={{ background: '#4ECDC4' }}
               disabled={!selectedProgram}
               onClick={handleNext}
             >
@@ -191,7 +191,7 @@ export function AssignProgramDialog({ open, onOpenChange, patient }: AssignProgr
                 </Button>
                 <Button
                   className="flex-1 gap-2"
-                  style={{ background: '#3ECF6A' }}
+                  style={{ background: '#4ECDC4' }}
                   disabled={!startDate || sending}
                   onClick={handleAssign}
                 >
@@ -209,8 +209,8 @@ export function AssignProgramDialog({ open, onOpenChange, patient }: AssignProgr
               <DialogTitle>Toegewezen!</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 mt-2 text-center">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style={{ background: '#dcfce7' }}>
-                <CheckCircle2 className="w-8 h-8" style={{ color: '#15803d' }} />
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style={{ background: '#ccfbf1' }}>
+                <CheckCircle2 className="w-8 h-8" style={{ color: '#0D6B6E' }} />
               </div>
               <div>
                 <p className="font-semibold">{selectedProgram.name}</p>
@@ -224,7 +224,7 @@ export function AssignProgramDialog({ open, onOpenChange, patient }: AssignProgr
                 <p className="font-mono font-bold text-2xl">{accessCode}</p>
                 <button
                   className="text-xs mt-1 flex items-center gap-1 mx-auto"
-                  style={{ color: '#3ECF6A' }}
+                  style={{ color: '#4ECDC4' }}
                   onClick={() => {
                     navigator.clipboard.writeText(accessCode)
                     toast.success('Gekopieerd')
@@ -238,7 +238,7 @@ export function AssignProgramDialog({ open, onOpenChange, patient }: AssignProgr
                 Een e-mail is verstuurd naar <strong>{patient.email}</strong> (indien Resend geconfigureerd is)
               </p>
 
-              <Button className="w-full" style={{ background: '#3ECF6A' }} onClick={handleClose}>
+              <Button className="w-full" style={{ background: '#4ECDC4' }} onClick={handleClose}>
                 Sluiten
               </Button>
             </div>

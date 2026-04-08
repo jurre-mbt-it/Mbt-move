@@ -51,7 +51,7 @@ function DayDropZone({
       ref={setNodeRef}
       className={cn(
         'min-h-24 rounded-xl p-2 transition-colors',
-        isOver ? 'bg-[#3ECF6A10] border-2 border-dashed border-[#3ECF6A]' : 'border-2 border-dashed border-transparent',
+        isOver ? 'bg-[#4ECDC410] border-2 border-dashed border-[#4ECDC4]' : 'border-2 border-dashed border-transparent',
         isEmpty && !isOver && 'border-zinc-200 border-dashed'
       )}
     >
@@ -70,7 +70,7 @@ function DayDropZone({
 function DragOverlayCard({ name }: { name: string }) {
   return (
     <div className="bg-white border rounded-lg shadow-xl px-3 py-2 text-sm font-semibold flex items-center gap-2 opacity-95">
-      <div className="w-2 h-2 rounded-full bg-[#3ECF6A]" />
+      <div className="w-2 h-2 rounded-full bg-[#4ECDC4]" />
       {name}
     </div>
   )
@@ -331,7 +331,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
           weeks: program.weeks,
           daysPerWeek: program.daysPerWeek,
           isTemplate: program.isTemplate,
-          patientId: program.patientId ?? null,
+          patientId: program.patientId || undefined,
         })
         // Save exercises to the newly created program
         if (exercises.length > 0) {
@@ -466,7 +466,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
           <Button
             size="sm"
             className="gap-1.5 h-7 text-xs shrink-0"
-            style={{ background: '#3ECF6A' }}
+            style={{ background: '#4ECDC4' }}
             onClick={handleSave}
             disabled={saving}
           >
@@ -536,7 +536,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
                       'shrink-0 flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-colors',
                       program.currentDay === d ? 'text-white' : 'text-muted-foreground hover:bg-zinc-100'
                     )}
-                    style={program.currentDay === d ? { background: '#3ECF6A' } : {}}
+                    style={program.currentDay === d ? { background: '#4ECDC4' } : {}}
                   >
                     {DAY_LABELS[d - 1]}
                     {count > 0 && (
@@ -632,7 +632,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
               <Button
                 onClick={() => setMobileLibraryOpen(true)}
                 className="w-12 h-12 rounded-full shadow-lg"
-                style={{ background: '#3ECF6A' }}
+                style={{ background: '#4ECDC4' }}
               >
                 <Plus className="w-5 h-5" />
               </Button>
@@ -701,7 +701,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
                     'shrink-0 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
                     mobileCategory === c.value ? 'text-white border-transparent' : 'border-zinc-200 text-muted-foreground bg-white'
                   )}
-                  style={mobileCategory === c.value ? { background: '#3ECF6A' } : {}}
+                  style={mobileCategory === c.value ? { background: '#4ECDC4' } : {}}
                 >
                   {c.label}
                 </button>
@@ -731,16 +731,16 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
                     className={cn(
                       'w-full flex items-center gap-3 px-3 py-3 rounded-xl border text-left transition-all',
                       selected
-                        ? 'border-[#3ECF6A] bg-[#f0fdf4]'
+                        ? 'border-[#4ECDC4] bg-[#f0fdfa]'
                         : 'border-zinc-100 bg-white hover:border-zinc-200'
                     )}
                   >
                     <div
                       className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ background: { STRENGTH: '#3ECF6A', MOBILITY: '#60a5fa', PLYOMETRICS: '#f59e0b', CARDIO: '#f87171', STABILITY: '#a78bfa' }[ex.category] ?? '#3ECF6A' }}
+                      style={{ background: { STRENGTH: '#4ECDC4', MOBILITY: '#60a5fa', PLYOMETRICS: '#f59e0b', CARDIO: '#f87171', STABILITY: '#a78bfa' }[ex.category] ?? '#4ECDC4' }}
                     />
                     <span className="flex-1 text-sm font-medium">{ex.name}</span>
-                    {selected && <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: '#3ECF6A' }} />}
+                    {selected && <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: '#4ECDC4' }} />}
                   </button>
                 )
               })
@@ -751,7 +751,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
           <div className="px-4 py-3 border-t shrink-0">
             <Button
               className="w-full gap-2"
-              style={{ background: '#3ECF6A' }}
+              style={{ background: '#4ECDC4' }}
               disabled={mobileSelected.size === 0}
               onClick={() => {
                 const source = libraryExercises.length > 0 ? libraryExercises : MOCK_EXERCISES
@@ -787,7 +787,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
             <div>
               <Label className="text-xs">Naam template</Label>
               <input
-                className="w-full mt-1.5 h-9 rounded-md border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#3ECF6A]"
+                className="w-full mt-1.5 h-9 rounded-md border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4ECDC4]"
                 value={templateName}
                 onChange={e => setTemplateName(e.target.value)}
                 placeholder={program.name}
@@ -807,7 +807,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
                         ? 'text-white border-transparent'
                         : 'border-zinc-200 text-muted-foreground hover:border-zinc-400'
                     )}
-                    style={templateCategory === cat ? { background: '#3ECF6A' } : {}}
+                    style={templateCategory === cat ? { background: '#4ECDC4' } : {}}
                   >
                     {cat}
                   </button>
@@ -816,7 +816,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
             </div>
             <div className="flex gap-2 pt-1">
               <Button
-                style={{ background: '#3ECF6A' }}
+                style={{ background: '#4ECDC4' }}
                 onClick={handleSaveAsTemplate}
                 disabled={templateSaving}
                 className="flex-1"

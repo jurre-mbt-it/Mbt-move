@@ -27,7 +27,7 @@ import {
 
 // Mock collections
 const MOCK_COLLECTIONS = [
-  { id: 'c1', name: 'Knie revalidatie', color: '#3ECF6A', count: 3 },
+  { id: 'c1', name: 'Knie revalidatie', color: '#4ECDC4', count: 3 },
   { id: 'c2', name: 'Schouder protocol', color: '#60a5fa', count: 2 },
   { id: 'c3', name: 'Warming-up basis', color: '#f59e0b', count: 4 },
 ]
@@ -125,7 +125,7 @@ export default function ExercisesPage() {
               'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
               activeCollection === null ? 'text-white border-transparent' : 'border-zinc-200 text-muted-foreground'
             )}
-            style={activeCollection === null ? { background: '#3ECF6A' } : {}}
+            style={activeCollection === null ? { background: '#4ECDC4' } : {}}
           >
             Alle ({exercises.length})
           </button>
@@ -155,7 +155,7 @@ export default function ExercisesPage() {
             </p>
           </div>
           <Link href="/therapist/exercises/new">
-            <Button style={{ background: '#3ECF6A' }} className="gap-2">
+            <Button style={{ background: '#4ECDC4' }} className="gap-2">
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Nieuwe oefening</span>
             </Button>
@@ -188,7 +188,7 @@ export default function ExercisesPage() {
             <Filter className="w-4 h-4" />
             Filters
             {activeFilterCount > 0 && (
-              <Badge className="h-4 w-4 p-0 text-xs flex items-center justify-center" style={{ background: '#3ECF6A' }}>
+              <Badge className="h-4 w-4 p-0 text-xs flex items-center justify-center" style={{ background: '#4ECDC4' }}>
                 {activeFilterCount}
               </Badge>
             )}
@@ -227,7 +227,7 @@ export default function ExercisesPage() {
                         ? 'border-transparent text-white'
                         : 'border-zinc-200 bg-white text-muted-foreground hover:border-zinc-400'
                     )}
-                    style={selectedCategory === c.value ? { background: '#3ECF6A' } : {}}
+                    style={selectedCategory === c.value ? { background: '#4ECDC4' } : {}}
                   >
                     {c.label}
                   </button>
@@ -320,7 +320,7 @@ export default function ExercisesPage() {
                 <div className="flex items-center gap-4 p-4 rounded-xl border hover:border-zinc-300 hover:bg-zinc-50 transition-colors cursor-pointer">
                   <div
                     className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-white font-bold text-sm"
-                    style={{ background: '#3ECF6A' }}
+                    style={{ background: '#4ECDC4' }}
                   >
                     {ex.name[0]}
                   </div>

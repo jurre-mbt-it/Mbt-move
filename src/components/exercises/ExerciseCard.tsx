@@ -31,7 +31,7 @@ interface ExerciseCardProps {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  STRENGTH:    '#3ECF6A',
+  STRENGTH:    '#4ECDC4',
   MOBILITY:    '#60a5fa',
   PLYOMETRICS: '#f59e0b',
   CARDIO:      '#f87171',
@@ -43,22 +43,32 @@ const DIFFICULTY_DOTS = { BEGINNER: 1, INTERMEDIATE: 2, ADVANCED: 3 }
 export function ExerciseCard({ exercise, onAddToCollection }: ExerciseCardProps) {
   const category = EXERCISE_CATEGORIES.find(c => c.value === exercise.category)
   const difficulty = DIFFICULTIES.find(d => d.value === exercise.difficulty)
-  const color = CATEGORY_COLORS[exercise.category] ?? '#3ECF6A'
+  const color = CATEGORY_COLORS[exercise.category] ?? '#4ECDC4'
   const dots = DIFFICULTY_DOTS[exercise.difficulty as keyof typeof DIFFICULTY_DOTS] ?? 1
 
   const hasVideo = exercise.mediaType === 'YOUTUBE' || exercise.mediaType === 'VIMEO'
 
+  // Extract YouTube thumbnail from videoUrl
+  function getYouTubeThumbnail(url: string): string | null {
+    const match = url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]+)/)
+    return match ? `https://img.youtube.com/vi/${match[1]}/mqdefault.jpg` : null
+  }
+
+  const thumbnail = exercise.thumbnailUrl
+    || (exercise.mediaType === 'YOUTUBE' && exercise.videoUrl ? getYouTubeThumbnail(exercise.videoUrl) : null)
+
   return (
-    <Card className="group overflow-hidden transition-shadow hover:shadow-md" style={{ borderRadius: '12px' }}>
+    <Link href={`/therapist/exercises/${exercise.id}/edit`} className="block">
+    <Card className="group overflow-hidden transition-shadow hover:shadow-md cursor-pointer" style={{ borderRadius: '12px' }}>
       {/* Thumbnail / placeholder */}
       <div
         className="relative h-36 flex items-center justify-center"
         style={{ background: `${color}15` }}
       >
-        {exercise.thumbnailUrl ? (
+        {thumbnail ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={exercise.thumbnailUrl}
+            src={thumbnail}
             alt={exercise.name}
             className="w-full h-full object-cover"
           />
@@ -111,6 +121,7 @@ export function ExerciseCard({ exercise, onAddToCollection }: ExerciseCardProps)
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={e => e.preventDefault()}
               >
                 <MoreHorizontal className="w-4 h-4" />
               </Button>
@@ -151,5 +162,6 @@ export function ExerciseCard({ exercise, onAddToCollection }: ExerciseCardProps)
         <p className="text-xs text-muted-foreground mt-2">{difficulty?.label}</p>
       </CardContent>
     </Card>
+    </Link>
   )
 }

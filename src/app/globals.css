@@ -7,81 +7,81 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* MBT Brand Colors */
-  --mbt-green: #3ECF6A;
-  --mbt-green-dark: #2db55a;
-  --mbt-green-light: #6ddb91;
-  --mbt-dark: #1A1A1A;
+  /* MBT Brand Colors — dark teal + seafoam palette */
+  --mbt-green: #4ECDC4;
+  --mbt-green-dark: #3BB8B0;
+  --mbt-green-light: #7EDCD6;
+  --mbt-dark: #1A3A3A;
 
   /* shadcn/ui tokens */
   --background: #FAFAFA;
-  --foreground: #1A1A1A;
+  --foreground: #1A3A3A;
   --card: #FFFFFF;
-  --card-foreground: #1A1A1A;
+  --card-foreground: #1A3A3A;
   --popover: #FFFFFF;
-  --popover-foreground: #1A1A1A;
-  --primary: #3ECF6A;
+  --popover-foreground: #1A3A3A;
+  --primary: #4ECDC4;
   --primary-foreground: #FFFFFF;
-  --secondary: #F4F4F5;
-  --secondary-foreground: #1A1A1A;
-  --muted: #F4F4F5;
-  --muted-foreground: #71717A;
-  --accent: #F4F4F5;
-  --accent-foreground: #1A1A1A;
+  --secondary: #F0F5F5;
+  --secondary-foreground: #1A3A3A;
+  --muted: #F0F5F5;
+  --muted-foreground: #5A7A7A;
+  --accent: #F0F5F5;
+  --accent-foreground: #1A3A3A;
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
-  --border: #E4E4E7;
-  --input: #E4E4E7;
-  --ring: #3ECF6A;
+  --border: #D4E4E4;
+  --input: #D4E4E4;
+  --ring: #4ECDC4;
   --radius: 0.5rem;
 
   /* Chart colors */
-  --chart-1: #3ECF6A;
+  --chart-1: #4ECDC4;
   --chart-2: #60a5fa;
   --chart-3: #f59e0b;
   --chart-4: #a78bfa;
   --chart-5: #f87171;
 
   /* Sidebar */
-  --sidebar: #1A1A1A;
+  --sidebar: #1A3A3A;
   --sidebar-foreground: #FAFAFA;
-  --sidebar-primary: #3ECF6A;
+  --sidebar-primary: #4ECDC4;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #2A2A2A;
+  --sidebar-accent: #2A4A4A;
   --sidebar-accent-foreground: #FAFAFA;
-  --sidebar-border: #2A2A2A;
-  --sidebar-ring: #3ECF6A;
+  --sidebar-border: #2A4A4A;
+  --sidebar-ring: #4ECDC4;
 }
 
 .dark {
-  --background: #0F0F0F;
+  --background: #0F1F1F;
   --foreground: #FAFAFA;
-  --card: #1A1A1A;
+  --card: #1A3A3A;
   --card-foreground: #FAFAFA;
-  --popover: #1A1A1A;
+  --popover: #1A3A3A;
   --popover-foreground: #FAFAFA;
-  --primary: #3ECF6A;
+  --primary: #4ECDC4;
   --primary-foreground: #FFFFFF;
-  --secondary: #27272A;
+  --secondary: #2A4A4A;
   --secondary-foreground: #FAFAFA;
-  --muted: #27272A;
-  --muted-foreground: #A1A1AA;
-  --accent: #27272A;
+  --muted: #2A4A4A;
+  --muted-foreground: #8AAFAF;
+  --accent: #2A4A4A;
   --accent-foreground: #FAFAFA;
   --destructive: #7F1D1D;
   --destructive-foreground: #FAFAFA;
-  --border: #27272A;
-  --input: #27272A;
-  --ring: #3ECF6A;
+  --border: #2A4A4A;
+  --input: #2A4A4A;
+  --ring: #4ECDC4;
 
-  --sidebar: #0F0F0F;
+  --sidebar: #0F1F1F;
   --sidebar-foreground: #FAFAFA;
-  --sidebar-primary: #3ECF6A;
+  --sidebar-primary: #4ECDC4;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #1A1A1A;
+  --sidebar-accent: #1A3A3A;
   --sidebar-accent-foreground: #FAFAFA;
-  --sidebar-border: #27272A;
-  --sidebar-ring: #3ECF6A;
+  --sidebar-border: #2A4A4A;
+  --sidebar-ring: #4ECDC4;
 }
 
 @theme inline {

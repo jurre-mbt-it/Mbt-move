@@ -35,7 +35,7 @@ export default function ProgressPage() {
   return (
     <div className="min-h-screen pb-6" style={{ background: '#FAFAFA' }}>
       {/* Header */}
-      <div className="px-4 pt-12 pb-5" style={{ background: '#1A1A1A' }}>
+      <div className="px-4 pt-12 pb-5" style={{ background: '#1A3A3A' }}>
         <h1 className="text-white text-xl font-bold">Voortgang</h1>
         <p className="text-zinc-400 text-xs mt-0.5">{MOCK_PATIENT.programName}</p>
       </div>
@@ -51,11 +51,11 @@ export default function ProgressPage() {
             bg="#fff7ed"
           />
           <StatCard
-            icon={<CheckCircle2 className="w-5 h-5" style={{ color: '#3ECF6A' }} />}
+            icon={<CheckCircle2 className="w-5 h-5" style={{ color: '#4ECDC4' }} />}
             value={MOCK_SESSION_HISTORY.length}
             unit="sessies"
             label="Voltooid"
-            bg="#f0fdf4"
+            bg="#f0fdfa"
           />
         </div>
 
@@ -67,7 +67,7 @@ export default function ProgressPage() {
                 <Target className="w-4 h-4 text-muted-foreground" />
                 <p className="font-semibold text-sm">Adherentie</p>
               </div>
-              <span className="text-sm font-bold" style={{ color: '#3ECF6A' }}>{ADHERENCE}%</span>
+              <span className="text-sm font-bold" style={{ color: '#4ECDC4' }}>{ADHERENCE}%</span>
             </div>
             <Progress value={ADHERENCE} className="h-2.5 mb-2" />
             <p className="text-xs text-muted-foreground">
@@ -81,7 +81,7 @@ export default function ProgressPage() {
           <CardContent className="px-4 py-4">
             <div className="flex items-center gap-2 mb-3">
               {painImproving
-                ? <TrendingDown className="w-4 h-4" style={{ color: '#3ECF6A' }} />
+                ? <TrendingDown className="w-4 h-4" style={{ color: '#4ECDC4' }} />
                 : <TrendingUp className="w-4 h-4" style={{ color: '#f97316' }} />}
               <p className="font-semibold text-sm">Pijnverloop</p>
               <span className="text-xs ml-auto text-muted-foreground">
@@ -92,7 +92,7 @@ export default function ProgressPage() {
               {[...MOCK_SESSION_HISTORY].reverse().map((s, i) => {
                 const pain = s.painLevel ?? 0
                 const heightPct = (pain / 10) * 100
-                const color = pain <= 3 ? '#3ECF6A' : pain <= 6 ? '#f97316' : '#ef4444'
+                const color = pain <= 3 ? '#4ECDC4' : pain <= 6 ? '#f97316' : '#ef4444'
                 return (
                   <div key={s.id} className="flex-1 flex flex-col items-center gap-1">
                     <div
@@ -110,7 +110,7 @@ export default function ProgressPage() {
               })}
             </div>
             {painImproving && (
-              <p className="text-xs" style={{ color: '#15803d' }}>
+              <p className="text-xs" style={{ color: '#0D6B6E' }}>
                 ↓ Je pijn verbetert de laatste 3 sessies — goed bezig!
               </p>
             )}
@@ -132,14 +132,14 @@ export default function ProgressPage() {
                 return (
                   <div key={w.week} className="flex-1 flex flex-col items-center gap-1">
                     <span className="text-[10px] font-semibold"
-                      style={{ color: isCurrent ? '#3ECF6A' : '#71717a' }}>
+                      style={{ color: isCurrent ? '#4ECDC4' : '#71717a' }}>
                       {w.volume}
                     </span>
                     <div
                       className="w-full rounded-t-lg"
                       style={{
                         height: `${heightPct}%`,
-                        background: isCurrent ? '#3ECF6A' : '#e4e4e7',
+                        background: isCurrent ? '#4ECDC4' : '#e4e4e7',
                         minHeight: 4,
                       }}
                     />
@@ -169,9 +169,9 @@ export default function ProgressPage() {
                     <div
                       className="w-full aspect-square rounded-xl flex items-center justify-center text-xs font-semibold max-w-[36px]"
                       style={
-                        hadSession ? { background: '#3ECF6A', color: 'white' }
-                          : isToday ? { background: '#1A1A1A', color: 'white' }
-                            : isPlanned ? { background: '#f4f4f5', color: '#3ECF6A' }
+                        hadSession ? { background: '#4ECDC4', color: 'white' }
+                          : isToday ? { background: '#1A3A3A', color: 'white' }
+                            : isPlanned ? { background: '#f4f4f5', color: '#4ECDC4' }
                               : { background: '#f9f9f9', color: '#d4d4d8' }
                       }
                     >

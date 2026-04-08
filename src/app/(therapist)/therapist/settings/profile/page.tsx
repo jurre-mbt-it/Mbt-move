@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { User, Mail, Phone, Building2 } from 'lucide-react'
+import { User, Mail, Phone, Building2, ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
 
 export const metadata = {
   title: 'Profiel – MBT Gym',
