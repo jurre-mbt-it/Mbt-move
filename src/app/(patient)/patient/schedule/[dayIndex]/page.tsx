@@ -77,7 +77,7 @@ export default function ScheduleDayPage({ params }: Props) {
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm truncate">{pe.exercise.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {pe.sets} sets × {pe.reps} {pe.repUnit} · {pe.restTime}s rust
+                      {pe.sets} sets × {pe.reps} {pe.repUnit} · {pe.rest}s rust
                     </p>
                   </div>
                 </div>

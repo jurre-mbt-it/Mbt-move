@@ -107,7 +107,7 @@ export default function AthleteSessionPage() {
           <CardContent className="p-6 text-center space-y-4">
             <div className="flex items-center justify-center gap-2 text-muted-foreground">
               <Timer className="w-4 h-4" />
-              <span className="text-sm">Rust: {current.restTime}s tussen sets</span>
+              <span className="text-sm">Rust: {current.rest}s tussen sets</span>
             </div>
             {current.notes && (
               <p className="text-xs text-muted-foreground italic">{current.notes}</p>
