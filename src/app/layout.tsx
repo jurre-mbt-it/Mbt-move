@@ -17,8 +17,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="h-full">
-      <body className="min-h-full flex flex-col antialiased overflow-x-hidden">
+    <html lang="en" className="h-full overflow-x-hidden">
+      <body className="min-h-full flex flex-col antialiased overflow-x-hidden w-full max-w-[100vw]">
         <TRPCProvider>
           {children}
         </TRPCProvider>

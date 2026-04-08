@@ -7,8 +7,8 @@ export default function AthleteLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen pb-16" style={{ background: '#FAFAFA' }}>
-      <main><PageTransition>{children}</PageTransition></main>
+    <div className="min-h-screen pb-16 overflow-x-hidden w-full" style={{ background: '#FAFAFA' }}>
+      <main className="w-full overflow-x-hidden"><PageTransition>{children}</PageTransition></main>
       <AthleteBottomNav />
     </div>
   )
