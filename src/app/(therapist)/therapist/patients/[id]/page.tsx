@@ -29,6 +29,13 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }>
   ARCHIVED:  { label: 'Gearchiveerd', bg: '#f1f5f9', text: '#475569' },
 }
 
+const ROLE_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
+  PATIENT:   { label: 'Patiënt',    bg: '#dbeafe', text: '#1e40af' },
+  ATHLETE:   { label: 'Atleet',     bg: '#ccfbf1', text: '#0D6B6E' },
+  THERAPIST: { label: 'Therapeut',  bg: '#f3e8ff', text: '#7c3aed' },
+  ADMIN:     { label: 'Admin',      bg: '#fef9c3', text: '#a16207' },
+}
+
 const ROLE_OPTIONS = [
   { value: 'PATIENT', label: 'Patiënt' },
   { value: 'ATHLETE', label: 'Atleet' },
@@ -85,7 +92,17 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           {patient.avatarInitials}
         </div>
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-bold">{patient.name}</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-xl font-bold">{patient.name}</h1>
+            {patient.role && ROLE_CONFIG[patient.role] && (
+              <span
+                className="text-xs px-2 py-0.5 rounded-full font-medium"
+                style={{ background: ROLE_CONFIG[patient.role].bg, color: ROLE_CONFIG[patient.role].text }}
+              >
+                {ROLE_CONFIG[patient.role].label}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">{patient.email}</p>
           {status && (
             <span
@@ -126,17 +143,23 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                 <UserCog className="w-3.5 h-3.5" /> Rol wijzigen
               </Button>
               {showRoleMenu && (
-                <div className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-lg z-20 py-1 min-w-[140px]">
-                  {ROLE_OPTIONS.map(opt => (
-                    <button
-                      key={opt.value}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-zinc-50 transition-colors"
-                      onClick={() => changeRole.mutate({ id: patient.id, role: opt.value })}
-                      disabled={changeRole.isPending}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
+                <div className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-lg z-20 py-1 min-w-[160px]">
+                  {ROLE_OPTIONS.map(opt => {
+                    const isCurrent = patient.role === opt.value
+                    return (
+                      <button
+                        key={opt.value}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-zinc-50 transition-colors flex items-center justify-between"
+                        onClick={() => {
+                          if (!isCurrent) changeRole.mutate({ id: patient.id, role: opt.value })
+                        }}
+                        disabled={changeRole.isPending || isCurrent}
+                      >
+                        <span style={isCurrent ? { fontWeight: 600, color: '#4ECDC4' } : {}}>{opt.label}</span>
+                        {isCurrent && <CheckCircle2 className="w-3.5 h-3.5" style={{ color: '#4ECDC4' }} />}
+                      </button>
+                    )
+                  })}
                 </div>
               )}
             </div>
