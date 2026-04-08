@@ -15,7 +15,7 @@ import {
 import { RecoveryPanel } from '@/components/recovery/RecoveryPanel'
 import { WorkloadPanel } from '@/components/workload/WorkloadPanel'
 import { getMockWorkloadSessions } from '@/lib/workload-monitoring'
-import { Play, CheckCircle2, Flame, TrendingUp, Calendar, ChevronRight, Plus, Dumbbell } from 'lucide-react'
+import { Play, CheckCircle2, Flame, TrendingUp, Calendar, ChevronRight, Plus, Dumbbell, Zap } from 'lucide-react'
 import { DAY_LABELS } from '@/lib/program-constants'
 import { Progress } from '@/components/ui/progress'
 
@@ -51,6 +51,22 @@ export default function AthleteDashboard() {
           <StatCard icon={<CheckCircle2 className="w-4 h-4" style={{ color: '#4ECDC4' }} />} value={MOCK_SESSION_HISTORY.length} label="Sessies" />
           <StatCard icon={<TrendingUp className="w-4 h-4" style={{ color: '#6366f1' }} />} value={`${Math.round(weekProgress)}%`} label="Deze week" />
         </div>
+
+        {/* Quick workout action */}
+        <Link href="/athlete/workouts/new">
+          <Card style={{ borderRadius: '14px', borderLeft: '3px solid #4ECDC4' }} className="hover:shadow-md transition-shadow">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: '#4ECDC420' }}>
+                <Zap className="w-6 h-6" style={{ color: '#4ECDC4' }} />
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-base">Quick Workout</p>
+                <p className="text-xs text-muted-foreground">Start een eigen workout</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-zinc-300" />
+            </CardContent>
+          </Card>
+        </Link>
 
         {/* Quick actions for athletes */}
         <div className="grid grid-cols-2 gap-3">
