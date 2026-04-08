@@ -9,11 +9,14 @@ const supabaseAdmin = createClient(
 )
 
 export async function POST(request: Request) {
-  const { email, name, resend } = await request.json()
+  const { email, name, role: requestedRole, resend } = await request.json()
 
   if (!email || !name) {
     return NextResponse.json({ error: 'Email en naam zijn verplicht' }, { status: 400 })
   }
+
+  const validRoles = ['PATIENT', 'THERAPIST', 'ATHLETE'] as const
+  const role = validRoles.includes(requestedRole) ? requestedRole : 'PATIENT'
 
   // Get the current therapist
   const supabase = await createServerClient()
@@ -41,7 +44,7 @@ export async function POST(request: Request) {
 
   // Invite via Supabase Auth (sends actual email)
   const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-    data: { role: 'PATIENT', name },
+    data: { role, name },
     redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')}/auth/callback`,
   })
 
@@ -63,12 +66,12 @@ export async function POST(request: Request) {
       id: data.user.id,
       email,
       name,
-      role: 'PATIENT',
+      role,
     },
   })
 
-  // Create therapist-patient relationship
-  await prisma.patientTherapist.upsert({
+  // Create therapist-patient relationship (only for patient/athlete roles)
+  if (role === 'PATIENT' || role === 'ATHLETE') await prisma.patientTherapist.upsert({
     where: {
       therapistId_patientId: {
         therapistId: therapist.id,

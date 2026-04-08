@@ -138,7 +138,7 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
       harderVariantId: form.harderVariantId ?? null,
       loadType: form.loadType as never,
       isUnilateral: form.isUnilateral,
-      movementPattern: form.movementPattern as never ?? null,
+      movementPattern: (form.movementPattern || null) as never,
     }
 
     try {
@@ -150,8 +150,10 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
         toast.success('Oefening opgeslagen')
       }
       router.push('/therapist/exercises')
-    } catch {
-      toast.error('Opslaan mislukt')
+    } catch (err) {
+      console.error('Save failed:', err)
+      const msg = err instanceof Error ? err.message : 'Opslaan mislukt'
+      toast.error(msg)
     }
   }
 

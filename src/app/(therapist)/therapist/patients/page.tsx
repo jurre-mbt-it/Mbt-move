@@ -34,6 +34,7 @@ export default function PatientsPage() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteName, setInviteName] = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<'PATIENT' | 'THERAPIST' | 'ATHLETE'>('PATIENT')
   const [inviteLoading, setInviteLoading] = useState(false)
   const [inviteExists, setInviteExists] = useState(false)
 
@@ -47,7 +48,7 @@ export default function PatientsPage() {
       const res = await fetch('/api/auth/invite-patient', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: inviteEmail, name: inviteName, resend }),
+        body: JSON.stringify({ email: inviteEmail, name: inviteName, role: inviteRole, resend }),
       })
       const data = await res.json()
       if (res.status === 409 && !resend) {
@@ -61,6 +62,7 @@ export default function PatientsPage() {
       setInviteOpen(false)
       setInviteName('')
       setInviteEmail('')
+      setInviteRole('PATIENT')
       setInviteExists(false)
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Er ging iets mis')
@@ -238,9 +240,9 @@ export default function PatientsPage() {
       <Dialog open={inviteOpen} onOpenChange={(open) => { setInviteOpen(open); if (!open) setInviteExists(false) }}>
         <DialogContent style={{ borderRadius: '16px' }}>
           <DialogHeader>
-            <DialogTitle>Patiënt uitnodigen</DialogTitle>
+            <DialogTitle>Gebruiker uitnodigen</DialogTitle>
             <DialogDescription>
-              De patiënt ontvangt een e-mail met een link om een account aan te maken.
+              De gebruiker ontvangt een e-mail met een link om een account aan te maken.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleInvite} className="space-y-4 mt-2">
@@ -264,6 +266,29 @@ export default function PatientsPage() {
                 onChange={e => { setInviteEmail(e.target.value); setInviteExists(false) }}
                 required
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Rol</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { value: 'PATIENT', label: 'Patiënt', color: '#4ECDC4' },
+                  { value: 'ATHLETE', label: 'Atleet', color: '#f59e0b' },
+                  { value: 'THERAPIST', label: 'Therapeut', color: '#6366f1' },
+                ] as const).map(r => (
+                  <button
+                    key={r.value}
+                    type="button"
+                    onClick={() => setInviteRole(r.value)}
+                    className="px-3 py-2 rounded-lg text-sm font-medium border-2 transition-colors"
+                    style={inviteRole === r.value
+                      ? { borderColor: r.color, background: r.color + '15', color: r.color }
+                      : { borderColor: '#e4e4e7', color: '#71717a' }
+                    }
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {inviteExists && (

@@ -34,24 +34,9 @@ export function VideoInput({ value, onChange }: VideoInputProps) {
     if (type) onChange({ mediaType: type, url })
   }
 
-  const handleFile = useCallback((file: File) => {
-    if (!file.type.match(/video\/(mp4|quicktime|webm)/)) return
-    if (file.size > 500 * 1024 * 1024) {
-      alert('Video mag maximaal 500 MB zijn.')
-      return
-    }
-    // Simulate upload progress (real upload requires Supabase Storage)
-    setUploadProgress(0)
-    const interval = setInterval(() => {
-      setUploadProgress(p => {
-        if (p === null || p >= 90) { clearInterval(interval); return 90 }
-        return p + 10
-      })
-    }, 200)
-    onChange({ mediaType: 'UPLOAD', url: file.name })
-    // In production: upload to Supabase Storage and set the public URL
-    setTimeout(() => { setUploadProgress(100); clearInterval(interval) }, 2200)
-  }, [onChange])
+  const handleFile = useCallback((_file: File) => {
+    alert('Video uploaden is nog niet beschikbaar. Gebruik een YouTube of Vimeo link.')
+  }, [])
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -68,7 +53,7 @@ export function VideoInput({ value, onChange }: VideoInputProps) {
 
   const activeTab = value.mediaType === 'UPLOAD' ? 'upload'
     : (value.mediaType === 'YOUTUBE' || value.mediaType === 'VIMEO') ? 'url'
-    : 'upload'
+    : 'url'
 
   return (
     <div className="space-y-3">

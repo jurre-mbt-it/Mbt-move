@@ -31,6 +31,7 @@ export default function NewWorkoutPage() {
   const [elapsed, setElapsed] = useState(0)
   const [paused, setPaused] = useState(false)
   const [feedback, setFeedback] = useState({ effort: 5, pain: 0, satisfaction: 7, notes: '' })
+  const [manualDuration, setManualDuration] = useState<number | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Timer
@@ -97,6 +98,16 @@ export default function NewWorkoutPage() {
     updateSet(exerciseId, setIndex, 'completed', !exercises.find(e => e.id === exerciseId)?.sets[setIndex]?.completed)
   }
 
+  function toggleExerciseComplete(exerciseId: string) {
+    const ex = exercises.find(e => e.id === exerciseId)
+    if (!ex) return
+    const allDone = ex.sets.every(s => s.completed)
+    setExercises(prev => prev.map(e => {
+      if (e.id !== exerciseId) return e
+      return { ...e, sets: e.sets.map(s => ({ ...s, completed: !allDone })) }
+    }))
+  }
+
   function startWorkout() {
     setStartTime(new Date())
     setStep('active')
@@ -104,6 +115,7 @@ export default function NewWorkoutPage() {
 
   function completeWorkout() {
     if (timerRef.current) clearInterval(timerRef.current)
+    setManualDuration(startTime ? Math.round((Date.now() - startTime.getTime()) / 60000) : 0)
     setStep('complete')
   }
 
@@ -118,7 +130,7 @@ export default function NewWorkoutPage() {
       createdAt: now.toISOString(),
       startedAt: startTime?.toISOString(),
       completedAt: now.toISOString(),
-      duration: startTime ? Math.round((now.getTime() - startTime.getTime()) / 60000) : 0,
+      duration: manualDuration ?? (startTime ? Math.round((now.getTime() - startTime.getTime()) / 60000) : 0),
       feedback,
     }
     saveWorkout(workout)
@@ -174,7 +186,7 @@ export default function NewWorkoutPage() {
 
   // Step: Complete / feedback
   if (step === 'complete') {
-    const duration = startTime ? Math.round((Date.now() - startTime.getTime()) / 60000) : 0
+    const duration = manualDuration ?? (startTime ? Math.round((Date.now() - startTime.getTime()) / 60000) : 0)
     const startStr = startTime ? startTime.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) : '--:--'
     const endStr = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
 
@@ -203,8 +215,17 @@ export default function NewWorkoutPage() {
                   <p className="text-lg font-bold mt-1">{endStr}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase">Duur</p>
-                  <p className="text-lg font-bold mt-1">{duration}&apos;</p>
+                  <p className="text-xs text-muted-foreground uppercase">Duur (min)</p>
+                  <div className="flex items-center justify-center gap-1 mt-1">
+                    <input
+                      type="number"
+                      min={0}
+                      value={duration}
+                      onChange={e => setManualDuration(Math.max(0, Number(e.target.value) || 0))}
+                      className="w-14 text-lg font-bold text-center bg-zinc-50 rounded-lg border-0 focus:outline-none focus:ring-1 focus:ring-[#4ECDC4]"
+                    />
+                    <span className="text-lg font-bold">&apos;</span>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -326,6 +347,7 @@ export default function NewWorkoutPage() {
             onRemove={() => removeExercise(ex.id)}
             onUpdateSet={(idx, field, value) => updateSet(ex.id, idx, field, value)}
             onToggleComplete={(idx) => toggleSetComplete(ex.id, idx)}
+            onToggleExercise={() => toggleExerciseComplete(ex.id)}
           />
         ))}
 
@@ -363,9 +385,37 @@ export default function NewWorkoutPage() {
   )
 }
 
+// Stepper component for +/− number control
+function Stepper({ value, onChange, min = 0, step = 1, label, unit }: {
+  value: number; onChange: (v: number) => void; min?: number; step?: number; label: string; unit?: string
+}) {
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <span className="text-[10px] uppercase text-muted-foreground font-medium tracking-wide">{label}</span>
+      <div className="flex items-center gap-0">
+        <button
+          onClick={() => onChange(Math.max(min, value - step))}
+          className="w-7 h-7 rounded-l-lg bg-zinc-100 flex items-center justify-center active:bg-zinc-200 transition-colors"
+        >
+          <Minus className="w-3 h-3 text-zinc-500" />
+        </button>
+        <div className="h-7 min-w-[2.5rem] px-1 bg-zinc-50 flex items-center justify-center border-y border-zinc-100">
+          <span className="text-sm font-bold tabular-nums">{value}{unit ? <span className="text-[10px] text-muted-foreground ml-0.5">{unit}</span> : null}</span>
+        </div>
+        <button
+          onClick={() => onChange(value + step)}
+          className="w-7 h-7 rounded-r-lg bg-zinc-100 flex items-center justify-center active:bg-zinc-200 transition-colors"
+        >
+          <Plus className="w-3 h-3 text-zinc-500" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // Exercise card component
 function ExerciseCard({
-  exercise, isActive, onAddSet, onRemoveSet, onRemove, onUpdateSet, onToggleComplete,
+  exercise, isActive, onAddSet, onRemoveSet, onRemove, onUpdateSet, onToggleComplete, onToggleExercise,
 }: {
   exercise: WorkoutExercise
   isActive: boolean
@@ -374,88 +424,94 @@ function ExerciseCard({
   onRemove: () => void
   onUpdateSet: (idx: number, field: keyof WorkoutSet, value: number | boolean) => void
   onToggleComplete: (idx: number) => void
+  onToggleExercise: () => void
 }) {
-  const catInfo = EXERCISE_CATEGORIES.find(c => c.value === exercise.category)
   const color = exercise.category === 'STRENGTH' ? '#4ECDC4'
     : exercise.category === 'MOBILITY' ? '#60a5fa'
     : exercise.category === 'PLYOMETRICS' ? '#f97316'
     : exercise.category === 'CARDIO' ? '#ef4444' : '#a78bfa'
 
+  const totalSetsCount = exercise.sets.length
+  const defaultReps = exercise.sets[0]?.reps ?? 10
+  const defaultWeight = exercise.sets[0]?.weight ?? 0
+  const allCompleted = exercise.sets.every(s => s.completed)
+
   return (
-    <Card style={{ borderRadius: '14px' }}>
-      <CardContent className="p-4">
-        {/* Exercise header */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Dumbbell className="w-4 h-4" style={{ color }} />
-            <div>
-              <p className="text-xs font-medium uppercase" style={{ color }}>{catInfo?.label}</p>
-              <p className="text-sm font-bold">{exercise.name}</p>
-            </div>
-          </div>
-          {!isActive && (
-            <button onClick={onRemove} className="text-zinc-300 hover:text-red-400 p-1">
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+    <div
+      className="rounded-xl border bg-white overflow-hidden transition-all"
+      style={allCompleted && isActive ? { borderColor: '#4ECDC4', background: '#4ECDC408' } : {}}
+    >
+      {/* Header: circle + name + remove */}
+      <div className="flex items-center gap-2.5 px-3 pt-3 pb-2">
+        {isActive ? (
+          <button
+            onClick={onToggleExercise}
+            className="w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors"
+            style={allCompleted
+              ? { borderColor: '#4ECDC4', background: '#4ECDC4' }
+              : { borderColor: '#d4d4d8' }
+            }
+          >
+            {allCompleted && <Check className="w-3.5 h-3.5 text-white" />}
+          </button>
+        ) : (
+          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
+        )}
+        <span className="flex-1 text-sm font-semibold truncate">{exercise.name}</span>
+        {!isActive && (
+          <button onClick={onRemove} className="text-zinc-300 hover:text-destructive shrink-0">
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
 
-        {/* Sets table */}
-        <div className="space-y-1">
-          {/* Header row */}
-          <div className="grid gap-2 text-xs text-muted-foreground font-medium" style={{ gridTemplateColumns: isActive ? '2fr 2fr 1fr' : '2fr 2fr 28px' }}>
-            <span className="pl-1" style={{ color }}>Reps</span>
-            <span style={{ color }}>Gewicht</span>
-            <span />
-          </div>
+      {/* Steppers row */}
+      <div className="flex items-end justify-around px-3 pb-3">
+        <Stepper
+          label="Sets"
+          value={totalSetsCount}
+          min={1}
+          onChange={v => {
+            if (v > totalSetsCount) onAddSet()
+            else if (v < totalSetsCount && totalSetsCount > 1) onRemoveSet(totalSetsCount - 1)
+          }}
+        />
+        <Stepper
+          label="Reps"
+          value={defaultReps}
+          min={1}
+          onChange={v => exercise.sets.forEach((_, idx) => onUpdateSet(idx, 'reps', v))}
+        />
+        <Stepper
+          label="Gewicht"
+          value={defaultWeight}
+          min={0}
+          step={2.5}
+          unit="kg"
+          onChange={v => exercise.sets.forEach((_, idx) => onUpdateSet(idx, 'weight', v))}
+        />
+      </div>
 
-          {/* Set rows */}
+      {/* Per-set completion row (active mode) */}
+      {isActive && (
+        <div className="flex gap-1.5 px-3 pb-3 overflow-x-auto">
           {exercise.sets.map((set, idx) => (
-            <div
+            <button
               key={idx}
-              className="grid gap-2 items-center"
-              style={{ gridTemplateColumns: isActive ? '2fr 2fr 1fr' : '2fr 2fr 28px' }}
+              onClick={() => onToggleComplete(idx)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors shrink-0"
+              style={set.completed
+                ? { background: '#4ECDC420', color: '#4ECDC4' }
+                : { background: '#f4f4f5', color: '#a1a1aa' }
+              }
             >
-              <input
-                type="number"
-                value={set.reps}
-                onChange={e => onUpdateSet(idx, 'reps', parseInt(e.target.value) || 0)}
-                className="bg-zinc-50 rounded-lg px-2 py-1.5 text-sm font-medium text-center border-0 outline-none"
-                style={set.completed ? { background: '#4ECDC420' } : {}}
-              />
-              <input
-                type="number"
-                value={set.weight}
-                onChange={e => onUpdateSet(idx, 'weight', parseFloat(e.target.value) || 0)}
-                className="bg-zinc-50 rounded-lg px-2 py-1.5 text-sm font-medium text-center border-0 outline-none"
-                style={set.completed ? { background: '#4ECDC420' } : {}}
-              />
-              {isActive ? (
-                <button
-                  onClick={() => onToggleComplete(idx)}
-                  className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
-                  style={set.completed ? { background: '#4ECDC4' } : { background: '#f4f4f5' }}
-                >
-                  <Check className="w-3.5 h-3.5" style={{ color: set.completed ? 'white' : '#d4d4d8' }} />
-                </button>
-              ) : (
-                <button onClick={() => onRemoveSet(idx)} className="text-zinc-300 hover:text-red-400">
-                  <Minus className="w-4 h-4" />
-                </button>
-              )}
-            </div>
+              <Check className="w-3 h-3" />
+              Set {idx + 1}
+            </button>
           ))}
         </div>
-
-        {/* Add set */}
-        <button
-          onClick={onAddSet}
-          className="w-full mt-2 py-1.5 text-xs font-medium text-muted-foreground flex items-center justify-center gap-1 hover:text-[#4ECDC4] transition-colors"
-        >
-          <Plus className="w-3 h-3" /> Set toevoegen
-        </button>
-      </CardContent>
-    </Card>
+      )}
+    </div>
   )
 }
 
