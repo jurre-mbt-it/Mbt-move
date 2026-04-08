@@ -95,7 +95,7 @@ export default function AthleteSchedulePage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate">{e.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {e.sets} × {e.reps} {e.repUnit} · {e.restTime}s rust
+                      {e.sets} × {e.reps} {e.repUnit} · {e.rest}s rust
                     </p>
                   </div>
                   <Dumbbell className="w-4 h-4 text-zinc-300 shrink-0" />
