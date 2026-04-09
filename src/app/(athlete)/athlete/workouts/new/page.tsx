@@ -35,6 +35,7 @@ export default function NewWorkoutPage() {
   const [paused, setPaused] = useState(false)
   const [feedback, setFeedback] = useState({ effort: 5, pain: 0, satisfaction: 7, notes: '' })
   const [manualDuration, setManualDuration] = useState<number | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Timer
@@ -123,8 +124,11 @@ export default function NewWorkoutPage() {
   }
 
   async function saveAndFinish() {
+    setSaveError(null)
     const now = new Date()
-    const durationMinutes = manualDuration ?? (startTime ? Math.round((now.getTime() - startTime.getTime()) / 60000) : 0)
+    const durationMinutes = Math.round(manualDuration ?? (startTime ? (now.getTime() - startTime.getTime()) / 60000 : 0))
+    const durationSeconds = Math.max(durationMinutes * 60, 60)
+
     const workout: Workout = {
       id: `w-${Date.now()}`,
       name: workoutName,
@@ -144,21 +148,21 @@ export default function NewWorkoutPage() {
       await logSession.mutateAsync({
         scheduledAt: (startTime ?? now).toISOString(),
         completedAt: now.toISOString(),
-        durationSeconds: Math.max(durationMinutes * 60, 60),
-        painLevel: feedback.pain,
-        exertionLevel: feedback.effort,
-        exercises: [], // MOCK_EXERCISES don't have real DB IDs
+        durationSeconds,
+        painLevel: Math.round(feedback.pain),
+        exertionLevel: Math.round(feedback.effort),
+        exercises: [], // MOCK_EXERCISES use local IDs, not real DB UUIDs
       })
       await Promise.all([
         utils.patient.getWorkloadSessions.invalidate(),
         utils.patient.getRecoverySessions.invalidate(),
         utils.patient.getSessionHistory.invalidate(),
       ])
+      router.push('/athlete/dashboard')
     } catch (err) {
       console.error('Session database save failed:', err)
+      setSaveError('Opslaan mislukt. Controleer je verbinding en probeer opnieuw.')
     }
-
-    router.push('/athlete/workouts')
   }
 
   const typeInfo = WORKOUT_TYPES.find(t => t.value === workoutType)
@@ -297,12 +301,16 @@ export default function NewWorkoutPage() {
             </CardContent>
           </Card>
 
+          {saveError && (
+            <p className="text-sm text-red-500 text-center px-2">{saveError}</p>
+          )}
           <Button
             className="w-full text-white font-semibold"
             style={{ background: '#4ECDC4', borderRadius: '14px', height: '48px' }}
             onClick={saveAndFinish}
+            disabled={logSession.isPending}
           >
-            Opslaan
+            {logSession.isPending ? 'Opslaan…' : 'Opslaan & afsluiten'}
           </Button>
         </div>
       </div>
