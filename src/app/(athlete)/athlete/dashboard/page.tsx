@@ -41,6 +41,9 @@ export default function AthleteDashboard() {
   const program = sessionData?.program ?? null
   const lastSession = sessionHistory?.[0] ?? null
   const streak = 5
+  const completedToday = sessionHistory?.some(s =>
+    new Date(s.completedAt).toDateString() === new Date().toDateString()
+  ) ?? false
 
   const today = new Date().getDay()
   const todayDayNum = today === 0 ? 7 : today
@@ -119,33 +122,46 @@ export default function AthleteDashboard() {
         </div>
 
         {/* Today's session */}
-        {todayExercises.length > 0 && (
+        {(todayExercises.length > 0 || completedToday) && (
           <Card style={{ borderRadius: '14px', overflow: 'hidden' }}>
             <div className="px-4 py-3 flex items-center justify-between" style={{ background: '#4ECDC4' }}>
               <div>
                 <p className="text-white text-xs font-medium opacity-80">Vandaag · {DAY_NAMES[todayDayNum - 1]}</p>
-                <p className="text-white font-bold text-base">{todayExercises.length} oefeningen</p>
+                <p className="text-white font-bold text-base">
+                  {completedToday ? 'Klaar voor vandaag! 🎉' : `${todayExercises.length} oefeningen`}
+                </p>
               </div>
-              <Link href="/athlete/session">
-                <Button size="sm" className="bg-white gap-1.5 font-semibold text-xs" style={{ color: '#0D6B6E' }}>
-                  <Play className="w-3 h-3 fill-current" /> Start
-                </Button>
-              </Link>
+              {!completedToday && (
+                <Link href="/athlete/session">
+                  <Button size="sm" className="bg-white gap-1.5 font-semibold text-xs" style={{ color: '#0D6B6E' }}>
+                    <Play className="w-3 h-3 fill-current" /> Start
+                  </Button>
+                </Link>
+              )}
             </div>
             <CardContent className="px-4 py-3 space-y-2.5">
-              {todayExercises.slice(0, 3).map(e => (
-                <div key={e.uid} className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-sm" style={{ background: '#f4f4f5' }}>
-                    💪
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{e.name}</p>
-                    <p className="text-xs text-muted-foreground">{e.sets} × {e.reps} {e.repUnit}</p>
-                  </div>
+              {completedToday ? (
+                <div className="py-2 text-center space-y-1">
+                  <p className="text-sm font-semibold">Lekker bezig!</p>
+                  <p className="text-xs text-muted-foreground">Alle trainingen voor vandaag zijn afgerond</p>
                 </div>
-              ))}
-              {todayExercises.length > 3 && (
-                <p className="text-xs text-muted-foreground pt-0.5">+{todayExercises.length - 3} meer</p>
+              ) : (
+                <>
+                  {todayExercises.slice(0, 3).map(e => (
+                    <div key={e.uid} className="flex items-center gap-3">
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-sm" style={{ background: '#f4f4f5' }}>
+                        💪
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{e.name}</p>
+                        <p className="text-xs text-muted-foreground">{e.sets} × {e.reps} {e.repUnit}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {todayExercises.length > 3 && (
+                    <p className="text-xs text-muted-foreground pt-0.5">+{todayExercises.length - 3} meer</p>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>

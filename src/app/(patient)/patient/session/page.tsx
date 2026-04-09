@@ -259,19 +259,25 @@ function FeedbackModal({
 function SessionSummary({
   exercises,
   feedback,
+  setWeights,
   elapsed,
   onFinish,
   isSaving,
 }: {
   exercises: SessionExercise[]
   feedback: Record<string, FeedbackEntry>
+  setWeights: Record<string, number[]>
   elapsed: number
-  onFinish: (sessionSmiley: number | null) => void
+  onFinish: (sessionSmiley: number | null, durationSeconds: number) => void
   isSaving: boolean
 }) {
   const [sessionSmiley, setSessionSmiley] = useState<number | null>(null)
-  const mins = Math.floor(elapsed / 60)
-  const secs = elapsed % 60
+  const [durationMinutes, setDurationMinutes] = useState(() => Math.max(1, Math.round(elapsed / 60)))
+
+  const now = new Date()
+  const finishTime = now
+  const startTime = new Date(now.getTime() - durationMinutes * 60 * 1000)
+  const fmtTime = (d: Date) => d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
 
   const smiliesGiven = Object.values(feedback).filter(f => f.smiley !== null)
   const avgSmiley = smiliesGiven.length > 0
@@ -285,9 +291,37 @@ function SessionSummary({
       <div className="px-5 pt-14 pb-6 text-center" style={{ background: MBT_DARK }}>
         <div className="text-5xl mb-3">🎉</div>
         <h1 className="text-white text-2xl font-bold">Sessie voltooid!</h1>
-        <p className="text-zinc-400 text-sm mt-1">
-          {mins}:{secs.toString().padStart(2, '0')} · {exercises.length} oefeningen
-        </p>
+        <p className="text-zinc-400 text-sm mt-1">{exercises.length} oefeningen</p>
+
+        {/* Editable duration with computed start/finish times */}
+        <div className="mt-4 bg-white/10 rounded-2xl px-4 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-zinc-400 text-xs">Duur</span>
+            <div className="flex items-center gap-3">
+              <button
+                className="w-8 h-8 rounded-full flex items-center justify-center"
+                style={{ background: 'rgba(255,255,255,0.15)' }}
+                onClick={() => setDurationMinutes(m => Math.max(1, m - 5))}
+              >
+                <Minus className="w-3.5 h-3.5 text-white" />
+              </button>
+              <span className="text-white font-bold text-lg w-16 text-center tabular-nums">
+                {durationMinutes} min
+              </span>
+              <button
+                className="w-8 h-8 rounded-full flex items-center justify-center"
+                style={{ background: 'rgba(255,255,255,0.15)' }}
+                onClick={() => setDurationMinutes(m => m + 5)}
+              >
+                <Plus className="w-3.5 h-3.5 text-white" />
+              </button>
+            </div>
+          </div>
+          <div className="flex justify-between text-xs text-zinc-400">
+            <span>Start: {fmtTime(startTime)}</span>
+            <span>Einde: {fmtTime(finishTime)}</span>
+          </div>
+        </div>
       </div>
 
       <div className="flex-1 px-4 py-4 space-y-4">
@@ -324,7 +358,14 @@ function SessionSummary({
                     <p className="text-sm font-medium truncate">{e.name}</p>
                     <p className="text-xs text-muted-foreground">
                       {e.sets} sets
-                      {fb?.weight ? ` · ${fb.weight}kg` : ''}
+                      {(() => {
+                        const ws = setWeights[e.uid]
+                        if (ws && ws.some(w => w > 0)) {
+                          const unique = [...new Set(ws.filter(w => w > 0))]
+                          return ` · ${unique.length === 1 ? unique[0] + ' kg' : ws.map(w => w + 'kg').join(' / ')}`
+                        }
+                        return fb?.weight ? ` · ${fb.weight}kg` : ''
+                      })()}
                       {fb?.pain !== null && fb?.pain !== undefined ? ` · pijn ${fb.pain}/10` : ''}
                     </p>
                   </div>
@@ -383,7 +424,7 @@ function SessionSummary({
 
       <div className="px-4 pb-8">
         <Button
-          onClick={() => onFinish(sessionSmiley)}
+          onClick={() => onFinish(sessionSmiley, durationMinutes * 60)}
           disabled={isSaving}
           className="w-full text-base font-semibold"
           style={{ height: 48, background: MBT_GREEN }}
@@ -417,6 +458,9 @@ export default function SessionPage() {
   const [elapsed, setElapsed] = useState(0)
   const [phase, setPhase] = useState<'session' | 'summary'>('session')
   const [showCuesFor, setShowCuesFor] = useState<string | null>(null)
+  const [setWeights, setSetWeights] = useState<Record<string, number[]>>({})
+  const [showExtraFor, setShowExtraFor] = useState<string | null>(null)
+  const [extraReps, setExtraReps] = useState<Record<string, number>>({})
 
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const feedbackTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -471,6 +515,14 @@ export default function SessionPage() {
     setShowRestTimer(false)
   }, [])
 
+  const adjustSetWeight = useCallback((uid: string, setIdx: number, delta: number) => {
+    setSetWeights(prev => {
+      const arr = [...(prev[uid] ?? [])]
+      arr[setIdx] = Math.max(0, Math.round(((arr[setIdx] ?? 0) + delta) * 10) / 10)
+      return { ...prev, [uid]: arr }
+    })
+  }, [])
+
   const markSetDone = useCallback((uid: string, restSec: number, totalSets: number) => {
     setSetsCompleted(prev => {
       const next = (prev[uid] ?? 0) + 1
@@ -523,22 +575,25 @@ export default function SessionPage() {
     setFeedback(prev => ({ ...prev, [uid]: { ...prev[uid], ...partial } }))
   }, [])
 
-  const handleFinish = useCallback(async (sessionSmiley: number | null) => {
+  const handleFinish = useCallback(async (sessionSmiley: number | null, durationSeconds: number) => {
     const pains = Object.values(feedback).filter(f => f.pain !== null).map(f => f.pain!)
     const avgPain = pains.length > 0 ? Math.round(pains.reduce((a, b) => a + b, 0) / pains.length) : null
     const exertionLevel = sessionSmiley !== null ? Math.max(1, 11 - sessionSmiley * 2) : null
 
+    const completedAt = new Date()
+    const scheduledAt = new Date(completedAt.getTime() - durationSeconds * 1000)
+
     await logSession.mutateAsync({
       programId: sessionData?.program?.id,
-      scheduledAt: new Date().toISOString(),
-      completedAt: new Date().toISOString(),
-      durationSeconds: elapsed,
+      scheduledAt: scheduledAt.toISOString(),
+      completedAt: completedAt.toISOString(),
+      durationSeconds,
       painLevel: avgPain,
       exertionLevel,
       exercises: exercises.map(e => ({
         exerciseId: e.exerciseId,
         setsCompleted: setsCompleted[e.uid] ?? 0,
-        repsCompleted: e.reps,
+        repsCompleted: extraReps[e.uid] ?? e.reps,
         painLevel: feedback[e.uid]?.pain ?? null,
       })),
     })
@@ -553,7 +608,7 @@ export default function SessionPage() {
     ])
 
     router.push('/patient/dashboard')
-  }, [sessionData, feedback, elapsed, exercises, setsCompleted, logSession, router])
+  }, [sessionData, feedback, elapsed, exercises, setsCompleted, extraReps, logSession, router, utils])
 
   if (isLoading) {
     return (
@@ -581,6 +636,7 @@ export default function SessionPage() {
       <SessionSummary
         exercises={exercises}
         feedback={feedback}
+        setWeights={setWeights}
         elapsed={elapsed}
         onFinish={handleFinish}
         isSaving={logSession.isPending}
@@ -636,6 +692,39 @@ export default function SessionPage() {
           }
         </button>
 
+        {/* Done view — tap to review what you did */}
+        {isExpanded && isDone && (() => {
+          const fb = feedback[e.uid]
+          return (
+            <div className="border-t px-4 pb-4 pt-3 space-y-3">
+              <div className="space-y-1.5">
+                {Array.from({ length: e.sets }, (_, i) => {
+                  const w = setWeights[e.uid]?.[i] ?? 0
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between px-4 rounded-xl"
+                      style={{ height: 44, background: MBT_GREEN + '15', border: `1px solid ${MBT_GREEN}33` }}
+                    >
+                      <span className="text-sm font-medium" style={{ color: MBT_GREEN }}>Set {i + 1} ✓</span>
+                      <span className="text-sm text-muted-foreground">{w > 0 ? `${w} kg` : '—'}</span>
+                    </div>
+                  )
+                })}
+              </div>
+              {fb && (fb.smiley !== null || fb.pain !== null) && (
+                <div className="flex items-center gap-3 px-1">
+                  {fb.smiley !== null && <span className="text-2xl">{SMILIES[fb.smiley - 1]}</span>}
+                  <span className="text-xs text-muted-foreground">
+                    {fb.smiley !== null && SMILEY_LABELS[fb.smiley - 1]}
+                    {fb.pain !== null && `${fb.smiley !== null ? ' · ' : ''}Pijn ${fb.pain}/10`}
+                  </span>
+                </div>
+              )}
+            </div>
+          )
+        })()}
+
         {/* Expanded content */}
         {isExpanded && !isDone && (
           <div className="border-t px-4 pb-4 pt-3 space-y-4">
@@ -668,33 +757,92 @@ export default function SessionPage() {
               <ParamPill label="Sets klaar" value={`${sets}/${e.sets}`} highlight />
             </div>
 
-            {/* Set buttons — one per set for tactile feedback */}
+            {/* Set buttons — one per set for tactile feedback, with per-set weight */}
             <div className="space-y-2">
               {Array.from({ length: e.sets }, (_, i) => {
                 const setNum = i + 1
                 const isSetDone = sets >= setNum
+                const w = setWeights[e.uid]?.[i] ?? 0
                 return (
-                  <button
-                    key={setNum}
-                    disabled={isSetDone || sets < setNum - 1}
-                    onClick={() => !isSetDone && markSetDone(e.uid, e.restTime || 60, e.sets)}
-                    className="w-full flex items-center justify-between px-4 rounded-2xl text-sm font-semibold transition-all active:scale-[0.98]"
-                    style={{
-                      height: 48,
-                      background: isSetDone
-                        ? MBT_GREEN + '22'
-                        : sets === setNum - 1 ? MBT_DARK : '#f4f4f5',
-                      color: isSetDone
-                        ? MBT_GREEN
-                        : sets === setNum - 1 ? 'white' : '#a1a1aa',
-                      border: isSetDone ? `1.5px solid ${MBT_GREEN}` : '1.5px solid transparent',
-                    }}
-                  >
-                    <span>Set {setNum}</span>
-                    <span>{isSetDone ? '✓ Klaar' : sets === setNum - 1 ? 'Tik om te voltooien →' : '—'}</span>
-                  </button>
+                  <div key={setNum} className="space-y-1">
+                    <button
+                      disabled={isSetDone || sets < setNum - 1}
+                      onClick={() => !isSetDone && markSetDone(e.uid, e.restTime || 60, e.sets)}
+                      className="w-full flex items-center justify-between px-4 rounded-2xl text-sm font-semibold transition-all active:scale-[0.98]"
+                      style={{
+                        height: 48,
+                        background: isSetDone
+                          ? MBT_GREEN + '22'
+                          : sets === setNum - 1 ? MBT_DARK : '#f4f4f5',
+                        color: isSetDone
+                          ? MBT_GREEN
+                          : sets === setNum - 1 ? 'white' : '#a1a1aa',
+                        border: isSetDone ? `1.5px solid ${MBT_GREEN}` : '1.5px solid transparent',
+                      }}
+                    >
+                      <span>Set {setNum}</span>
+                      <span>{isSetDone ? `✓ ${w > 0 ? w + ' kg' : 'Klaar'}` : sets === setNum - 1 ? 'Tik om te voltooien →' : '—'}</span>
+                    </button>
+                    {isSetDone && (
+                      <div className="flex items-center gap-2 px-2 py-1">
+                        <span className="text-xs text-muted-foreground flex-1">Gewicht set {setNum}</span>
+                        <button
+                          className="w-7 h-7 rounded-lg flex items-center justify-center"
+                          style={{ background: '#f4f4f5' }}
+                          onClick={() => adjustSetWeight(e.uid, i, -2.5)}
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="text-sm font-semibold w-14 text-center tabular-nums">{w} kg</span>
+                        <button
+                          className="w-7 h-7 rounded-lg flex items-center justify-center"
+                          style={{ background: '#f4f4f5' }}
+                          onClick={() => adjustSetWeight(e.uid, i, 2.5)}
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )
               })}
+            </div>
+
+            {/* Extra parameters collapsible */}
+            <div>
+              <button
+                onClick={() => setShowExtraFor(showExtraFor === e.uid ? null : e.uid)}
+                className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
+              >
+                {showExtraFor === e.uid
+                  ? <ChevronUp className="w-3.5 h-3.5" />
+                  : <ChevronDown className="w-3.5 h-3.5" />}
+                Extra parameters
+              </button>
+              {showExtraFor === e.uid && (
+                <div className="mt-2 border rounded-2xl p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium">Reps gedaan</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="w-7 h-7 rounded-lg flex items-center justify-center"
+                        style={{ background: '#f4f4f5' }}
+                        onClick={() => setExtraReps(prev => ({ ...prev, [e.uid]: Math.max(1, (prev[e.uid] ?? e.reps) - 1) }))}
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="text-sm font-semibold w-8 text-center tabular-nums">{extraReps[e.uid] ?? e.reps}</span>
+                      <button
+                        className="w-7 h-7 rounded-lg flex items-center justify-center"
+                        style={{ background: '#f4f4f5' }}
+                        onClick={() => setExtraReps(prev => ({ ...prev, [e.uid]: (prev[e.uid] ?? e.reps) + 1 }))}
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Coaching cues */}
