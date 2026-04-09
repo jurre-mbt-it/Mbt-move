@@ -128,6 +128,7 @@ model User {
   messages               Message[]
   createdWeekSchedules   WeekSchedule[]         @relation("CreatedWeekSchedules")
   patientWeekSchedules   WeekSchedule[]         @relation("PatientWeekSchedules")
+  researchConsent        ResearchConsent?
 
   @@map("users")
 }
@@ -375,4 +376,49 @@ model Message {
   createdAt   DateTime @default(now())
 
   @@map("messages")
+}
+
+// ─── Research / GDPR ──────────────────────────────────────────────────────────
+
+model ResearchConsent {
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  consentGiven   Boolean   @default(false)
+  consentVersion String    @default("1.0")
+  consentGivenAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("research_consents")
+}
+
+// SECURITY: AnonymousIdMapping is NEVER exposed via API or tRPC.
+// Only server-side functions may read/write this table.
+model AnonymousIdMapping {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  anonymousId String   @unique @default(cuid())
+  createdAt   DateTime @default(now())
+
+  @@map("anonymous_id_mappings")
+}
+
+model AnonymizedRecord {
+  id                String   @id @default(cuid())
+  // anonymousId references AnonymousIdMapping.anonymousId — no direct FK to prevent reverse lookup
+  anonymousId       String
+  recordDate        DateTime
+  ageAtRecord       Int      // computed from dateOfBirth at time of recording; DOB not stored
+  diagnosisCategory String?  // normalized diagnosis category (e.g. "ACL", "Schouder impingement")
+  exerciseName      String?
+  setsCompleted     Int?
+  repsCompleted     Int?
+  sessionDuration   Int?     // seconds
+  painLevel         Int?     // 0-10
+  exertionLevel     Int?     // 0-10 RPE
+  promData          Json?    // PROM scores placeholder
+  createdAt         DateTime @default(now())
+
+  @@map("anonymized_records")
 }
