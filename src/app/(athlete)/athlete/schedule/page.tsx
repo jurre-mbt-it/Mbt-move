@@ -4,24 +4,39 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { getWeekSchedule, DAY_NAMES, TODAY_DAY } from '@/lib/patient-constants'
-import { Dumbbell, Moon, Play, ChevronRight } from 'lucide-react'
+import { trpc } from '@/lib/trpc/client'
+import { Dumbbell, Moon, Play } from 'lucide-react'
 
 const DAY_SHORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
+const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
+
+type ProgramExercise = {
+  uid: string
+  name: string
+  sets: number
+  reps: number
+  repUnit: string
+  restTime: number
+  supersetGroup: string | null
+}
 
 export default function AthleteSchedulePage() {
-  const weekSchedule = getWeekSchedule()
-  const [selectedDay, setSelectedDay] = useState(TODAY_DAY)
+  const { data: program, isLoading } = trpc.patient.getActiveProgram.useQuery()
 
-  const exercises = weekSchedule[selectedDay] ?? []
-  const activeDays = Object.keys(weekSchedule).map(Number)
+  const todayDayNum = (() => { const d = new Date().getDay(); return d === 0 ? 7 : d })()
+  const [selectedDay, setSelectedDay] = useState(todayDayNum)
+
+  const weekData = program?.byWeekDay as Record<number, Record<number, ProgramExercise[]>> | undefined
+  const currentWeek = program?.currentWeek ?? 1
+  const exercises = weekData?.[currentWeek]?.[selectedDay] ?? []
+  const activeDays = Object.keys(weekData?.[currentWeek] ?? {}).map(Number)
   const isRestDay = exercises.length === 0
 
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
       <div className="px-4 pt-12 pb-6" style={{ background: '#1A3A3A' }}>
         <h1 className="text-white text-xl font-bold">Weekschema</h1>
-        <p className="text-zinc-400 text-sm mt-1">Week 1</p>
+        <p className="text-zinc-400 text-sm mt-1">Week {currentWeek}</p>
       </div>
 
       <div className="px-4 -mt-3 space-y-4 pb-6">
@@ -33,7 +48,7 @@ export default function AthleteSchedulePage() {
                 const dayNum = i + 1
                 const hasExercises = activeDays.includes(dayNum)
                 const isSelected = dayNum === selectedDay
-                const isToday = dayNum === TODAY_DAY
+                const isToday = dayNum === todayDayNum
                 return (
                   <button
                     key={label}
@@ -64,7 +79,7 @@ export default function AthleteSchedulePage() {
         {/* Day content */}
         <div className="flex items-center justify-between">
           <h2 className="text-base font-bold">{DAY_NAMES[selectedDay - 1]}</h2>
-          {!isRestDay && (
+          {!isRestDay && selectedDay === todayDayNum && (
             <Link href="/athlete/session">
               <Button size="sm" className="gap-1.5 text-xs font-semibold" style={{ background: '#4ECDC4' }}>
                 <Play className="w-3 h-3 fill-current" /> Start sessie
@@ -73,7 +88,9 @@ export default function AthleteSchedulePage() {
           )}
         </div>
 
-        {isRestDay ? (
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground text-center py-8">Laden…</p>
+        ) : isRestDay ? (
           <Card style={{ borderRadius: '14px' }}>
             <CardContent className="py-8 flex flex-col items-center gap-2">
               <Moon className="w-8 h-8 text-zinc-300" />
@@ -95,7 +112,7 @@ export default function AthleteSchedulePage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate">{e.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {e.sets} × {e.reps} {e.repUnit} · {e.rest}s rust
+                      {e.sets} × {e.reps} {e.repUnit} · {e.restTime}s rust
                     </p>
                   </div>
                   <Dumbbell className="w-4 h-4 text-zinc-300 shrink-0" />

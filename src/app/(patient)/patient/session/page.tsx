@@ -399,6 +399,7 @@ function SessionSummary({
 
 export default function SessionPage() {
   const router = useRouter()
+  const utils = trpc.useUtils()
   const { data: sessionData, isLoading } = trpc.patient.getTodayExercises.useQuery()
   const logSession = trpc.patient.logSession.useMutation()
 
@@ -541,6 +542,15 @@ export default function SessionPage() {
         painLevel: feedback[e.uid]?.pain ?? null,
       })),
     })
+
+    // Invalidate all patient queries so dashboard shows fresh data immediately
+    await Promise.all([
+      utils.patient.getWorkloadSessions.invalidate(),
+      utils.patient.getRecoverySessions.invalidate(),
+      utils.patient.getSessionHistory.invalidate(),
+      utils.patient.getTodayExercises.invalidate(),
+      utils.patient.getActiveProgram.invalidate(),
+    ])
 
     router.push('/patient/dashboard')
   }, [sessionData, feedback, elapsed, exercises, setsCompleted, logSession, router])
