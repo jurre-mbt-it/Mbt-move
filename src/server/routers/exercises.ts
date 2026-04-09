@@ -137,7 +137,10 @@ export const exercisesRouter = createTRPCRouter({
       const { id, muscleLoads, ...data } = input
       const existing = await ctx.prisma.exercise.findUnique({ where: { id } })
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
-      if (existing.createdById !== ctx.user!.id && ctx.user!.role !== 'ADMIN') {
+      const canEdit = existing.createdById === ctx.user!.id
+        || ctx.user!.role === 'ADMIN'
+        || ctx.user!.role === 'THERAPIST'
+      if (!canEdit) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
 
@@ -169,7 +172,10 @@ export const exercisesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const existing = await ctx.prisma.exercise.findUnique({ where: { id: input.id } })
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
-      if (existing.createdById !== ctx.user!.id && ctx.user!.role !== 'ADMIN') {
+      const canDelete = existing.createdById === ctx.user!.id
+        || ctx.user!.role === 'ADMIN'
+        || ctx.user!.role === 'THERAPIST'
+      if (!canDelete) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
       await ctx.prisma.exercise.delete({ where: { id: input.id } })
