@@ -268,12 +268,16 @@ function SessionSummary({
   feedback: Record<string, FeedbackEntry>
   setWeights: Record<string, number[]>
   elapsed: number
-  onFinish: (sessionSmiley: number | null) => void
+  onFinish: (sessionSmiley: number | null, durationSeconds: number) => void
   isSaving: boolean
 }) {
   const [sessionSmiley, setSessionSmiley] = useState<number | null>(null)
-  const mins = Math.floor(elapsed / 60)
-  const secs = elapsed % 60
+  const [durationMinutes, setDurationMinutes] = useState(() => Math.max(1, Math.round(elapsed / 60)))
+
+  const now = new Date()
+  const finishTime = now
+  const startTime = new Date(now.getTime() - durationMinutes * 60 * 1000)
+  const fmtTime = (d: Date) => d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
 
   const smiliesGiven = Object.values(feedback).filter(f => f.smiley !== null)
   const avgSmiley = smiliesGiven.length > 0
@@ -287,9 +291,37 @@ function SessionSummary({
       <div className="px-5 pt-14 pb-6 text-center" style={{ background: MBT_DARK }}>
         <div className="text-5xl mb-3">🎉</div>
         <h1 className="text-white text-2xl font-bold">Sessie voltooid!</h1>
-        <p className="text-zinc-400 text-sm mt-1">
-          {mins}:{secs.toString().padStart(2, '0')} · {exercises.length} oefeningen
-        </p>
+        <p className="text-zinc-400 text-sm mt-1">{exercises.length} oefeningen</p>
+
+        {/* Editable duration with computed start/finish times */}
+        <div className="mt-4 bg-white/10 rounded-2xl px-4 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-zinc-400 text-xs">Duur</span>
+            <div className="flex items-center gap-3">
+              <button
+                className="w-8 h-8 rounded-full flex items-center justify-center"
+                style={{ background: 'rgba(255,255,255,0.15)' }}
+                onClick={() => setDurationMinutes(m => Math.max(1, m - 5))}
+              >
+                <Minus className="w-3.5 h-3.5 text-white" />
+              </button>
+              <span className="text-white font-bold text-lg w-16 text-center tabular-nums">
+                {durationMinutes} min
+              </span>
+              <button
+                className="w-8 h-8 rounded-full flex items-center justify-center"
+                style={{ background: 'rgba(255,255,255,0.15)' }}
+                onClick={() => setDurationMinutes(m => m + 5)}
+              >
+                <Plus className="w-3.5 h-3.5 text-white" />
+              </button>
+            </div>
+          </div>
+          <div className="flex justify-between text-xs text-zinc-400">
+            <span>Start: {fmtTime(startTime)}</span>
+            <span>Einde: {fmtTime(finishTime)}</span>
+          </div>
+        </div>
       </div>
 
       <div className="flex-1 px-4 py-4 space-y-4">
@@ -392,7 +424,7 @@ function SessionSummary({
 
       <div className="px-4 pb-8">
         <Button
-          onClick={() => onFinish(sessionSmiley)}
+          onClick={() => onFinish(sessionSmiley, durationMinutes * 60)}
           disabled={isSaving}
           className="w-full text-base font-semibold"
           style={{ height: 48, background: MBT_GREEN }}
@@ -543,16 +575,19 @@ export default function SessionPage() {
     setFeedback(prev => ({ ...prev, [uid]: { ...prev[uid], ...partial } }))
   }, [])
 
-  const handleFinish = useCallback(async (sessionSmiley: number | null) => {
+  const handleFinish = useCallback(async (sessionSmiley: number | null, durationSeconds: number) => {
     const pains = Object.values(feedback).filter(f => f.pain !== null).map(f => f.pain!)
     const avgPain = pains.length > 0 ? Math.round(pains.reduce((a, b) => a + b, 0) / pains.length) : null
     const exertionLevel = sessionSmiley !== null ? Math.max(1, 11 - sessionSmiley * 2) : null
 
+    const completedAt = new Date()
+    const scheduledAt = new Date(completedAt.getTime() - durationSeconds * 1000)
+
     await logSession.mutateAsync({
       programId: sessionData?.program?.id,
-      scheduledAt: new Date().toISOString(),
-      completedAt: new Date().toISOString(),
-      durationSeconds: elapsed,
+      scheduledAt: scheduledAt.toISOString(),
+      completedAt: completedAt.toISOString(),
+      durationSeconds,
       painLevel: avgPain,
       exertionLevel,
       exercises: exercises.map(e => ({
