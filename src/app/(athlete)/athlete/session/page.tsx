@@ -4,18 +4,29 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { getTodayExercises, DAY_NAMES, TODAY_DAY } from '@/lib/patient-constants'
-import { Play, CheckCircle2, ArrowLeft, ChevronRight, Timer } from 'lucide-react'
+import { trpc } from '@/lib/trpc/client'
+import { Play, CheckCircle2, ArrowLeft, Timer } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+
+const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
 
 type SessionState = 'ready' | 'active' | 'done'
 
 export default function AthleteSessionPage() {
-  const exercises = getTodayExercises()
+  const router = useRouter()
+  const utils = trpc.useUtils()
+  const { data: sessionData, isLoading } = trpc.patient.getTodayExercises.useQuery()
+  const logSession = trpc.patient.logSession.useMutation()
+
+  const exercises = sessionData?.exercises ?? []
+
   const [state, setState] = useState<SessionState>('ready')
   const [currentIndex, setCurrentIndex] = useState(0)
   const [completed, setCompleted] = useState<Set<number>>(new Set())
 
   const current = exercises[currentIndex]
+
+  const todayDayNum = (() => { const d = new Date().getDay(); return d === 0 ? 7 : d })()
 
   function markDone() {
     setCompleted(prev => new Set(prev).add(currentIndex))
@@ -24,6 +35,37 @@ export default function AthleteSessionPage() {
     } else {
       setState('done')
     }
+  }
+
+  async function handleFinish() {
+    await logSession.mutateAsync({
+      programId: sessionData?.program?.id,
+      scheduledAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      durationSeconds: 0, // athlete session doesn't track timer
+      painLevel: null,
+      exertionLevel: null,
+      exercises: exercises.map(e => ({
+        exerciseId: e.exerciseId,
+        setsCompleted: e.sets,
+        repsCompleted: e.reps,
+        painLevel: null,
+      })),
+    })
+    await Promise.all([
+      utils.patient.getWorkloadSessions.invalidate(),
+      utils.patient.getRecoverySessions.invalidate(),
+      utils.patient.getSessionHistory.invalidate(),
+    ])
+    router.push('/athlete/dashboard')
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#FAFAFA' }}>
+        <p className="text-muted-foreground text-sm">Laden…</p>
+      </div>
+    )
   }
 
   if (exercises.length === 0) {
@@ -46,7 +88,7 @@ export default function AthleteSessionPage() {
           <Link href="/athlete/dashboard" className="text-zinc-400 flex items-center gap-1 text-sm mb-4">
             <ArrowLeft className="w-4 h-4" /> Terug
           </Link>
-          <h1 className="text-white text-xl font-bold">{DAY_NAMES[TODAY_DAY - 1]}</h1>
+          <h1 className="text-white text-xl font-bold">{DAY_NAMES[todayDayNum - 1]}</h1>
           <p className="text-zinc-400 text-sm mt-1">{exercises.length} oefeningen</p>
         </div>
         <div className="px-4 -mt-3 space-y-3 pb-6">
@@ -81,9 +123,14 @@ export default function AthleteSessionPage() {
           </div>
           <h2 className="text-xl font-bold">Sessie voltooid!</h2>
           <p className="text-muted-foreground text-sm">{completed.size}/{exercises.length} oefeningen afgerond</p>
-          <Link href="/athlete/dashboard">
-            <Button style={{ background: '#4ECDC4' }} className="text-white">Terug naar dashboard</Button>
-          </Link>
+          <Button
+            style={{ background: '#4ECDC4' }}
+            className="text-white"
+            disabled={logSession.isPending}
+            onClick={handleFinish}
+          >
+            {logSession.isPending ? 'Opslaan…' : 'Opslaan & afsluiten'}
+          </Button>
         </div>
       </div>
     )
@@ -107,7 +154,7 @@ export default function AthleteSessionPage() {
           <CardContent className="p-6 text-center space-y-4">
             <div className="flex items-center justify-center gap-2 text-muted-foreground">
               <Timer className="w-4 h-4" />
-              <span className="text-sm">Rust: {current.rest}s tussen sets</span>
+              <span className="text-sm">Rust: {current.restTime}s tussen sets</span>
             </div>
           </CardContent>
         </Card>

@@ -254,7 +254,6 @@ export const patientRouter = createTRPCRouter({
         status: 'COMPLETED',
         completedAt: { not: null },
         duration: { not: null },
-        exertionLevel: { not: null },
       },
       orderBy: { completedAt: 'desc' },
       take: 50,
@@ -262,13 +261,18 @@ export const patientRouter = createTRPCRouter({
     })
 
     return sessions
-      .filter(s => s.completedAt && s.duration != null && s.exertionLevel != null)
-      .map(s => ({
-        date: s.completedAt!,
-        durationMinutes: Math.round(s.duration! / 60),
-        rpe: s.exertionLevel!,
-        sRPE: Math.round((s.duration! / 60) * s.exertionLevel!),
-      }))
+      .filter(s => s.completedAt && s.duration != null)
+      .map(s => {
+        const durationMinutes = Math.max(1, Math.round(s.duration! / 60))
+        // Default RPE 5 if no smiley was chosen (neutral effort)
+        const rpe = s.exertionLevel ?? 5
+        return {
+          date: s.completedAt!,
+          durationMinutes,
+          rpe,
+          sRPE: Math.round(durationMinutes * rpe),
+        }
+      })
   }),
 
   // ── Recovery sessions — with muscle loads (ExerciseSession[]) ─────────────
