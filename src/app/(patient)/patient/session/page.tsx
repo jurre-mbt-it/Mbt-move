@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
-import { getTodayExercises, TODAY_DAY, DAY_NAMES } from '@/lib/patient-constants'
+import { trpc } from '@/lib/trpc/client'
 import { SUPERSET_COLORS } from '@/lib/program-constants'
 import {
   ChevronLeft, Clock, ChevronDown, ChevronUp, Lightbulb,
@@ -18,8 +18,6 @@ import {
 const ReactPlayer = dynamic(() => import('react-player') as any, { ssr: false }) as any
 
 // ─── Brand colors ─────────────────────────────────────────────────────────────
-// #3ECF6A = MBT groen (voltooide items)
-// #1A3A3A = MBT donker
 const MBT_GREEN = '#3ECF6A'
 const MBT_DARK = '#1A3A3A'
 
@@ -44,6 +42,25 @@ const VARIANTS: Record<string, { easier?: string; harder?: string }> = {
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+type SessionExercise = {
+  uid: string
+  exerciseId: string
+  name: string
+  category: string
+  difficulty: string
+  sets: number
+  reps: number
+  repUnit: string
+  restTime: number
+  videoUrl: string | null
+  muscleLoads: Record<string, number>
+  supersetGroup: string | null
+  supersetOrder: number
+  notes: string | null
+  easierVariantId: string | null
+  harderVariantId: string | null
+}
 
 type FeedbackEntry = {
   smiley: number | null
@@ -244,13 +261,14 @@ function SessionSummary({
   feedback,
   elapsed,
   onFinish,
+  isSaving,
 }: {
-  exercises: ReturnType<typeof getTodayExercises>
+  exercises: SessionExercise[]
   feedback: Record<string, FeedbackEntry>
   elapsed: number
-  onFinish: () => void
+  onFinish: (sessionSmiley: number | null) => void
+  isSaving: boolean
 }) {
-  const router = useRouter()
   const [sessionSmiley, setSessionSmiley] = useState<number | null>(null)
   const mins = Math.floor(elapsed / 60)
   const secs = elapsed % 60
@@ -365,11 +383,12 @@ function SessionSummary({
 
       <div className="px-4 pb-8">
         <Button
-          onClick={() => { onFinish(); router.push('/patient/dashboard') }}
+          onClick={() => onFinish(sessionSmiley)}
+          disabled={isSaving}
           className="w-full text-base font-semibold"
           style={{ height: 48, background: MBT_GREEN }}
         >
-          Opslaan & afsluiten
+          {isSaving ? 'Opslaan…' : 'Opslaan & afsluiten'}
         </Button>
       </div>
     </div>
@@ -380,9 +399,12 @@ function SessionSummary({
 
 export default function SessionPage() {
   const router = useRouter()
-  const exercises = getTodayExercises()
+  const { data: sessionData, isLoading } = trpc.patient.getTodayExercises.useQuery()
+  const logSession = trpc.patient.logSession.useMutation()
 
-  const [expanded, setExpanded] = useState<string | null>(exercises[0]?.uid ?? null)
+  const exercises: SessionExercise[] = sessionData?.exercises ?? []
+
+  const [expanded, setExpanded] = useState<string | null>(null)
   const [setsCompleted, setSetsCompleted] = useState<Record<string, number>>({})
   const [done, setDone] = useState<Set<string>>(new Set())
   const [feedback, setFeedback] = useState<Record<string, FeedbackEntry>>({})
@@ -398,11 +420,18 @@ export default function SessionPage() {
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const feedbackTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Keep a ref to the current done set so intervals can always access the latest
   const doneRef = useRef(done)
   useEffect(() => { doneRef.current = done }, [done])
 
-  // Session elapsed timer — starts immediately on mount
+  // Set initial expanded after exercises load
+  useEffect(() => {
+    if (exercises.length > 0 && expanded === null) {
+      setExpanded(exercises[0].uid)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exercises.length])
+
+  // Session elapsed timer
   useEffect(() => {
     const t = setInterval(() => setElapsed(s => s + 1), 1000)
     return () => clearInterval(t)
@@ -461,21 +490,17 @@ export default function SessionPage() {
     setShowFeedbackFor(uid)
   }, [])
 
-  // Feedback save — uses doneRef to always have fresh done state
   const saveFeedback = useCallback((uid: string) => {
     setDone(prev => new Set(prev).add(uid))
     setShowFeedbackFor(null)
     clearInterval(feedbackTimerRef.current!)
-    // Auto-expand next undone exercise
     const next = exercises.find(e => !doneRef.current.has(e.uid) && e.uid !== uid)
     setExpanded(next?.uid ?? null)
   }, [exercises])
 
-  // Ref so the auto-close interval always calls the latest saveFeedback
   const saveFeedbackRef = useRef(saveFeedback)
   useEffect(() => { saveFeedbackRef.current = saveFeedback }, [saveFeedback])
 
-  // Feedback auto-close countdown — fixed: no side effects inside setState updater
   useEffect(() => {
     if (showFeedbackFor === null) return
     setFeedbackTimer(3)
@@ -492,11 +517,54 @@ export default function SessionPage() {
   }, [showFeedbackFor])
 
   const handleFeedbackChange = useCallback((uid: string, partial: Partial<FeedbackEntry>) => {
-    // User interacted — cancel auto-close
     clearInterval(feedbackTimerRef.current!)
     setFeedbackTimer(0)
     setFeedback(prev => ({ ...prev, [uid]: { ...prev[uid], ...partial } }))
   }, [])
+
+  const handleFinish = useCallback(async (sessionSmiley: number | null) => {
+    const pains = Object.values(feedback).filter(f => f.pain !== null).map(f => f.pain!)
+    const avgPain = pains.length > 0 ? Math.round(pains.reduce((a, b) => a + b, 0) / pains.length) : null
+    const exertionLevel = sessionSmiley !== null ? Math.max(1, 11 - sessionSmiley * 2) : null
+
+    await logSession.mutateAsync({
+      programId: sessionData?.program?.id,
+      scheduledAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      durationSeconds: elapsed,
+      painLevel: avgPain,
+      exertionLevel,
+      exercises: exercises.map(e => ({
+        exerciseId: e.exerciseId,
+        setsCompleted: setsCompleted[e.uid] ?? 0,
+        repsCompleted: e.reps,
+        painLevel: feedback[e.uid]?.pain ?? null,
+      })),
+    })
+
+    router.push('/patient/dashboard')
+  }, [sessionData, feedback, elapsed, exercises, setsCompleted, logSession, router])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#FAFAFA' }}>
+        <p className="text-muted-foreground text-sm">Sessie laden…</p>
+      </div>
+    )
+  }
+
+  if (!sessionData?.program || exercises.length === 0) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: '#FAFAFA' }}>
+        <div className="text-5xl">🏖️</div>
+        <p className="font-semibold text-lg">Geen sessie vandaag</p>
+        <p className="text-muted-foreground text-sm">Je hebt vandaag geen oefeningen gepland. Geniet van je rustdag!</p>
+        <Button variant="outline" onClick={() => router.push('/patient/dashboard')}>
+          Terug naar dashboard
+        </Button>
+      </div>
+    )
+  }
 
   if (phase === 'summary') {
     return (
@@ -504,13 +572,14 @@ export default function SessionPage() {
         exercises={exercises}
         feedback={feedback}
         elapsed={elapsed}
-        onFinish={() => {}}
+        onFinish={handleFinish}
+        isSaving={logSession.isPending}
       />
     )
   }
 
   // Group exercises by superset
-  const supersetGroups = new Map<string, typeof exercises>()
+  const supersetGroups = new Map<string, SessionExercise[]>()
   exercises.forEach(e => {
     if (e.supersetGroup) {
       const g = supersetGroups.get(e.supersetGroup) ?? []
@@ -519,7 +588,7 @@ export default function SessionPage() {
     }
   })
 
-  const renderExercise = (e: typeof exercises[number]) => {
+  const renderExercise = (e: SessionExercise) => {
     const isDone = done.has(e.uid)
     const isExpanded = expanded === e.uid
     const sets = setsCompleted[e.uid] ?? 0
@@ -585,7 +654,7 @@ export default function SessionPage() {
             <div className="grid grid-cols-4 gap-2">
               <ParamPill label="Sets" value={String(e.sets)} />
               <ParamPill label="Reps" value={`${e.reps} ${e.repUnit}`} />
-              <ParamPill label="Rust" value={`${e.rest}s`} />
+              <ParamPill label="Rust" value={`${e.restTime}s`} />
               <ParamPill label="Sets klaar" value={`${sets}/${e.sets}`} highlight />
             </div>
 
@@ -598,7 +667,7 @@ export default function SessionPage() {
                   <button
                     key={setNum}
                     disabled={isSetDone || sets < setNum - 1}
-                    onClick={() => !isSetDone && markSetDone(e.uid, e.rest || 60, e.sets)}
+                    onClick={() => !isSetDone && markSetDone(e.uid, e.restTime || 60, e.sets)}
                     className="w-full flex items-center justify-between px-4 rounded-2xl text-sm font-semibold transition-all active:scale-[0.98]"
                     style={{
                       height: 48,
@@ -727,7 +796,9 @@ export default function SessionPage() {
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div className="text-center">
-            <p className="text-xs text-muted-foreground">{DAY_NAMES[TODAY_DAY - 1]} · Week 1</p>
+            <p className="text-xs text-muted-foreground">
+              {sessionData.program.name} · Week {sessionData.program.currentWeek}
+            </p>
             <p className="font-semibold text-sm">
               <span style={{ color: doneCount > 0 ? MBT_GREEN : undefined }}>{doneCount}</span>
               /{exercises.length} gedaan

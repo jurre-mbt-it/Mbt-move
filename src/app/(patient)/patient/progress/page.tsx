@@ -3,41 +3,75 @@
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { MOCK_SESSION_HISTORY, MOCK_PATIENT } from '@/lib/patient-constants'
+import { trpc } from '@/lib/trpc/client'
 import {
   Flame, TrendingUp, TrendingDown, CheckCircle2,
   Target, Calendar, BarChart3, Plus,
 } from 'lucide-react'
 
-// ─── Mock adherence data ──────────────────────────────────────────────────────
-const TOTAL_SESSIONS_PLANNED = 12 // 4 weeks × 3/week
-const STREAK = 5
-const ADHERENCE = Math.round((MOCK_SESSION_HISTORY.length / TOTAL_SESSIONS_PLANNED) * 100)
-
-// Simple weekly volume mock (sets × reps per week)
-const WEEKLY_VOLUME = [
-  { week: 1, volume: 180, label: 'W1' },
-  { week: 2, volume: 210, label: 'W2' },
-  { week: 3, volume: 230, label: 'W3' },
-  { week: 4, volume: 195, label: 'W4 (huidig)' },
-]
-const maxVolume = Math.max(...WEEKLY_VOLUME.map(w => w.volume))
+const DAY_SHORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 
 export default function ProgressPage() {
-  const avgPain = MOCK_SESSION_HISTORY
-    .filter(s => s.painLevel !== null)
-    .reduce((sum, s, _, arr) => sum + (s.painLevel ?? 0) / arr.length, 0)
+  const { data: sessions } = trpc.patient.getSessionHistory.useQuery({ limit: 50 })
+  const { data: program } = trpc.patient.getActiveProgram.useQuery()
 
-  const painTrend = MOCK_SESSION_HISTORY.slice(0, 3).reduce((a, b) => a + (b.painLevel ?? 0), 0) / 3
-  const painOlder = MOCK_SESSION_HISTORY.slice(3).reduce((a, b) => a + (b.painLevel ?? 0), 0) / Math.max(MOCK_SESSION_HISTORY.slice(3).length, 1)
-  const painImproving = painTrend < painOlder
+  const history = sessions ?? []
+  const streak = 5 // TODO: compute from consecutive days
+
+  const avgPain = history.filter(s => s.painLevel !== null).length > 0
+    ? history.filter(s => s.painLevel !== null).reduce((sum, s) => sum + (s.painLevel ?? 0), 0) / history.filter(s => s.painLevel !== null).length
+    : null
+
+  const totalSessionsPlanned = program ? program.weeks * program.daysPerWeek : 0
+  const adherence = totalSessionsPlanned > 0
+    ? Math.min(Math.round((history.length / totalSessionsPlanned) * 100), 100)
+    : 0
+
+  // Pain trend: recent 3 vs older
+  const painSessions = history.filter(s => s.painLevel !== null)
+  const recentPain = painSessions.slice(0, 3).reduce((a, b) => a + (b.painLevel ?? 0), 0) / Math.max(painSessions.slice(0, 3).length, 1)
+  const olderPain = painSessions.slice(3).reduce((a, b) => a + (b.painLevel ?? 0), 0) / Math.max(painSessions.slice(3).length, 1)
+  const painImproving = painSessions.length >= 4 && recentPain < olderPain
+
+  // Volume per week from session history
+  const weeklyVolume: { week: number; volume: number; label: string }[] = []
+  if (program) {
+    for (let w = 1; w <= program.currentWeek; w++) {
+      weeklyVolume.push({ week: w, volume: 0, label: `W${w}` })
+    }
+    history.forEach(s => {
+      // Estimate week from completedAt vs program startDate
+      if (program.startDate) {
+        const start = new Date(program.startDate)
+        const completed = new Date(s.completedAt)
+        const daysSince = Math.max(0, Math.floor((completed.getTime() - start.getTime()) / 86_400_000))
+        const weekIdx = Math.min(Math.floor(daysSince / 7), weeklyVolume.length - 1)
+        if (weeklyVolume[weekIdx]) {
+          weeklyVolume[weekIdx].volume += s.durationMinutes
+        }
+      }
+    })
+  }
+  const maxVolume = Math.max(...weeklyVolume.map(w => w.volume), 1)
+
+  // This week's sessions
+  const today = new Date().getDay()
+  const todayDayNum = today === 0 ? 7 : today
+  const weekStart = new Date()
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1)
+  weekStart.setHours(0, 0, 0, 0)
+  const thisWeekSessions = history.filter(s => new Date(s.completedAt) >= weekStart)
+  const daysWithSessions = new Set(thisWeekSessions.map(s => {
+    const d = new Date(s.completedAt).getDay()
+    return d === 0 ? 7 : d
+  }))
 
   return (
     <div className="min-h-screen pb-6" style={{ background: '#FAFAFA' }}>
       {/* Header */}
       <div className="px-4 pt-12 pb-5" style={{ background: '#1A3A3A' }}>
         <h1 className="text-white text-xl font-bold">Voortgang</h1>
-        <p className="text-zinc-400 text-xs mt-0.5">{MOCK_PATIENT.programName}</p>
+        {program && <p className="text-zinc-400 text-xs mt-0.5">{program.name}</p>}
       </div>
 
       <div className="px-4 py-4 space-y-4">
@@ -45,14 +79,14 @@ export default function ProgressPage() {
         <div className="grid grid-cols-2 gap-3">
           <StatCard
             icon={<Flame className="w-5 h-5" style={{ color: '#f97316' }} />}
-            value={STREAK}
+            value={streak}
             unit="dagen"
             label="Streak"
             bg="#fff7ed"
           />
           <StatCard
             icon={<CheckCircle2 className="w-5 h-5" style={{ color: '#4ECDC4' }} />}
-            value={MOCK_SESSION_HISTORY.length}
+            value={history.length}
             unit="sessies"
             label="Voltooid"
             bg="#f0fdfa"
@@ -60,110 +94,117 @@ export default function ProgressPage() {
         </div>
 
         {/* Adherence */}
-        <Card style={{ borderRadius: '14px' }}>
-          <CardContent className="px-4 py-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-muted-foreground" />
-                <p className="font-semibold text-sm">Adherentie</p>
+        {totalSessionsPlanned > 0 && (
+          <Card style={{ borderRadius: '14px' }}>
+            <CardContent className="px-4 py-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-muted-foreground" />
+                  <p className="font-semibold text-sm">Adherentie</p>
+                </div>
+                <span className="text-sm font-bold" style={{ color: '#4ECDC4' }}>{adherence}%</span>
               </div>
-              <span className="text-sm font-bold" style={{ color: '#4ECDC4' }}>{ADHERENCE}%</span>
-            </div>
-            <Progress value={ADHERENCE} className="h-2.5 mb-2" />
-            <p className="text-xs text-muted-foreground">
-              {MOCK_SESSION_HISTORY.length} van {TOTAL_SESSIONS_PLANNED} geplande sessies gedaan
-            </p>
-          </CardContent>
-        </Card>
+              <Progress value={adherence} className="h-2.5 mb-2" />
+              <p className="text-xs text-muted-foreground">
+                {history.length} van {totalSessionsPlanned} geplande sessies gedaan
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Pain trend */}
-        <Card style={{ borderRadius: '14px' }}>
-          <CardContent className="px-4 py-4">
-            <div className="flex items-center gap-2 mb-3">
-              {painImproving
-                ? <TrendingDown className="w-4 h-4" style={{ color: '#4ECDC4' }} />
-                : <TrendingUp className="w-4 h-4" style={{ color: '#f97316' }} />}
-              <p className="font-semibold text-sm">Pijnverloop</p>
-              <span className="text-xs ml-auto text-muted-foreground">
-                gem. {Math.round(avgPain * 10) / 10}/10
-              </span>
-            </div>
-            <div className="flex items-end gap-1.5 h-20 mb-2">
-              {[...MOCK_SESSION_HISTORY].reverse().map((s, i) => {
-                const pain = s.painLevel ?? 0
-                const heightPct = (pain / 10) * 100
-                const color = pain <= 3 ? '#4ECDC4' : pain <= 6 ? '#f97316' : '#ef4444'
-                return (
-                  <div key={s.id} className="flex-1 flex flex-col items-center gap-1">
-                    <div
-                      className="w-full rounded-t-md transition-all relative group"
-                      style={{ height: `${heightPct}%`, background: color, minHeight: 4 }}
-                    >
-                      <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-semibold"
-                        style={{ color }}>
-                        {pain}
-                      </span>
+        {painSessions.length > 0 && (
+          <Card style={{ borderRadius: '14px' }}>
+            <CardContent className="px-4 py-4">
+              <div className="flex items-center gap-2 mb-3">
+                {painImproving
+                  ? <TrendingDown className="w-4 h-4" style={{ color: '#4ECDC4' }} />
+                  : <TrendingUp className="w-4 h-4" style={{ color: '#f97316' }} />}
+                <p className="font-semibold text-sm">Pijnverloop</p>
+                {avgPain !== null && (
+                  <span className="text-xs ml-auto text-muted-foreground">
+                    gem. {Math.round(avgPain * 10) / 10}/10
+                  </span>
+                )}
+              </div>
+              <div className="flex items-end gap-1.5 h-20 mb-2">
+                {[...history].reverse().slice(0, 10).map((s, i) => {
+                  const pain = s.painLevel ?? 0
+                  const heightPct = (pain / 10) * 100
+                  const color = pain <= 3 ? '#4ECDC4' : pain <= 6 ? '#f97316' : '#ef4444'
+                  return (
+                    <div key={s.id} className="flex-1 flex flex-col items-center gap-1">
+                      <div
+                        className="w-full rounded-t-md transition-all relative"
+                        style={{ height: `${heightPct}%`, background: color, minHeight: 4 }}
+                      >
+                        <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-semibold"
+                          style={{ color }}>
+                          {pain}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-zinc-400">S{i + 1}</span>
                     </div>
-                    <span className="text-[10px] text-zinc-400">S{i + 1}</span>
-                  </div>
-                )
-              })}
-            </div>
-            {painImproving && (
-              <p className="text-xs" style={{ color: '#0D6B6E' }}>
-                ↓ Je pijn verbetert de laatste 3 sessies — goed bezig!
-              </p>
-            )}
-          </CardContent>
-        </Card>
+                  )
+                })}
+              </div>
+              {painImproving && (
+                <p className="text-xs" style={{ color: '#0D6B6E' }}>
+                  ↓ Je pijn verbetert de laatste 3 sessies — goed bezig!
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Volume per week */}
-        <Card style={{ borderRadius: '14px' }}>
-          <CardContent className="px-4 py-4">
-            <div className="flex items-center gap-2 mb-3">
-              <BarChart3 className="w-4 h-4 text-muted-foreground" />
-              <p className="font-semibold text-sm">Volume per week</p>
-              <span className="text-xs ml-auto text-muted-foreground">sets × reps</span>
-            </div>
-            <div className="flex items-end gap-2 h-24">
-              {WEEKLY_VOLUME.map(w => {
-                const heightPct = (w.volume / maxVolume) * 100
-                const isCurrent = w.label.includes('huidig')
-                return (
-                  <div key={w.week} className="flex-1 flex flex-col items-center gap-1">
-                    <span className="text-[10px] font-semibold"
-                      style={{ color: isCurrent ? '#4ECDC4' : '#71717a' }}>
-                      {w.volume}
-                    </span>
-                    <div
-                      className="w-full rounded-t-lg"
-                      style={{
-                        height: `${heightPct}%`,
-                        background: isCurrent ? '#4ECDC4' : '#e4e4e7',
-                        minHeight: 4,
-                      }}
-                    />
-                    <span className="text-[10px] text-zinc-400">{w.label.replace(' (huidig)', '')}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
+        {weeklyVolume.length > 0 && (
+          <Card style={{ borderRadius: '14px' }}>
+            <CardContent className="px-4 py-4">
+              <div className="flex items-center gap-2 mb-3">
+                <BarChart3 className="w-4 h-4 text-muted-foreground" />
+                <p className="font-semibold text-sm">Volume per week</p>
+                <span className="text-xs ml-auto text-muted-foreground">minuten</span>
+              </div>
+              <div className="flex items-end gap-2 h-24">
+                {weeklyVolume.map(w => {
+                  const heightPct = (w.volume / maxVolume) * 100
+                  const isCurrent = w.week === program?.currentWeek
+                  return (
+                    <div key={w.week} className="flex-1 flex flex-col items-center gap-1">
+                      <span className="text-[10px] font-semibold"
+                        style={{ color: isCurrent ? '#4ECDC4' : '#71717a' }}>
+                        {w.volume}
+                      </span>
+                      <div
+                        className="w-full rounded-t-lg"
+                        style={{
+                          height: `${heightPct}%`,
+                          background: isCurrent ? '#4ECDC4' : '#e4e4e7',
+                          minHeight: 4,
+                        }}
+                      />
+                      <span className="text-[10px] text-zinc-400">{w.label}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Weekly calendar */}
+        {/* This week calendar */}
         <Card style={{ borderRadius: '14px' }}>
           <CardContent className="px-4 py-4">
             <div className="flex items-center gap-2 mb-3">
               <Calendar className="w-4 h-4 text-muted-foreground" />
-              <p className="font-semibold text-sm">Sessies week 4</p>
+              <p className="font-semibold text-sm">Sessies deze week</p>
             </div>
             <div className="flex gap-1.5">
-              {['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo'].map((d, i) => {
-                // Mock: week 4 has sessions on Ma, Wo, Vr (indices 0, 2, 4)
-                const hadSession = [0, 2].includes(i)
-                const isToday = i === 1 // Di
-                const isPlanned = [0, 2, 4].includes(i)
+              {DAY_SHORT.map((d, i) => {
+                const dayNum = i + 1
+                const hadSession = daysWithSessions.has(dayNum)
+                const isToday = dayNum === todayDayNum
                 return (
                   <div key={d} className="flex-1 flex flex-col items-center gap-1">
                     <div
@@ -171,8 +212,7 @@ export default function ProgressPage() {
                       style={
                         hadSession ? { background: '#4ECDC4', color: 'white' }
                           : isToday ? { background: '#1A3A3A', color: 'white' }
-                            : isPlanned ? { background: '#f4f4f5', color: '#4ECDC4' }
-                              : { background: '#f9f9f9', color: '#d4d4d8' }
+                            : { background: '#f4f4f5', color: '#d4d4d8' }
                       }
                     >
                       {hadSession ? '✓' : d.slice(0, 1)}

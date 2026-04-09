@@ -5,26 +5,40 @@ import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { MOCK_PATIENT } from '@/lib/patient-constants'
-import { buildMockProgram, DAY_LABELS, MOCK_PROGRAMS } from '@/lib/program-constants'
+import { trpc } from '@/lib/trpc/client'
+import { DAY_LABELS } from '@/lib/program-constants'
 import { ChevronLeft, Play, CheckCircle2, Lock } from 'lucide-react'
 
-const WEEK_COUNT = 4
-
 export default function PatientProgramPage() {
+  const { data: program, isLoading } = trpc.patient.getActiveProgram.useQuery()
   const [activeWeek, setActiveWeek] = useState(1)
 
-  const program = MOCK_PROGRAMS.find(p => p.id === MOCK_PATIENT.programId)!
-  const allExercises = buildMockProgram()
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#FAFAFA' }}>
+        <p className="text-muted-foreground text-sm">Laden…</p>
+      </div>
+    )
+  }
 
-  // Get days that have exercises this week
-  const daysWithExercises = [...new Set(
-    allExercises.filter(e => e.week === activeWeek).map(e => e.day)
-  )].sort()
+  if (!program) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: '#FAFAFA' }}>
+        <div className="text-5xl">📋</div>
+        <p className="font-semibold text-lg">Geen actief programma</p>
+        <p className="text-muted-foreground text-sm">Je therapeut heeft nog geen programma voor je aangemaakt.</p>
+        <Link href="/patient/dashboard">
+          <Button variant="outline">Terug naar dashboard</Button>
+        </Link>
+      </div>
+    )
+  }
 
-  const completedDays = activeWeek === 1 ? [1, 2] : [] // mock: week 1 has 2 done days
-  const isCurrentWeek = activeWeek === 1
-  const isFutureWeek = activeWeek > 1
+  const weekData = program.byWeekDay as Record<number, Record<number, typeof program.exercises>>
+  const daysWithExercises = Object.keys(weekData[activeWeek] ?? {}).map(Number).sort()
+
+  const isCurrentWeek = activeWeek === program.currentWeek
+  const isFutureWeek = activeWeek > program.currentWeek
 
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
@@ -38,7 +52,7 @@ export default function PatientProgramPage() {
 
         {/* Week tabs */}
         <div className="flex gap-2 mt-4 overflow-x-auto pb-1">
-          {Array.from({ length: WEEK_COUNT }, (_, i) => i + 1).map(w => (
+          {Array.from({ length: program.weeks }, (_, i) => i + 1).map(w => (
             <button
               key={w}
               onClick={() => setActiveWeek(w)}
@@ -70,10 +84,10 @@ export default function PatientProgramPage() {
         )}
 
         {daysWithExercises.map(dayNum => {
-          const dayExercises = allExercises.filter(e => e.week === activeWeek && e.day === dayNum)
-          const isDone = completedDays.includes(dayNum)
-          const isToday = isCurrentWeek && dayNum === 1
-          const dayLabel = DAY_LABELS[dayNum - 1]
+          const dayExercises = weekData[activeWeek]?.[dayNum] ?? []
+          const isToday = isCurrentWeek && dayNum === program.currentDay
+          const isPast = isCurrentWeek && dayNum < program.currentDay
+          const dayLabel = DAY_LABELS[dayNum - 1] ?? `Dag ${dayNum}`
 
           return (
             <Card key={dayNum} style={{ borderRadius: '14px', opacity: isFutureWeek ? 0.5 : 1 }}>
@@ -83,12 +97,12 @@ export default function PatientProgramPage() {
                     <div
                       className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
                       style={
-                        isDone ? { background: '#4ECDC4', color: 'white' }
+                        isPast ? { background: '#4ECDC4', color: 'white' }
                           : isToday ? { background: '#1A3A3A', color: 'white' }
                             : { background: '#f4f4f5', color: '#52525b' }
                       }
                     >
-                      {isDone ? '✓' : dayLabel.slice(0, 2)}
+                      {isPast ? '✓' : dayLabel.slice(0, 2)}
                     </div>
                     <div>
                       <p className="font-semibold text-sm">{dayLabel}</p>
@@ -96,7 +110,7 @@ export default function PatientProgramPage() {
                     </div>
                   </div>
 
-                  {isDone ? (
+                  {isPast ? (
                     <Badge className="text-xs gap-1" style={{ background: '#f0fdfa', color: '#0D6B6E', border: 'none' }}>
                       <CheckCircle2 className="w-3 h-3" /> Afgerond
                     </Badge>
@@ -112,7 +126,7 @@ export default function PatientProgramPage() {
                 <div className="space-y-2">
                   {dayExercises.map(e => (
                     <div key={e.uid} className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: isDone ? '#4ECDC4' : '#d4d4d8' }} />
+                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: isPast ? '#4ECDC4' : '#d4d4d8' }} />
                       <span className="text-sm flex-1 truncate">{e.name}</span>
                       <span className="text-xs text-muted-foreground shrink-0">{e.sets}×{e.reps}</span>
                     </div>
