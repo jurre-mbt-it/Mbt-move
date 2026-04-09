@@ -4,26 +4,73 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { getWeekSchedule, DAY_NAMES, TODAY_DAY } from '@/lib/patient-constants'
+import { trpc } from '@/lib/trpc/client'
 import { Dumbbell, Moon, Play, ChevronRight } from 'lucide-react'
 
 const DAY_SHORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
+const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
+
+type ProgramExercise = {
+  uid: string
+  exerciseId: string
+  name: string
+  sets: number
+  reps: number
+  repUnit: string
+  restTime: number
+  supersetGroup: string | null
+}
 
 export default function PatientSchedulePage() {
-  const weekSchedule = getWeekSchedule()
-  const [selectedDay, setSelectedDay] = useState(TODAY_DAY)
+  const { data: program, isLoading } = trpc.patient.getActiveProgram.useQuery()
 
-  const selectedExercises = weekSchedule[selectedDay] ?? []
-  const hasExercises = selectedExercises.length > 0
-  const isToday = selectedDay === TODAY_DAY
+  const today = new Date().getDay()
+  const todayDayNum = today === 0 ? 7 : today // Mon=1…Sun=7
+
+  const [selectedDay, setSelectedDay] = useState(todayDayNum)
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#FAFAFA' }}>
+        <p className="text-muted-foreground text-sm">Laden…</p>
+      </div>
+    )
+  }
+
+  if (!program) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: '#FAFAFA' }}>
+        <div className="text-5xl">📋</div>
+        <p className="font-semibold text-lg">Geen actief programma</p>
+        <p className="text-muted-foreground text-sm">Je therapeut heeft nog geen programma voor je aangemaakt.</p>
+      </div>
+    )
+  }
+
+  // Build map: dayOfWeek → exercises (using day field from program exercises)
+  // The program uses day 1-7 as day-in-program-week, not day-of-calendar-week.
+  // We show the week schedule based on day numbers in the current week.
+  const currentWeekExercises = Object.values(program.byWeekDay[program.currentWeek] ?? {}).flat() as ProgramExercise[]
+
+  // Get which program-days exist in current week
+  const programDaysInWeek = Object.keys(program.byWeekDay[program.currentWeek] ?? {}).map(Number).sort()
+
+  // Map program-day-index → calendar day. Day 1 = Monday, Day 2 = Tuesday, etc.
+  // For simplicity we show exercises by their program day (1–7)
+  const exercisesForSelectedDay = (program.byWeekDay[program.currentWeek]?.[selectedDay] as ProgramExercise[] | undefined) ?? []
+  const hasExercises = exercisesForSelectedDay.length > 0
+  const isToday = selectedDay === todayDayNum
+
+  // Which calendar days have exercises (map programDay → calendarDay as same)
+  const activeDays = new Set(programDaysInWeek)
 
   // Group exercises by superset
-  const groups: { key: string; exercises: typeof selectedExercises }[] = []
+  const groups: { key: string; exercises: ProgramExercise[] }[] = []
   const seen = new Set<string>()
-  selectedExercises.forEach(e => {
+  exercisesForSelectedDay.forEach(e => {
     if (e.supersetGroup && !seen.has(e.supersetGroup)) {
       seen.add(e.supersetGroup)
-      groups.push({ key: e.supersetGroup, exercises: selectedExercises.filter(x => x.supersetGroup === e.supersetGroup) })
+      groups.push({ key: e.supersetGroup, exercises: exercisesForSelectedDay.filter(x => x.supersetGroup === e.supersetGroup) })
     } else if (!e.supersetGroup) {
       groups.push({ key: e.uid, exercises: [e] })
     }
@@ -34,7 +81,7 @@ export default function PatientSchedulePage() {
       {/* Header */}
       <div className="px-4 pt-12 pb-4" style={{ background: '#1A3A3A' }}>
         <h1 className="text-white text-xl font-bold">Weekschema</h1>
-        <p className="text-zinc-400 text-xs mt-0.5">Week 1 · Knie Revalidatie</p>
+        <p className="text-zinc-400 text-xs mt-0.5">Week {program.currentWeek} · {program.name}</p>
       </div>
 
       {/* 7-day strip */}
@@ -42,9 +89,10 @@ export default function PatientSchedulePage() {
         <div className="flex gap-2 overflow-x-auto pb-1">
           {Array.from({ length: 7 }).map((_, i) => {
             const dayNum = i + 1
-            const hasSession = !!weekSchedule[dayNum]?.length
+            const hasSession = activeDays.has(dayNum)
             const isSelected = selectedDay === dayNum
-            const isTd = dayNum === TODAY_DAY
+            const isTd = dayNum === todayDayNum
+            const count = (program.byWeekDay[program.currentWeek]?.[dayNum] as ProgramExercise[] | undefined)?.length ?? 0
             return (
               <button
                 key={i}
@@ -75,7 +123,7 @@ export default function PatientSchedulePage() {
                 </div>
                 {hasSession && (
                   <span className="text-[10px] font-medium" style={{ color: isSelected ? '#4ECDC4' : '#71717a' }}>
-                    {weekSchedule[dayNum]?.length}
+                    {count}
                   </span>
                 )}
               </button>
@@ -102,7 +150,6 @@ export default function PatientSchedulePage() {
             {groups.map(({ key, exercises }) => (
               <div key={key}>
                 {exercises.length > 1 ? (
-                  // Superset block
                   <div
                     className="rounded-2xl overflow-hidden"
                     style={{ border: '2px solid #93c5fd', background: '#eff6ff' }}
@@ -135,13 +182,12 @@ export default function PatientSchedulePage() {
                   style={{ background: '#4ECDC4' }}
                 >
                   <Play className="w-4 h-4 fill-white text-white" />
-                  <span className="text-white font-bold text-sm">Start sessie — {selectedExercises.length} oefeningen</span>
+                  <span className="text-white font-bold text-sm">Start sessie — {exercisesForSelectedDay.length} oefeningen</span>
                 </div>
               </Link>
             )}
           </div>
         ) : (
-          // Rest day
           <div
             className="rounded-2xl px-5 py-8 flex flex-col items-center text-center gap-3"
             style={{ background: '#f0fdfa', border: '2px solid #bbf7d0' }}
@@ -163,7 +209,7 @@ export default function PatientSchedulePage() {
   )
 }
 
-function ExerciseRow({ exercise, isToday }: { exercise: ReturnType<typeof getWeekSchedule>[number][number]; isToday: boolean }) {
+function ExerciseRow({ exercise, isToday }: { exercise: ProgramExercise; isToday: boolean }) {
   return (
     <div className="flex items-center gap-3 px-4 py-3">
       <div
@@ -176,7 +222,7 @@ function ExerciseRow({ exercise, isToday }: { exercise: ReturnType<typeof getWee
         <p className="font-semibold text-sm truncate">{exercise.name}</p>
         <p className="text-xs text-muted-foreground">
           {exercise.sets} × {exercise.reps} {exercise.repUnit}
-          {exercise.rest > 0 ? ` · ${exercise.rest}s rust` : ''}
+          {exercise.restTime > 0 ? ` · ${exercise.restTime}s rust` : ''}
         </p>
       </div>
       {isToday && <ChevronRight className="w-4 h-4 text-zinc-300 shrink-0" />}

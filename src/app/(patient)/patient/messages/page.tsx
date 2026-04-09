@@ -2,10 +2,9 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { getMessagesByPatient } from '@/lib/mock-data'
-import { MOCK_PATIENT } from '@/lib/patient-constants'
 import { Send } from 'lucide-react'
 
-const THERAPIST_NAME = MOCK_PATIENT.therapistName
+const THERAPIST_NAME = 'Uw therapeut'
 
 function formatTime(dateStr: string) {
   const d = new Date(dateStr)

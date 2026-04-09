@@ -6,37 +6,48 @@ import { ConsentPopup } from '@/components/research/ConsentPopup'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import {
-  MOCK_PATIENT,
-  MOCK_SESSION_HISTORY,
-  getTodayExercises,
-  getWeekSchedule,
-  getMockRecoverySessions,
-  DAY_NAMES,
-  TODAY_DAY,
-} from '@/lib/patient-constants'
+import { trpc } from '@/lib/trpc/client'
 import { RecoveryPanel } from '@/components/recovery/RecoveryPanel'
 import { WorkloadPanel } from '@/components/workload/WorkloadPanel'
-import { getMockWorkloadSessions } from '@/lib/workload-monitoring'
 import { Play, CheckCircle2, Flame, TrendingUp, Calendar, ChevronRight, AlertCircle } from 'lucide-react'
 import { DAY_LABELS } from '@/lib/program-constants'
 
+const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
+
 export default function PatientDashboard() {
-  const todayExercises = getTodayExercises()
-  const weekSchedule = getWeekSchedule()
-  const recoverySessions = getMockRecoverySessions()
-  const workloadSessions = getMockWorkloadSessions()
-  const activeDays = Object.keys(weekSchedule).map(Number).sort()
+  const { data: sessionData } = trpc.patient.getTodayExercises.useQuery()
+  const { data: activeProgram } = trpc.patient.getActiveProgram.useQuery()
+  const { data: sessionHistory } = trpc.patient.getSessionHistory.useQuery({ limit: 20 })
+  const { data: rawWorkloadSessions } = trpc.patient.getWorkloadSessions.useQuery()
+  const { data: rawRecoverySessions } = trpc.patient.getRecoverySessions.useQuery()
 
-  const lastSession = MOCK_SESSION_HISTORY[0]
-  const streak = 5
+  // Convert serialized dates back to Date objects for the panel components
+  const workloadSessions = rawWorkloadSessions?.map(s => ({ ...s, date: new Date(s.date) })) ?? []
+  const recoverySessions = rawRecoverySessions?.map(s => ({ ...s, completedAt: new Date(s.completedAt) })) ?? []
 
-  const weekTotal = activeDays.length
-  const weekCompleted = Math.min(MOCK_SESSION_HISTORY.filter(s => s.week === 1).length, weekTotal)
-  const weekProgress = weekTotal > 0 ? (weekCompleted / weekTotal) * 100 : 0
+  const todayExercises = sessionData?.exercises ?? []
+  const program = sessionData?.program ?? null
+  const lastSession = sessionHistory?.[0] ?? null
+  const streak = 5 // TODO: compute from history
+
+  const currentWeek = program?.currentWeek ?? 1
+  const weekCompleted = sessionHistory?.filter(s => {
+    const d = new Date(s.completedAt)
+    const weekStart = new Date()
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1)
+    weekStart.setHours(0, 0, 0, 0)
+    return d >= weekStart
+  }).length ?? 0
+  const weekTotal = activeProgram?.daysPerWeek ?? 0
+  const weekProgress = weekTotal > 0 ? Math.min((weekCompleted / weekTotal) * 100, 100) : 0
+
+  const today = new Date().getDay() // 0=Sun, 1=Mon, …
+  const todayDayNum = today === 0 ? 7 : today // convert to Mon=1…Sun=7
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Goedemorgen' : hour < 18 ? 'Goedemiddag' : 'Goedenavond'
+
+  const firstName = 'Hey' // user name shown from auth context — kept simple for now
 
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
@@ -44,15 +55,15 @@ export default function PatientDashboard() {
       {/* Header */}
       <div className="px-4 pt-12 pb-8" style={{ background: '#1A3A3A' }}>
         <p className="text-zinc-400 text-sm">{greeting}</p>
-        <h1 className="text-white text-2xl font-bold mt-0.5">{MOCK_PATIENT.name.split(' ')[0]} 👋</h1>
-        <p className="text-zinc-400 text-xs mt-1">Programma: {MOCK_PATIENT.programName}</p>
+        <h1 className="text-white text-2xl font-bold mt-0.5">{firstName} 👋</h1>
+        {program && <p className="text-zinc-400 text-xs mt-1">Programma: {program.name}</p>}
       </div>
 
       <div className="px-4 -mt-3 space-y-4 pb-6">
         {/* Stats row */}
         <div className="grid grid-cols-3 gap-3">
           <StatCard icon={<Flame className="w-4 h-4" style={{ color: '#f97316' }} />} value={streak} label="Streak" />
-          <StatCard icon={<CheckCircle2 className="w-4 h-4" style={{ color: '#4ECDC4' }} />} value={MOCK_SESSION_HISTORY.length} label="Sessies" />
+          <StatCard icon={<CheckCircle2 className="w-4 h-4" style={{ color: '#4ECDC4' }} />} value={sessionHistory?.length ?? 0} label="Sessies" />
           <StatCard icon={<TrendingUp className="w-4 h-4" style={{ color: '#6366f1' }} />} value={`${Math.round(weekProgress)}%`} label="Deze week" />
         </div>
 
@@ -60,7 +71,7 @@ export default function PatientDashboard() {
         <Card style={{ borderRadius: '14px', overflow: 'hidden' }}>
           <div className="px-4 py-3 flex items-center justify-between" style={{ background: '#4ECDC4' }}>
             <div>
-              <p className="text-white text-xs font-medium opacity-80">Vandaag · {DAY_NAMES[TODAY_DAY - 1]}</p>
+              <p className="text-white text-xs font-medium opacity-80">Vandaag · {DAY_NAMES[todayDayNum - 1]}</p>
               <p className="text-white font-bold text-base">{todayExercises.length} oefeningen</p>
             </div>
             <Link href="/patient/session">
@@ -70,19 +81,25 @@ export default function PatientDashboard() {
             </Link>
           </div>
           <CardContent className="px-4 py-3 space-y-2.5">
-            {todayExercises.slice(0, 3).map(e => (
-              <div key={e.uid} className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-sm" style={{ background: '#f4f4f5' }}>
-                  💪
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{e.name}</p>
-                  <p className="text-xs text-muted-foreground">{e.sets} × {e.reps} {e.repUnit}</p>
-                </div>
-              </div>
-            ))}
-            {todayExercises.length > 3 && (
-              <p className="text-xs text-muted-foreground pt-0.5">+{todayExercises.length - 3} meer</p>
+            {todayExercises.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-1">Geen oefeningen voor vandaag</p>
+            ) : (
+              <>
+                {todayExercises.slice(0, 3).map(e => (
+                  <div key={e.uid} className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-sm" style={{ background: '#f4f4f5' }}>
+                      💪
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{e.name}</p>
+                      <p className="text-xs text-muted-foreground">{e.sets} × {e.reps} {e.repUnit}</p>
+                    </div>
+                  </div>
+                ))}
+                {todayExercises.length > 3 && (
+                  <p className="text-xs text-muted-foreground pt-0.5">+{todayExercises.length - 3} meer</p>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
@@ -91,16 +108,18 @@ export default function PatientDashboard() {
         <Card style={{ borderRadius: '14px' }}>
           <CardContent className="px-4 py-4">
             <div className="flex items-center justify-between mb-3">
-              <p className="font-semibold text-sm">Week 1 voortgang</p>
+              <p className="font-semibold text-sm">Week {currentWeek} voortgang</p>
               <span className="text-xs text-muted-foreground">{weekCompleted}/{weekTotal} sessies</span>
             </div>
             <Progress value={weekProgress} className="h-1.5 mb-4" />
             <div className="flex gap-1.5 justify-between">
               {DAY_LABELS.map((label, i) => {
                 const dayNum = i + 1
-                const hasSession = activeDays.includes(dayNum)
-                const isDone = dayNum < TODAY_DAY && hasSession
-                const isToday = dayNum === TODAY_DAY
+                const isToday = dayNum === todayDayNum
+                const isDone = dayNum < todayDayNum && sessionHistory?.some(s => {
+                  const d = new Date(s.completedAt)
+                  return d.getDay() === (dayNum === 7 ? 0 : dayNum)
+                })
                 return (
                   <div key={label} className="flex flex-col items-center gap-1 flex-1">
                     <div
@@ -108,8 +127,7 @@ export default function PatientDashboard() {
                       style={
                         isDone ? { background: '#4ECDC4', color: 'white' }
                           : isToday ? { background: '#1A3A3A', color: 'white' }
-                            : hasSession ? { background: '#f4f4f5', color: '#52525b' }
-                              : { background: 'transparent', color: '#d4d4d8' }
+                            : { background: '#f4f4f5', color: '#d4d4d8' }
                       }
                     >
                       {isDone ? '✓' : label.slice(0, 2)}
@@ -122,10 +140,10 @@ export default function PatientDashboard() {
         </Card>
 
         {/* Recovery / supercompensation model */}
-        <RecoveryPanel sessions={recoverySessions} />
+        <RecoveryPanel sessions={recoverySessions ?? []} />
 
         {/* ACWR workload monitoring */}
-        <WorkloadPanel sessions={workloadSessions} />
+        <WorkloadPanel sessions={workloadSessions ?? []} />
 
         {/* Pain report quick link */}
         <Link href="/patient/pain">
@@ -159,8 +177,13 @@ export default function PatientDashboard() {
                   <Calendar className="w-5 h-5" style={{ color: '#4ECDC4' }} />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium">{lastSession.dayLabel} · W{lastSession.week + 1}D{lastSession.day}</p>
-                  <p className="text-xs text-muted-foreground">{lastSession.exercisesCompleted}/{lastSession.exercisesTotal} oefeningen · {lastSession.duration} min</p>
+                  <p className="text-sm font-medium">
+                    {new Date(lastSession.completedAt).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'short' })}
+                    {lastSession.programName ? ` · ${lastSession.programName}` : ''}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {lastSession.exerciseCount} oefeningen · {lastSession.durationMinutes} min
+                  </p>
                 </div>
                 {lastSession.painLevel !== null && (
                   <Badge variant="outline" className="text-xs shrink-0">Pijn {lastSession.painLevel}/10</Badge>
