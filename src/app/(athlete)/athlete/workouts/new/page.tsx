@@ -14,6 +14,7 @@ import {
   type WorkoutSet,
 } from '@/lib/workout-constants'
 import { EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
+import { trpc } from '@/lib/trpc/client'
 import {
   ArrowLeft, X, Plus, Search, Check, ChevronRight,
   Dumbbell, Play, Pause, Square, Minus, ChevronDown,
@@ -23,6 +24,8 @@ type Step = 'pick-type' | 'build' | 'pick-exercises' | 'active' | 'complete'
 
 export default function NewWorkoutPage() {
   const router = useRouter()
+  const utils = trpc.useUtils()
+  const logSession = trpc.patient.logSession.useMutation()
   const [step, setStep] = useState<Step>('pick-type')
   const [workoutType, setWorkoutType] = useState('')
   const [workoutName, setWorkoutName] = useState('Nieuwe Workout')
@@ -119,8 +122,9 @@ export default function NewWorkoutPage() {
     setStep('complete')
   }
 
-  function saveAndFinish() {
+  async function saveAndFinish() {
     const now = new Date()
+    const durationMinutes = manualDuration ?? (startTime ? Math.round((now.getTime() - startTime.getTime()) / 60000) : 0)
     const workout: Workout = {
       id: `w-${Date.now()}`,
       name: workoutName,
@@ -130,10 +134,30 @@ export default function NewWorkoutPage() {
       createdAt: now.toISOString(),
       startedAt: startTime?.toISOString(),
       completedAt: now.toISOString(),
-      duration: manualDuration ?? (startTime ? Math.round((now.getTime() - startTime.getTime()) / 60000) : 0),
+      duration: durationMinutes,
       feedback,
     }
     saveWorkout(workout)
+
+    // Save to database for workload/dashboard tracking
+    try {
+      await logSession.mutateAsync({
+        scheduledAt: (startTime ?? now).toISOString(),
+        completedAt: now.toISOString(),
+        durationSeconds: Math.max(durationMinutes * 60, 60),
+        painLevel: feedback.pain,
+        exertionLevel: feedback.effort,
+        exercises: [], // MOCK_EXERCISES don't have real DB IDs
+      })
+      await Promise.all([
+        utils.patient.getWorkloadSessions.invalidate(),
+        utils.patient.getRecoverySessions.invalidate(),
+        utils.patient.getSessionHistory.invalidate(),
+      ])
+    } catch (err) {
+      console.error('Session database save failed:', err)
+    }
+
     router.push('/athlete/workouts')
   }
 
