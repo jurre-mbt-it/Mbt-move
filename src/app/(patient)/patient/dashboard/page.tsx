@@ -29,6 +29,9 @@ export default function PatientDashboard() {
   const program = sessionData?.program ?? null
   const lastSession = sessionHistory?.[0] ?? null
   const streak = 5 // TODO: compute from history
+  const completedToday = sessionHistory?.some(s =>
+    new Date(s.completedAt).toDateString() === new Date().toDateString()
+  ) ?? false
 
   const currentWeek = program?.currentWeek ?? 1
   const weekCompleted = sessionHistory?.filter(s => {
@@ -72,16 +75,25 @@ export default function PatientDashboard() {
           <div className="px-4 py-3 flex items-center justify-between" style={{ background: '#4ECDC4' }}>
             <div>
               <p className="text-white text-xs font-medium opacity-80">Vandaag · {DAY_NAMES[todayDayNum - 1]}</p>
-              <p className="text-white font-bold text-base">{todayExercises.length} oefeningen</p>
+              <p className="text-white font-bold text-base">
+                {completedToday ? 'Klaar voor vandaag! 🎉' : `${todayExercises.length} oefeningen`}
+              </p>
             </div>
-            <Link href="/patient/session">
-              <Button size="sm" className="bg-white gap-1.5 font-semibold text-xs" style={{ color: '#0D6B6E' }}>
-                <Play className="w-3 h-3 fill-current" /> Start
-              </Button>
-            </Link>
+            {!completedToday && (
+              <Link href="/patient/session">
+                <Button size="sm" className="bg-white gap-1.5 font-semibold text-xs" style={{ color: '#0D6B6E' }}>
+                  <Play className="w-3 h-3 fill-current" /> Start
+                </Button>
+              </Link>
+            )}
           </div>
           <CardContent className="px-4 py-3 space-y-2.5">
-            {todayExercises.length === 0 ? (
+            {completedToday ? (
+              <div className="py-2 text-center space-y-1">
+                <p className="text-sm font-semibold">Lekker bezig!</p>
+                <p className="text-xs text-muted-foreground">Alle trainingen voor vandaag zijn afgerond</p>
+              </div>
+            ) : todayExercises.length === 0 ? (
               <p className="text-xs text-muted-foreground py-1">Geen oefeningen voor vandaag</p>
             ) : (
               <>

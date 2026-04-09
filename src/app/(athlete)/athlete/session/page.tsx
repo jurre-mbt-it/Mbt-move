@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { trpc } from '@/lib/trpc/client'
-import { Play, CheckCircle2, ArrowLeft, Timer } from 'lucide-react'
+import { Play, CheckCircle2, ArrowLeft, Timer, Clock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
@@ -23,10 +23,25 @@ export default function AthleteSessionPage() {
   const [state, setState] = useState<SessionState>('ready')
   const [currentIndex, setCurrentIndex] = useState(0)
   const [completed, setCompleted] = useState<Set<number>>(new Set())
+  const [elapsed, setElapsed] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+
+  const startTimeRef = useRef<number | null>(null)
+
+  // Start timer when session becomes active
+  useEffect(() => {
+    if (state !== 'active') return
+    if (startTimeRef.current === null) {
+      startTimeRef.current = Date.now()
+    }
+    const t = setInterval(() => setElapsed(Math.floor((Date.now() - startTimeRef.current!) / 1000)), 1000)
+    return () => clearInterval(t)
+  }, [state])
 
   const current = exercises[currentIndex]
-
   const todayDayNum = (() => { const d = new Date().getDay(); return d === 0 ? 7 : d })()
+  const mins = Math.floor(elapsed / 60)
+  const secs = elapsed % 60
 
   function markDone() {
     setCompleted(prev => new Set(prev).add(currentIndex))
@@ -38,26 +53,34 @@ export default function AthleteSessionPage() {
   }
 
   async function handleFinish() {
-    await logSession.mutateAsync({
-      programId: sessionData?.program?.id,
-      scheduledAt: new Date().toISOString(),
-      completedAt: new Date().toISOString(),
-      durationSeconds: 0, // athlete session doesn't track timer
-      painLevel: null,
-      exertionLevel: null,
-      exercises: exercises.map(e => ({
-        exerciseId: e.exerciseId,
-        setsCompleted: e.sets,
-        repsCompleted: e.reps,
+    setError(null)
+    try {
+      await logSession.mutateAsync({
+        programId: sessionData?.program?.id,
+        scheduledAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+        durationSeconds: Math.max(elapsed, 1),
         painLevel: null,
-      })),
-    })
-    await Promise.all([
-      utils.patient.getWorkloadSessions.invalidate(),
-      utils.patient.getRecoverySessions.invalidate(),
-      utils.patient.getSessionHistory.invalidate(),
-    ])
-    router.push('/athlete/dashboard')
+        exertionLevel: null,
+        exercises: exercises.map(e => ({
+          exerciseId: e.exerciseId,
+          setsCompleted: e.sets,
+          repsCompleted: e.reps,
+          painLevel: null,
+        })),
+      })
+      await Promise.all([
+        utils.patient.getWorkloadSessions.invalidate(),
+        utils.patient.getRecoverySessions.invalidate(),
+        utils.patient.getSessionHistory.invalidate(),
+        utils.patient.getTodayExercises.invalidate(),
+        utils.patient.getActiveProgram.invalidate(),
+      ])
+      router.push('/athlete/dashboard')
+    } catch (err) {
+      console.error('Session save failed:', err)
+      setError('Opslaan mislukt. Probeer het opnieuw.')
+    }
   }
 
   if (isLoading) {
@@ -122,7 +145,10 @@ export default function AthleteSessionPage() {
             <CheckCircle2 className="w-8 h-8" style={{ color: '#4ECDC4' }} />
           </div>
           <h2 className="text-xl font-bold">Sessie voltooid!</h2>
-          <p className="text-muted-foreground text-sm">{completed.size}/{exercises.length} oefeningen afgerond</p>
+          <p className="text-muted-foreground text-sm">
+            {completed.size}/{exercises.length} oefeningen · {mins}:{secs.toString().padStart(2, '0')}
+          </p>
+          {error && <p className="text-sm text-red-500">{error}</p>}
           <Button
             style={{ background: '#4ECDC4' }}
             className="text-white"
@@ -143,7 +169,13 @@ export default function AthleteSessionPage() {
           <button onClick={() => setState('ready')} className="text-zinc-400 flex items-center gap-1 text-sm">
             <ArrowLeft className="w-4 h-4" /> Overzicht
           </button>
-          <span className="text-zinc-400 text-sm">{currentIndex + 1}/{exercises.length}</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 text-zinc-400 text-sm tabular-nums">
+              <Clock className="w-3.5 h-3.5" />
+              {mins}:{secs.toString().padStart(2, '0')}
+            </div>
+            <span className="text-zinc-400 text-sm">{currentIndex + 1}/{exercises.length}</span>
+          </div>
         </div>
         <h1 className="text-white text-lg font-bold">{current.name}</h1>
         <p className="text-zinc-400 text-sm mt-1">{current.sets} × {current.reps} {current.repUnit}</p>
