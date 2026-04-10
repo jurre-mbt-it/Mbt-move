@@ -23,6 +23,7 @@ import {
   UserCog,
   Trash2,
   AlertTriangle,
+  BarChart2,
 } from 'lucide-react'
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
@@ -146,6 +147,11 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                 </Button>
               </Link>
             )}
+            <Link href={`/therapist/patients/${patient.id}/progress`}>
+              <Button size="sm" variant="outline" className="gap-1.5">
+                <BarChart2 className="w-3.5 h-3.5" /> Progressie
+              </Button>
+            </Link>
           </div>
           <div className="flex gap-2">
             {/* Role switcher */}

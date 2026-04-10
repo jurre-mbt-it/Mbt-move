@@ -2,516 +2,677 @@
 
 import { use, useState } from 'react'
 import Link from 'next/link'
+import {
+  LineChart, Line, BarChart, Bar, RadarChart, Radar,
+  PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import {
-  ArrowLeft, TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle2, Info,
-  Activity, Dumbbell, Heart,
+  ArrowLeft, Download, TrendingUp, TrendingDown, Activity,
+  CheckCircle2, XCircle, Minus, Loader2,
 } from 'lucide-react'
-import {
-  getPatientById, getSessionsByPatient, getCardioLogsByPatient, MockSessionLog, MockCardioLog,
-} from '@/lib/mock-data'
-import {
-  calculateACWR, calculateSRPE, ACWR_ZONE_CONFIG, SessionWorkload,
-} from '@/lib/workload-monitoring'
-import { calculateCardioSRPE, CARDIO_ACTIVITIES, HR_ZONES } from '@/lib/cardio-constants'
-import { notFound } from 'next/navigation'
 
-const MBT_GREEN = '#3ECF6A'
-const MBT_TEAL = '#4ECDC4'
+// ─── MBT brand ─────────────────────────────────────────────────────────────
+const G = '#3ECF6A'   // MBT green
+const DARK = '#1A3A3A'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ─── Mock patient ────────────────────────────────────────────────────────────
+const PATIENT = { name: 'Thomas de Vries', program: 'Knie Revalidatie', therapist: 'Fysiotherapie Centrum Amsterdam' }
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+// ─── Adherence calendar (56 days) ────────────────────────────────────────────
+const TODAY = new Date('2026-04-09')
+const CALENDAR_DAYS = Array.from({ length: 56 }, (_, i) => {
+  const d = new Date(TODAY)
+  d.setDate(d.getDate() - 55 + i)
+  const dow = d.getDay() // 0=Sun
+  const isTraining = [1, 2, 4, 5].includes(dow) // Mon Tue Thu Fri
+  if (!isTraining) return { date: d, status: 'rest' as const }
+  const isCompleted = (i * 13 + 7) % 9 !== 0 // ≈78%
+  return { date: d, status: isCompleted ? 'completed' as const : 'missed' as const }
+})
+
+const trainingDays = CALENDAR_DAYS.filter(d => d.status !== 'rest')
+const completedDays = CALENDAR_DAYS.filter(d => d.status === 'completed')
+const adherencePct = Math.round((completedDays.length / trainingDays.length) * 100)
+
+// ─── Exercise mock data (8 weeks) ────────────────────────────────────────────
+const WEEKS = ['W1','W2','W3','W4','W5','W6','W7','W8']
+
+const EXERCISES = {
+  squat: {
+    name: 'Squat',
+    color: G,
+    muscleScores: { Quadriceps: 5, Hamstrings: 3, Glutes: 4, Kuiten: 1 } as Record<string,number>,
+    videoUrl: 'https://mbtmove.nl/exercises/squat',
+    sets: 3, reps: 10,
+    cues: ['Knieën volgen de tenen', 'Heupen terug en omlaag', 'Borst omhoog houden', 'Volledige range of motion'],
+    data: WEEKS.map((week, i) => ({
+      week,
+      gewicht: 40 + i * 5,
+      volume: 3 * 10 * (40 + i * 5),
+      rpe: parseFloat((6 + Math.sin(i * 0.9) * 0.5).toFixed(1)),
+      gevoel: Math.min(5, Math.max(1, parseFloat((2.8 + i * 0.15 + Math.sin(i) * 0.2).toFixed(1)))),
+    })),
+  },
+  legPress: {
+    name: 'Leg Press',
+    color: '#60a5fa',
+    muscleScores: { Quadriceps: 5, Hamstrings: 2, Glutes: 3, Kuiten: 2 } as Record<string,number>,
+    videoUrl: 'https://mbtmove.nl/exercises/leg-press',
+    sets: 3, reps: 12,
+    cues: ['Voeten schouderbreedte op plaat', 'Knieën niet op slot vergrendelen', '90° buiging in het diepste punt'],
+    data: WEEKS.map((week, i) => ({
+      week,
+      gewicht: 60 + i * 7,
+      volume: 3 * 12 * (60 + i * 7),
+      rpe: parseFloat((6.5 + Math.cos(i * 0.7) * 0.4).toFixed(1)),
+      gevoel: Math.min(5, Math.max(1, parseFloat((3 + i * 0.12 + Math.cos(i) * 0.15).toFixed(1)))),
+    })),
+  },
+  hipAbductor: {
+    name: 'Hip Abductor',
+    color: '#f59e0b',
+    muscleScores: { 'Hip Add.': 5, Glutes: 3 } as Record<string,number>,
+    videoUrl: 'https://mbtmove.nl/exercises/hip-abductor',
+    sets: 3, reps: 15,
+    cues: ['Stabiele romp, geen compensatie', 'Gecontroleerde beweging terug', 'Voet flexie bij abductie'],
+    data: WEEKS.map((week, i) => ({
+      week,
+      gewicht: 15 + i * 2,
+      volume: 3 * 15 * (15 + i * 2),
+      rpe: parseFloat((5.5 + Math.sin(i * 1.1) * 0.3).toFixed(1)),
+      gevoel: Math.min(5, Math.max(1, parseFloat((3.5 + i * 0.1 + Math.sin(i * 0.5) * 0.1).toFixed(1)))),
+    })),
+  },
+  calfRaises: {
+    name: 'Calf Raises',
+    color: '#a78bfa',
+    muscleScores: { Kuiten: 5 } as Record<string,number>,
+    videoUrl: 'https://mbtmove.nl/exercises/calf-raises',
+    sets: 3, reps: 20,
+    cues: ['Volledig omhoog op de teentoppen', 'Langzaam neerwaarts (3 sec)', 'Eén been voor meer uitdaging'],
+    data: WEEKS.map((week, i) => ({
+      week,
+      gewicht: 20 + i * 3,
+      volume: 3 * 20 * (20 + i * 3),
+      rpe: parseFloat((5 + Math.cos(i * 0.8) * 0.4).toFixed(1)),
+      gevoel: Math.min(5, Math.max(1, parseFloat((4 + i * 0.05 + Math.cos(i) * 0.1).toFixed(1)))),
+    })),
+  },
 }
 
-function weekLabel(iso: string) {
-  const d = new Date(iso)
-  const day = d.getDay()
-  const diff = day === 0 ? -6 : 1 - day
-  const monday = new Date(d)
-  monday.setDate(d.getDate() + diff)
-  const sunday = new Date(monday)
-  sunday.setDate(monday.getDate() + 6)
-  return `${monday.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })} – ${sunday.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`
+// ─── Muscle group volumes ─────────────────────────────────────────────────────
+const MUSCLES = ['Quadriceps','Hamstrings','Glutes','Kuiten','Hip Add.']
+
+function calcMuscleVol(weekIdx: number, muscle: string) {
+  return Object.values(EXERCISES).reduce((tot, ex) => {
+    const score = ex.muscleScores[muscle] ?? 0
+    if (!score) return tot
+    const d = ex.data[weekIdx]
+    return tot + d.volume * (score / 5)
+  }, 0)
 }
 
-function getISOWeekKey(iso: string) {
-  const d = new Date(iso)
-  const day = d.getDay()
-  const diff = day === 0 ? -6 : 1 - day
-  const monday = new Date(d)
-  monday.setDate(d.getDate() + diff)
-  return monday.toISOString().split('T')[0]
-}
+const MUSCLE_WEEKLY = WEEKS.map((week, i) => {
+  const row: Record<string, number | string> = { week }
+  MUSCLES.forEach(m => { row[m] = Math.round(calcMuscleVol(i, m)) })
+  return row
+})
 
-// ── Workload ratio per week ───────────────────────────────────────────────────
+const MUSCLE_COMPARISON = MUSCLES.map(m => {
+  const v1 = [0,1,2,3].reduce((s, i) => s + calcMuscleVol(i, m), 0)
+  const v2 = [4,5,6,7].reduce((s, i) => s + calcMuscleVol(i, m), 0)
+  const change = Math.round(((v2 - v1) / v1) * 100)
+  return { name: m, 'W1–4': Math.round(v1), 'W5–8': Math.round(v2), change }
+})
 
-interface WeekWorkload {
-  weekKey: string
-  weekLabel: string
-  strengthSRPE: number
-  cardioSRPE: number
-  total: number
-  strengthPct: number
-  cardioPct: number
-  strengthSessions: number
-  cardioSessions: number
-}
+// ─── Radar data ───────────────────────────────────────────────────────────────
+const RADAR_DATA = [
+  { muscle: 'Quadriceps', score: 85, doel: 80 },
+  { muscle: 'Hamstrings', score: 62, doel: 75 },
+  { muscle: 'Glutes',     score: 70, doel: 75 },
+  { muscle: 'Kuiten',     score: 75, doel: 70 },
+  { muscle: 'Hip Add.',   score: 58, doel: 70 },
+  { muscle: 'Core',       score: 65, doel: 70 },
+]
 
-function computeWeeklyWorkloads(
-  strengthLogs: MockSessionLog[],
-  cardioLogs: MockCardioLog[],
-): WeekWorkload[] {
-  const weekMap = new Map<string, WeekWorkload>()
+// ─── Feeling scores ───────────────────────────────────────────────────────────
+const FEELING_DATA = Array.from({ length: 24 }, (_, i) => ({
+  sessie: `S${i + 1}`,
+  gevoel: Math.min(5, Math.max(1, parseFloat((2.5 + i * 0.1 + Math.sin(i * 0.7) * 0.3).toFixed(1)))),
+  trend: parseFloat((2.5 + i * 0.1).toFixed(1)),
+}))
 
-  const ensureWeek = (key: string, label: string) => {
-    if (!weekMap.has(key)) {
-      weekMap.set(key, {
-        weekKey: key, weekLabel: label,
-        strengthSRPE: 0, cardioSRPE: 0, total: 0,
-        strengthPct: 0, cardioPct: 0,
-        strengthSessions: 0, cardioSessions: 0,
-      })
-    }
-    return weekMap.get(key)!
-  }
+// ─── PROM placeholder ─────────────────────────────────────────────────────────
+const PROM_DATA = [
+  { moment: 'Meting 1\n(W1)', koos_adl: 45, koos_sport: 32, whoq: 52 },
+  { moment: 'Meting 2\n(W3)', koos_adl: 58, koos_sport: 45, whoq: 60 },
+  { moment: 'Meting 3\n(W5)', koos_adl: 67, koos_sport: 55, whoq: 65 },
+  { moment: 'Meting 4\n(W8)', koos_adl: 72, koos_sport: 63, whoq: 68 },
+]
 
-  for (const s of strengthLogs) {
-    const key = getISOWeekKey(s.date)
-    const label = weekLabel(s.date)
-    const w = ensureWeek(key, label)
-    const srpe = calculateSRPE(s.rpe, s.duration)
-    w.strengthSRPE += srpe
-    w.strengthSessions++
-  }
+// ─── Pain NRS ─────────────────────────────────────────────────────────────────
+const PAIN_LOCATION = WEEKS.map((week, i) => ({
+  week,
+  Knie:  Math.max(0, parseFloat((6.5 - i * 0.5 + Math.sin(i) * 0.2).toFixed(1))),
+  Rug:   Math.max(0, parseFloat((3.5 - i * 0.2 + Math.cos(i) * 0.2).toFixed(1))),
+}))
 
-  for (const c of cardioLogs) {
-    const key = getISOWeekKey(c.date)
-    const label = weekLabel(c.date)
-    const w = ensureWeek(key, label)
-    const durationMin = c.durationSec / 60
-    const srpe = c.rpe ? calculateCardioSRPE(c.rpe, durationMin) : durationMin * 4 // default rpe 4
-    w.cardioSRPE += srpe
-    w.cardioSessions++
-  }
+const PAIN_EXERCISE = WEEKS.map((week, i) => ({
+  week,
+  Squat:         Math.max(0, parseFloat((5   - i * 0.4  + Math.sin(i) * 0.2).toFixed(1))),
+  'Leg Press':   Math.max(0, parseFloat((4   - i * 0.35 + Math.cos(i * 0.8) * 0.15).toFixed(1))),
+  'Hip Abd.':    Math.max(0, parseFloat((2.5 - i * 0.2  + Math.sin(i * 0.6) * 0.1).toFixed(1))),
+  'Calf Raises': Math.max(0, parseFloat((1.5 - i * 0.1  + Math.cos(i) * 0.1).toFixed(1))),
+}))
 
-  // Bereken percentages
-  for (const w of weekMap.values()) {
-    w.total = w.strengthSRPE + w.cardioSRPE
-    w.strengthPct = w.total > 0 ? Math.round((w.strengthSRPE / w.total) * 100) : 0
-    w.cardioPct = w.total > 0 ? Math.round((w.cardioSRPE / w.total) * 100) : 0
-  }
+// ─── Summary stats ────────────────────────────────────────────────────────────
+const bestMuscle = [...MUSCLE_COMPARISON].sort((a, b) => b.change - a.change)[0]
+const initialNRS = PAIN_LOCATION[0].Knie
+const currentNRS = PAIN_LOCATION[PAIN_LOCATION.length - 1].Knie
+const avgVolChange = Math.round(MUSCLE_COMPARISON.reduce((s, m) => s + m.change, 0) / MUSCLE_COMPARISON.length)
 
-  return Array.from(weekMap.values()).sort((a, b) => a.weekKey.localeCompare(b.weekKey))
-}
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-// ── Stacked bar chart ─────────────────────────────────────────────────────────
-
-function StackedWorkloadBar({ week, maxTotal }: { week: WeekWorkload; maxTotal: number }) {
-  const strengthW = maxTotal > 0 ? (week.strengthSRPE / maxTotal) * 100 : 0
-  const cardioW = maxTotal > 0 ? (week.cardioSRPE / maxTotal) * 100 : 0
-
+function StatChip({ label, value, sub, trend }: { label: string; value: string; sub?: string; trend?: 'up' | 'down' | 'neutral' }) {
   return (
-    <div className="flex flex-col gap-1">
-      <div className="h-24 flex items-end gap-1">
-        <div className="flex-1 flex flex-col justify-end h-full">
-          <div className="w-full flex flex-col justify-end" style={{ height: `${strengthW + cardioW}%`, minHeight: week.total > 0 ? '4px' : 0 }}>
-            <div className="w-full rounded-t" style={{ height: `${cardioW / (strengthW + cardioW) * 100}%`, minHeight: week.cardioSRPE > 0 ? '4px' : 0, background: MBT_TEAL }} />
-            <div className="w-full" style={{ height: `${strengthW / (strengthW + cardioW) * 100}%`, minHeight: week.strengthSRPE > 0 ? '4px' : 0, background: MBT_GREEN }} />
-          </div>
-        </div>
+    <div className="bg-white rounded-xl p-4 border" style={{ borderColor: '#e2e8f0' }}>
+      <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">{label}</p>
+      <div className="flex items-baseline gap-2 mt-1">
+        <span className="text-2xl font-bold" style={{ color: DARK }}>{value}</span>
+        {sub && <span className="text-sm text-muted-foreground">{sub}</span>}
       </div>
-      <p className="text-xs text-muted-foreground text-center leading-tight">{week.weekLabel.split('–')[0]}</p>
+      {trend && (
+        <div className="flex items-center gap-1 mt-1">
+          {trend === 'up'      && <TrendingUp  className="w-3.5 h-3.5" style={{ color: G }} />}
+          {trend === 'down'    && <TrendingDown className="w-3.5 h-3.5 text-red-400" />}
+          {trend === 'neutral' && <Minus        className="w-3.5 h-3.5 text-zinc-400" />}
+        </div>
+      )}
     </div>
   )
 }
 
-// ── ACWR card ─────────────────────────────────────────────────────────────────
-
-function ACWRCard({ sessions }: { sessions: SessionWorkload[] }) {
-  const result = calculateACWR(sessions)
-  const zone = ACWR_ZONE_CONFIG[result.zone]
-  const noData = sessions.length === 0
-
+function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <Card>
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-sm">Acute:Chronic Workload Ratio</h3>
-          <span className="text-xs text-muted-foreground">Gabbett 2016</span>
-        </div>
+    <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">{children}</h2>
+  )
+}
 
-        {noData ? (
-          <p className="text-sm text-muted-foreground py-2">Geen sessiedata beschikbaar.</p>
-        ) : (
-          <>
-            <div className="flex items-center gap-4">
-              <div>
-                <p className="text-4xl font-bold" style={{ color: zone.color }}>{result.acwr.toFixed(2)}</p>
-                <div className="mt-1 px-2 py-0.5 rounded-full text-xs font-semibold inline-block" style={{ background: zone.bg, color: zone.color }}>
-                  {zone.label}
-                </div>
-              </div>
-              <div className="flex-1 space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Acuut (week):</span>
-                  <span className="font-medium">{result.acuteWorkload}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Chronisch (4w gem):</span>
-                  <span className="font-medium">{result.chronicWorkload}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Week-over-week:</span>
-                  <span className="font-medium flex items-center gap-1">
-                    {result.weekOverWeekChange > 0 ? <TrendingUp className="w-3 h-3 text-amber-500" /> : result.weekOverWeekChange < 0 ? <TrendingDown className="w-3 h-3 text-blue-500" /> : <Minus className="w-3 h-3" />}
-                    {result.weekOverWeekChange > 0 ? '+' : ''}{result.weekOverWeekChange}%
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-2 rounded-lg text-xs" style={{ background: zone.bg, color: zone.color }}>
-              {zone.description}
-            </div>
-
-            {/* ACWR schaal */}
-            <div className="space-y-1">
-              <div className="relative h-3 rounded-full overflow-hidden flex">
-                <div className="flex-1 bg-blue-200" title="Onderbelast (<0.8)" />
-                <div className="flex-[2] bg-green-200" title="Optimaal (0.8-1.3)" />
-                <div className="flex-1 bg-amber-200" title="Verhoogd risico (1.3-1.5)" />
-                <div className="flex-1 bg-red-200" title="Hoog risico (>1.5)" />
-                {/* Indicator */}
-                <div
-                  className="absolute top-0 bottom-0 w-1.5 rounded-full bg-gray-800 -translate-x-1/2"
-                  style={{ left: `${Math.min(Math.max((result.acwr / 2) * 100, 0), 100)}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>0</span><span>0.8</span><span>1.3</span><span>1.5</span><span>2.0</span>
-              </div>
-            </div>
-          </>
-        )}
+function ChartCard({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }) {
+  return (
+    <Card style={{ borderRadius: '12px' }} className={className}>
+      <CardContent className="p-5">
+        <p className="text-sm font-semibold mb-4">{title}</p>
+        {children}
       </CardContent>
     </Card>
   )
 }
 
-// ── Tabs ──────────────────────────────────────────────────────────────────────
+// Adherence heatmap calendar
+function AdherenceHeatmap() {
+  const firstDate = CALENDAR_DAYS[0].date
+  const firstDow = firstDate.getDay()
+  const mondayOffset = firstDow === 0 ? 6 : firstDow - 1
 
-type Tab = 'overview' | 'workload'
+  const padded: (typeof CALENDAR_DAYS[0] | null)[] = [
+    ...Array(mondayOffset).fill(null),
+    ...CALENDAR_DAYS,
+  ]
+  const rem = padded.length % 7
+  if (rem > 0) for (let i = 0; i < 7 - rem; i++) padded.push(null)
 
-// ── Hoofdpagina ───────────────────────────────────────────────────────────────
+  const weekRows: (typeof CALENDAR_DAYS[0] | null)[][] = []
+  for (let i = 0; i < padded.length; i += 7) weekRows.push(padded.slice(i, i + 7))
+
+  const dayLabels = ['Ma','Di','Wo','Do','Vr','Za','Zo']
+
+  return (
+    <div>
+      <div className="grid grid-cols-7 gap-1.5 mb-1.5">
+        {dayLabels.map(d => (
+          <div key={d} className="text-center text-xs text-muted-foreground font-medium">{d}</div>
+        ))}
+      </div>
+      {weekRows.map((row, ri) => (
+        <div key={ri} className="grid grid-cols-7 gap-1.5 mb-1.5">
+          {row.map((day, di) => {
+            if (!day) return <div key={di} className="aspect-square rounded-md" />
+            const cfg = {
+              completed: { bg: '#dcfce7', border: G,       title: 'Voltooid' },
+              missed:    { bg: '#fee2e2', border: '#f87171', title: 'Gemist' },
+              rest:      { bg: '#f8fafc', border: '#e2e8f0', title: 'Rustdag' },
+            }[day.status]
+            return (
+              <div
+                key={di}
+                className="aspect-square rounded-md border-2 cursor-default"
+                style={{ background: cfg.bg, borderColor: cfg.border }}
+                title={`${day.date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}: ${cfg.title}`}
+              />
+            )
+          })}
+        </div>
+      ))}
+      <div className="flex items-center gap-4 mt-3">
+        {[
+          { color: '#dcfce7', border: G,       label: 'Voltooid' },
+          { color: '#fee2e2', border: '#f87171', label: 'Gemist' },
+          { color: '#f8fafc', border: '#e2e8f0', label: 'Rustdag' },
+        ].map(({ color, border, label }) => (
+          <div key={label} className="flex items-center gap-1.5">
+            <div className="w-3.5 h-3.5 rounded border-2" style={{ background: color, borderColor: border }} />
+            <span className="text-xs text-muted-foreground">{label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Exercise line chart (4-metric)
+function ExerciseChart({ ex }: { ex: (typeof EXERCISES)[keyof typeof EXERCISES] }) {
+  return (
+    <ChartCard title={ex.name}>
+      <div className="grid grid-cols-2 gap-4">
+        {/* Gewicht */}
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">Gewicht (kg)</p>
+          <ResponsiveContainer width="100%" height={120}>
+            <LineChart data={ex.data} margin={{ top: 2, right: 8, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="week" tick={{ fontSize: 10 }} />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+              <Line type="monotone" dataKey="gewicht" stroke={ex.color} strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        {/* Volume */}
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">Volume (sets × reps × kg)</p>
+          <ResponsiveContainer width="100%" height={120}>
+            <LineChart data={ex.data} margin={{ top: 2, right: 8, left: -10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="week" tick={{ fontSize: 10 }} />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+              <Line type="monotone" dataKey="volume" stroke={G} strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        {/* RPE */}
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">RPE (1–10)</p>
+          <ResponsiveContainer width="100%" height={120}>
+            <LineChart data={ex.data} margin={{ top: 2, right: 8, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="week" tick={{ fontSize: 10 }} />
+              <YAxis domain={[4, 10]} tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+              <Line type="monotone" dataKey="rpe" stroke="#f59e0b" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        {/* Gevoel */}
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">Gevoel (1–5)</p>
+          <ResponsiveContainer width="100%" height={120}>
+            <LineChart data={ex.data} margin={{ top: 2, right: 8, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="week" tick={{ fontSize: 10 }} />
+              <YAxis domain={[1, 5]} tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+              <Line type="monotone" dataKey="gevoel" stroke="#a78bfa" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </ChartCard>
+  )
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function PatientProgressPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const [tab, setTab] = useState<Tab>('overview')
+  const [exporting, setExporting] = useState(false)
 
-  const patient = getPatientById(id)
-  if (!patient) notFound()
+  async function handleExportPdf() {
+    setExporting(true)
+    try {
+      const QRCode = (await import('qrcode')).default
+      const { pdf } = await import('@react-pdf/renderer')
+      const { PatientPdfDocument } = await import('@/components/therapist/PatientPdfDoc')
 
-  const strengthLogs = getSessionsByPatient(id)
-  const cardioLogs = getCardioLogsByPatient(id)
+      const qrCodes: Record<string, string> = {}
+      for (const [key, ex] of Object.entries(EXERCISES)) {
+        qrCodes[key] = await QRCode.toDataURL(ex.videoUrl, { width: 100, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
+      }
 
-  const weeklyWorkloads = computeWeeklyWorkloads(strengthLogs, cardioLogs)
-  const maxTotal = Math.max(...weeklyWorkloads.map(w => w.total), 1)
-
-  // ACWR data alleen op basis van alle sessies (strength + cardio gecombineerd)
-  const allWorkloadSessions: SessionWorkload[] = [
-    ...strengthLogs.map(s => ({
-      date: new Date(s.date),
-      durationMinutes: s.duration,
-      rpe: s.rpe,
-      sRPE: calculateSRPE(s.rpe, s.duration),
-    })),
-    ...cardioLogs.map(c => ({
-      date: new Date(c.date),
-      durationMinutes: c.durationSec / 60,
-      rpe: c.rpe ?? 4,
-      sRPE: calculateCardioSRPE(c.rpe ?? 4, c.durationSec / 60),
-    })),
-  ]
-
-  // Laatste cardio logs voor tabel
-  const recentCardio = cardioLogs.slice(0, 6)
-  const recentStrength = strengthLogs.slice(0, 6)
-
-  // Totaal km lopend (10%-regel)
-  const runningLogs = cardioLogs.filter(c => c.activity === 'RUNNING' && c.distanceM)
-  const lastWeekKey = weeklyWorkloads[weeklyWorkloads.length - 1]?.weekKey
-  const prevWeekKey = weeklyWorkloads[weeklyWorkloads.length - 2]?.weekKey
-  const lastWeekKm = runningLogs.filter(c => getISOWeekKey(c.date) === lastWeekKey).reduce((s, c) => s + (c.distanceM ?? 0), 0) / 1000
-  const prevWeekKm = runningLogs.filter(c => getISOWeekKey(c.date) === prevWeekKey).reduce((s, c) => s + (c.distanceM ?? 0), 0) / 1000
-  const kmIncreasePct = prevWeekKm > 0 ? ((lastWeekKm - prevWeekKm) / prevWeekKm) * 100 : 0
+      const blob = await pdf(
+        PatientPdfDocument({ patient: PATIENT, exercises: EXERCISES, qrCodes })
+      ).toBlob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `programma-thomas-de-vries.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('PDF export fout:', err)
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-5 pb-16">
+    <div className="space-y-6 max-w-5xl">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link href={`/therapist/patients/${id}`}>
-          <Button variant="ghost" size="icon" className="rounded-full">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-        </Link>
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold">Voortgang — {patient.name}</h1>
-          <p className="text-sm text-muted-foreground">{patient.diagnosis.slice(0, 50)}</p>
+          <Link
+            href={`/therapist/patients/${id}`}
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2"
+          >
+            <ArrowLeft className="w-4 h-4" /> Terug naar patiënt
+          </Link>
+          <h1 className="text-xl font-bold" style={{ color: DARK }}>Progressie — {PATIENT.name}</h1>
+          <p className="text-sm text-muted-foreground">{PATIENT.program} · 8 weken data</p>
         </div>
+        <Button
+          onClick={handleExportPdf}
+          disabled={exporting}
+          className="gap-2 text-white shrink-0"
+          style={{ background: G }}
+        >
+          {exporting
+            ? <><Loader2 className="w-4 h-4 animate-spin" /> Exporteren...</>
+            : <><Download className="w-4 h-4" /> PDF exporteren</>
+          }
+        </Button>
+      </div>
+
+      {/* Summary banner */}
+      <div
+        className="rounded-2xl p-5 text-white"
+        style={{ background: `linear-gradient(135deg, ${DARK} 0%, #0f2a2a 100%)` }}
+      >
+        <p className="text-xs uppercase tracking-widest font-semibold opacity-60 mb-3">Samenvatting</p>
+        <p className="text-lg font-semibold leading-relaxed">
+          Patiënt heeft <span style={{ color: G }}>{adherencePct}% adherentie</span>, gemiddeld volume{' '}
+          <span style={{ color: G }}>+{avgVolChange}%</span> over 4 weken, NRS gedaald van{' '}
+          <span style={{ color: '#f87171' }}>{initialNRS.toFixed(1)}</span> naar{' '}
+          <span style={{ color: G }}>{currentNRS.toFixed(1)}</span>, spiergroep{' '}
+          <span style={{ color: G }}>{bestMuscle.name} +{bestMuscle.change}%</span>.
+        </p>
+      </div>
+
+      {/* KPI row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatChip label="Adherentie"    value={`${adherencePct}%`}            sub={`${completedDays.length}/${trainingDays.length} sessies`} trend="up" />
+        <StatChip label="Gem. volume ↑" value={`+${avgVolChange}%`}           sub="vs eerste 4 weken"   trend="up" />
+        <StatChip label="NRS knie"      value={`${currentNRS.toFixed(1)}`}    sub={`was ${initialNRS.toFixed(1)}`}  trend="down" />
+        <StatChip label="Beste spier"   value={`+${bestMuscle.change}%`}      sub={bestMuscle.name}     trend="up" />
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-muted/50 p-1 rounded-xl">
-        {([
-          { key: 'overview', label: 'Overzicht', icon: Activity },
-          { key: 'workload', label: 'Workload Ratio', icon: Dumbbell },
-        ] as { key: Tab; label: string; icon: typeof Activity }[]).map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all"
-            style={tab === key ? { background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' } : { color: '#6b7280' }}
-          >
-            <Icon className="w-4 h-4" />
-            {label}
-          </button>
-        ))}
-      </div>
+      <Tabs defaultValue="adherentie">
+        <TabsList className="flex-wrap h-auto gap-1 p-1">
+          <TabsTrigger value="adherentie">Adherentie</TabsTrigger>
+          <TabsTrigger value="oefeningen">Oefeningen</TabsTrigger>
+          <TabsTrigger value="spiergroepen">Spiergroepen</TabsTrigger>
+          <TabsTrigger value="gevoel-pijn">Gevoel & Pijn</TabsTrigger>
+          <TabsTrigger value="proms">PROMs</TabsTrigger>
+        </TabsList>
 
-      {/* ── Tab: Overzicht ── */}
-      {tab === 'overview' && (
-        <div className="space-y-4">
-          {/* Stats row */}
+        {/* ── TAB: Adherentie ── */}
+        <TabsContent value="adherentie" className="space-y-4 mt-4">
+          <SectionTitle>Adherentie heatmap — 8 weken</SectionTitle>
+          <ChartCard title="Kalenderoverzicht">
+            <AdherenceHeatmap />
+          </ChartCard>
+
           <div className="grid grid-cols-3 gap-3">
-            <Card>
-              <CardContent className="p-3 text-center">
-                <p className="text-2xl font-bold" style={{ color: MBT_GREEN }}>{strengthLogs.length}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Kracht sessies</p>
+            <Card style={{ borderRadius: '12px' }}>
+              <CardContent className="p-4 flex items-center gap-3">
+                <CheckCircle2 className="w-8 h-8 shrink-0" style={{ color: G }} />
+                <div>
+                  <p className="text-2xl font-bold">{completedDays.length}</p>
+                  <p className="text-xs text-muted-foreground">Voltooide sessies</p>
+                </div>
               </CardContent>
             </Card>
-            <Card>
-              <CardContent className="p-3 text-center">
-                <p className="text-2xl font-bold" style={{ color: MBT_TEAL }}>{cardioLogs.length}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Cardio sessies</p>
+            <Card style={{ borderRadius: '12px' }}>
+              <CardContent className="p-4 flex items-center gap-3">
+                <XCircle className="w-8 h-8 shrink-0 text-red-400" />
+                <div>
+                  <p className="text-2xl font-bold">{trainingDays.length - completedDays.length}</p>
+                  <p className="text-xs text-muted-foreground">Gemiste sessies</p>
+                </div>
               </CardContent>
             </Card>
-            <Card>
-              <CardContent className="p-3 text-center">
-                <p className="text-2xl font-bold">{patient.compliance}%</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Compliance</p>
+            <Card style={{ borderRadius: '12px' }}>
+              <CardContent className="p-4 flex items-center gap-3">
+                <Activity className="w-8 h-8 shrink-0" style={{ color: G }} />
+                <div>
+                  <p className="text-2xl font-bold">{adherencePct}%</p>
+                  <p className="text-xs text-muted-foreground">Adherentie totaal</p>
+                </div>
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
 
-          {/* Recente strength sessies */}
-          {recentStrength.length > 0 && (
-            <Card>
-              <CardContent className="p-4">
-                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                  <Dumbbell className="w-4 h-4" style={{ color: MBT_GREEN }} />
-                  Recente krachtsessies
-                </h3>
-                <div className="space-y-2">
-                  {recentStrength.map(s => (
-                    <div key={s.id} className="flex items-center gap-3 text-sm py-1.5 border-b last:border-0">
-                      <div className="w-16 text-xs text-muted-foreground shrink-0">{fmtDate(s.date)}</div>
-                      <div className="flex-1">
-                        <span className="text-xs">Week {s.week}, dag {s.day}</span>
-                        {s.notes && <p className="text-xs text-muted-foreground truncate">{s.notes}</p>}
-                      </div>
-                      <Badge variant="outline" className="text-xs">RPE {s.rpe}</Badge>
-                      <Badge variant="outline" className="text-xs" style={s.pain >= 5 ? { borderColor: '#ef4444', color: '#ef4444' } : {}}>
-                        Pijn {s.pain}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+        {/* ── TAB: Oefeningen ── */}
+        <TabsContent value="oefeningen" className="space-y-4 mt-4">
+          <SectionTitle>Volume-load per oefening</SectionTitle>
+          {Object.values(EXERCISES).map(ex => (
+            <ExerciseChart key={ex.name} ex={ex} />
+          ))}
+        </TabsContent>
 
-          {/* Recente cardio sessies */}
-          {recentCardio.length > 0 && (
-            <Card>
-              <CardContent className="p-4">
-                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                  <Heart className="w-4 h-4" style={{ color: MBT_TEAL }} />
-                  Recente cardiosessies
-                </h3>
-                <div className="space-y-2">
-                  {recentCardio.map(c => {
-                    const act = CARDIO_ACTIVITIES[c.activity as keyof typeof CARDIO_ACTIVITIES]
-                    return (
-                      <div key={c.id} className="flex items-center gap-3 text-sm py-1.5 border-b last:border-0">
-                        <div className="w-16 text-xs text-muted-foreground shrink-0">{fmtDate(c.date)}</div>
-                        <span className="text-base">{act?.icon ?? '🏃'}</span>
-                        <div className="flex-1">
-                          <span className="text-xs font-medium">{act?.label ?? c.activity}</span>
-                          <p className="text-xs text-muted-foreground">
-                            {Math.round(c.durationSec / 60)} min
-                            {c.distanceM ? ` · ${(c.distanceM / 1000).toFixed(1)} km` : ''}
-                            {c.avgHeartRate ? ` · ${c.avgHeartRate} bpm` : ''}
-                          </p>
-                        </div>
-                        {c.zone && (
-                          <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: HR_ZONES[c.zone as 1 | 2 | 3 | 4 | 5]?.color }}>
-                            {c.zone}
-                          </div>
-                        )}
-                        {c.painLevel !== undefined && c.painLevel >= 5 && (
-                          <AlertTriangle className="w-4 h-4 text-amber-500" />
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+        {/* ── TAB: Spiergroepen ── */}
+        <TabsContent value="spiergroepen" className="space-y-4 mt-4">
+          <SectionTitle>Gewogen spiergroep-volume (sets × reps × gewicht × score/5)</SectionTitle>
 
-          {strengthLogs.length === 0 && cardioLogs.length === 0 && (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                <p>Nog geen sessiedata beschikbaar.</p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+          {/* Bar chart: W1–4 vs W5–8 */}
+          <ChartCard title="Volumevergelijking per spiergroep — W1–4 vs W5–8">
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={MUSCLE_COMPARISON} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip
+                  contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                  formatter={(value, name) => [value.toLocaleString('nl-NL'), name === 'W1–4' ? 'Week 1–4' : 'Week 5–8']}
+                />
+                <Legend formatter={n => n === 'W1–4' ? 'Week 1–4' : 'Week 5–8'} />
+                <Bar dataKey="W1–4" fill="#94a3b8" radius={[4,4,0,0]} />
+                <Bar dataKey="W5–8" fill={G}       radius={[4,4,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+            {/* % change labels */}
+            <div className="flex flex-wrap gap-2 mt-3">
+              {MUSCLE_COMPARISON.map(m => (
+                <span
+                  key={m.name}
+                  className="text-xs px-2 py-1 rounded-full font-semibold"
+                  style={{ background: m.change > 0 ? '#dcfce7' : '#fee2e2', color: m.change > 0 ? '#166534' : '#991b1b' }}
+                >
+                  {m.name} {m.change > 0 ? '+' : ''}{m.change}%
+                </span>
+              ))}
+            </div>
+          </ChartCard>
 
-      {/* ── Tab: Workload Ratio ── */}
-      {tab === 'workload' && (
-        <div className="space-y-4">
-          {/* ACWR */}
-          <ACWRCard sessions={allWorkloadSessions} />
+          {/* Weekly trend bars */}
+          <ChartCard title="Spiergroep-volume per week (trend)">
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={MUSCLE_WEEKLY} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="week" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                <Legend />
+                {MUSCLES.map((m, mi) => (
+                  <Bar
+                    key={m} dataKey={m} stackId="a"
+                    fill={[G, '#60a5fa', '#f59e0b', '#a78bfa', '#f87171'][mi]}
+                  />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
 
-          {/* 10% regel lopen */}
-          {runningLogs.length > 0 && (
-            <Card className={kmIncreasePct > 10 ? 'border-amber-300' : ''}>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <span>🏃</span>
-                  <h3 className="font-semibold text-sm">10%-regel Hardlopen</h3>
-                  {kmIncreasePct > 10 && (
-                    <Badge variant="outline" className="text-xs border-amber-400 text-amber-700 bg-amber-50 ml-auto">
-                      ⚠️ Grens overschreden
-                    </Badge>
-                  )}
-                  {kmIncreasePct <= 10 && lastWeekKm > 0 && (
-                    <Badge variant="outline" className="text-xs border-green-400 text-green-700 bg-green-50 ml-auto">
-                      ✓ Veilig
-                    </Badge>
-                  )}
-                </div>
-                <div className="grid grid-cols-3 gap-3 text-center">
-                  <div className="bg-muted/40 rounded-lg p-2">
-                    <p className="text-xl font-bold">{prevWeekKm.toFixed(1)} km</p>
-                    <p className="text-xs text-muted-foreground">Vorige week</p>
+          {/* Radar chart */}
+          <ChartCard title="Spiergroep balans — huidig vs doel">
+            <ResponsiveContainer width="100%" height={300}>
+              <RadarChart data={RADAR_DATA} margin={{ top: 10, right: 30, left: 30, bottom: 10 }}>
+                <PolarGrid stroke="#e2e8f0" />
+                <PolarAngleAxis dataKey="muscle" tick={{ fontSize: 11 }} />
+                <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 9 }} />
+                <Radar name="Huidig" dataKey="score" fill={G} fillOpacity={0.25} stroke={G} strokeWidth={2} />
+                <Radar name="Doel"   dataKey="doel"  fill="transparent" stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="5 5" />
+                <Legend />
+                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+              </RadarChart>
+            </ResponsiveContainer>
+            <p className="text-xs text-muted-foreground mt-2">
+              Score = relatief volume-aandeel t.o.v. doelstelling (0–100). Hamstrings en Hip Abd. lopen nog achter op het doel.
+            </p>
+          </ChartCard>
+        </TabsContent>
+
+        {/* ── TAB: Gevoel & Pijn ── */}
+        <TabsContent value="gevoel-pijn" className="space-y-4 mt-4">
+          <SectionTitle>Gevoel & pijn trends</SectionTitle>
+
+          {/* Feeling score per session */}
+          <ChartCard title="Gevoel per sessie (1 = slecht, 5 = uitstekend)">
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={FEELING_DATA} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="sessie" tick={{ fontSize: 10 }} interval={2} />
+                <YAxis domain={[1, 5]} ticks={[1,2,3,4,5]} tick={{ fontSize: 11 }} />
+                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                <Legend />
+                <Line type="monotone" dataKey="gevoel" name="Gevoel" stroke="#a78bfa" strokeWidth={2} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="trend"  name="Trend"  stroke={G}       strokeWidth={1.5} dot={false} strokeDasharray="4 4" />
+              </LineChart>
+            </ResponsiveContainer>
+          </ChartCard>
+
+          {/* Feeling per exercise */}
+          <div className="grid grid-cols-2 gap-4">
+            {Object.values(EXERCISES).map(ex => (
+              <ChartCard key={ex.name} title={`Gevoel — ${ex.name}`}>
+                <ResponsiveContainer width="100%" height={130}>
+                  <LineChart data={ex.data} margin={{ top: 2, right: 8, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="week" tick={{ fontSize: 10 }} />
+                    <YAxis domain={[1, 5]} ticks={[1,3,5]} tick={{ fontSize: 10 }} />
+                    <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                    <Line type="monotone" dataKey="gevoel" stroke={ex.color} strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            ))}
+          </div>
+
+          {/* Pain NRS per location */}
+          <ChartCard title="Pijn NRS per locatie (0 = geen, 10 = maximaal)">
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={PAIN_LOCATION} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="week" tick={{ fontSize: 11 }} />
+                <YAxis domain={[0, 10]} ticks={[0,2,4,6,8,10]} tick={{ fontSize: 11 }} />
+                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                <Legend />
+                <Line type="monotone" dataKey="Knie" stroke="#f87171" strokeWidth={2.5} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="Rug"  stroke="#f59e0b" strokeWidth={2}   dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </ChartCard>
+
+          {/* Pain NRS per exercise */}
+          <ChartCard title="Pijn NRS per oefening">
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={PAIN_EXERCISE} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="week" tick={{ fontSize: 11 }} />
+                <YAxis domain={[0, 8]} tick={{ fontSize: 11 }} />
+                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                <Legend />
+                <Line type="monotone" dataKey="Squat"        stroke="#f87171" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="Leg Press"    stroke="#f59e0b" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="Hip Abd."     stroke="#60a5fa" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="Calf Raises"  stroke="#a78bfa" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </TabsContent>
+
+        {/* ── TAB: PROMs ── */}
+        <TabsContent value="proms" className="space-y-4 mt-4">
+          <SectionTitle>PROM score verloop</SectionTitle>
+
+          <div
+            className="rounded-xl p-4 border flex items-start gap-3"
+            style={{ borderColor: '#fbbf24', background: '#fffbeb' }}
+          >
+            <span className="text-lg">📋</span>
+            <div>
+              <p className="text-sm font-semibold text-amber-800">Placeholder — PROMs komen in Fase 9</p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Onderstaande data is illustratief. Zodra de PROM-module actief is worden hier echte meetmomenten getoond
+                (KOOS ADL, KOOS Sport, WHOQOL-BREF, PSK).
+              </p>
+            </div>
+          </div>
+
+          <ChartCard title="KOOS score verloop (0–100, hoger = beter)">
+            <ResponsiveContainer width="100%" height={240}>
+              <LineChart data={PROM_DATA} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="moment" tick={{ fontSize: 10 }} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
+                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                <Legend />
+                <Line type="monotone" dataKey="koos_adl"   name="KOOS ADL"   stroke={G}       strokeWidth={2.5} dot={{ r: 5 }} />
+                <Line type="monotone" dataKey="koos_sport" name="KOOS Sport" stroke="#60a5fa" strokeWidth={2.5} dot={{ r: 5 }} />
+                <Line type="monotone" dataKey="whoq"       name="WHOQOL"     stroke="#a78bfa" strokeWidth={2}   dot={{ r: 4 }} strokeDasharray="5 3" />
+              </LineChart>
+            </ResponsiveContainer>
+          </ChartCard>
+
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: 'KOOS ADL',   start: 45, end: 72, color: G },
+              { label: 'KOOS Sport', start: 32, end: 63, color: '#60a5fa' },
+              { label: 'WHOQOL',     start: 52, end: 68, color: '#a78bfa' },
+            ].map(({ label, start, end, color }) => (
+              <Card key={label} style={{ borderRadius: '12px' }}>
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">{label}</p>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-2xl font-bold" style={{ color }}>{end}</span>
+                    <span className="text-sm text-muted-foreground">/ 100</span>
                   </div>
-                  <div className="bg-muted/40 rounded-lg p-2">
-                    <p className="text-xl font-bold" style={{ color: kmIncreasePct > 10 ? '#f59e0b' : MBT_GREEN }}>{lastWeekKm.toFixed(1)} km</p>
-                    <p className="text-xs text-muted-foreground">Deze week</p>
+                  <p className="text-xs text-muted-foreground mt-1">was {start} → +{end - start} punten</p>
+                  <div className="mt-2 h-1.5 rounded-full bg-zinc-100">
+                    <div className="h-full rounded-full" style={{ width: `${end}%`, background: color }} />
                   </div>
-                  <div className="bg-muted/40 rounded-lg p-2">
-                    <p className="text-xl font-bold" style={{ color: kmIncreasePct > 10 ? '#ef4444' : MBT_GREEN }}>
-                      {kmIncreasePct > 0 ? '+' : ''}{kmIncreasePct.toFixed(0)}%
-                    </p>
-                    <p className="text-xs text-muted-foreground">Stijging</p>
-                  </div>
-                </div>
-                {kmIncreasePct > 10 && (
-                  <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex gap-2">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    <span>Weekvolume stijgt meer dan 10%. Overweeg het trainingsvolume terug te schalen om overbelasting te voorkomen.</span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Stacked bar chart */}
-          {weeklyWorkloads.length > 0 ? (
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-sm">Workload per week</h3>
-                  <div className="flex gap-3 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <span className="w-3 h-3 rounded-sm inline-block" style={{ background: MBT_GREEN }} />
-                      Kracht
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="w-3 h-3 rounded-sm inline-block" style={{ background: MBT_TEAL }} />
-                      Cardio
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 items-end min-h-[120px]">
-                  {weeklyWorkloads.map(w => (
-                    <div key={w.weekKey} className="flex-1 flex flex-col gap-1">
-                      <StackedWorkloadBar week={w} maxTotal={maxTotal} />
-                    </div>
-                  ))}
-                </div>
-
-                {/* Ratio tabel */}
-                <div className="mt-4 space-y-2 border-t pt-4">
-                  {weeklyWorkloads.slice(-4).map(w => (
-                    <div key={w.weekKey}>
-                      <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                        <span>{w.weekLabel}</span>
-                        <span>{w.strengthSessions > 0 ? `${w.strengthSessions} kracht` : ''}
-                          {w.strengthSessions > 0 && w.cardioSessions > 0 ? ' · ' : ''}
-                          {w.cardioSessions > 0 ? `${w.cardioSessions} cardio` : ''}
-                        </span>
-                      </div>
-                      <div className="h-3 rounded-full overflow-hidden flex">
-                        <div
-                          className="h-full transition-all"
-                          style={{ width: `${w.strengthPct}%`, background: MBT_GREEN }}
-                        />
-                        <div
-                          className="h-full transition-all"
-                          style={{ width: `${w.cardioPct}%`, background: MBT_TEAL }}
-                        />
-                      </div>
-                      <div className="flex justify-between text-xs mt-0.5">
-                        <span style={{ color: MBT_GREEN }}>{w.strengthPct}% kracht</span>
-                        <span style={{ color: MBT_TEAL }}>{w.cardioPct}% cardio</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                <p>Nog geen workload data — sessies worden hier weergegeven zodra de patiënt start.</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Uitleg */}
-          <Card className="border-muted bg-muted/20">
-            <CardContent className="p-4">
-              <div className="flex gap-2">
-                <Info className="w-4 h-4 shrink-0 mt-0.5 text-muted-foreground" />
-                <div className="text-xs text-muted-foreground space-y-1">
-                  <p><strong>sRPE methode (Foster 2001):</strong> Workload = RPE × duur (min). Vergelijkbaar voor kracht en cardio.</p>
-                  <p><strong>ACWR (Gabbett 2016):</strong> Acuut (huidige week) / Chronisch (4-weeks gemiddelde). Optimaal: 0.8–1.3.</p>
-                  <p><strong>10%-regel:</strong> Weekvolume hardlopen mag maximaal 10% stijgen om overbelasting te voorkomen.</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
