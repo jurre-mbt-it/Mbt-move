@@ -159,9 +159,10 @@ export default function NewWorkoutPage() {
         utils.patient.getSessionHistory.invalidate(),
       ])
       router.push('/athlete/dashboard')
-    } catch (err) {
-      console.error('Session database save failed:', err)
-      setSaveError('Opslaan mislukt. Controleer je verbinding en probeer opnieuw.')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : JSON.stringify(err)
+      console.error('Session database save failed:', msg)
+      setSaveError(`Opslaan mislukt: ${msg}`)
     }
   }
 
