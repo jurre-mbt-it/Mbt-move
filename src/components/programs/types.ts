@@ -22,6 +22,7 @@ export interface BuilderExercise {
   easierVariantId: string | null
   harderVariantId: string | null
   videoUrl?: string | null
+  trackOneRepMax: boolean
 
   // Fixed params
   sets: number
@@ -67,4 +68,5 @@ export interface ProgramState {
   currentDay: number
   exercises: BuilderExercise[]
   isTemplate: boolean
+  tendinopathyMode: boolean
 }

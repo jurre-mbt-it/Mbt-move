@@ -6,7 +6,7 @@ import type { BuilderExercise, ExtraParam, RepUnit } from './types'
 import { STANDARD_PARAMS, REP_UNITS } from '@/lib/program-constants'
 import { cn } from '@/lib/utils'
 import {
-  GripVertical, X, Plus, ArrowUp, ArrowDown, MoreHorizontal, Play,
+  GripVertical, X, Plus, ArrowUp, ArrowDown, MoreHorizontal, Play, TrendingUp,
 } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -155,6 +155,15 @@ export function ProgramExerciseBlock({
           >
             {exercise.name}
           </button>
+          {exercise.trackOneRepMax && (
+            <span
+              className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+              style={{ background: '#3ECF6A22', color: '#3ECF6A' }}
+              title="1RM tracking aan"
+            >
+              1RM
+            </span>
+          )}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -207,6 +216,16 @@ export function ProgramExerciseBlock({
                 </>
               )}
 
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => onUpdate(exercise.uid, { trackOneRepMax: !exercise.trackOneRepMax })}
+                className="gap-2"
+              >
+                <TrendingUp className="w-3.5 h-3.5" style={{ color: exercise.trackOneRepMax ? '#3ECF6A' : undefined }} />
+                <span style={{ color: exercise.trackOneRepMax ? '#3ECF6A' : undefined }}>
+                  1RM tracken {exercise.trackOneRepMax ? '✓' : ''}
+                </span>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onRemove(exercise.uid)} className="text-destructive gap-2">
                 <X className="w-3.5 h-3.5" />

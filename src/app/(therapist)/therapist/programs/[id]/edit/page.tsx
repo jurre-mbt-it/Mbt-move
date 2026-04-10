@@ -38,6 +38,8 @@ export default function EditProgramPage({ params }: Props) {
     easierVariantId: pe.exercise.easierVariantId ?? null,
     harderVariantId: pe.exercise.harderVariantId ?? null,
     videoUrl: pe.exercise.videoUrl ?? null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    trackOneRepMax: (pe.exercise as any).trackOneRepMax ?? false,
     sets: pe.sets,
     reps: pe.reps,
     repUnit: (pe.repUnit as 'reps' | 'sec' | 'min') ?? 'reps',

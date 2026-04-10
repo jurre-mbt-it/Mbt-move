@@ -53,6 +53,7 @@ function mapProgramExercise(pe: {
     muscleLoads: { muscle: string; load: number }[]
     easierVariantId: string | null
     harderVariantId: string | null
+    trackOneRepMax?: boolean
   }
 }) {
   return {
@@ -76,6 +77,7 @@ function mapProgramExercise(pe: {
     notes: pe.notes ?? null,
     easierVariantId: pe.exercise.easierVariantId ?? null,
     harderVariantId: pe.exercise.harderVariantId ?? null,
+    trackOneRepMax: pe.exercise.trackOneRepMax ?? false,
   }
 }
 
@@ -166,6 +168,8 @@ export const patientRouter = createTRPCRouter({
         currentWeek: week,
         currentDay: day,
         weeks: program.weeks,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        tendinopathyMode: (program as any).tendinopathyMode ?? false,
       },
       exercises: todayExercises,
     }
@@ -188,6 +192,9 @@ export const patientRouter = createTRPCRouter({
             setsCompleted: z.number().int().min(0).optional(),
             repsCompleted: z.number().int().min(0).optional(),
             painLevel: z.number().int().min(0).max(10).nullable().optional(),
+            weight: z.number().nullable().optional(),
+            estimatedOneRepMax: z.number().nullable().optional(),
+            painDuring: z.number().int().min(0).max(10).nullable().optional(),
           })
         ),
       })
@@ -209,6 +216,9 @@ export const patientRouter = createTRPCRouter({
               setsCompleted: ex.setsCompleted ?? null,
               repsCompleted: ex.repsCompleted ?? null,
               painLevel: ex.painLevel ?? null,
+              weight: ex.weight ?? null,
+              estimatedOneRepMax: ex.estimatedOneRepMax ?? null,
+              painDuring: ex.painDuring ?? null,
             })),
           },
         },

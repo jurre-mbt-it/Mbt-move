@@ -34,7 +34,7 @@ import { cn } from '@/lib/utils'
 
 import {
   Save, Eye, Copy, FileDown, Plus, Trash2, Rocket,
-  ChevronLeft, Layers, Search, CheckCircle2, X, BarChart2,
+  ChevronLeft, Layers, Search, CheckCircle2, X, BarChart2, Info,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -94,6 +94,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
     currentWeek: 1,
     currentDay: 1,
     isTemplate: initialState?.isTemplate ?? false,
+    tendinopathyMode: (initialState as Partial<ProgramState> | undefined)?.tendinopathyMode ?? false,
     exercises: initialState?.exercises ?? [],
   }))
   const [exercises, setExercises] = useState<BuilderExercise[]>(
@@ -219,6 +220,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
       supersetGroup: null,
       supersetOrder: 0,
       selected: false,
+      trackOneRepMax: false,
       day: program.currentDay,
       week: program.currentWeek,
     }
@@ -276,6 +278,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
         videoUrl: ex.videoUrl,
         sets: 3, reps: 10, repUnit: 'reps', rest: 60,
         extraParams: [], supersetGroup: null, supersetOrder: 0, selected: false,
+        trackOneRepMax: false,
         day: targetDay, week: targetWeek,
       }
       setExercises(prev => [...prev, newEx])
@@ -506,6 +509,42 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
             <Rocket className="w-3.5 h-3.5" />
             {saving ? '...' : 'Deployen'}
           </Button>
+        </div>
+
+        {/* ── Program settings bar: tendinopathy toggle ── */}
+        <div className="flex items-center gap-3 px-3 md:px-4 py-1.5 border-b bg-zinc-50 shrink-0">
+          <button
+            type="button"
+            onClick={() => setProgram(p => ({ ...p, tendinopathyMode: !p.tendinopathyMode }))}
+            className="flex items-center gap-2 text-xs font-medium"
+          >
+            <div
+              className="w-8 h-4 rounded-full relative transition-colors flex items-center"
+              style={{ background: program.tendinopathyMode ? '#3ECF6A' : '#d4d4d8' }}
+            >
+              <div
+                className="w-3 h-3 bg-white rounded-full absolute shadow transition-transform"
+                style={{ transform: program.tendinopathyMode ? 'translateX(18px)' : 'translateX(2px)' }}
+              />
+            </div>
+            <span className={program.tendinopathyMode ? 'text-[#3ECF6A] font-semibold' : 'text-muted-foreground'}>
+              Tendinopathie pijn tracking
+            </span>
+          </button>
+          <div className="relative group">
+            <Info className="w-3.5 h-3.5 text-zinc-400 cursor-help" />
+            <div className="absolute left-5 top-0 z-50 w-64 hidden group-hover:block bg-zinc-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl">
+              Voor peesproblematiek (achilles, patella, RC): splitst pijn in tijdens vs 24u erna + ochtend stijfheid. Gebruikt Silbernagel-protocol grenzen.
+            </div>
+          </div>
+          {program.tendinopathyMode && (
+            <span
+              className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+              style={{ background: '#3ECF6A22', color: '#3ECF6A' }}
+            >
+              Actief voor alle oefeningen
+            </span>
+          )}
         </div>
 
         {/* Mobile action row: week tabs + balance toggle */}

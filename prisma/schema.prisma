@@ -164,6 +164,7 @@ model Exercise {
   loadType       LoadType         @default(BODYWEIGHT)
   isUnilateral   Boolean          @default(false)
   movementPattern MovementPattern?
+  trackOneRepMax Boolean          @default(false)
   createdBy      User             @relation(fields: [createdById], references: [id])
   createdById    String
   createdAt      DateTime         @default(now())
@@ -233,6 +234,8 @@ model Program {
   daysPerWeek  Int           @default(3)
   startDate    DateTime?
   endDate      DateTime?
+
+  tendinopathyMode Boolean       @default(false)
 
   creator   User    @relation("ProgramCreator", fields: [creatorId], references: [id])
   creatorId String
@@ -321,15 +324,20 @@ model SessionLog {
 }
 
 model ExerciseLog {
-  id            String     @id @default(cuid())
-  session       SessionLog @relation(fields: [sessionId], references: [id])
-  sessionId     String
-  exerciseId    String
-  setsCompleted Int?
-  repsCompleted Int?
-  duration      Int?
-  notes         String?
-  painLevel     Int?
+  id                  String     @id @default(cuid())
+  session             SessionLog @relation(fields: [sessionId], references: [id])
+  sessionId           String
+  exerciseId          String
+  setsCompleted       Int?
+  repsCompleted       Int?
+  duration            Int?
+  notes               String?
+  painLevel           Int?
+  weight              Float?     // kg used in last set
+  estimatedOneRepMax  Float?     // Epley: weight × (1 + reps/30)
+  painDuring          Int?       // 0-10 NRS, tendinopathy mode
+  painAfter24h        Int?       // 0-10 NRS, filled via follow-up
+  morningStiffness    Int?       // 0-10, filled via follow-up
 
   @@map("exercise_logs")
 }

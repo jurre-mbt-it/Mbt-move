@@ -11,7 +11,7 @@ import { trpc } from '@/lib/trpc/client'
 import { SUPERSET_COLORS } from '@/lib/program-constants'
 import {
   ChevronLeft, Clock, ChevronDown, ChevronUp, Lightbulb,
-  TrendingUp, TrendingDown, CheckCircle2, SkipForward, Minus, Plus
+  TrendingUp, TrendingDown, CheckCircle2, SkipForward, Minus, Plus, Trophy, Bell,
 } from 'lucide-react'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -60,6 +60,7 @@ type SessionExercise = {
   notes: string | null
   easierVariantId: string | null
   harderVariantId: string | null
+  trackOneRepMax?: boolean
 }
 
 type FeedbackEntry = {
@@ -67,6 +68,37 @@ type FeedbackEntry = {
   pain: number | null
   weight: number | null
   rpe: number | null
+  painDuring: number | null  // tendinopathy: pijn tijdens oefening 0-10
+}
+
+// Epley formule: 1RM = weight × (1 + reps/30)
+function calcEpley(weightKg: number, reps: number): number {
+  if (weightKg <= 0 || reps <= 0) return 0
+  return Math.round(weightKg * (1 + reps / 30) * 10) / 10
+}
+
+// Pijn kleur: algemeen (niet-tendinopathie): <3 groen, 3-5 geel, 5+ rood
+// Tendinopathie (Silbernagel): ≤5 groen, 5-7 geel, >7 rood
+function painColor(pain: number, isTendinopathy = false): string {
+  if (isTendinopathy) {
+    if (pain <= 5) return MBT_GREEN
+    if (pain <= 7) return '#f97316'
+    return '#ef4444'
+  }
+  if (pain < 3) return MBT_GREEN
+  if (pain <= 5) return '#f97316'
+  return '#ef4444'
+}
+
+function painLabel(pain: number, isTendinopathy = false): string {
+  if (isTendinopathy) {
+    if (pain <= 5) return 'OK'
+    if (pain <= 7) return 'Let op'
+    return 'STOP'
+  }
+  if (pain < 3) return 'OK'
+  if (pain <= 5) return 'Let op'
+  return 'Stop'
 }
 
 const SMILIES = ['😫', '😕', '😐', '🙂', '😄']
@@ -117,12 +149,14 @@ function FeedbackModal({
   onChange,
   onSave,
   autoCloseIn,
+  tendinopathyMode,
 }: {
   exerciseName: string
   feedback: FeedbackEntry
   onChange: (f: Partial<FeedbackEntry>) => void
   onSave: () => void
   autoCloseIn: number
+  tendinopathyMode?: boolean
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end">
@@ -174,33 +208,74 @@ function FeedbackModal({
           })}
         </div>
 
-        {/* NRS Pain slider */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-medium">Pijn tijdens oefening</p>
-            <span className="text-sm font-bold" style={{ color: feedback.pain !== null && feedback.pain > 5 ? '#ef4444' : MBT_GREEN }}>
-              {feedback.pain !== null ? `${feedback.pain}/10` : 'Geen'}
-            </span>
-          </div>
-          <div className="flex gap-1">
-            {Array.from({ length: 11 }, (_, i) => (
-              <button
-                key={i}
-                onClick={() => onChange({ pain: feedback.pain === i ? null : i })}
-                className="flex-1 rounded-lg text-xs font-semibold transition-all active:scale-95"
+        {/* NRS Pain slider — tendinopathie modus: pijnDuring apart */}
+        {tendinopathyMode ? (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium">Pijn tijdens oefening (NRS)</p>
+              <span className="text-sm font-bold" style={{ color: feedback.painDuring !== null ? painColor(feedback.painDuring ?? 0, true) : '#71717a' }}>
+                {feedback.painDuring !== null ? `${feedback.painDuring}/10 — ${painLabel(feedback.painDuring ?? 0, true)}` : 'Geen'}
+              </span>
+            </div>
+            <div className="flex gap-1">
+              {Array.from({ length: 11 }, (_, i) => (
+                <button
+                  key={i}
+                  onClick={() => onChange({ painDuring: feedback.painDuring === i ? null : i, pain: feedback.painDuring === i ? null : i })}
+                  className="flex-1 rounded-lg text-xs font-semibold transition-all active:scale-95"
+                  style={{
+                    height: 44,
+                    background: feedback.painDuring === i ? painColor(i, true) : '#f4f4f5',
+                    color: feedback.painDuring === i ? 'white' : '#71717a',
+                  }}
+                >
+                  {i}
+                </button>
+              ))}
+            </div>
+            {(feedback.painDuring ?? 0) > 5 && (
+              <div
+                className="mt-2 rounded-xl px-3 py-2 text-xs font-medium"
                 style={{
-                  height: 44,
-                  background: feedback.pain === i
-                    ? i <= 3 ? MBT_GREEN : i <= 6 ? '#f97316' : '#ef4444'
-                    : '#f4f4f5',
-                  color: feedback.pain === i ? 'white' : '#71717a',
+                  background: (feedback.painDuring ?? 0) > 7 ? '#fef2f2' : '#fff7ed',
+                  color: (feedback.painDuring ?? 0) > 7 ? '#dc2626' : '#c2410c',
                 }}
               >
-                {i}
-              </button>
-            ))}
+                {(feedback.painDuring ?? 0) > 7
+                  ? '⛔ Pijn te hoog — stop en consult de therapeut.'
+                  : '⚠️ Verhoogde pijn. Noteer dit en monitor de volgende sessies.'}
+              </div>
+            )}
+            <p className="text-[10px] text-muted-foreground mt-1.5">
+              Je ontvangt morgenochtend een herinnering voor de 24u-check.
+            </p>
           </div>
-        </div>
+        ) : (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium">Pijn tijdens oefening</p>
+              <span className="text-sm font-bold" style={{ color: feedback.pain !== null ? painColor(feedback.pain ?? 0) : MBT_GREEN }}>
+                {feedback.pain !== null ? `${feedback.pain}/10` : 'Geen'}
+              </span>
+            </div>
+            <div className="flex gap-1">
+              {Array.from({ length: 11 }, (_, i) => (
+                <button
+                  key={i}
+                  onClick={() => onChange({ pain: feedback.pain === i ? null : i })}
+                  className="flex-1 rounded-lg text-xs font-semibold transition-all active:scale-95"
+                  style={{
+                    height: 44,
+                    background: feedback.pain === i ? painColor(i) : '#f4f4f5',
+                    color: feedback.pain === i ? 'white' : '#71717a',
+                  }}
+                >
+                  {i}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Optional weight / RPE */}
         <div className="grid grid-cols-2 gap-3">
@@ -263,6 +338,8 @@ function SessionSummary({
   elapsed,
   onFinish,
   isSaving,
+  tendinopathyMode,
+  sessionOneRmPRs,
 }: {
   exercises: SessionExercise[]
   feedback: Record<string, FeedbackEntry>
@@ -270,6 +347,8 @@ function SessionSummary({
   elapsed: number
   onFinish: (sessionSmiley: number | null, durationSeconds: number) => void
   isSaving: boolean
+  tendinopathyMode?: boolean
+  sessionOneRmPRs?: Record<string, number>
 }) {
   const [sessionSmiley, setSessionSmiley] = useState<number | null>(null)
   const [durationMinutes, setDurationMinutes] = useState(() => Math.max(1, Math.round(elapsed / 60)))
@@ -340,12 +419,31 @@ function SessionSummary({
           </Card>
         )}
 
+        {/* 1RM PRs */}
+        {sessionOneRmPRs && Object.keys(sessionOneRmPRs).length > 0 && (
+          <Card style={{ borderRadius: '14px', border: '2px solid #3ECF6A' }}>
+            <CardContent className="px-4 py-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-4 h-4" style={{ color: '#3ECF6A' }} />
+                <p className="font-bold text-sm" style={{ color: '#3ECF6A' }}>Nieuw(e) 1RM PR(s)! 🎉</p>
+              </div>
+              {exercises.filter(e => sessionOneRmPRs[e.uid]).map(e => (
+                <div key={e.uid} className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground truncate">{e.name}</span>
+                  <span className="font-bold" style={{ color: '#3ECF6A' }}>{sessionOneRmPRs[e.uid]} kg</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Exercise recap */}
         <Card style={{ borderRadius: '14px' }}>
           <CardContent className="px-4 py-3 space-y-3">
             <p className="font-semibold text-sm">Oefeningen</p>
             {exercises.map(e => {
               const fb = feedback[e.uid]
+              const pain = tendinopathyMode ? (fb?.painDuring ?? fb?.pain) : fb?.pain
               return (
                 <div key={e.uid} className="flex items-center gap-3">
                   <div
@@ -366,19 +464,15 @@ function SessionSummary({
                         }
                         return fb?.weight ? ` · ${fb.weight}kg` : ''
                       })()}
-                      {fb?.pain !== null && fb?.pain !== undefined ? ` · pijn ${fb.pain}/10` : ''}
+                      {pain !== null && pain !== undefined ? ` · pijn ${pain}/10` : ''}
                     </p>
                   </div>
-                  {fb?.pain !== null && fb?.pain !== undefined && (
+                  {pain !== null && pain !== undefined && (
                     <div
                       className="w-6 h-6 rounded-full text-[10px] font-bold flex items-center justify-center text-white shrink-0"
-                      style={{
-                        background: (fb.pain ?? 0) <= 3
-                          ? MBT_GREEN
-                          : (fb.pain ?? 0) <= 6 ? '#f97316' : '#ef4444',
-                      }}
+                      style={{ background: painColor(pain ?? 0, tendinopathyMode) }}
                     >
-                      {fb.pain}
+                      {pain}
                     </div>
                   )}
                 </div>
@@ -386,6 +480,21 @@ function SessionSummary({
             })}
           </CardContent>
         </Card>
+
+        {/* Tendinopathie follow-up reminder */}
+        {tendinopathyMode && (
+          <Card style={{ borderRadius: '14px', background: '#f0fdf4', border: '1.5px solid #3ECF6A33' }}>
+            <CardContent className="px-4 py-3 flex items-start gap-3">
+              <Bell className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#3ECF6A' }} />
+              <div>
+                <p className="text-sm font-semibold" style={{ color: '#166534' }}>24u follow-up herinnering</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Morgenochtend ontvang je een herinnering om de pijn 24u na de sessie en de ochtend stijfheid in te vullen.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Overall session smiley */}
         <Card style={{ borderRadius: '14px' }}>
@@ -461,6 +570,11 @@ export default function SessionPage() {
   const [setWeights, setSetWeights] = useState<Record<string, number[]>>({})
   const [showExtraFor, setShowExtraFor] = useState<string | null>(null)
   const [extraReps, setExtraReps] = useState<Record<string, number>>({})
+  // 1RM tracking: estimated 1RM per exercise (current session best) and PR tracker
+  const [sessionOneRm, setSessionOneRm] = useState<Record<string, number>>({})  // uid -> best estimated 1RM this session
+  const [sessionPRs, setSessionPRs] = useState<Record<string, number>>({})      // uid -> new PR value (if PR set)
+  // Mock previous best 1RM per exerciseId (would come from DB in production)
+  const MOCK_PREV_1RM: Record<string, number> = { '1': 88, '2': 0, '4': 65, '5': 0 }
 
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const feedbackTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -523,6 +637,23 @@ export default function SessionPage() {
     })
   }, [])
 
+  const updateOneRm = useCallback((uid: string, exerciseId: string, weights: number[], reps: number) => {
+    const best = Math.max(...weights.filter(w => w > 0), 0)
+    if (best <= 0) return
+    const estimated = calcEpley(best, reps)
+    setSessionOneRm(prev => {
+      const current = prev[uid] ?? 0
+      if (estimated <= current) return prev
+      // Check against mock previous best
+      const prevBest = MOCK_PREV_1RM[exerciseId] ?? 0
+      if (estimated > prevBest) {
+        setSessionPRs(p => ({ ...p, [uid]: estimated }))
+      }
+      return { ...prev, [uid]: estimated }
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const markSetDone = useCallback((uid: string, restSec: number, totalSets: number) => {
     setSetsCompleted(prev => {
       const next = (prev[uid] ?? 0) + 1
@@ -576,6 +707,7 @@ export default function SessionPage() {
   }, [])
 
   const handleFinish = useCallback(async (sessionSmiley: number | null, durationSeconds: number) => {
+    const tendinopathyMode = sessionData?.program?.tendinopathyMode ?? false
     const pains = Object.values(feedback).filter(f => f.pain !== null).map(f => f.pain!)
     const avgPain = pains.length > 0 ? Math.round(pains.reduce((a, b) => a + b, 0) / pains.length) : null
     const exertionLevel = sessionSmiley !== null ? Math.max(1, 11 - sessionSmiley * 2) : null
@@ -590,12 +722,23 @@ export default function SessionPage() {
       durationSeconds,
       painLevel: avgPain,
       exertionLevel,
-      exercises: exercises.map(e => ({
-        exerciseId: e.exerciseId,
-        setsCompleted: setsCompleted[e.uid] ?? 0,
-        repsCompleted: extraReps[e.uid] ?? e.reps,
-        painLevel: feedback[e.uid]?.pain ?? null,
-      })),
+      exercises: exercises.map(e => {
+        const weights = setWeights[e.uid] ?? []
+        const lastWeight = weights.filter(w => w > 0).slice(-1)[0] ?? null
+        const reps = extraReps[e.uid] ?? e.reps
+        const estimated1rm = (e.trackOneRepMax && lastWeight && lastWeight > 0)
+          ? calcEpley(lastWeight, reps)
+          : null
+        return {
+          exerciseId: e.exerciseId,
+          setsCompleted: setsCompleted[e.uid] ?? 0,
+          repsCompleted: reps,
+          painLevel: tendinopathyMode ? (feedback[e.uid]?.painDuring ?? null) : (feedback[e.uid]?.pain ?? null),
+          weight: lastWeight,
+          estimatedOneRepMax: estimated1rm,
+          painDuring: tendinopathyMode ? (feedback[e.uid]?.painDuring ?? null) : null,
+        }
+      }),
     })
 
     // Invalidate all patient queries so dashboard shows fresh data immediately
@@ -640,6 +783,8 @@ export default function SessionPage() {
         elapsed={elapsed}
         onFinish={handleFinish}
         isSaving={logSession.isPending}
+        tendinopathyMode={sessionData?.program?.tendinopathyMode}
+        sessionOneRmPRs={sessionPRs}
       />
     )
   }
@@ -789,7 +934,14 @@ export default function SessionPage() {
                         <button
                           className="w-7 h-7 rounded-lg flex items-center justify-center"
                           style={{ background: '#f4f4f5' }}
-                          onClick={() => adjustSetWeight(e.uid, i, -2.5)}
+                          onClick={() => {
+                            adjustSetWeight(e.uid, i, -2.5)
+                            if (e.trackOneRepMax) {
+                              const newWeights = [...(setWeights[e.uid] ?? [])]
+                              newWeights[i] = Math.max(0, Math.round(((newWeights[i] ?? 0) - 2.5) * 10) / 10)
+                              updateOneRm(e.uid, e.exerciseId, newWeights, extraReps[e.uid] ?? e.reps)
+                            }
+                          }}
                         >
                           <Minus className="w-3 h-3" />
                         </button>
@@ -797,7 +949,14 @@ export default function SessionPage() {
                         <button
                           className="w-7 h-7 rounded-lg flex items-center justify-center"
                           style={{ background: '#f4f4f5' }}
-                          onClick={() => adjustSetWeight(e.uid, i, 2.5)}
+                          onClick={() => {
+                            adjustSetWeight(e.uid, i, 2.5)
+                            if (e.trackOneRepMax) {
+                              const newWeights = [...(setWeights[e.uid] ?? [])]
+                              newWeights[i] = Math.round(((newWeights[i] ?? 0) + 2.5) * 10) / 10
+                              updateOneRm(e.uid, e.exerciseId, newWeights, extraReps[e.uid] ?? e.reps)
+                            }
+                          }}
                         >
                           <Plus className="w-3 h-3" />
                         </button>
@@ -807,6 +966,41 @@ export default function SessionPage() {
                 )
               })}
             </div>
+
+            {/* 1RM indicator */}
+            {e.trackOneRepMax && sets > 0 && (() => {
+              const weights = setWeights[e.uid] ?? []
+              const bestWeight = Math.max(...weights.filter(w => w > 0), 0)
+              const reps = extraReps[e.uid] ?? e.reps
+              const est1rm = bestWeight > 0 ? calcEpley(bestWeight, reps) : null
+              const prevBest = MOCK_PREV_1RM[e.exerciseId] ?? 0
+              const isPR = est1rm !== null && est1rm > prevBest && prevBest > 0
+              return est1rm ? (
+                <div
+                  className="flex items-center gap-2 rounded-2xl px-4 py-2.5"
+                  style={{
+                    background: isPR ? '#3ECF6A22' : '#f4f4f5',
+                    border: isPR ? '1.5px solid #3ECF6A' : '1.5px solid transparent',
+                  }}
+                >
+                  <TrendingUp className="w-4 h-4 shrink-0" style={{ color: isPR ? '#3ECF6A' : '#a1a1aa' }} />
+                  <div className="flex-1">
+                    <span className="text-xs text-muted-foreground">Geschatte 1RM</span>
+                    <span className="text-sm font-bold ml-2" style={{ color: isPR ? '#3ECF6A' : '#1a1a1a' }}>
+                      {est1rm} kg
+                    </span>
+                  </div>
+                  {isPR && (
+                    <span
+                      className="text-xs font-bold px-2 py-0.5 rounded-full text-white animate-bounce"
+                      style={{ background: '#3ECF6A' }}
+                    >
+                      NIEUW PR! 🎉
+                    </span>
+                  )}
+                </div>
+              ) : null
+            })()}
 
             {/* Extra parameters collapsible */}
             <div>
@@ -1018,10 +1212,11 @@ export default function SessionPage() {
       {showFeedbackFor && (
         <FeedbackModal
           exerciseName={exercises.find(e => e.uid === showFeedbackFor)?.name ?? ''}
-          feedback={feedback[showFeedbackFor] ?? { smiley: null, pain: null, weight: null, rpe: null }}
+          feedback={feedback[showFeedbackFor] ?? { smiley: null, pain: null, weight: null, rpe: null, painDuring: null }}
           onChange={partial => handleFeedbackChange(showFeedbackFor, partial)}
           onSave={() => saveFeedback(showFeedbackFor)}
           autoCloseIn={feedbackTimer}
+          tendinopathyMode={sessionData?.program?.tendinopathyMode}
         />
       )}
     </div>
