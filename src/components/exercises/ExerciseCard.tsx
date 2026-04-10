@@ -28,6 +28,8 @@ interface ExerciseCardProps {
     tags?: string[]
   }
   onAddToCollection?: (id: string) => void
+  /** When provided, clicking the card calls this instead of navigating to edit */
+  onPreview?: () => void
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -40,7 +42,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 const DIFFICULTY_DOTS = { BEGINNER: 1, INTERMEDIATE: 2, ADVANCED: 3 }
 
-export function ExerciseCard({ exercise, onAddToCollection }: ExerciseCardProps) {
+export function ExerciseCard({ exercise, onAddToCollection, onPreview }: ExerciseCardProps) {
   const category = EXERCISE_CATEGORIES.find(c => c.value === exercise.category)
   const difficulty = DIFFICULTIES.find(d => d.value === exercise.difficulty)
   const color = CATEGORY_COLORS[exercise.category] ?? '#4ECDC4'
@@ -48,7 +50,6 @@ export function ExerciseCard({ exercise, onAddToCollection }: ExerciseCardProps)
 
   const hasVideo = exercise.mediaType === 'YOUTUBE' || exercise.mediaType === 'VIMEO'
 
-  // Extract YouTube thumbnail from videoUrl
   function getYouTubeThumbnail(url: string): string | null {
     const match = url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]+)/)
     return match ? `https://img.youtube.com/vi/${match[1]}/mqdefault.jpg` : null
@@ -57,8 +58,7 @@ export function ExerciseCard({ exercise, onAddToCollection }: ExerciseCardProps)
   const thumbnail = exercise.thumbnailUrl
     || (exercise.mediaType === 'YOUTUBE' && exercise.videoUrl ? getYouTubeThumbnail(exercise.videoUrl) : null)
 
-  return (
-    <Link href={`/therapist/exercises/${exercise.id}/edit`} className="block">
+  const cardInner = (
     <Card className="group overflow-hidden transition-shadow hover:shadow-md cursor-pointer" style={{ borderRadius: '12px' }}>
       {/* Thumbnail / placeholder */}
       <div
@@ -82,6 +82,18 @@ export function ExerciseCard({ exercise, onAddToCollection }: ExerciseCardProps)
             ) : (
               <Play className="w-6 h-6" style={{ color }} />
             )}
+          </div>
+        )}
+
+        {/* Play overlay — shown on hover when onPreview is set */}
+        {onPreview && hasVideo && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-all">
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              style={{ background: '#4ECDC4' }}
+            >
+              <Play className="w-5 h-5 text-white ml-0.5" />
+            </div>
           </div>
         )}
 
@@ -127,6 +139,12 @@ export function ExerciseCard({ exercise, onAddToCollection }: ExerciseCardProps)
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {onPreview && (
+                <DropdownMenuItem onClick={e => { e.preventDefault(); onPreview() }}>
+                  <Play className="w-4 h-4 mr-2" />
+                  Video bekijken
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem asChild>
                 <Link href={`/therapist/exercises/${exercise.id}/edit`} className="flex items-center gap-2">
                   <Edit className="w-4 h-4" />
@@ -162,6 +180,19 @@ export function ExerciseCard({ exercise, onAddToCollection }: ExerciseCardProps)
         <p className="text-xs text-muted-foreground mt-2">{difficulty?.label}</p>
       </CardContent>
     </Card>
+  )
+
+  if (onPreview) {
+    return (
+      <button className="block w-full text-left" onClick={onPreview}>
+        {cardInner}
+      </button>
+    )
+  }
+
+  return (
+    <Link href={`/therapist/exercises/${exercise.id}/edit`} className="block">
+      {cardInner}
     </Link>
   )
 }

@@ -6,11 +6,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { ExerciseCard } from '@/components/exercises/ExerciseCard'
+import { ExerciseVideoModal, type ExerciseForModal } from '@/components/exercises/ExerciseVideoModal'
 import {
   EXERCISE_CATEGORIES,
   BODY_REGIONS,
   DIFFICULTIES,
-  COLLECTION_COLORS,
 } from '@/lib/exercise-constants'
 import { trpc } from '@/lib/trpc/client'
 import { cn } from '@/lib/utils'
@@ -23,6 +23,8 @@ import {
   FolderOpen,
   ChevronRight,
   X,
+  Play,
+  Edit,
 } from 'lucide-react'
 
 // Mock collections
@@ -32,6 +34,20 @@ const MOCK_COLLECTIONS = [
   { id: 'c3', name: 'Warming-up basis', color: '#f59e0b', count: 4 },
 ]
 
+type ExerciseItem = {
+  id: string
+  name: string
+  category: string
+  bodyRegion: string[]
+  difficulty: string
+  mediaType?: string | null
+  videoUrl?: string | null
+  thumbnailUrl?: string | null
+  description?: string | null
+  tags?: string[]
+  muscleLoads?: { muscle: string; load: number }[]
+}
+
 export default function ExercisesPage() {
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [query, setQuery] = useState('')
@@ -40,15 +56,16 @@ export default function ExercisesPage() {
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null)
   const [activeCollection, setActiveCollection] = useState<string | null>(null)
   const [showFilters, setShowFilters] = useState(true)
+  const [modalExercise, setModalExercise] = useState<ExerciseForModal | null>(null)
 
   const { data: exercises = [], isLoading } = trpc.exercises.list.useQuery(undefined, {
     staleTime: 30_000,
   })
 
   const filtered = useMemo(() => {
-    return exercises.filter(ex => {
+    return exercises.filter((ex: ExerciseItem) => {
       if (query && !ex.name.toLowerCase().includes(query.toLowerCase()) &&
-          !ex.tags.some((t: string) => t.includes(query.toLowerCase()))) return false
+          !(ex.tags ?? []).some((t: string) => t.includes(query.toLowerCase()))) return false
       if (selectedCategory && ex.category !== selectedCategory) return false
       if (selectedRegion && !(ex.bodyRegion as string[]).includes(selectedRegion)) return false
       if (selectedDifficulty && ex.difficulty !== selectedDifficulty) return false
@@ -62,6 +79,23 @@ export default function ExercisesPage() {
     setSelectedCategory(null)
     setSelectedRegion(null)
     setSelectedDifficulty(null)
+  }
+
+  function openPreview(ex: ExerciseItem) {
+    const muscleLoads = ex.muscleLoads
+      ? Object.fromEntries(ex.muscleLoads.map(ml => [ml.muscle, ml.load]))
+      : undefined
+
+    setModalExercise({
+      id: ex.id,
+      name: ex.name,
+      description: ex.description,
+      category: ex.category,
+      difficulty: ex.difficulty,
+      videoUrl: ex.videoUrl,
+      muscleLoads,
+      editHref: `/therapist/exercises/${ex.id}/edit`,
+    })
   }
 
   return (
@@ -152,6 +186,8 @@ export default function ExercisesPage() {
             <p className="text-muted-foreground text-sm mt-0.5">
               {filtered.length} oefening{filtered.length !== 1 ? 'en' : ''}
               {activeCollection && ` in collectie`}
+              {' · '}
+              <span className="text-xs">Klik op een kaart om de video te bekijken</span>
             </p>
           </div>
           <Link href="/therapist/exercises/new">
@@ -309,40 +345,64 @@ export default function ExercisesPage() {
           </div>
         ) : view === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map(ex => (
-              <ExerciseCard key={ex.id} exercise={ex} />
+            {filtered.map((ex: ExerciseItem) => (
+              <ExerciseCard
+                key={ex.id}
+                exercise={ex}
+                onPreview={() => openPreview(ex)}
+              />
             ))}
           </div>
         ) : (
           <div className="space-y-2">
-            {filtered.map(ex => (
-              <Link key={ex.id} href={`/therapist/exercises/${ex.id}/edit`}>
-                <div className="flex items-center gap-4 p-4 rounded-xl border hover:border-zinc-300 hover:bg-zinc-50 transition-colors cursor-pointer">
-                  <div
-                    className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-white font-bold text-sm"
-                    style={{ background: '#4ECDC4' }}
-                  >
-                    {ex.name[0]}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm">{ex.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{ex.description}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Badge variant="secondary" className="text-xs">
-                      {EXERCISE_CATEGORIES.find(c => c.value === ex.category)?.label}
-                    </Badge>
-                    <Badge variant="outline" className="text-xs">
-                      {DIFFICULTIES.find(d => d.value === ex.difficulty)?.label}
-                    </Badge>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            {filtered.map((ex: ExerciseItem) => (
+              <div
+                key={ex.id}
+                className="flex items-center gap-4 p-4 rounded-xl border hover:border-zinc-300 hover:bg-zinc-50 transition-colors cursor-pointer"
+                onClick={() => openPreview(ex)}
+              >
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-white font-bold text-sm"
+                  style={{ background: '#4ECDC4' }}
+                >
+                  {ex.name[0]}
                 </div>
-              </Link>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">{ex.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{ex.description}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge variant="secondary" className="text-xs">
+                    {EXERCISE_CATEGORIES.find(c => c.value === ex.category)?.label}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {DIFFICULTIES.find(d => d.value === ex.difficulty)?.label}
+                  </Badge>
+                  {ex.videoUrl && (
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: '#4ECDC420' }}>
+                      <Play className="w-3.5 h-3.5" style={{ color: '#4ECDC4' }} />
+                    </div>
+                  )}
+                </div>
+                <Link
+                  href={`/therapist/exercises/${ex.id}/edit`}
+                  onClick={e => e.stopPropagation()}
+                  className="p-1.5 rounded-lg hover:bg-zinc-200 transition-colors shrink-0"
+                >
+                  <Edit className="w-4 h-4 text-zinc-500" />
+                </Link>
+              </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Video preview modal */}
+      <ExerciseVideoModal
+        open={!!modalExercise}
+        onClose={() => setModalExercise(null)}
+        exercise={modalExercise}
+      />
     </div>
   )
 }

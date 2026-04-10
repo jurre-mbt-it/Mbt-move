@@ -1,9 +1,10 @@
 'use client'
 
-import { use } from 'react'
+import { use, useState } from 'react'
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
-import { ChevronLeft, Moon, Dumbbell } from 'lucide-react'
+import { ExerciseVideoModal, type ExerciseForModal } from '@/components/exercises/ExerciseVideoModal'
+import { ChevronLeft, Moon, Dumbbell, Play } from 'lucide-react'
 
 const DAY_LABELS = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
 
@@ -20,6 +21,8 @@ export default function ScheduleDayPage({ params }: Props) {
   const { dayIndex } = use(params)
   const dayNum = parseInt(dayIndex, 10)
   const { data: schedule, isLoading } = trpc.weekSchedules.mySchedule.useQuery(undefined, { staleTime: 60_000 })
+
+  const [modalExercise, setModalExercise] = useState<ExerciseForModal | null>(null)
 
   if (isLoading) {
     return (
@@ -67,7 +70,19 @@ export default function ScheduleDayPage({ params }: Props) {
             {(day.program.exercises ?? []).map((pe, idx) => {
               const color = CATEGORY_COLORS[pe.exercise.category] ?? '#4ECDC4'
               return (
-                <div key={pe.id} className="flex items-center gap-3 p-3 rounded-xl border bg-white">
+                <button
+                  key={pe.id}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl border bg-white text-left active:scale-[0.98] transition-all"
+                  onClick={() => setModalExercise({
+                    id: pe.exercise.id,
+                    name: pe.exercise.name,
+                    category: pe.exercise.category,
+                    videoUrl: pe.exercise.videoUrl,
+                    sets: pe.sets,
+                    reps: pe.reps,
+                    repUnit: pe.repUnit,
+                  })}
+                >
                   <div
                     className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold text-white"
                     style={{ background: color }}
@@ -80,12 +95,27 @@ export default function ScheduleDayPage({ params }: Props) {
                       {pe.sets} sets × {pe.reps} {pe.repUnit} · {pe.restTime}s rust
                     </p>
                   </div>
-                </div>
+                  {pe.exercise.videoUrl && (
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                      style={{ background: `${color}20` }}
+                    >
+                      <Play className="w-3.5 h-3.5" style={{ color }} />
+                    </div>
+                  )}
+                </button>
               )
             })}
           </div>
         </>
       )}
+
+      {/* Video modal */}
+      <ExerciseVideoModal
+        open={!!modalExercise}
+        onClose={() => setModalExercise(null)}
+        exercise={modalExercise}
+      />
     </div>
   )
 }

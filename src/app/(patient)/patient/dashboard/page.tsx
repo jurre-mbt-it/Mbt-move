@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ConsentPopup } from '@/components/research/ConsentPopup'
+import { DpaPopup } from '@/components/dpa/DpaPopup'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -54,6 +55,7 @@ export default function PatientDashboard() {
 
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
+      <DpaPopup />
       <ConsentPopup />
       {/* Header */}
       <div className="px-4 pt-12 pb-8" style={{ background: '#1A3A3A' }}>

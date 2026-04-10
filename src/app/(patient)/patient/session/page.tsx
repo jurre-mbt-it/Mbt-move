@@ -1220,6 +1220,7 @@ export default function SessionPage() {
           tendinopathyMode={sessionData?.program?.tendinopathyMode}
         />
       )}
+
     </div>
   )
 }

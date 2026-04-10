@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
-import { ChevronRight, ShieldCheck, User } from 'lucide-react'
+import { ChevronRight, ShieldCheck, User, FileText } from 'lucide-react'
 
 const SETTINGS_ITEMS = [
   {
@@ -12,6 +12,14 @@ const SETTINGS_ITEMS = [
     description: 'Beheer je toestemming voor geanonimiseerde dataverzameling',
     iconBg: '#f0fdfa',
     iconColor: '#4ECDC4',
+  },
+  {
+    href: '/patient/legal/dpa',
+    icon: FileText,
+    label: 'Verwerkingsovereenkomst',
+    description: 'Bekijk hoe wij uw persoonsgegevens verwerken (AVG/DPA)',
+    iconBg: '#eff6ff',
+    iconColor: '#3b82f6',
   },
   {
     href: '/patient/profile',

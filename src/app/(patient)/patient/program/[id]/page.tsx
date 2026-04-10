@@ -7,11 +7,31 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { trpc } from '@/lib/trpc/client'
 import { DAY_LABELS } from '@/lib/program-constants'
+import { ExerciseVideoModal, type ExerciseForModal } from '@/components/exercises/ExerciseVideoModal'
 import { ChevronLeft, Play, CheckCircle2, Lock } from 'lucide-react'
+
+// Coaching cues by exerciseId (static — based on demo exercises)
+const COACHING_CUES: Record<string, string[]> = {
+  '1': ['Houd de romp recht, borst omhoog', 'Knie over de tweede teen', 'Druk door de hiel van het voorste been'],
+  '2': ['Gecontroleerde val — niet laten crashen', 'Core strak tijdens de hele beweging', 'Krachtige push terug naar startpositie'],
+  '3': ['Beide zitknobbels in contact met de grond', 'Roteer vanuit de heup, niet de romp'],
+  '4': ['Staand been licht gebogen', 'Hinge vanuit de heup — niet buigen vanuit de rug', 'Houd het zwevende been in lijn met de romp'],
+  '5': ['Soft landing — knieën veren mee', 'Land op het midden van de voet', 'Spring omhoog en iets naar voren'],
+  '6': ['Elleboog gefixeerd tegen het lichaam', 'Langzame gecontroleerde beweging'],
+}
+
+const VARIANTS: Record<string, { easier?: string; harder?: string }> = {
+  '1': { easier: 'Goblet Squat', harder: 'Bulgarian Split Squat + kettlebell' },
+  '2': { easier: 'Lying Leg Curl machine', harder: 'Nordic met weerstandsband' },
+  '4': { easier: 'Romanian Deadlift (bilateral)', harder: 'Single Leg DL + kettlebell' },
+  '5': { easier: 'Step-up op box', harder: 'Box Jump + squat hold landing' },
+  '6': { easier: 'Interne rotatie met band', harder: 'Externe rotatie met dumbbell' },
+}
 
 export default function PatientProgramPage() {
   const { data: program, isLoading } = trpc.patient.getActiveProgram.useQuery()
   const [activeWeek, setActiveWeek] = useState(1)
+  const [modalExercise, setModalExercise] = useState<ExerciseForModal | null>(null)
 
   if (isLoading) {
     return (
@@ -39,6 +59,23 @@ export default function PatientProgramPage() {
 
   const isCurrentWeek = activeWeek === program.currentWeek
   const isFutureWeek = activeWeek > program.currentWeek
+
+  function openExerciseModal(e: typeof program.exercises[0]) {
+    setModalExercise({
+      id: e.exerciseId,
+      name: e.name,
+      category: e.category,
+      difficulty: e.difficulty,
+      videoUrl: e.videoUrl,
+      muscleLoads: e.muscleLoads,
+      sets: e.sets,
+      reps: e.reps,
+      repUnit: e.repUnit,
+      coachingCues: COACHING_CUES[e.exerciseId] ?? [],
+      easierVariant: VARIANTS[e.exerciseId]?.easier ?? null,
+      harderVariant: VARIANTS[e.exerciseId]?.harder ?? null,
+    })
+  }
 
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
@@ -123,13 +160,21 @@ export default function PatientProgramPage() {
                   ) : null}
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {dayExercises.map(e => (
-                    <div key={e.uid} className="flex items-center gap-2">
+                    <button
+                      key={e.uid}
+                      className="w-full flex items-center gap-2 text-left rounded-lg px-2 py-1.5 hover:bg-zinc-50 active:scale-[0.98] transition-all group"
+                      onClick={() => openExerciseModal(e)}
+                      disabled={isFutureWeek}
+                    >
                       <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: isPast ? '#4ECDC4' : '#d4d4d8' }} />
                       <span className="text-sm flex-1 truncate">{e.name}</span>
                       <span className="text-xs text-muted-foreground shrink-0">{e.sets}×{e.reps}</span>
-                    </div>
+                      {e.videoUrl && (
+                        <Play className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: '#4ECDC4' }} />
+                      )}
+                    </button>
                   ))}
                 </div>
               </CardContent>
@@ -137,6 +182,13 @@ export default function PatientProgramPage() {
           )
         })}
       </div>
+
+      {/* Video modal */}
+      <ExerciseVideoModal
+        open={!!modalExercise}
+        onClose={() => setModalExercise(null)}
+        exercise={modalExercise}
+      />
     </div>
   )
 }
