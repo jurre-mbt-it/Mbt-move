@@ -342,6 +342,121 @@ export const MESSAGES: MockMessage[] = [
   { id: 'm6-3', patientId: 'pat6', from: 'patient', content: 'Oke goed. Geen roodheid. Gaat al wat beter nu. Bedankt!', date: '2026-04-04T14:00:00', read: true },
 ]
 
+// ─── Cardio log mock data ─────────────────────────────────────────────────────
+
+export type MockCardioLog = {
+  id: string
+  patientId: string
+  date: string           // ISO date
+  activity: string       // CardioActivity enum value
+  protocol: string       // CardioProtocol enum value
+  durationSec: number
+  distanceM?: number
+  avgHeartRate?: number
+  maxHeartRate?: number
+  zone?: number
+  calories?: number
+  rpe?: number
+  painLevel?: number
+  notes?: string
+}
+
+export const CARDIO_LOGS: MockCardioLog[] = [
+  // Jan de Vries (pat1) — knie, walk-run protocol
+  { id: 'c1-1', patientId: 'pat1', date: '2026-04-05', activity: 'RUNNING', protocol: 'WALK_RUN', durationSec: 1080, distanceM: 2200, avgHeartRate: 138, zone: 2, rpe: 4, painLevel: 2, notes: 'Week 3 dag 3 walk-run. Knie goed.' },
+  { id: 'c1-2', patientId: 'pat1', date: '2026-04-03', activity: 'RUNNING', protocol: 'WALK_RUN', durationSec: 1080, distanceM: 2100, avgHeartRate: 140, zone: 2, rpe: 5, painLevel: 3 },
+  { id: 'c1-3', patientId: 'pat1', date: '2026-04-01', activity: 'RUNNING', protocol: 'WALK_RUN', durationSec: 1080, distanceM: 2050, avgHeartRate: 135, zone: 2, rpe: 4, painLevel: 2 },
+  { id: 'c1-4', patientId: 'pat1', date: '2026-03-27', activity: 'RUNNING', protocol: 'WALK_RUN', durationSec: 900, distanceM: 1800, avgHeartRate: 132, zone: 2, rpe: 4, painLevel: 3 },
+  { id: 'c1-5', patientId: 'pat1', date: '2026-03-25', activity: 'RUNNING', protocol: 'WALK_RUN', durationSec: 900, distanceM: 1750, avgHeartRate: 136, zone: 2, rpe: 5, painLevel: 3 },
+  { id: 'c1-6', patientId: 'pat1', date: '2026-03-23', activity: 'RUNNING', protocol: 'WALK_RUN', durationSec: 900, distanceM: 1700, avgHeartRate: 130, zone: 2, rpe: 4, painLevel: 4 },
+  { id: 'c1-7', patientId: 'pat1', date: '2026-03-18', activity: 'WALKING', protocol: 'ZONE_TRAINING', durationSec: 1800, distanceM: 2500, avgHeartRate: 110, zone: 1, rpe: 2, painLevel: 3, notes: 'Opstartweek — alleen wandelen' },
+
+  // Sophie Dekker (pat4) — achilles, zone 2 fiets
+  { id: 'c4-1', patientId: 'pat4', date: '2026-03-14', activity: 'CYCLING', protocol: 'ZONE_TRAINING', durationSec: 2700, distanceM: 18000, avgHeartRate: 145, zone: 2, rpe: 4, painLevel: 1, notes: 'Crosstraining tijdens achillesrevalidatie' },
+  { id: 'c4-2', patientId: 'pat4', date: '2026-03-10', activity: 'CYCLING', protocol: 'ZONE_TRAINING', durationSec: 2700, distanceM: 17500, avgHeartRate: 142, zone: 2, rpe: 4, painLevel: 1 },
+  { id: 'c4-3', patientId: 'pat4', date: '2026-03-05', activity: 'CYCLING', protocol: 'STEADY_STATE', durationSec: 2400, distanceM: 15000, avgHeartRate: 138, zone: 2, rpe: 4, painLevel: 2 },
+  { id: 'c4-4', patientId: 'pat4', date: '2026-03-01', activity: 'CROSSTRAINER', protocol: 'STEADY_STATE', durationSec: 1800, avgHeartRate: 130, zone: 2, rpe: 3, painLevel: 2, notes: 'Geen impact op achilles' },
+
+  // Lars Pietersen (pat6) — enkel, zwemmen als alternatief
+  { id: 'c6-1', patientId: 'pat6', date: '2026-04-06', activity: 'SWIMMING', protocol: 'STEADY_STATE', durationSec: 1800, distanceM: 1200, avgHeartRate: 135, zone: 2, rpe: 4, painLevel: 4, notes: 'Enkel rust — zwemmen als non-impact alternatief' },
+  { id: 'c6-2', patientId: 'pat6', date: '2026-04-03', activity: 'SWIMMING', protocol: 'STEADY_STATE', durationSec: 1800, distanceM: 1100, avgHeartRate: 132, zone: 2, rpe: 3, painLevel: 5 },
+]
+
+export function getCardioLogsByPatient(patientId: string): MockCardioLog[] {
+  return CARDIO_LOGS
+    .filter(c => c.patientId === patientId)
+    .sort((a, b) => b.date.localeCompare(a.date))
+}
+
+// ─── Mock cardio programs ─────────────────────────────────────────────────────
+
+export type MockCardioProgram = {
+  id: string
+  patientId?: string
+  name: string
+  description: string
+  type: 'CARDIO'
+  activity: string
+  protocol: string
+  weeks: number
+  sessionsPerWeek: number
+  targetDurationMin: number
+  targetDistanceKm?: number
+  targetZone?: number
+  isWalkRun: boolean
+  walkRunTemplateId?: string
+  status: 'ACTIVE' | 'DRAFT' | 'COMPLETED'
+}
+
+export const CARDIO_PROGRAMS: MockCardioProgram[] = [
+  {
+    id: 'cp1',
+    patientId: 'pat1',
+    name: 'Walk-Run Terugkeer Protocol — Knie',
+    description: 'Geleidelijke terugkeer naar hardlopen na meniscusoperatie. 10 weken progressief walk-run schema.',
+    type: 'CARDIO',
+    activity: 'RUNNING',
+    protocol: 'WALK_RUN',
+    weeks: 10,
+    sessionsPerWeek: 3,
+    targetDurationMin: 30,
+    targetDistanceKm: 5,
+    targetZone: 2,
+    isWalkRun: true,
+    walkRunTemplateId: 'wr-knie',
+    status: 'ACTIVE',
+  },
+  {
+    id: 'cp2',
+    patientId: 'pat4',
+    name: 'Cardio Crosstraining — Achilles',
+    description: 'Non-impact cardio conditionering tijdens achillesrevalidatie. Fiets + crosstrainer.',
+    type: 'CARDIO',
+    activity: 'CYCLING',
+    protocol: 'ZONE_TRAINING',
+    weeks: 6,
+    sessionsPerWeek: 3,
+    targetDurationMin: 45,
+    targetZone: 2,
+    isWalkRun: false,
+    status: 'COMPLETED',
+  },
+  {
+    id: 'cp3',
+    patientId: 'pat6',
+    name: 'Zwem Conditie — Enkel Herstel',
+    description: 'Cardiovasculaire basis behouden tijdens enkelherstel via zwemmen.',
+    type: 'CARDIO',
+    activity: 'SWIMMING',
+    protocol: 'STEADY_STATE',
+    weeks: 4,
+    sessionsPerWeek: 2,
+    targetDurationMin: 30,
+    isWalkRun: false,
+    status: 'ACTIVE',
+  },
+]
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 export function getPatientById(id: string): PatientProfile | undefined {
