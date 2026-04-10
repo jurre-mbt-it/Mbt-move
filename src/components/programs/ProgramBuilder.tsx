@@ -95,6 +95,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
     currentDay: 1,
     isTemplate: initialState?.isTemplate ?? false,
     tendinopathyMode: (initialState as Partial<ProgramState> | undefined)?.tendinopathyMode ?? false,
+    trackOneRepMax: (initialState as Partial<ProgramState> | undefined)?.trackOneRepMax ?? false,
     exercises: initialState?.exercises ?? [],
   }))
   const [exercises, setExercises] = useState<BuilderExercise[]>(
@@ -543,6 +544,36 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
               style={{ background: '#3ECF6A22', color: '#3ECF6A' }}
             >
               Actief voor alle oefeningen
+            </span>
+          )}
+
+          <div className="w-px h-4 bg-zinc-200 mx-1 hidden sm:block" />
+
+          {/* 1RM toggle */}
+          <button
+            type="button"
+            onClick={() => setProgram(p => ({ ...p, trackOneRepMax: !p.trackOneRepMax }))}
+            className="flex items-center gap-2 text-xs font-medium"
+          >
+            <div
+              className="w-8 h-4 rounded-full relative transition-colors flex items-center"
+              style={{ background: program.trackOneRepMax ? '#3ECF6A' : '#d4d4d8' }}
+            >
+              <div
+                className="w-3 h-3 bg-white rounded-full absolute shadow transition-transform"
+                style={{ transform: program.trackOneRepMax ? 'translateX(18px)' : 'translateX(2px)' }}
+              />
+            </div>
+            <span className={program.trackOneRepMax ? 'text-[#3ECF6A] font-semibold' : 'text-muted-foreground'}>
+              1RM tracking
+            </span>
+          </button>
+          {program.trackOneRepMax && (
+            <span
+              className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+              style={{ background: '#3ECF6A22', color: '#3ECF6A' }}
+            >
+              Epley per sessie
             </span>
           )}
         </div>

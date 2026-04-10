@@ -69,4 +69,5 @@ export interface ProgramState {
   exercises: BuilderExercise[]
   isTemplate: boolean
   tendinopathyMode: boolean
+  trackOneRepMax: boolean
 }

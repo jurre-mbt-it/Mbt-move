@@ -726,7 +726,8 @@ export default function SessionPage() {
         const weights = setWeights[e.uid] ?? []
         const lastWeight = weights.filter(w => w > 0).slice(-1)[0] ?? null
         const reps = extraReps[e.uid] ?? e.reps
-        const estimated1rm = (e.trackOneRepMax && lastWeight && lastWeight > 0)
+        const programTrack1rm = sessionData?.program?.trackOneRepMax ?? false
+        const estimated1rm = (programTrack1rm && lastWeight && lastWeight > 0)
           ? calcEpley(lastWeight, reps)
           : null
         return {
@@ -936,7 +937,7 @@ export default function SessionPage() {
                           style={{ background: '#f4f4f5' }}
                           onClick={() => {
                             adjustSetWeight(e.uid, i, -2.5)
-                            if (e.trackOneRepMax) {
+                            if (sessionData?.program?.trackOneRepMax) {
                               const newWeights = [...(setWeights[e.uid] ?? [])]
                               newWeights[i] = Math.max(0, Math.round(((newWeights[i] ?? 0) - 2.5) * 10) / 10)
                               updateOneRm(e.uid, e.exerciseId, newWeights, extraReps[e.uid] ?? e.reps)
@@ -951,7 +952,7 @@ export default function SessionPage() {
                           style={{ background: '#f4f4f5' }}
                           onClick={() => {
                             adjustSetWeight(e.uid, i, 2.5)
-                            if (e.trackOneRepMax) {
+                            if (sessionData?.program?.trackOneRepMax) {
                               const newWeights = [...(setWeights[e.uid] ?? [])]
                               newWeights[i] = Math.round(((newWeights[i] ?? 0) + 2.5) * 10) / 10
                               updateOneRm(e.uid, e.exerciseId, newWeights, extraReps[e.uid] ?? e.reps)
@@ -968,7 +969,7 @@ export default function SessionPage() {
             </div>
 
             {/* 1RM indicator */}
-            {e.trackOneRepMax && sets > 0 && (() => {
+            {(sessionData?.program?.trackOneRepMax) && sets > 0 && (() => {
               const weights = setWeights[e.uid] ?? []
               const bestWeight = Math.max(...weights.filter(w => w > 0), 0)
               const reps = extraReps[e.uid] ?? e.reps

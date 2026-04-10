@@ -170,6 +170,8 @@ export const patientRouter = createTRPCRouter({
         weeks: program.weeks,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         tendinopathyMode: (program as any).tendinopathyMode ?? false,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        trackOneRepMax: (program as any).trackOneRepMax ?? false,
       },
       exercises: todayExercises,
     }

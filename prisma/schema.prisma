@@ -236,6 +236,7 @@ model Program {
   endDate      DateTime?
 
   tendinopathyMode Boolean       @default(false)
+  trackOneRepMax   Boolean       @default(false)
 
   creator   User    @relation("ProgramCreator", fields: [creatorId], references: [id])
   creatorId String
