@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { trpc } from '@/lib/trpc/client'
-import { Dumbbell, Moon, Play } from 'lucide-react'
+import { Dumbbell, Moon, Play, Plus } from 'lucide-react'
 
 const DAY_SHORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
@@ -58,15 +58,26 @@ export default function AthleteSchedulePage() {
                       isSelected
                         ? { background: '#4ECDC4', color: 'white' }
                         : isToday
-                          ? { background: '#f0fdfa', color: '#1A3A3A' }
+                          ? { background: '#f0fdfa', color: '#1A3A3A', fontWeight: 700 }
                           : {}
                     }
                   >
                     <span className="text-xs font-medium">{label}</span>
-                    {hasExercises && (
+                    {isToday && !isSelected && (
+                      <span
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ background: '#4ECDC4' }}
+                      />
+                    )}
+                    {hasExercises && !isToday && (
                       <span
                         className="w-1.5 h-1.5 rounded-full"
                         style={{ background: isSelected ? 'white' : '#4ECDC4' }}
+                      />
+                    )}
+                    {isToday && isSelected && (
+                      <span
+                        className="w-1.5 h-1.5 rounded-full bg-white"
                       />
                     )}
                   </button>
@@ -78,7 +89,14 @@ export default function AthleteSchedulePage() {
 
         {/* Day content */}
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold">{DAY_NAMES[selectedDay - 1]}</h2>
+          <h2 className="text-base font-bold">
+            {DAY_NAMES[selectedDay - 1]}
+            {selectedDay === todayDayNum && (
+              <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: '#4ECDC420', color: '#4ECDC4' }}>
+                Vandaag
+              </span>
+            )}
+          </h2>
           {!isRestDay && selectedDay === todayDayNum && (
             <Link href="/athlete/session">
               <Button size="sm" className="gap-1.5 text-xs font-semibold" style={{ background: '#4ECDC4' }}>
@@ -91,13 +109,20 @@ export default function AthleteSchedulePage() {
         {isLoading ? (
           <p className="text-sm text-muted-foreground text-center py-8">Laden…</p>
         ) : isRestDay ? (
-          <Card style={{ borderRadius: '14px' }}>
-            <CardContent className="py-8 flex flex-col items-center gap-2">
-              <Moon className="w-8 h-8 text-zinc-300" />
-              <p className="text-sm font-medium text-muted-foreground">Rustdag</p>
-              <p className="text-xs text-muted-foreground">Herstel is net zo belangrijk als training</p>
-            </CardContent>
-          </Card>
+          <>
+            <Card style={{ borderRadius: '14px' }}>
+              <CardContent className="py-8 flex flex-col items-center gap-2">
+                <Moon className="w-8 h-8 text-zinc-300" />
+                <p className="text-sm font-medium text-muted-foreground">Rustdag</p>
+                <p className="text-xs text-muted-foreground">Herstel is net zo belangrijk als training</p>
+              </CardContent>
+            </Card>
+            <Link href="/athlete/workouts/new">
+              <Button variant="outline" size="sm" className="mt-2 gap-1.5">
+                <Plus className="w-3.5 h-3.5" /> Workout toevoegen
+              </Button>
+            </Link>
+          </>
         ) : (
           <div className="space-y-2">
             {exercises.map((e, i) => (
@@ -119,6 +144,11 @@ export default function AthleteSchedulePage() {
                 </CardContent>
               </Card>
             ))}
+            <Link href="/athlete/workouts/new">
+              <Button variant="outline" size="sm" className="mt-1 gap-1.5">
+                <Plus className="w-3.5 h-3.5" /> Andere workout toevoegen
+              </Button>
+            </Link>
           </div>
         )}
       </div>

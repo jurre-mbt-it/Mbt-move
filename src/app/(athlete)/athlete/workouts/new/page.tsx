@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { MOCK_EXERCISES } from '@/lib/exercise-constants'
 import {
   WORKOUT_TYPES,
   saveWorkout,
@@ -22,6 +21,14 @@ import {
 
 type Step = 'pick-type' | 'build' | 'pick-exercises' | 'active' | 'complete'
 
+type RealExercise = {
+  id: string
+  name: string
+  category: 'STRENGTH' | 'MOBILITY' | 'PLYOMETRICS' | 'CARDIO' | 'STABILITY'
+  muscleLoads: Record<string, number>
+  difficulty: string
+}
+
 export default function NewWorkoutPage() {
   const router = useRouter()
   const utils = trpc.useUtils()
@@ -36,6 +43,7 @@ export default function NewWorkoutPage() {
   const [feedback, setFeedback] = useState({ effort: 5, pain: 0, satisfaction: 7, notes: '' })
   const [manualDuration, setManualDuration] = useState<number | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveAsProgram, setSaveAsProgram] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Timer
@@ -60,7 +68,7 @@ export default function NewWorkoutPage() {
     setStep('build')
   }
 
-  function addExercise(ex: typeof MOCK_EXERCISES[number]) {
+  function addExercise(ex: RealExercise) {
     const newEx: WorkoutExercise = {
       id: `we-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       exerciseId: ex.id,
@@ -151,7 +159,12 @@ export default function NewWorkoutPage() {
         durationSeconds,
         painLevel: Math.round(feedback.pain),
         exertionLevel: Math.round(feedback.effort),
-        exercises: [], // MOCK_EXERCISES use local IDs, not real DB UUIDs
+        exercises: exercises.map(ex => ({
+          exerciseId: ex.exerciseId,
+          setsCompleted: ex.sets.filter(s => s.completed).length || ex.sets.length,
+          repsCompleted: ex.sets[0]?.reps ?? 10,
+          painLevel: null,
+        })),
       })
       await Promise.all([
         utils.patient.getWorkloadSessions.invalidate(),
@@ -299,6 +312,32 @@ export default function NewWorkoutPage() {
                   className="w-full border rounded-xl p-3 text-sm resize-none h-20 bg-white"
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Save as program option */}
+          <Card style={{ borderRadius: '14px' }}>
+            <CardContent className="p-4">
+              <p className="text-sm font-semibold mb-3">Workout opslaan als programma?</p>
+              <p className="text-xs text-muted-foreground mb-3">Sla deze workout op als programma zodat je hem opnieuw kunt gebruiken.</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSaveAsProgram(p => !p)}
+                  className="flex-1 py-2 rounded-xl text-sm font-semibold border-2 transition-colors"
+                  style={saveAsProgram ? { borderColor: '#4ECDC4', color: '#4ECDC4', background: '#4ECDC410' } : { borderColor: '#e4e4e7', color: '#a1a1aa' }}
+                >
+                  {saveAsProgram ? '✓ Opslaan als programma' : 'Opslaan als programma'}
+                </button>
+              </div>
+              {saveAsProgram && (
+                <input
+                  type="text"
+                  value={workoutName}
+                  onChange={e => setWorkoutName(e.target.value)}
+                  placeholder="Naam van het programma..."
+                  className="mt-2 w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4ECDC4]"
+                />
+              )}
             </CardContent>
           </Card>
 
@@ -553,19 +592,21 @@ function ExercisePickerView({
   exercises, onAdd, onBack,
 }: {
   exercises: WorkoutExercise[]
-  onAdd: (ex: typeof MOCK_EXERCISES[number]) => void
+  onAdd: (ex: RealExercise) => void
   onBack: () => void
 }) {
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
 
-  const addedIds = new Set(exercises.map(e => e.exerciseId))
+  const { data: allExercises = [], isLoading } = trpc.exercises.list.useQuery(
+    {
+      query: search || undefined,
+      category: categoryFilter || undefined,
+    },
+    { staleTime: 30_000 }
+  )
 
-  const filtered = MOCK_EXERCISES.filter(ex => {
-    if (search && !ex.name.toLowerCase().includes(search.toLowerCase())) return false
-    if (categoryFilter && ex.category !== categoryFilter) return false
-    return true
-  })
+  const addedIds = new Set(exercises.map(e => e.exerciseId))
 
   const CATEGORY_COLORS: Record<string, string> = {
     STRENGTH: '#4ECDC4',
@@ -622,43 +663,54 @@ function ExercisePickerView({
         </div>
 
         {/* Exercise list */}
-        <div className="space-y-2">
-          {filtered.map(ex => {
-            const alreadyAdded = addedIds.has(ex.id)
-            const color = CATEGORY_COLORS[ex.category] ?? '#4ECDC4'
-            const muscles = Object.keys(ex.muscleLoads).join(', ')
-            return (
-              <Card
-                key={ex.id}
-                style={{ borderRadius: '12px', opacity: alreadyAdded ? 0.5 : 1 }}
-                className={alreadyAdded ? '' : 'hover:shadow-md transition-shadow cursor-pointer'}
-                onClick={() => !alreadyAdded && onAdd(ex)}
-              >
-                <CardContent className="p-3 flex items-center gap-3">
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ background: color + '20' }}
-                  >
-                    <Dumbbell className="w-5 h-5" style={{ color }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">{ex.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {EXERCISE_CATEGORIES.find(c => c.value === ex.category)?.label} · {muscles}
-                    </p>
-                  </div>
-                  {alreadyAdded ? (
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: '#4ECDC4' }}>
-                      <Check className="w-4 h-4 text-white" />
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <p className="text-sm text-muted-foreground">Laden…</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {allExercises.map(ex => {
+              const alreadyAdded = addedIds.has(ex.id)
+              const color = CATEGORY_COLORS[ex.category] ?? '#4ECDC4'
+              const muscles = Object.keys(ex.muscleLoads ?? {}).join(', ')
+              return (
+                <Card
+                  key={ex.id}
+                  style={{ borderRadius: '12px', opacity: alreadyAdded ? 0.5 : 1 }}
+                  className={alreadyAdded ? '' : 'hover:shadow-md transition-shadow cursor-pointer'}
+                  onClick={() => !alreadyAdded && onAdd(ex as RealExercise)}
+                >
+                  <CardContent className="p-3 flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                      style={{ background: color + '20' }}
+                    >
+                      <Dumbbell className="w-5 h-5" style={{ color }} />
                     </div>
-                  ) : (
-                    <div className="w-7 h-7 rounded-full border-2 border-zinc-200" />
-                  )}
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">{ex.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {EXERCISE_CATEGORIES.find(c => c.value === ex.category)?.label}{muscles ? ` · ${muscles}` : ''}
+                      </p>
+                    </div>
+                    {alreadyAdded ? (
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: '#4ECDC4' }}>
+                        <Check className="w-4 h-4 text-white" />
+                      </div>
+                    ) : (
+                      <div className="w-7 h-7 rounded-full border-2 border-zinc-200" />
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
+            {allExercises.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <p className="text-sm text-muted-foreground">Geen oefeningen gevonden</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
