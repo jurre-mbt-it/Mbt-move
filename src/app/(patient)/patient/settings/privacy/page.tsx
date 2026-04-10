@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -14,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { ChevronLeft, ShieldCheck, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { ChevronLeft, ShieldCheck, CheckCircle2, AlertTriangle, FileText, ExternalLink } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
 
@@ -183,6 +184,25 @@ export default function PrivacySettingsPage() {
             ))}
           </CardContent>
         </Card>
+
+        {/* DPA link */}
+        <Link href="/patient/legal/dpa">
+          <Card style={{ borderRadius: '14px' }} className="hover:shadow-sm transition-shadow">
+            <CardContent className="px-4 py-4 flex items-center gap-4">
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: '#eff6ff' }}
+              >
+                <FileText className="w-5 h-5" style={{ color: '#3b82f6' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm">Verwerkingsovereenkomst</p>
+                <p className="text-xs text-muted-foreground">Bekijk hoe wij uw persoonsgegevens verwerken (AVG)</p>
+              </div>
+              <ExternalLink className="w-4 h-4 text-zinc-400 shrink-0" />
+            </CardContent>
+          </Card>
+        </Link>
 
         {/* Withdraw button (only shown when consent is given) */}
         {consentGiven && (

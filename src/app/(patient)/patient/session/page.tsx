@@ -1024,6 +1024,7 @@ export default function SessionPage() {
           autoCloseIn={feedbackTimer}
         />
       )}
+
     </div>
   )
 }

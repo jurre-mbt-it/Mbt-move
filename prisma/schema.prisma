@@ -110,6 +110,10 @@ model User {
   bio           String?
   licenseNumber String?
 
+  // DPA (Verwerkingsovereenkomst — AVG verplicht)
+  dpaAcceptedVersion String?
+  dpaAcceptedAt      DateTime?
+
   // MFA
   mfaEnabled    Boolean   @default(false)
   mfaSecret     String?

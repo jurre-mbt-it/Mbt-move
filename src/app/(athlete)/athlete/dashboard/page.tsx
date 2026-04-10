@@ -76,7 +76,7 @@ export default function AthleteDashboard() {
         </div>
 
         {/* Quick workout action */}
-        <Link href="/athlete/workouts/new">
+        <Link href="/athlete/session?mode=quick">
           <Card style={{ borderRadius: '14px', borderLeft: '3px solid #4ECDC4' }} className="hover:shadow-md transition-shadow">
             <CardContent className="p-4 flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: '#4ECDC420' }}>
