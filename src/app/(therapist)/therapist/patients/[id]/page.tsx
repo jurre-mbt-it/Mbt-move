@@ -128,6 +128,11 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         {/* Actions */}
         <div className="flex flex-col items-end gap-2 shrink-0">
           <div className="flex gap-2">
+            <Link href={`/therapist/patients/${patient.id}/progress`}>
+              <Button size="sm" variant="outline" className="gap-1.5 border-[#3ECF6A] text-[#3ECF6A] hover:bg-[#3ECF6A]/10">
+                <Activity className="w-3.5 h-3.5" /> Voortgang
+              </Button>
+            </Link>
             {patient.programId ? (
               <Link href={`/therapist/programs/${patient.programId}/edit`}>
                 <Button size="sm" className="gap-1.5" style={{ background: '#4ECDC4' }}>

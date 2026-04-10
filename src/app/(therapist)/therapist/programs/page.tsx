@@ -92,17 +92,29 @@ export default function ProgramsPage() {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold">Programma&apos;s</h1>
           <p className="text-muted-foreground text-sm mt-0.5">Maak en beheer revalidatieprogramma&apos;s</p>
         </div>
-        <Link href="/therapist/programs/new">
-          <Button style={{ background: '#4ECDC4' }} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Nieuw programma
-          </Button>
-        </Link>
+        <div className="flex gap-2 flex-wrap">
+          <Link href="/therapist/programs/new/walk-run">
+            <Button variant="outline" className="gap-2 border-[#0ea5e9] text-[#0ea5e9] hover:bg-[#0ea5e9]/10">
+              🏃 Walk-Run Wizard
+            </Button>
+          </Link>
+          <Link href="/therapist/programs/new/cardio">
+            <Button variant="outline" className="gap-2 border-[#4ECDC4] text-[#4ECDC4] hover:bg-[#4ECDC4]/10">
+              ❤️ Nieuw Cardio
+            </Button>
+          </Link>
+          <Link href="/therapist/programs/new">
+            <Button style={{ background: '#4ECDC4' }} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Nieuw Kracht
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Templates */}

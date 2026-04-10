@@ -159,6 +159,23 @@ export default function PatientDashboard() {
         {/* ACWR workload monitoring */}
         <WorkloadPanel sessions={workloadSessions ?? []} />
 
+        {/* Cardio sessie quick link */}
+        <Link href="/patient/cardio-session">
+          <div
+            className="flex items-center gap-3 px-4 py-3 rounded-2xl"
+            style={{ background: '#f0fdf4', border: '1.5px solid #86efac' }}
+          >
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#dcfce7' }}>
+              <span className="text-lg">🏃</span>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold" style={{ color: '#166534' }}>Cardio sessie starten</p>
+              <p className="text-xs" style={{ color: '#16a34a' }}>Walk-run, zone 2, intervallen…</p>
+            </div>
+            <ChevronRight className="w-4 h-4 shrink-0" style={{ color: '#86efac' }} />
+          </div>
+        </Link>
+
         {/* Pain report quick link */}
         <Link href="/patient/pain">
           <div

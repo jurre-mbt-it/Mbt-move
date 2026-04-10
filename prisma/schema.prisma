@@ -94,6 +94,37 @@ enum SessionStatus {
   SKIPPED
 }
 
+enum ProgramType {
+  STRENGTH
+  CARDIO
+  MIXED
+}
+
+enum CardioActivity {
+  RUNNING
+  CYCLING
+  ROWING
+  SWIMMING
+  CROSSTRAINER
+  WALKING
+  SKIERG
+  ASSAULT_BIKE
+  WATTBIKE
+  STAIRCLIMBER
+  OTHER
+}
+
+enum CardioProtocol {
+  STEADY_STATE
+  INTERVALS
+  TEMPO
+  FARTLEK
+  ZONE_TRAINING
+  THRESHOLD
+  LONG_SLOW_DISTANCE
+  WALK_RUN
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -128,6 +159,7 @@ model User {
   appointments           Appointment[]          @relation("PatientAppointments")
   therapistAppointments  Appointment[]          @relation("TherapistAppointments")
   sessionLogs            SessionLog[]
+  cardioLogs             CardioLog[]
   notifications          Notification[]
   messages               Message[]
   createdWeekSchedules   WeekSchedule[]         @relation("CreatedWeekSchedules")
@@ -233,11 +265,13 @@ model Program {
   name         String
   description  String?
   status       ProgramStatus @default(DRAFT)
+  type         ProgramType   @default(STRENGTH)
   isTemplate   Boolean       @default(false)
   weeks        Int           @default(4)
   daysPerWeek  Int           @default(3)
   startDate    DateTime?
   endDate      DateTime?
+  cardioParams Json?         // CardioParams JSONB for cardio programs
 
   tendinopathyMode Boolean       @default(false)
   trackOneRepMax   Boolean       @default(false)
@@ -250,11 +284,36 @@ model Program {
   exercises        ProgramExercise[]
   sessionLogs      SessionLog[]
   weekScheduleDays WeekScheduleDay[]
+  cardioLogs       CardioLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("programs")
+}
+
+model CardioLog {
+  id           String          @id @default(cuid())
+  program      Program?        @relation(fields: [programId], references: [id])
+  programId    String?
+  patient      User            @relation(fields: [patientId], references: [id])
+  patientId    String
+  activity     CardioActivity
+  protocol     CardioProtocol
+  durationSec  Int             // seconds
+  distanceM    Int?            // meters
+  avgHeartRate Int?
+  maxHeartRate Int?
+  zone         Int?            // 1-5
+  calories     Int?
+  rpe          Int?            // 1-10
+  painLevel    Int?            // 0-10
+  notes        String?
+  intervals    Json?           // interval details JSONB
+  completedAt  DateTime        @default(now())
+  createdAt    DateTime        @default(now())
+
+  @@map("cardio_logs")
 }
 
 model WeekSchedule {
