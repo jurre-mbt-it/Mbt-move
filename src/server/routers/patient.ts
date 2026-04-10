@@ -196,7 +196,7 @@ export const patientRouter = createTRPCRouter({
       return ctx.prisma.sessionLog.create({
         data: {
           patientId: ctx.user.id,
-          ...(input.programId ? { programId: input.programId } : {}),
+          programId: input.programId ?? undefined,
           scheduledAt: new Date(input.scheduledAt),
           completedAt: new Date(input.completedAt),
           status: 'COMPLETED',
