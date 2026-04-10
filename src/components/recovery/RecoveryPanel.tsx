@@ -106,10 +106,12 @@ export function RecoveryPanel({ sessions, showBodyFigure = true }: Props) {
 
       {recoveryStates.length === 0 && (
         <Card style={{ borderRadius: '12px' }}>
-          <CardContent className="flex flex-col items-center justify-center py-12 text-center gap-2">
+          <CardContent className="flex flex-col items-center justify-center py-10 text-center gap-2">
             <Activity className="w-8 h-8 text-zinc-300" />
-            <p className="text-sm text-muted-foreground">Nog geen sessiegegevens</p>
-            <p className="text-xs text-muted-foreground">Na je eerste sessie verschijnt hier het herstelmodel</p>
+            <p className="text-sm font-medium text-muted-foreground">Geen spierbelasting data</p>
+            <p className="text-xs text-muted-foreground max-w-[220px]">
+              Het herstelmodel werkt op basis van oefeningen uit je programma. Quick workouts tellen mee voor ACWR maar niet voor spierbelasting.
+            </p>
           </CardContent>
         </Card>
       )}
