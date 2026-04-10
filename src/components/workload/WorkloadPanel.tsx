@@ -25,50 +25,59 @@ export function WorkloadPanel({ sessions }: Props) {
 
   const maxWeekly = Math.max(...acwr.weeklyHistory.map(w => w.totalSRPE), 1)
 
+  const needlePercent = ((Math.min(1.8, Math.max(0.4, acwr.acwr)) - 0.4) / 1.4) * 100
+
   return (
     <div className="space-y-4">
-      {/* ACWR Gauge */}
+      {/* Load Insights ACWR Card */}
       <Card style={{ borderRadius: '12px' }}>
-        <CardContent className="p-4">
-          <div className="flex items-center gap-3 mb-3">
-            <div
-              className="w-12 h-12 rounded-full flex items-center justify-center"
-              style={{ background: zone.bg }}
-            >
-              <Zap className="w-6 h-6" style={{ color: zone.color }} />
+        <CardContent className="p-5">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Load Insights</p>
+              <p className="text-2xl font-bold mt-0.5" style={{ color: zone.color }}>{acwr.acwr}</p>
+              <p className="text-xs font-medium mt-0.5" style={{ color: zone.color }}>{zone.label}</p>
             </div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold">{zone.label}</p>
-              <p className="text-xs text-muted-foreground">{zone.description}</p>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">Doelzone</p>
+              <p className="text-xs font-semibold text-[#14B8A6]">1.0 – 1.3</p>
             </div>
           </div>
 
-          {/* ACWR bar visualization */}
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>ACWR (Acute:Chronic Ratio)</span>
-              <span className="font-bold text-sm" style={{ color: zone.color }}>{acwr.acwr}</span>
-            </div>
-            <div className="relative h-3 bg-zinc-100 rounded-full overflow-hidden">
-              {/* Zone markers */}
-              <div className="absolute inset-0 flex">
-                <div className="h-full" style={{ width: '26.7%', background: '#dbeafe' }} /> {/* 0-0.8 */}
-                <div className="h-full" style={{ width: '16.7%', background: '#ccfbf1' }} /> {/* 0.8-1.3 */}
-                <div className="h-full" style={{ width: '6.7%', background: '#fef3c7' }} />  {/* 1.3-1.5 */}
-                <div className="h-full flex-1" style={{ background: '#fee2e2' }} />          {/* 1.5+ */}
+          <div className="relative">
+            {/* Zone target bracket */}
+            <div className="flex mb-1" aria-hidden>
+              <div style={{ width: `${(0.6 / 1.4) * 100}%` }} />
+              <div style={{ width: `${(0.3 / 1.4) * 100}%` }} className="relative">
+                <div className="absolute top-0 left-0 right-0 text-center">
+                  <span className="text-[9px] font-semibold text-[#14B8A6] uppercase tracking-wide">Doel</span>
+                </div>
               </div>
-              {/* Pointer */}
+            </div>
+
+            {/* Track */}
+            <div className="relative h-4 rounded-full overflow-visible flex">
+              <div style={{ width: `${(0.4 / 1.4) * 100}%`, borderRadius: '999px 0 0 999px', background: '#bfdbfe' }} />
+              <div style={{ width: `${(0.2 / 1.4) * 100}%`, background: '#6ee7b7' }} />
+              <div style={{ width: `${(0.3 / 1.4) * 100}%`, background: '#14B8A6' }} />
+              <div style={{ width: `${(0.2 / 1.4) * 100}%`, background: '#fbbf24' }} />
+              <div style={{ flex: 1, borderRadius: '0 999px 999px 0', background: '#f87171' }} />
+
+              {/* Needle */}
               <div
-                className="absolute top-0 h-full w-1 rounded-full bg-[#1A3A3A] z-10 transition-all duration-500"
-                style={{ left: `${Math.min(100, (acwr.acwr / 3) * 100)}%` }}
+                className="absolute -top-1 -bottom-1 w-1 rounded-full bg-[#1A3A3A] z-10 transition-all duration-700 shadow-md"
+                style={{ left: `calc(${needlePercent}% - 2px)` }}
               />
             </div>
-            <div className="flex justify-between text-[10px] text-muted-foreground">
-              <span>0</span>
+
+            {/* Scale labels */}
+            <div className="flex justify-between text-[10px] text-muted-foreground mt-1.5 px-0.5">
+              <span>0.4</span>
               <span>0.8</span>
+              <span>1.0</span>
               <span>1.3</span>
               <span>1.5</span>
-              <span>3.0</span>
+              <span>1.8</span>
             </div>
           </div>
         </CardContent>
