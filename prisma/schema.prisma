@@ -300,8 +300,8 @@ model ProgramExercise {
 
 model SessionLog {
   id            String        @id @default(cuid())
-  program       Program       @relation(fields: [programId], references: [id])
-  programId     String
+  program       Program?      @relation(fields: [programId], references: [id])
+  programId     String?
   patient       User          @relation(fields: [patientId], references: [id])
   patientId     String
   status        SessionStatus @default(PENDING)
