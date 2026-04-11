@@ -2,26 +2,29 @@
 
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { MOCK_PATIENTS } from '@/lib/therapist-constants'
-import { MOCK_PROGRAMS } from '@/lib/program-constants'
-import { Users, ClipboardList, TrendingUp, AlertCircle, ChevronRight, Plus } from 'lucide-react'
+import { trpc } from '@/lib/trpc/client'
+import { Users, ClipboardList, TrendingUp, ChevronRight, Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 export default function TherapistDashboard() {
   const router = useRouter()
 
-  const activePatients = MOCK_PATIENTS.filter(p => p.programStatus === 'ACTIVE')
-  const activePrograms = MOCK_PROGRAMS.filter(p => p.status === 'ACTIVE' && !p.isTemplate)
-  const avgCompliance = Math.round(
-    MOCK_PATIENTS.filter(p => p.compliance > 0).reduce((sum, p) => sum + p.compliance, 0) /
-    MOCK_PATIENTS.filter(p => p.compliance > 0).length
-  )
-  const alertPatients = MOCK_PATIENTS.filter(p =>
-    p.lastSessionDate && new Date(p.lastSessionDate) < new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-  )
+  const { data: patients = [], isLoading: patientsLoading } = trpc.patients.list.useQuery()
+  const { data: programsRaw = [], isLoading: programsLoading } = trpc.programs.list.useQuery()
+  const programs = programsRaw as Array<{ status: string; isTemplate: boolean }>
+
+  const activePatients = patients.filter(p => p.programStatus === 'ACTIVE')
+  const activePrograms = programs.filter(p => p.status === 'ACTIVE' && !p.isTemplate)
+
+  function weeksCurrent(startDate: Date | string | null | undefined): number {
+    if (!startDate) return 1
+    const diff = Date.now() - new Date(startDate).getTime()
+    return Math.max(1, Math.ceil(diff / (7 * 24 * 60 * 60 * 1000)))
+  }
+
+  const isLoading = patientsLoading || programsLoading
 
   return (
     <div className="space-y-5 max-w-4xl">
@@ -32,18 +35,10 @@ export default function TherapistDashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <StatCard icon={<Users className="w-4 h-4" style={{ color: '#4ECDC4' }} />} value={activePatients.length} label="Actieve patiënten" />
-        <StatCard icon={<ClipboardList className="w-4 h-4" style={{ color: '#60a5fa' }} />} value={activePrograms.length} label="Actieve programma's" />
-        <StatCard icon={<TrendingUp className="w-4 h-4" style={{ color: '#a78bfa' }} />} value={`${avgCompliance}%`} label="Gem. compliance" />
+        <StatCard icon={<Users className="w-4 h-4" style={{ color: '#4ECDC4' }} />} value={isLoading ? '…' : activePatients.length} label="Actieve patiënten" />
+        <StatCard icon={<ClipboardList className="w-4 h-4" style={{ color: '#60a5fa' }} />} value={isLoading ? '…' : activePrograms.length} label="Actieve programma's" />
+        <StatCard icon={<TrendingUp className="w-4 h-4" style={{ color: '#a78bfa' }} />} value={isLoading ? '…' : patients.length} label="Totaal patiënten" />
       </div>
-
-      {/* Alerts */}
-      {alertPatients.length > 0 && (
-        <div className="flex items-start gap-2 p-3 rounded-xl text-sm" style={{ background: '#fff7ed', color: '#c2410c' }}>
-          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-          <p><strong>{alertPatients.length} patiënt{alertPatients.length > 1 ? 'en' : ''}</strong> heeft al meer dan 7 dagen geen sessie gelogd.</p>
-        </div>
-      )}
 
       {/* Active patients */}
       <div>
@@ -54,27 +49,41 @@ export default function TherapistDashboard() {
           </Link>
         </div>
         <div className="space-y-2">
-          {activePatients.slice(0, 3).map(p => (
-            <Link key={p.id} href={`/therapist/patients/${p.id}`} className="block">
-            <Card style={{ borderRadius: '12px' }} className="hover:shadow-md transition-shadow cursor-pointer">
-              <CardContent className="px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0" style={{ background: '#1A3A3A' }}>
-                    {p.avatarInitials}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm">{p.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{p.programName}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Progress value={(p.weeksCurrent / p.weeksTotal) * 100} className="h-1 flex-1" />
-                      <span className="text-xs text-muted-foreground shrink-0">{p.compliance}%</span>
-                    </div>
-                  </div>
-                </div>
+          {isLoading && (
+            <p className="text-sm text-muted-foreground py-2">Laden…</p>
+          )}
+          {!isLoading && activePatients.length === 0 && (
+            <Card style={{ borderRadius: '12px' }}>
+              <CardContent className="py-6 text-center">
+                <p className="text-sm text-muted-foreground">Geen actieve patiënten</p>
               </CardContent>
             </Card>
-            </Link>
-          ))}
+          )}
+          {activePatients.slice(0, 3).map(p => {
+            const current = weeksCurrent(p.startDate)
+            const total = p.weeksTotal || 1
+            return (
+              <Link key={p.id} href={`/therapist/patients/${p.id}`} className="block">
+                <Card style={{ borderRadius: '12px' }} className="hover:shadow-md transition-shadow cursor-pointer">
+                  <CardContent className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0" style={{ background: '#1A3A3A' }}>
+                        {p.avatarInitials}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm">{p.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{p.programName ?? 'Geen programma'}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Progress value={(Math.min(current, total) / total) * 100} className="h-1 flex-1" />
+                          <span className="text-xs text-muted-foreground shrink-0">W{Math.min(current, total)}/{total}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            )
+          })}
         </div>
       </div>
 
