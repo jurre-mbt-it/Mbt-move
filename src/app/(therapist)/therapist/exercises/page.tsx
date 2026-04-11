@@ -45,7 +45,7 @@ type ExerciseItem = {
   thumbnailUrl?: string | null
   description?: string | null
   tags?: string[]
-  muscleLoads?: { muscle: string; load: number }[]
+  muscleLoads?: Record<string, number>
 }
 
 export default function ExercisesPage() {
@@ -63,7 +63,7 @@ export default function ExercisesPage() {
   })
 
   const filtered = useMemo(() => {
-    return exercises.filter((ex: ExerciseItem) => {
+    return (exercises as ExerciseItem[]).filter((ex) => {
       if (query && !ex.name.toLowerCase().includes(query.toLowerCase()) &&
           !(ex.tags ?? []).some((t: string) => t.includes(query.toLowerCase()))) return false
       if (selectedCategory && ex.category !== selectedCategory) return false
@@ -82,10 +82,6 @@ export default function ExercisesPage() {
   }
 
   function openPreview(ex: ExerciseItem) {
-    const muscleLoads = ex.muscleLoads
-      ? Object.fromEntries(ex.muscleLoads.map(ml => [ml.muscle, ml.load]))
-      : undefined
-
     setModalExercise({
       id: ex.id,
       name: ex.name,
@@ -93,7 +89,7 @@ export default function ExercisesPage() {
       category: ex.category,
       difficulty: ex.difficulty,
       videoUrl: ex.videoUrl,
-      muscleLoads,
+      muscleLoads: ex.muscleLoads,
       editHref: `/therapist/exercises/${ex.id}/edit`,
     })
   }
@@ -345,7 +341,7 @@ export default function ExercisesPage() {
           </div>
         ) : view === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map((ex: ExerciseItem) => (
+            {filtered.map((ex) => (
               <ExerciseCard
                 key={ex.id}
                 exercise={ex}
@@ -355,7 +351,7 @@ export default function ExercisesPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {filtered.map((ex: ExerciseItem) => (
+            {filtered.map((ex) => (
               <div
                 key={ex.id}
                 className="flex items-center gap-4 p-4 rounded-xl border hover:border-zinc-300 hover:bg-zinc-50 transition-colors cursor-pointer"

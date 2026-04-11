@@ -1,11 +1,13 @@
 'use client'
 
+import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { trpc } from '@/lib/trpc/client'
-import { CheckCircle2, Clock, Flame } from 'lucide-react'
+import { CheckCircle2, Clock, Flame, ChevronDown, ChevronUp } from 'lucide-react'
 
 export default function AthleteHistoryPage() {
   const { data: sessions, isLoading } = trpc.patient.getSessionHistory.useQuery({ limit: 50 })
+  const [expanded, setExpanded] = useState<string | null>(null)
 
   const history = sessions ?? []
   const totalMinutes = history.reduce((s, h) => s + h.durationMinutes, 0)
@@ -55,32 +57,74 @@ export default function AthleteHistoryPage() {
             </CardContent>
           </Card>
         )}
-        {history.map(session => (
-          <Card key={session.id} style={{ borderRadius: '14px' }}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-sm font-bold"
-                style={{ background: '#f0fdfa', color: '#4ECDC4' }}
+        {history.map(session => {
+          const isOpen = expanded === session.id
+          return (
+            <Card key={session.id} style={{ borderRadius: '14px', overflow: 'hidden' }}>
+              <button
+                className="w-full text-left"
+                onClick={() => setExpanded(isOpen ? null : session.id)}
               >
-                ✓
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold">
-                  {new Date(session.completedAt).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'short' })}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {session.exerciseCount} oefeningen · {session.durationMinutes} min
-                  {session.programName ? ` · ${session.programName}` : ''}
-                </p>
-              </div>
-              <div className="text-right shrink-0">
-                {session.painLevel !== null && (
-                  <p className="text-xs text-muted-foreground">Pijn {session.painLevel}/10</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-sm font-bold"
+                    style={{ background: '#f0fdfa', color: '#4ECDC4' }}
+                  >
+                    ✓
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold">
+                      {new Date(session.completedAt).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'short' })}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {session.exerciseCount} oefeningen · {session.durationMinutes} min
+                      {session.programName ? ` · ${session.programName}` : ''}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {session.painLevel !== null && (
+                      <p className="text-xs text-muted-foreground">Pijn {session.painLevel}/10</p>
+                    )}
+                    {isOpen
+                      ? <ChevronUp className="w-4 h-4 text-zinc-400" />
+                      : <ChevronDown className="w-4 h-4 text-zinc-400" />
+                    }
+                  </div>
+                </CardContent>
+              </button>
+
+              {isOpen && (
+                <div className="px-4 pb-4 pt-0 border-t border-zinc-100 space-y-2">
+                  <div className="grid grid-cols-2 gap-2 pt-3">
+                    <div className="rounded-xl p-3 text-center" style={{ background: '#f4f4f5' }}>
+                      <p className="text-sm font-bold">{session.durationMinutes} min</p>
+                      <p className="text-[10px] text-muted-foreground">Duur</p>
+                    </div>
+                    <div className="rounded-xl p-3 text-center" style={{ background: '#f4f4f5' }}>
+                      <p className="text-sm font-bold">{session.exerciseCount}</p>
+                      <p className="text-[10px] text-muted-foreground">Oefeningen</p>
+                    </div>
+                    {session.painLevel !== null && (
+                      <div className="rounded-xl p-3 text-center" style={{ background: '#f4f4f5' }}>
+                        <p className="text-sm font-bold">{session.painLevel}/10</p>
+                        <p className="text-[10px] text-muted-foreground">Pijn</p>
+                      </div>
+                    )}
+                    {session.exertionLevel !== null && (
+                      <div className="rounded-xl p-3 text-center" style={{ background: '#f4f4f5' }}>
+                        <p className="text-sm font-bold">{session.exertionLevel}/10</p>
+                        <p className="text-[10px] text-muted-foreground">Inspanning</p>
+                      </div>
+                    )}
+                  </div>
+                  {session.notes && (
+                    <p className="text-xs text-muted-foreground italic pt-1">&ldquo;{session.notes}&rdquo;</p>
+                  )}
+                </div>
+              )}
+            </Card>
+          )
+        })}
       </div>
     </div>
   )

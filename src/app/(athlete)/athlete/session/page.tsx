@@ -5,12 +5,18 @@ import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { trpc } from '@/lib/trpc/client'
-import { MOCK_EXERCISES } from '@/lib/exercise-constants'
 import {
   Play, CheckCircle2, ArrowLeft, Timer, Clock,
   PlusCircle, Search, X, Plus, Zap,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+
+type DbExercise = {
+  id: string
+  name: string
+  category: string
+  [key: string]: unknown
+}
 
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
 
@@ -27,12 +33,12 @@ type LiveExercise = {
   restTime: number
 }
 
-function mockToLiveExercise(mock: typeof MOCK_EXERCISES[0]): LiveExercise {
+function dbExerciseToLive(ex: DbExercise): LiveExercise {
   return {
-    uid: `q-${mock.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    exerciseId: mock.id,
-    name: mock.name,
-    category: mock.category,
+    uid: `q-${ex.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    exerciseId: ex.id,
+    name: ex.name,
+    category: ex.category,
     sets: 3,
     reps: 10,
     repUnit: 'reps',
@@ -44,6 +50,7 @@ export default function AthleteSessionPage() {
   const router = useRouter()
   const utils = trpc.useUtils()
   const { data: sessionData, isLoading } = trpc.patient.getTodayExercises.useQuery()
+  const { data: dbExercises = [] } = trpc.exercises.list.useQuery(undefined, { staleTime: 60_000 })
   const logSession = trpc.patient.logSession.useMutation()
 
   // Quick mode detection
@@ -95,19 +102,18 @@ export default function AthleteSessionPage() {
   const mins = Math.floor(elapsed / 60)
   const secs = elapsed % 60
 
-  function addExercise(mock: typeof MOCK_EXERCISES[0]) {
-    const ex = mockToLiveExercise(mock)
-    setExtraExercises(prev => [...prev, ex])
+  function addExercise(ex: DbExercise) {
+    setExtraExercises(prev => [...prev, dbExerciseToLive(ex)])
     setShowAddExercise(false)
     setAddExerciseQuery('')
   }
 
   const filteredLibrary = addExerciseQuery
-    ? MOCK_EXERCISES.filter(e =>
+    ? dbExercises.filter(e =>
         e.name.toLowerCase().includes(addExerciseQuery.toLowerCase()) ||
         e.category.toLowerCase().includes(addExerciseQuery.toLowerCase())
       )
-    : MOCK_EXERCISES
+    : dbExercises
 
   function markDone() {
     setCompleted(prev => new Set(prev).add(currentIndex))
@@ -372,9 +378,9 @@ function AddExerciseSheet({
 }: {
   query: string
   onQueryChange: (q: string) => void
-  filtered: typeof MOCK_EXERCISES
+  filtered: DbExercise[]
   added: LiveExercise[]
-  onAdd: (ex: typeof MOCK_EXERCISES[0]) => void
+  onAdd: (ex: DbExercise) => void
   onClose: () => void
 }) {
   return (

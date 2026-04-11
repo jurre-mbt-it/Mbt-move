@@ -17,7 +17,7 @@ import {
   CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, HR_ZONES,
   CARDIO_TEMPLATES, CardioActivityKey, CardioProtocolKey, HRZone, CardioInterval,
 } from '@/lib/cardio-constants'
-import { PATIENTS } from '@/lib/mock-data'
+import { trpc } from '@/lib/trpc/client'
 
 const MBT_GREEN = '#3ECF6A'
 const MBT_TEAL = '#4ECDC4'
@@ -136,6 +136,7 @@ function CardioProgramBuilderContent() {
   const searchParams = useSearchParams()
   const prePatientId = searchParams.get('patientId') ?? ''
 
+  const { data: patientsData = [] } = trpc.patients.list.useQuery()
   const [form, setForm] = useState<CardioFormState>({ ...DEFAULT_STATE, patientId: prePatientId })
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [saving, setSaving] = useState(false)
@@ -209,7 +210,7 @@ function CardioProgramBuilderContent() {
                   onChange={e => set('patientId', e.target.value)}
                 >
                   <option value="">— Selecteer patiënt (optioneel) —</option>
-                  {PATIENTS.map(p => (
+                  {patientsData.map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
@@ -451,7 +452,7 @@ function CardioProgramBuilderContent() {
                 {form.targetZone && <p>Zone {form.targetZone}: {HR_ZONES[form.targetZone].label}</p>}
                 {form.intervals.length > 0 && <p>{form.intervals.length} intervalblok(ken) geconfigureerd</p>}
                 {form.patientId && (
-                  <p>Patiënt: {PATIENTS.find(p => p.id === form.patientId)?.name}</p>
+                  <p>Patiënt: {patientsData.find(p => p.id === form.patientId)?.name}</p>
                 )}
               </div>
             </CardContent>

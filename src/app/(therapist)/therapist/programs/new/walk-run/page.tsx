@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { ArrowLeft, ChevronRight, ChevronLeft, CheckCircle2, AlertTriangle, Footprints } from 'lucide-react'
 import { WALK_RUN_TEMPLATES, WalkRunTemplate, WalkRunWeek } from '@/lib/cardio-constants'
-import { PATIENTS } from '@/lib/mock-data'
+import { trpc } from '@/lib/trpc/client'
 
 const MBT_GREEN = '#3ECF6A'
 const MBT_TEAL = '#4ECDC4'
@@ -152,6 +152,7 @@ function PainCheckCard() {
 
 export default function WalkRunWizardPage() {
   const router = useRouter()
+  const { data: patientsData = [] } = trpc.patients.list.useQuery()
   const [step, setStep] = useState<WizardStep>(1)
   const [state, setState] = useState<WizardState>(DEFAULT)
   const [saving, setSaving] = useState(false)
@@ -228,8 +229,8 @@ export default function WalkRunWizardPage() {
                 onChange={e => set('patientId', e.target.value)}
               >
                 <option value="">— Selecteer patiënt —</option>
-                {PATIENTS.map(p => (
-                  <option key={p.id} value={p.id}>{p.name} — {p.diagnosis.slice(0, 40)}</option>
+                {patientsData.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
             </CardContent>
@@ -414,7 +415,7 @@ export default function WalkRunWizardPage() {
                 </div>
                 <div>
                   <p className="font-bold">{selectedTemplate.name}</p>
-                  <p className="text-sm text-muted-foreground">{PATIENTS.find(p => p.id === state.patientId)?.name}</p>
+                  <p className="text-sm text-muted-foreground">{patientsData.find(p => p.id === state.patientId)?.name}</p>
                 </div>
               </div>
 
