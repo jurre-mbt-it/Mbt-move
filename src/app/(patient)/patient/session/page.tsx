@@ -896,7 +896,7 @@ export default function SessionPage() {
             )}
 
             {/* Params grid */}
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <ParamPill label="Sets" value={String(e.sets)} />
               <ParamPill label="Reps" value={`${e.reps} ${e.repUnit}`} />
               <ParamPill label="Rust" value={`${e.restTime}s`} />
