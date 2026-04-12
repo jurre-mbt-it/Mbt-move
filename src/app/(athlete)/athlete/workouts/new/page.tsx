@@ -13,6 +13,7 @@ import {
   type WorkoutSet,
 } from '@/lib/workout-constants'
 import { EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
+import { WORKOUT_ICON_MAP } from '@/components/icons'
 import { trpc } from '@/lib/trpc/client'
 import {
   ArrowLeft, X, Plus, Search, Check, ChevronRight,
@@ -205,10 +206,10 @@ export default function NewWorkoutPage() {
               >
                 <CardContent className="p-4 flex flex-col items-center text-center gap-2">
                   <div
-                    className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl"
+                    className="w-14 h-14 rounded-2xl flex items-center justify-center"
                     style={{ background: type.color + '20' }}
                   >
-                    {type.icon}
+                    {(() => { const Icon = WORKOUT_ICON_MAP[type.value]; return Icon ? <Icon size={28} /> : type.icon })()}
                   </div>
                   <p className="text-sm font-bold">{type.label}</p>
                   <p className="text-xs text-muted-foreground">{type.description}</p>

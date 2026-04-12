@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { getSavedWorkouts, deleteWorkout, type Workout, WORKOUT_TYPES } from '@/lib/workout-constants'
 import { Plus, Search, Zap, Dumbbell, Trash2, ChevronRight, Clock } from 'lucide-react'
+import { WORKOUT_ICON_MAP } from '@/components/icons'
 
 export default function MyWorkoutsPage() {
   const [workouts, setWorkouts] = useState<Workout[]>([])
@@ -110,7 +111,7 @@ function WorkoutCard({ workout, onDelete }: { workout: Workout; onDelete: (id: s
           className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0"
           style={{ background: color + '20' }}
         >
-          {type?.icon ?? '💪'}
+          {(() => { const Icon = type ? WORKOUT_ICON_MAP[type.value] : null; return Icon ? <Icon size={20} /> : '💪' })()}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold truncate">{workout.name || 'Workout'}</p>

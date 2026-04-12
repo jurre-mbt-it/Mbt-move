@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { ArrowLeft, ChevronRight, ChevronLeft, CheckCircle2, AlertTriangle, Footprints } from 'lucide-react'
 import { WALK_RUN_TEMPLATES, WalkRunTemplate, WalkRunWeek } from '@/lib/cardio-constants'
 import { trpc } from '@/lib/trpc/client'
+import { IconRunning, IconSquat, IconLunge } from '@/components/icons'
 
 const MBT_GREEN = '#3ECF6A'
 const MBT_TEAL = '#4ECDC4'
@@ -47,9 +48,9 @@ const FITNESS_OPTIONS = [
 ] as const
 
 const INJURY_TEMPLATES = [
-  { id: 'wr-generiek', label: 'Generiek', icon: '🏃', description: 'Geschikt voor de meeste blessures en als algemeen terugkeer protocol' },
-  { id: 'wr-achilles', label: 'Achilles', icon: '🦵', description: 'Conservatieve opbouw voor achillestendinopathie met hielprotocol' },
-  { id: 'wr-knie',     label: 'Knie',     icon: '🦴', description: 'Geleidelijke opbouw na knieblessure, meniscus of PFPS/ACL' },
+  { id: 'wr-generiek', label: 'Generiek', icon: 'running', description: 'Geschikt voor de meeste blessures en als algemeen terugkeer protocol' },
+  { id: 'wr-achilles', label: 'Achilles', icon: 'squat', description: 'Conservatieve opbouw voor achillestendinopathie met hielprotocol' },
+  { id: 'wr-knie',     label: 'Knie',     icon: 'lunge', description: 'Geleidelijke opbouw na knieblessure, meniscus of PFPS/ACL' },
 ]
 
 // ── Week tabel component ──────────────────────────────────────────────────────
@@ -247,7 +248,7 @@ export default function WalkRunWizardPage() {
                     className="w-full text-left p-3 rounded-xl border transition-all flex items-start gap-3"
                     style={state.templateId === tpl.id ? { borderColor: MBT_GREEN, background: '#f0fdf4' } : {}}
                   >
-                    <span className="text-2xl">{tpl.icon}</span>
+                    <span className="text-2xl">{tpl.icon === 'running' ? <IconRunning size={24} /> : tpl.icon === 'squat' ? <IconSquat size={24} /> : <IconLunge size={24} />}</span>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-sm">{tpl.label}</span>
@@ -410,8 +411,8 @@ export default function WalkRunWizardPage() {
           <Card className="border-2" style={{ borderColor: MBT_GREEN + '80' }}>
             <CardContent className="p-5 space-y-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center text-2xl" style={{ background: MBT_GREEN + '20' }}>
-                  🏃
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: MBT_GREEN + '20' }}>
+                  <IconRunning size={24} />
                 </div>
                 <div>
                   <p className="font-bold">{selectedTemplate.name}</p>

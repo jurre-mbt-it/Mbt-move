@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, CheckCircle2 } from 'lucide-react'
+import { PAIN_CONTEXT_ICON_MAP } from '@/components/icons'
 
 const LOCATIONS = [
   'Knie links', 'Knie rechts',
@@ -169,7 +170,7 @@ export default function PainReportPage() {
                       color: selected ? '#0D6B6E' : '#52525b',
                     }}
                   >
-                    <span className="text-lg">{c.icon}</span>
+                    <span className="text-lg">{(() => { const Icon = PAIN_CONTEXT_ICON_MAP[c.value]; return Icon ? <Icon size={20} /> : c.icon })()}</span>
                     {c.label}
                   </button>
                 )

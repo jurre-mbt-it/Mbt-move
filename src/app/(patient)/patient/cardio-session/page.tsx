@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, HR_ZONES, HRZone } from '@/lib/cardio-constants'
 import { cn } from '@/lib/utils'
+import { CARDIO_ICON_MAP, IconRunning, IconWalking } from '@/components/icons'
 
 const MBT_GREEN = '#3ECF6A'
 const MBT_TEAL = '#4ECDC4'
@@ -347,7 +348,7 @@ export default function CardioSessionPage() {
           <ChevronLeft className="w-6 h-6" />
         </button>
         <div className="text-center">
-          <p className="text-xs opacity-70 uppercase tracking-wider">{activityInfo.icon} {activityInfo.label}</p>
+          <p className="text-xs opacity-70 uppercase tracking-wider flex items-center justify-center gap-1">{(() => { const Icon = CARDIO_ICON_MAP[session.activity]; return Icon ? <Icon size={14} /> : activityInfo.icon })()} {activityInfo.label}</p>
           <p className="text-sm font-semibold">{protocolInfo.label} — Week {session.week}</p>
         </div>
         <button onClick={() => setSoundEnabled(s => !s)} className="opacity-70 hover:opacity-100">
@@ -379,7 +380,7 @@ export default function CardioSessionPage() {
             {/* Interval indicator */}
             <div className="mt-4">
               <p className="text-3xl font-bold" style={{ color: isRun ? MBT_GREEN : '#94a3b8' }}>
-                {isRun ? '🏃 LOPEN' : '🚶 WANDELEN'}
+                <span className="inline-flex items-center gap-2">{isRun ? <><IconRunning size={28} /> LOPEN</> : <><IconWalking size={28} /> WANDELEN</>}</span>
               </p>
               <p className="text-sm opacity-70 mt-1" style={{ color: '#94a3b8' }}>
                 Interval {currentIntervalIdx + 1} / {session.intervals.length}

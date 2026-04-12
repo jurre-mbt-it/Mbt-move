@@ -13,6 +13,7 @@ import { trpc } from '@/lib/trpc/client'
 import { Plus, Layers, Users, Calendar, Copy, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { IconRunning, IconCardio } from '@/components/icons'
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }> = {
   ACTIVE:    { bg: '#ccfbf1', text: '#0D6B6E', label: 'Actief' },
@@ -100,12 +101,12 @@ export default function ProgramsPage() {
         <div className="flex gap-2 flex-wrap">
           <Link href="/therapist/programs/new/walk-run">
             <Button variant="outline" className="gap-2 border-[#0ea5e9] text-[#0ea5e9] hover:bg-[#0ea5e9]/10">
-              🏃 Walk-Run Wizard
+              <IconRunning size={16} /> Walk-Run Wizard
             </Button>
           </Link>
           <Link href="/therapist/programs/new/cardio">
             <Button variant="outline" className="gap-2 border-[#4ECDC4] text-[#4ECDC4] hover:bg-[#4ECDC4]/10">
-              ❤️ Nieuw Cardio
+              <IconCardio size={16} /> Nieuw Cardio
             </Button>
           </Link>
           <Link href="/therapist/programs/new">

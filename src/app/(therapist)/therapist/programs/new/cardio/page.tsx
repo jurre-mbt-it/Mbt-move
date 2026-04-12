@@ -18,6 +18,7 @@ import {
   CARDIO_TEMPLATES, CardioActivityKey, CardioProtocolKey, HRZone, CardioInterval,
 } from '@/lib/cardio-constants'
 import { trpc } from '@/lib/trpc/client'
+import { CARDIO_ICON_MAP } from '@/components/icons'
 
 const MBT_GREEN = '#3ECF6A'
 const MBT_TEAL = '#4ECDC4'
@@ -269,7 +270,7 @@ function CardioProgramBuilderContent() {
                     onClick={() => applyTemplate(tpl)}
                     className="w-full text-left p-2 rounded-lg border hover:bg-muted/50 transition-colors flex items-center gap-3"
                   >
-                    <span className="text-xl">{CARDIO_ACTIVITIES[tpl.activity].icon}</span>
+                    <span className="text-xl">{(() => { const Icon = CARDIO_ICON_MAP[tpl.activity]; return Icon ? <Icon size={22} /> : CARDIO_ACTIVITIES[tpl.activity].icon })()}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{tpl.name}</p>
                       <p className="text-xs text-muted-foreground truncate">{tpl.description}</p>
@@ -304,7 +305,7 @@ function CardioProgramBuilderContent() {
                     className="flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-all"
                     style={form.activity === key ? { borderColor: MBT_GREEN, background: '#f0fdf4' } : {}}
                   >
-                    <span className="text-2xl">{act.icon}</span>
+                    <span className="text-2xl">{(() => { const Icon = CARDIO_ICON_MAP[key]; return Icon ? <Icon size={28} /> : act.icon })()}</span>
                     <span className="text-xs font-medium leading-tight">{act.label}</span>
                   </button>
                 ))}

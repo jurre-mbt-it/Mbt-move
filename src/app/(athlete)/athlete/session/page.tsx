@@ -10,6 +10,7 @@ import {
   PlusCircle, Search, X, Plus, Zap,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { IconStrength } from '@/components/icons'
 
 type DbExercise = {
   id: string
@@ -207,7 +208,7 @@ export default function AthleteSessionPage() {
               className="flex flex-col items-center justify-center py-12 rounded-2xl text-center gap-3"
               style={{ background: '#f0fdfa', border: '2px dashed #4ECDC480' }}
             >
-              <div className="text-4xl">💪</div>
+              <div className="text-4xl"><IconStrength size={40} /></div>
               <p className="font-semibold" style={{ color: '#0D6B6E' }}>Voeg je eerste oefening toe</p>
               <p className="text-sm text-muted-foreground max-w-[240px]">
                 Kies oefeningen uit de bibliotheek en begin met trainen

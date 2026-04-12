@@ -8,6 +8,7 @@ import { trpc } from '@/lib/trpc/client'
 import { RecoveryPanel } from '@/components/recovery/RecoveryPanel'
 import { WorkloadPanel } from '@/components/workload/WorkloadPanel'
 import { Play, CheckCircle2, Flame, TrendingUp, Calendar, ChevronRight, Plus, Dumbbell, Zap } from 'lucide-react'
+import { IconStrength } from '@/components/icons'
 import { DAY_LABELS } from '@/lib/program-constants'
 import { Progress } from '@/components/ui/progress'
 import { createClient } from '@/lib/supabase/client'
@@ -150,7 +151,7 @@ export default function AthleteDashboard() {
                   {todayExercises.slice(0, 3).map(e => (
                     <div key={e.uid} className="flex items-center gap-3">
                       <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-sm" style={{ background: '#f4f4f5' }}>
-                        💪
+                        <IconStrength size={16} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{e.name}</p>
