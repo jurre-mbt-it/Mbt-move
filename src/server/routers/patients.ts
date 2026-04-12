@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, therapistProcedure } from '@/server/trpc'
 
 export const patientsRouter = createTRPCRouter({
@@ -190,6 +191,86 @@ export const patientsRouter = createTRPCRouter({
       await ctx.prisma.user.delete({ where: { id: input.id } })
 
       return { success: true }
+    }),
+
+  // ── Voortgangsdata voor therapist ────────────────────────────────────────
+  getProgress: therapistProcedure
+    .input(z.object({ patientId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      // Verify access
+      const relation = await ctx.prisma.patientTherapist.findFirst({
+        where: { therapistId: ctx.user.id, patientId: input.patientId, isActive: true },
+      })
+      if (!relation) throw new TRPCError({ code: 'FORBIDDEN' })
+
+      // Sessions (last 90 days)
+      const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+      const sessions = await ctx.prisma.sessionLog.findMany({
+        where: { patientId: input.patientId, status: 'COMPLETED', completedAt: { gte: since } },
+        orderBy: { completedAt: 'asc' },
+        select: {
+          id: true, completedAt: true, duration: true,
+          painLevel: true, exertionLevel: true, notes: true,
+        },
+      })
+
+      // Exercise logs met gewicht/1RM (laatste 60 sessies)
+      const exerciseLogs = await ctx.prisma.exerciseLog.findMany({
+        where: {
+          session: { patientId: input.patientId, status: 'COMPLETED' },
+          weight: { not: null },
+        },
+        orderBy: { session: { completedAt: 'asc' } },
+        select: {
+          exerciseId: true, weight: true, estimatedOneRepMax: true,
+          setsCompleted: true, repsCompleted: true,
+          session: { select: { completedAt: true } },
+        },
+        take: 500,
+      })
+
+      // Exercise namen
+      const exerciseIds = [...new Set(exerciseLogs.map(l => l.exerciseId))]
+      const exercises = await ctx.prisma.exercise.findMany({
+        where: { id: { in: exerciseIds } },
+        select: { id: true, name: true },
+      })
+      const exerciseMap = Object.fromEntries(exercises.map(e => [e.id, e.name]))
+
+      // Groepeer 1RM per oefening over tijd
+      const oneRmByExercise: Record<string, { date: string; oneRm: number }[]> = {}
+      for (const log of exerciseLogs) {
+        if (!log.estimatedOneRepMax || !log.session.completedAt) continue
+        const name = exerciseMap[log.exerciseId] ?? log.exerciseId
+        if (!oneRmByExercise[name]) oneRmByExercise[name] = []
+        oneRmByExercise[name].push({
+          date: log.session.completedAt.toISOString().slice(0, 10),
+          oneRm: Math.round(log.estimatedOneRepMax),
+        })
+      }
+
+      return {
+        sessions: sessions.map(s => ({
+          id: s.id,
+          date: s.completedAt?.toISOString() ?? '',
+          durationMinutes: s.duration ? Math.round(s.duration / 60) : 0,
+          painLevel: s.painLevel ?? null,
+          exertionLevel: s.exertionLevel ?? null,
+          notes: s.notes ?? null,
+        })),
+        oneRmByExercise,
+        totalSessions: sessions.length,
+        avgPain: sessions.filter(s => s.painLevel !== null).length
+          ? Math.round(sessions.filter(s => s.painLevel !== null)
+              .reduce((s, l) => s + (l.painLevel ?? 0), 0) /
+              sessions.filter(s => s.painLevel !== null).length * 10) / 10
+          : null,
+        avgExertion: sessions.filter(s => s.exertionLevel !== null).length
+          ? Math.round(sessions.filter(s => s.exertionLevel !== null)
+              .reduce((s, l) => s + (l.exertionLevel ?? 0), 0) /
+              sessions.filter(s => s.exertionLevel !== null).length * 10) / 10
+          : null,
+      }
     }),
 
   // Get all patients (including unlinked) for the therapist to invite/link
