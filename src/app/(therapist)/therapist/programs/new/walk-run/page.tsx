@@ -12,7 +12,7 @@ import { toast } from 'sonner'
 import { ArrowLeft, ChevronRight, ChevronLeft, CheckCircle2, AlertTriangle, Footprints } from 'lucide-react'
 import { WALK_RUN_TEMPLATES, WalkRunTemplate, WalkRunWeek } from '@/lib/cardio-constants'
 import { trpc } from '@/lib/trpc/client'
-import { IconRunning, IconSquat, IconLunge } from '@/components/icons'
+import { IconRunning, IconSquat, IconLunge, IconNote, IconClipboard, IconCheck } from '@/components/icons'
 
 const MBT_GREEN = '#3ECF6A'
 const MBT_TEAL = '#4ECDC4'
@@ -85,7 +85,7 @@ function WeekTable({
                   </div>
                   {w.notes && (
                     <span className="text-xs text-muted-foreground hidden sm:block truncate max-w-[100px]" title={w.notes}>
-                      📝
+                      <IconNote size={14} />
                     </span>
                   )}
                 </div>
@@ -266,7 +266,7 @@ export default function WalkRunWizardPage() {
 
           <Card className="border-muted bg-muted/20">
             <CardContent className="p-4 text-sm text-muted-foreground space-y-1">
-              <p className="font-medium text-foreground">📋 {selectedTemplate.name}</p>
+              <p className="font-medium text-foreground inline-flex items-center gap-1"><IconClipboard size={14} /> {selectedTemplate.name}</p>
               <p>{selectedTemplate.description}</p>
               <p className="text-xs mt-2">{selectedTemplate.progressionRule}</p>
             </CardContent>
@@ -488,7 +488,7 @@ export default function WalkRunWizardPage() {
               disabled={saving}
               onClick={handleSave}
             >
-              {saving ? 'Aanmaken...' : '✓ Protocol aanmaken'}
+              {saving ? 'Aanmaken...' : <span className="inline-flex items-center gap-1"><IconCheck size={16} /> Protocol aanmaken</span>}
             </Button>
           </div>
         </div>

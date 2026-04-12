@@ -178,7 +178,7 @@ export function WeekPlannerEditor({ initialData }: Props) {
                   onChange={e => setDayProgram(i, e.target.value || null)}
                   className="flex-1 h-9 text-sm border rounded-md px-3 bg-white focus:outline-none focus:ring-1 focus:ring-[#4ECDC4]"
                 >
-                  <option value="">Rustdag 😴</option>
+                  <option value="">Rustdag</option>
                   {programs
                     .filter(p => !p.isTemplate)
                     .map(p => (

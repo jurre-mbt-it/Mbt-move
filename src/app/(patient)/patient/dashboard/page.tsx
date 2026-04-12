@@ -12,7 +12,7 @@ import { RecoveryPanel } from '@/components/recovery/RecoveryPanel'
 import { WorkloadPanel } from '@/components/workload/WorkloadPanel'
 import { Play, CheckCircle2, Flame, TrendingUp, Calendar, ChevronRight, AlertCircle } from 'lucide-react'
 import { DAY_LABELS } from '@/lib/program-constants'
-import { IconStrength, IconRunning } from '@/components/icons'
+import { IconStrength, IconRunning, IconWave, IconCelebration } from '@/components/icons'
 
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
 
@@ -61,7 +61,7 @@ export default function PatientDashboard() {
       {/* Header */}
       <div className="px-4 pt-12 pb-8" style={{ background: '#1A3A3A' }}>
         <p className="text-zinc-400 text-sm">{greeting}</p>
-        <h1 className="text-white text-2xl font-bold mt-0.5">{firstName} 👋</h1>
+        <h1 className="text-white text-2xl font-bold mt-0.5"><span className="inline-flex items-center gap-2">{firstName} <IconWave size={22} /></span></h1>
         {program && <p className="text-zinc-400 text-xs mt-1">Programma: {program.name}</p>}
       </div>
 
@@ -79,7 +79,7 @@ export default function PatientDashboard() {
             <div>
               <p className="text-white text-xs font-medium opacity-80">Vandaag · {DAY_NAMES[todayDayNum - 1]}</p>
               <p className="text-white font-bold text-base">
-                {completedToday ? 'Klaar voor vandaag! 🎉' : `${todayExercises.length} oefeningen`}
+                {completedToday ? <span className="inline-flex items-center gap-1">Klaar voor vandaag! <IconCelebration size={16} /></span> : `${todayExercises.length} oefeningen`}
               </p>
             </div>
             {!completedToday && (

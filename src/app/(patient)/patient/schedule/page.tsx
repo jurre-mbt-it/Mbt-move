@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { trpc } from '@/lib/trpc/client'
 import { Dumbbell, Moon, Play, ChevronRight } from 'lucide-react'
+import { IconLeaf, IconClipboard } from '@/components/icons'
 
 const DAY_SHORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
@@ -40,7 +41,7 @@ export default function PatientSchedulePage() {
   if (!program) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: '#FAFAFA' }}>
-        <div className="text-5xl">📋</div>
+        <div><IconClipboard size={48} /></div>
         <p className="font-semibold text-lg">Geen actief programma</p>
         <p className="text-muted-foreground text-sm">Je therapeut heeft nog geen programma voor je aangemaakt.</p>
       </div>
@@ -192,7 +193,7 @@ export default function PatientSchedulePage() {
             className="rounded-2xl px-5 py-8 flex flex-col items-center text-center gap-3"
             style={{ background: '#f0fdfa', border: '2px solid #bbf7d0' }}
           >
-            <div className="text-4xl">🌿</div>
+            <div><IconLeaf size={40} /></div>
             <div>
               <p className="font-bold text-base" style={{ color: '#0D6B6E' }}>Rustdag</p>
               <p className="text-sm mt-1.5 leading-relaxed" style={{ color: '#166534' }}>

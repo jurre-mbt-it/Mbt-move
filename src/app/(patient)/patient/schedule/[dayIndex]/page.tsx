@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
 import { ExerciseVideoModal, type ExerciseForModal } from '@/components/exercises/ExerciseVideoModal'
 import { ChevronLeft, Moon, Dumbbell, Play } from 'lucide-react'
+import { IconSleep } from '@/components/icons'
 
 const DAY_LABELS = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
 
@@ -51,7 +52,7 @@ export default function ScheduleDayPage({ params }: Props) {
         <div className="flex flex-col items-center justify-center py-12 rounded-2xl text-center"
           style={{ background: '#f0fdfa' }}>
           <Moon className="w-10 h-10 mb-3" style={{ color: '#86efac' }} />
-          <p className="font-bold text-base" style={{ color: '#0D6B6E' }}>Rustdag 😴</p>
+          <p className="font-bold text-base inline-flex items-center gap-2" style={{ color: '#0D6B6E' }}>Rustdag <IconSleep size={18} /></p>
           <p className="text-sm text-muted-foreground mt-1 max-w-xs">
             Vandaag hoef je niet te trainen. Gun je lichaam de tijd om te herstellen — dat is net zo belangrijk als trainen!
           </p>

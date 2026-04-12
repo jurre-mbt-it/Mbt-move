@@ -7,11 +7,147 @@ import React from 'react'
 export interface IconProps {
   size?: number
   className?: string
+  color?: string
 }
 
 const D = '#4a5568'   // primary dark
 const M = '#5a6577'   // mid tone
 const L = '#9ca3af'   // light accent
+
+// ─── General / UI icons ─────────────────────────────────────────────────────
+
+export function IconWave({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M7 12c1-3 2-5 4-7" stroke={D} strokeWidth="2" strokeLinecap="round" />
+      <path d="M11 5c1 2 2 5 1 8" stroke={M} strokeWidth="2" strokeLinecap="round" />
+      <path d="M14 4c0 3-1 6-2 9" stroke={D} strokeWidth="2" strokeLinecap="round" />
+      <path d="M17 6c-1 3-2 5-2 7" stroke={M} strokeWidth="2" strokeLinecap="round" />
+      <path d="M5 15c3 3 7 4 14 1" stroke={D} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function IconCelebration({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      {/* Confetti / celebration */}
+      <path d="M4 20l4-16 4 12 4-8 4 12" stroke={D} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="6" cy="5" r="1" fill={L} />
+      <circle cx="18" cy="4" r="1" fill={M} />
+      <circle cx="12" cy="3" r="1" fill={L} />
+      <line x1="2" y1="8" x2="4" y2="7" stroke={L} strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="20" y1="8" x2="22" y2="7" stroke={L} strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function IconFinishFlag({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      {/* Finish flag */}
+      <path d="M5 3v18" stroke={D} strokeWidth="2" strokeLinecap="round" />
+      <rect x="5" y="3" width="14" height="10" rx="1" stroke={D} strokeWidth="1.5" />
+      {/* Checkerboard pattern */}
+      <rect x="5" y="3" width="4.67" height="5" fill={D} />
+      <rect x="14.33" y="3" width="4.67" height="5" fill={D} />
+      <rect x="9.67" y="8" width="4.67" height="5" fill={D} />
+    </svg>
+  )
+}
+
+export function IconWarning({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M12 2L2 20h20L12 2z" stroke={D} strokeWidth="2" strokeLinejoin="round" />
+      <path d="M12 9v5" stroke={M} strokeWidth="2" strokeLinecap="round" />
+      <circle cx="12" cy="17" r="1" fill={M} />
+    </svg>
+  )
+}
+
+export function IconStop({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="12" cy="12" r="9" stroke={D} strokeWidth="2" />
+      <line x1="7" y1="7" x2="17" y2="17" stroke={D} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function IconLightbulb({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M9 18h6" stroke={M} strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M10 20h4" stroke={M} strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M12 2a7 7 0 0 0-4 12.7V16h8v-1.3A7 7 0 0 0 12 2z" stroke={D} strokeWidth="2" />
+      <path d="M12 6v4" stroke={L} strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M10 8h4" stroke={L} strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function IconClipboard({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <rect x="5" y="4" width="14" height="17" rx="2" stroke={D} strokeWidth="2" />
+      <rect x="8" y="2" width="8" height="4" rx="1" stroke={M} strokeWidth="1.5" fill="white" />
+      <line x1="8" y1="10" x2="16" y2="10" stroke={L} strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="8" y1="13" x2="14" y2="13" stroke={L} strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="8" y1="16" x2="12" y2="16" stroke={L} strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function IconNote({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <rect x="4" y="3" width="16" height="18" rx="2" stroke={D} strokeWidth="2" />
+      <line x1="8" y1="8" x2="16" y2="8" stroke={L} strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="8" y1="11" x2="16" y2="11" stroke={L} strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="8" y1="14" x2="12" y2="14" stroke={L} strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function IconLeaf({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M6 20c0 0 2-8 8-12s8-4 8-4-2 8-8 12-8 4-8 4z" stroke={D} strokeWidth="2" strokeLinejoin="round" />
+      <path d="M6 20c4-4 8-8 16-16" stroke={M} strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M10 16c2-2 4-4 6-5" stroke={L} strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function IconSleep({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M17 4h4l-4 4h4" stroke={D} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 8h3l-3 3h3" stroke={M} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Moon */}
+      <path d="M5 18a7 7 0 0 1 0-12 7.5 7.5 0 0 0 0 12z" stroke={D} strokeWidth="2" />
+    </svg>
+  )
+}
+
+export function IconLock({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <rect x="5" y="11" width="14" height="10" rx="2" stroke={D} strokeWidth="2" />
+      <path d="M8 11V7a4 4 0 1 1 8 0v4" stroke={M} strokeWidth="2" strokeLinecap="round" />
+      <circle cx="12" cy="16" r="1.5" fill={D} />
+    </svg>
+  )
+}
+
+export function IconCheck({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M5 12l5 5L20 7" stroke={D} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
 
 // ─── Workout types ──────────────────────────────────────────────────────────
 

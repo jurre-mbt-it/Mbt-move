@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { trpc } from '@/lib/trpc/client'
 import { Database, Download, Users, Activity, TrendingUp, BarChart3 } from 'lucide-react'
 import { toast } from 'sonner'
+import { IconLock } from '@/components/icons'
 
 export default function AdminResearchPage() {
   const [isExporting, setIsExporting] = useState(false)
@@ -102,7 +103,7 @@ export default function AdminResearchPage() {
         className="flex items-start gap-3 px-4 py-3 rounded-xl text-sm"
         style={{ background: '#fffbeb', border: '1px solid #fde68a' }}
       >
-        <span className="text-lg leading-none">🔒</span>
+        <IconLock size={18} />
         <div>
           <p className="font-semibold" style={{ color: '#92400e' }}>Beveiligingsregels actief</p>
           <p style={{ color: '#78350f' }}>

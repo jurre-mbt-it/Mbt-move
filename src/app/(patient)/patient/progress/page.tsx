@@ -8,6 +8,7 @@ import {
   Flame, TrendingUp, TrendingDown, CheckCircle2,
   Target, Calendar, BarChart3, Plus, Trophy, Activity,
 } from 'lucide-react'
+import { IconWarning, IconLightbulb } from '@/components/icons'
 
 // ─── Mock 1RM progression data ────────────────────────────────────────────────
 const MOCK_1RM_DATA = [
@@ -285,8 +286,9 @@ export default function ProgressPage() {
                 const last3 = ex.data.slice(-3).map(d => d.value)
                 const isStagnant = last3.length === 3 && last3[2] <= last3[0]
                 const suggestion = isStagnant
-                  ? '⚠️ Deload aanbevolen — 3 sessies geen progressie'
-                  : `💡 Volgende sessie: probeer ${last + 2.5} kg`
+                  ? 'Deload aanbevolen — 3 sessies geen progressie'
+                  : `Volgende sessie: probeer ${last + 2.5} kg`
+                const SuggestionIcon = isStagnant ? IconWarning : IconLightbulb
                 return (
                   <div key={ex.exerciseId} className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -330,7 +332,7 @@ export default function ProgressPage() {
                         )
                       })}
                     </svg>
-                    <p className="text-[10px] text-muted-foreground">{suggestion}</p>
+                    <p className="text-[10px] text-muted-foreground inline-flex items-center gap-1"><SuggestionIcon size={10} /> {suggestion}</p>
                   </div>
                 )
               })}

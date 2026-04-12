@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { ArrowLeft, CheckCircle2, Clock } from 'lucide-react'
+import { IconStop, IconWarning, IconCheck } from '@/components/icons'
 import { toast } from 'sonner'
 
 const MBT_GREEN = '#3ECF6A'
@@ -163,8 +164,8 @@ function FollowUpCard({
               }}
             >
               {pain24h > 7
-                ? '⛔ Pijn te hoog — bespreek met je therapeut voor de volgende sessie.'
-                : '⚠️ Verhoogde pijn na sessie. Monitor het verloop.'}
+                ? <span className="inline-flex items-center gap-1"><IconStop size={14} /> Pijn te hoog — bespreek met je therapeut voor de volgende sessie.</span>
+                : <span className="inline-flex items-center gap-1"><IconWarning size={14} /> Verhoogde pijn na sessie. Monitor het verloop.</span>}
             </div>
           )}
         </div>
@@ -239,7 +240,7 @@ export default function FollowUpPage() {
         {/* Pending items */}
         {items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-            <div className="text-4xl">✅</div>
+            <div><IconCheck size={40} /></div>
             <p className="font-semibold">Geen follow-ups</p>
             <p className="text-sm text-muted-foreground">Je hebt geen openstaande 24u checks.</p>
           </div>

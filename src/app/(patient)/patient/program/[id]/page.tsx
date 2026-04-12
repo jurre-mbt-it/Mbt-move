@@ -9,6 +9,7 @@ import { trpc } from '@/lib/trpc/client'
 import { DAY_LABELS } from '@/lib/program-constants'
 import { ExerciseVideoModal, type ExerciseForModal } from '@/components/exercises/ExerciseVideoModal'
 import { ChevronLeft, Play, CheckCircle2, Lock } from 'lucide-react'
+import { IconClipboard } from '@/components/icons'
 
 // Coaching cues by exerciseId (static — based on demo exercises)
 const COACHING_CUES: Record<string, string[]> = {
@@ -44,7 +45,7 @@ export default function PatientProgramPage() {
   if (!program) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: '#FAFAFA' }}>
-        <div className="text-5xl">📋</div>
+        <div><IconClipboard size={48} /></div>
         <p className="font-semibold text-lg">Geen actief programma</p>
         <p className="text-muted-foreground text-sm">Je therapeut heeft nog geen programma voor je aangemaakt.</p>
         <Link href="/patient/dashboard">

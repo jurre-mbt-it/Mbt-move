@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   const html = `
     <div style="font-family: sans-serif; max-width: 540px; margin: 0 auto; padding: 32px 24px;">
       <img src="https://mbt-move.nl/Logo.jpg" alt="MBT Gym" style="height: 36px; margin-bottom: 24px;" />
-      <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 8px;">Hoi ${patientName} 👋</h2>
+      <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 8px;">Hoi ${patientName}</h2>
       <p style="color: #52525b; margin: 0 0 24px;">
         Jouw therapeut heeft een revalidatieprogramma voor je klaarstaan.
       </p>

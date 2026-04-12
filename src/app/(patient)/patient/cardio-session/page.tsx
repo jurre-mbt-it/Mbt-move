@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, HR_ZONES, HRZone } from '@/lib/cardio-constants'
 import { cn } from '@/lib/utils'
-import { CARDIO_ICON_MAP, IconRunning, IconWalking } from '@/components/icons'
+import { CARDIO_ICON_MAP, IconRunning, IconWalking, IconWarning, IconFinishFlag, IconCheck } from '@/components/icons'
 
 const MBT_GREEN = '#3ECF6A'
 const MBT_TEAL = '#4ECDC4'
@@ -113,7 +113,33 @@ function CircularTimer({
 
 // ── Smiley RPE feedback ───────────────────────────────────────────────────────
 
-const SMILIES = ['😫', '😕', '😐', '🙂', '😄']
+// SVG smiley faces — flat style matching the icon set
+function SmileySVG({ expression, size = 28, color }: { expression: 'exhausted' | 'unhappy' | 'neutral' | 'happy' | 'great'; size?: number; color: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" stroke={color} strokeWidth="2" />
+      {/* Eyes */}
+      {expression === 'exhausted' ? (
+        <>
+          <line x1="7" y1="9" x2="10" y2="10" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+          <line x1="14" y1="10" x2="17" y2="9" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+        </>
+      ) : (
+        <>
+          <circle cx="8.5" cy="9.5" r="1.2" fill={color} />
+          <circle cx="15.5" cy="9.5" r="1.2" fill={color} />
+        </>
+      )}
+      {/* Mouth */}
+      {expression === 'exhausted' && <path d="M9 16c1-1.5 5-1.5 6 0" stroke={color} strokeWidth="1.5" strokeLinecap="round" />}
+      {expression === 'unhappy' && <path d="M9 16c1-1.5 5-1.5 6 0" stroke={color} strokeWidth="1.5" strokeLinecap="round" />}
+      {expression === 'neutral' && <line x1="9" y1="15" x2="15" y2="15" stroke={color} strokeWidth="1.5" strokeLinecap="round" />}
+      {expression === 'happy' && <path d="M9 14c1 1.5 5 1.5 6 0" stroke={color} strokeWidth="1.5" strokeLinecap="round" />}
+      {expression === 'great' && <path d="M8 13c1 3 7 3 8 0" stroke={color} strokeWidth="1.5" strokeLinecap="round" />}
+    </svg>
+  )
+}
+const SMILEY_EXPRESSIONS: Array<'exhausted' | 'unhappy' | 'neutral' | 'happy' | 'great'> = ['exhausted', 'unhappy', 'neutral', 'happy', 'great']
 const SMILEY_LABELS = ['Zwaar', 'Moeilijk', 'Oké', 'Goed', 'Super']
 const SMILEY_COLORS = ['#ef4444', '#f97316', '#eab308', '#84cc16', MBT_GREEN]
 
@@ -134,14 +160,14 @@ function FeedbackModal({
       <div>
         <p className="text-sm font-semibold mb-3">Hoe voelde de sessie?</p>
         <div className="flex gap-2">
-          {SMILIES.map((s, i) => (
+          {SMILEY_EXPRESSIONS.map((expr, i) => (
             <button
               key={i}
               onClick={() => setRpe(i + 1)}
               className="flex-1 flex flex-col items-center gap-1 p-2 rounded-xl border transition-all"
               style={rpe === i + 1 ? { borderColor: SMILEY_COLORS[i], background: SMILEY_COLORS[i] + '20' } : {}}
             >
-              <span className="text-2xl">{s}</span>
+              <SmileySVG expression={expr} color={SMILEY_COLORS[i]} />
               <span className="text-xs">{SMILEY_LABELS[i]}</span>
             </button>
           ))}
@@ -164,7 +190,7 @@ function FeedbackModal({
         </div>
         {highPain && (
           <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex gap-2">
-            <span>⚠️</span>
+            <IconWarning size={16} />
             <span>Pijn &gt; 5/10 — Volgende sessie wordt herhaald. Therapeut wordt op de hoogte gesteld.</span>
           </div>
         )}
@@ -203,7 +229,7 @@ function FeedbackModal({
           distance: distInput ? +distInput : null,
         })}
       >
-        {highPain ? '⚠️ Sessie afsluiten (pijn gemeld)' : '✓ Sessie afsluiten'}
+        {highPain ? <span className="inline-flex items-center gap-1"><IconWarning size={16} /> Sessie afsluiten (pijn gemeld)</span> : <span className="inline-flex items-center gap-1"><IconCheck size={16} /> Sessie afsluiten</span>}
       </Button>
     </div>
   )
@@ -281,7 +307,7 @@ export default function CardioSessionPage() {
   const handleStart = () => {
     setPhase('ACTIVE')
     playBeep(660, 0.2)
-    toast('Sessie gestart! Succes! 🏃', { duration: 2000 })
+    toast('Sessie gestart! Succes!', { duration: 2000 })
   }
 
   const handlePause = () => setPhase('PAUSED')
@@ -328,7 +354,7 @@ export default function CardioSessionPage() {
       <div className="min-h-screen flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-sm space-y-5">
           <div className="text-center">
-            <div className="text-5xl mb-3">🏁</div>
+            <div className="mb-3"><IconFinishFlag size={48} /></div>
             <h2 className="text-xl font-bold">Sessie afgerond!</h2>
             <p className="text-sm text-muted-foreground mt-1">
               {elapsedMin}:{elapsedSecs.toString().padStart(2, '0')} actief · Week {session.week}, Sessie {session.session}
