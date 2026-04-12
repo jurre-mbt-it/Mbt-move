@@ -29,7 +29,7 @@ const VARIANTS: Record<string, { easier?: string; harder?: string }> = {
 }
 
 export default function PatientProgramPage() {
-  const { data: program, isLoading } = trpc.patient.getActiveProgram.useQuery()
+  const { data: program, isLoading } = trpc.patient.getActiveProgram.useQuery(undefined, { staleTime: 60_000 })
   const [activeWeek, setActiveWeek] = useState(1)
   const [modalExercise, setModalExercise] = useState<ExerciseForModal | null>(null)
 

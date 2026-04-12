@@ -50,7 +50,7 @@ function mapProgramExercise(pe: {
     category: string
     difficulty: string
     videoUrl: string | null
-    muscleLoads: { muscle: string; load: number }[]
+    muscleLoads?: { muscle: string; load: number }[]
     easierVariantId: string | null
     harderVariantId: string | null
     trackOneRepMax?: boolean
@@ -69,9 +69,9 @@ function mapProgramExercise(pe: {
     repUnit: pe.repUnit,
     restTime: pe.restTime,
     videoUrl: pe.exercise.videoUrl ?? null,
-    muscleLoads: Object.fromEntries(
-      pe.exercise.muscleLoads.map(ml => [ml.muscle, ml.load])
-    ) as Record<string, number>,
+    muscleLoads: pe.exercise.muscleLoads
+      ? Object.fromEntries(pe.exercise.muscleLoads.map(ml => [ml.muscle, ml.load]))
+      : {} as Record<string, number>,
     supersetGroup: pe.supersetGroup ?? null,
     supersetOrder: pe.supersetOrder,
     notes: pe.notes ?? null,
@@ -142,7 +142,13 @@ export const patientRouter = createTRPCRouter({
       include: {
         exercises: {
           include: {
-            exercise: { include: { muscleLoads: true } },
+            exercise: {
+              select: {
+                name: true, category: true, difficulty: true,
+                videoUrl: true, easierVariantId: true, harderVariantId: true,
+                trackOneRepMax: true,
+              },
+            },
           },
           orderBy: [{ order: 'asc' }],
         },
