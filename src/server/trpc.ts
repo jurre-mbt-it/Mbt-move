@@ -14,20 +14,35 @@ export interface Context {
   } | null
 }
 
+// In-memory cache voor user lookups (leeft mee met de serverless instantie)
+const userCache = new Map<string, { user: Context['user']; expiresAt: number }>()
+const USER_CACHE_TTL = 60_000 // 60 seconden
+
 export async function createTRPCContext(opts: { req?: NextRequest }): Promise<Context> {
   let user: Context['user'] = null
 
   try {
     const supabase = await createClient()
-    const { data: { user: supabaseUser } } = await supabase.auth.getUser()
 
-    if (supabaseUser?.email) {
-      const dbUser = await prisma.user.findUnique({
-        where: { email: supabaseUser.email },
-        select: { id: true, email: true, role: true },
-      })
-      if (dbUser) {
-        user = { id: dbUser.id, email: dbUser.email, role: dbUser.role }
+    // getSession() leest uit cookie — geen netwerkroundtrip naar Supabase
+    const { data: { session } } = await supabase.auth.getSession()
+    const supabaseUser = session?.user
+
+    if (supabaseUser?.id && supabaseUser?.email) {
+      // Check cache eerst
+      const cached = userCache.get(supabaseUser.id)
+      if (cached && cached.expiresAt > Date.now()) {
+        user = cached.user
+      } else {
+        // Één DB-query, resultaat wordt gecached
+        const dbUser = await prisma.user.findUnique({
+          where: { email: supabaseUser.email },
+          select: { id: true, email: true, role: true },
+        })
+        if (dbUser) {
+          user = { id: dbUser.id, email: dbUser.email, role: dbUser.role }
+          userCache.set(supabaseUser.id, { user, expiresAt: Date.now() + USER_CACHE_TTL })
+        }
       }
     }
   } catch {
