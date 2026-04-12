@@ -28,7 +28,7 @@ import { SupersetGroupBlock } from './SupersetGroupBlock'
 import { MuscleBalancePanel } from './MuscleBalancePanel'
 import type { BuilderExercise, ProgramState } from './types'
 import { SUPERSET_LETTERS, DAY_LABELS } from '@/lib/program-constants'
-import { MOCK_EXERCISES, EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
+import { EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
 import { trpc } from '@/lib/trpc/client'
 import { cn } from '@/lib/utils'
 
@@ -184,7 +184,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
       if (e.uid !== uid) return e
       const targetId = direction === 'easier' ? e.easierVariantId : e.harderVariantId
       if (!targetId) return e
-      const source = libraryExercises.length > 0 ? libraryExercises : MOCK_EXERCISES
+      const source = libraryExercises
       const target = source.find((le: { id: string }) => le.id === targetId) as typeof MOCK_EXERCISES[number] | undefined
       if (!target) { toast.error('Variant niet gevonden in bibliotheek'); return e }
       toast.success(`Gewisseld naar: ${target.name}`)
@@ -696,7 +696,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
                             onRemove={removeEx}
                             onToggleSelect={toggleSelect}
                             onSwapVariant={swapVariant}
-                            allExercises={libraryExercises.length > 0 ? libraryExercises as never : MOCK_EXERCISES as never}
+                            allExercises={libraryExercises as never}
                             customParams={customParams}
                           />
                           <button
@@ -720,7 +720,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
                           onRemove={removeEx}
                           onToggleSelect={toggleSelect}
                           onSwapVariant={swapVariant}
-                          allExercises={libraryExercises.length > 0 ? libraryExercises as never : MOCK_EXERCISES as never}
+                          allExercises={libraryExercises as never}
                           customParams={customParams}
                         />
                       </SortableContext>
@@ -814,7 +814,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
 
           {/* Exercise list */}
           <div className="flex-1 overflow-y-auto px-4 pb-2 space-y-1.5">
-            {(libraryExercises.length > 0 ? libraryExercises : MOCK_EXERCISES)
+            {(libraryExercises)
               .filter(ex => {
                 if (mobileCategory && ex.category !== mobileCategory) return false
                 if (mobileQuery && !ex.name.toLowerCase().includes(mobileQuery.toLowerCase())) return false
@@ -857,7 +857,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
               style={{ background: '#4ECDC4' }}
               disabled={mobileSelected.size === 0}
               onClick={() => {
-                const source = libraryExercises.length > 0 ? libraryExercises : MOCK_EXERCISES
+                const source = libraryExercises
                 source
                   .filter(ex => mobileSelected.has(ex.id))
                   .forEach(ex => addFromLibrary(ex))

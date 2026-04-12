@@ -4,8 +4,8 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { ArrowDown, ArrowUp, X, Search } from 'lucide-react'
-import { MOCK_EXERCISES } from '@/lib/exercise-constants'
+import { ArrowDown, ArrowUp, X, Search, Loader2 } from 'lucide-react'
+import { trpc } from '@/lib/trpc/client'
 
 interface ProgressionPickerProps {
   easierVariantId: string | null
@@ -33,10 +33,14 @@ function ExercisePicker({
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
 
-  const exercises = MOCK_EXERCISES.filter(
+  const { data: allExercises = [], isLoading } = trpc.exercises.list.useQuery(undefined, {
+    staleTime: 60_000,
+  })
+
+  const exercises = allExercises.filter(
     e => e.id !== excludeId && e.name.toLowerCase().includes(query.toLowerCase())
   )
-  const selected = MOCK_EXERCISES.find(e => e.id === selectedId)
+  const selected = allExercises.find(e => e.id === selectedId)
 
   return (
     <div className="space-y-2">
@@ -79,7 +83,11 @@ function ExercisePicker({
                 />
               </div>
               <div className="max-h-48 overflow-y-auto">
-                {exercises.length === 0 ? (
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                  </div>
+                ) : exercises.length === 0 ? (
                   <p className="text-sm text-muted-foreground px-3 py-2">Geen oefeningen gevonden</p>
                 ) : (
                   exercises.map(ex => (

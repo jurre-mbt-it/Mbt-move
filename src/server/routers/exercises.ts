@@ -181,4 +181,127 @@ export const exercisesRouter = createTRPCRouter({
       await ctx.prisma.exercise.delete({ where: { id: input.id } })
       return { success: true }
     }),
+
+  // ── Collections CRUD ────────────────────────────────────────────────────
+
+  listCollections: protectedProcedure
+    .query(async ({ ctx }) => {
+      const collections = await ctx.prisma.exerciseCollection.findMany({
+        where: { therapistId: ctx.user!.id },
+        include: { _count: { select: { items: true } } },
+        orderBy: { createdAt: 'asc' },
+      })
+      return collections.map(c => ({
+        id: c.id,
+        name: c.name,
+        color: c.color ?? '#4ECDC4',
+        count: c._count.items,
+      }))
+    }),
+
+  createCollection: therapistProcedure
+    .input(z.object({
+      name: z.string().min(1),
+      color: z.string().default('#4ECDC4'),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const collection = await ctx.prisma.exerciseCollection.create({
+        data: {
+          id: createId(),
+          name: input.name,
+          color: input.color,
+          therapistId: ctx.user!.id,
+        },
+      })
+      return collection
+    }),
+
+  updateCollection: therapistProcedure
+    .input(z.object({
+      id: z.string(),
+      name: z.string().min(1).optional(),
+      color: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.prisma.exerciseCollection.findUnique({ where: { id: input.id } })
+      if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
+      if (existing.therapistId !== ctx.user!.id) throw new TRPCError({ code: 'FORBIDDEN' })
+      return ctx.prisma.exerciseCollection.update({
+        where: { id: input.id },
+        data: {
+          ...(input.name ? { name: input.name } : {}),
+          ...(input.color ? { color: input.color } : {}),
+        },
+      })
+    }),
+
+  deleteCollection: therapistProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.prisma.exerciseCollection.findUnique({ where: { id: input.id } })
+      if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
+      if (existing.therapistId !== ctx.user!.id) throw new TRPCError({ code: 'FORBIDDEN' })
+      await ctx.prisma.exerciseCollection.delete({ where: { id: input.id } })
+      return { success: true }
+    }),
+
+  addToCollection: therapistProcedure
+    .input(z.object({
+      collectionId: z.string(),
+      exerciseId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const collection = await ctx.prisma.exerciseCollection.findUnique({ where: { id: input.collectionId } })
+      if (!collection) throw new TRPCError({ code: 'NOT_FOUND' })
+      if (collection.therapistId !== ctx.user!.id) throw new TRPCError({ code: 'FORBIDDEN' })
+      // Upsert to avoid duplicate errors
+      return ctx.prisma.exerciseCollectionItem.upsert({
+        where: {
+          collectionId_exerciseId: {
+            collectionId: input.collectionId,
+            exerciseId: input.exerciseId,
+          },
+        },
+        create: {
+          id: createId(),
+          collectionId: input.collectionId,
+          exerciseId: input.exerciseId,
+        },
+        update: {},
+      })
+    }),
+
+  removeFromCollection: therapistProcedure
+    .input(z.object({
+      collectionId: z.string(),
+      exerciseId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const collection = await ctx.prisma.exerciseCollection.findUnique({ where: { id: input.collectionId } })
+      if (!collection) throw new TRPCError({ code: 'NOT_FOUND' })
+      if (collection.therapistId !== ctx.user!.id) throw new TRPCError({ code: 'FORBIDDEN' })
+      await ctx.prisma.exerciseCollectionItem.deleteMany({
+        where: {
+          collectionId: input.collectionId,
+          exerciseId: input.exerciseId,
+        },
+      })
+      return { success: true }
+    }),
+
+  getCollectionExercises: protectedProcedure
+    .input(z.object({ collectionId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const items = await ctx.prisma.exerciseCollectionItem.findMany({
+        where: { collectionId: input.collectionId },
+        include: {
+          exercise: { include: { muscleLoads: true } },
+        },
+        orderBy: { addedAt: 'asc' },
+      })
+      return items.map(item => ({
+        ...item.exercise,
+        muscleLoads: Object.fromEntries(item.exercise.muscleLoads.map(ml => [ml.muscle, ml.load])),
+      }))
+    }),
 })

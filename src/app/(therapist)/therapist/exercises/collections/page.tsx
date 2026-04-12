@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { COLLECTION_COLORS, MOCK_EXERCISES } from '@/lib/exercise-constants'
+import { COLLECTION_COLORS } from '@/lib/exercise-constants'
+import { trpc } from '@/lib/trpc/client'
 import { cn } from '@/lib/utils'
 import {
   Plus,
@@ -18,39 +19,66 @@ import {
   FolderOpen,
   GripVertical,
   X,
+  Loader2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-interface Collection {
-  id: string
-  name: string
-  color: string
-  exerciseIds: string[]
-}
-
-const INITIAL_COLLECTIONS: Collection[] = [
-  { id: 'c1', name: 'Knie revalidatie', color: '#4ECDC4', exerciseIds: ['1', '2', '4'] },
-  { id: 'c2', name: 'Schouder protocol', color: '#60a5fa', exerciseIds: ['6', '4'] },
-  { id: 'c3', name: 'Warming-up basis', color: '#f59e0b', exerciseIds: ['3', '4', '5', '1'] },
-]
-
 export default function CollectionsPage() {
-  const [collections, setCollections] = useState<Collection[]>(INITIAL_COLLECTIONS)
+  const utils = trpc.useUtils()
+
+  const { data: collections = [], isLoading: collectionsLoading } = trpc.exercises.listCollections.useQuery()
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editing, setEditing] = useState<Collection | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [formName, setFormName] = useState('')
   const [formColor, setFormColor] = useState<string>(COLLECTION_COLORS[0])
   const [activeCollection, setActiveCollection] = useState<string | null>(null)
 
+  const { data: collectionExercises = [], isLoading: exercisesLoading } = trpc.exercises.getCollectionExercises.useQuery(
+    { collectionId: activeCollection! },
+    { enabled: !!activeCollection },
+  )
+
+  const createMutation = trpc.exercises.createCollection.useMutation({
+    onSuccess: () => {
+      utils.exercises.listCollections.invalidate()
+      setDialogOpen(false)
+      toast.success('Collectie aangemaakt')
+    },
+  })
+
+  const updateMutation = trpc.exercises.updateCollection.useMutation({
+    onSuccess: () => {
+      utils.exercises.listCollections.invalidate()
+      setDialogOpen(false)
+      toast.success('Collectie bijgewerkt')
+    },
+  })
+
+  const deleteMutation = trpc.exercises.deleteCollection.useMutation({
+    onSuccess: () => {
+      utils.exercises.listCollections.invalidate()
+      if (activeCollection) setActiveCollection(null)
+      toast.success('Collectie verwijderd')
+    },
+  })
+
+  const removeMutation = trpc.exercises.removeFromCollection.useMutation({
+    onSuccess: () => {
+      utils.exercises.getCollectionExercises.invalidate({ collectionId: activeCollection! })
+      utils.exercises.listCollections.invalidate()
+      toast.success('Oefening verwijderd uit collectie')
+    },
+  })
+
   const openCreate = () => {
-    setEditing(null)
+    setEditingId(null)
     setFormName('')
     setFormColor(COLLECTION_COLORS[0])
     setDialogOpen(true)
   }
 
-  const openEdit = (col: Collection) => {
-    setEditing(col)
+  const openEdit = (col: { id: string; name: string; color: string }) => {
+    setEditingId(col.id)
     setFormName(col.name)
     setFormColor(col.color)
     setDialogOpen(true)
@@ -58,40 +86,23 @@ export default function CollectionsPage() {
 
   const handleSave = () => {
     if (!formName.trim()) { toast.error('Naam is verplicht'); return }
-    if (editing) {
-      setCollections(cs => cs.map(c => c.id === editing.id ? { ...c, name: formName, color: formColor } : c))
-      toast.success('Collectie bijgewerkt')
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, name: formName, color: formColor })
     } else {
-      const newCol: Collection = {
-        id: `c${Date.now()}`,
-        name: formName,
-        color: formColor,
-        exerciseIds: [],
-      }
-      setCollections(cs => [...cs, newCol])
-      toast.success('Collectie aangemaakt')
+      createMutation.mutate({ name: formName, color: formColor })
     }
-    setDialogOpen(false)
   }
 
   const handleDelete = (id: string) => {
-    setCollections(cs => cs.filter(c => c.id !== id))
-    if (activeCollection === id) setActiveCollection(null)
-    toast.success('Collectie verwijderd')
+    deleteMutation.mutate({ id })
   }
 
-  const removeExercise = (collectionId: string, exerciseId: string) => {
-    setCollections(cs => cs.map(c =>
-      c.id === collectionId
-        ? { ...c, exerciseIds: c.exerciseIds.filter(id => id !== exerciseId) }
-        : c
-    ))
+  const removeExercise = (exerciseId: string) => {
+    if (!activeCollection) return
+    removeMutation.mutate({ collectionId: activeCollection, exerciseId })
   }
 
   const active = collections.find(c => c.id === activeCollection)
-  const activeExercises = active
-    ? MOCK_EXERCISES.filter(e => active.exerciseIds.includes(e.id))
-    : []
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -120,49 +131,11 @@ export default function CollectionsPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Collections list */}
         <div className="space-y-3 md:col-span-1">
-          {collections.map(col => (
-            <Card
-              key={col.id}
-              className={cn(
-                'cursor-pointer transition-all hover:shadow-md',
-                activeCollection === col.id ? 'ring-2' : ''
-              )}
-              style={{ borderRadius: '12px', ...(activeCollection === col.id ? { ringColor: col.color } : {}) }}
-              onClick={() => setActiveCollection(activeCollection === col.id ? null : col.id)}
-            >
-              <CardHeader className="pb-2 pt-4 px-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className="w-3 h-3 rounded-full shrink-0"
-                      style={{ background: col.color }}
-                    />
-                    <CardTitle className="text-sm font-semibold">{col.name}</CardTitle>
-                  </div>
-                  <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(col)}>
-                      <Pencil className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 hover:text-destructive"
-                      onClick={() => handleDelete(col.id)}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="px-4 pb-4">
-                <p className="text-xs text-muted-foreground">
-                  {col.exerciseIds.length} oefening{col.exerciseIds.length !== 1 ? 'en' : ''}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-
-          {collections.length === 0 && (
+          {collectionsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : collections.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-xl">
               <FolderOpen className="w-10 h-10 text-zinc-300 mb-3" />
               <p className="text-sm text-muted-foreground">Nog geen collecties</p>
@@ -170,6 +143,48 @@ export default function CollectionsPage() {
                 <Plus className="w-4 h-4 mr-1" /> Aanmaken
               </Button>
             </div>
+          ) : (
+            collections.map(col => (
+              <Card
+                key={col.id}
+                className={cn(
+                  'cursor-pointer transition-all hover:shadow-md',
+                  activeCollection === col.id ? 'ring-2' : ''
+                )}
+                style={{ borderRadius: '12px', ...(activeCollection === col.id ? { ringColor: col.color } : {}) }}
+                onClick={() => setActiveCollection(activeCollection === col.id ? null : col.id)}
+              >
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <span
+                        className="w-3 h-3 rounded-full shrink-0"
+                        style={{ background: col.color }}
+                      />
+                      <CardTitle className="text-sm font-semibold">{col.name}</CardTitle>
+                    </div>
+                    <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(col)}>
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 hover:text-destructive"
+                        onClick={() => handleDelete(col.id)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="px-4 pb-4">
+                  <p className="text-xs text-muted-foreground">
+                    {col.count} oefening{col.count !== 1 ? 'en' : ''}
+                  </p>
+                </CardContent>
+              </Card>
+            ))
           )}
         </div>
 
@@ -181,11 +196,15 @@ export default function CollectionsPage() {
                 <div className="flex items-center gap-2.5">
                   <span className="w-4 h-4 rounded-full" style={{ background: active.color }} />
                   <CardTitle>{active.name}</CardTitle>
-                  <Badge variant="secondary">{active.exerciseIds.length}</Badge>
+                  <Badge variant="secondary">{active.count}</Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-2">
-                {activeExercises.length === 0 ? (
+                {exercisesLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : collectionExercises.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-sm text-muted-foreground">Geen oefeningen in deze collectie</p>
                     <Link href="/therapist/exercises">
@@ -195,7 +214,7 @@ export default function CollectionsPage() {
                     </Link>
                   </div>
                 ) : (
-                  activeExercises.map(ex => (
+                  collectionExercises.map(ex => (
                     <div key={ex.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-zinc-50 group">
                       <GripVertical className="w-4 h-4 text-zinc-300 cursor-grab shrink-0" />
                       <div
@@ -209,7 +228,7 @@ export default function CollectionsPage() {
                         <p className="text-xs text-muted-foreground truncate">{ex.description}</p>
                       </div>
                       <button
-                        onClick={() => removeExercise(active.id, ex.id)}
+                        onClick={() => removeExercise(ex.id)}
                         className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-destructive"
                       >
                         <X className="w-4 h-4" />
@@ -232,7 +251,7 @@ export default function CollectionsPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Collectie bewerken' : 'Nieuwe collectie'}</DialogTitle>
+            <DialogTitle>{editingId ? 'Collectie bewerken' : 'Nieuwe collectie'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div>
@@ -265,8 +284,16 @@ export default function CollectionsPage() {
               </div>
             </div>
             <div className="flex gap-2 pt-2">
-              <Button onClick={handleSave} style={{ background: '#4ECDC4' }} className="flex-1">
-                {editing ? 'Opslaan' : 'Aanmaken'}
+              <Button
+                onClick={handleSave}
+                style={{ background: '#4ECDC4' }}
+                className="flex-1"
+                disabled={createMutation.isPending || updateMutation.isPending}
+              >
+                {(createMutation.isPending || updateMutation.isPending)
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : editingId ? 'Opslaan' : 'Aanmaken'
+                }
               </Button>
               <Button variant="outline" onClick={() => setDialogOpen(false)}>
                 Annuleren

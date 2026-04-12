@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { MOCK_EXERCISES, EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
+import { EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
 import { SUPERSET_COLORS } from '@/lib/program-constants'
 import { cn } from '@/lib/utils'
 import { Search, Plus, GripVertical, X } from 'lucide-react'
@@ -92,7 +92,7 @@ export function ExerciseLibraryPanel({ onAdd, exercises: propExercises }: Exerci
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<string | null>(null)
 
-  const allExercises = (propExercises && propExercises.length > 0 ? propExercises : MOCK_EXERCISES) as LibraryExercise[]
+  const allExercises = (propExercises ?? []) as LibraryExercise[]
 
   const filtered = useMemo(() =>
     allExercises.filter(e => {

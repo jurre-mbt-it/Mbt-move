@@ -1,5 +1,4 @@
 import type { CustomParameter } from '@/components/programs/types'
-import { MOCK_EXERCISES } from './exercise-constants'
 
 export const STANDARD_PARAMS = [
   { label: 'Tempo',        type: 'text'   as const, unit: '',     placeholder: '3-1-2-0' },
@@ -78,47 +77,4 @@ export const MOCK_PROGRAMS = [
   },
 ]
 
-// Pre-populated program for the edit demo (id: p1)
-export function buildMockProgram() {
-  const ex = MOCK_EXERCISES
-
-  const makeEx = (
-    idx: number,
-    e: typeof ex[number],
-    day: number,
-    week: number,
-    sets = 3,
-    reps = 10,
-    supersetGroup: string | null = null,
-    supersetOrder = 0,
-  ) => ({
-    uid: `uid-${idx}`,
-    exerciseId: e.id,
-    name: e.name,
-    category: e.category,
-    difficulty: e.difficulty,
-    muscleLoads: e.muscleLoads as unknown as Record<string, number>,
-    easierVariantId: null,
-    harderVariantId: null,
-    videoUrl: e.videoUrl,
-    sets,
-    reps,
-    repUnit: 'reps' as const,
-    rest: 60,
-    extraParams: [],
-    supersetGroup,
-    supersetOrder,
-    selected: false,
-    day,
-    week,
-  })
-
-  return [
-    makeEx(1, ex[0], 1, 1, 4, 8),                    // Bulgarian Split Squat — Day 1
-    makeEx(2, ex[1], 1, 1, 3, 6),                    // Nordic Hamstring — Day 1
-    makeEx(3, ex[2], 1, 1, 2, 45, 'A', 0),           // Hip 90/90 — Superset A, Day 1
-    makeEx(4, ex[3], 1, 1, 3, 10, 'A', 1),           // Single Leg Deadlift — Superset A, Day 1
-    makeEx(5, ex[5], 2, 1, 3, 12),                   // Schouder Ext. Rot. — Day 2
-    makeEx(6, ex[4], 2, 1, 3, 5),                    // Box Jump — Day 2
-  ]
-}
+// buildMockProgram verwijderd — programma's komen uit de database

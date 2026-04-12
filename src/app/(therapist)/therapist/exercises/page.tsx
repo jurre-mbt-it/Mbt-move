@@ -27,13 +27,6 @@ import {
   Edit,
 } from 'lucide-react'
 
-// Mock collections
-const MOCK_COLLECTIONS = [
-  { id: 'c1', name: 'Knie revalidatie', color: '#4ECDC4', count: 3 },
-  { id: 'c2', name: 'Schouder protocol', color: '#60a5fa', count: 2 },
-  { id: 'c3', name: 'Warming-up basis', color: '#f59e0b', count: 4 },
-]
-
 type ExerciseItem = {
   id: string
   name: string
@@ -62,6 +55,21 @@ export default function ExercisesPage() {
     staleTime: 30_000,
   })
 
+  const { data: collections = [] } = trpc.exercises.listCollections.useQuery(undefined, {
+    staleTime: 30_000,
+  })
+
+  // When a collection is active, fetch its exercise IDs
+  const { data: collectionExercises } = trpc.exercises.getCollectionExercises.useQuery(
+    { collectionId: activeCollection! },
+    { enabled: !!activeCollection, staleTime: 10_000 },
+  )
+
+  const collectionExerciseIds = useMemo(() => {
+    if (!collectionExercises) return null
+    return new Set(collectionExercises.map(e => e.id))
+  }, [collectionExercises])
+
   const filtered = useMemo(() => {
     return (exercises as ExerciseItem[]).filter((ex) => {
       if (query && !ex.name.toLowerCase().includes(query.toLowerCase()) &&
@@ -69,9 +77,11 @@ export default function ExercisesPage() {
       if (selectedCategory && ex.category !== selectedCategory) return false
       if (selectedRegion && !(ex.bodyRegion as string[]).includes(selectedRegion)) return false
       if (selectedDifficulty && ex.difficulty !== selectedDifficulty) return false
+      // Filter by collection
+      if (activeCollection && collectionExerciseIds && !collectionExerciseIds.has(ex.id)) return false
       return true
     })
-  }, [exercises, query, selectedCategory, selectedRegion, selectedDifficulty])
+  }, [exercises, query, selectedCategory, selectedRegion, selectedDifficulty, activeCollection, collectionExerciseIds])
 
   const activeFilterCount = [selectedCategory, selectedRegion, selectedDifficulty].filter(Boolean).length
 
@@ -119,10 +129,10 @@ export default function ExercisesPage() {
           <span className="ml-auto text-xs text-muted-foreground">{exercises.length}</span>
         </button>
 
-        {MOCK_COLLECTIONS.map(col => (
+        {collections.map(col => (
           <button
             key={col.id}
-            onClick={() => setActiveCollection(col.id)}
+            onClick={() => setActiveCollection(activeCollection === col.id ? null : col.id)}
             className={cn(
               'w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-colors',
               activeCollection === col.id ? 'bg-zinc-100 font-medium' : 'text-muted-foreground hover:bg-zinc-50'
@@ -159,10 +169,10 @@ export default function ExercisesPage() {
           >
             Alle ({exercises.length})
           </button>
-          {MOCK_COLLECTIONS.map(col => (
+          {collections.map(col => (
             <button
               key={col.id}
-              onClick={() => setActiveCollection(col.id)}
+              onClick={() => setActiveCollection(activeCollection === col.id ? null : col.id)}
               className={cn(
                 'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
                 activeCollection === col.id ? 'text-white border-transparent' : 'border-zinc-200 text-muted-foreground'
