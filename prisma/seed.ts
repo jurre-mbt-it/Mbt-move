@@ -1,5 +1,6 @@
 import { PrismaClient, UserRole, ExerciseCategory, BodyRegion, LoadType, MovementPattern } from '@prisma/client'
 import { STANDARD_EXERCISES } from './seed-exercises'
+import { PROGRESSION_CHAINS } from './exercise-progressions'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
 import { config } from 'dotenv'
@@ -197,39 +198,101 @@ async function main() {
   }
   console.log(`Created ${exercises.length} sample exercises`)
 
-  // Standard exercise database (50+ exercises without videos)
+  // Standard exercise database — UPSERT met evidence-based EMG data
   let standardCreated = 0
+  let standardUpdated = 0
   for (const stdEx of STANDARD_EXERCISES) {
     const existing = await prisma.exercise.findFirst({
       where: { name: { equals: stdEx.name, mode: 'insensitive' } },
     })
-    if (existing) continue // Skip duplicates
 
-    await prisma.exercise.create({
-      data: {
-        name: stdEx.name,
-        description: stdEx.description,
-        category: stdEx.category as ExerciseCategory,
-        bodyRegion: stdEx.bodyRegion as BodyRegion[],
-        difficulty: stdEx.difficulty as never,
-        loadType: stdEx.loadType as LoadType,
-        isUnilateral: stdEx.isUnilateral,
-        movementPattern: stdEx.movementPattern as MovementPattern | null,
-        instructions: stdEx.instructions,
-        tags: stdEx.tags,
-        isPublic: true,
-        createdById: admin.id,
-        muscleLoads: {
-          create: Object.entries(stdEx.muscleLoads).map(([muscle, load]) => ({
-            muscle,
-            load,
-          })),
+    if (existing) {
+      // Alleen updaten als deze door admin is aangemaakt (user-created exercises niet overschrijven)
+      if (existing.createdById !== admin.id) continue
+
+      // Update bestaande oefening met evidence-based data
+      await prisma.muscleLoad.deleteMany({ where: { exerciseId: existing.id } })
+      await prisma.exercise.update({
+        where: { id: existing.id },
+        data: {
+          description: stdEx.description,
+          category: stdEx.category as ExerciseCategory,
+          bodyRegion: stdEx.bodyRegion as BodyRegion[],
+          difficulty: stdEx.difficulty as never,
+          loadType: stdEx.loadType as LoadType,
+          isUnilateral: stdEx.isUnilateral,
+          movementPattern: stdEx.movementPattern as MovementPattern | null,
+          instructions: stdEx.instructions,
+          tags: stdEx.tags,
+          muscleLoads: {
+            create: Object.entries(stdEx.muscleLoads).map(([muscle, load]) => ({
+              muscle,
+              load,
+            })),
+          },
         },
-      },
-    })
-    standardCreated++
+      })
+      standardUpdated++
+    } else {
+      await prisma.exercise.create({
+        data: {
+          name: stdEx.name,
+          description: stdEx.description,
+          category: stdEx.category as ExerciseCategory,
+          bodyRegion: stdEx.bodyRegion as BodyRegion[],
+          difficulty: stdEx.difficulty as never,
+          loadType: stdEx.loadType as LoadType,
+          isUnilateral: stdEx.isUnilateral,
+          movementPattern: stdEx.movementPattern as MovementPattern | null,
+          instructions: stdEx.instructions,
+          tags: stdEx.tags,
+          isPublic: true,
+          createdById: admin.id,
+          muscleLoads: {
+            create: Object.entries(stdEx.muscleLoads).map(([muscle, load]) => ({
+              muscle,
+              load,
+            })),
+          },
+        },
+      })
+      standardCreated++
+    }
   }
-  console.log(`Created ${standardCreated} standard exercises (${STANDARD_EXERCISES.length - standardCreated} already existed)`)
+  console.log(`Standard exercises: ${standardCreated} created, ${standardUpdated} updated`)
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Pass 2: Progressie/regressie links koppelen op basis van PROGRESSION_CHAINS
+  // ───────────────────────────────────────────────────────────────────────────
+  console.log('Linking progression/regression variants...')
+  const allExercises = await prisma.exercise.findMany({
+    where: { isPublic: true },
+    select: { id: true, name: true },
+  })
+  const byName = new Map(allExercises.map(e => [e.name.toLowerCase(), e.id]))
+
+  let linksCreated = 0
+  let linksSkipped = 0
+  for (const chain of PROGRESSION_CHAINS) {
+    for (let i = 0; i < chain.length; i++) {
+      const currentId = byName.get(chain[i].toLowerCase())
+      if (!currentId) {
+        linksSkipped++
+        continue
+      }
+      const easierId = i > 0 ? byName.get(chain[i - 1].toLowerCase()) ?? null : null
+      const harderId = i < chain.length - 1 ? byName.get(chain[i + 1].toLowerCase()) ?? null : null
+      await prisma.exercise.update({
+        where: { id: currentId },
+        data: {
+          easierVariantId: easierId,
+          harderVariantId: harderId,
+        },
+      })
+      linksCreated++
+    }
+  }
+  console.log(`Progression links: ${linksCreated} configured, ${linksSkipped} skipped (exercise not found)`)
 
   console.log('Seeding complete!')
 }
