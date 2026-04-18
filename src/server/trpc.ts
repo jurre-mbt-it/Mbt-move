@@ -1,6 +1,7 @@
 import { initTRPC, TRPCError } from '@trpc/server'
 import { type NextRequest } from 'next/server'
 import { ZodError } from 'zod'
+import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
 
@@ -22,11 +23,27 @@ export async function createTRPCContext(opts: { req?: NextRequest }): Promise<Co
   let user: Context['user'] = null
 
   try {
-    const supabase = await createClient()
+    // Mobile clients sturen de Supabase JWT als Bearer-token; browsers gebruiken cookies.
+    const authHeader = opts.req?.headers.get('authorization') ?? opts.req?.headers.get('Authorization')
+    const bearerToken = authHeader?.toLowerCase().startsWith('bearer ')
+      ? authHeader.slice(7)
+      : null
 
-    // getSession() leest uit cookie — geen netwerkroundtrip naar Supabase
-    const { data: { session } } = await supabase.auth.getSession()
-    const supabaseUser = session?.user
+    let supabaseUser: { id: string; email?: string } | undefined
+
+    if (bearerToken) {
+      const supabaseJs = createSupabaseJsClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      )
+      const { data } = await supabaseJs.auth.getUser(bearerToken)
+      if (data.user) supabaseUser = { id: data.user.id, email: data.user.email }
+    } else {
+      const supabase = await createClient()
+      // getSession() leest uit cookie — geen netwerkroundtrip naar Supabase
+      const { data: { session } } = await supabase.auth.getSession()
+      supabaseUser = session?.user
+    }
 
     if (supabaseUser?.id && supabaseUser?.email) {
       // Check cache eerst
