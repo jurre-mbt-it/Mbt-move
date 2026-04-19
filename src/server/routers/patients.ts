@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
+import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
 import { createTRPCRouter, therapistProcedure } from '@/server/trpc'
 
 export const patientsRouter = createTRPCRouter({
@@ -145,26 +146,120 @@ export const patientsRouter = createTRPCRouter({
       })
     }),
 
+  /**
+   * Invite a new patient/athlete/therapist. Works for both web (cookie auth) and
+   * mobile (Bearer token) — no internal fetch needed.
+   */
+  invite: therapistProcedure
+    .input(
+      z.object({
+        email: z.string().email('Ongeldig e-mailadres'),
+        name: z.string().min(1, 'Naam is verplicht'),
+        role: z.enum(['PATIENT', 'ATHLETE', 'THERAPIST']).default('PATIENT'),
+        resend: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { email, name, role, resend } = input
+
+      const supabaseAdmin = createSupabaseAdminClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      )
+
+      // If resend: delete the existing Supabase auth user first so we can re-invite
+      if (resend) {
+        const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
+        const existingUser = users.find(u => u.email === email)
+        if (existingUser) {
+          await supabaseAdmin.auth.admin.deleteUser(existingUser.id)
+        }
+      }
+
+      const redirectBase =
+        process.env.NEXT_PUBLIC_APP_URL ||
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+
+      const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+        data: { role, name },
+        redirectTo: `${redirectBase}/auth/callback`,
+      })
+
+      if (error) {
+        if (!resend && (error.message.includes('already') || error.message.includes('exists'))) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Deze gebruiker bestaat al.',
+          })
+        }
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: error.message || 'Uitnodiging mislukt',
+        })
+      }
+
+      // Create/update the user record
+      const patient = await ctx.prisma.user.upsert({
+        where: { email },
+        update: { name },
+        create: {
+          id: data.user.id,
+          email,
+          name,
+          role,
+        },
+      })
+
+      // Link therapist ↔ patient (only for PATIENT/ATHLETE)
+      if (role === 'PATIENT' || role === 'ATHLETE') {
+        await ctx.prisma.patientTherapist.upsert({
+          where: {
+            therapistId_patientId: {
+              therapistId: ctx.user.id,
+              patientId: patient.id,
+            },
+          },
+          update: { isActive: true },
+          create: {
+            therapistId: ctx.user.id,
+            patientId: patient.id,
+          },
+        })
+      }
+
+      return { success: true, resent: !!resend, patientId: patient.id }
+    }),
+
   resendInvite: therapistProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const patient = await ctx.prisma.user.findUnique({
         where: { id: input.id },
-        select: { email: true, name: true },
+        select: { email: true, name: true, role: true },
       })
-      if (!patient) throw new Error('Patiënt niet gevonden')
+      if (!patient) throw new TRPCError({ code: 'NOT_FOUND', message: 'Patiënt niet gevonden' })
 
-      // Call the invite API internally
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
-      const res = await fetch(`${baseUrl}/api/auth/invite-patient`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: patient.email, name: patient.name, resend: true }),
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Uitnodiging mislukt')
+      const supabaseAdmin = createSupabaseAdminClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      )
+
+      const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
+      const existingUser = users.find(u => u.email === patient.email)
+      if (existingUser) {
+        await supabaseAdmin.auth.admin.deleteUser(existingUser.id)
       }
+
+      const redirectBase =
+        process.env.NEXT_PUBLIC_APP_URL ||
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+
+      const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(patient.email, {
+        data: { role: patient.role, name: patient.name },
+        redirectTo: `${redirectBase}/auth/callback`,
+      })
+      if (error) throw new TRPCError({ code: 'BAD_REQUEST', message: error.message })
+
       return { success: true }
     }),
 
