@@ -166,8 +166,27 @@ model User {
   patientWeekSchedules   WeekSchedule[]         @relation("PatientWeekSchedules")
   researchConsent        ResearchConsent?
   favoriteExercises      FavoriteExercise[]
+  wellnessChecks         WellnessCheck[]
 
   @@map("users")
+}
+
+model WellnessCheck {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  date      DateTime // start-of-day, 1 per user per day
+  sleep     Int      // 1-5 (5 = great sleep)
+  soreness  Int      // 1-5 (5 = no soreness)
+  fatigue   Int      // 1-5 (5 = fresh)
+  mood      Int      // 1-5 (5 = great)
+  stress    Int      // 1-5 (5 = calm)
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("wellness_checks")
 }
 
 model PatientTherapist {

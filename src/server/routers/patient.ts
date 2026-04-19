@@ -11,6 +11,7 @@
  */
 
 import { z } from 'zod'
+import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -231,6 +232,90 @@ export const patientRouter = createTRPCRouter({
           },
         },
         select: { id: true },
+      })
+    }),
+
+  // ── Tendinopathy pain follow-up (24u na sessie) ───────────────────────────
+
+  getPendingPainFollowUps: protectedProcedure.query(async ({ ctx }) => {
+    // Sessies tussen 16u en 48u geleden waar tendinopathy mode aan stond,
+    // met exercise-logs die painDuring hebben maar geen painAfter24h.
+    const now = Date.now()
+    const earliest = new Date(now - 48 * 60 * 60 * 1000)
+    const latest = new Date(now - 16 * 60 * 60 * 1000)
+
+    const sessions = await ctx.prisma.sessionLog.findMany({
+      where: {
+        patientId: ctx.user!.id,
+        status: 'COMPLETED',
+        completedAt: { gte: earliest, lte: latest },
+        program: { tendinopathyMode: true },
+      },
+      include: {
+        program: { select: { id: true, name: true, tendinopathyMode: true } },
+        exerciseLogs: {
+          where: {
+            painDuring: { not: null },
+            painAfter24h: null,
+          },
+          include: {
+            // We need exercise name
+          },
+        },
+      },
+    })
+
+    // Haal exercise-namen op
+    const exerciseIds = Array.from(
+      new Set(sessions.flatMap(s => s.exerciseLogs.map(el => el.exerciseId))),
+    )
+    const exercises = exerciseIds.length
+      ? await ctx.prisma.exercise.findMany({
+          where: { id: { in: exerciseIds } },
+          select: { id: true, name: true },
+        })
+      : []
+    const exerciseMap = new Map(exercises.map(e => [e.id, e.name]))
+
+    return sessions
+      .filter(s => s.exerciseLogs.length > 0)
+      .map(s => ({
+        sessionId: s.id,
+        completedAt: s.completedAt,
+        programName: s.program?.name ?? null,
+        exerciseLogs: s.exerciseLogs.map(el => ({
+          id: el.id,
+          exerciseId: el.exerciseId,
+          exerciseName: exerciseMap.get(el.exerciseId) ?? 'Oefening',
+          painDuring: el.painDuring,
+        })),
+      }))
+  }),
+
+  submitPainFollowUp: protectedProcedure
+    .input(
+      z.object({
+        exerciseLogId: z.string(),
+        painAfter24h: z.number().int().min(0).max(10),
+        morningStiffness: z.number().int().min(0).max(10).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify ownership
+      const log = await ctx.prisma.exerciseLog.findUnique({
+        where: { id: input.exerciseLogId },
+        select: { session: { select: { patientId: true } } },
+      })
+      if (!log || log.session.patientId !== ctx.user!.id) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+
+      return ctx.prisma.exerciseLog.update({
+        where: { id: input.exerciseLogId },
+        data: {
+          painAfter24h: input.painAfter24h,
+          morningStiffness: input.morningStiffness ?? null,
+        },
       })
     }),
 
