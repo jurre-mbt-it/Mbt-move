@@ -142,4 +142,126 @@ export const weekSchedulesRouter = createTRPCRouter({
         },
       })
     }),
+
+  /**
+   * Plan een programma in de kalender van een patient voor X weken op bepaalde dagen.
+   * Merged met bestaande schedule: overschrijft de geselecteerde dagen, laat andere dagen
+   * intact. Als er nog geen schedule bestaat voor de patient, wordt er eentje aangemaakt.
+   */
+  scheduleProgram: therapistProcedure
+    .input(
+      z.object({
+        programId: z.string(),
+        patientId: z.string(),
+        weeks: z.number().int().min(1).max(52),
+        daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Check ownership van programma
+      const program = await ctx.prisma.program.findUnique({
+        where: { id: input.programId },
+      })
+      if (!program) throw new TRPCError({ code: 'NOT_FOUND', message: 'Programma niet gevonden' })
+      if (program.creatorId !== ctx.user.id && ctx.user.role !== 'ADMIN') {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+
+      // Check dat patient gekoppeld is aan deze therapist
+      const relation = await ctx.prisma.patientTherapist.findFirst({
+        where: { therapistId: ctx.user.id, patientId: input.patientId, isActive: true },
+      })
+      if (!relation) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Patient is niet aan jou gekoppeld' })
+      }
+
+      const patient = await ctx.prisma.user.findUnique({
+        where: { id: input.patientId },
+        select: { name: true, email: true },
+      })
+
+      const now = new Date()
+      const endDate = new Date(now.getTime() + input.weeks * 7 * 24 * 60 * 60 * 1000)
+
+      // Zoek bestaande schedule (per therapist + patient)
+      const existing = await ctx.prisma.weekSchedule.findFirst({
+        where: { creatorId: ctx.user.id, patientId: input.patientId },
+        include: { days: true },
+      })
+
+      const uniqueDays = Array.from(new Set(input.daysOfWeek))
+
+      if (existing) {
+        // Merge: update/insert dagen voor dit programma, laat andere dagen ongemoeid
+        // (behalve dagen die voorheen dit programma hadden maar nu niet meer geselecteerd zijn)
+        const existingDayMap = new Map(existing.days.map(d => [d.dayOfWeek, d]))
+
+        // Verwijder dagen die voorheen dit programma hadden maar nu niet meer in selectie
+        const toClear = existing.days.filter(
+          d => d.programId === input.programId && !uniqueDays.includes(d.dayOfWeek),
+        )
+        for (const d of toClear) {
+          await ctx.prisma.weekScheduleDay.update({
+            where: { id: d.id },
+            data: { programId: null },
+          })
+        }
+
+        // Zet geselecteerde dagen op dit programma
+        for (const dow of uniqueDays) {
+          const existingDay = existingDayMap.get(dow)
+          if (existingDay) {
+            await ctx.prisma.weekScheduleDay.update({
+              where: { id: existingDay.id },
+              data: { programId: input.programId },
+            })
+          } else {
+            await ctx.prisma.weekScheduleDay.create({
+              data: {
+                id: createId(),
+                weekScheduleId: existing.id,
+                dayOfWeek: dow,
+                programId: input.programId,
+              },
+            })
+          }
+        }
+
+        return ctx.prisma.weekSchedule.update({
+          where: { id: existing.id },
+          data: {
+            startDate: existing.startDate ?? now,
+            endDate,
+            updatedAt: now,
+          },
+          include: {
+            days: { include: { program: { select: { id: true, name: true } } }, orderBy: { dayOfWeek: 'asc' } },
+          },
+        })
+      }
+
+      // Nieuwe schedule aanmaken met 7 dagen
+      const patientLabel = patient?.name ?? patient?.email ?? 'Patient'
+      return ctx.prisma.weekSchedule.create({
+        data: {
+          id: createId(),
+          name: `Weekplan · ${patientLabel}`,
+          creatorId: ctx.user.id,
+          patientId: input.patientId,
+          startDate: now,
+          endDate,
+          isTemplate: false,
+          days: {
+            create: Array.from({ length: 7 }, (_, dow) => ({
+              id: createId(),
+              dayOfWeek: dow,
+              ...(uniqueDays.includes(dow) ? { programId: input.programId } : {}),
+            })),
+          },
+        },
+        include: {
+          days: { include: { program: { select: { id: true, name: true } } }, orderBy: { dayOfWeek: 'asc' } },
+        },
+      })
+    }),
 })
