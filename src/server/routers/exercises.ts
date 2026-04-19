@@ -40,8 +40,16 @@ export const exercisesRouter = createTRPCRouter({
       category: z.string().optional(),
       bodyRegion: z.string().optional(),
       difficulty: z.string().optional(),
+      favoritesOnly: z.boolean().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
+      // Eerst de ID's van favorieten van deze user ophalen
+      const favs = await ctx.prisma.favoriteExercise.findMany({
+        where: { userId: ctx.user!.id },
+        select: { exerciseId: true },
+      })
+      const favoriteIds = new Set(favs.map(f => f.exerciseId))
+
       const exercises = await ctx.prisma.exercise.findMany({
         where: {
           OR: [
@@ -51,6 +59,7 @@ export const exercisesRouter = createTRPCRouter({
           ...(input?.category ? { category: input.category as never } : {}),
           ...(input?.difficulty ? { difficulty: input.difficulty as never } : {}),
           ...(input?.bodyRegion ? { bodyRegion: { has: input.bodyRegion as never } } : {}),
+          ...(input?.favoritesOnly ? { id: { in: Array.from(favoriteIds) } } : {}),
           ...(input?.query ? {
             OR: [
               { name: { contains: input.query, mode: 'insensitive' } },
@@ -66,8 +75,46 @@ export const exercisesRouter = createTRPCRouter({
 
       return exercises.map(ex => ({
         ...ex,
+        isFavorite: favoriteIds.has(ex.id),
         muscleLoads: Object.fromEntries(ex.muscleLoads.map(ml => [ml.muscle, ml.load])),
       }))
+    }),
+
+  toggleFavorite: protectedProcedure
+    .input(z.object({ exerciseId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.prisma.favoriteExercise.findUnique({
+        where: {
+          userId_exerciseId: {
+            userId: ctx.user!.id,
+            exerciseId: input.exerciseId,
+          },
+        },
+      })
+
+      if (existing) {
+        await ctx.prisma.favoriteExercise.delete({ where: { id: existing.id } })
+        return { isFavorite: false }
+      }
+
+      // Check dat de oefening bestaat en zichtbaar is voor deze user
+      const exercise = await ctx.prisma.exercise.findUnique({
+        where: { id: input.exerciseId },
+        select: { id: true, isPublic: true, createdById: true },
+      })
+      if (!exercise) throw new TRPCError({ code: 'NOT_FOUND' })
+      if (!exercise.isPublic && exercise.createdById !== ctx.user!.id) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+
+      await ctx.prisma.favoriteExercise.create({
+        data: {
+          id: createId(),
+          userId: ctx.user!.id,
+          exerciseId: input.exerciseId,
+        },
+      })
+      return { isFavorite: true }
     }),
 
   get: protectedProcedure
@@ -81,8 +128,15 @@ export const exercisesRouter = createTRPCRouter({
       if (!ex.isPublic && ex.createdById !== ctx.user!.id) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
+      const fav = await ctx.prisma.favoriteExercise.findUnique({
+        where: {
+          userId_exerciseId: { userId: ctx.user!.id, exerciseId: ex.id },
+        },
+        select: { id: true },
+      })
       return {
         ...ex,
+        isFavorite: !!fav,
         muscleLoads: Object.fromEntries(ex.muscleLoads.map(ml => [ml.muscle, ml.load])),
       }
     }),
