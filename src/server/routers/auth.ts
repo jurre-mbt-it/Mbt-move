@@ -33,6 +33,19 @@ export const authRouter = createTRPCRouter({
     return user
   }),
 
+  /**
+   * Mobile client roept dit aan na succesvolle MFA enroll/unenroll zodat
+   * User.mfaEnabled synchroon blijft met Supabase factors.
+   */
+  setMfaStatus: protectedProcedure
+    .input(z.object({ enabled: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.user.update({
+        where: { id: ctx.user.id },
+        data: { mfaEnabled: input.enabled },
+      })
+    }),
+
   updateProfile: protectedProcedure
     .input(
       z.object({
