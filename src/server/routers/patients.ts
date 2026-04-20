@@ -3,6 +3,8 @@ import { TRPCError } from '@trpc/server'
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
 import { createTRPCRouter, therapistProcedure } from '@/server/trpc'
 
+const createId = () => crypto.randomUUID()
+
 export const patientsRouter = createTRPCRouter({
   list: therapistProcedure.query(async ({ ctx }) => {
     const relations = await ctx.prisma.patientTherapist.findMany({
@@ -286,6 +288,169 @@ export const patientsRouter = createTRPCRouter({
       await ctx.prisma.user.delete({ where: { id: input.id } })
 
       return { success: true }
+    }),
+
+  // ── Live behandeling loggen (therapist doet dit ter plekke met patient) ──
+
+  /**
+   * Therapeut logt een behandelsessie voor een patient. Gebaseerd op
+   * patient.logSession, maar neemt patientId als input en verifieert de
+   * therapist-patient-relatie.
+   */
+  logSessionForPatient: therapistProcedure
+    .input(
+      z.object({
+        patientId: z.string(),
+        programId: z.string().optional(),
+        scheduledAt: z.string(),
+        completedAt: z.string(),
+        durationSeconds: z.number().int().min(0),
+        painLevel: z.number().int().min(0).max(10).nullable(),
+        exertionLevel: z.number().int().min(0).max(10).nullable(),
+        notes: z.string().optional(),
+        exercises: z.array(
+          z.object({
+            exerciseId: z.string(),
+            setsCompleted: z.number().int().min(0).optional(),
+            repsCompleted: z.number().int().min(0).optional(),
+            painLevel: z.number().int().min(0).max(10).nullable().optional(),
+            weight: z.number().nullable().optional(),
+            estimatedOneRepMax: z.number().nullable().optional(),
+            painDuring: z.number().int().min(0).max(10).nullable().optional(),
+          }),
+        ),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const relation = await ctx.prisma.patientTherapist.findFirst({
+        where: {
+          therapistId: ctx.user.id,
+          patientId: input.patientId,
+          isActive: true,
+        },
+      })
+      if (!relation && ctx.user.role !== 'ADMIN') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Patient is niet aan jou gekoppeld',
+        })
+      }
+
+      return ctx.prisma.sessionLog.create({
+        data: {
+          id: createId(),
+          patientId: input.patientId,
+          programId: input.programId ?? undefined,
+          scheduledAt: new Date(input.scheduledAt),
+          completedAt: new Date(input.completedAt),
+          status: 'COMPLETED',
+          duration: input.durationSeconds,
+          painLevel: input.painLevel,
+          exertionLevel: input.exertionLevel,
+          notes: input.notes ?? undefined,
+          exerciseLogs: {
+            create: input.exercises.map((ex) => ({
+              id: createId(),
+              exerciseId: ex.exerciseId,
+              setsCompleted: ex.setsCompleted ?? null,
+              repsCompleted: ex.repsCompleted ?? null,
+              painLevel: ex.painLevel ?? null,
+              weight: ex.weight ?? null,
+              estimatedOneRepMax: ex.estimatedOneRepMax ?? null,
+              painDuring: ex.painDuring ?? null,
+            })),
+          },
+        },
+        select: { id: true },
+      })
+    }),
+
+  /**
+   * Uitgebreide patient-dashboard data voor therapist: sessie-historie,
+   * load-metrics bron, frequentie en meest-gedane oefeningen.
+   */
+  getDashboardData: therapistProcedure
+    .input(z.object({ patientId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const relation = await ctx.prisma.patientTherapist.findFirst({
+        where: {
+          therapistId: ctx.user.id,
+          patientId: input.patientId,
+          isActive: true,
+        },
+      })
+      if (!relation && ctx.user.role !== 'ADMIN') {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+
+      const since = new Date()
+      since.setDate(since.getDate() - 60) // 60d historie
+
+      const sessions = await ctx.prisma.sessionLog.findMany({
+        where: {
+          patientId: input.patientId,
+          status: 'COMPLETED',
+          completedAt: { gte: since },
+        },
+        orderBy: { completedAt: 'desc' },
+        include: {
+          program: { select: { id: true, name: true } },
+          exerciseLogs: {
+            select: { exerciseId: true },
+          },
+        },
+      })
+
+      // Exercise-namen voor top-5
+      const exIdCounts = new Map<string, number>()
+      for (const s of sessions) {
+        for (const el of s.exerciseLogs) {
+          exIdCounts.set(el.exerciseId, (exIdCounts.get(el.exerciseId) ?? 0) + 1)
+        }
+      }
+      const topExerciseIds = Array.from(exIdCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([id]) => id)
+
+      const topExercises = topExerciseIds.length
+        ? await ctx.prisma.exercise.findMany({
+            where: { id: { in: topExerciseIds } },
+            select: { id: true, name: true, category: true },
+          })
+        : []
+
+      const topExercisesWithCount = topExerciseIds.map((id) => {
+        const ex = topExercises.find((e) => e.id === id)
+        return {
+          id,
+          name: ex?.name ?? 'Oefening',
+          category: ex?.category ?? 'STRENGTH',
+          count: exIdCounts.get(id) ?? 0,
+        }
+      })
+
+      // Recent wellness checks
+      const wellnessChecks = await ctx.prisma.wellnessCheck.findMany({
+        where: { userId: input.patientId, date: { gte: since } },
+        orderBy: { date: 'desc' },
+        take: 14,
+      })
+
+      return {
+        sessions: sessions.map((s) => ({
+          id: s.id,
+          completedAt: s.completedAt,
+          programName: s.program?.name ?? null,
+          durationMinutes: s.duration ? Math.round(s.duration / 60) : 0,
+          exerciseCount: s.exerciseLogs.length,
+          painLevel: s.painLevel,
+          exertionLevel: s.exertionLevel,
+          notes: s.notes,
+        })),
+        topExercises: topExercisesWithCount,
+        wellnessChecks,
+      }
     }),
 
   // ── Voortgangsdata voor therapist ────────────────────────────────────────

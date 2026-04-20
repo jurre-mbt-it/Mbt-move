@@ -137,9 +137,31 @@ export const patientRouter = createTRPCRouter({
 
   // ── Today's exercises (for session page) ─────────────────────────────────
 
-  getTodayExercises: protectedProcedure.query(async ({ ctx }) => {
+  getTodayExercises: protectedProcedure
+    .input(z.object({ patientId: z.string().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+    // Default = eigen user. Therapist kan patientId meegeven om door
+    // patient's oogpunt te kijken (bv. live-behandeling flow).
+    let targetPatientId = ctx.user.id
+    if (input?.patientId && input.patientId !== ctx.user.id) {
+      if (ctx.user.role !== 'THERAPIST' && ctx.user.role !== 'ADMIN') {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+      const relation = await ctx.prisma.patientTherapist.findFirst({
+        where: {
+          therapistId: ctx.user.id,
+          patientId: input.patientId,
+          isActive: true,
+        },
+      })
+      if (!relation && ctx.user.role !== 'ADMIN') {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+      targetPatientId = input.patientId
+    }
+
     const program = await ctx.prisma.program.findFirst({
-      where: { patientId: ctx.user.id, status: 'ACTIVE' },
+      where: { patientId: targetPatientId, status: 'ACTIVE' },
       include: {
         exercises: {
           include: {
