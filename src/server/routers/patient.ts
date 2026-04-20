@@ -257,6 +257,66 @@ export const patientRouter = createTRPCRouter({
       })
     }),
 
+  // ── Last weights per exercise ─────────────────────────────────────────────
+
+  /**
+   * Laatste gebruikte gewicht per oefening voor een user (self of patient
+   * via therapeut-flow). Handig om als "laatst gebruikt" hint te tonen.
+   */
+  getLastWeights: protectedProcedure
+    .input(z.object({ patientId: z.string().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      let targetId = ctx.user!.id
+      if (input?.patientId && input.patientId !== ctx.user!.id) {
+        if (ctx.user!.role !== 'THERAPIST' && ctx.user!.role !== 'ADMIN') {
+          throw new TRPCError({ code: 'FORBIDDEN' })
+        }
+        const relation = await ctx.prisma.patientTherapist.findFirst({
+          where: {
+            therapistId: ctx.user!.id,
+            patientId: input.patientId,
+            isActive: true,
+          },
+        })
+        if (!relation && ctx.user!.role !== 'ADMIN') {
+          throw new TRPCError({ code: 'FORBIDDEN' })
+        }
+        targetId = input.patientId
+      }
+
+      const logs = await ctx.prisma.exerciseLog.findMany({
+        where: {
+          session: { patientId: targetId, status: 'COMPLETED' },
+          weight: { not: null, gt: 0 },
+        },
+        orderBy: { session: { completedAt: 'desc' } },
+        select: {
+          exerciseId: true,
+          weight: true,
+          repsCompleted: true,
+          session: { select: { completedAt: true } },
+        },
+        take: 500, // genoeg voor recente historie
+      })
+
+      // Dedupe — eerste (meest recente) per exerciseId wint
+      const byExercise: Record<
+        string,
+        { weight: number; reps: number | null; date: string }
+      > = {}
+      for (const log of logs) {
+        if (!(log.exerciseId in byExercise) && log.weight !== null) {
+          byExercise[log.exerciseId] = {
+            weight: log.weight,
+            reps: log.repsCompleted,
+            date: (log.session.completedAt ?? new Date()).toISOString(),
+          }
+        }
+      }
+
+      return byExercise
+    }),
+
   // ── Tendinopathy pain follow-up (24u na sessie) ───────────────────────────
 
   getPendingPainFollowUps: protectedProcedure.query(async ({ ctx }) => {

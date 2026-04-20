@@ -193,7 +193,6 @@ export const exercisesRouter = createTRPCRouter({
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
       const canEdit = existing.createdById === ctx.user!.id
         || ctx.user!.role === 'ADMIN'
-        || ctx.user!.role === 'THERAPIST'
       if (!canEdit) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
@@ -228,7 +227,6 @@ export const exercisesRouter = createTRPCRouter({
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
       const canDelete = existing.createdById === ctx.user!.id
         || ctx.user!.role === 'ADMIN'
-        || ctx.user!.role === 'THERAPIST'
       if (!canDelete) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
