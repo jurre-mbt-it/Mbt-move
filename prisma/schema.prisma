@@ -141,6 +141,10 @@ model User {
   bio           String?
   licenseNumber String?
 
+  // Patient fields — blessure / injury info
+  injuryInfo                String?
+  injuryVisibleToTherapist  Boolean  @default(false)
+
   // DPA (Verwerkingsovereenkomst — AVG verplicht)
   dpaAcceptedVersion String?
   dpaAcceptedAt      DateTime?

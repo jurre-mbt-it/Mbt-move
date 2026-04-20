@@ -19,6 +19,8 @@ export const authRouter = createTRPCRouter({
         phone: true,
         specialty: true,
         bio: true,
+        injuryInfo: true,
+        injuryVisibleToTherapist: true,
         mfaEnabled: true,
         createdAt: true,
       },
@@ -38,6 +40,8 @@ export const authRouter = createTRPCRouter({
         phone: z.string().optional(),
         specialty: z.string().optional(),
         bio: z.string().optional(),
+        injuryInfo: z.string().nullable().optional(),
+        injuryVisibleToTherapist: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

@@ -81,6 +81,8 @@ export const patientsRouter = createTRPCRouter({
               phone: true,
               dateOfBirth: true,
               createdAt: true,
+              injuryInfo: true,
+              injuryVisibleToTherapist: true,
               patientPrograms: {
                 orderBy: { createdAt: 'desc' },
                 select: {
@@ -118,6 +120,8 @@ export const patientsRouter = createTRPCRouter({
         avatarInitials: initials,
         dateOfBirth: p.dateOfBirth,
         createdAt: p.createdAt,
+        // Alleen tonen als patient ermee instemt
+        injuryInfo: p.injuryVisibleToTherapist ? p.injuryInfo : null,
         notes: relation.notes,
         programId: program?.id ?? null,
         programName: program?.name ?? null,
