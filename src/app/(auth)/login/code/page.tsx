@@ -2,11 +2,9 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { PATIENTS } from '@/lib/mock-data'
 import Link from 'next/link'
-import { ArrowLeft, KeyRound } from 'lucide-react'
+import { PATIENTS } from '@/lib/mock-data'
+import { DarkButton, DarkInput, Kicker, P } from '@/components/dark-ui'
 
 export default function AccessCodeLoginPage() {
   const router = useRouter()
@@ -42,72 +40,90 @@ export default function AccessCodeLoginPage() {
   }
 
   return (
-    <div className="athletic-dark min-h-screen flex items-center justify-center p-4" style={{ background: '#0A0E0F' }}>
-      <div className="w-full max-w-sm">
+    <div
+      className="athletic-dark min-h-screen flex items-center justify-center p-4"
+      style={{ background: P.bg, color: P.ink }}
+    >
+      <div className="w-full max-w-sm flex flex-col gap-6">
         {/* Logo */}
-        <div className="flex justify-center mb-8">
+        <div className="flex justify-center">
           <img src="/Logo.jpg" alt="MBT Gym" className="h-10 w-auto" />
         </div>
 
-        <div className="bg-[#141A1B] rounded-2xl shadow-sm border p-8 space-y-6" style={{ borderColor: '#e4e4e7' }}>
-          {/* Icon */}
+        <div
+          className="rounded-2xl p-8 flex flex-col gap-6"
+          style={{ background: P.surface, border: `1px solid ${P.line}` }}
+        >
+          {/* Heading */}
           <div className="flex flex-col items-center gap-2 text-center">
-            <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center"
-              style={{ background: '#f0fdfa' }}
+            <Kicker>Patiënt toegang</Kicker>
+            <h1
+              className="athletic-display"
+              style={{ fontSize: 24, lineHeight: '28px', letterSpacing: '-0.02em', color: P.ink }}
             >
-              <KeyRound className="w-7 h-7" style={{ color: '#4ECDC4' }} />
-            </div>
-            <h1 className="text-xl font-bold mt-2">Toegangscode invoeren</h1>
-            <p className="text-sm text-muted-foreground">
+              TOEGANGSCODE
+            </h1>
+            <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 4 }}>
               Voer de code in die je van je therapeut hebt ontvangen.
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <DarkInput
               ref={inputRef}
-              placeholder="bijv. MBT-JV24"
+              placeholder="MBT-JV24"
               value={code}
               onChange={e => {
                 setCode(e.target.value.toUpperCase())
                 setError('')
               }}
-              className="text-center font-mono text-lg tracking-widest h-12"
-              style={{ borderRadius: '10px' }}
+              className="athletic-mono"
+              style={{
+                textAlign: 'center',
+                fontSize: 22,
+                letterSpacing: '0.3em',
+                fontWeight: 800,
+                height: 56,
+                color: P.ink,
+              }}
               autoComplete="off"
               autoFocus
               maxLength={12}
             />
 
             {error && (
-              <p className="text-sm text-destructive text-center">{error}</p>
+              <p
+                className="athletic-mono text-center"
+                style={{ color: P.danger, fontSize: 12, letterSpacing: '0.04em' }}
+              >
+                {error}
+              </p>
             )}
 
-            <Button
+            <DarkButton
               type="submit"
-              className="w-full h-11 font-semibold"
-              style={{ background: '#4ECDC4' }}
               disabled={!code.trim() || loading}
+              loading={loading}
             >
-              {loading ? 'Controleren...' : 'Inloggen'}
-            </Button>
+              {loading ? 'Controleren…' : 'Inloggen'}
+            </DarkButton>
           </form>
 
-          <div className="text-center text-sm text-muted-foreground">
+          <div className="text-center" style={{ color: P.inkMuted, fontSize: 13 }}>
             Heb je een account?{' '}
-            <Link href="/login" className="font-medium" style={{ color: '#4ECDC4' }}>
+            <Link href="/login" style={{ color: P.lime, fontWeight: 700 }}>
               Inloggen met e-mail
             </Link>
           </div>
         </div>
 
-        <div className="mt-6 text-center">
+        <div className="text-center">
           <Link
             href="/login"
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="athletic-mono"
+            style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.16em' }}
           >
-            <ArrowLeft className="w-4 h-4" /> Terug naar inloggen
+            ← TERUG NAAR INLOGGEN
           </Link>
         </div>
       </div>

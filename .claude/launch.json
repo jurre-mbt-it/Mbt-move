@@ -5,7 +5,8 @@
       "name": "mbt-move",
       "runtimeExecutable": "/bin/bash",
       "runtimeArgs": ["/Users/eva/mbt-move/dev-main.sh"],
-      "port": 3000
+      "port": 3000,
+      "autoPort": true
     }
   ]
 }

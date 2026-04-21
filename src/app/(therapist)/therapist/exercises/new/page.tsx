@@ -1,24 +1,32 @@
-import { ExerciseForm } from '@/components/exercises/ExerciseForm'
 import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
+import { ExerciseForm } from '@/components/exercises/ExerciseForm'
+import { Kicker, MetaLabel, P } from '@/components/dark-ui'
 
 export const metadata = { title: 'Nieuwe oefening – MBT Gym' }
 
 export default function NewExercisePage() {
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="max-w-2xl w-full flex flex-col gap-6">
+      <div className="flex flex-col gap-3">
         <Link
           href="/therapist/exercises"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+          className="athletic-mono"
+          style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.16em' }}
         >
-          <ChevronLeft className="w-4 h-4" />
-          Terug naar bibliotheek
+          ← BIBLIOTHEEK
         </Link>
-        <h1 className="text-2xl font-bold">Nieuwe oefening</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Voeg een oefening toe aan je bibliotheek
-        </p>
+        <div className="flex flex-col gap-1">
+          <Kicker>Bibliotheek</Kicker>
+          <h1
+            className="athletic-display"
+            style={{ fontSize: 32, lineHeight: '38px', letterSpacing: '-0.025em', paddingTop: 2 }}
+          >
+            NIEUWE OEFENING
+          </h1>
+          <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
+            Voeg een oefening toe aan je bibliotheek
+          </MetaLabel>
+        </div>
       </div>
       <ExerciseForm mode="create" />
     </div>

@@ -1,26 +1,8 @@
 'use client'
 
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { User, SlidersHorizontal, ChevronRight, LogOut } from 'lucide-react'
+import { ActionTile, DarkButton, Kicker, MetaLabel, P } from '@/components/dark-ui'
 import { createClient } from '@/lib/supabase/client'
-
-const sections = [
-  {
-    href: '/therapist/settings/profile',
-    icon: User,
-    label: 'Profiel',
-    description: 'Persoonlijke gegevens en accountinformatie',
-  },
-  {
-    href: '/therapist/settings/parameters',
-    icon: SlidersHorizontal,
-    label: 'Parameters',
-    description: 'Aangepaste meetparameters voor programma\'s',
-  },
-]
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -33,42 +15,38 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-5 max-w-lg">
-      <div>
-        <h1 className="text-2xl font-bold">Instellingen</h1>
-        <p className="text-muted-foreground text-sm">Beheer je account en voorkeuren</p>
+    <div className="max-w-lg w-full flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <Kicker>Account</Kicker>
+        <h1
+          className="athletic-display"
+          style={{ fontSize: 32, lineHeight: '38px', letterSpacing: '-0.025em', paddingTop: 2 }}
+        >
+          INSTELLINGEN
+        </h1>
+        <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
+          Beheer je account en voorkeuren
+        </MetaLabel>
       </div>
 
-      <div className="space-y-2">
-        {sections.map(({ href, icon: Icon, label, description }) => (
-          <Link key={href} href={href}>
-            <Card style={{ borderRadius: '12px' }} className="hover:shadow-sm transition-shadow cursor-pointer">
-              <CardContent className="px-4 py-4 flex items-center gap-4">
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ background: '#1C2425' }}
-                >
-                  <Icon className="w-5 h-5 text-[#7B8889]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">{label}</p>
-                  <p className="text-xs text-muted-foreground">{description}</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#7B8889] shrink-0" />
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
+      <div className="flex flex-col gap-2">
+        <ActionTile
+          href="/therapist/settings/profile"
+          label="Profiel"
+          sub="Persoonlijke gegevens en accountinformatie"
+          bar={P.lime}
+        />
+        <ActionTile
+          href="/therapist/settings/parameters"
+          label="Parameters"
+          sub="Aangepaste meetparameters voor programma's"
+          bar={P.ice}
+        />
       </div>
 
-      <Button
-        variant="outline"
-        className="w-full gap-2 text-red-600 border-red-200 hover:bg-red-50"
-        onClick={handleSignOut}
-      >
-        <LogOut className="w-4 h-4" />
+      <DarkButton variant="danger" onClick={handleSignOut}>
         Uitloggen
-      </Button>
+      </DarkButton>
     </div>
   )
 }

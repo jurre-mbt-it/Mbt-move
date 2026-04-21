@@ -1,13 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { trpc } from '@/lib/trpc/client'
-import { Database, Download, Users, Activity, TrendingUp, BarChart3 } from 'lucide-react'
 import { toast } from 'sonner'
-import { IconLock } from '@/components/icons'
+import { DarkButton, Kicker, MetaLabel, MetricTile, P, Tile } from '@/components/dark-ui'
 
 export default function AdminResearchPage() {
   const [isExporting, setIsExporting] = useState(false)
@@ -44,152 +40,173 @@ export default function AdminResearchPage() {
     {
       label: 'Geanonimiseerde records',
       value: isLoading ? '…' : (aggregates?.totalRecords ?? 0).toLocaleString('nl-NL'),
-      icon: Database,
-      bg: 'rgba(190,242,100,0.10)',
-      color: '#0f766e',
+      tint: P.lime,
     },
     {
       label: 'Patiënten met toestemming',
       value: isLoading ? '…' : (aggregates?.totalConsenting ?? 0).toLocaleString('nl-NL'),
-      icon: Users,
-      bg: '#eff6ff',
-      color: '#1d4ed8',
+      tint: P.ice,
     },
     {
       label: 'Gemiddelde leeftijd',
-      value: isLoading ? '…' : aggregates?.averageAge ? `${aggregates.averageAge} jr` : '—',
-      icon: TrendingUp,
-      bg: '#fefce8',
-      color: '#F4C261',
+      value: isLoading ? '…' : aggregates?.averageAge ? `${aggregates.averageAge}` : '—',
+      unit: aggregates?.averageAge ? 'jr' : undefined,
+      tint: P.gold,
     },
     {
       label: 'Gem. pijnniveau',
-      value: isLoading ? '…' : aggregates?.averagePainLevel != null ? `${aggregates.averagePainLevel}/10` : '—',
-      icon: Activity,
-      bg: '#fff1f2',
-      color: '#be123c',
+      value: isLoading ? '…' : aggregates?.averagePainLevel != null ? `${aggregates.averagePainLevel}` : '—',
+      unit: aggregates?.averagePainLevel != null ? '/10' : undefined,
+      tint: P.danger,
     },
   ]
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      {/* Title + export */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Research Database</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
+    <div className="max-w-5xl w-full flex flex-col gap-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <Kicker>Onderzoek</Kicker>
+          <h1
+            className="athletic-display"
+            style={{ fontSize: 32, lineHeight: '38px', letterSpacing: '-0.025em', paddingTop: 2 }}
+          >
+            RESEARCH DATABASE
+          </h1>
+          <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 4 }}>
             Geanonimiseerde trainingsdata van patiënten met toestemming.{' '}
-            <span className="font-medium text-[#F5F7F6]">
+            <span style={{ color: P.ink, fontWeight: 600 }}>
               Alleen aggregaties zichtbaar — geen individuele records.
             </span>
           </p>
         </div>
-        <div className="flex gap-2 shrink-0">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            onClick={handleExportCSV}
-            disabled={isExporting || isLoading}
-          >
-            <Download className="w-4 h-4" />
-            CSV export
-          </Button>
-        </div>
+        <DarkButton
+          variant="secondary"
+          size="sm"
+          onClick={handleExportCSV}
+          disabled={isExporting || isLoading}
+        >
+          CSV export
+        </DarkButton>
       </div>
 
       {/* Security notice */}
-      <div
-        className="flex items-start gap-3 px-4 py-3 rounded-xl text-sm"
-        style={{ background: '#fffbeb', border: '1px solid #fde68a' }}
-      >
-        <IconLock size={18} />
-        <div>
-          <p className="font-semibold" style={{ color: '#92400e' }}>Beveiligingsregels actief</p>
-          <p style={{ color: '#78350f' }}>
+      <Tile accentBar={P.gold}>
+        <div className="flex flex-col gap-1">
+          <span
+            className="athletic-mono"
+            style={{ color: P.gold, fontSize: 11, letterSpacing: '0.16em', fontWeight: 800 }}
+          >
+            BEVEILIGINGSREGELS ACTIEF
+          </span>
+          <p style={{ color: P.ink, fontSize: 13, lineHeight: 1.5 }}>
             AnonymousIdMapping is nooit toegankelijk via deze interface. Export bevat uitsluitend
             AnonymizedRecord rijen. Geen individuele identificatie mogelijk.
           </p>
         </div>
-      </div>
+      </Tile>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map(stat => (
-          <Card key={stat.label} style={{ borderRadius: '12px' }}>
-            <CardContent className="p-5">
-              <div
-                className="w-9 h-9 rounded-lg flex items-center justify-center mb-3"
-                style={{ background: stat.bg }}
-              >
-                <stat.icon className="w-4 h-4" style={{ color: stat.color }} />
-              </div>
-              <p className="text-2xl font-bold">{stat.value}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{stat.label}</p>
-            </CardContent>
-          </Card>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {statCards.map((stat) => (
+          <MetricTile
+            key={stat.label}
+            label={stat.label}
+            value={stat.value}
+            unit={stat.unit}
+            tint={stat.tint}
+          />
         ))}
       </div>
 
       {/* Diagnosis breakdown */}
-      <Card style={{ borderRadius: '12px' }}>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <BarChart3 className="w-4 h-4" style={{ color: '#BEF264' }} />
-            Verdeling per diagnose categorie
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Tile>
+        <MetaLabel>Verdeling per diagnose categorie</MetaLabel>
+        <div className="mt-3">
           {isLoading ? (
-            <div className="h-32 flex items-center justify-center text-sm text-muted-foreground">
+            <div
+              className="h-32 flex items-center justify-center"
+              style={{ color: P.inkMuted, fontSize: 13 }}
+            >
               Laden…
             </div>
           ) : !aggregates?.byDiagnosis?.length ? (
-            <div className="h-32 flex items-center justify-center text-sm text-muted-foreground">
+            <div
+              className="h-32 flex items-center justify-center"
+              style={{ color: P.inkMuted, fontSize: 13 }}
+            >
               Nog geen data beschikbaar
             </div>
           ) : (
-            <div className="space-y-2.5">
-              {aggregates.byDiagnosis.map(row => {
+            <div className="flex flex-col gap-2.5">
+              {aggregates.byDiagnosis.map((row) => {
                 const max = aggregates.byDiagnosis[0]?.count ?? 1
                 const pct = Math.round((row.count / max) * 100)
                 return (
                   <div key={row.category} className="flex items-center gap-3">
-                    <span className="text-sm font-medium w-40 shrink-0 truncate">{row.category}</span>
-                    <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: '#1C2425' }}>
+                    <span
+                      className="w-40 shrink-0 truncate"
+                      style={{ color: P.ink, fontSize: 13, fontWeight: 600 }}
+                    >
+                      {row.category}
+                    </span>
+                    <div
+                      className="flex-1 h-2 rounded-full overflow-hidden"
+                      style={{ background: P.surfaceHi }}
+                    >
                       <div
                         className="h-full rounded-full transition-all"
-                        style={{ width: `${pct}%`, background: '#BEF264' }}
+                        style={{ width: `${pct}%`, background: P.lime }}
                       />
                     </div>
-                    <Badge
-                      variant="outline"
-                      className="text-xs w-12 text-center justify-center shrink-0"
+                    <span
+                      className="athletic-mono w-12 text-center shrink-0"
+                      style={{ color: P.inkMuted, fontSize: 12, fontWeight: 700 }}
                     >
                       {row.count}
-                    </Badge>
+                    </span>
                   </div>
                 )
               })}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Tile>
 
       {/* Export info */}
-      <Card style={{ borderRadius: '12px' }}>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Download className="w-4 h-4" style={{ color: '#BEF264' }} />
-            Data export
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            De CSV export bevat uitsluitend rijen uit de <code className="bg-[#1C2425] px-1 rounded text-xs">anonymized_records</code> tabel.
-            De koppeltabel <code className="bg-[#1C2425] px-1 rounded text-xs">anonymous_id_mappings</code> is nooit inbegrepen in exports.
+      <Tile accentBar={P.lime}>
+        <MetaLabel>Data export</MetaLabel>
+        <div className="flex flex-col gap-3 mt-3">
+          <p style={{ color: P.inkMuted, fontSize: 13, lineHeight: 1.5 }}>
+            De CSV export bevat uitsluitend rijen uit de{' '}
+            <code
+              className="athletic-mono"
+              style={{
+                background: P.surfaceHi,
+                padding: '2px 6px',
+                borderRadius: 4,
+                fontSize: 11,
+                color: P.ink,
+              }}
+            >
+              anonymized_records
+            </code>{' '}
+            tabel. De koppeltabel{' '}
+            <code
+              className="athletic-mono"
+              style={{
+                background: P.surfaceHi,
+                padding: '2px 6px',
+                borderRadius: 4,
+                fontSize: 11,
+                color: P.ink,
+              }}
+            >
+              anonymous_id_mappings
+            </code>{' '}
+            is nooit inbegrepen in exports.
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
               { col: 'anonymousId', desc: 'Willekeurig gegenereerde ID (niet terug te voeren naar patiënt)' },
               { col: 'ageAtRecord', desc: 'Leeftijd in jaren op moment van registratie' },
@@ -197,26 +214,33 @@ export default function AdminResearchPage() {
               { col: 'painLevel / exertionLevel', desc: 'Pijn (0-10) en RPE (0-10)' },
               { col: 'sessionDuration', desc: 'Sessieduur in seconden' },
               { col: 'recordDate', desc: 'Datum van de sessie (geen tijdstip)' },
-            ].map(item => (
-              <div key={item.col} className="flex flex-col gap-0.5">
-                <code className="text-xs font-mono bg-[#1C2425] px-1.5 py-0.5 rounded w-fit">
+            ].map((item) => (
+              <div key={item.col} className="flex flex-col gap-1">
+                <code
+                  className="athletic-mono w-fit"
+                  style={{
+                    background: P.surfaceHi,
+                    padding: '2px 8px',
+                    borderRadius: 4,
+                    fontSize: 11,
+                    color: P.ink,
+                    fontWeight: 700,
+                  }}
+                >
                   {item.col}
                 </code>
-                <span className="text-xs text-muted-foreground">{item.desc}</span>
+                <span style={{ color: P.inkMuted, fontSize: 12 }}>{item.desc}</span>
               </div>
             ))}
           </div>
-          <Button
-            className="gap-2 text-white"
-            style={{ background: '#BEF264' }}
+          <DarkButton
             onClick={handleExportCSV}
             disabled={isExporting || isLoading || (aggregates?.totalRecords ?? 0) === 0}
           >
-            <Download className="w-4 h-4" />
             Download CSV ({(aggregates?.totalRecords ?? 0).toLocaleString('nl-NL')} records)
-          </Button>
-        </CardContent>
-      </Card>
+          </DarkButton>
+        </div>
+      </Tile>
     </div>
   )
 }

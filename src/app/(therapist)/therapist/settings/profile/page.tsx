@@ -1,10 +1,8 @@
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { User, Mail, Phone, Building2, ChevronLeft, LogOut } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { DarkButton, Kicker, MetaLabel, P, Tile } from '@/components/dark-ui'
 import { createClient } from '@/lib/supabase/client'
 
 export default function ProfilePage() {
@@ -18,53 +16,55 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="space-y-5 max-w-lg">
+    <div className="max-w-lg w-full flex flex-col gap-4">
       <Link
         href="/therapist/settings"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        className="athletic-mono"
+        style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.16em' }}
       >
-        <ChevronLeft className="w-4 h-4" /> Instellingen
+        ← INSTELLINGEN
       </Link>
 
-      <div>
-        <h1 className="text-2xl font-bold">Profiel</h1>
-        <p className="text-muted-foreground text-sm">Persoonlijke gegevens en accountinformatie</p>
+      <div className="flex flex-col gap-1">
+        <Kicker>Account</Kicker>
+        <h1
+          className="athletic-display"
+          style={{ fontSize: 32, lineHeight: '38px', letterSpacing: '-0.025em', paddingTop: 2 }}
+        >
+          PROFIEL
+        </h1>
+        <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
+          Persoonlijke gegevens en accountinformatie
+        </MetaLabel>
       </div>
 
-      <Card style={{ borderRadius: '12px' }}>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Accountgegevens</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <InfoRow icon={<User className="w-4 h-4" />} label="Naam" value="—" />
-          <InfoRow icon={<Mail className="w-4 h-4" />} label="E-mail" value="—" />
-          <InfoRow icon={<Phone className="w-4 h-4" />} label="Telefoon" value="—" />
-          <InfoRow icon={<Building2 className="w-4 h-4" />} label="Praktijk" value="—" />
-        </CardContent>
-      </Card>
+      <Tile>
+        <MetaLabel>Accountgegevens</MetaLabel>
+        <div className="flex flex-col gap-3 mt-3">
+          <InfoRow label="Naam" value="—" />
+          <InfoRow label="E-mail" value="—" />
+          <InfoRow label="Telefoon" value="—" />
+          <InfoRow label="Praktijk" value="—" />
+        </div>
+      </Tile>
 
-      <Button
-        variant="outline"
-        className="w-full gap-2 text-red-600 border-red-200 hover:bg-red-50"
-        onClick={handleSignOut}
-      >
-        <LogOut className="w-4 h-4" />
+      <DarkButton variant="danger" onClick={handleSignOut}>
         Uitloggen
-      </Button>
+      </DarkButton>
     </div>
   )
 }
 
-function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center gap-3">
-      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-[#7B8889]" style={{ background: '#1C2425' }}>
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-sm font-medium">{value}</p>
-      </div>
+    <div className="flex items-baseline justify-between gap-3 border-b pb-2" style={{ borderColor: P.line }}>
+      <span
+        className="athletic-mono"
+        style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 700 }}
+      >
+        {label}
+      </span>
+      <span style={{ color: P.ink, fontSize: 14, fontWeight: 600 }}>{value}</span>
     </div>
   )
 }

@@ -6,12 +6,16 @@ import { trpc } from '@/lib/trpc/client'
 import { ExerciseVideoModal, type ExerciseForModal } from '@/components/exercises/ExerciseVideoModal'
 import { ChevronLeft, Moon, Dumbbell, Play } from 'lucide-react'
 import { IconSleep } from '@/components/icons'
+import { P, Kicker, MetaLabel, Tile, CATEGORY_COLORS } from '@/components/dark-ui'
 
 const DAY_LABELS = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
 
-const CATEGORY_COLORS: Record<string, string> = {
-  STRENGTH: '#BEF264', MOBILITY: '#60a5fa', PLYOMETRICS: '#f59e0b',
-  CARDIO: '#f87171', STABILITY: '#a78bfa',
+const CAT_COLOR: Record<string, string> = {
+  STRENGTH: CATEGORY_COLORS.STRENGTH,
+  MOBILITY: CATEGORY_COLORS.MOBILITY,
+  PLYOMETRICS: CATEGORY_COLORS.PLYO,
+  CARDIO: CATEGORY_COLORS.CARDIO,
+  STABILITY: CATEGORY_COLORS.STABILITY,
 }
 
 interface Props {
@@ -27,11 +31,13 @@ export default function ScheduleDayPage({ params }: Props) {
 
   if (isLoading) {
     return (
-      <div className="px-4 pt-4 space-y-4">
-        <div className="h-7 w-32 bg-[#1C2425] rounded animate-pulse" />
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-16 bg-[#1C2425] rounded-xl animate-pulse" />
-        ))}
+      <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+        <div className="max-w-lg mx-auto px-4 pt-10 pb-8 space-y-4">
+          <div className="h-7 w-32 rounded animate-pulse" style={{ background: P.surfaceHi }} />
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-16 rounded-xl animate-pulse" style={{ background: P.surfaceHi }} />
+          ))}
+        </div>
       </div>
     )
   }
@@ -40,83 +46,124 @@ export default function ScheduleDayPage({ params }: Props) {
   const dayLabel = DAY_LABELS[dayNum] ?? 'Dag'
 
   return (
-    <div className="px-4 pt-4 pb-6 space-y-4">
-      <div className="flex items-center gap-2">
-        <Link href="/patient/schedule" className="p-1.5 rounded-lg hover:bg-[#1C2425]">
-          <ChevronLeft className="w-5 h-5" />
-        </Link>
-        <h1 className="text-lg font-bold">{dayLabel}</h1>
-      </div>
-
-      {!day?.program ? (
-        <div className="flex flex-col items-center justify-center py-12 rounded-2xl text-center"
-          style={{ background: 'rgba(190,242,100,0.10)' }}>
-          <Moon className="w-10 h-10 mb-3" style={{ color: 'rgba(190,242,100,0.4)' }} />
-          <p className="font-bold text-base inline-flex items-center gap-2" style={{ color: '#BEF264' }}>Rustdag <IconSleep size={18} /></p>
-          <p className="text-sm text-muted-foreground mt-1 max-w-xs">
-            Vandaag hoef je niet te trainen. Gun je lichaam de tijd om te herstellen — dat is net zo belangrijk als trainen!
-          </p>
+    <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+      <div className="max-w-lg mx-auto px-4 pt-10 pb-8 space-y-4">
+        <div className="flex items-center gap-2">
+          <Link
+            href="/patient/schedule"
+            className="athletic-tap p-1.5 rounded-lg"
+            style={{ color: P.inkMuted }}
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </Link>
+          <div>
+            <Kicker>DAG</Kicker>
+            <h1
+              className="athletic-display"
+              style={{
+                color: P.ink,
+                fontSize: 32,
+                lineHeight: '36px',
+                letterSpacing: '-0.03em',
+                fontWeight: 900,
+                paddingTop: 2,
+                textTransform: 'uppercase',
+              }}
+            >
+              {dayLabel}
+            </h1>
+          </div>
         </div>
-      ) : (
-        <>
-          <div className="rounded-xl p-3 border" style={{ background: 'rgba(190,242,100,0.10)', borderColor: '#bbf7d0' }}>
-            <div className="flex items-center gap-2">
-              <Dumbbell className="w-4 h-4" style={{ color: '#BEF264' }} />
-              <h2 className="font-bold text-sm" style={{ color: '#BEF264' }}>{day.program.name}</h2>
+
+        {!day?.program ? (
+          <Tile accentBar={P.lime}>
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Moon className="w-10 h-10 mb-3" style={{ color: P.lime, opacity: 0.5 }} />
+              <p
+                className="athletic-mono inline-flex items-center gap-2"
+                style={{ color: P.lime, fontSize: 14, fontWeight: 900, letterSpacing: '0.14em' }}
+              >
+                RUSTDAG <IconSleep size={18} />
+              </p>
+              <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 8, maxWidth: '20rem', lineHeight: 1.5 }}>
+                Vandaag hoef je niet te trainen. Gun je lichaam de tijd om te herstellen — dat is net zo belangrijk als trainen!
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">{day.program.exercises?.length ?? 0} oefeningen</p>
-          </div>
-
-          <div className="space-y-2">
-            {(day.program.exercises ?? []).map((pe, idx) => {
-              const color = CATEGORY_COLORS[pe.exercise.category] ?? '#BEF264'
-              return (
-                <button
-                  key={pe.id}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl border bg-[#141A1B] text-left active:scale-[0.98] transition-all"
-                  onClick={() => setModalExercise({
-                    id: pe.exercise.id,
-                    name: pe.exercise.name,
-                    category: pe.exercise.category,
-                    videoUrl: pe.exercise.videoUrl,
-                    sets: pe.sets,
-                    reps: pe.reps,
-                    repUnit: pe.repUnit,
-                  })}
+          </Tile>
+        ) : (
+          <>
+            <Tile accentBar={P.lime}>
+              <div className="flex items-center gap-2">
+                <Dumbbell className="w-4 h-4" style={{ color: P.lime }} />
+                <h2
+                  className="athletic-mono"
+                  style={{ color: P.lime, fontSize: 13, fontWeight: 900, letterSpacing: '0.12em' }}
                 >
-                  <div
-                    className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold text-white"
-                    style={{ background: color }}
-                  >
-                    {idx + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate">{pe.exercise.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {pe.sets} sets × {pe.reps} {pe.repUnit} · {pe.restTime}s rust
-                    </p>
-                  </div>
-                  {pe.exercise.videoUrl && (
-                    <div
-                      className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
-                      style={{ background: `${color}20` }}
-                    >
-                      <Play className="w-3.5 h-3.5" style={{ color }} />
-                    </div>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </>
-      )}
+                  {day.program.name.toUpperCase()}
+                </h2>
+              </div>
+              <MetaLabel style={{ marginTop: 4 }}>
+                {day.program.exercises?.length ?? 0} OEFENINGEN
+              </MetaLabel>
+            </Tile>
 
-      {/* Video modal */}
-      <ExerciseVideoModal
-        open={!!modalExercise}
-        onClose={() => setModalExercise(null)}
-        exercise={modalExercise}
-      />
+            <div className="space-y-2">
+              {(day.program.exercises ?? []).map((pe, idx) => {
+                const color = CAT_COLOR[pe.exercise.category] ?? P.lime
+                return (
+                  <button
+                    key={pe.id}
+                    className="athletic-tap w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all"
+                    style={{ background: P.surface, border: `1px solid ${P.line}` }}
+                    onClick={() => setModalExercise({
+                      id: pe.exercise.id,
+                      name: pe.exercise.name,
+                      category: pe.exercise.category,
+                      videoUrl: pe.exercise.videoUrl,
+                      sets: pe.sets,
+                      reps: pe.reps,
+                      repUnit: pe.repUnit,
+                    })}
+                  >
+                    <div
+                      className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 athletic-mono"
+                      style={{ background: color, color: P.bg, fontSize: 12, fontWeight: 900 }}
+                    >
+                      {idx + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate" style={{ color: P.ink, fontSize: 14, fontWeight: 700 }}>
+                        {pe.exercise.name}
+                      </p>
+                      <p
+                        className="athletic-mono"
+                        style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.04em', marginTop: 2 }}
+                      >
+                        {pe.sets} sets × {pe.reps} {pe.repUnit} · {pe.restTime}s rust
+                      </p>
+                    </div>
+                    {pe.exercise.videoUrl && (
+                      <div
+                        className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                        style={{ background: `${color}22` }}
+                      >
+                        <Play className="w-3.5 h-3.5" style={{ color }} />
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </>
+        )}
+
+        {/* Video modal */}
+        <ExerciseVideoModal
+          open={!!modalExercise}
+          onClose={() => setModalExercise(null)}
+          exercise={modalExercise}
+        />
+      </div>
     </div>
   )
 }

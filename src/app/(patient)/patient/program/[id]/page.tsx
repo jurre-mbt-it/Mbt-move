@@ -2,14 +2,12 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { trpc } from '@/lib/trpc/client'
 import { DAY_LABELS } from '@/lib/program-constants'
 import { ExerciseVideoModal, type ExerciseForModal } from '@/components/exercises/ExerciseVideoModal'
 import { ChevronLeft, Play, CheckCircle2, Lock } from 'lucide-react'
 import { IconClipboard } from '@/components/icons'
+import { P, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-ui'
 
 // Coaching cues by exerciseId (static — based on demo exercises)
 const COACHING_CUES: Record<string, string[]> = {
@@ -36,32 +34,34 @@ export default function PatientProgramPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0A0E0F' }}>
-        <p className="text-muted-foreground text-sm">Laden…</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: P.bg, color: P.ink }}>
+        <span className="athletic-mono text-[11px]" style={{ color: P.inkMuted, letterSpacing: '0.16em' }}>LADEN…</span>
       </div>
     )
   }
 
   if (!program) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: '#0A0E0F' }}>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: P.bg, color: P.ink }}>
         <div><IconClipboard size={48} /></div>
-        <p className="font-semibold text-lg">Geen actief programma</p>
-        <p className="text-muted-foreground text-sm">Je therapeut heeft nog geen programma voor je aangemaakt.</p>
-        <Link href="/patient/dashboard">
-          <Button variant="outline">Terug naar dashboard</Button>
-        </Link>
+        <p style={{ color: P.ink, fontSize: 18, fontWeight: 800 }}>Geen actief programma</p>
+        <p style={{ color: P.inkMuted, fontSize: 13 }}>Je therapeut heeft nog geen programma voor je aangemaakt.</p>
+        <DarkButton href="/patient/dashboard" variant="secondary">Terug naar dashboard</DarkButton>
       </div>
     )
   }
 
-  const weekData = program.byWeekDay as Record<number, Record<number, typeof program.exercises>>
+  // Narrow program into a local const so TS keeps the narrow inside nested closures.
+  const programExercises = program.exercises
+  type ProgramExercise = typeof programExercises[number]
+
+  const weekData = program.byWeekDay as Record<number, Record<number, ProgramExercise[]>>
   const daysWithExercises = Object.keys(weekData[activeWeek] ?? {}).map(Number).sort()
 
   const isCurrentWeek = activeWeek === program.currentWeek
   const isFutureWeek = activeWeek > program.currentWeek
 
-  function openExerciseModal(e: typeof program.exercises[0]) {
+  function openExerciseModal(e: ProgramExercise) {
     setModalExercise({
       id: e.exerciseId,
       name: e.name,
@@ -79,85 +79,132 @@ export default function PatientProgramPage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
-      {/* Header */}
-      <div className="px-4 pt-12 pb-5" style={{ background: '#1C2425' }}>
-        <Link href="/patient/dashboard" className="inline-flex items-center gap-1 text-[#7B8889] text-sm mb-3">
-          <ChevronLeft className="w-4 h-4" /> Terug
-        </Link>
-        <h1 className="text-white text-xl font-bold">{program.name}</h1>
-        <p className="text-[#7B8889] text-xs mt-1">{program.weeks} weken · {program.daysPerWeek}×/week</p>
+    <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+      <div className="max-w-lg mx-auto px-4 pt-10 pb-8 space-y-4">
+        {/* Hero */}
+        <div>
+          <Link
+            href="/patient/dashboard"
+            className="athletic-tap inline-flex items-center gap-1 mb-2"
+            style={{ color: P.inkMuted }}
+          >
+            <ChevronLeft className="w-4 h-4" />
+            <span className="athletic-mono" style={{ fontSize: 11, letterSpacing: '0.16em' }}>TERUG</span>
+          </Link>
+          <Kicker>PROGRAMMA · WEEK {activeWeek}</Kicker>
+          <h1
+            className="athletic-display"
+            style={{
+              color: P.ink,
+              fontWeight: 900,
+              letterSpacing: '-0.04em',
+              lineHeight: 1.02,
+              fontSize: 'clamp(44px, 12vw, 80px)',
+              paddingTop: 4,
+              textTransform: 'uppercase',
+              margin: 0,
+            }}
+          >
+            {program.name}
+          </h1>
+          <MetaLabel style={{ marginTop: 6 }}>
+            {program.weeks} WEKEN · {program.daysPerWeek}×/WEEK
+          </MetaLabel>
+        </div>
 
         {/* Week tabs */}
-        <div className="flex gap-2 mt-4 overflow-x-auto pb-1">
-          {Array.from({ length: program.weeks }, (_, i) => i + 1).map(w => (
-            <button
-              key={w}
-              onClick={() => setActiveWeek(w)}
-              className="shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors"
-              style={
-                activeWeek === w
-                  ? { background: '#BEF264', color: 'white' }
-                  : { background: 'rgba(255,255,255,0.1)', color: '#a1a1aa' }
-              }
-            >
-              Week {w}
-            </button>
-          ))}
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {Array.from({ length: program.weeks }, (_, i) => i + 1).map(w => {
+            const active = activeWeek === w
+            return (
+              <button
+                key={w}
+                onClick={() => setActiveWeek(w)}
+                className="athletic-tap shrink-0 px-4 py-1.5 rounded-full athletic-mono transition-colors"
+                style={{
+                  background: active ? P.lime : P.surface,
+                  color: active ? P.bg : P.inkMuted,
+                  border: `1px solid ${active ? P.lime : P.line}`,
+                  fontSize: 12,
+                  fontWeight: 900,
+                  letterSpacing: '0.1em',
+                }}
+              >
+                WEEK {w}
+              </button>
+            )
+          })}
         </div>
-      </div>
 
-      <div className="px-4 py-4 space-y-3">
-        {isFutureWeek && (
-          <div className="flex items-center gap-2 p-3 rounded-xl text-sm" style={{ background: 'rgba(244,194,97,0.14)', color: '#F4C261' }}>
-            <Lock className="w-4 h-4 shrink-0" />
-            Week {activeWeek} is beschikbaar na het voltooien van week {activeWeek - 1}.
-          </div>
-        )}
+        <div className="space-y-3">
+          {isFutureWeek && (
+            <div
+              className="flex items-center gap-2 p-3 rounded-xl"
+              style={{ background: 'rgba(244,194,97,0.10)', color: P.gold, border: `1px solid ${P.gold}33` }}
+            >
+              <Lock className="w-4 h-4 shrink-0" />
+              <span style={{ fontSize: 13 }}>
+                Week {activeWeek} is beschikbaar na het voltooien van week {activeWeek - 1}.
+              </span>
+            </div>
+          )}
 
-        {daysWithExercises.length === 0 && !isFutureWeek && (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <p className="text-muted-foreground text-sm">Geen oefeningen gepland voor deze week</p>
-          </div>
-        )}
+          {daysWithExercises.length === 0 && !isFutureWeek && (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <p style={{ color: P.inkMuted, fontSize: 13 }}>Geen oefeningen gepland voor deze week</p>
+            </div>
+          )}
 
-        {daysWithExercises.map(dayNum => {
-          const dayExercises = weekData[activeWeek]?.[dayNum] ?? []
-          const isToday = isCurrentWeek && dayNum === program.currentDay
-          const isPast = isCurrentWeek && dayNum < program.currentDay
-          const dayLabel = DAY_LABELS[dayNum - 1] ?? `Dag ${dayNum}`
+          {daysWithExercises.map(dayNum => {
+            const dayExercises = weekData[activeWeek]?.[dayNum] ?? []
+            const isToday = isCurrentWeek && dayNum === program.currentDay
+            const isPast = isCurrentWeek && dayNum < program.currentDay
+            const dayLabel = DAY_LABELS[dayNum - 1] ?? `Dag ${dayNum}`
 
-          return (
-            <Card key={dayNum} style={{ borderRadius: '14px', opacity: isFutureWeek ? 0.5 : 1 }}>
-              <CardContent className="px-4 py-4">
+            return (
+              <Tile
+                key={dayNum}
+                accentBar={isPast ? P.lime : isToday ? P.gold : undefined}
+                style={{ opacity: isFutureWeek ? 0.5 : 1 }}
+              >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
-                      style={
-                        isPast ? { background: '#BEF264', color: 'white' }
-                          : isToday ? { background: '#1C2425', color: 'white' }
-                            : { background: '#1C2425', color: '#52525b' }
-                      }
+                      className="w-8 h-8 rounded-full flex items-center justify-center athletic-mono"
+                      style={{
+                        background: isPast ? P.lime : P.surfaceHi,
+                        color: isPast ? P.bg : isToday ? P.ink : P.inkMuted,
+                        fontSize: 11,
+                        fontWeight: 900,
+                        letterSpacing: '0.08em',
+                      }}
                     >
-                      {isPast ? '✓' : dayLabel.slice(0, 2)}
+                      {isPast ? '✓' : dayLabel.slice(0, 2).toUpperCase()}
                     </div>
                     <div>
-                      <p className="font-semibold text-sm">{dayLabel}</p>
-                      <p className="text-xs text-muted-foreground">{dayExercises.length} oefeningen</p>
+                      <p style={{ color: P.ink, fontSize: 14, fontWeight: 800 }}>{dayLabel}</p>
+                      <MetaLabel>{dayExercises.length} OEFENINGEN</MetaLabel>
                     </div>
                   </div>
 
                   {isPast ? (
-                    <Badge className="text-xs gap-1" style={{ background: 'rgba(190,242,100,0.10)', color: '#BEF264', border: 'none' }}>
-                      <CheckCircle2 className="w-3 h-3" /> Afgerond
-                    </Badge>
+                    <span
+                      className="athletic-mono inline-flex items-center gap-1 px-2 py-1 rounded"
+                      style={{
+                        color: P.lime,
+                        background: 'rgba(190,242,100,0.10)',
+                        border: `1px solid ${P.lime}33`,
+                        fontSize: 10,
+                        fontWeight: 900,
+                        letterSpacing: '0.12em',
+                      }}
+                    >
+                      <CheckCircle2 className="w-3 h-3" /> AFGEROND
+                    </span>
                   ) : isToday ? (
-                    <Link href="/patient/session">
-                      <Button size="sm" className="gap-1.5 text-xs h-7" style={{ background: '#BEF264' }}>
-                        <Play className="w-3 h-3 fill-current" /> Start
-                      </Button>
-                    </Link>
+                    <DarkButton href="/patient/session" size="sm" variant="primary">
+                      <Play className="w-3 h-3 fill-current mr-1" /> START
+                    </DarkButton>
                   ) : null}
                 </div>
 
@@ -165,31 +212,41 @@ export default function PatientProgramPage() {
                   {dayExercises.map(e => (
                     <button
                       key={e.uid}
-                      className="w-full flex items-center gap-2 text-left rounded-lg px-2 py-1.5 hover:bg-[#1C2425] active:scale-[0.98] transition-all group"
+                      className="athletic-tap w-full flex items-center gap-2 text-left rounded-lg px-2 py-1.5 transition-all"
                       onClick={() => openExerciseModal(e)}
                       disabled={isFutureWeek}
                     >
-                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: isPast ? '#BEF264' : '#4A5454' }} />
-                      <span className="text-sm flex-1 truncate">{e.name}</span>
-                      <span className="text-xs text-muted-foreground shrink-0">{e.sets}×{e.reps}</span>
+                      <div
+                        className="w-1.5 h-1.5 rounded-full shrink-0"
+                        style={{ background: isPast ? P.lime : P.inkDim }}
+                      />
+                      <span className="flex-1 truncate" style={{ color: P.ink, fontSize: 13 }}>
+                        {e.name}
+                      </span>
+                      <span
+                        className="athletic-mono shrink-0"
+                        style={{ color: P.inkMuted, fontSize: 11 }}
+                      >
+                        {e.sets}×{e.reps}
+                      </span>
                       {e.videoUrl && (
-                        <Play className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: '#BEF264' }} />
+                        <Play className="w-3 h-3 shrink-0" style={{ color: P.lime }} />
                       )}
                     </button>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+              </Tile>
+            )
+          })}
+        </div>
 
-      {/* Video modal */}
-      <ExerciseVideoModal
-        open={!!modalExercise}
-        onClose={() => setModalExercise(null)}
-        exercise={modalExercise}
-      />
+        {/* Video modal */}
+        <ExerciseVideoModal
+          open={!!modalExercise}
+          onClose={() => setModalExercise(null)}
+          exercise={modalExercise}
+        />
+      </div>
     </div>
   )
 }

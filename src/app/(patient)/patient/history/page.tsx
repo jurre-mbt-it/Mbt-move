@@ -1,32 +1,42 @@
 'use client'
 
 import { useState } from 'react'
-import { Card, CardContent } from '@/components/ui/card'
 import { trpc } from '@/lib/trpc/client'
-import { CheckCircle2, Clock, ChevronDown, ChevronUp, Flame, TrendingUp } from 'lucide-react'
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
 } from 'recharts'
+import {
+  DARK_CHART_STYLES,
+  DarkChartTooltip,
+  DarkScreen,
+  Display,
+  Kicker,
+  MetaLabel,
+  MetricTile,
+  P,
+  Tile,
+} from '@/components/dark-ui'
 
 function PainDot({ level }: { level: number }) {
-  const color = level <= 3 ? '#BEF264' : level <= 6 ? '#f97316' : '#ef4444'
+  const color = level <= 3 ? P.lime : level <= 6 ? P.gold : P.danger
   return (
-    <span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color }}>
-      <span className="w-2 h-2 rounded-full inline-block" style={{ background: color }} />
+    <span
+      className="athletic-mono inline-flex items-center gap-1"
+      style={{ color, fontSize: 11, fontWeight: 900, letterSpacing: '0.08em' }}
+    >
+      <span
+        className="w-2 h-2 rounded-full inline-block"
+        style={{ backgroundColor: color }}
+      />
       {level}/10
     </span>
-  )
-}
-
-function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{value: number; name: string}>; label?: string }) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="rounded-xl px-3 py-2 shadow-lg text-xs" style={{ background: '#1A1A1A', color: '#fff' }}>
-      <p className="font-semibold mb-1">{label}</p>
-      {payload.map(p => (
-        <p key={p.name}>{p.name}: <span className="font-bold">{p.value}</span></p>
-      ))}
-    </div>
   )
 }
 
@@ -37,196 +47,250 @@ export default function HistoryPage() {
   const { data: sessions = [], isLoading } = trpc.patient.getSessionHistory.useQuery({ limit: 50 })
 
   const totalMin = sessions.reduce((sum, s) => sum + s.durationMinutes, 0)
-  const avgPain = sessions.filter(s => s.painLevel !== null).length > 0
-    ? sessions.filter(s => s.painLevel !== null)
-        .reduce((sum, s, _, arr) => sum + (s.painLevel ?? 0) / arr.length, 0)
-    : null
+  const avgPain =
+    sessions.filter((s) => s.painLevel !== null).length > 0
+      ? sessions
+          .filter((s) => s.painLevel !== null)
+          .reduce((sum, s, _, arr) => sum + (s.painLevel ?? 0) / arr.length, 0)
+      : null
 
   const chartData = [...sessions].reverse().map((s, i) => ({
-    name: new Date(s.completedAt).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }),
+    name: new Date(s.completedAt).toLocaleDateString('nl-NL', {
+      day: 'numeric',
+      month: 'short',
+    }),
     sessieNr: i + 1,
     duur: s.durationMinutes,
     pain: s.painLevel ?? 0,
   }))
 
   return (
-    <div className="min-h-screen pb-6" style={{ background: '#0A0E0F' }}>
-      {/* Header */}
-      <div className="px-4 pt-12 pb-5" style={{ background: '#1A1A1A' }}>
-        <h1 className="text-white text-xl font-bold">Voortgang</h1>
-        <p className="text-[#7B8889] text-xs mt-0.5">{sessions.length} sessies afgerond</p>
-      </div>
+    <DarkScreen>
+      <div className="max-w-lg w-full mx-auto px-4 pt-10 pb-8 flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <Kicker>Geschiedenis</Kicker>
+          <Display size="md">VOORTGANG</Display>
+          <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
+            {sessions.length} sessies afgerond
+          </MetaLabel>
+        </div>
 
-      <div className="px-4 py-4 space-y-4">
         {/* Stats row */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <Card style={{ borderRadius: '14px' }}>
-            <CardContent className="px-3 py-3 text-center">
-              <div className="flex justify-center mb-1">
-                <Flame className="w-4 h-4" style={{ color: '#f97316' }} />
-              </div>
-              <p className="text-xl font-bold" style={{ color: '#f97316' }}>{sessions.length}</p>
-              <p className="text-xs text-muted-foreground">Totaal</p>
-            </CardContent>
-          </Card>
-          <Card style={{ borderRadius: '14px' }}>
-            <CardContent className="px-3 py-3 text-center">
-              <div className="flex justify-center mb-1">
-                <CheckCircle2 className="w-4 h-4" style={{ color: '#BEF264' }} />
-              </div>
-              <p className="text-xl font-bold" style={{ color: '#BEF264' }}>
-                {avgPain !== null ? avgPain.toFixed(1) : '—'}
-              </p>
-              <p className="text-xs text-muted-foreground">Gem. pijn</p>
-            </CardContent>
-          </Card>
-          <Card style={{ borderRadius: '14px' }}>
-            <CardContent className="px-3 py-3 text-center">
-              <div className="flex justify-center mb-1">
-                <Clock className="w-4 h-4" style={{ color: '#6366f1' }} />
-              </div>
-              <p className="text-xl font-bold" style={{ color: '#6366f1' }}>{totalMin}</p>
-              <p className="text-xs text-muted-foreground">Minuten</p>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-3 gap-3">
+          <MetricTile label="Totaal" value={sessions.length} tint={P.lime} />
+          <MetricTile
+            label="Gem. pijn"
+            value={avgPain !== null ? avgPain.toFixed(1) : '—'}
+            tint={avgPain !== null && avgPain <= 3 ? P.lime : avgPain !== null && avgPain <= 6 ? P.gold : P.danger}
+          />
+          <MetricTile label="Min" value={totalMin} tint={P.ice} />
         </div>
 
         {/* Chart */}
         {chartData.length > 0 && (
-          <Card style={{ borderRadius: '14px' }}>
-            <CardContent className="px-4 py-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" style={{ color: '#BEF264' }} />
-                  <p className="font-semibold text-sm">Grafiek</p>
-                </div>
-                <div className="flex rounded-xl overflow-hidden border text-xs font-semibold">
-                  <button
-                    onClick={() => setActiveChart('volume')}
-                    className="px-3 py-1.5 transition-all"
-                    style={{
-                      background: activeChart === 'volume' ? '#1A1A1A' : 'transparent',
-                      color: activeChart === 'volume' ? '#fff' : '#7B8889',
-                    }}
-                  >
-                    Volume
-                  </button>
-                  <button
-                    onClick={() => setActiveChart('pain')}
-                    className="px-3 py-1.5 transition-all"
-                    style={{
-                      background: activeChart === 'pain' ? '#1A1A1A' : 'transparent',
-                      color: activeChart === 'pain' ? '#fff' : '#7B8889',
-                    }}
-                  >
-                    Pijn
-                  </button>
-                </div>
+          <Tile>
+            <div className="flex items-center justify-between mb-3">
+              <MetaLabel>Grafiek</MetaLabel>
+              <div
+                className="flex rounded-xl overflow-hidden athletic-mono"
+                style={{ border: `1px solid ${P.lineStrong}` }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setActiveChart('volume')}
+                  className="athletic-tap px-3 py-1.5 transition-all"
+                  style={{
+                    backgroundColor: activeChart === 'volume' ? P.lime : 'transparent',
+                    color: activeChart === 'volume' ? P.bg : P.inkMuted,
+                    fontSize: 11,
+                    fontWeight: 900,
+                    letterSpacing: '0.1em',
+                  }}
+                >
+                  VOLUME
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveChart('pain')}
+                  className="athletic-tap px-3 py-1.5 transition-all"
+                  style={{
+                    backgroundColor: activeChart === 'pain' ? P.lime : 'transparent',
+                    color: activeChart === 'pain' ? P.bg : P.inkMuted,
+                    fontSize: 11,
+                    fontWeight: 900,
+                    letterSpacing: '0.1em',
+                  }}
+                >
+                  PIJN
+                </button>
               </div>
-              <ResponsiveContainer width="100%" height={160}>
-                <BarChart data={chartData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} />
-                  <Tooltip content={<CustomTooltip />} cursor={{ fill: '#1C2425' }} />
-                  <Bar
-                    dataKey={activeChart === 'volume' ? 'duur' : 'pain'}
-                    name={activeChart === 'volume' ? 'Duur (min)' : 'Pijn (/10)'}
-                    radius={[4, 4, 0, 0]}
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={
-                          activeChart === 'volume'
-                            ? '#BEF264'
-                            : entry.pain <= 3 ? '#BEF264' : entry.pain <= 6 ? '#f97316' : '#ef4444'
-                        }
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+            </div>
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={chartData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+                <CartesianGrid {...DARK_CHART_STYLES.grid} />
+                <XAxis dataKey="name" {...DARK_CHART_STYLES.axis} />
+                <YAxis {...DARK_CHART_STYLES.axis} />
+                <Tooltip content={<DarkChartTooltip />} cursor={{ fill: P.surfaceHi }} />
+                <Bar
+                  dataKey={activeChart === 'volume' ? 'duur' : 'pain'}
+                  name={activeChart === 'volume' ? 'Duur (min)' : 'Pijn (/10)'}
+                  radius={[4, 4, 0, 0]}
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={
+                        activeChart === 'volume'
+                          ? P.lime
+                          : entry.pain <= 3
+                            ? P.lime
+                            : entry.pain <= 6
+                              ? P.gold
+                              : P.danger
+                      }
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </Tile>
         )}
 
         {/* Session list */}
-        <p className="font-semibold text-sm px-1">Sessiegeschiedenis</p>
+        <MetaLabel>Sessiegeschiedenis</MetaLabel>
 
         {isLoading && (
-          <p className="text-sm text-muted-foreground text-center py-4">Laden…</p>
+          <p
+            className="athletic-mono text-center py-4"
+            style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.1em' }}
+          >
+            LADEN…
+          </p>
         )}
 
         {!isLoading && sessions.length === 0 && (
-          <Card style={{ borderRadius: '14px' }}>
-            <CardContent className="py-8 text-center">
-              <p className="text-sm text-muted-foreground">Nog geen sessies voltooid</p>
-            </CardContent>
-          </Card>
+          <Tile>
+            <p className="text-center py-4" style={{ color: P.inkMuted, fontSize: 13 }}>
+              Nog geen sessies voltooid
+            </p>
+          </Tile>
         )}
 
-        <div className="space-y-2">
-          {sessions.map(session => {
+        <div className="flex flex-col gap-2">
+          {sessions.map((session) => {
             const isOpen = expanded === session.id
             const date = new Date(session.completedAt)
-            const dateStr = date.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
+            const dateStr = date
+              .toLocaleDateString('nl-NL', {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+              })
+              .toUpperCase()
 
             return (
-              <Card key={session.id} style={{ borderRadius: '14px', overflow: 'hidden' }}>
-                <CardContent className="px-4 py-3">
-                  <button
-                    className="w-full flex items-center gap-3 text-left"
-                    onClick={() => setExpanded(isOpen ? null : session.id)}
-                  >
-                    <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-sm font-bold"
-                      style={{ background: 'rgba(190,242,100,0.10)', color: '#BEF264' }}
+              <Tile key={session.id}>
+                <button
+                  type="button"
+                  className="athletic-tap w-full flex items-center gap-3 text-left"
+                  onClick={() => setExpanded(isOpen ? null : session.id)}
+                >
+                  <span
+                    aria-hidden
+                    style={{
+                      width: 3,
+                      height: 36,
+                      borderRadius: 1.5,
+                      backgroundColor: P.lime,
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className="athletic-mono"
+                      style={{
+                        color: P.ink,
+                        fontSize: 13,
+                        fontWeight: 900,
+                        letterSpacing: '0.08em',
+                      }}
                     >
-                      ✓
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm">{dateStr}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {session.exerciseCount} oefeningen · {session.durationMinutes} min
-                        {session.programName ? ` · ${session.programName}` : ''}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {session.painLevel !== null && <PainDot level={session.painLevel} />}
-                      {isOpen ? <ChevronUp className="w-4 h-4 text-[#7B8889]" /> : <ChevronDown className="w-4 h-4 text-[#7B8889]" />}
-                    </div>
-                  </button>
+                      {dateStr}
+                    </p>
+                    <p
+                      className="athletic-mono"
+                      style={{
+                        color: P.inkMuted,
+                        fontSize: 11,
+                        marginTop: 2,
+                        textTransform: 'none',
+                        fontWeight: 500,
+                      }}
+                    >
+                      {session.exerciseCount} oefeningen · {session.durationMinutes} min
+                      {session.programName ? ` · ${session.programName}` : ''}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {session.painLevel !== null && <PainDot level={session.painLevel} />}
+                    <span style={{ color: P.inkMuted, fontSize: 14 }} aria-hidden>
+                      {isOpen ? '▲' : '▼'}
+                    </span>
+                  </div>
+                </button>
 
-                  {isOpen && (
-                    <div className="mt-3 pt-3 border-t space-y-2">
-                      <div className="grid grid-cols-3 gap-2 text-center">
-                        <div>
-                          <p className="text-sm font-semibold">{session.exerciseCount}</p>
-                          <p className="text-xs text-muted-foreground">Oefeningen</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold">{session.durationMinutes} min</p>
-                          <p className="text-xs text-muted-foreground">Duur</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold">{session.exertionLevel !== null ? `${session.exertionLevel}/10` : '—'}</p>
-                          <p className="text-xs text-muted-foreground">Inspanning</p>
-                        </div>
-                      </div>
-                      {session.notes && (
-                        <p className="text-xs text-muted-foreground italic bg-[#1C2425] rounded-lg px-3 py-2">
-                          &ldquo;{session.notes}&rdquo;
+                {isOpen && (
+                  <div
+                    className="mt-3 pt-3 flex flex-col gap-2"
+                    style={{ borderTop: `1px solid ${P.line}` }}
+                  >
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div>
+                        <p
+                          className="athletic-mono"
+                          style={{ color: P.ink, fontSize: 16, fontWeight: 900 }}
+                        >
+                          {session.exerciseCount}
                         </p>
-                      )}
+                        <MetaLabel>Oefeningen</MetaLabel>
+                      </div>
+                      <div>
+                        <p
+                          className="athletic-mono"
+                          style={{ color: P.ink, fontSize: 16, fontWeight: 900 }}
+                        >
+                          {session.durationMinutes} min
+                        </p>
+                        <MetaLabel>Duur</MetaLabel>
+                      </div>
+                      <div>
+                        <p
+                          className="athletic-mono"
+                          style={{ color: P.ink, fontSize: 16, fontWeight: 900 }}
+                        >
+                          {session.exertionLevel !== null ? `${session.exertionLevel}/10` : '—'}
+                        </p>
+                        <MetaLabel>Inspanning</MetaLabel>
+                      </div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                    {session.notes && (
+                      <p
+                        className="italic rounded-lg px-3 py-2"
+                        style={{
+                          color: P.inkMuted,
+                          fontSize: 12,
+                          backgroundColor: P.surfaceHi,
+                        }}
+                      >
+                        &ldquo;{session.notes}&rdquo;
+                      </p>
+                    )}
+                  </div>
+                )}
+              </Tile>
             )
           })}
         </div>
       </div>
-    </div>
+    </DarkScreen>
   )
 }

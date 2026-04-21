@@ -2,20 +2,14 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
 import {
-  Play, Pause, Square, Heart, CheckCircle2, ChevronLeft,
+  Play, Pause, Square, Heart, ChevronLeft,
   Volume2, VolumeX, SkipForward,
 } from 'lucide-react'
 import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, HR_ZONES, HRZone } from '@/lib/cardio-constants'
-import { cn } from '@/lib/utils'
 import { CARDIO_ICON_MAP, IconRunning, IconWalking, IconWarning, IconFinishFlag, IconCheck } from '@/components/icons'
-
-const MBT_GREEN = '#BEF264'
-const MBT_TEAL = '#BEF264'
-const MBT_DARK = '#1C2425'
+import { P, Kicker, MetaLabel, Tile, DarkButton, DarkInput, CATEGORY_COLORS } from '@/components/dark-ui'
 
 // ── Mock sessie data ──────────────────────────────────────────────────────────
 
@@ -45,6 +39,15 @@ const MOCK_SESSION = {
 }
 
 type SessionPhase = 'IDLE' | 'ACTIVE' | 'PAUSED' | 'DONE'
+
+// HR zone colors — use CATEGORY_COLORS Z1-Z5
+const ZONE_COLOR_MAP: Record<HRZone, string> = {
+  1: CATEGORY_COLORS.Z1,
+  2: CATEGORY_COLORS.Z2,
+  3: CATEGORY_COLORS.Z3,
+  4: CATEGORY_COLORS.Z4,
+  5: CATEGORY_COLORS.Z5,
+}
 
 // ── Audio cue helper ──────────────────────────────────────────────────────────
 
@@ -92,7 +95,7 @@ function CircularTimer({
   return (
     <div className="relative w-52 h-52 mx-auto">
       <svg className="w-full h-full -rotate-90" viewBox="0 0 200 200">
-        <circle cx="100" cy="100" r={r} fill="none" stroke="#f1f5f9" strokeWidth="12" />
+        <circle cx="100" cy="100" r={r} fill="none" stroke={P.surfaceHi} strokeWidth="12" />
         <circle
           cx="100" cy="100" r={r} fill="none" stroke={color} strokeWidth="12"
           strokeLinecap="round"
@@ -102,10 +105,18 @@ function CircularTimer({
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-5xl font-bold tabular-nums" style={{ color }}>
+        <span
+          className="athletic-mono"
+          style={{ color, fontSize: 48, fontWeight: 900, letterSpacing: '-0.02em' }}
+        >
           {mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : secs}
         </span>
-        <span className="text-sm text-muted-foreground mt-1">{label}</span>
+        <span
+          className="athletic-mono mt-1"
+          style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase' }}
+        >
+          {label}
+        </span>
       </div>
     </div>
   )
@@ -141,7 +152,7 @@ function SmileySVG({ expression, size = 28, color }: { expression: 'exhausted' |
 }
 const SMILEY_EXPRESSIONS: Array<'exhausted' | 'unhappy' | 'neutral' | 'happy' | 'great'> = ['exhausted', 'unhappy', 'neutral', 'happy', 'great']
 const SMILEY_LABELS = ['Zwaar', 'Moeilijk', 'Oké', 'Goed', 'Super']
-const SMILEY_COLORS = ['#ef4444', '#f97316', '#eab308', '#84cc16', MBT_GREEN]
+const SMILEY_COLORS = [P.danger, P.orange, P.gold, P.limeDeep, P.lime]
 
 function FeedbackModal({
   onSubmit,
@@ -158,38 +169,53 @@ function FeedbackModal({
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-sm font-semibold mb-3">Hoe voelde de sessie?</p>
+        <MetaLabel style={{ marginBottom: 8 }}>HOE VOELDE DE SESSIE?</MetaLabel>
         <div className="flex gap-2">
           {SMILEY_EXPRESSIONS.map((expr, i) => (
             <button
               key={i}
               onClick={() => setRpe(i + 1)}
-              className="flex-1 flex flex-col items-center gap-1 p-2 rounded-xl border transition-all"
-              style={rpe === i + 1 ? { borderColor: SMILEY_COLORS[i], background: SMILEY_COLORS[i] + '20' } : {}}
+              className="athletic-tap flex-1 flex flex-col items-center gap-1 p-2 rounded-xl transition-all"
+              style={
+                rpe === i + 1
+                  ? { borderColor: SMILEY_COLORS[i], background: SMILEY_COLORS[i] + '22', border: `2px solid ${SMILEY_COLORS[i]}` }
+                  : { border: `2px solid ${P.line}`, background: P.surfaceHi }
+              }
             >
               <SmileySVG expression={expr} color={SMILEY_COLORS[i]} />
-              <span className="text-xs">{SMILEY_LABELS[i]}</span>
+              <span
+                className="athletic-mono"
+                style={{ color: rpe === i + 1 ? SMILEY_COLORS[i] : P.inkMuted, fontSize: 10, fontWeight: 700 }}
+              >
+                {SMILEY_LABELS[i]}
+              </span>
             </button>
           ))}
         </div>
       </div>
 
       <div>
-        <p className="text-sm font-semibold mb-2">Pijn knie / enkel / voet? (0-10)</p>
+        <MetaLabel style={{ marginBottom: 8 }}>PIJN KNIE / ENKEL / VOET? (0-10)</MetaLabel>
         <div className="flex items-center gap-3">
           <input
             type="range" min={0} max={10} step={1}
             value={painLevel}
             onChange={e => setPainLevel(+e.target.value)}
             className="flex-1"
-            style={{ accentColor: painLevel >= 5 ? '#ef4444' : MBT_GREEN }}
+            style={{ accentColor: painLevel >= 5 ? P.danger : P.lime }}
           />
-          <span className="w-8 text-center font-bold text-lg" style={{ color: painLevel >= 5 ? '#ef4444' : MBT_GREEN }}>
+          <span
+            className="athletic-mono w-8 text-center"
+            style={{ color: painLevel >= 5 ? P.danger : P.lime, fontSize: 18, fontWeight: 900 }}
+          >
             {painLevel}
           </span>
         </div>
         {highPain && (
-          <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex gap-2">
+          <div
+            className="mt-2 p-2 rounded-lg flex gap-2"
+            style={{ background: 'rgba(248,113,113,0.10)', border: `1px solid ${P.danger}33`, color: P.danger, fontSize: 11 }}
+          >
             <IconWarning size={16} />
             <span>Pijn &gt; 5/10 — Volgende sessie wordt herhaald. Therapeut wordt op de hoogte gesteld.</span>
           </div>
@@ -198,30 +224,30 @@ function FeedbackModal({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <p className="text-xs font-medium mb-1 flex items-center gap-1">
-            <Heart className="w-3 h-3 text-red-400" /> Gem. hartslag (optioneel)
-          </p>
-          <input
+          <MetaLabel style={{ marginBottom: 6 }}>
+            <span className="inline-flex items-center gap-1">
+              <Heart className="w-3 h-3" style={{ color: P.danger }} /> GEM. HARTSLAG
+            </span>
+          </MetaLabel>
+          <DarkInput
             type="number" min={60} max={220} placeholder="bijv. 145"
             value={hrInput}
             onChange={e => setHrInput(e.target.value)}
-            className="w-full h-9 rounded-md border bg-background px-3 text-sm"
           />
         </div>
         <div>
-          <p className="text-xs font-medium mb-1">Afstand (km, optioneel)</p>
-          <input
+          <MetaLabel style={{ marginBottom: 6 }}>AFSTAND (KM)</MetaLabel>
+          <DarkInput
             type="number" min={0} step={0.1} placeholder="bijv. 2.4"
             value={distInput}
             onChange={e => setDistInput(e.target.value)}
-            className="w-full h-9 rounded-md border bg-background px-3 text-sm"
           />
         </div>
       </div>
 
-      <Button
-        className="w-full"
-        style={{ background: highPain ? '#ef4444' : MBT_GREEN }}
+      <DarkButton
+        size="lg"
+        variant={highPain ? 'danger' : 'primary'}
         onClick={() => onSubmit({
           rpe: rpe * 2,
           painLevel,
@@ -229,8 +255,10 @@ function FeedbackModal({
           distance: distInput ? +distInput : null,
         })}
       >
-        {highPain ? <span className="inline-flex items-center gap-1"><IconWarning size={16} /> Sessie afsluiten (pijn gemeld)</span> : <span className="inline-flex items-center gap-1"><IconCheck size={16} /> Sessie afsluiten</span>}
-      </Button>
+        {highPain
+          ? <span className="inline-flex items-center gap-1"><IconWarning size={16} /> SESSIE AFSLUITEN (PIJN GEMELD)</span>
+          : <span className="inline-flex items-center gap-1"><IconCheck size={16} /> SESSIE AFSLUITEN</span>}
+      </DarkButton>
     </div>
   )
 }
@@ -343,6 +371,7 @@ export default function CardioSessionPage() {
   const activityInfo = CARDIO_ACTIVITIES[session.activity]
   const protocolInfo = CARDIO_PROTOCOLS[session.protocol]
   const zoneInfo = HR_ZONES[session.targetZone]
+  const zoneColor = ZONE_COLOR_MAP[session.targetZone]
 
   const elapsedMin = Math.floor(elapsedSec / 60)
   const elapsedSecs = elapsedSec % 60
@@ -351,14 +380,28 @@ export default function CardioSessionPage() {
 
   if (showFeedback) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ background: P.bg, color: P.ink }}>
         <div className="w-full max-w-sm space-y-5">
           <div className="text-center">
             <div className="mb-3"><IconFinishFlag size={48} /></div>
-            <h2 className="text-xl font-bold">Sessie afgerond!</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              {elapsedMin}:{elapsedSecs.toString().padStart(2, '0')} actief · Week {session.week}, Sessie {session.session}
-            </p>
+            <Kicker>VOLTOOID</Kicker>
+            <h2
+              className="athletic-display"
+              style={{
+                color: P.ink,
+                fontSize: 36,
+                lineHeight: '40px',
+                letterSpacing: '-0.03em',
+                fontWeight: 900,
+                paddingTop: 4,
+                textTransform: 'uppercase',
+              }}
+            >
+              SESSIE AF
+            </h2>
+            <MetaLabel style={{ marginTop: 6 }}>
+              {elapsedMin}:{elapsedSecs.toString().padStart(2, '0')} ACTIEF · WEEK {session.week}, SESSIE {session.session}
+            </MetaLabel>
           </div>
           <FeedbackModal onSubmit={handleFeedbackSubmit} />
         </div>
@@ -367,17 +410,35 @@ export default function CardioSessionPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: phase === 'IDLE' ? undefined : MBT_DARK }}>
+    <div className="min-h-screen flex flex-col" style={{ background: P.bg, color: P.ink }}>
       {/* Header */}
-      <div className="flex items-center justify-between p-4" style={{ color: phase !== 'IDLE' ? '#fff' : undefined }}>
-        <button onClick={() => router.back()} className="opacity-70 hover:opacity-100">
+      <div className="flex items-center justify-between p-4">
+        <button
+          onClick={() => router.back()}
+          className="athletic-tap opacity-70 hover:opacity-100"
+          style={{ color: P.ink }}
+        >
           <ChevronLeft className="w-6 h-6" />
         </button>
         <div className="text-center">
-          <p className="text-xs opacity-70 uppercase tracking-wider flex items-center justify-center gap-1">{(() => { const Icon = CARDIO_ICON_MAP[session.activity]; return Icon ? <Icon size={14} /> : activityInfo.icon })()} {activityInfo.label}</p>
-          <p className="text-sm font-semibold">{protocolInfo.label} — Week {session.week}</p>
+          <p
+            className="athletic-mono flex items-center justify-center gap-1"
+            style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.16em', fontWeight: 700, textTransform: 'uppercase' }}
+          >
+            {(() => { const Icon = CARDIO_ICON_MAP[session.activity]; return Icon ? <Icon size={14} /> : activityInfo.icon })()} {activityInfo.label}
+          </p>
+          <p
+            className="athletic-mono mt-1"
+            style={{ color: P.ink, fontSize: 13, fontWeight: 800, letterSpacing: '0.04em' }}
+          >
+            {protocolInfo.label} — Week {session.week}
+          </p>
         </div>
-        <button onClick={() => setSoundEnabled(s => !s)} className="opacity-70 hover:opacity-100">
+        <button
+          onClick={() => setSoundEnabled(s => !s)}
+          className="athletic-tap opacity-70 hover:opacity-100"
+          style={{ color: P.ink }}
+        >
           {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
         </button>
       </div>
@@ -387,8 +448,15 @@ export default function CardioSessionPage() {
 
         {/* Zone badge */}
         <div
-          className="px-4 py-1.5 rounded-full text-sm font-semibold"
-          style={{ background: zoneInfo.color + '25', color: zoneInfo.color }}
+          className="px-4 py-1.5 rounded-full athletic-mono"
+          style={{
+            background: zoneColor + '22',
+            color: zoneColor,
+            border: `1px solid ${zoneColor}66`,
+            fontSize: 12,
+            fontWeight: 900,
+            letterSpacing: '0.08em',
+          }}
         >
           {zoneInfo.label} ({zoneInfo.minPct}–{zoneInfo.maxPct}% HRmax)
         </div>
@@ -399,17 +467,25 @@ export default function CardioSessionPage() {
             <CircularTimer
               seconds={intervalRemaining}
               total={currentInterval?.durationSec ?? 1}
-              color={isRun ? MBT_GREEN : '#94a3b8'}
+              color={isRun ? P.lime : P.ice}
               label={currentInterval?.label ?? ''}
             />
 
             {/* Interval indicator */}
             <div className="mt-4">
-              <p className="text-3xl font-bold" style={{ color: isRun ? MBT_GREEN : '#94a3b8' }}>
-                <span className="inline-flex items-center gap-2">{isRun ? <><IconRunning size={28} /> LOPEN</> : <><IconWalking size={28} /> WANDELEN</>}</span>
+              <p
+                className="athletic-display"
+                style={{ color: isRun ? P.lime : P.ice, fontSize: 30, fontWeight: 900, letterSpacing: '-0.02em' }}
+              >
+                <span className="inline-flex items-center gap-2">
+                  {isRun ? <><IconRunning size={28} /> LOPEN</> : <><IconWalking size={28} /> WANDELEN</>}
+                </span>
               </p>
-              <p className="text-sm opacity-70 mt-1" style={{ color: '#94a3b8' }}>
-                Interval {currentIntervalIdx + 1} / {session.intervals.length}
+              <p
+                className="athletic-mono mt-1"
+                style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.1em' }}
+              >
+                INTERVAL {currentIntervalIdx + 1} / {session.intervals.length}
               </p>
             </div>
 
@@ -421,11 +497,11 @@ export default function CardioSessionPage() {
                   className="w-3 h-3 rounded-full transition-all"
                   style={{
                     background: i < currentIntervalIdx
-                      ? (iv.type === 'RUN' ? MBT_GREEN + '80' : '#94a3b880')
+                      ? (iv.type === 'RUN' ? P.lime + '88' : P.ice + '88')
                       : i === currentIntervalIdx
-                        ? (iv.type === 'RUN' ? MBT_GREEN : '#94a3b8')
-                        : '#1e3a3a',
-                    border: i === currentIntervalIdx ? '2px solid white' : 'none',
+                        ? (iv.type === 'RUN' ? P.lime : P.ice)
+                        : P.surfaceHi,
+                    border: i === currentIntervalIdx ? `2px solid ${P.ink}` : 'none',
                   }}
                 />
               ))}
@@ -435,24 +511,30 @@ export default function CardioSessionPage() {
           /* Elapsed timer voor non-interval */
           <div className="text-center">
             <div className="relative">
-              <p className="text-8xl font-bold tabular-nums" style={{ color: phase !== 'IDLE' ? '#fff' : MBT_GREEN }}>
+              <p
+                className="athletic-mono"
+                style={{ color: P.lime, fontSize: 80, fontWeight: 900, letterSpacing: '-0.04em' }}
+              >
                 {elapsedMin.toString().padStart(2, '0')}:{elapsedSecs.toString().padStart(2, '0')}
               </p>
-              <p className="text-sm mt-2" style={{ color: phase !== 'IDLE' ? '#94a3b8' : '#6b7280' }}>
-                verstreken · doel {session.targetDurationMin} min
-              </p>
+              <MetaLabel style={{ marginTop: 8 }}>
+                VERSTREKEN · DOEL {session.targetDurationMin} MIN
+              </MetaLabel>
             </div>
 
             {/* Voortgangsbalk */}
             {phase !== 'IDLE' && (
               <div className="w-64 mx-auto mt-4">
-                <div className="h-2 rounded-full bg-[#141A1B]/20 overflow-hidden">
+                <div className="h-2 rounded-full overflow-hidden" style={{ background: P.surfaceHi }}>
                   <div
                     className="h-full rounded-full transition-all duration-1000"
-                    style={{ background: MBT_GREEN, width: `${Math.min((elapsedSec / (session.targetDurationMin * 60)) * 100, 100)}%` }}
+                    style={{ background: P.lime, width: `${Math.min((elapsedSec / (session.targetDurationMin * 60)) * 100, 100)}%` }}
                   />
                 </div>
-                <p className="text-xs mt-1" style={{ color: '#94a3b8' }}>
+                <p
+                  className="athletic-mono mt-1"
+                  style={{ color: P.inkMuted, fontSize: 11 }}
+                >
                   {Math.round((elapsedSec / (session.targetDurationMin * 60)) * 100)}% voltooid
                 </p>
               </div>
@@ -462,9 +544,17 @@ export default function CardioSessionPage() {
 
         {/* Totale tijd */}
         {phase !== 'IDLE' && (
-          <div className="text-center opacity-60" style={{ color: '#94a3b8' }}>
-            <p className="text-xs">TOTALE TIJD</p>
-            <p className="text-lg font-bold">
+          <div className="text-center">
+            <p
+              className="athletic-mono"
+              style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.14em', fontWeight: 700 }}
+            >
+              TOTALE TIJD
+            </p>
+            <p
+              className="athletic-mono mt-1"
+              style={{ color: P.ink, fontSize: 18, fontWeight: 900 }}
+            >
               {Math.floor(elapsedSec / 60).toString().padStart(2, '0')}:{(elapsedSec % 60).toString().padStart(2, '0')}
             </p>
           </div>
@@ -474,83 +564,77 @@ export default function CardioSessionPage() {
       {/* Controls */}
       <div className="p-6 space-y-3">
         {phase === 'IDLE' && (
-          <Button
-            className="w-full h-16 text-xl font-bold rounded-2xl gap-3"
-            style={{ background: MBT_GREEN }}
-            onClick={handleStart}
-          >
-            <Play className="w-7 h-7" />
-            Start sessie
-          </Button>
+          <DarkButton size="lg" onClick={handleStart}>
+            <Play className="w-6 h-6 mr-2" />
+            START SESSIE
+          </DarkButton>
         )}
 
         {phase === 'ACTIVE' && (
           <div className="flex gap-3">
             {hasIntervals && (
-              <Button
-                variant="outline"
-                className="h-14 flex-shrink-0 rounded-xl gap-2"
-                style={{ borderColor: '#ffffff40', background: '#ffffff10', color: '#fff' }}
+              <DarkButton
+                variant="secondary"
                 onClick={handleSkipInterval}
+                className="flex-shrink-0"
               >
                 <SkipForward className="w-5 h-5" />
-              </Button>
+              </DarkButton>
             )}
-            <Button
-              className="h-14 flex-1 text-lg font-bold rounded-2xl gap-2"
-              style={{ background: '#ffffff20', color: '#fff' }}
+            <DarkButton
+              variant="secondary"
               onClick={handlePause}
+              className="flex-1"
+              size="lg"
             >
-              <Pause className="w-6 h-6" />
-              Pauzeer
-            </Button>
-            <Button
-              variant="outline"
-              className="h-14 px-5 rounded-xl"
-              style={{ borderColor: '#ef444440', background: '#ef444420', color: '#ef4444' }}
-              onClick={handleStop}
-            >
+              <Pause className="w-5 h-5 mr-2" />
+              PAUZEER
+            </DarkButton>
+            <DarkButton variant="danger" onClick={handleStop}>
               <Square className="w-5 h-5" />
-            </Button>
+            </DarkButton>
           </div>
         )}
 
         {phase === 'PAUSED' && (
           <div className="flex gap-3">
-            <Button
-              className="h-14 flex-1 text-lg font-bold rounded-2xl gap-2"
-              style={{ background: MBT_GREEN }}
-              onClick={handleResume}
-            >
-              <Play className="w-6 h-6" />
-              Hervat
-            </Button>
-            <Button
-              variant="outline"
-              className="h-14 px-5 rounded-xl border-destructive/30 text-destructive"
-              onClick={handleStop}
-            >
+            <DarkButton onClick={handleResume} size="lg" className="flex-1">
+              <Play className="w-5 h-5 mr-2" />
+              HERVAT
+            </DarkButton>
+            <DarkButton variant="danger" onClick={handleStop}>
               <Square className="w-5 h-5" />
-            </Button>
+            </DarkButton>
           </div>
         )}
 
         {/* Hartslag invoer (altijd zichtbaar tijdens sessie) */}
         {(phase === 'ACTIVE' || phase === 'PAUSED') && (
-          <div
-            className="flex items-center gap-3 px-4 py-3 rounded-xl"
-            style={{ background: '#ffffff10' }}
-          >
-            <Heart className="w-5 h-5 text-red-400" />
-            <div className="flex-1">
-              <p className="text-xs text-white/60">Hartslag (handmatig)</p>
-              <p className="text-sm text-white/80">Doel: {HR_ZONES[session.targetZone].minPct}–{HR_ZONES[session.targetZone].maxPct}% HRmax</p>
+          <Tile style={{ padding: 12 }}>
+            <div className="flex items-center gap-3">
+              <Heart className="w-5 h-5" style={{ color: P.danger }} />
+              <div className="flex-1">
+                <MetaLabel>HARTSLAG (HANDMATIG)</MetaLabel>
+                <p
+                  className="athletic-mono mt-1"
+                  style={{ color: P.inkMuted, fontSize: 11 }}
+                >
+                  Doel: {HR_ZONES[session.targetZone].minPct}–{HR_ZONES[session.targetZone].maxPct}% HRmax
+                </p>
+              </div>
+              <input
+                type="number" min={40} max={220} placeholder="bpm"
+                className="w-20 h-8 rounded-lg text-center athletic-mono outline-none"
+                style={{
+                  background: P.surfaceHi,
+                  border: `1px solid ${P.lineStrong}`,
+                  color: P.ink,
+                  fontSize: 12,
+                  fontWeight: 800,
+                }}
+              />
             </div>
-            <input
-              type="number" min={40} max={220} placeholder="bpm"
-              className="w-20 h-8 rounded-lg border bg-[#141A1B]/10 text-white text-center text-sm"
-            />
-          </div>
+          </Tile>
         )}
       </div>
     </div>

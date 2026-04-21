@@ -2,9 +2,6 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { ExerciseCard } from '@/components/exercises/ExerciseCard'
 import { ExerciseVideoModal, type ExerciseForModal } from '@/components/exercises/ExerciseVideoModal'
 import {
@@ -15,17 +12,14 @@ import {
 import { trpc } from '@/lib/trpc/client'
 import { cn } from '@/lib/utils'
 import {
-  Plus,
-  Search,
-  LayoutGrid,
-  List,
-  Filter,
-  FolderOpen,
-  ChevronRight,
-  X,
-  Play,
-  Edit,
-} from 'lucide-react'
+  CATEGORY_COLORS,
+  DarkButton,
+  DarkInput,
+  Kicker,
+  MetaLabel,
+  P,
+  Tile,
+} from '@/components/dark-ui'
 
 type ExerciseItem = {
   id: string
@@ -107,65 +101,89 @@ export default function ExercisesPage() {
   return (
     <div className="flex gap-0">
       {/* Collections sidebar — desktop only */}
-      <aside className="hidden md:block w-52 shrink-0 border-r pr-4 mr-6 space-y-4">
+      <aside
+        className="hidden md:flex md:flex-col w-52 shrink-0 pr-4 mr-6 gap-4"
+        style={{ borderRight: `1px solid ${P.line}` }}
+      >
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-sm">Collecties</h3>
-          <Link href="/therapist/exercises/collections">
-            <Button variant="ghost" size="icon" className="h-6 w-6">
-              <Plus className="w-3.5 h-3.5" />
-            </Button>
+          <Kicker>Collecties</Kicker>
+          <Link
+            href="/therapist/exercises/collections"
+            className="athletic-tap w-6 h-6 rounded flex items-center justify-center"
+            style={{ color: P.inkMuted, fontSize: 18, lineHeight: 1 }}
+          >
+            +
           </Link>
         </div>
 
         <button
           onClick={() => setActiveCollection(null)}
-          className={cn(
-            'w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-colors',
-            activeCollection === null ? 'bg-[#1C2425] font-medium' : 'text-muted-foreground hover:bg-[#1C2425]'
-          )}
+          className="w-full flex items-center gap-2 px-2 py-2 rounded-lg transition-colors athletic-tap"
+          style={{
+            background: activeCollection === null ? P.surfaceHi : 'transparent',
+            color: activeCollection === null ? P.ink : P.inkMuted,
+            fontSize: 13,
+            fontWeight: activeCollection === null ? 700 : 500,
+          }}
         >
-          <FolderOpen className="w-4 h-4" />
           Alle oefeningen
-          <span className="ml-auto text-xs text-muted-foreground">{exercises.length}</span>
+          <span
+            className="ml-auto athletic-mono"
+            style={{ color: P.inkDim, fontSize: 11 }}
+          >
+            {exercises.length}
+          </span>
         </button>
 
         {collections.map(col => (
           <button
             key={col.id}
             onClick={() => setActiveCollection(activeCollection === col.id ? null : col.id)}
-            className={cn(
-              'w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-colors',
-              activeCollection === col.id ? 'bg-[#1C2425] font-medium' : 'text-muted-foreground hover:bg-[#1C2425]'
-            )}
+            className="w-full flex items-center gap-2 px-2 py-2 rounded-lg transition-colors athletic-tap"
+            style={{
+              background: activeCollection === col.id ? P.surfaceHi : 'transparent',
+              color: activeCollection === col.id ? P.ink : P.inkMuted,
+              fontSize: 13,
+              fontWeight: activeCollection === col.id ? 700 : 500,
+            }}
           >
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: col.color }} />
             <span className="truncate">{col.name}</span>
-            <span className="ml-auto text-xs text-muted-foreground">{col.count}</span>
+            <span
+              className="ml-auto athletic-mono"
+              style={{ color: P.inkDim, fontSize: 11 }}
+            >
+              {col.count}
+            </span>
           </button>
         ))}
 
-        <div className="pt-2 border-t">
+        <div className="pt-2" style={{ borderTop: `1px solid ${P.line}` }}>
           <Link
             href="/therapist/exercises/collections"
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="athletic-mono"
+            style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.12em' }}
           >
-            Beheer collecties
-            <ChevronRight className="w-3 h-3" />
+            BEHEER COLLECTIES →
           </Link>
         </div>
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 min-w-0 space-y-5">
+      <div className="flex-1 min-w-0 flex flex-col gap-5">
         {/* Mobile collection chips */}
         <div className="flex md:hidden gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-none">
           <button
             onClick={() => setActiveCollection(null)}
-            className={cn(
-              'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
-              activeCollection === null ? 'text-white border-transparent' : 'border-[rgba(255,255,255,0.12)] text-muted-foreground'
-            )}
-            style={activeCollection === null ? { background: '#BEF264' } : {}}
+            className="shrink-0 px-3 py-1.5 rounded-full athletic-mono transition-colors"
+            style={{
+              background: activeCollection === null ? P.lime : 'transparent',
+              color: activeCollection === null ? P.bg : P.inkMuted,
+              border: activeCollection === null ? 'none' : `1px solid ${P.lineStrong}`,
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: '0.08em',
+            }}
           >
             Alle ({exercises.length})
           </button>
@@ -173,11 +191,15 @@ export default function ExercisesPage() {
             <button
               key={col.id}
               onClick={() => setActiveCollection(activeCollection === col.id ? null : col.id)}
-              className={cn(
-                'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
-                activeCollection === col.id ? 'text-white border-transparent' : 'border-[rgba(255,255,255,0.12)] text-muted-foreground'
-              )}
-              style={activeCollection === col.id ? { background: col.color } : {}}
+              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full athletic-mono transition-colors"
+              style={{
+                background: activeCollection === col.id ? col.color : 'transparent',
+                color: activeCollection === col.id ? P.bg : P.inkMuted,
+                border: activeCollection === col.id ? 'none' : `1px solid ${P.lineStrong}`,
+                fontSize: 11,
+                fontWeight: 800,
+                letterSpacing: '0.08em',
+              }}
             >
               <span className="w-2 h-2 rounded-full" style={{ background: col.color }} />
               {col.name}
@@ -186,167 +208,201 @@ export default function ExercisesPage() {
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold">Oefeningen</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <Kicker>Bibliotheek</Kicker>
+            <h1
+              className="athletic-display"
+              style={{ fontSize: 32, lineHeight: '38px', letterSpacing: '-0.025em', paddingTop: 2 }}
+            >
+              OEFENINGEN
+            </h1>
+            <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 2 }}>
               {filtered.length} oefening{filtered.length !== 1 ? 'en' : ''}
               {activeCollection && ` in collectie`}
               {' · '}
-              <span className="text-xs">Klik op een kaart om de video te bekijken</span>
+              Klik op een kaart voor de video
             </p>
           </div>
-          <Link href="/therapist/exercises/new">
-            <Button style={{ background: '#BEF264' }} className="gap-2">
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Nieuwe oefening</span>
-            </Button>
-          </Link>
+          <DarkButton href="/therapist/exercises/new" size="sm">
+            + <span className="hidden sm:inline ml-1">Nieuwe oefening</span>
+          </DarkButton>
         </div>
 
         {/* Search + view toggle */}
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Zoek oefeningen, tags..."
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[200px] max-w-md">
+            <DarkInput
+              placeholder="Zoek oefeningen, tags…"
               value={query}
               onChange={e => setQuery(e.target.value)}
-              className="pl-9"
             />
             {query && (
-              <button className="absolute right-3 top-1/2 -translate-y-1/2" onClick={() => setQuery('')}>
-                <X className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+              <button
+                className="absolute right-3 top-1/2 -translate-y-1/2"
+                onClick={() => setQuery('')}
+                style={{ color: P.inkMuted, fontSize: 16 }}
+              >
+                ×
               </button>
             )}
           </div>
 
-          <Button
-            variant="outline"
+          <DarkButton
+            variant="secondary"
             size="sm"
-            className="gap-2"
             onClick={() => setShowFilters(f => !f)}
           >
-            <Filter className="w-4 h-4" />
-            Filters
-            {activeFilterCount > 0 && (
-              <Badge className="h-4 w-4 p-0 text-xs flex items-center justify-center" style={{ background: '#BEF264' }}>
-                {activeFilterCount}
-              </Badge>
-            )}
-          </Button>
+            Filters{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ''}
+          </DarkButton>
 
-          <div className="flex border rounded-lg overflow-hidden">
+          <div
+            className="flex rounded-xl overflow-hidden"
+            style={{ border: `1px solid ${P.lineStrong}` }}
+          >
             <button
               onClick={() => setView('grid')}
-              className={cn('px-3 py-2 transition-colors', view === 'grid' ? 'bg-[#BEF264] text-white' : 'hover:bg-[#1C2425]')}
+              className="px-3 py-2 athletic-mono transition-colors"
+              style={{
+                background: view === 'grid' ? P.lime : 'transparent',
+                color: view === 'grid' ? P.bg : P.inkMuted,
+                fontSize: 11,
+                fontWeight: 800,
+                letterSpacing: '0.08em',
+              }}
             >
-              <LayoutGrid className="w-4 h-4" />
+              GRID
             </button>
             <button
               onClick={() => setView('list')}
-              className={cn('px-3 py-2 transition-colors', view === 'list' ? 'bg-[#BEF264] text-white' : 'hover:bg-[#1C2425]')}
+              className="px-3 py-2 athletic-mono transition-colors"
+              style={{
+                background: view === 'list' ? P.lime : 'transparent',
+                color: view === 'list' ? P.bg : P.inkMuted,
+                fontSize: 11,
+                fontWeight: 800,
+                letterSpacing: '0.08em',
+              }}
             >
-              <List className="w-4 h-4" />
+              LIJST
             </button>
           </div>
         </div>
 
         {/* Filters */}
         {showFilters && (
-          <div className="flex flex-wrap gap-4 p-4 bg-[#1C2425] rounded-xl border">
-            {/* Category filter */}
-            <div className="space-y-1.5">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Categorie</p>
-              <div className="flex flex-wrap gap-1.5">
-                {EXERCISE_CATEGORIES.map(c => (
-                  <button
-                    key={c.value}
-                    onClick={() => setSelectedCategory(selectedCategory === c.value ? null : c.value)}
-                    className={cn(
-                      'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
-                      selectedCategory === c.value
-                        ? 'border-transparent text-white'
-                        : 'border-[rgba(255,255,255,0.12)] bg-[#141A1B] text-muted-foreground hover:border-[rgba(255,255,255,0.2)]'
-                    )}
-                    style={selectedCategory === c.value ? { background: '#BEF264' } : {}}
-                  >
-                    {c.label}
-                  </button>
-                ))}
+          <Tile>
+            <div className="flex flex-wrap gap-4">
+              {/* Category filter */}
+              <div className="flex flex-col gap-1.5">
+                <MetaLabel>Categorie</MetaLabel>
+                <div className="flex flex-wrap gap-1.5">
+                  {EXERCISE_CATEGORIES.map(c => (
+                    <button
+                      key={c.value}
+                      onClick={() => setSelectedCategory(selectedCategory === c.value ? null : c.value)}
+                      className="px-2.5 py-1 rounded-full athletic-mono transition-colors"
+                      style={{
+                        background: selectedCategory === c.value ? P.lime : P.surfaceHi,
+                        color: selectedCategory === c.value ? P.bg : P.inkMuted,
+                        border: `1px solid ${selectedCategory === c.value ? P.lime : P.lineStrong}`,
+                        fontSize: 10,
+                        fontWeight: 800,
+                        letterSpacing: '0.08em',
+                      }}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* Region filter */}
-            <div className="space-y-1.5">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Lichaamsdeel</p>
-              <div className="flex flex-wrap gap-1.5">
-                {BODY_REGIONS.slice(0, 6).map(r => (
-                  <button
-                    key={r.value}
-                    onClick={() => setSelectedRegion(selectedRegion === r.value ? null : r.value)}
-                    className={cn(
-                      'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
-                      selectedRegion === r.value
-                        ? 'bg-[#BEF264] text-white border-[#BEF264]'
-                        : 'border-[rgba(255,255,255,0.12)] bg-[#141A1B] text-muted-foreground hover:border-[rgba(255,255,255,0.2)]'
-                    )}
-                  >
-                    {r.label}
-                  </button>
-                ))}
+              {/* Region filter */}
+              <div className="flex flex-col gap-1.5">
+                <MetaLabel>Lichaamsdeel</MetaLabel>
+                <div className="flex flex-wrap gap-1.5">
+                  {BODY_REGIONS.slice(0, 6).map(r => (
+                    <button
+                      key={r.value}
+                      onClick={() => setSelectedRegion(selectedRegion === r.value ? null : r.value)}
+                      className="px-2.5 py-1 rounded-full athletic-mono transition-colors"
+                      style={{
+                        background: selectedRegion === r.value ? P.lime : P.surfaceHi,
+                        color: selectedRegion === r.value ? P.bg : P.inkMuted,
+                        border: `1px solid ${selectedRegion === r.value ? P.lime : P.lineStrong}`,
+                        fontSize: 10,
+                        fontWeight: 800,
+                        letterSpacing: '0.08em',
+                      }}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* Difficulty filter */}
-            <div className="space-y-1.5">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Niveau</p>
-              <div className="flex gap-1.5">
-                {DIFFICULTIES.map(d => (
-                  <button
-                    key={d.value}
-                    onClick={() => setSelectedDifficulty(selectedDifficulty === d.value ? null : d.value)}
-                    className={cn(
-                      'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
-                      selectedDifficulty === d.value
-                        ? 'bg-[#BEF264] text-white border-[#BEF264]'
-                        : 'border-[rgba(255,255,255,0.12)] bg-[#141A1B] text-muted-foreground hover:border-[rgba(255,255,255,0.2)]'
-                    )}
-                  >
-                    {d.label}
-                  </button>
-                ))}
+              {/* Difficulty filter */}
+              <div className="flex flex-col gap-1.5">
+                <MetaLabel>Niveau</MetaLabel>
+                <div className="flex gap-1.5">
+                  {DIFFICULTIES.map(d => (
+                    <button
+                      key={d.value}
+                      onClick={() => setSelectedDifficulty(selectedDifficulty === d.value ? null : d.value)}
+                      className="px-2.5 py-1 rounded-full athletic-mono transition-colors"
+                      style={{
+                        background: selectedDifficulty === d.value ? P.lime : P.surfaceHi,
+                        color: selectedDifficulty === d.value ? P.bg : P.inkMuted,
+                        border: `1px solid ${selectedDifficulty === d.value ? P.lime : P.lineStrong}`,
+                        fontSize: 10,
+                        fontWeight: 800,
+                        letterSpacing: '0.08em',
+                      }}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {activeFilterCount > 0 && (
-              <div className="flex items-end">
-                <button onClick={clearFilters} className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1">
-                  <X className="w-3 h-3" /> Wis filters
-                </button>
-              </div>
-            )}
-          </div>
+              {activeFilterCount > 0 && (
+                <div className="flex items-end">
+                  <button
+                    onClick={clearFilters}
+                    className="athletic-mono"
+                    style={{ color: P.danger, fontSize: 11, letterSpacing: '0.08em', fontWeight: 700 }}
+                  >
+                    × WIS FILTERS
+                  </button>
+                </div>
+              )}
+            </div>
+          </Tile>
         )}
 
         {/* Exercise grid / list */}
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-40 rounded-xl bg-[#1C2425] animate-pulse" />
+              <div key={i} className="h-40 rounded-xl animate-pulse" style={{ background: P.surfaceHi }} />
             ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-14 h-14 rounded-full bg-[#1C2425] flex items-center justify-center mb-4">
-              <Search className="w-6 h-6 text-[#7B8889]" />
+            <div
+              className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
+              style={{ background: P.surfaceHi, color: P.inkMuted, fontSize: 22 }}
+            >
+              ○
             </div>
-            <h3 className="font-medium">Geen oefeningen gevonden</h3>
-            <p className="text-sm text-muted-foreground mt-1">Probeer andere zoektermen of filters</p>
+            <p style={{ color: P.ink, fontSize: 14, fontWeight: 700 }}>Geen oefeningen gevonden</p>
+            <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 4 }}>
+              Probeer andere zoektermen of filters
+            </p>
             {activeFilterCount > 0 && (
-              <Button variant="outline" size="sm" className="mt-4" onClick={clearFilters}>
+              <DarkButton variant="secondary" size="sm" className="mt-4" onClick={clearFilters}>
                 Filters wissen
-              </Button>
+              </DarkButton>
             )}
           </div>
         ) : view === 'grid' ? (
@@ -360,45 +416,83 @@ export default function ExercisesPage() {
             ))}
           </div>
         ) : (
-          <div className="space-y-2">
-            {filtered.map((ex) => (
-              <div
-                key={ex.id}
-                className="flex items-center gap-4 p-4 rounded-xl border hover:border-[rgba(255,255,255,0.16)] hover:bg-[#1C2425] transition-colors cursor-pointer"
-                onClick={() => openPreview(ex)}
-              >
+          <div className="flex flex-col gap-2">
+            {filtered.map((ex) => {
+              const categoryColor =
+                (CATEGORY_COLORS as Record<string, string>)[ex.category] ?? P.inkDim
+              return (
                 <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-white font-bold text-sm"
-                  style={{ background: '#BEF264' }}
-                >
-                  {ex.name[0]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">{ex.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">{ex.description}</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Badge variant="secondary" className="text-xs">
-                    {EXERCISE_CATEGORIES.find(c => c.value === ex.category)?.label}
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    {DIFFICULTIES.find(d => d.value === ex.difficulty)?.label}
-                  </Badge>
-                  {ex.videoUrl && (
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: '#BEF26420' }}>
-                      <Play className="w-3.5 h-3.5" style={{ color: '#BEF264' }} />
-                    </div>
+                  key={ex.id}
+                  onClick={() => openPreview(ex)}
+                  className={cn(
+                    'relative flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-colors athletic-tap',
                   )}
-                </div>
-                <Link
-                  href={`/therapist/exercises/${ex.id}/edit`}
-                  onClick={e => e.stopPropagation()}
-                  className="p-1.5 rounded-lg hover:bg-[rgba(255,255,255,0.08)] transition-colors shrink-0"
+                  style={{
+                    background: P.surface,
+                    paddingLeft: 20,
+                    borderLeft: `4px solid ${categoryColor}`,
+                  }}
                 >
-                  <Edit className="w-4 h-4 text-[#7B8889]" />
-                </Link>
-              </div>
-            ))}
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 font-bold"
+                    style={{ background: categoryColor, color: P.bg, fontSize: 14 }}
+                  >
+                    {ex.name[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p style={{ color: P.ink, fontSize: 14, fontWeight: 600 }}>{ex.name}</p>
+                    <p
+                      className="truncate"
+                      style={{ color: P.inkMuted, fontSize: 12 }}
+                    >
+                      {ex.description}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span
+                      className="athletic-mono px-2 py-0.5 rounded-full"
+                      style={{
+                        background: P.surfaceHi,
+                        color: P.inkMuted,
+                        fontSize: 10,
+                        letterSpacing: '0.08em',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {EXERCISE_CATEGORIES.find(c => c.value === ex.category)?.label}
+                    </span>
+                    <span
+                      className="athletic-mono px-2 py-0.5 rounded-full"
+                      style={{
+                        border: `1px solid ${P.lineStrong}`,
+                        color: P.inkMuted,
+                        fontSize: 10,
+                        letterSpacing: '0.08em',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {DIFFICULTIES.find(d => d.value === ex.difficulty)?.label}
+                    </span>
+                    {ex.videoUrl && (
+                      <span
+                        className="w-7 h-7 rounded-full flex items-center justify-center"
+                        style={{ background: 'rgba(190,242,100,0.12)', color: P.lime, fontSize: 12 }}
+                      >
+                        ▶
+                      </span>
+                    )}
+                  </div>
+                  <Link
+                    href={`/therapist/exercises/${ex.id}/edit`}
+                    onClick={e => e.stopPropagation()}
+                    className="p-1.5 rounded-lg shrink-0 athletic-mono"
+                    style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.12em' }}
+                  >
+                    BEWERK
+                  </Link>
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

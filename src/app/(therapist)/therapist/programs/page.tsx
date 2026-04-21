@@ -1,28 +1,30 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { trpc } from '@/lib/trpc/client'
-import { Plus, Layers, Users, Calendar, Copy, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
 import { IconRunning, IconCardio } from '@/components/icons'
+import {
+  DarkButton,
+  DarkDialog as Dialog,
+  DarkDialogContent as DialogContent,
+  DarkDialogHeader as DialogHeader,
+  DarkDialogTitle as DialogTitle,
+  DarkInput,
+  Display,
+  Kicker,
+  MetaLabel,
+  P,
+  Tile,
+} from '@/components/dark-ui'
 
-const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }> = {
-  ACTIVE:    { bg: 'rgba(190,242,100,0.14)', text: '#BEF264', label: 'Actief' },
-  DRAFT:     { bg: 'rgba(244,194,97,0.14)', text: '#F4C261', label: 'Concept' },
-  COMPLETED: { bg: 'rgba(255,255,255,0.06)', text: '#7B8889', label: 'Afgerond' },
-  ARCHIVED:  { bg: 'rgba(255,255,255,0.06)', text: '#7B8889', label: 'Gearchiveerd' },
+const STATUS_COLORS: Record<string, { bg: string; text: string; label: string; accent: string }> = {
+  ACTIVE:    { bg: 'rgba(190,242,100,0.14)', text: P.lime,     label: 'Actief',       accent: P.lime },
+  DRAFT:     { bg: 'rgba(244,194,97,0.14)',  text: P.gold,     label: 'Concept',      accent: P.gold },
+  COMPLETED: { bg: 'rgba(255,255,255,0.06)', text: P.inkMuted, label: 'Afgerond',     accent: P.inkDim },
+  ARCHIVED:  { bg: 'rgba(255,255,255,0.06)', text: P.inkMuted, label: 'Gearchiveerd', accent: P.inkDim },
 }
-
-const TEMPLATE_CATEGORIES = ['Knie', 'Schouder', 'Rug', 'Heup', 'Enkel', 'Full Body', 'Revalidatie', 'Preventie']
 
 type Program = {
   id: string
@@ -80,135 +82,149 @@ export default function ProgramsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6 max-w-4xl">
-        <div className="h-8 w-48 bg-[#1C2425] rounded animate-pulse" />
-        <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-24 bg-[#1C2425] rounded-xl animate-pulse" />
-          ))}
+      <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+        <div className="max-w-5xl mx-auto px-4 pt-10 pb-8 space-y-6">
+          <div className="h-8 w-48 rounded animate-pulse" style={{ background: P.surfaceHi }} />
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-24 rounded-xl animate-pulse" style={{ background: P.surfaceHi }} />
+            ))}
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold">Programma&apos;s</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">Maak en beheer revalidatieprogramma&apos;s</p>
+    <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+      <div className="max-w-5xl mx-auto px-4 pt-10 pb-8 space-y-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="flex flex-col gap-1">
+            <Kicker>Behandeling</Kicker>
+            <Display size="md">PROGRAMMA&apos;S</Display>
+            <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
+              Maak en beheer revalidatieprogramma&apos;s
+            </MetaLabel>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <DarkButton
+              variant="secondary"
+              size="sm"
+              href="/therapist/programs/new/walk-run"
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <IconRunning size={14} /> Walk-Run
+              </span>
+            </DarkButton>
+            <DarkButton
+              variant="secondary"
+              size="sm"
+              href="/therapist/programs/new/cardio"
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <IconCardio size={14} /> Nieuw Cardio
+              </span>
+            </DarkButton>
+            <DarkButton variant="primary" size="sm" href="/therapist/programs/new">
+              + Nieuw Kracht
+            </DarkButton>
+          </div>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Link href="/therapist/programs/new/walk-run">
-            <Button variant="outline" className="gap-2 border-[#0ea5e9] text-[#0ea5e9] hover:bg-[#0ea5e9]/10">
-              <IconRunning size={16} /> Walk-Run Wizard
-            </Button>
-          </Link>
-          <Link href="/therapist/programs/new/cardio">
-            <Button variant="outline" className="gap-2 border-[#BEF264] text-[#BEF264] hover:bg-[#BEF264]/10">
-              <IconCardio size={16} /> Nieuw Cardio
-            </Button>
-          </Link>
-          <Link href="/therapist/programs/new">
-            <Button style={{ background: '#BEF264' }} className="gap-2">
-              <Plus className="w-4 h-4" />
-              Nieuw Kracht
-            </Button>
-          </Link>
-        </div>
-      </div>
 
-      {/* Templates */}
-      {templates.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-            <Layers className="w-4 h-4" /> Bibliotheek / Templates ({templates.length})
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {templates.map(p => (
-              <ProgramCard
-                key={p.id}
-                program={p}
-                isTemplate
-                onDuplicate={() => { setDuplicateTarget(p); setDuplicateName(`${p.name} (kopie)`); setDuplicateAsTemplate(false) }}
-                onDelete={() => handleDelete(p.id, p.name)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Programs */}
-      <section className="space-y-3">
-        <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-          <Users className="w-4 h-4" /> Patiëntprogramma&apos;s ({programs.length})
-        </h2>
-        {programs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed rounded-xl text-center">
-            <p className="text-sm text-muted-foreground">Nog geen programma&apos;s</p>
-            <Link href="/therapist/programs/new">
-              <Button variant="outline" size="sm" className="mt-3">
-                <Plus className="w-4 h-4 mr-1" /> Programma aanmaken
-              </Button>
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {programs.map(p => (
-              <ProgramCard
-                key={p.id}
-                program={p}
-                onDuplicate={() => { setDuplicateTarget(p); setDuplicateName(`${p.name} (kopie)`); setDuplicateAsTemplate(false) }}
-                onDelete={() => handleDelete(p.id, p.name)}
-              />
-            ))}
-          </div>
+        {/* Templates */}
+        {templates.length > 0 && (
+          <section className="space-y-3">
+            <Kicker>Bibliotheek · Templates ({templates.length})</Kicker>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {templates.map(p => (
+                <ProgramCard
+                  key={p.id}
+                  program={p}
+                  isTemplate
+                  onDuplicate={() => { setDuplicateTarget(p); setDuplicateName(`${p.name} (kopie)`); setDuplicateAsTemplate(false) }}
+                  onDelete={() => handleDelete(p.id, p.name)}
+                />
+              ))}
+            </div>
+          </section>
         )}
-      </section>
 
-      {/* Duplicate dialog */}
-      <Dialog open={!!duplicateTarget} onOpenChange={open => { if (!open) setDuplicateTarget(null) }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Programma dupliceren</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <p className="text-sm text-muted-foreground">
-              Maak een kopie van <strong>{duplicateTarget?.name}</strong> met alle oefeningen.
-            </p>
-            <div>
-              <Label className="text-xs">Naam kopie</Label>
-              <Input
-                value={duplicateName}
-                onChange={e => setDuplicateName(e.target.value)}
-                className="mt-1.5"
-                placeholder={`${duplicateTarget?.name} (kopie)`}
-              />
+        {/* Programs */}
+        <section className="space-y-3">
+          <Kicker>Patiëntprogramma&apos;s ({programs.length})</Kicker>
+          {programs.length === 0 ? (
+            <Tile>
+              <div className="py-12 flex flex-col items-center gap-3 text-center">
+                <p style={{ color: P.inkMuted, fontSize: 13 }}>Nog geen programma&apos;s</p>
+                <DarkButton variant="secondary" size="sm" href="/therapist/programs/new">
+                  + Programma aanmaken
+                </DarkButton>
+              </div>
+            </Tile>
+          ) : (
+            <div className="space-y-3">
+              {programs.map(p => (
+                <ProgramCard
+                  key={p.id}
+                  program={p}
+                  onDuplicate={() => { setDuplicateTarget(p); setDuplicateName(`${p.name} (kopie)`); setDuplicateAsTemplate(false) }}
+                  onDelete={() => handleDelete(p.id, p.name)}
+                />
+              ))}
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="asTemplate"
-                checked={duplicateAsTemplate}
-                onChange={e => setDuplicateAsTemplate(e.target.checked)}
-                className="accent-[#BEF264]"
-              />
-              <label htmlFor="asTemplate" className="text-sm">Opslaan als template</label>
+          )}
+        </section>
+
+        {/* Duplicate dialog */}
+        <Dialog open={!!duplicateTarget} onOpenChange={open => { if (!open) setDuplicateTarget(null) }}>
+          <DialogContent
+            className="max-w-sm"
+            style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
+          >
+            <DialogHeader>
+              <DialogTitle style={{ color: P.ink }}>Programma dupliceren</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <p style={{ color: P.inkMuted, fontSize: 13 }}>
+                Maak een kopie van <strong style={{ color: P.ink }}>{duplicateTarget?.name}</strong> met alle oefeningen.
+              </p>
+              <div className="space-y-1.5">
+                <MetaLabel>Naam kopie</MetaLabel>
+                <DarkInput
+                  value={duplicateName}
+                  onChange={e => setDuplicateName(e.target.value)}
+                  placeholder={`${duplicateTarget?.name} (kopie)`}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="asTemplate"
+                  checked={duplicateAsTemplate}
+                  onChange={e => setDuplicateAsTemplate(e.target.checked)}
+                  className="accent-[#BEF264]"
+                />
+                <label htmlFor="asTemplate" style={{ color: P.ink, fontSize: 13 }}>
+                  Opslaan als template
+                </label>
+              </div>
+              <div className="flex gap-2">
+                <DarkButton
+                  variant="primary"
+                  onClick={handleDuplicate}
+                  disabled={duplicateMutation.isPending}
+                  className="flex-1"
+                >
+                  {duplicateMutation.isPending ? 'Kopiëren...' : 'Dupliceren'}
+                </DarkButton>
+                <DarkButton variant="secondary" onClick={() => setDuplicateTarget(null)}>
+                  Annuleren
+                </DarkButton>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button
-                style={{ background: '#BEF264' }}
-                onClick={handleDuplicate}
-                disabled={duplicateMutation.isPending}
-                className="flex-1"
-              >
-                {duplicateMutation.isPending ? 'Kopiëren...' : 'Dupliceren'}
-              </Button>
-              <Button variant="outline" onClick={() => setDuplicateTarget(null)}>Annuleren</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   )
 }
@@ -224,51 +240,99 @@ function ProgramCard({
   const status = STATUS_COLORS[program.status] ?? STATUS_COLORS.DRAFT
 
   return (
-    <Card style={{ borderRadius: '12px' }} className="hover:shadow-md transition-shadow">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-semibold text-sm">{program.name}</h3>
-              <span
-                className="text-xs px-2 py-0.5 rounded-full font-medium"
-                style={{ background: status.bg, color: status.text }}
-              >
-                {status.label}
-              </span>
-              {isTemplate && <Badge variant="secondary" className="text-xs">Template</Badge>}
-            </div>
-            {program.description && (
-              <p className="text-xs text-muted-foreground mt-0.5 truncate">{program.description}</p>
-            )}
-            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-              {program.patient?.name && (
-                <span className="flex items-center gap-1"><Users className="w-3 h-3" />{program.patient.name}</span>
-              )}
-              <span className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" />{program.weeks} wk · {program.daysPerWeek}×/wk
-              </span>
-              <span>{program._count?.exercises ?? 0} oefeningen</span>
-            </div>
-          </div>
-          <div className="flex gap-1 shrink-0">
-            <Button variant="ghost" size="icon" className="h-7 w-7" title="Dupliceren" onClick={onDuplicate}>
-              <Copy className="w-3.5 h-3.5" />
-            </Button>
-            <Link href={`/therapist/programs/${program.id}/edit`}>
-              <Button variant="ghost" size="icon" className="h-7 w-7">
-                <Pencil className="w-3.5 h-3.5" />
-              </Button>
-            </Link>
-            <Button
-              variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive"
-              title="Verwijderen" onClick={onDelete}
+    <Tile accentBar={status.accent}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3
+              style={{
+                color: P.ink,
+                fontSize: 14,
+                fontWeight: 800,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+              }}
             >
-              <Trash2 className="w-3.5 h-3.5" />
-            </Button>
+              {program.name}
+            </h3>
+            <span
+              className="athletic-mono"
+              style={{
+                background: status.bg,
+                color: status.text,
+                fontSize: 10,
+                letterSpacing: '0.1em',
+                padding: '2px 8px',
+                borderRadius: 999,
+                fontWeight: 800,
+                textTransform: 'uppercase',
+              }}
+            >
+              {status.label}
+            </span>
+            {isTemplate && (
+              <span
+                className="athletic-mono"
+                style={{
+                  background: P.surfaceHi,
+                  color: P.inkMuted,
+                  fontSize: 10,
+                  letterSpacing: '0.1em',
+                  padding: '2px 8px',
+                  borderRadius: 999,
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                }}
+              >
+                Template
+              </span>
+            )}
+          </div>
+          {program.description && (
+            <p
+              className="athletic-mono truncate"
+              style={{ color: P.inkMuted, fontSize: 11, marginTop: 3, letterSpacing: '0.03em' }}
+            >
+              {program.description}
+            </p>
+          )}
+          <div
+            className="athletic-mono flex items-center gap-3 mt-2 flex-wrap"
+            style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.05em' }}
+          >
+            {program.patient?.name && <span>· {program.patient.name}</span>}
+            <span>{program.weeks} wk · {program.daysPerWeek}×/wk</span>
+            <span>{program._count?.exercises ?? 0} oefeningen</span>
           </div>
         </div>
-      </CardContent>
-    </Card>
+        <div className="flex gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={onDuplicate}
+            title="Dupliceren"
+            className="athletic-tap w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ background: P.surfaceHi, color: P.inkMuted, fontSize: 14 }}
+          >
+            ⧉
+          </button>
+          <DarkButton
+            variant="secondary"
+            size="sm"
+            href={`/therapist/programs/${program.id}/edit`}
+          >
+            Wijzig
+          </DarkButton>
+          <button
+            type="button"
+            onClick={onDelete}
+            title="Verwijderen"
+            className="athletic-tap w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ background: P.surfaceHi, color: P.danger, fontSize: 14 }}
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+    </Tile>
   )
 }

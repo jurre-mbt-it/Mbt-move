@@ -4,24 +4,25 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
-import {
-  ArrowLeft, ChevronRight, Plus, Trash2, Timer, Zap, Info,
-} from 'lucide-react'
 import {
   CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, HR_ZONES,
   CARDIO_TEMPLATES, CardioActivityKey, CardioProtocolKey, HRZone, CardioInterval,
 } from '@/lib/cardio-constants'
 import { trpc } from '@/lib/trpc/client'
 import { CARDIO_ICON_MAP } from '@/components/icons'
-
-const MBT_GREEN = '#BEF264'
-const MBT_TEAL = '#BEF264'
+import {
+  CATEGORY_COLORS,
+  DarkButton,
+  DarkInput,
+  DarkSelect,
+  DarkTextarea,
+  Display,
+  Kicker,
+  MetaLabel,
+  P,
+  Tile,
+} from '@/components/dark-ui'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -55,6 +56,10 @@ const DEFAULT_STATE: CardioFormState = {
   intervals: [],
 }
 
+function zoneColor(zone: HRZone): string {
+  return CATEGORY_COLORS[`Z${zone}` as 'Z1' | 'Z2' | 'Z3' | 'Z4' | 'Z5']
+}
+
 // ── Interval editor ───────────────────────────────────────────────────────────
 
 function IntervalEditor({
@@ -77,55 +82,63 @@ function IntervalEditor({
   return (
     <div className="space-y-3">
       {intervals.map((iv, i) => (
-        <div key={i} className="border rounded-lg p-3 space-y-3 bg-muted/30">
+        <div
+          key={i}
+          className="rounded-xl p-3 space-y-3"
+          style={{ background: P.surfaceHi, border: `1px solid ${P.line}` }}
+        >
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">Interval {i + 1}</span>
-            <button onClick={() => remove(i)} className="text-muted-foreground hover:text-destructive">
-              <Trash2 className="w-4 h-4" />
+            <MetaLabel>Interval {i + 1}</MetaLabel>
+            <button
+              onClick={() => remove(i)}
+              className="athletic-tap"
+              style={{ color: P.danger, fontSize: 14 }}
+              aria-label="Verwijderen"
+            >
+              ✕
             </button>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <div>
-              <Label className="text-xs">Werk (sec)</Label>
-              <Input
+            <div className="space-y-1">
+              <MetaLabel>Werk (sec)</MetaLabel>
+              <DarkInput
                 type="number" min={10} value={iv.workDuration}
                 onChange={e => update(i, 'workDuration', +e.target.value)}
-                className="h-8 text-sm"
               />
             </div>
-            <div>
-              <Label className="text-xs">Rust (sec)</Label>
-              <Input
+            <div className="space-y-1">
+              <MetaLabel>Rust (sec)</MetaLabel>
+              <DarkInput
                 type="number" min={0} value={iv.restDuration}
                 onChange={e => update(i, 'restDuration', +e.target.value)}
-                className="h-8 text-sm"
               />
             </div>
-            <div>
-              <Label className="text-xs">Herhalingen</Label>
-              <Input
+            <div className="space-y-1">
+              <MetaLabel>Herhalingen</MetaLabel>
+              <DarkInput
                 type="number" min={1} value={iv.repetitions}
                 onChange={e => update(i, 'repetitions', +e.target.value)}
-                className="h-8 text-sm"
               />
             </div>
-            <div>
-              <Label className="text-xs">Label</Label>
-              <Input
+            <div className="space-y-1">
+              <MetaLabel>Label</MetaLabel>
+              <DarkInput
                 value={iv.label ?? ''} placeholder="Bijv. Sprint"
                 onChange={e => update(i, 'label', e.target.value)}
-                className="h-8 text-sm"
               />
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p
+            className="athletic-mono"
+            style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.05em' }}
+          >
             Totaal: {Math.round(iv.repetitions * (iv.workDuration + iv.restDuration) / 60)} min
           </p>
         </div>
       ))}
-      <Button variant="outline" size="sm" onClick={addInterval} className="gap-1 w-full">
-        <Plus className="w-3 h-3" /> Interval toevoegen
-      </Button>
+      <DarkButton variant="secondary" size="sm" onClick={addInterval} className="w-full">
+        + Interval toevoegen
+      </DarkButton>
     </div>
   )
 }
@@ -177,300 +190,393 @@ function CardioProgramBuilderContent() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 pb-16">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link href="/therapist/programs">
-          <Button variant="ghost" size="icon" className="rounded-full">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-xl font-bold">Nieuw Cardio Programma</h1>
-          <p className="text-sm text-muted-foreground">Stap {step} van 3</p>
-        </div>
-        <div className="ml-auto flex gap-1">
-          {([1, 2, 3] as const).map(s => (
-            <div key={s} className="w-8 h-1 rounded-full" style={{ background: s <= step ? MBT_GREEN : '#e2e8f0' }} />
-          ))}
-        </div>
-      </div>
-
-      {/* Stap 1: Basis */}
-      {step === 1 && (
-        <div className="space-y-5">
-          <Card>
-            <CardContent className="p-4 space-y-4">
-              <h2 className="font-semibold">Basisinformatie</h2>
-
-              <div>
-                <Label>Patiënt</Label>
-                <select
-                  className="w-full mt-1 h-9 rounded-md border bg-background px-3 text-sm"
-                  value={form.patientId}
-                  onChange={e => set('patientId', e.target.value)}
-                >
-                  <option value="">— Selecteer patiënt (optioneel) —</option>
-                  {patientsData.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <Label>Naam programma *</Label>
-                <Input
-                  className="mt-1"
-                  placeholder="Bijv. Zone 2 Cardio — Opbouw"
-                  value={form.name}
-                  onChange={e => set('name', e.target.value)}
-                />
-              </div>
-
-              <div>
-                <Label>Omschrijving</Label>
-                <textarea
-                  className="w-full mt-1 rounded-md border bg-background px-3 py-2 text-sm resize-none"
-                  rows={2}
-                  placeholder="Doel, aanpak, aandachtspunten..."
-                  value={form.description}
-                  onChange={e => set('description', e.target.value)}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Aantal weken</Label>
-                  <Input
-                    type="number" min={1} max={52} className="mt-1"
-                    value={form.weeks}
-                    onChange={e => set('weeks', +e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Sessies per week</Label>
-                  <Input
-                    type="number" min={1} max={7} className="mt-1"
-                    value={form.sessionsPerWeek}
-                    onChange={e => set('sessionsPerWeek', +e.target.value)}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Snelle templates */}
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              <h2 className="font-semibold text-sm">Snelstart — kies een template</h2>
-              <div className="space-y-2">
-                {CARDIO_TEMPLATES.slice(0, 5).map(tpl => (
-                  <button
-                    key={tpl.id}
-                    onClick={() => applyTemplate(tpl)}
-                    className="w-full text-left p-2 rounded-lg border hover:bg-muted/50 transition-colors flex items-center gap-3"
-                  >
-                    <span className="text-xl">{(() => { const Icon = CARDIO_ICON_MAP[tpl.activity]; return Icon ? <Icon size={22} /> : CARDIO_ACTIVITIES[tpl.activity].icon })()}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{tpl.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{tpl.description}</p>
-                    </div>
-                    <Badge variant="outline" className="text-xs shrink-0">
-                      {CARDIO_PROTOCOLS[tpl.protocol].label}
-                    </Badge>
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Button className="w-full gap-2" style={{ background: MBT_GREEN }} onClick={() => setStep(2)}>
-            Volgende <ChevronRight className="w-4 h-4" />
-          </Button>
-        </div>
-      )}
-
-      {/* Stap 2: Activiteit & Protocol */}
-      {step === 2 && (
-        <div className="space-y-5">
-          {/* Activiteit */}
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              <h2 className="font-semibold">Activiteit</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {(Object.entries(CARDIO_ACTIVITIES) as [CardioActivityKey, typeof CARDIO_ACTIVITIES[CardioActivityKey]][]).map(([key, act]) => (
-                  <button
-                    key={key}
-                    onClick={() => set('activity', key)}
-                    className="flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-all"
-                    style={form.activity === key ? { borderColor: MBT_GREEN, background: 'rgba(190,242,100,0.10)' } : {}}
-                  >
-                    <span className="text-2xl">{(() => { const Icon = CARDIO_ICON_MAP[key]; return Icon ? <Icon size={28} /> : act.icon })()}</span>
-                    <span className="text-xs font-medium leading-tight">{act.label}</span>
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Protocol */}
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              <h2 className="font-semibold">Protocol</h2>
-              <div className="space-y-2">
-                {(Object.entries(CARDIO_PROTOCOLS) as [CardioProtocolKey, typeof CARDIO_PROTOCOLS[CardioProtocolKey]][]).map(([key, proto]) => (
-                  <button
-                    key={key}
-                    onClick={() => set('protocol', key)}
-                    className="w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all"
-                    style={form.protocol === key ? { borderColor: proto.color, background: proto.color + '18' } : {}}
-                  >
-                    <div className="w-3 h-3 rounded-full shrink-0" style={{ background: proto.color }} />
-                    <div>
-                      <p className="text-sm font-medium">{proto.label}</p>
-                      <p className="text-xs text-muted-foreground">{proto.description}</p>
-                    </div>
-                    {form.protocol === key && <div className="ml-auto w-2 h-2 rounded-full" style={{ background: MBT_GREEN }} />}
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>Terug</Button>
-            <Button className="flex-1 gap-2" style={{ background: MBT_GREEN }} onClick={() => setStep(3)}>
-              Volgende <ChevronRight className="w-4 h-4" />
-            </Button>
+    <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+      <div className="max-w-2xl mx-auto px-4 pt-10 pb-16 space-y-5">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <Link
+            href="/therapist/programs"
+            className="athletic-mono"
+            style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.16em' }}
+          >
+            ← TERUG
+          </Link>
+          <div className="flex-1 flex flex-col gap-1">
+            <Kicker>Cardio · Stap {step} van 3</Kicker>
+            <Display size="sm">NIEUW PROGRAMMA</Display>
+          </div>
+          <div className="flex gap-1">
+            {([1, 2, 3] as const).map(s => (
+              <div
+                key={s}
+                className="w-8 h-1 rounded-full"
+                style={{ background: s <= step ? P.lime : P.surfaceHi }}
+              />
+            ))}
           </div>
         </div>
-      )}
 
-      {/* Stap 3: Doelen & Intervallen */}
-      {step === 3 && (
-        <div className="space-y-5">
-          <Card>
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">{activityInfo.icon}</span>
-                <div>
-                  <h2 className="font-semibold">{activityInfo.label}</h2>
-                  <p className="text-xs text-muted-foreground">{protocolInfo.label}</p>
+        {/* Stap 1: Basis */}
+        {step === 1 && (
+          <div className="space-y-4">
+            <Tile>
+              <div className="space-y-4">
+                <MetaLabel>Basisinformatie</MetaLabel>
+
+                <div className="space-y-1.5">
+                  <MetaLabel>Patiënt</MetaLabel>
+                  <DarkSelect
+                    value={form.patientId}
+                    onChange={e => set('patientId', e.target.value)}
+                  >
+                    <option value="">— Selecteer patiënt (optioneel) —</option>
+                    {patientsData.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </DarkSelect>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Doelduur (min)</Label>
-                  <Input
-                    type="number" min={1} max={300} className="mt-1"
-                    value={form.targetDurationMin}
-                    onChange={e => set('targetDurationMin', +e.target.value)}
+                <div className="space-y-1.5">
+                  <MetaLabel>Naam programma *</MetaLabel>
+                  <DarkInput
+                    placeholder="Bijv. Zone 2 Cardio — Opbouw"
+                    value={form.name}
+                    onChange={e => set('name', e.target.value)}
                   />
                 </div>
-                <div>
-                  <Label>Doelafsand (km)</Label>
-                  <Input
-                    type="number" min={0} step={0.1} className="mt-1"
-                    placeholder="Optioneel"
-                    value={form.targetDistanceKm}
-                    onChange={e => set('targetDistanceKm', e.target.value)}
+
+                <div className="space-y-1.5">
+                  <MetaLabel>Omschrijving</MetaLabel>
+                  <DarkTextarea
+                    rows={2}
+                    placeholder="Doel, aanpak, aandachtspunten..."
+                    value={form.description}
+                    onChange={e => set('description', e.target.value)}
                   />
                 </div>
-              </div>
 
-              {/* HR Zone */}
-              <div>
-                <Label>Hartslagzone (doelzone)</Label>
-                <div className="flex gap-2 mt-2">
-                  {([null, 1, 2, 3, 4, 5] as (HRZone | null)[]).map(z => (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <MetaLabel>Aantal weken</MetaLabel>
+                    <DarkInput
+                      type="number" min={1} max={52}
+                      value={form.weeks}
+                      onChange={e => set('weeks', +e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <MetaLabel>Sessies per week</MetaLabel>
+                    <DarkInput
+                      type="number" min={1} max={7}
+                      value={form.sessionsPerWeek}
+                      onChange={e => set('sessionsPerWeek', +e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            </Tile>
+
+            {/* Snelle templates */}
+            <Tile>
+              <div className="space-y-3">
+                <MetaLabel>Snelstart — kies een template</MetaLabel>
+                <div className="space-y-2">
+                  {CARDIO_TEMPLATES.slice(0, 5).map(tpl => (
                     <button
-                      key={z ?? 'none'}
-                      onClick={() => set('targetZone', z)}
-                      className="flex-1 py-2 rounded-lg border text-xs font-semibold transition-all"
-                      style={form.targetZone === z
-                        ? { background: z ? HR_ZONES[z].color : '#94a3b8', color: '#fff', borderColor: 'transparent' }
-                        : {}}
+                      key={tpl.id}
+                      onClick={() => applyTemplate(tpl)}
+                      className="athletic-tap w-full text-left p-3 rounded-lg flex items-center gap-3 transition-colors"
+                      style={{ background: P.surfaceHi, border: `1px solid ${P.line}` }}
                     >
-                      {z === null ? 'Geen' : `Z${z}`}
+                      <span style={{ fontSize: 20 }}>
+                        {(() => { const Icon = CARDIO_ICON_MAP[tpl.activity]; return Icon ? <Icon size={22} /> : CARDIO_ACTIVITIES[tpl.activity].icon })()}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className="truncate"
+                          style={{ color: P.ink, fontSize: 13, fontWeight: 700 }}
+                        >
+                          {tpl.name}
+                        </p>
+                        <p
+                          className="athletic-mono truncate"
+                          style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.03em' }}
+                        >
+                          {tpl.description}
+                        </p>
+                      </div>
+                      <span
+                        className="athletic-mono shrink-0"
+                        style={{
+                          color: P.inkMuted,
+                          fontSize: 10,
+                          letterSpacing: '0.1em',
+                          padding: '2px 8px',
+                          borderRadius: 999,
+                          border: `1px solid ${P.lineStrong}`,
+                          fontWeight: 800,
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        {CARDIO_PROTOCOLS[tpl.protocol].label}
+                      </span>
                     </button>
                   ))}
                 </div>
-                {form.targetZone && (
-                  <div className="mt-2 p-2 rounded-lg text-xs flex gap-2" style={{ background: HR_ZONES[form.targetZone].bg }}>
-                    <Info className="w-3 h-3 mt-0.5 shrink-0" style={{ color: HR_ZONES[form.targetZone].color }} />
-                    <div>
-                      <span className="font-medium">{HR_ZONES[form.targetZone].label}</span> — {HR_ZONES[form.targetZone].description}
-                      <br />{HR_ZONES[form.targetZone].rpeFeel}
-                    </div>
-                  </div>
-                )}
               </div>
+            </Tile>
 
-              {/* RPE target */}
-              <div>
-                <Label>Doel RPE (1-10, optioneel)</Label>
-                <div className="flex items-center gap-3 mt-2">
-                  <input
-                    type="range" min={1} max={10} step={1}
-                    value={form.targetRpe ?? 5}
-                    onChange={e => set('targetRpe', +e.target.value)}
-                    className="flex-1 accent-[#BEF264]"
-                  />
-                  <span className="w-6 text-sm font-bold text-center">{form.targetRpe ?? '—'}</span>
-                  {form.targetRpe && (
-                    <button onClick={() => set('targetRpe', null)} className="text-xs text-muted-foreground">Wis</button>
+            <DarkButton variant="primary" className="w-full" onClick={() => setStep(2)}>
+              Volgende →
+            </DarkButton>
+          </div>
+        )}
+
+        {/* Stap 2: Activiteit & Protocol */}
+        {step === 2 && (
+          <div className="space-y-4">
+            {/* Activiteit */}
+            <Tile>
+              <div className="space-y-3">
+                <MetaLabel>Activiteit</MetaLabel>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {(Object.entries(CARDIO_ACTIVITIES) as [CardioActivityKey, typeof CARDIO_ACTIVITIES[CardioActivityKey]][]).map(([key, act]) => (
+                    <button
+                      key={key}
+                      onClick={() => set('activity', key)}
+                      className="athletic-tap flex flex-col items-center gap-1 p-3 rounded-xl text-center transition-all"
+                      style={form.activity === key
+                        ? { border: `1px solid ${P.lime}`, background: 'rgba(190,242,100,0.10)' }
+                        : { border: `1px solid ${P.line}`, background: P.surfaceHi }}
+                    >
+                      <span style={{ fontSize: 22 }}>
+                        {(() => { const Icon = CARDIO_ICON_MAP[key]; return Icon ? <Icon size={28} /> : act.icon })()}
+                      </span>
+                      <span
+                        className="athletic-mono"
+                        style={{ color: P.ink, fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}
+                      >
+                        {act.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </Tile>
+
+            {/* Protocol */}
+            <Tile>
+              <div className="space-y-3">
+                <MetaLabel>Protocol</MetaLabel>
+                <div className="space-y-2">
+                  {(Object.entries(CARDIO_PROTOCOLS) as [CardioProtocolKey, typeof CARDIO_PROTOCOLS[CardioProtocolKey]][]).map(([key, proto]) => (
+                    <button
+                      key={key}
+                      onClick={() => set('protocol', key)}
+                      className="athletic-tap w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all"
+                      style={form.protocol === key
+                        ? { border: `1px solid ${proto.color}`, background: proto.color + '18' }
+                        : { border: `1px solid ${P.line}`, background: P.surfaceHi }}
+                    >
+                      <div className="w-3 h-3 rounded-full shrink-0" style={{ background: proto.color }} />
+                      <div className="flex-1">
+                        <p style={{ color: P.ink, fontSize: 13, fontWeight: 700 }}>{proto.label}</p>
+                        <p
+                          className="athletic-mono"
+                          style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.03em' }}
+                        >
+                          {proto.description}
+                        </p>
+                      </div>
+                      {form.protocol === key && (
+                        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: P.lime }} />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </Tile>
+
+            <div className="flex gap-3">
+              <DarkButton variant="secondary" className="flex-1" onClick={() => setStep(1)}>
+                Terug
+              </DarkButton>
+              <DarkButton variant="primary" className="flex-1" onClick={() => setStep(3)}>
+                Volgende →
+              </DarkButton>
+            </div>
+          </div>
+        )}
+
+        {/* Stap 3: Doelen & Intervallen */}
+        {step === 3 && (
+          <div className="space-y-4">
+            <Tile>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <span style={{ fontSize: 20 }}>{activityInfo.icon}</span>
+                  <div>
+                    <p
+                      className="athletic-mono"
+                      style={{ color: P.ink, fontSize: 13, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}
+                    >
+                      {activityInfo.label}
+                    </p>
+                    <p
+                      className="athletic-mono"
+                      style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.03em' }}
+                    >
+                      {protocolInfo.label}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <MetaLabel>Doelduur (min)</MetaLabel>
+                    <DarkInput
+                      type="number" min={1} max={300}
+                      value={form.targetDurationMin}
+                      onChange={e => set('targetDurationMin', +e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <MetaLabel>Doelafstand (km)</MetaLabel>
+                    <DarkInput
+                      type="number" min={0} step={0.1}
+                      placeholder="Optioneel"
+                      value={form.targetDistanceKm}
+                      onChange={e => set('targetDistanceKm', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* HR Zone */}
+                <div className="space-y-2">
+                  <MetaLabel>Hartslagzone (doelzone)</MetaLabel>
+                  <div className="flex gap-2">
+                    {([null, 1, 2, 3, 4, 5] as (HRZone | null)[]).map(z => {
+                      const zc = z ? zoneColor(z) : P.inkMuted
+                      const active = form.targetZone === z
+                      return (
+                        <button
+                          key={z ?? 'none'}
+                          onClick={() => set('targetZone', z)}
+                          className="athletic-tap flex-1 py-2 rounded-lg athletic-mono transition-all"
+                          style={active
+                            ? { background: zc, color: P.bg, border: '1px solid transparent', fontSize: 12, fontWeight: 800, letterSpacing: '0.08em' }
+                            : { background: P.surfaceHi, color: P.inkMuted, border: `1px solid ${P.lineStrong}`, fontSize: 12, fontWeight: 800, letterSpacing: '0.08em' }}
+                        >
+                          {z === null ? 'GEEN' : `Z${z}`}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {form.targetZone && (
+                    <div
+                      className="rounded-lg p-3 flex gap-2"
+                      style={{ background: P.surfaceHi, border: `1px solid ${zoneColor(form.targetZone)}` }}
+                    >
+                      <div
+                        className="w-2 h-2 rounded-full mt-1 shrink-0"
+                        style={{ background: zoneColor(form.targetZone) }}
+                      />
+                      <div
+                        className="athletic-mono"
+                        style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.03em' }}
+                      >
+                        <span style={{ color: P.ink, fontWeight: 800 }}>
+                          {HR_ZONES[form.targetZone].label}
+                        </span>
+                        {' — '}{HR_ZONES[form.targetZone].description}
+                        <br />
+                        {HR_ZONES[form.targetZone].rpeFeel}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* RPE target */}
+                <div className="space-y-2">
+                  <MetaLabel>Doel RPE (1-10, optioneel)</MetaLabel>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range" min={1} max={10} step={1}
+                      value={form.targetRpe ?? 5}
+                      onChange={e => set('targetRpe', +e.target.value)}
+                      className="flex-1 accent-[#BEF264]"
+                    />
+                    <span
+                      className="athletic-display w-6 text-center"
+                      style={{ color: P.ink, fontSize: 18 }}
+                    >
+                      {form.targetRpe ?? '—'}
+                    </span>
+                    {form.targetRpe && (
+                      <button
+                        onClick={() => set('targetRpe', null)}
+                        className="athletic-mono"
+                        style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.08em' }}
+                      >
+                        WIS
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Tile>
+
+            {/* Intervallen als protocol dat ondersteunt */}
+            {protocolInfo.hasIntervals && (
+              <Tile accentBar={protocolInfo.color}>
+                <div className="space-y-3">
+                  <MetaLabel>Intervallen</MetaLabel>
+                  <IntervalEditor intervals={form.intervals} onChange={iv => set('intervals', iv)} />
+                </div>
+              </Tile>
+            )}
+
+            {/* Samenvatting */}
+            <Tile accentBar={P.lime}>
+              <div className="space-y-2">
+                <MetaLabel>Samenvatting</MetaLabel>
+                <div
+                  className="athletic-mono"
+                  style={{ color: P.inkMuted, fontSize: 12, letterSpacing: '0.03em' }}
+                >
+                  <p>
+                    <span style={{ color: P.ink, fontWeight: 700 }}>
+                      {activityInfo.icon} {activityInfo.label}
+                    </span>
+                    {' — '}{protocolInfo.label}
+                  </p>
+                  <p>{form.weeks} weken · {form.sessionsPerWeek}×/week · {form.targetDurationMin} min per sessie</p>
+                  {form.targetDistanceKm && <p>Doelafstand: {form.targetDistanceKm} km</p>}
+                  {form.targetZone && <p>Zone {form.targetZone}: {HR_ZONES[form.targetZone].label}</p>}
+                  {form.intervals.length > 0 && <p>{form.intervals.length} intervalblok(ken) geconfigureerd</p>}
+                  {form.patientId && (
+                    <p>Patiënt: {patientsData.find(p => p.id === form.patientId)?.name}</p>
                   )}
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </Tile>
 
-          {/* Intervallen als protocol dat ondersteunt */}
-          {protocolInfo.hasIntervals && (
-            <Card>
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Timer className="w-4 h-4" style={{ color: protocolInfo.color }} />
-                  <h2 className="font-semibold">Intervallen</h2>
-                </div>
-                <IntervalEditor intervals={form.intervals} onChange={iv => set('intervals', iv)} />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Samenvatting */}
-          <Card className="border-2" style={{ borderColor: MBT_GREEN + '60' }}>
-            <CardContent className="p-4">
-              <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                <Zap className="w-4 h-4" style={{ color: MBT_GREEN }} />
-                Samenvatting
-              </h3>
-              <div className="space-y-1 text-sm text-muted-foreground">
-                <p><span className="font-medium text-foreground">{activityInfo.icon} {activityInfo.label}</span> — {protocolInfo.label}</p>
-                <p>{form.weeks} weken · {form.sessionsPerWeek}×/week · {form.targetDurationMin} min per sessie</p>
-                {form.targetDistanceKm && <p>Doelafstand: {form.targetDistanceKm} km</p>}
-                {form.targetZone && <p>Zone {form.targetZone}: {HR_ZONES[form.targetZone].label}</p>}
-                {form.intervals.length > 0 && <p>{form.intervals.length} intervalblok(ken) geconfigureerd</p>}
-                {form.patientId && (
-                  <p>Patiënt: {patientsData.find(p => p.id === form.patientId)?.name}</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={() => setStep(2)}>Terug</Button>
-            <Button
-              className="flex-1" style={{ background: MBT_GREEN }}
-              disabled={saving || !form.name.trim()}
-              onClick={handleSave}
-            >
-              {saving ? 'Opslaan...' : 'Programma opslaan'}
-            </Button>
+            <div className="flex gap-3">
+              <DarkButton variant="secondary" className="flex-1" onClick={() => setStep(2)}>
+                Terug
+              </DarkButton>
+              <DarkButton
+                variant="primary"
+                className="flex-1"
+                disabled={saving || !form.name.trim()}
+                onClick={handleSave}
+              >
+                {saving ? 'Opslaan...' : 'Programma opslaan'}
+              </DarkButton>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

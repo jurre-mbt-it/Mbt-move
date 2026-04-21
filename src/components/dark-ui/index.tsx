@@ -9,6 +9,8 @@
 
 import * as React from 'react'
 import Link from 'next/link'
+import * as DialogPrimitive from '@radix-ui/react-dialog'
+import * as TabsPrimitive from '@radix-ui/react-tabs'
 import { cn } from '@/lib/utils'
 
 // Palette constants — synchroon met globals.css `:root --p-*` en `constants/theme.ts` in mbt-gym
@@ -24,9 +26,13 @@ export const P = {
   inkDim: '#4A5454',
   lime: '#BEF264',
   limeDark: '#65A30D',
+  limeMid: '#D4EC6C',
+  limeDeep: '#84CC16',
   danger: '#F87171',
   dangerDark: '#991B1B',
   gold: '#F4C261',
+  goldWarm: '#F39644',
+  orange: '#F97316',
   ice: '#93C5FD',
   purple: '#C084FC',
 } as const
@@ -673,6 +679,372 @@ export const CATEGORY_COLORS = {
   Z1: P.ice,
   Z2: P.lime,
   Z3: P.gold,
-  Z4: '#F97316',
+  Z4: P.orange,
   Z5: P.danger,
 } as const
+
+// ─── Dialog (radix-based, dark-themed) ──────────────────────────────────────
+
+export const DarkDialog = DialogPrimitive.Root
+export const DarkDialogTrigger = DialogPrimitive.Trigger
+export const DarkDialogPortal = DialogPrimitive.Portal
+export const DarkDialogClose = DialogPrimitive.Close
+
+export const DarkDialogOverlay = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Overlay>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
+>(function DarkDialogOverlay({ className, ...props }, ref) {
+  return (
+    <DialogPrimitive.Overlay
+      ref={ref}
+      className={cn(
+        'fixed inset-0 z-50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+        className,
+      )}
+      style={{ backgroundColor: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(4px)' }}
+      {...props}
+    />
+  )
+})
+
+export const DarkDialogContent = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+    showClose?: boolean
+  }
+>(function DarkDialogContent(
+  { className, children, showClose = true, style, ...props },
+  ref,
+) {
+  return (
+    <DarkDialogPortal>
+      <DarkDialogOverlay />
+      <DialogPrimitive.Content
+        ref={ref}
+        className={cn(
+          'athletic-dark fixed left-[50%] top-[50%] z-50 w-[calc(100%-24px)] max-w-lg translate-x-[-50%] translate-y-[-50%]',
+          'duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+          'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+          className,
+        )}
+        style={{
+          backgroundColor: P.surface,
+          border: `1px solid ${P.lineStrong}`,
+          color: P.ink,
+          borderRadius: 20,
+          padding: 24,
+          boxShadow: '0 30px 60px -20px rgba(0,0,0,0.7)',
+          ...style,
+        }}
+        {...props}
+      >
+        {children}
+        {showClose && (
+          <DialogPrimitive.Close
+            className="athletic-tap absolute right-4 top-4 flex items-center justify-center rounded-md transition-colors"
+            style={{
+              width: 28,
+              height: 28,
+              color: P.inkMuted,
+              background: P.surfaceHi,
+              border: `1px solid ${P.line}`,
+            }}
+            aria-label="Sluiten"
+          >
+            <span aria-hidden style={{ fontSize: 16, lineHeight: 1, fontWeight: 700 }}>×</span>
+          </DialogPrimitive.Close>
+        )}
+      </DialogPrimitive.Content>
+    </DarkDialogPortal>
+  )
+})
+
+export function DarkDialogHeader({
+  className,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn('flex flex-col gap-1.5 pr-8', className)}
+      style={{ marginBottom: 16 }}
+      {...props}
+    >
+      {children}
+    </div>
+  )
+}
+
+export function DarkDialogFooter({
+  className,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn('flex flex-col-reverse sm:flex-row sm:justify-end sm:gap-2 gap-2', className)}
+      style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${P.line}` }}
+      {...props}
+    >
+      {children}
+    </div>
+  )
+}
+
+export const DarkDialogTitle = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Title>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
+>(function DarkDialogTitle({ className, style, ...props }, ref) {
+  return (
+    <DialogPrimitive.Title
+      ref={ref}
+      className={cn('athletic-display', className)}
+      style={{
+        color: P.ink,
+        fontSize: 22,
+        fontWeight: 900,
+        letterSpacing: '-0.02em',
+        lineHeight: '26px',
+        textTransform: 'uppercase',
+        ...style,
+      }}
+      {...props}
+    />
+  )
+})
+
+export const DarkDialogDescription = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Description>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
+>(function DarkDialogDescription({ className, style, ...props }, ref) {
+  return (
+    <DialogPrimitive.Description
+      ref={ref}
+      className={className}
+      style={{ color: P.inkMuted, fontSize: 13, lineHeight: '19px', ...style }}
+      {...props}
+    />
+  )
+})
+
+// ─── Tabs (radix-based, dark-themed) ────────────────────────────────────────
+
+export const DarkTabs = TabsPrimitive.Root
+
+export const DarkTabsList = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.List>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
+>(function DarkTabsList({ className, style, ...props }, ref) {
+  return (
+    <TabsPrimitive.List
+      ref={ref}
+      className={cn(
+        'inline-flex items-center justify-start gap-1 overflow-x-auto rounded-xl p-1',
+        className,
+      )}
+      style={{
+        backgroundColor: P.surface,
+        border: `1px solid ${P.line}`,
+        ...style,
+      }}
+      {...props}
+    />
+  )
+})
+
+export const DarkTabsTrigger = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
+>(function DarkTabsTrigger({ className, style, ...props }, ref) {
+  return (
+    <TabsPrimitive.Trigger
+      ref={ref}
+      className={cn(
+        'athletic-mono athletic-tap dark-tab inline-flex items-center justify-center whitespace-nowrap rounded-lg px-3 py-1.5 transition-colors',
+        'disabled:pointer-events-none disabled:opacity-50',
+        className,
+      )}
+      style={{
+        fontSize: 11,
+        letterSpacing: '0.14em',
+        fontWeight: 900,
+        textTransform: 'uppercase',
+        ...style,
+      }}
+      {...props}
+    />
+  )
+})
+
+/** Side-effect: kleurt de DarkTabsTrigger via data-state — één keer injecteren. */
+if (typeof document !== 'undefined' && !document.getElementById('dark-ui-styles')) {
+  const el = document.createElement('style')
+  el.id = 'dark-ui-styles'
+  el.textContent = `
+    .dark-tab[data-state="inactive"] { color: ${P.inkMuted}; background: transparent; }
+    .dark-tab[data-state="inactive"]:hover { color: ${P.ink}; background: ${P.surfaceHi}; }
+    .dark-tab[data-state="active"] { color: ${P.bg}; background: ${P.lime}; }
+  `
+  document.head.appendChild(el)
+}
+
+export const DarkTabsContent = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
+>(function DarkTabsContent({ className, ...props }, ref) {
+  return (
+    <TabsPrimitive.Content
+      ref={ref}
+      className={cn('mt-3 focus-visible:outline-none', className)}
+      {...props}
+    />
+  )
+})
+
+// ─── Chart helpers (recharts-agnostic theming) ──────────────────────────────
+
+export const DARK_CHART_COLORS = {
+  primary: P.lime,
+  secondary: P.ice,
+  warning: P.gold,
+  danger: P.danger,
+  accent: P.purple,
+  grid: P.line,
+  gridStrong: P.lineStrong,
+  axis: P.inkDim,
+  label: P.inkMuted,
+  tooltipBg: P.surfaceHi,
+  tooltipBorder: P.lineStrong,
+  tooltipText: P.ink,
+} as const
+
+/**
+ * Tokens die je kunt doorgeven aan recharts primitives.
+ * Gebruik: `<CartesianGrid {...DARK_CHART_STYLES.grid} />` of los per prop.
+ */
+export const DARK_CHART_STYLES = {
+  grid: {
+    stroke: DARK_CHART_COLORS.grid,
+    strokeDasharray: '3 3',
+    vertical: false,
+  },
+  axis: {
+    stroke: DARK_CHART_COLORS.axis,
+    tick: { fill: DARK_CHART_COLORS.label, fontSize: 11 },
+    tickLine: false,
+    axisLine: { stroke: DARK_CHART_COLORS.grid },
+  },
+  tooltip: {
+    contentStyle: {
+      backgroundColor: DARK_CHART_COLORS.tooltipBg,
+      border: `1px solid ${DARK_CHART_COLORS.tooltipBorder}`,
+      borderRadius: 12,
+      color: DARK_CHART_COLORS.tooltipText,
+      fontSize: 12,
+      padding: '8px 12px',
+    },
+    labelStyle: {
+      color: DARK_CHART_COLORS.label,
+      fontSize: 10,
+      textTransform: 'uppercase' as const,
+      letterSpacing: '0.12em',
+      marginBottom: 4,
+    },
+    itemStyle: {
+      color: DARK_CHART_COLORS.tooltipText,
+      fontSize: 12,
+      padding: 0,
+    },
+    cursor: { stroke: DARK_CHART_COLORS.gridStrong, strokeDasharray: '3 3' },
+  },
+} as const
+
+/**
+ * Drop-in custom tooltip content voor Recharts.
+ * Werkt met `<Tooltip content={<DarkChartTooltip />} />`.
+ */
+export function DarkChartTooltip({
+  active,
+  payload,
+  label,
+  valueFormatter,
+  labelFormatter,
+}: {
+  active?: boolean
+  payload?: Array<{ name?: string; value?: number | string; color?: string; dataKey?: string }>
+  label?: string | number
+  valueFormatter?: (v: number | string) => string
+  labelFormatter?: (v: string | number) => string
+}) {
+  if (!active || !payload || payload.length === 0) return null
+  return (
+    <div
+      style={{
+        background: P.surfaceHi,
+        border: `1px solid ${P.lineStrong}`,
+        borderRadius: 12,
+        padding: '10px 12px',
+        boxShadow: '0 10px 30px -10px rgba(0,0,0,0.5)',
+      }}
+    >
+      {label !== undefined && (
+        <div
+          className="athletic-mono"
+          style={{
+            fontSize: 10,
+            letterSpacing: '0.14em',
+            fontWeight: 700,
+            color: P.inkMuted,
+            textTransform: 'uppercase',
+            marginBottom: 6,
+          }}
+        >
+          {labelFormatter ? labelFormatter(label) : label}
+        </div>
+      )}
+      <div className="flex flex-col gap-1">
+        {payload.map((entry, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span
+              aria-hidden
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 2,
+                background: entry.color ?? P.lime,
+                display: 'inline-block',
+              }}
+            />
+            {entry.name && (
+              <span
+                className="athletic-mono"
+                style={{
+                  fontSize: 10,
+                  letterSpacing: '0.1em',
+                  fontWeight: 700,
+                  color: P.inkMuted,
+                  textTransform: 'uppercase',
+                }}
+              >
+                {entry.name}
+              </span>
+            )}
+            <span
+              style={{
+                color: P.ink,
+                fontSize: 13,
+                fontWeight: 800,
+                marginLeft: 'auto',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {valueFormatter && typeof entry.value !== 'undefined'
+                ? valueFormatter(entry.value)
+                : entry.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}

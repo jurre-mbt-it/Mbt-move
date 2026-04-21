@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { getMessagesByPatient } from '@/lib/mock-data'
-import { Send } from 'lucide-react'
+import { DarkScreen, P, PulsingDot } from '@/components/dark-ui'
 
 const THERAPIST_NAME = 'Uw therapeut'
 
@@ -37,7 +37,7 @@ export default function MessagesPage() {
   const send = () => {
     const text = input.trim()
     if (!text) return
-    setMessages(prev => [
+    setMessages((prev) => [
       ...prev,
       {
         id: `new-${Date.now()}`,
@@ -51,26 +51,58 @@ export default function MessagesPage() {
     setInput('')
   }
 
-  const unread = messages.filter(m => m.from === 'therapist' && !m.read).length
+  const unread = messages.filter((m) => m.from === 'therapist' && !m.read).length
+  const initials = THERAPIST_NAME.split(' ')
+    .map((n) => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#0A0E0F' }}>
+    <DarkScreen>
       {/* Header */}
-      <div className="px-4 pt-12 pb-4 flex items-center gap-3" style={{ background: '#1C2425' }}>
+      <div
+        className="px-4 pt-10 pb-4 flex items-center gap-3"
+        style={{ borderBottom: `1px solid ${P.line}` }}
+      >
         <div
-          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
-          style={{ background: '#BEF264' }}
+          className="athletic-mono w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+          style={{
+            backgroundColor: P.lime,
+            color: P.bg,
+            fontSize: 13,
+            fontWeight: 900,
+            letterSpacing: '0.04em',
+          }}
         >
-          {THERAPIST_NAME.split(' ').map(n => n[0]).join('').slice(0, 2)}
+          {initials}
         </div>
-        <div>
-          <p className="text-white font-bold text-base">{THERAPIST_NAME}</p>
-          <p className="text-[#7B8889] text-xs">Jouw therapeut</p>
+        <div className="flex-1 min-w-0">
+          <p
+            className="athletic-mono"
+            style={{
+              color: P.ink,
+              fontSize: 13,
+              fontWeight: 900,
+              letterSpacing: '0.1em',
+            }}
+          >
+            {THERAPIST_NAME.toUpperCase()}
+          </p>
+          <p style={{ color: P.inkMuted, fontSize: 11, marginTop: 2 }}>
+            <PulsingDot color={P.lime} size={6} style={{ marginRight: 6 }} />
+            Jouw therapeut
+          </p>
         </div>
         {unread > 0 && (
           <div
-            className="ml-auto w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold"
-            style={{ background: '#ef4444' }}
+            className="athletic-mono ml-auto min-w-5 h-5 px-1.5 rounded-full flex items-center justify-center"
+            style={{
+              backgroundColor: P.danger,
+              color: P.bg,
+              fontSize: 11,
+              fontWeight: 900,
+            }}
           >
             {unread}
           </div>
@@ -78,34 +110,60 @@ export default function MessagesPage() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 pb-32">
+      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3 pb-32">
         {messages.map((msg, i) => {
           const isPatient = msg.from === 'patient'
-          const showDate = i === 0 || new Date(msg.date).toDateString() !== new Date(messages[i - 1].date).toDateString()
+          const showDate =
+            i === 0 ||
+            new Date(msg.date).toDateString() !== new Date(messages[i - 1].date).toDateString()
           return (
             <div key={msg.id}>
               {showDate && (
                 <div className="flex justify-center my-2">
-                  <span className="text-[11px] text-[#7B8889] bg-[#1C2425] rounded-full px-3 py-1">
-                    {new Date(msg.date).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  <span
+                    className="athletic-mono rounded-full px-3 py-1"
+                    style={{
+                      color: P.inkMuted,
+                      backgroundColor: P.surface,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: '0.12em',
+                    }}
+                  >
+                    {new Date(msg.date)
+                      .toLocaleDateString('nl-NL', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                      })
+                      .toUpperCase()}
                   </span>
                 </div>
               )}
               <div className={`flex ${isPatient ? 'justify-end' : 'justify-start'}`}>
                 <div className="max-w-[80%]">
                   <div
-                    className="rounded-2xl px-4 py-3 text-sm leading-relaxed"
+                    className="rounded-2xl px-4 py-3"
                     style={{
-                      background: isPatient ? '#BEF264' : '#fff',
-                      color: isPatient ? '#fff' : '#1C2425',
+                      backgroundColor: isPatient ? P.lime : P.surface,
+                      color: isPatient ? P.bg : P.ink,
+                      fontSize: 14,
+                      lineHeight: '19px',
                       borderBottomRightRadius: isPatient ? 4 : undefined,
                       borderBottomLeftRadius: !isPatient ? 4 : undefined,
-                      boxShadow: !isPatient ? '0 1px 3px rgba(0,0,0,0.08)' : undefined,
+                      border: isPatient ? 'none' : `1px solid ${P.line}`,
                     }}
                   >
                     {msg.content}
                   </div>
-                  <p className={`text-[10px] text-[#7B8889] mt-1 ${isPatient ? 'text-right' : 'text-left'}`}>
+                  <p
+                    className={`athletic-mono mt-1 ${isPatient ? 'text-right' : 'text-left'}`}
+                    style={{
+                      color: P.inkDim,
+                      fontSize: 10,
+                      letterSpacing: '0.06em',
+                    }}
+                  >
                     {formatTime(msg.date)}
                   </p>
                 </div>
@@ -119,29 +177,41 @@ export default function MessagesPage() {
       {/* Input bar */}
       <div
         className="fixed bottom-16 left-0 right-0 px-4 py-3 flex items-center gap-3"
-        style={{ background: '#fff', borderTop: '1px solid #e4e4e7' }}
+        style={{
+          backgroundColor: P.surface,
+          borderTop: `1px solid ${P.lineStrong}`,
+        }}
       >
         <input
           type="text"
           value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && send()}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && send()}
           placeholder="Typ een bericht..."
-          className="flex-1 rounded-2xl px-4 py-2.5 text-sm outline-none"
-          style={{ background: '#1C2425', border: 'none' }}
+          className="flex-1 rounded-2xl px-4 py-2.5 outline-none"
+          style={{
+            backgroundColor: P.surfaceHi,
+            color: P.ink,
+            border: `1px solid ${P.lineStrong}`,
+            fontSize: 14,
+          }}
         />
         <button
+          type="button"
           onClick={send}
           disabled={!input.trim()}
-          className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all"
+          className="athletic-tap w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all"
           style={{
-            background: input.trim() ? '#BEF264' : '#1C2425',
-            color: input.trim() ? 'white' : '#a1a1aa',
+            backgroundColor: input.trim() ? P.lime : P.surfaceHi,
+            color: input.trim() ? P.bg : P.inkMuted,
+            fontSize: 16,
+            fontWeight: 900,
           }}
+          aria-label="Versturen"
         >
-          <Send className="w-4 h-4" />
+          ➤
         </button>
       </div>
-    </div>
+    </DarkScreen>
   )
 }

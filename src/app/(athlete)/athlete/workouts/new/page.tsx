@@ -2,9 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
   WORKOUT_TYPES,
   saveWorkout,
@@ -16,9 +13,19 @@ import { EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
 import { WORKOUT_ICON_MAP } from '@/components/icons'
 import { trpc } from '@/lib/trpc/client'
 import {
-  ArrowLeft, X, Plus, Search, Check, ChevronRight,
-  Dumbbell, Play, Pause, Square, Minus, ChevronDown,
+  X, Plus, Search, Check,
+  Play, Pause, Minus, ChevronDown,
 } from 'lucide-react'
+import {
+  P,
+  Kicker,
+  MetaLabel,
+  Tile,
+  DarkButton,
+  DarkInput,
+  DarkTextarea,
+  CATEGORY_COLORS,
+} from '@/components/dark-ui'
 
 type Step = 'pick-type' | 'build' | 'pick-exercises' | 'active' | 'complete'
 
@@ -28,6 +35,13 @@ type RealExercise = {
   category: 'STRENGTH' | 'MOBILITY' | 'PLYOMETRICS' | 'CARDIO' | 'STABILITY'
   muscleLoads: Record<string, number>
   difficulty: string
+}
+
+const mono =
+  'ui-monospace, Menlo, "SF Mono", "Cascadia Code", "Source Code Pro", monospace'
+
+function categoryColor(cat: string): string {
+  return (CATEGORY_COLORS as Record<string, string>)[cat] ?? P.lime
 }
 
 export default function NewWorkoutPage() {
@@ -187,35 +201,80 @@ export default function NewWorkoutPage() {
   // Step 1: Pick workout type
   if (step === 'pick-type') {
     return (
-      <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
-        <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
-          <button onClick={() => router.back()} className="text-[#7B8889] flex items-center gap-1 text-sm mb-3">
-            <ArrowLeft className="w-4 h-4" /> Terug
+      <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+        <div className="max-w-lg mx-auto px-4 pt-10 pb-8 space-y-4">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            style={{
+              fontFamily: mono,
+              fontSize: 11,
+              letterSpacing: '0.16em',
+              fontWeight: 800,
+              color: P.inkMuted,
+              textTransform: 'uppercase',
+            }}
+          >
+            ← TERUG
           </button>
-          <h1 className="text-white text-xl font-bold">Nieuwe Workout</h1>
-          <p className="text-[#7B8889] text-sm mt-1">Kies je workout type</p>
-        </div>
-        <div className="px-4 -mt-3 pb-6">
-          <div className="grid grid-cols-2 gap-3">
-            {WORKOUT_TYPES.map(type => (
-              <Card
-                key={type.value}
-                style={{ borderRadius: '14px', cursor: 'pointer' }}
-                className="hover:shadow-md transition-shadow"
-                onClick={() => selectType(type.value)}
-              >
-                <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-                  <div
-                    className="w-14 h-14 rounded-2xl flex items-center justify-center"
-                    style={{ background: type.color + '20' }}
-                  >
-                    {(() => { const Icon = WORKOUT_ICON_MAP[type.value]; return Icon ? <Icon size={28} /> : type.icon })()}
+          <div>
+            <Kicker>WORKOUT · NIEUW</Kicker>
+            <h1
+              className="athletic-display"
+              style={{
+                color: P.ink,
+                fontWeight: 900,
+                letterSpacing: '-0.04em',
+                lineHeight: 1.02,
+                fontSize: 'clamp(44px, 12vw, 80px)',
+                paddingTop: 4,
+                textTransform: 'uppercase',
+                margin: 0,
+              }}
+            >
+              KIES TYPE
+            </h1>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {WORKOUT_TYPES.map(type => {
+              const Icon = WORKOUT_ICON_MAP[type.value]
+              return (
+                <Tile
+                  key={type.value}
+                  onClick={() => selectType(type.value)}
+                  accentBar={type.color}
+                  style={{ padding: 16 }}
+                >
+                  <div className="flex flex-col items-center text-center gap-2">
+                    <div
+                      className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                      style={{
+                        background: P.surfaceHi,
+                        border: `1px solid ${P.line}`,
+                      }}
+                    >
+                      {Icon ? <Icon size={28} /> : (
+                        <span style={{ fontSize: 24 }}>{type.icon}</span>
+                      )}
+                    </div>
+                    <p
+                      style={{
+                        color: P.ink,
+                        fontSize: 14,
+                        fontWeight: 900,
+                        letterSpacing: '0.04em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      {type.label}
+                    </p>
+                    <MetaLabel style={{ textTransform: 'none', letterSpacing: '0.02em', fontSize: 11 }}>
+                      {type.description}
+                    </MetaLabel>
                   </div>
-                  <p className="text-sm font-bold">{type.label}</p>
-                  <p className="text-xs text-muted-foreground">{type.description}</p>
-                </CardContent>
-              </Card>
-            ))}
+                </Tile>
+              )
+            })}
           </div>
         </div>
       </div>
@@ -234,125 +293,188 @@ export default function NewWorkoutPage() {
     const endStr = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
 
     return (
-      <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
-        <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
-          <p className="text-[#7B8889] text-xs uppercase tracking-wider">Workout Voltooid</p>
-          <h1 className="text-white text-xl font-bold mt-1">{workoutName}</h1>
-          <div className="flex items-center gap-1 mt-1">
-            <span className="text-lg">{typeInfo?.icon}</span>
-            <span className="text-[#7B8889] text-sm">{typeInfo?.label}</span>
+      <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+        <div className="max-w-lg mx-auto px-4 pt-10 pb-8 space-y-4">
+          <div>
+            <Kicker>WORKOUT · VOLTOOID</Kicker>
+            <h1
+              className="athletic-display"
+              style={{
+                color: P.ink,
+                fontWeight: 900,
+                letterSpacing: '-0.04em',
+                lineHeight: 1.02,
+                fontSize: 'clamp(36px, 10vw, 64px)',
+                paddingTop: 4,
+                textTransform: 'uppercase',
+                margin: 0,
+              }}
+            >
+              {workoutName}
+            </h1>
+            <div className="flex items-center gap-2 mt-2">
+              <span style={{ fontSize: 18 }}>{typeInfo?.icon}</span>
+              <MetaLabel>{typeInfo?.label?.toUpperCase()}</MetaLabel>
+            </div>
           </div>
-        </div>
 
-        <div className="px-4 -mt-3 space-y-4 pb-6">
           {/* Time summary */}
-          <Card style={{ borderRadius: '14px' }}>
-            <CardContent className="p-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 text-center">
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase">Start</p>
-                  <p className="text-lg font-bold mt-1">{startStr}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase">Einde</p>
-                  <p className="text-lg font-bold mt-1">{endStr}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase">Duur (min)</p>
-                  <div className="flex items-center justify-center gap-1 mt-1">
-                    <input
-                      type="number"
-                      min={0}
-                      value={duration}
-                      onChange={e => setManualDuration(Math.max(0, Number(e.target.value) || 0))}
-                      className="w-14 text-lg font-bold text-center bg-[#1C2425] rounded-lg border-0 focus:outline-none focus:ring-1 focus:ring-[#BEF264]"
-                    />
-                    <span className="text-lg font-bold">&apos;</span>
-                  </div>
+          <Tile>
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div>
+                <MetaLabel>START</MetaLabel>
+                <p
+                  className="athletic-display"
+                  style={{
+                    color: P.ink,
+                    fontSize: 22,
+                    fontWeight: 900,
+                    lineHeight: '26px',
+                    letterSpacing: '-0.02em',
+                    marginTop: 6,
+                  }}
+                >
+                  {startStr}
+                </p>
+              </div>
+              <div>
+                <MetaLabel>EINDE</MetaLabel>
+                <p
+                  className="athletic-display"
+                  style={{
+                    color: P.ink,
+                    fontSize: 22,
+                    fontWeight: 900,
+                    lineHeight: '26px',
+                    letterSpacing: '-0.02em',
+                    marginTop: 6,
+                  }}
+                >
+                  {endStr}
+                </p>
+              </div>
+              <div>
+                <MetaLabel>DUUR (MIN)</MetaLabel>
+                <div className="flex items-center justify-center gap-1 mt-1">
+                  <input
+                    type="number"
+                    min={0}
+                    value={duration}
+                    onChange={e => setManualDuration(Math.max(0, Number(e.target.value) || 0))}
+                    className="text-center rounded-lg outline-none"
+                    style={{
+                      background: P.surfaceHi,
+                      border: `1px solid ${P.lineStrong}`,
+                      color: P.ink,
+                      width: 64,
+                      padding: '4px 6px',
+                      fontFamily: mono,
+                      fontSize: 18,
+                      fontWeight: 900,
+                    }}
+                  />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Tile>
 
           {/* Feedback sliders */}
-          <Card style={{ borderRadius: '14px' }}>
-            <CardContent className="p-4 space-y-5">
-              <p className="font-bold text-sm">Hoe was je workout?</p>
-
+          <Tile>
+            <Kicker style={{ marginBottom: 16 }}>HOE WAS JE WORKOUT?</Kicker>
+            <div className="space-y-5">
               <FeedbackSlider
-                label="Inspanning"
+                label="INSPANNING"
                 value={feedback.effort}
                 onChange={v => setFeedback(f => ({ ...f, effort: v }))}
                 min={1} max={10}
-                leftLabel="Makkelijk" rightLabel="Maximaal"
-                color="#BEF264"
+                leftLabel="MAKKELIJK" rightLabel="MAXIMAAL"
+                color={P.lime}
               />
               <FeedbackSlider
-                label="Pijn"
+                label="PIJN"
                 value={feedback.pain}
                 onChange={v => setFeedback(f => ({ ...f, pain: v }))}
                 min={0} max={10}
-                leftLabel="Geen" rightLabel="Veel"
-                color="#ef4444"
+                leftLabel="GEEN" rightLabel="VEEL"
+                color={P.danger}
               />
               <FeedbackSlider
-                label="Tevredenheid"
+                label="TEVREDENHEID"
                 value={feedback.satisfaction}
                 onChange={v => setFeedback(f => ({ ...f, satisfaction: v }))}
                 min={1} max={10}
-                leftLabel="Teleurgesteld" rightLabel="Top!"
-                color="#f97316"
+                leftLabel="TELEURGESTELD" rightLabel="TOP!"
+                color={P.gold}
               />
 
               <div>
-                <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Notities (optioneel)</p>
-                <textarea
+                <div style={{ marginBottom: 8 }}>
+                  <MetaLabel>NOTITIES (OPTIONEEL)</MetaLabel>
+                </div>
+                <DarkTextarea
                   value={feedback.notes}
                   onChange={e => setFeedback(f => ({ ...f, notes: e.target.value }))}
                   placeholder="Hoe ging het? Opmerkingen..."
-                  className="w-full border rounded-xl p-3 text-sm resize-none h-20 bg-[#141A1B]"
+                  style={{ minHeight: 80 }}
                 />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Tile>
 
           {/* Save as program option */}
-          <Card style={{ borderRadius: '14px' }}>
-            <CardContent className="p-4">
-              <p className="text-sm font-semibold mb-3">Workout opslaan als programma?</p>
-              <p className="text-xs text-muted-foreground mb-3">Sla deze workout op als programma zodat je hem opnieuw kunt gebruiken.</p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSaveAsProgram(p => !p)}
-                  className="flex-1 py-2 rounded-xl text-sm font-semibold border-2 transition-colors"
-                  style={saveAsProgram ? { borderColor: '#BEF264', color: '#BEF264', background: '#BEF26410' } : { borderColor: 'rgba(255,255,255,0.12)', color: '#a1a1aa' }}
-                >
-                  {saveAsProgram ? '✓ Opslaan als programma' : 'Opslaan als programma'}
-                </button>
-              </div>
-              {saveAsProgram && (
-                <input
-                  type="text"
+          <Tile>
+            <Kicker style={{ marginBottom: 8 }}>OPSLAAN ALS PROGRAMMA?</Kicker>
+            <p
+              style={{
+                color: P.inkMuted,
+                fontSize: 12,
+                lineHeight: 1.5,
+                marginBottom: 12,
+              }}
+            >
+              Sla deze workout op als programma zodat je hem opnieuw kunt gebruiken.
+            </p>
+            <button
+              type="button"
+              onClick={() => setSaveAsProgram(p => !p)}
+              className="w-full rounded-xl transition-colors"
+              style={{
+                padding: '10px 14px',
+                border: `2px solid ${saveAsProgram ? P.lime : P.line}`,
+                background: saveAsProgram ? 'rgba(190,242,100,0.10)' : 'transparent',
+                color: saveAsProgram ? P.lime : P.inkMuted,
+                fontFamily: mono,
+                fontSize: 11,
+                fontWeight: 900,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {saveAsProgram ? '✓ OPSLAAN ALS PROGRAMMA' : 'OPSLAAN ALS PROGRAMMA'}
+            </button>
+            {saveAsProgram && (
+              <div style={{ marginTop: 10 }}>
+                <DarkInput
                   value={workoutName}
                   onChange={e => setWorkoutName(e.target.value)}
                   placeholder="Naam van het programma..."
-                  className="mt-2 w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#BEF264]"
                 />
-              )}
-            </CardContent>
-          </Card>
+              </div>
+            )}
+          </Tile>
 
           {saveError && (
-            <p className="text-sm text-red-500 text-center px-2">{saveError}</p>
+            <p style={{ color: P.danger, fontSize: 13, textAlign: 'center' }}>{saveError}</p>
           )}
-          <Button
-            className="w-full text-white font-semibold"
-            style={{ background: '#BEF264', borderRadius: '14px', height: '48px' }}
+          <DarkButton
+            variant="primary"
+            size="lg"
             onClick={saveAndFinish}
             disabled={logSession.isPending}
+            className="w-full"
           >
-            {logSession.isPending ? 'Opslaan…' : 'Opslaan & afsluiten'}
-          </Button>
+            {logSession.isPending ? 'OPSLAAN…' : 'OPSLAAN & AFSLUITEN'}
+          </DarkButton>
         </div>
       </div>
     )
@@ -362,96 +484,153 @@ export default function NewWorkoutPage() {
   const isActive = step === 'active'
 
   return (
-    <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
-      {/* Header */}
-      <div className="px-4 pt-12 pb-4" style={{ background: '#1C2425' }}>
-        <div className="flex items-center justify-between mb-2">
-          <button onClick={() => isActive ? undefined : router.back()} className="text-[#7B8889] flex items-center gap-1 text-sm">
-            {isActive ? <ChevronDown className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
-            {isActive ? '' : 'Terug'}
+    <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+      <div className="max-w-lg mx-auto px-4 pt-10 pb-32 space-y-4">
+        {/* Top row */}
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => isActive ? undefined : router.back()}
+            className="flex items-center gap-1"
+            style={{
+              fontFamily: mono,
+              fontSize: 11,
+              letterSpacing: '0.16em',
+              fontWeight: 800,
+              color: P.inkMuted,
+              textTransform: 'uppercase',
+            }}
+          >
+            {isActive ? <ChevronDown className="w-4 h-4" /> : '←'}
+            {isActive ? '' : ' TERUG'}
           </button>
           <div className="flex items-center gap-2">
             {isActive ? (
               <div
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full text-white text-sm font-mono font-bold"
-                style={{ background: paused ? '#a78bfa' : '#BEF264' }}
+                className="flex items-center gap-2 rounded-full"
+                style={{
+                  background: paused ? P.purple : P.lime,
+                  color: P.bg,
+                  padding: '6px 14px',
+                  fontFamily: mono,
+                  fontSize: 13,
+                  fontWeight: 900,
+                  letterSpacing: '0.04em',
+                }}
               >
-                {paused ? <Play className="w-3.5 h-3.5" onClick={() => setPaused(false)} /> : <Pause className="w-3.5 h-3.5" onClick={() => setPaused(true)} />}
+                {paused
+                  ? <Play className="w-3.5 h-3.5" onClick={() => setPaused(false)} />
+                  : <Pause className="w-3.5 h-3.5" onClick={() => setPaused(true)} />
+                }
                 {formatTime(elapsed)}
               </div>
             ) : (
-              <Button
+              <DarkButton
+                variant="primary"
                 size="sm"
-                className="text-white font-semibold gap-1.5"
-                style={{ background: '#BEF264' }}
                 onClick={startWorkout}
                 disabled={exercises.length === 0}
               >
-                <Play className="w-3.5 h-3.5 fill-current" /> Start
-              </Button>
+                ▶ START
+              </DarkButton>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* Hero: workout name */}
+        <div>
+          <Kicker>
+            {typeInfo ? `${typeInfo.label.toUpperCase()}` : 'WORKOUT'}
+            {isActive && ` · ${completedSets}/${totalSets} SETS`}
+          </Kicker>
           <input
             value={workoutName}
             onChange={e => setWorkoutName(e.target.value)}
-            className="text-white text-lg font-bold bg-transparent border-none outline-none flex-1"
+            className="athletic-display w-full bg-transparent outline-none"
+            style={{
+              color: P.ink,
+              fontWeight: 900,
+              letterSpacing: '-0.04em',
+              lineHeight: 1.02,
+              fontSize: 'clamp(36px, 10vw, 64px)',
+              paddingTop: 4,
+              textTransform: 'uppercase',
+              border: 'none',
+              margin: 0,
+            }}
           />
         </div>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <span className="text-base">{typeInfo?.icon}</span>
-          <span className="text-[#7B8889] text-sm">{typeInfo?.label}</span>
-          {isActive && (
-            <span className="text-[#7B8889] text-xs ml-auto">{completedSets}/{totalSets} sets</span>
+
+        {/* Exercise cards */}
+        <div className="space-y-2">
+          {exercises.map(ex => (
+            <ExerciseCard
+              key={ex.id}
+              exercise={ex}
+              isActive={isActive}
+              onAddSet={() => addSet(ex.id)}
+              onRemoveSet={(idx) => removeSet(ex.id, idx)}
+              onRemove={() => removeExercise(ex.id)}
+              onUpdateSet={(idx, field, value) => updateSet(ex.id, idx, field, value)}
+              onToggleComplete={(idx) => toggleSetComplete(ex.id, idx)}
+              onToggleExercise={() => toggleExerciseComplete(ex.id)}
+            />
+          ))}
+
+          {/* Add exercise button */}
+          {!isActive && (
+            <button
+              type="button"
+              className="w-full rounded-2xl flex items-center justify-center gap-2 transition-colors"
+              style={{
+                padding: 16,
+                border: `2px dashed ${P.lime}`,
+                color: P.lime,
+                background: 'transparent',
+                fontFamily: mono,
+                fontSize: 12,
+                fontWeight: 900,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+              }}
+              onClick={() => setStep('pick-exercises')}
+            >
+              <Plus className="w-4 h-4" /> OEFENING TOEVOEGEN
+            </button>
+          )}
+
+          {exercises.length === 0 && (
+            <Tile style={{ padding: 32, textAlign: 'center' }}>
+              <div style={{ fontSize: 36, marginBottom: 8 }}>🏁</div>
+              <Kicker>DE STARTLIJN</Kicker>
+              <p
+                style={{
+                  marginTop: 10,
+                  color: P.inkMuted,
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                }}
+              >
+                Voeg oefeningen toe om te beginnen.
+              </p>
+            </Tile>
           )}
         </div>
-      </div>
-
-      <div className="px-4 pt-4 space-y-3 pb-28">
-        {/* Exercise cards */}
-        {exercises.map(ex => (
-          <ExerciseCard
-            key={ex.id}
-            exercise={ex}
-            isActive={isActive}
-            onAddSet={() => addSet(ex.id)}
-            onRemoveSet={(idx) => removeSet(ex.id, idx)}
-            onRemove={() => removeExercise(ex.id)}
-            onUpdateSet={(idx, field, value) => updateSet(ex.id, idx, field, value)}
-            onToggleComplete={(idx) => toggleSetComplete(ex.id, idx)}
-            onToggleExercise={() => toggleExerciseComplete(ex.id)}
-          />
-        ))}
-
-        {/* Add exercise button */}
-        {!isActive && (
-          <button
-            className="w-full border-2 border-dashed rounded-2xl p-4 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-[#BEF264] hover:text-[#BEF264] transition-colors"
-            onClick={() => setStep('pick-exercises')}
-          >
-            <Plus className="w-4 h-4" /> Oefening toevoegen
-          </button>
-        )}
-
-        {exercises.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <p className="text-sm text-muted-foreground uppercase tracking-wider font-medium">De startlijn</p>
-            <p className="text-xs text-muted-foreground mt-2">Voeg oefeningen toe om te beginnen</p>
-          </div>
-        )}
       </div>
 
       {/* Bottom action */}
       {isActive && (
         <div className="fixed bottom-20 left-0 right-0 px-4 pb-4">
-          <Button
-            className="w-full font-semibold text-base"
-            style={{ background: '#1C2425', borderRadius: '14px', height: '52px' }}
-            onClick={completeWorkout}
-          >
-            Workout Afronden
-          </Button>
+          <div className="max-w-lg mx-auto">
+            <DarkButton
+              variant="secondary"
+              size="lg"
+              onClick={completeWorkout}
+              className="w-full"
+            >
+              WORKOUT AFRONDEN ✓
+            </DarkButton>
+          </div>
         </div>
       )}
     </div>
@@ -463,23 +642,65 @@ function Stepper({ value, onChange, min = 0, step = 1, label, unit }: {
   value: number; onChange: (v: number) => void; min?: number; step?: number; label: string; unit?: string
 }) {
   return (
-    <div className="flex flex-col items-center gap-1">
-      <span className="text-[10px] uppercase text-muted-foreground font-medium tracking-wide">{label}</span>
+    <div className="flex flex-col items-center gap-1.5">
+      <span
+        style={{
+          fontFamily: mono,
+          fontSize: 10,
+          fontWeight: 900,
+          letterSpacing: '0.14em',
+          color: P.inkMuted,
+          textTransform: 'uppercase',
+        }}
+      >
+        {label}
+      </span>
       <div className="flex items-center gap-0">
         <button
+          type="button"
           onClick={() => onChange(Math.max(min, value - step))}
-          className="w-7 h-7 rounded-l-lg bg-[#1C2425] flex items-center justify-center active:bg-[rgba(255,255,255,0.08)] transition-colors"
+          className="w-8 h-8 rounded-l-lg flex items-center justify-center"
+          style={{
+            background: P.surfaceHi,
+            border: `1px solid ${P.line}`,
+            color: P.inkMuted,
+          }}
         >
-          <Minus className="w-3 h-3 text-[#7B8889]" />
+          <Minus className="w-3 h-3" />
         </button>
-        <div className="h-7 min-w-[2.5rem] px-1 bg-[#1C2425] flex items-center justify-center border-y border-[rgba(255,255,255,0.06)]">
-          <span className="text-sm font-bold tabular-nums">{value}{unit ? <span className="text-[10px] text-muted-foreground ml-0.5">{unit}</span> : null}</span>
+        <div
+          className="h-8 min-w-[3rem] px-2 flex items-center justify-center"
+          style={{
+            background: P.surfaceLow,
+            borderTop: `1px solid ${P.line}`,
+            borderBottom: `1px solid ${P.line}`,
+          }}
+        >
+          <span
+            style={{
+              color: P.ink,
+              fontFamily: mono,
+              fontSize: 14,
+              fontWeight: 900,
+            }}
+          >
+            {value}
+            {unit ? (
+              <span style={{ fontSize: 10, color: P.inkMuted, marginLeft: 2 }}>{unit}</span>
+            ) : null}
+          </span>
         </div>
         <button
+          type="button"
           onClick={() => onChange(value + step)}
-          className="w-7 h-7 rounded-r-lg bg-[#1C2425] flex items-center justify-center active:bg-[rgba(255,255,255,0.08)] transition-colors"
+          className="w-8 h-8 rounded-r-lg flex items-center justify-center"
+          style={{
+            background: P.surfaceHi,
+            border: `1px solid ${P.line}`,
+            color: P.inkMuted,
+          }}
         >
-          <Plus className="w-3 h-3 text-[#7B8889]" />
+          <Plus className="w-3 h-3" />
         </button>
       </div>
     </div>
@@ -499,10 +720,7 @@ function ExerciseCard({
   onToggleComplete: (idx: number) => void
   onToggleExercise: () => void
 }) {
-  const color = exercise.category === 'STRENGTH' ? '#BEF264'
-    : exercise.category === 'MOBILITY' ? '#60a5fa'
-    : exercise.category === 'PLYOMETRICS' ? '#f97316'
-    : exercise.category === 'CARDIO' ? '#ef4444' : '#a78bfa'
+  const color = categoryColor(exercise.category)
 
   const totalSetsCount = exercise.sets.length
   const defaultReps = exercise.sets[0]?.reps ?? 10
@@ -511,28 +729,51 @@ function ExerciseCard({
 
   return (
     <div
-      className="rounded-xl border bg-[#141A1B] overflow-hidden transition-all"
-      style={allCompleted && isActive ? { borderColor: '#BEF264', background: '#BEF26408' } : {}}
+      className="rounded-xl overflow-hidden transition-all"
+      style={{
+        background: allCompleted && isActive ? 'rgba(190,242,100,0.06)' : P.surface,
+        border: `1px solid ${allCompleted && isActive ? P.lime : P.line}`,
+        borderLeft: `3px solid ${color}`,
+      }}
     >
       {/* Header: circle + name + remove */}
       <div className="flex items-center gap-2.5 px-3 pt-3 pb-2">
         {isActive ? (
           <button
+            type="button"
             onClick={onToggleExercise}
-            className="w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors"
+            className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-colors"
             style={allCompleted
-              ? { borderColor: '#BEF264', background: '#BEF264' }
-              : { borderColor: '#4A5454' }
+              ? { background: P.lime, border: `2px solid ${P.lime}` }
+              : { background: 'transparent', border: `2px solid ${P.inkDim}` }
             }
           >
-            {allCompleted && <Check className="w-3.5 h-3.5 text-white" />}
+            {allCompleted && <Check className="w-3.5 h-3.5" style={{ color: P.bg }} />}
           </button>
         ) : (
-          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
+          <div
+            className="w-2.5 h-2.5 rounded-full shrink-0"
+            style={{ background: color }}
+          />
         )}
-        <span className="flex-1 text-sm font-semibold truncate">{exercise.name}</span>
+        <span
+          className="flex-1 truncate"
+          style={{
+            color: P.ink,
+            fontSize: 14,
+            fontWeight: 800,
+            letterSpacing: '-0.01em',
+          }}
+        >
+          {exercise.name}
+        </span>
         {!isActive && (
-          <button onClick={onRemove} className="text-zinc-300 hover:text-destructive shrink-0">
+          <button
+            type="button"
+            onClick={onRemove}
+            className="shrink-0"
+            style={{ color: P.inkMuted }}
+          >
             <X className="w-4 h-4" />
           </button>
         )}
@@ -541,7 +782,7 @@ function ExerciseCard({
       {/* Steppers row */}
       <div className="flex items-end justify-around px-3 pb-3">
         <Stepper
-          label="Sets"
+          label="SETS"
           value={totalSetsCount}
           min={1}
           onChange={v => {
@@ -550,36 +791,47 @@ function ExerciseCard({
           }}
         />
         <Stepper
-          label="Reps"
+          label="REPS"
           value={defaultReps}
           min={1}
           onChange={v => exercise.sets.forEach((_, idx) => onUpdateSet(idx, 'reps', v))}
         />
         <Stepper
-          label="Gewicht"
+          label="GEWICHT"
           value={defaultWeight}
           min={0}
           step={2.5}
-          unit="kg"
+          unit="KG"
           onChange={v => exercise.sets.forEach((_, idx) => onUpdateSet(idx, 'weight', v))}
         />
       </div>
 
       {/* Per-set completion row (active mode) */}
       {isActive && (
-        <div className="flex gap-1.5 px-3 pb-3 overflow-x-auto">
+        <div
+          className="flex gap-1.5 px-3 pb-3 overflow-x-auto"
+          style={{ borderTop: `1px solid ${P.line}`, paddingTop: 10 }}
+        >
           {exercise.sets.map((set, idx) => (
             <button
               key={idx}
+              type="button"
               onClick={() => onToggleComplete(idx)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors shrink-0"
-              style={set.completed
-                ? { background: '#BEF26420', color: '#BEF264' }
-                : { background: '#1C2425', color: '#a1a1aa' }
-              }
+              className="flex items-center gap-1 rounded-full transition-colors shrink-0"
+              style={{
+                padding: '4px 10px',
+                background: set.completed ? 'rgba(190,242,100,0.12)' : P.surfaceLow,
+                border: `1px solid ${set.completed ? P.lime : P.line}`,
+                color: set.completed ? P.lime : P.inkMuted,
+                fontFamily: mono,
+                fontSize: 10,
+                fontWeight: 900,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+              }}
             >
               <Check className="w-3 h-3" />
-              Set {idx + 1}
+              SET {idx + 1}
             </button>
           ))}
         </div>
@@ -609,106 +861,199 @@ function ExercisePickerView({
 
   const addedIds = new Set(exercises.map(e => e.exerciseId))
 
-  const CATEGORY_COLORS: Record<string, string> = {
-    STRENGTH: '#BEF264',
-    MOBILITY: '#60a5fa',
-    PLYOMETRICS: '#f97316',
-    CARDIO: '#ef4444',
-    STABILITY: '#a78bfa',
-  }
-
   return (
-    <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
-      <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
-        <div className="flex items-center justify-between">
-          <button onClick={onBack} className="text-[#7B8889] flex items-center gap-1 text-sm">
-            <ArrowLeft className="w-4 h-4" /> Terug
-          </button>
-          <h1 className="text-white text-lg font-bold">Oefeningen</h1>
-          <div className="w-12" />
-        </div>
-      </div>
+    <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+      <div className="max-w-lg mx-auto px-4 pt-10 pb-8 space-y-4">
+        <button
+          type="button"
+          onClick={onBack}
+          style={{
+            fontFamily: mono,
+            fontSize: 11,
+            letterSpacing: '0.16em',
+            fontWeight: 800,
+            color: P.inkMuted,
+            textTransform: 'uppercase',
+          }}
+        >
+          ← TERUG
+        </button>
 
-      <div className="px-4 -mt-3 space-y-3 pb-6">
-        {/* Filters */}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Zoek oefeningen..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-9 bg-[#141A1B]"
-              style={{ borderRadius: '12px' }}
-            />
-          </div>
+        <div>
+          <Kicker>BIBLIOTHEEK · KIES OEFENING</Kicker>
+          <h1
+            className="athletic-display"
+            style={{
+              color: P.ink,
+              fontWeight: 900,
+              letterSpacing: '-0.04em',
+              lineHeight: 1.02,
+              fontSize: 'clamp(44px, 12vw, 80px)',
+              paddingTop: 4,
+              textTransform: 'uppercase',
+              margin: 0,
+            }}
+          >
+            OEFENINGEN
+          </h1>
         </div>
 
+        {/* Search */}
+        <div style={{ position: 'relative' }}>
+          <Search
+            className="w-4 h-4"
+            style={{
+              position: 'absolute',
+              left: 14,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: P.inkMuted,
+              pointerEvents: 'none',
+            }}
+          />
+          <DarkInput
+            placeholder="Zoek oefeningen..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ paddingLeft: 40 }}
+          />
+        </div>
+
+        {/* Category filters */}
         <div className="flex gap-2 overflow-x-auto pb-1">
           <button
-            className={`text-xs px-3 py-1.5 rounded-full shrink-0 transition-colors ${!categoryFilter ? 'bg-[#1A3A3A] text-white' : 'bg-[#141A1B] text-muted-foreground border'}`}
+            type="button"
             onClick={() => setCategoryFilter(null)}
+            className="shrink-0 rounded-full transition-colors"
+            style={{
+              padding: '6px 14px',
+              background: !categoryFilter ? P.lime : P.surface,
+              color: !categoryFilter ? P.bg : P.inkMuted,
+              border: `1px solid ${!categoryFilter ? P.lime : P.line}`,
+              fontFamily: mono,
+              fontSize: 10,
+              fontWeight: 900,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+            }}
           >
-            Alles
+            ALLES
           </button>
-          {EXERCISE_CATEGORIES.map(cat => (
-            <button
-              key={cat.value}
-              className={`text-xs px-3 py-1.5 rounded-full shrink-0 transition-colors ${categoryFilter === cat.value ? 'text-white' : 'bg-[#141A1B] text-muted-foreground border'}`}
-              style={categoryFilter === cat.value ? { background: CATEGORY_COLORS[cat.value] } : {}}
-              onClick={() => setCategoryFilter(categoryFilter === cat.value ? null : cat.value)}
-            >
-              {cat.label}
-            </button>
-          ))}
+          {EXERCISE_CATEGORIES.map(cat => {
+            const active = categoryFilter === cat.value
+            const color = categoryColor(cat.value)
+            return (
+              <button
+                key={cat.value}
+                type="button"
+                onClick={() => setCategoryFilter(active ? null : cat.value)}
+                className="shrink-0 rounded-full transition-colors"
+                style={{
+                  padding: '6px 14px',
+                  background: active ? color : P.surface,
+                  color: active ? P.bg : P.inkMuted,
+                  border: `1px solid ${active ? color : P.line}`,
+                  fontFamily: mono,
+                  fontSize: 10,
+                  fontWeight: 900,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {cat.label}
+              </button>
+            )
+          })}
         </div>
 
         {/* Exercise list */}
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <p className="text-sm text-muted-foreground">Laden…</p>
-          </div>
+          <Tile style={{ padding: 32, textAlign: 'center' }}>
+            <MetaLabel>LADEN…</MetaLabel>
+          </Tile>
         ) : (
           <div className="space-y-2">
             {allExercises.map(ex => {
               const alreadyAdded = addedIds.has(ex.id)
-              const color = CATEGORY_COLORS[ex.category] ?? '#BEF264'
+              const color = categoryColor(ex.category)
               const muscles = Object.keys(ex.muscleLoads ?? {}).join(', ')
+              const catLabel = EXERCISE_CATEGORIES.find(c => c.value === ex.category)?.label
               return (
-                <Card
+                <button
                   key={ex.id}
-                  style={{ borderRadius: '12px', opacity: alreadyAdded ? 0.5 : 1 }}
-                  className={alreadyAdded ? '' : 'hover:shadow-md transition-shadow cursor-pointer'}
+                  type="button"
+                  disabled={alreadyAdded}
                   onClick={() => !alreadyAdded && onAdd(ex as RealExercise)}
+                  className="w-full flex items-center gap-3 rounded-xl text-left transition-all active:scale-[0.98]"
+                  style={{
+                    background: P.surface,
+                    padding: '12px 14px',
+                    borderLeft: `3px solid ${color}`,
+                    border: `1px solid ${P.line}`,
+                    opacity: alreadyAdded ? 0.5 : 1,
+                  }}
                 >
-                  <CardContent className="p-3 flex items-center gap-3">
-                    <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                      style={{ background: color + '20' }}
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                    style={{
+                      background: P.surfaceHi,
+                      border: `1px solid ${P.line}`,
+                      color,
+                      fontFamily: mono,
+                      fontSize: 14,
+                      fontWeight: 900,
+                    }}
+                  >
+                    {ex.name[0]?.toUpperCase() ?? '·'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className="truncate"
+                      style={{
+                        color: P.ink,
+                        fontSize: 14,
+                        fontWeight: 800,
+                        letterSpacing: '-0.01em',
+                      }}
                     >
-                      <Dumbbell className="w-5 h-5" style={{ color }} />
+                      {ex.name}
+                    </p>
+                    <div
+                      className="truncate"
+                      style={{
+                        fontFamily: mono,
+                        fontSize: 10,
+                        letterSpacing: '0.14em',
+                        fontWeight: 700,
+                        color: P.inkMuted,
+                        marginTop: 3,
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      <span style={{ color }}>{catLabel}</span>
+                      {muscles ? ` · ${muscles}` : ''}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold truncate">{ex.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {EXERCISE_CATEGORIES.find(c => c.value === ex.category)?.label}{muscles ? ` · ${muscles}` : ''}
-                      </p>
+                  </div>
+                  {alreadyAdded ? (
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                      style={{ background: P.lime, color: P.bg }}
+                    >
+                      <Check className="w-4 h-4" />
                     </div>
-                    {alreadyAdded ? (
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: '#BEF264' }}>
-                        <Check className="w-4 h-4 text-white" />
-                      </div>
-                    ) : (
-                      <div className="w-7 h-7 rounded-full border-2 border-[rgba(255,255,255,0.12)]" />
-                    )}
-                  </CardContent>
-                </Card>
+                  ) : (
+                    <div
+                      className="w-7 h-7 rounded-full shrink-0"
+                      style={{ border: `2px solid ${P.lineStrong}` }}
+                    />
+                  )}
+                </button>
               )
             })}
             {allExercises.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <p className="text-sm text-muted-foreground">Geen oefeningen gevonden</p>
-              </div>
+              <Tile style={{ padding: 32, textAlign: 'center' }}>
+                <MetaLabel>GEEN OEFENINGEN GEVONDEN</MetaLabel>
+              </Tile>
             )}
           </div>
         )}
@@ -724,9 +1069,22 @@ function FeedbackSlider({
   label: string; value: number; onChange: (v: number) => void
   min: number; max: number; leftLabel: string; rightLabel: string; color: string
 }) {
+  const pct = ((value - min) / (max - min)) * 100
   return (
     <div>
-      <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">{label}</p>
+      <div className="flex items-baseline justify-between mb-2">
+        <MetaLabel>{label}</MetaLabel>
+        <span
+          style={{
+            fontFamily: mono,
+            fontSize: 13,
+            fontWeight: 900,
+            color,
+          }}
+        >
+          {value}
+        </span>
+      </div>
       <input
         type="range"
         min={min}
@@ -735,10 +1093,20 @@ function FeedbackSlider({
         onChange={e => onChange(parseInt(e.target.value))}
         className="w-full h-2 rounded-full appearance-none cursor-pointer"
         style={{
-          background: `linear-gradient(to right, ${color} ${((value - min) / (max - min)) * 100}%, #e4e4e7 ${((value - min) / (max - min)) * 100}%)`,
+          background: `linear-gradient(to right, ${color} ${pct}%, ${P.surfaceHi} ${pct}%)`,
         }}
       />
-      <div className="flex justify-between text-xs text-muted-foreground mt-1">
+      <div
+        className="flex justify-between mt-1"
+        style={{
+          fontFamily: mono,
+          fontSize: 10,
+          letterSpacing: '0.14em',
+          fontWeight: 700,
+          color: P.inkDim,
+          textTransform: 'uppercase',
+        }}
+      >
         <span>{leftLabel}</span>
         <span>{rightLabel}</span>
       </div>

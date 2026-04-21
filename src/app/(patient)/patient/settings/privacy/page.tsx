@@ -1,23 +1,26 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { Badge } from '@/components/ui/badge'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { ChevronLeft, ShieldCheck, CheckCircle2, AlertTriangle, FileText, ExternalLink } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
+import {
+  DarkButton,
+  DarkDialog as Dialog,
+  DarkDialogContent as DialogContent,
+  DarkDialogDescription as DialogDescription,
+  DarkDialogFooter as DialogFooter,
+  DarkDialogHeader as DialogHeader,
+  DarkDialogTitle as DialogTitle,
+  DarkHeader,
+  DarkScreen,
+  Display,
+  Kicker,
+  MetaLabel,
+  P,
+  Tile,
+} from '@/components/dark-ui'
 
 export default function PrivacySettingsPage() {
   const router = useRouter()
@@ -61,187 +64,214 @@ export default function PrivacySettingsPage() {
     : null
 
   return (
-    <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
-      {/* Header */}
-      <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
-        <button
-          onClick={() => router.back()}
-          className="flex items-center gap-1.5 text-[#7B8889] text-sm mb-4"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Terug
-        </button>
-        <div className="flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-            style={{ background: '#BEF26420' }}
-          >
-            <ShieldCheck className="w-5 h-5" style={{ color: '#BEF264' }} />
-          </div>
-          <div>
-            <h1 className="text-white text-xl font-bold">Privacy & onderzoek</h1>
-            <p className="text-[#7B8889] text-sm">Beheer je gegevensdeling</p>
-          </div>
-        </div>
-      </div>
+    <DarkScreen>
+      <DarkHeader title="Privacy" onBack={() => router.back()} />
 
-      <div className="px-4 -mt-3 pb-6 space-y-4">
+      <div className="max-w-lg w-full mx-auto px-4 pt-4 pb-8 flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <Kicker>Privacy &amp; onderzoek</Kicker>
+          <Display size="md">GEGEVENS</Display>
+          <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
+            Beheer je gegevensdeling
+          </MetaLabel>
+        </div>
+
         {/* Consent toggle card */}
-        <Card style={{ borderRadius: '14px' }}>
-          <CardContent className="px-4 py-4">
-            <div className="flex items-start gap-4">
-              <div className="flex-1">
-                <p className="font-semibold text-sm">Geanonimiseerde data delen</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Sta Movement Based Therapy toe om je trainingsdata anoniem te gebruiken voor onderzoek.
-                </p>
-                {!isLoading && (
-                  <div className="mt-2 flex items-center gap-2">
-                    {consentGiven ? (
-                      <>
-                        <Badge
-                          className="text-xs px-2 py-0.5 font-medium"
-                          style={{ background: 'rgba(190,242,100,0.10)', color: '#0f766e', border: 'none' }}
-                        >
-                          Toestemming gegeven
-                        </Badge>
-                        {consentDate && (
-                          <span className="text-xs text-muted-foreground">op {consentDate}</span>
-                        )}
-                      </>
-                    ) : (
-                      <Badge
-                        variant="outline"
-                        className="text-xs px-2 py-0.5 font-medium text-[#7B8889]"
+        <Tile accentBar={consentGiven ? P.lime : P.inkDim}>
+          <div className="flex items-start gap-4">
+            <div className="flex-1 min-w-0">
+              <p
+                className="athletic-mono"
+                style={{
+                  color: P.ink,
+                  fontSize: 13,
+                  fontWeight: 900,
+                  letterSpacing: '0.08em',
+                }}
+              >
+                GEANONIMISEERDE DATA DELEN
+              </p>
+              <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 4, lineHeight: '17px' }}>
+                Sta Movement Based Therapy toe om je trainingsdata anoniem te gebruiken voor
+                onderzoek.
+              </p>
+              {!isLoading && (
+                <div className="mt-3 flex items-center gap-2 flex-wrap">
+                  {consentGiven ? (
+                    <>
+                      <span
+                        className="athletic-mono px-2 py-1 rounded-full"
+                        style={{
+                          backgroundColor: P.surfaceHi,
+                          color: P.lime,
+                          fontSize: 10,
+                          fontWeight: 900,
+                          letterSpacing: '0.08em',
+                          border: `1px solid ${P.lime}`,
+                        }}
                       >
-                        Geen toestemming
-                      </Badge>
-                    )}
-                  </div>
-                )}
-              </div>
-              <Switch
-                checked={consentGiven}
-                onCheckedChange={handleToggle}
-                disabled={isLoading || setConsent.isPending}
-              />
+                        TOESTEMMING GEGEVEN
+                      </span>
+                      {consentDate && (
+                        <span style={{ color: P.inkMuted, fontSize: 11 }}>op {consentDate}</span>
+                      )}
+                    </>
+                  ) : (
+                    <span
+                      className="athletic-mono px-2 py-1 rounded-full"
+                      style={{
+                        backgroundColor: P.surfaceHi,
+                        color: P.inkMuted,
+                        fontSize: 10,
+                        fontWeight: 900,
+                        letterSpacing: '0.08em',
+                        border: `1px solid ${P.lineStrong}`,
+                      }}
+                    >
+                      GEEN TOESTEMMING
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
-          </CardContent>
-        </Card>
+            <Switch
+              checked={consentGiven}
+              onCheckedChange={handleToggle}
+              disabled={isLoading || setConsent.isPending}
+            />
+          </div>
+        </Tile>
 
         {/* What's collected */}
-        <Card style={{ borderRadius: '14px' }}>
-          <CardHeader className="pb-2 pt-4 px-4">
-            <CardTitle className="text-sm font-semibold">Wat wordt er verzameld?</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4 space-y-2.5">
-            {[
-              { text: 'Trainingsgegevens (oefeningen, sets, herhalingen)', included: true },
-              { text: 'Demografisch (leeftijd, diagnose categorie)', included: true },
-              { text: 'Sessie-informatie (duur, pijnniveau, RPE)', included: true },
-              { text: 'Je naam of e-mailadres', included: false },
-              { text: 'Contactgegevens of persoonlijke informatie', included: false },
-              { text: 'Identificeerbare gegevens', included: false },
-            ].map((item, i) => (
-              <div key={i} className="flex items-start gap-2.5 text-sm">
-                <div
-                  className="w-4 h-4 rounded-full flex items-center justify-center mt-0.5 shrink-0 text-xs font-bold"
-                  style={
-                    item.included
-                      ? { background: 'rgba(190,242,100,0.10)', color: '#0f766e' }
-                      : { background: 'rgba(248,113,113,0.10)', color: '#F87171' }
-                  }
-                >
-                  {item.included ? '✓' : '✕'}
+        <Tile>
+          <div className="flex flex-col gap-3">
+            <MetaLabel>Wat wordt er verzameld?</MetaLabel>
+            <div className="flex flex-col gap-2">
+              {[
+                { text: 'Trainingsgegevens (oefeningen, sets, herhalingen)', included: true },
+                { text: 'Demografisch (leeftijd, diagnose categorie)', included: true },
+                { text: 'Sessie-informatie (duur, pijnniveau, RPE)', included: true },
+                { text: 'Je naam of e-mailadres', included: false },
+                { text: 'Contactgegevens of persoonlijke informatie', included: false },
+                { text: 'Identificeerbare gegevens', included: false },
+              ].map((item, i) => (
+                <div key={i} className="flex items-start gap-2.5">
+                  <span
+                    className="athletic-mono w-4 h-4 rounded-full flex items-center justify-center mt-0.5 shrink-0"
+                    style={{
+                      backgroundColor: item.included ? P.lime : P.surfaceHi,
+                      color: item.included ? P.bg : P.danger,
+                      fontSize: 10,
+                      fontWeight: 900,
+                      border: item.included ? 'none' : `1px solid ${P.danger}`,
+                    }}
+                  >
+                    {item.included ? '✓' : '✕'}
+                  </span>
+                  <span
+                    style={{
+                      color: item.included ? P.ink : P.inkDim,
+                      fontSize: 13,
+                      textDecoration: item.included ? 'none' : 'line-through',
+                    }}
+                  >
+                    {item.text}
+                  </span>
                 </div>
-                <span className={item.included ? 'text-[#F5F7F6]' : 'text-[#7B8889] line-through'}>
-                  {item.text}
-                </span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+              ))}
+            </div>
+          </div>
+        </Tile>
 
         {/* GDPR info */}
-        <Card style={{ borderRadius: '14px' }}>
-          <CardHeader className="pb-2 pt-4 px-4">
-            <CardTitle className="text-sm font-semibold">Je rechten (AVG/GDPR)</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4 space-y-2">
-            {[
-              'Je kunt toestemming op elk moment intrekken',
-              'Bij intrekken worden ALLE anonieme records direct verwijderd',
-              'De koppeling tussen jou en je anonieme ID wordt ook gewist',
-              'Data is nooit herleidbaar naar jou als persoon',
-            ].map((item, i) => (
-              <div key={i} className="flex items-start gap-2.5 text-sm text-[#7B8889]">
-                <CheckCircle2
-                  className="w-4 h-4 mt-0.5 shrink-0"
-                  style={{ color: '#BEF264' }}
-                />
-                <span>{item}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        <Tile>
+          <div className="flex flex-col gap-3">
+            <MetaLabel>Je rechten (AVG/GDPR)</MetaLabel>
+            <div className="flex flex-col gap-2">
+              {[
+                'Je kunt toestemming op elk moment intrekken',
+                'Bij intrekken worden ALLE anonieme records direct verwijderd',
+                'De koppeling tussen jou en je anonieme ID wordt ook gewist',
+                'Data is nooit herleidbaar naar jou als persoon',
+              ].map((item, i) => (
+                <div key={i} className="flex items-start gap-2.5">
+                  <span
+                    className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0"
+                    style={{ backgroundColor: P.lime }}
+                  />
+                  <span style={{ color: P.inkMuted, fontSize: 13 }}>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Tile>
 
         {/* DPA link */}
-        <Link href="/patient/legal/dpa">
-          <Card style={{ borderRadius: '14px' }} className="hover:shadow-sm transition-shadow">
-            <CardContent className="px-4 py-4 flex items-center gap-4">
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: '#eff6ff' }}
+        <Tile href="/patient/legal/dpa" accentBar={P.ice}>
+          <div className="flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <p
+                className="athletic-mono"
+                style={{
+                  color: P.ink,
+                  fontSize: 13,
+                  fontWeight: 900,
+                  letterSpacing: '0.08em',
+                }}
               >
-                <FileText className="w-5 h-5" style={{ color: '#3b82f6' }} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm">Verwerkingsovereenkomst</p>
-                <p className="text-xs text-muted-foreground">Bekijk hoe wij uw persoonsgegevens verwerken (AVG)</p>
-              </div>
-              <ExternalLink className="w-4 h-4 text-[#7B8889] shrink-0" />
-            </CardContent>
-          </Card>
-        </Link>
+                VERWERKINGSOVEREENKOMST
+              </p>
+              <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 2 }}>
+                Bekijk hoe wij uw persoonsgegevens verwerken (AVG)
+              </p>
+            </div>
+            <span style={{ color: P.inkMuted, fontSize: 18 }} aria-hidden>
+              →
+            </span>
+          </div>
+        </Tile>
 
         {/* Withdraw button (only shown when consent is given) */}
         {consentGiven && (
-          <Button
-            variant="outline"
-            className="w-full gap-2 text-red-600 border-red-200 hover:bg-red-50"
+          <DarkButton
+            variant="danger"
             onClick={() => setShowWithdrawDialog(true)}
             disabled={setConsent.isPending}
           >
-            <AlertTriangle className="w-4 h-4" />
-            Toestemming intrekken en data verwijderen
-          </Button>
+            TOESTEMMING INTREKKEN
+          </DarkButton>
         )}
       </div>
 
       {/* Confirm withdraw dialog */}
       <Dialog open={showWithdrawDialog} onOpenChange={setShowWithdrawDialog}>
-        <DialogContent style={{ borderRadius: '16px' }}>
+        <DialogContent
+          className="athletic-dark"
+          style={{
+            borderRadius: 16,
+            backgroundColor: P.surface,
+            color: P.ink,
+            border: `1px solid ${P.lineStrong}`,
+          }}
+        >
           <DialogHeader>
-            <DialogTitle>Toestemming intrekken?</DialogTitle>
-            <DialogDescription>
+            <DialogTitle style={{ color: P.ink }}>Toestemming intrekken?</DialogTitle>
+            <DialogDescription style={{ color: P.inkMuted }}>
               Al je geanonimiseerde trainingsdata wordt direct en permanent verwijderd. Dit kan niet
               ongedaan worden gemaakt. Je trainingen en voortgang in de app blijven gewoon
               beschikbaar.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowWithdrawDialog(false)}>
-              Annuleren
-            </Button>
-            <Button
-              onClick={confirmWithdraw}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              Ja, verwijder mijn data
-            </Button>
+            <DarkButton variant="secondary" onClick={() => setShowWithdrawDialog(false)}>
+              ANNULEREN
+            </DarkButton>
+            <DarkButton variant="danger" onClick={confirmWithdraw}>
+              JA, VERWIJDER
+            </DarkButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </DarkScreen>
   )
 }

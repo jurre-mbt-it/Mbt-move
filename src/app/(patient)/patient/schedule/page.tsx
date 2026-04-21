@@ -2,11 +2,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { trpc } from '@/lib/trpc/client'
 import { Dumbbell, Moon, Play, ChevronRight } from 'lucide-react'
 import { IconLeaf, IconClipboard } from '@/components/icons'
+import { P, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-ui'
 
 const DAY_SHORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
@@ -32,18 +31,18 @@ export default function PatientSchedulePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0A0E0F' }}>
-        <p className="text-muted-foreground text-sm">Laden…</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: P.bg, color: P.ink }}>
+        <span className="athletic-mono text-[11px]" style={{ color: P.inkMuted, letterSpacing: '0.16em' }}>LADEN…</span>
       </div>
     )
   }
 
   if (!program) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: '#0A0E0F' }}>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: P.bg, color: P.ink }}>
         <div><IconClipboard size={48} /></div>
-        <p className="font-semibold text-lg">Geen actief programma</p>
-        <p className="text-muted-foreground text-sm">Je therapeut heeft nog geen programma voor je aangemaakt.</p>
+        <p style={{ color: P.ink, fontSize: 18, fontWeight: 800 }}>Geen actief programma</p>
+        <p style={{ color: P.inkMuted, fontSize: 13 }}>Je therapeut heeft nog geen programma voor je aangemaakt.</p>
       </div>
     )
   }
@@ -78,15 +77,32 @@ export default function PatientSchedulePage() {
   })
 
   return (
-    <div className="min-h-screen pb-6" style={{ background: '#0A0E0F' }}>
-      {/* Header */}
-      <div className="px-4 pt-12 pb-4" style={{ background: '#1C2425' }}>
-        <h1 className="text-white text-xl font-bold">Weekschema</h1>
-        <p className="text-[#7B8889] text-xs mt-0.5">Week {program.currentWeek} · {program.name}</p>
-      </div>
+    <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+      <div className="max-w-lg mx-auto px-4 pt-10 pb-8 space-y-4">
+        {/* Hero */}
+        <div>
+          <Kicker>WEEKSCHEMA · WEEK {program.currentWeek}</Kicker>
+          <h1
+            className="athletic-display"
+            style={{
+              color: P.ink,
+              fontWeight: 900,
+              letterSpacing: '-0.04em',
+              lineHeight: 1.02,
+              fontSize: 'clamp(44px, 12vw, 80px)',
+              paddingTop: 4,
+              textTransform: 'uppercase',
+              margin: 0,
+            }}
+          >
+            SCHEMA
+          </h1>
+          <MetaLabel style={{ marginTop: 4, textTransform: 'none', fontWeight: 500 }}>
+            {program.name}
+          </MetaLabel>
+        </div>
 
-      {/* 7-day strip */}
-      <div className="px-4 pt-4">
+        {/* 7-day strip */}
         <div className="flex gap-2 overflow-x-auto pb-1">
           {Array.from({ length: 7 }).map((_, i) => {
             const dayNum = i + 1
@@ -98,32 +114,42 @@ export default function PatientSchedulePage() {
               <button
                 key={i}
                 onClick={() => setSelectedDay(dayNum)}
-                className="flex flex-col items-center gap-1.5 min-w-[44px] rounded-2xl p-2.5 transition-all"
+                className="athletic-tap flex flex-col items-center gap-1.5 min-w-[44px] rounded-2xl p-2.5 transition-all"
                 style={{
-                  background: isSelected
-                    ? '#1C2425'
-                    : isTd
-                      ? 'rgba(190,242,100,0.10)'
-                      : hasSession
-                        ? '#fff'
-                        : '#1C2425',
+                  background: isSelected ? P.surfaceHi : P.surface,
                   border: isSelected
-                    ? '2px solid #BEF264'
+                    ? `2px solid ${P.lime}`
                     : isTd
-                      ? '2px solid #BEF264'
-                      : '2px solid transparent',
-                  color: isSelected ? '#fff' : hasSession ? '#1C2425' : '#a1a1aa',
+                      ? `2px solid ${P.gold}`
+                      : `2px solid ${P.line}`,
                 }}
               >
-                <span className="text-[11px] font-bold">{DAY_SHORT[i]}</span>
+                <span
+                  className="athletic-mono"
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 900,
+                    letterSpacing: '0.14em',
+                    color: isSelected ? P.ink : isTd ? P.gold : P.inkMuted,
+                  }}
+                >
+                  {DAY_SHORT[i]}
+                </span>
                 <div className="w-6 h-6 flex items-center justify-center">
                   {hasSession
-                    ? <Dumbbell className="w-3.5 h-3.5" style={{ color: isSelected ? '#BEF264' : '#52525b' }} />
-                    : <Moon className="w-3.5 h-3.5" />
+                    ? <Dumbbell className="w-3.5 h-3.5" style={{ color: isSelected ? P.lime : hasSession ? P.ink : P.inkDim }} />
+                    : <Moon className="w-3.5 h-3.5" style={{ color: P.inkDim }} />
                   }
                 </div>
                 {hasSession && (
-                  <span className="text-[10px] font-medium" style={{ color: isSelected ? '#BEF264' : '#7B8889' }}>
+                  <span
+                    className="athletic-mono"
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: isSelected ? P.lime : P.inkMuted,
+                    }}
+                  >
                     {count}
                   </span>
                 )}
@@ -131,80 +157,100 @@ export default function PatientSchedulePage() {
             )
           })}
         </div>
-      </div>
 
-      {/* Day detail */}
-      <div className="px-4 pt-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="font-bold text-base">{DAY_NAMES[selectedDay - 1]}{isToday ? ' · Vandaag' : ''}</h2>
-          {hasExercises && isToday && (
-            <Link href="/patient/session">
-              <Button size="sm" className="gap-1.5 text-xs font-semibold h-8" style={{ background: '#BEF264' }}>
-                <Play className="w-3 h-3 fill-current" /> Start sessie
-              </Button>
-            </Link>
-          )}
-        </div>
-
-        {hasExercises ? (
-          <div className="space-y-2">
-            {groups.map(({ key, exercises }) => (
-              <div key={key}>
-                {exercises.length > 1 ? (
-                  <div
-                    className="rounded-2xl overflow-hidden"
-                    style={{ border: '2px solid #93c5fd', background: '#eff6ff' }}
-                  >
-                    <div className="px-3 py-1.5 flex items-center gap-1.5" style={{ background: 'rgba(147,197,253,0.14)' }}>
-                      <span className="text-[10px] font-bold tracking-wider" style={{ color: '#1d4ed8' }}>
-                        SUPERSET {exercises[0].supersetGroup}
-                      </span>
-                    </div>
-                    <div className="divide-y divide-blue-100">
-                      {exercises.map(e => (
-                        <ExerciseRow key={e.uid} exercise={e} isToday={isToday} />
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <Card style={{ borderRadius: '14px' }}>
-                    <CardContent className="p-0">
-                      <ExerciseRow exercise={exercises[0]} isToday={isToday} />
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            ))}
-
-            {isToday && (
-              <Link href="/patient/session">
-                <div
-                  className="flex items-center justify-center gap-2 py-4 rounded-2xl mt-2"
-                  style={{ background: '#BEF264' }}
-                >
-                  <Play className="w-4 h-4 fill-white text-white" />
-                  <span className="text-white font-bold text-sm">Start sessie — {exercisesForSelectedDay.length} oefeningen</span>
-                </div>
-              </Link>
+        {/* Day detail */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <Kicker>{isToday ? 'VANDAAG' : 'DAG'}</Kicker>
+              <h2
+                className="athletic-display"
+                style={{
+                  color: P.ink,
+                  fontSize: 28,
+                  lineHeight: '32px',
+                  letterSpacing: '-0.03em',
+                  fontWeight: 900,
+                  paddingTop: 2,
+                  textTransform: 'uppercase',
+                }}
+              >
+                {DAY_NAMES[selectedDay - 1]}
+              </h2>
+            </div>
+            {hasExercises && isToday && (
+              <DarkButton href="/patient/session" size="sm" variant="primary">
+                <Play className="w-3 h-3 fill-current mr-1.5" /> START
+              </DarkButton>
             )}
           </div>
-        ) : (
-          <div
-            className="rounded-2xl px-5 py-8 flex flex-col items-center text-center gap-3"
-            style={{ background: 'rgba(190,242,100,0.10)', border: '2px solid #bbf7d0' }}
-          >
-            <div><IconLeaf size={40} /></div>
-            <div>
-              <p className="font-bold text-base" style={{ color: '#BEF264' }}>Rustdag</p>
-              <p className="text-sm mt-1.5 leading-relaxed" style={{ color: '#BEF264' }}>
-                Vandaag is een rustdag. Goed herstel is onderdeel van je programma.
-              </p>
+
+          {hasExercises ? (
+            <div className="space-y-2">
+              {groups.map(({ key, exercises }) => (
+                <div key={key}>
+                  {exercises.length > 1 ? (
+                    <div
+                      className="rounded-2xl overflow-hidden"
+                      style={{ border: `2px solid ${P.ice}`, background: P.surface }}
+                    >
+                      <div className="px-3 py-1.5 flex items-center gap-1.5" style={{ background: 'rgba(147,197,253,0.12)' }}>
+                        <span
+                          className="athletic-mono"
+                          style={{ color: P.ice, fontSize: 10, fontWeight: 900, letterSpacing: '0.16em' }}
+                        >
+                          SUPERSET {exercises[0].supersetGroup}
+                        </span>
+                      </div>
+                      <div style={{ borderTop: `1px solid ${P.line}` }}>
+                        {exercises.map((e, idx) => (
+                          <div key={e.uid} style={{ borderTop: idx > 0 ? `1px solid ${P.line}` : 'none' }}>
+                            <ExerciseRow exercise={e} isToday={isToday} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <Tile style={{ padding: 0 }}>
+                      <ExerciseRow exercise={exercises[0]} isToday={isToday} />
+                    </Tile>
+                  )}
+                </div>
+              ))}
+
+              {isToday && (
+                <Link
+                  href="/patient/session"
+                  className="athletic-tap flex items-center justify-center gap-2 py-4 rounded-2xl mt-2"
+                  style={{ background: P.lime, color: P.bg }}
+                >
+                  <Play className="w-4 h-4 fill-current" />
+                  <span
+                    className="athletic-mono"
+                    style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.1em' }}
+                  >
+                    START SESSIE — {exercisesForSelectedDay.length} OEFENINGEN
+                  </span>
+                </Link>
+              )}
             </div>
-            <p className="text-xs text-[#7B8889] mt-1">
-              Lichaam en geest herstellen terwijl je rust — dat is training.
-            </p>
-          </div>
-        )}
+          ) : (
+            <Tile accentBar={P.lime}>
+              <div className="flex flex-col items-center text-center gap-3 py-4">
+                <div><IconLeaf size={40} /></div>
+                <div>
+                  <Kicker style={{ color: P.lime }}>RUSTDAG</Kicker>
+                  <p style={{ color: P.ink, fontSize: 14, marginTop: 6, lineHeight: 1.5 }}>
+                    Vandaag is een rustdag. Goed herstel is onderdeel van je programma.
+                  </p>
+                </div>
+                <p style={{ color: P.inkMuted, fontSize: 12 }}>
+                  Lichaam en geest herstellen terwijl je rust — dat is training.
+                </p>
+              </div>
+            </Tile>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -215,18 +261,21 @@ function ExerciseRow({ exercise, isToday }: { exercise: ProgramExercise; isToday
     <div className="flex items-center gap-3 px-4 py-3">
       <div
         className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-        style={{ background: '#1C2425' }}
+        style={{ background: P.surfaceHi }}
       >
-        <Dumbbell className="w-4 h-4 text-[#7B8889]" />
+        <Dumbbell className="w-4 h-4" style={{ color: P.inkMuted }} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-sm truncate">{exercise.name}</p>
-        <p className="text-xs text-muted-foreground">
+        <p className="truncate" style={{ color: P.ink, fontSize: 14, fontWeight: 700 }}>{exercise.name}</p>
+        <p
+          className="athletic-mono"
+          style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.04em', marginTop: 2 }}
+        >
           {exercise.sets} × {exercise.reps} {exercise.repUnit}
           {exercise.restTime > 0 ? ` · ${exercise.restTime}s rust` : ''}
         </p>
       </div>
-      {isToday && <ChevronRight className="w-4 h-4 text-zinc-300 shrink-0" />}
+      {isToday && <ChevronRight className="w-4 h-4 shrink-0" style={{ color: P.inkMuted }} />}
     </div>
   )
 }

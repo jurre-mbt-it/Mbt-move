@@ -1,11 +1,11 @@
 'use client'
 
 import { use } from 'react'
-import { ExerciseForm } from '@/components/exercises/ExerciseForm'
 import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
-import { trpc } from '@/lib/trpc/client'
 import { notFound } from 'next/navigation'
+import { ExerciseForm } from '@/components/exercises/ExerciseForm'
+import { trpc } from '@/lib/trpc/client'
+import { Kicker, MetaLabel, P } from '@/components/dark-ui'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -17,11 +17,11 @@ export default function EditExercisePage({ params }: Props) {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div className="h-8 w-48 bg-[#1C2425] rounded animate-pulse" />
-        <div className="space-y-4">
+      <div className="max-w-2xl w-full flex flex-col gap-4">
+        <div className="h-8 w-48 rounded animate-pulse" style={{ background: P.surfaceHi }} />
+        <div className="flex flex-col gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-12 bg-[#1C2425] rounded-xl animate-pulse" />
+            <div key={i} className="h-12 rounded-xl animate-pulse" style={{ background: P.surfaceHi }} />
           ))}
         </div>
       </div>
@@ -51,17 +51,27 @@ export default function EditExercisePage({ params }: Props) {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="max-w-2xl w-full flex flex-col gap-6">
+      <div className="flex flex-col gap-3">
         <Link
           href="/therapist/exercises"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+          className="athletic-mono"
+          style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.16em' }}
         >
-          <ChevronLeft className="w-4 h-4" />
-          Terug naar bibliotheek
+          ← BIBLIOTHEEK
         </Link>
-        <h1 className="text-2xl font-bold">{exercise.name}</h1>
-        <p className="text-muted-foreground text-sm mt-1">Oefening bewerken</p>
+        <div className="flex flex-col gap-1">
+          <Kicker>Oefening bewerken</Kicker>
+          <h1
+            className="athletic-display"
+            style={{ fontSize: 32, lineHeight: '38px', letterSpacing: '-0.025em', paddingTop: 2 }}
+          >
+            {exercise.name.toUpperCase()}
+          </h1>
+          <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
+            Wijzig de details van deze oefening
+          </MetaLabel>
+        </div>
       </div>
       <ExerciseForm mode="edit" exerciseId={id} initialData={initialData} />
     </div>

@@ -2,11 +2,20 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { getSavedWorkouts, deleteWorkout, type Workout, WORKOUT_TYPES } from '@/lib/workout-constants'
-import { Plus, Search, Zap, Dumbbell, Trash2, ChevronRight, Clock } from 'lucide-react'
+import {
+  P,
+  Kicker,
+  MetaLabel,
+  Tile,
+  DarkInput,
+} from '@/components/dark-ui'
+import {
+  getSavedWorkouts,
+  deleteWorkout,
+  type Workout,
+  WORKOUT_TYPES,
+} from '@/lib/workout-constants'
+import { Search, Trash2, Clock } from 'lucide-react'
 import { WORKOUT_ICON_MAP } from '@/components/icons'
 
 export default function MyWorkoutsPage() {
@@ -17,11 +26,15 @@ export default function MyWorkoutsPage() {
     setWorkouts(getSavedWorkouts())
   }, [])
 
-  const completed = workouts.filter(w => w.completedAt)
-  const templates = workouts.filter(w => !w.completedAt && !w.startedAt)
+  const completed = workouts.filter((w) => w.completedAt)
+  const templates = workouts.filter((w) => !w.completedAt && !w.startedAt)
 
   const filtered = (list: Workout[]) =>
-    search ? list.filter(w => w.name.toLowerCase().includes(search.toLowerCase())) : list
+    search
+      ? list.filter((w) =>
+          w.name.toLowerCase().includes(search.toLowerCase()),
+        )
+      : list
 
   function handleDelete(id: string) {
     deleteWorkout(id)
@@ -29,109 +42,229 @@ export default function MyWorkoutsPage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
-      <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
-        <h1 className="text-white text-2xl font-bold">Mijn Workouts</h1>
-        <p className="text-[#7B8889] text-xs mt-1">{workouts.length} workouts</p>
-      </div>
+    <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+      <div className="max-w-lg mx-auto px-4 pt-10 pb-8 space-y-4">
+        {/* Hero */}
+        <div>
+          <Kicker>MIJN WORKOUTS · {workouts.length}</Kicker>
+          <h1
+            className="athletic-display"
+            style={{
+              color: P.ink,
+              fontWeight: 900,
+              letterSpacing: '-0.04em',
+              lineHeight: 1.02,
+              fontSize: 'clamp(44px, 12vw, 80px)',
+              paddingTop: 4,
+              textTransform: 'uppercase',
+              margin: 0,
+            }}
+          >
+            WORKOUTS
+          </h1>
+        </div>
 
-      <div className="px-4 -mt-3 space-y-4 pb-6">
         {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
+        <div style={{ position: 'relative' }}>
+          <Search
+            className="w-4 h-4"
+            style={{
+              position: 'absolute',
+              left: 14,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: P.inkMuted,
+              pointerEvents: 'none',
+            }}
+          />
+          <DarkInput
             placeholder="Zoek workouts..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-9 bg-[#141A1B]"
-            style={{ borderRadius: '12px' }}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ paddingLeft: 40 }}
           />
         </div>
 
         {/* Quick Start */}
-        <Link href="/athlete/workouts/new">
-          <Card style={{ borderRadius: '14px', borderLeft: '3px solid #BEF264' }} className="hover:shadow-md transition-shadow">
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: '#BEF26420' }}>
-                <Zap className="w-6 h-6" style={{ color: '#BEF264' }} />
+        <Tile href="/athlete/workouts/new" accentBar={P.lime} style={{ padding: 20 }}>
+          <div className="flex items-center gap-4">
+            <div
+              className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+              style={{
+                background: 'rgba(190,242,100,0.12)',
+                border: `1px solid ${P.lineStrong}`,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 22,
+                  fontWeight: 900,
+                  color: P.lime,
+                  lineHeight: 1,
+                }}
+              >
+                ⚡
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <Kicker>TRAIN NOW</Kicker>
+              <div
+                className="athletic-display"
+                style={{
+                  color: P.ink,
+                  fontSize: 22,
+                  fontWeight: 900,
+                  letterSpacing: '-0.02em',
+                  lineHeight: '26px',
+                  paddingTop: 2,
+                  marginTop: 4,
+                }}
+              >
+                QUICK START
               </div>
-              <div className="flex-1">
-                <p className="font-bold text-base">Quick Start</p>
-                <p className="text-xs text-muted-foreground">Start een nieuwe workout</p>
+              <div style={{ marginTop: 4 }}>
+                <MetaLabel>START EEN NIEUWE WORKOUT</MetaLabel>
               </div>
-              <ChevronRight className="w-5 h-5 text-zinc-300" />
-            </CardContent>
-          </Card>
-        </Link>
+            </div>
+            <span style={{ color: P.lime, fontSize: 22, fontWeight: 900 }}>
+              →
+            </span>
+          </div>
+        </Tile>
 
-        {/* Completed workouts */}
+        {/* Completed */}
         {filtered(completed).length > 0 && (
-          <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Afgerond</p>
-            <div className="space-y-2">
-              {filtered(completed).map(w => (
-                <WorkoutCard key={w.id} workout={w} onDelete={handleDelete} />
-              ))}
-            </div>
-          </div>
+          <Section title="AFGEROND" color={P.lime}>
+            {filtered(completed).map((w) => (
+              <WorkoutRow key={w.id} workout={w} onDelete={handleDelete} />
+            ))}
+          </Section>
         )}
 
-        {/* Templates / in-progress */}
+        {/* Templates */}
         {filtered(templates).length > 0 && (
-          <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Templates</p>
-            <div className="space-y-2">
-              {filtered(templates).map(w => (
-                <WorkoutCard key={w.id} workout={w} onDelete={handleDelete} />
-              ))}
-            </div>
-          </div>
+          <Section title="TEMPLATES" color={P.ice}>
+            {filtered(templates).map((w) => (
+              <WorkoutRow key={w.id} workout={w} onDelete={handleDelete} />
+            ))}
+          </Section>
         )}
 
+        {/* Empty */}
         {workouts.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Dumbbell className="w-10 h-10 text-zinc-300 mb-3" />
-            <p className="text-sm font-medium text-muted-foreground">Nog geen workouts</p>
-            <p className="text-xs text-muted-foreground mt-1">Tik op Quick Start om je eerste workout te maken</p>
-          </div>
+          <Tile style={{ padding: 32, textAlign: 'center' }}>
+            <div style={{ fontSize: 40, marginBottom: 8 }}>💪</div>
+            <Kicker>NOG GEEN WORKOUTS</Kicker>
+            <p
+              style={{
+                marginTop: 10,
+                color: P.inkMuted,
+                fontSize: 13,
+                lineHeight: 1.5,
+              }}
+            >
+              Tik op Quick Start om je eerste workout te maken.
+            </p>
+          </Tile>
         )}
       </div>
     </div>
   )
 }
 
-function WorkoutCard({ workout, onDelete }: { workout: Workout; onDelete: (id: string) => void }) {
-  const type = WORKOUT_TYPES.find(t => t.value === workout.type)
-  const color = type?.color ?? '#BEF264'
+function Section({
+  title,
+  color,
+  children,
+}: {
+  title: string
+  color: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="pt-2">
+      <Kicker style={{ color, marginBottom: 8 }}>{title}</Kicker>
+      <div className="space-y-2">{children}</div>
+    </div>
+  )
+}
+
+function WorkoutRow({
+  workout,
+  onDelete,
+}: {
+  workout: Workout
+  onDelete: (id: string) => void
+}) {
+  const type = WORKOUT_TYPES.find((t) => t.value === workout.type)
+  const color = type?.color ?? P.lime
+  const Icon = type ? WORKOUT_ICON_MAP[type.value] : null
 
   return (
-    <Card style={{ borderRadius: '12px', borderLeft: `3px solid ${color}` }} className="hover:shadow-md transition-shadow">
-      <CardContent className="p-3 flex items-center gap-3">
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0"
-          style={{ background: color + '20' }}
+    <div
+      className="flex items-center gap-3 rounded-xl overflow-hidden"
+      style={{
+        background: P.surface,
+        padding: '12px 14px',
+        borderLeft: `3px solid ${color}`,
+        border: `1px solid ${P.line}`,
+      }}
+    >
+      <div
+        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+        style={{
+          background: P.surfaceHi,
+          border: `1px solid ${P.line}`,
+        }}
+      >
+        {Icon ? <Icon size={20} /> : <span>💪</span>}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p
+          className="truncate"
+          style={{
+            color: P.ink,
+            fontSize: 14,
+            fontWeight: 800,
+            letterSpacing: '-0.01em',
+          }}
         >
-          {(() => { const Icon = type ? WORKOUT_ICON_MAP[type.value] : null; return Icon ? <Icon size={20} /> : '💪' })()}
+          {workout.name || 'Workout'}
+        </p>
+        <div
+          className="flex items-center gap-2"
+          style={{
+            fontFamily:
+              'ui-monospace, Menlo, "SF Mono", "Cascadia Code", monospace',
+            fontSize: 10,
+            letterSpacing: '0.14em',
+            fontWeight: 700,
+            color: P.inkMuted,
+            marginTop: 3,
+            textTransform: 'uppercase',
+          }}
+        >
+          <span style={{ color }}>{type?.label ?? workout.type}</span>
+          <span style={{ color: P.inkDim }}>·</span>
+          <span>{workout.exercises.length} OEF</span>
+          {workout.duration && (
+            <>
+              <span style={{ color: P.inkDim }}>·</span>
+              <Clock className="w-3 h-3 inline" style={{ color: P.inkMuted }} />
+              <span>{workout.duration} MIN</span>
+            </>
+          )}
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold truncate">{workout.name || 'Workout'}</p>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span style={{ color }}>{type?.label ?? workout.type}</span>
-            <span>·</span>
-            <span>{workout.exercises.length} oefeningen</span>
-            {workout.duration && (
-              <>
-                <span>·</span>
-                <Clock className="w-3 h-3 inline" />
-                <span>{workout.duration} min</span>
-              </>
-            )}
-          </div>
-        </div>
-        <button onClick={() => onDelete(workout.id)} className="p-2 text-zinc-300 hover:text-red-400 transition-colors">
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </CardContent>
-    </Card>
+      </div>
+      <button
+        onClick={() => onDelete(workout.id)}
+        className="p-2 transition-colors"
+        style={{ color: P.inkDim }}
+        type="button"
+        aria-label="Verwijder"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </div>
   )
 }

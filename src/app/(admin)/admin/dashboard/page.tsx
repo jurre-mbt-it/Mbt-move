@@ -1,88 +1,63 @@
-import Link from 'next/link'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, Activity, ShieldCheck, Server, ClipboardList, Dumbbell, Database, ChevronRight, UserCog, Building2 } from 'lucide-react'
+import { ActionTile, Kicker, MetaLabel, MetricTile, P, Tile } from '@/components/dark-ui'
 
 export const metadata = {
   title: 'Admin Dashboard – MBT Gym',
 }
 
 const stats = [
-  { label: 'Total Users', value: '—', icon: Users },
-  { label: 'Active Sessions', value: '—', icon: Activity },
-  { label: 'MFA Enabled', value: '—', icon: ShieldCheck },
-  { label: 'System Status', value: 'OK', icon: Server },
+  { label: 'Total Users', value: '—', tint: P.lime },
+  { label: 'Active Sessions', value: '—', tint: P.ice },
+  { label: 'MFA Enabled', value: '—', tint: P.gold },
+  { label: 'System Status', value: 'OK', tint: P.lime },
 ]
 
 const quickLinks = [
-  { href: '/admin/users', icon: UserCog, label: 'Users & rollen', description: 'Wijs rollen toe + koppel aan praktijk' },
-  { href: '/admin/practices', icon: Building2, label: 'Praktijken', description: 'Multi-tenant groepen beheren' },
-  { href: '/therapist/patients', icon: Users, label: 'Patiënten', description: 'Beheer patiënten en hun programma\'s' },
-  { href: '/therapist/exercises', icon: Dumbbell, label: 'Oefeningen', description: 'Oefeningenbibliotheek beheren' },
-  { href: '/therapist/programs', icon: ClipboardList, label: "Programma's", description: "Revalidatieprogramma's beheren" },
-  { href: '/admin/research', icon: Database, label: 'Research data', description: 'Geanonimiseerde onderzoeksdata & export' },
+  { href: '/admin/users', label: 'Users & rollen', description: 'Wijs rollen toe + koppel aan praktijk', bar: P.lime },
+  { href: '/admin/practices', label: 'Praktijken', description: 'Multi-tenant groepen beheren', bar: P.ice },
+  { href: '/therapist/patients', label: 'Patiënten', description: 'Beheer patiënten en hun programma\'s', bar: P.purple },
+  { href: '/therapist/exercises', label: 'Oefeningen', description: 'Oefeningenbibliotheek beheren', bar: P.gold },
+  { href: '/therapist/programs', label: "Programma's", description: "Revalidatieprogramma's beheren", bar: P.ice },
+  { href: '/admin/research', label: 'Research data', description: 'Geanonimiseerde onderzoeksdata & export', bar: P.danger },
 ]
 
 export default function AdminDashboard() {
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div>
-        <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-        <p className="text-muted-foreground">Manage users, roles, and system settings.</p>
+    <div className="max-w-5xl w-full flex flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <Kicker>Beheer</Kicker>
+        <h1
+          className="athletic-display"
+          style={{ fontSize: 32, lineHeight: '38px', letterSpacing: '-0.025em', paddingTop: 2 }}
+        >
+          ADMIN DASHBOARD
+        </h1>
+        <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
+          Manage users, roles, and system settings.
+        </MetaLabel>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {stats.map((stat) => (
-          <Card key={stat.label} style={{ borderRadius: '12px' }}>
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <p className="text-2xl font-bold mt-1">{stat.value}</p>
-                </div>
-                <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center"
-                  style={{ background: '#BEF26420' }}
-                >
-                  <stat.icon className="w-5 h-5" style={{ color: '#BEF264' }} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <MetricTile key={stat.label} label={stat.label} value={stat.value} tint={stat.tint} />
         ))}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {quickLinks.map(({ href, icon: Icon, label, description }) => (
-          <Link key={href} href={href}>
-            <Card style={{ borderRadius: '12px' }} className="hover:shadow-sm transition-shadow cursor-pointer h-full">
-              <CardContent className="p-5 flex items-center gap-4">
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ background: '#1C2425' }}
-                >
-                  <Icon className="w-5 h-5 text-[#7B8889]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm">{label}</p>
-                  <p className="text-xs text-muted-foreground">{description}</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#7B8889] shrink-0" />
-              </CardContent>
-            </Card>
-          </Link>
+      <div className="flex flex-col gap-2">
+        <Kicker>Snelkoppelingen</Kicker>
+        {quickLinks.map(({ href, label, description, bar }) => (
+          <ActionTile key={href} href={href} label={label} sub={description} bar={bar} />
         ))}
       </div>
 
-      <Card style={{ borderRadius: '12px' }}>
-        <CardHeader>
-          <CardTitle>User Management</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-            Connect Supabase to manage users here.
-          </div>
-        </CardContent>
-      </Card>
+      <Tile>
+        <MetaLabel>User Management</MetaLabel>
+        <div
+          className="flex items-center justify-center h-32"
+          style={{ color: P.inkMuted, fontSize: 13 }}
+        >
+          Connect Supabase to manage users here.
+        </div>
+      </Tile>
     </div>
   )
 }

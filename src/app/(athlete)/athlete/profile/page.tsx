@@ -1,10 +1,14 @@
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { User, Mail, Dumbbell, LogOut } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import {
+  P,
+  Kicker,
+  MetaLabel,
+  Tile,
+  DarkButton,
+} from '@/components/dark-ui'
 
 export default function AthleteProfilePage() {
   const router = useRouter()
@@ -17,53 +21,103 @@ export default function AthleteProfilePage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
-      <div className="px-4 pt-12 pb-8" style={{ background: '#1C2425' }}>
-        <div className="flex flex-col items-center gap-3">
-          <div
-            className="w-20 h-20 rounded-full flex items-center justify-center font-bold text-2xl text-white"
-            style={{ background: '#BEF264' }}
+    <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+      <div className="max-w-lg mx-auto px-4 pt-10 pb-8 space-y-4">
+        {/* Hero */}
+        <div>
+          <Kicker>PROFIEL · ATLEET</Kicker>
+          <h1
+            className="athletic-display"
+            style={{
+              color: P.ink,
+              fontWeight: 900,
+              letterSpacing: '-0.04em',
+              lineHeight: 1.02,
+              fontSize: 'clamp(44px, 12vw, 80px)',
+              paddingTop: 4,
+              textTransform: 'uppercase',
+              margin: 0,
+            }}
           >
-            AT
-          </div>
-          <div className="text-center">
-            <h1 className="text-white text-xl font-bold">Atleet</h1>
-            <p className="text-[#7B8889] text-sm mt-0.5">Atleet Dashboard</p>
-          </div>
+            ATLEET
+          </h1>
         </div>
-      </div>
 
-      <div className="px-4 -mt-3 space-y-4 pb-6">
-        <Card style={{ borderRadius: '14px' }}>
-          <CardHeader className="pb-2 pt-4 px-4">
-            <CardTitle className="text-sm font-semibold">Profiel</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4 space-y-4">
-            <div className="flex items-center gap-3">
-              <User className="w-4 h-4 text-muted-foreground shrink-0" />
-              <div>
-                <p className="text-xs text-muted-foreground">Rol</p>
-                <p className="text-sm font-medium">Atleet</p>
+        {/* Avatar circle */}
+        <Tile>
+          <div className="flex items-center gap-4">
+            <div
+              className="w-16 h-16 rounded-full flex items-center justify-center shrink-0"
+              style={{
+                background: P.lime,
+                color: P.bg,
+                fontWeight: 900,
+                fontSize: 22,
+                letterSpacing: '0.04em',
+              }}
+            >
+              AT
+            </div>
+            <div className="min-w-0">
+              <div
+                style={{
+                  color: P.ink,
+                  fontSize: 20,
+                  fontWeight: 900,
+                  letterSpacing: '-0.01em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                ATLEET
+              </div>
+              <div style={{ marginTop: 4 }}>
+                <MetaLabel>ATLEET DASHBOARD</MetaLabel>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Dumbbell className="w-4 h-4 text-muted-foreground shrink-0" />
-              <div>
-                <p className="text-xs text-muted-foreground">Modus</p>
-                <p className="text-sm font-medium">Zelfstandig trainen</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </Tile>
 
-        <Button
-          variant="outline"
-          className="w-full gap-2"
-          onClick={handleSignOut}
-        >
-          <LogOut className="w-4 h-4" />
-          Uitloggen
-        </Button>
+        {/* Profile info */}
+        <Tile>
+          <Kicker style={{ marginBottom: 12 }}>PROFIEL</Kicker>
+          <div className="space-y-3">
+            <div
+              className="flex items-center justify-between py-2"
+              style={{ borderBottom: `1px solid ${P.line}` }}
+            >
+              <MetaLabel>ROL</MetaLabel>
+              <span
+                style={{
+                  color: P.ink,
+                  fontSize: 13,
+                  fontWeight: 800,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                ATLEET
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-2">
+              <MetaLabel>MODUS</MetaLabel>
+              <span
+                style={{
+                  color: P.ink,
+                  fontSize: 13,
+                  fontWeight: 800,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                ZELFSTANDIG TRAINEN
+              </span>
+            </div>
+          </div>
+        </Tile>
+
+        <DarkButton variant="secondary" onClick={handleSignOut} className="w-full">
+          UITLOGGEN
+        </DarkButton>
       </div>
     </div>
   )

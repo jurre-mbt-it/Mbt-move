@@ -1,14 +1,20 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { trpc } from '@/lib/trpc/client'
-import { Dumbbell, Moon, Play, Plus } from 'lucide-react'
+import {
+  P,
+  Kicker,
+  MetaLabel,
+  Tile,
+  DarkButton,
+} from '@/components/dark-ui'
 
 const DAY_SHORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
+
+const mono =
+  'ui-monospace, Menlo, "SF Mono", "Cascadia Code", "Source Code Pro", monospace'
 
 type ProgramExercise = {
   uid: string
@@ -33,122 +39,196 @@ export default function AthleteSchedulePage() {
   const isRestDay = exercises.length === 0
 
   return (
-    <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
-      <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
-        <h1 className="text-white text-xl font-bold">Weekschema</h1>
-        <p className="text-[#7B8889] text-sm mt-1">Week {currentWeek}</p>
-      </div>
+    <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+      <div className="max-w-lg mx-auto px-4 pt-10 pb-8 space-y-4">
+        {/* Hero */}
+        <div>
+          <Kicker>WEEKSCHEMA · WEEK {currentWeek}</Kicker>
+          <h1
+            className="athletic-display"
+            style={{
+              color: P.ink,
+              fontWeight: 900,
+              letterSpacing: '-0.04em',
+              lineHeight: 1.02,
+              fontSize: 'clamp(44px, 12vw, 80px)',
+              paddingTop: 4,
+              textTransform: 'uppercase',
+              margin: 0,
+            }}
+          >
+            WEEKSCHEMA
+          </h1>
+        </div>
 
-      <div className="px-4 -mt-3 space-y-4 pb-6">
         {/* Day selector */}
-        <Card style={{ borderRadius: '14px' }}>
-          <CardContent className="py-3 px-2">
-            <div className="flex gap-1">
-              {DAY_SHORT.map((label, i) => {
-                const dayNum = i + 1
-                const hasExercises = activeDays.includes(dayNum)
-                const isSelected = dayNum === selectedDay
-                const isToday = dayNum === todayDayNum
-                return (
-                  <button
-                    key={label}
-                    onClick={() => setSelectedDay(dayNum)}
-                    className="flex-1 flex flex-col items-center gap-1 py-2 rounded-xl transition-colors"
-                    style={
-                      isSelected
-                        ? { background: '#BEF264', color: 'white' }
-                        : isToday
-                          ? { background: 'rgba(190,242,100,0.10)', color: '#1C2425', fontWeight: 700 }
-                          : {}
-                    }
+        <Tile>
+          <div className="flex gap-1">
+            {DAY_SHORT.map((label, i) => {
+              const dayNum = i + 1
+              const hasExercises = activeDays.includes(dayNum)
+              const isSelected = dayNum === selectedDay
+              const isToday = dayNum === todayDayNum
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setSelectedDay(dayNum)}
+                  className="flex-1 flex flex-col items-center gap-1.5 py-2 rounded-lg transition-colors"
+                  style={{
+                    background: isSelected ? P.lime : P.surfaceLow,
+                    color: isSelected ? P.bg : P.ink,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: mono,
+                      fontSize: 10,
+                      fontWeight: 900,
+                      letterSpacing: '0.14em',
+                      textTransform: 'uppercase',
+                      color: isSelected ? P.bg : isToday ? P.gold : P.inkMuted,
+                    }}
                   >
-                    <span className="text-xs font-medium">{label}</span>
-                    {isToday && !isSelected && (
-                      <span
-                        className="w-1.5 h-1.5 rounded-full"
-                        style={{ background: '#BEF264' }}
-                      />
-                    )}
-                    {hasExercises && !isToday && (
-                      <span
-                        className="w-1.5 h-1.5 rounded-full"
-                        style={{ background: isSelected ? 'white' : '#BEF264' }}
-                      />
-                    )}
-                    {isToday && isSelected && (
-                      <span
-                        className="w-1.5 h-1.5 rounded-full bg-[#141A1B]"
-                      />
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
+                    {label}
+                  </span>
+                  <span
+                    className="w-1.5 h-1.5 rounded-full"
+                    style={{
+                      background:
+                        hasExercises
+                          ? isSelected ? P.bg : P.lime
+                          : isToday && !isSelected
+                            ? P.gold
+                            : 'transparent',
+                    }}
+                  />
+                </button>
+              )
+            })}
+          </div>
+        </Tile>
 
-        {/* Day content */}
+        {/* Day title */}
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold">
-            {DAY_NAMES[selectedDay - 1]}
+          <div className="flex items-center gap-2">
+            <h2
+              style={{
+                color: P.ink,
+                fontSize: 18,
+                fontWeight: 900,
+                letterSpacing: '-0.01em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {DAY_NAMES[selectedDay - 1]}
+            </h2>
             {selectedDay === todayDayNum && (
-              <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: '#BEF26420', color: '#BEF264' }}>
-                Vandaag
+              <span
+                className="rounded-full px-2 py-0.5"
+                style={{
+                  background: 'rgba(190,242,100,0.12)',
+                  border: `1px solid ${P.lime}`,
+                  color: P.lime,
+                  fontFamily: mono,
+                  fontSize: 9,
+                  fontWeight: 900,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                VANDAAG
               </span>
             )}
-          </h2>
+          </div>
           {!isRestDay && selectedDay === todayDayNum && (
-            <Link href="/athlete/session">
-              <Button size="sm" className="gap-1.5 text-xs font-semibold" style={{ background: '#BEF264' }}>
-                <Play className="w-3 h-3 fill-current" /> Start sessie
-              </Button>
-            </Link>
+            <DarkButton href="/athlete/session" variant="primary" size="sm">
+              START SESSIE →
+            </DarkButton>
           )}
         </div>
 
         {isLoading ? (
-          <p className="text-sm text-muted-foreground text-center py-8">Laden…</p>
+          <Tile style={{ padding: 24, textAlign: 'center' }}>
+            <MetaLabel>LADEN…</MetaLabel>
+          </Tile>
         ) : isRestDay ? (
           <>
-            <Card style={{ borderRadius: '14px' }}>
-              <CardContent className="py-8 flex flex-col items-center gap-2">
-                <Moon className="w-8 h-8 text-zinc-300" />
-                <p className="text-sm font-medium text-muted-foreground">Rustdag</p>
-                <p className="text-xs text-muted-foreground">Herstel is net zo belangrijk als training</p>
-              </CardContent>
-            </Card>
-            <Link href="/athlete/workouts/new">
-              <Button variant="outline" size="sm" className="mt-2 gap-1.5">
-                <Plus className="w-3.5 h-3.5" /> Workout toevoegen
-              </Button>
-            </Link>
+            <Tile style={{ padding: 32, textAlign: 'center' }}>
+              <div style={{ fontSize: 36, marginBottom: 8 }}>🌙</div>
+              <Kicker>RUSTDAG</Kicker>
+              <p
+                style={{
+                  marginTop: 10,
+                  color: P.inkMuted,
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                }}
+              >
+                Herstel is net zo belangrijk als training.
+              </p>
+            </Tile>
+            <DarkButton href="/athlete/workouts/new" variant="secondary" className="w-full">
+              + WORKOUT TOEVOEGEN
+            </DarkButton>
           </>
         ) : (
           <div className="space-y-2">
             {exercises.map((e, i) => (
-              <Card key={e.uid} style={{ borderRadius: '14px' }}>
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-sm font-bold"
-                    style={{ background: 'rgba(190,242,100,0.10)', color: '#BEF264' }}
+              <div
+                key={e.uid}
+                className="flex items-center gap-3 rounded-xl"
+                style={{
+                  background: P.surface,
+                  padding: '12px 14px',
+                  borderLeft: `3px solid ${P.lime}`,
+                  border: `1px solid ${P.line}`,
+                }}
+              >
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                  style={{
+                    background: P.surfaceHi,
+                    border: `1px solid ${P.line}`,
+                    color: P.lime,
+                    fontFamily: mono,
+                    fontSize: 14,
+                    fontWeight: 900,
+                  }}
+                >
+                  {i + 1}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="truncate"
+                    style={{
+                      color: P.ink,
+                      fontSize: 14,
+                      fontWeight: 800,
+                      letterSpacing: '-0.01em',
+                    }}
                   >
-                    {i + 1}
+                    {e.name}
+                  </p>
+                  <div
+                    style={{
+                      fontFamily: mono,
+                      fontSize: 10,
+                      letterSpacing: '0.14em',
+                      fontWeight: 700,
+                      color: P.inkMuted,
+                      marginTop: 3,
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {e.sets} × {e.reps} {e.repUnit} · {e.restTime}S RUST
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate">{e.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {e.sets} × {e.reps} {e.repUnit} · {e.restTime}s rust
-                    </p>
-                  </div>
-                  <Dumbbell className="w-4 h-4 text-zinc-300 shrink-0" />
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ))}
-            <Link href="/athlete/workouts/new">
-              <Button variant="outline" size="sm" className="mt-1 gap-1.5">
-                <Plus className="w-3.5 h-3.5" /> Andere workout toevoegen
-              </Button>
-            </Link>
+            <DarkButton href="/athlete/workouts/new" variant="secondary" className="w-full">
+              + ANDERE WORKOUT TOEVOEGEN
+            </DarkButton>
           </div>
         )}
       </div>

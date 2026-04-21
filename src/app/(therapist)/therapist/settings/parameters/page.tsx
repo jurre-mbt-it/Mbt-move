@@ -1,18 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import Link from 'next/link'
 import { Switch } from '@/components/ui/switch'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { CustomParameter, ParamType } from '@/components/programs/types'
 import { useCustomParams } from '@/hooks/useCustomParams'
 import { cn } from '@/lib/utils'
-import { Plus, Pencil, Trash2, GripVertical, ChevronLeft } from 'lucide-react'
-import Link from 'next/link'
 import { toast } from 'sonner'
 import {
   DndContext, closestCenter, PointerSensor,
@@ -22,6 +15,18 @@ import {
   SortableContext, useSortable, arrayMove, verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import {
+  DarkButton,
+  DarkDialog as Dialog,
+  DarkDialogContent as DialogContent,
+  DarkDialogHeader as DialogHeader,
+  DarkDialogTitle as DialogTitle,
+  DarkInput,
+  Kicker,
+  MetaLabel,
+  P,
+  Tile,
+} from '@/components/dark-ui'
 
 const TYPE_LABELS: Record<ParamType, string> = {
   number: 'Getal',
@@ -46,56 +51,87 @@ function SortableParamCard({
 
   return (
     <div ref={setNodeRef} style={style}>
-      <Card style={{ borderRadius: '10px' }} className={cn(isDragging && 'opacity-50 shadow-xl')}>
-        <CardContent className="px-4 py-3">
-          <div className="flex items-center gap-3">
-            <button
-              {...attributes}
-              {...listeners}
-              className="text-zinc-300 hover:text-[#7B8889] cursor-grab active:cursor-grabbing shrink-0 touch-none"
-            >
-              <GripVertical className="w-4 h-4" />
-            </button>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-semibold text-sm">{p.label}</span>
-                <Badge variant="secondary" className="text-xs">{TYPE_LABELS[p.type]}</Badge>
-                {p.unit && <span className="text-xs text-muted-foreground">{p.unit}</span>}
-                {p.isGlobal && (
-                  <span className="text-xs px-1.5 py-0 rounded-full font-medium text-white" style={{ background: '#BEF264' }}>
-                    Globaal
-                  </span>
-                )}
-              </div>
-              {p.type === 'select' && p.options && (
-                <p className="text-xs text-muted-foreground mt-0.5">{p.options.join(' · ')}</p>
-              )}
-              {(p.min !== undefined || p.max !== undefined) && (
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {p.min !== undefined && `Min: ${p.min}`}
-                  {p.min !== undefined && p.max !== undefined && ' · '}
-                  {p.max !== undefined && `Max: ${p.max}`}
-                </p>
-              )}
-              {p.defaultValue !== undefined && p.defaultValue !== '' && (
-                <p className="text-xs text-muted-foreground mt-0.5">Standaard: {p.defaultValue}</p>
-              )}
-            </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <Switch checked={p.isGlobal} onCheckedChange={() => onToggleGlobal(p.id)} className="scale-75" />
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(p)}>
-                <Pencil className="w-3.5 h-3.5" />
-              </Button>
-              <Button
-                variant="ghost" size="icon" className="h-7 w-7 hover:text-destructive"
-                onClick={() => onDelete(p.id)}
+      <Tile
+        className={cn(isDragging && 'opacity-50')}
+        style={{ padding: '12px 14px' }}
+      >
+        <div className="flex items-center gap-3">
+          <button
+            {...attributes}
+            {...listeners}
+            className="athletic-mono shrink-0 touch-none"
+            style={{ color: P.inkDim, cursor: 'grab', fontSize: 14 }}
+          >
+            ⋮⋮
+          </button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span style={{ color: P.ink, fontSize: 13, fontWeight: 700 }}>{p.label}</span>
+              <span
+                className="athletic-mono px-2 py-0.5 rounded-full"
+                style={{
+                  background: P.surfaceHi,
+                  color: P.inkMuted,
+                  fontSize: 10,
+                  letterSpacing: '0.08em',
+                  fontWeight: 700,
+                }}
               >
-                <Trash2 className="w-3.5 h-3.5" />
-              </Button>
+                {TYPE_LABELS[p.type]}
+              </span>
+              {p.unit && <span style={{ color: P.inkMuted, fontSize: 11 }}>{p.unit}</span>}
+              {p.isGlobal && (
+                <span
+                  className="athletic-mono px-1.5 py-0.5 rounded-full"
+                  style={{
+                    background: P.lime,
+                    color: P.bg,
+                    fontSize: 10,
+                    letterSpacing: '0.08em',
+                    fontWeight: 800,
+                  }}
+                >
+                  GLOBAAL
+                </span>
+              )}
             </div>
+            {p.type === 'select' && p.options && (
+              <p style={{ color: P.inkMuted, fontSize: 11, marginTop: 2 }}>
+                {p.options.join(' · ')}
+              </p>
+            )}
+            {(p.min !== undefined || p.max !== undefined) && (
+              <p style={{ color: P.inkMuted, fontSize: 11, marginTop: 2 }}>
+                {p.min !== undefined && `Min: ${p.min}`}
+                {p.min !== undefined && p.max !== undefined && ' · '}
+                {p.max !== undefined && `Max: ${p.max}`}
+              </p>
+            )}
+            {p.defaultValue !== undefined && p.defaultValue !== '' && (
+              <p style={{ color: P.inkMuted, fontSize: 11, marginTop: 2 }}>
+                Standaard: {p.defaultValue}
+              </p>
+            )}
           </div>
-        </CardContent>
-      </Card>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Switch checked={p.isGlobal} onCheckedChange={() => onToggleGlobal(p.id)} className="scale-75" />
+            <button
+              onClick={() => onEdit(p)}
+              className="athletic-mono px-2 py-1 rounded"
+              style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.12em', fontWeight: 700 }}
+            >
+              WIJZIG
+            </button>
+            <button
+              onClick={() => onDelete(p.id)}
+              className="athletic-mono px-2 py-1 rounded"
+              style={{ color: P.danger, fontSize: 12 }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      </Tile>
     </div>
   )
 }
@@ -176,28 +212,37 @@ export default function ParametersPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <Link href="/therapist/programs" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4">
-          <ChevronLeft className="w-4 h-4" /> Terug naar programma&apos;s
+    <div className="max-w-2xl w-full flex flex-col gap-6">
+      <div className="flex flex-col gap-3">
+        <Link
+          href="/therapist/programs"
+          className="athletic-mono"
+          style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.16em' }}
+        >
+          ← PROGRAMMA&apos;S
         </Link>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Custom parameters</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <Kicker>Configuratie</Kicker>
+            <h1
+              className="athletic-display"
+              style={{ fontSize: 32, lineHeight: '38px', letterSpacing: '-0.025em', paddingTop: 2 }}
+            >
+              CUSTOM PARAMETERS
+            </h1>
+            <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
               Definieer eigen parameters · Sleep om volgorde te wijzigen
-            </p>
+            </MetaLabel>
           </div>
-          <Button onClick={openCreate} style={{ background: '#BEF264' }} className="gap-2 shrink-0">
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Nieuwe parameter</span>
-          </Button>
+          <DarkButton onClick={openCreate} size="sm" className="shrink-0">
+            + <span className="hidden sm:inline ml-1">Nieuwe</span>
+          </DarkButton>
         </div>
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={params.map(p => p.id)} strategy={verticalListSortingStrategy}>
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             {params.map(p => (
               <SortableParamCard
                 key={p.id}
@@ -208,11 +253,14 @@ export default function ParametersPage() {
               />
             ))}
             {params.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed rounded-xl text-center">
-                <p className="text-sm text-muted-foreground">Geen custom parameters</p>
-                <Button variant="outline" size="sm" className="mt-3" onClick={openCreate}>
-                  <Plus className="w-4 h-4 mr-1" /> Aanmaken
-                </Button>
+              <div
+                className="flex flex-col items-center justify-center py-16 rounded-xl text-center"
+                style={{ border: `2px dashed ${P.line}` }}
+              >
+                <p style={{ color: P.inkMuted, fontSize: 13 }}>Geen custom parameters</p>
+                <DarkButton variant="secondary" size="sm" className="mt-3" onClick={openCreate}>
+                  + Aanmaken
+                </DarkButton>
               </div>
             )}
           </div>
@@ -221,34 +269,43 @@ export default function ParametersPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent
+          className="max-w-sm"
+          style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
+        >
           <DialogHeader>
-            <DialogTitle>{editing ? 'Parameter bewerken' : 'Nieuwe parameter'}</DialogTitle>
+            <DialogTitle style={{ color: P.ink }}>
+              {editing ? 'Parameter bewerken' : 'Nieuwe parameter'}
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div>
-              <Label>Label</Label>
-              <Input
+          <div className="flex flex-col gap-4 pt-2">
+            <div className="flex flex-col gap-1.5">
+              <MetaLabel>Label</MetaLabel>
+              <DarkInput
                 value={form.label ?? ''}
                 onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
                 placeholder="bv. Kabelgewicht"
-                className="mt-1.5"
                 autoFocus
               />
             </div>
 
-            <div>
-              <Label>Type</Label>
-              <div className="grid grid-cols-4 gap-1.5 mt-1.5">
+            <div className="flex flex-col gap-1.5">
+              <MetaLabel>Type</MetaLabel>
+              <div className="grid grid-cols-4 gap-1.5">
                 {(['number', 'text', 'select', 'slider'] as ParamType[]).map(t => (
                   <button
                     key={t}
                     type="button"
                     onClick={() => setForm(f => ({ ...f, type: t }))}
-                    className={cn(
-                      'py-1.5 rounded text-xs font-medium border transition-colors',
-                      form.type === t ? 'bg-[#BEF264] text-white border-[#BEF264]' : 'border-[rgba(255,255,255,0.12)] text-muted-foreground hover:border-[rgba(255,255,255,0.2)]'
-                    )}
+                    className="py-1.5 rounded athletic-mono transition-colors"
+                    style={{
+                      background: form.type === t ? P.lime : P.surfaceHi,
+                      color: form.type === t ? P.bg : P.inkMuted,
+                      border: `1px solid ${form.type === t ? P.lime : P.lineStrong}`,
+                      fontSize: 10,
+                      fontWeight: 800,
+                      letterSpacing: '0.08em',
+                    }}
                   >
                     {TYPE_LABELS[t]}
                   </button>
@@ -258,54 +315,65 @@ export default function ParametersPage() {
 
             {(form.type === 'number' || form.type === 'slider') && (
               <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <Label className="text-xs">Eenheid</Label>
-                  <Input
+                <div className="flex flex-col gap-1.5">
+                  <MetaLabel>Eenheid</MetaLabel>
+                  <DarkInput
                     value={form.unit ?? ''}
                     onChange={e => setForm(f => ({ ...f, unit: e.target.value }))}
                     placeholder="kg"
-                    className="mt-1 h-8 text-xs"
+                    style={{ padding: '8px 10px', fontSize: 13 }}
                   />
                 </div>
-                <div>
-                  <Label className="text-xs">Min</Label>
-                  <Input
+                <div className="flex flex-col gap-1.5">
+                  <MetaLabel>Min</MetaLabel>
+                  <DarkInput
                     type="number"
                     value={form.min ?? ''}
                     onChange={e => setForm(f => ({ ...f, min: e.target.value === '' ? undefined : Number(e.target.value) }))}
-                    className="mt-1 h-8 text-xs"
+                    style={{ padding: '8px 10px', fontSize: 13 }}
                   />
                 </div>
-                <div>
-                  <Label className="text-xs">Max</Label>
-                  <Input
+                <div className="flex flex-col gap-1.5">
+                  <MetaLabel>Max</MetaLabel>
+                  <DarkInput
                     type="number"
                     value={form.max ?? ''}
                     onChange={e => setForm(f => ({ ...f, max: e.target.value === '' ? undefined : Number(e.target.value) }))}
-                    className="mt-1 h-8 text-xs"
+                    style={{ padding: '8px 10px', fontSize: 13 }}
                   />
                 </div>
               </div>
             )}
 
             {form.type === 'select' && (
-              <div>
-                <Label className="text-xs">Opties</Label>
-                <div className="flex gap-2 mt-1.5">
-                  <Input
+              <div className="flex flex-col gap-1.5">
+                <MetaLabel>Opties</MetaLabel>
+                <div className="flex gap-2">
+                  <DarkInput
                     value={optionDraft}
                     onChange={e => setOptionDraft(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addOption() } }}
                     placeholder="Voeg optie toe..."
-                    className="h-8 text-xs"
+                    style={{ padding: '8px 10px', fontSize: 13 }}
                   />
-                  <Button type="button" variant="outline" size="sm" className="h-8 px-2" onClick={addOption}>+</Button>
+                  <DarkButton type="button" variant="secondary" size="sm" onClick={addOption}>
+                    +
+                  </DarkButton>
                 </div>
                 <div className="flex flex-wrap gap-1 mt-1.5">
                   {(form.options ?? []).map((o, i) => (
-                    <span key={i} className="flex items-center gap-1 text-xs bg-[#1C2425] rounded px-2 py-0.5">
+                    <span
+                      key={i}
+                      className="athletic-mono flex items-center gap-1 rounded px-2 py-0.5"
+                      style={{
+                        background: P.surfaceHi,
+                        color: P.ink,
+                        fontSize: 11,
+                        letterSpacing: '0.04em',
+                      }}
+                    >
                       {o}
-                      <button onClick={() => removeOption(i)} className="text-[#7B8889] hover:text-destructive">×</button>
+                      <button onClick={() => removeOption(i)} style={{ color: P.danger }}>×</button>
                     </span>
                   ))}
                 </div>
@@ -313,14 +381,14 @@ export default function ParametersPage() {
             )}
 
             {(form.type === 'number' || form.type === 'slider') && (
-              <div>
-                <Label className="text-xs">Standaardwaarde</Label>
-                <Input
+              <div className="flex flex-col gap-1.5">
+                <MetaLabel>Standaardwaarde</MetaLabel>
+                <DarkInput
                   type="number"
                   value={form.defaultValue ?? ''}
                   onChange={e => setForm(f => ({ ...f, defaultValue: e.target.value === '' ? undefined : Number(e.target.value) }))}
-                  className="mt-1 h-8 text-xs"
                   placeholder="0"
+                  style={{ padding: '8px 10px', fontSize: 13 }}
                 />
               </div>
             )}
@@ -330,14 +398,18 @@ export default function ParametersPage() {
                 checked={form.isGlobal ?? false}
                 onCheckedChange={v => setForm(f => ({ ...f, isGlobal: v }))}
               />
-              <Label className="text-sm">Globaal (zichtbaar in alle programma&apos;s)</Label>
+              <span style={{ color: P.ink, fontSize: 13 }}>
+                Globaal (zichtbaar in alle programma&apos;s)
+              </span>
             </div>
 
             <div className="flex gap-2 pt-1">
-              <Button style={{ background: '#BEF264' }} onClick={handleSave} className="flex-1">
+              <DarkButton onClick={handleSave} className="flex-1">
                 {editing ? 'Opslaan' : 'Aanmaken'}
-              </Button>
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuleren</Button>
+              </DarkButton>
+              <DarkButton variant="secondary" onClick={() => setDialogOpen(false)}>
+                Annuleren
+              </DarkButton>
             </div>
           </div>
         </DialogContent>

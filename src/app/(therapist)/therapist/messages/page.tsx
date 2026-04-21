@@ -1,5 +1,4 @@
-import { Card, CardContent } from '@/components/ui/card'
-import { MessageSquare } from 'lucide-react'
+import { Kicker, MetaLabel, P, Tile } from '@/components/dark-ui'
 
 export const metadata = {
   title: 'Berichten – MBT Gym',
@@ -7,26 +6,38 @@ export const metadata = {
 
 export default function MessagesPage() {
   return (
-    <div className="space-y-5 max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-bold">Berichten</h1>
-        <p className="text-muted-foreground text-sm">Communicatie met patiënten</p>
+    <div className="max-w-2xl w-full flex flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <Kicker>Communicatie</Kicker>
+        <h1
+          className="athletic-display"
+          style={{ fontSize: 32, lineHeight: '38px', letterSpacing: '-0.025em', paddingTop: 2 }}
+        >
+          BERICHTEN
+        </h1>
+        <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
+          Communicatie met patiënten
+        </MetaLabel>
       </div>
 
-      <Card style={{ borderRadius: '12px' }}>
-        <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+      <Tile>
+        <div className="flex flex-col items-center justify-center py-10 text-center">
           <div
             className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-            style={{ background: '#1C2425' }}
+            style={{ background: P.surfaceHi }}
           >
-            <MessageSquare className="w-7 h-7 text-[#7B8889]" />
+            <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 22, fontWeight: 900 }}>
+              ✉
+            </span>
           </div>
-          <p className="font-semibold text-base">Geen berichten</p>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p style={{ color: P.ink, fontSize: 16, fontWeight: 800, letterSpacing: '0.04em' }}>
+            GEEN BERICHTEN
+          </p>
+          <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 6 }}>
             Berichtenmodule is beschikbaar zodra de database is gekoppeld.
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </Tile>
     </div>
   )
 }

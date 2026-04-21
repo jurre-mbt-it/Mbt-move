@@ -3,9 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
 import { trpc } from '@/lib/trpc/client'
 import { SUPERSET_COLORS } from '@/lib/program-constants'
@@ -13,13 +10,10 @@ import {
   ChevronLeft, Clock, ChevronDown, ChevronUp, Lightbulb,
   TrendingUp, TrendingDown, CheckCircle2, SkipForward, Minus, Plus, Trophy, Bell,
 } from 'lucide-react'
+import { P, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-ui'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ReactPlayer = dynamic(() => import('react-player') as any, { ssr: false }) as any
-
-// ─── Brand colors ─────────────────────────────────────────────────────────────
-const MBT_GREEN = '#BEF264'
-const MBT_DARK = '#1C2425'
 
 // ─── Static coaching data ─────────────────────────────────────────────────────
 
@@ -77,17 +71,17 @@ function calcEpley(weightKg: number, reps: number): number {
   return Math.round(weightKg * (1 + reps / 30) * 10) / 10
 }
 
-// Pijn kleur: algemeen (niet-tendinopathie): <3 groen, 3-5 geel, 5+ rood
-// Tendinopathie (Silbernagel): ≤5 groen, 5-7 geel, >7 rood
+// Pijn kleur: algemeen (niet-tendinopathie): <3 lime, 3-5 gold, 5+ danger
+// Tendinopathie (Silbernagel): ≤5 lime, 5-7 gold, >7 danger
 function painColor(pain: number, isTendinopathy = false): string {
   if (isTendinopathy) {
-    if (pain <= 5) return MBT_GREEN
-    if (pain <= 7) return '#f97316'
-    return '#ef4444'
+    if (pain <= 5) return P.lime
+    if (pain <= 7) return P.gold
+    return P.danger
   }
-  if (pain < 3) return MBT_GREEN
-  if (pain <= 5) return '#f97316'
-  return '#ef4444'
+  if (pain < 3) return P.lime
+  if (pain <= 5) return P.gold
+  return P.danger
 }
 
 function painLabel(pain: number, isTendinopathy = false): string {
@@ -103,7 +97,7 @@ function painLabel(pain: number, isTendinopathy = false): string {
 
 const SMILIES = ['😫', '😕', '😐', '🙂', '😄']
 const SMILEY_LABELS = ['Zwaar', 'Moeilijk', 'Oké', 'Goed', 'Super']
-const SMILEY_COLORS = ['#ef4444', '#f97316', '#eab308', '#84cc16', MBT_GREEN]
+const SMILEY_COLORS = [P.danger, P.orange, P.gold, P.limeDeep, P.lime]
 
 // ─── Circular Timer SVG ───────────────────────────────────────────────────────
 
@@ -117,9 +111,9 @@ function CircularTimer({ seconds, total, onSkip }: { seconds: number; total: num
     <div className="flex flex-col items-center gap-4">
       <div className="relative w-32 h-32">
         <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-          <circle cx="60" cy="60" r={r} fill="none" stroke="#f4f4f5" strokeWidth="8" />
+          <circle cx="60" cy="60" r={r} fill="none" stroke={P.surfaceHi} strokeWidth="8" />
           <circle
-            cx="60" cy="60" r={r} fill="none" stroke={MBT_GREEN} strokeWidth="8"
+            cx="60" cy="60" r={r} fill="none" stroke={P.lime} strokeWidth="8"
             strokeLinecap="round"
             strokeDasharray={circ}
             strokeDashoffset={offset}
@@ -127,15 +121,16 @@ function CircularTimer({ seconds, total, onSkip }: { seconds: number; total: num
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-3xl font-bold tabular-nums">{seconds}</span>
-          <span className="text-xs text-muted-foreground">sec</span>
+          <span className="athletic-mono" style={{ color: P.ink, fontSize: 30, fontWeight: 900 }}>{seconds}</span>
+          <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11 }}>sec</span>
         </div>
       </div>
       <button
         onClick={onSkip}
-        className="flex items-center gap-1.5 text-sm text-[#7B8889] font-medium"
+        className="athletic-tap athletic-mono flex items-center gap-1.5"
+        style={{ color: P.inkMuted, fontSize: 12, fontWeight: 700, letterSpacing: '0.1em' }}
       >
-        <SkipForward className="w-4 h-4" /> Sla rust over
+        <SkipForward className="w-4 h-4" /> SLA RUST OVER
       </button>
     </div>
   )
@@ -160,23 +155,28 @@ function FeedbackModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end">
-      <div className="absolute inset-0 bg-black/40" onClick={onSave} />
+      <div className="absolute inset-0 bg-black/60" onClick={onSave} />
       <div
         className="relative w-full rounded-t-3xl px-5 pt-5 pb-8 space-y-5"
-        style={{ background: '#fff', maxWidth: 480, margin: '0 auto' }}
+        style={{ background: P.surface, maxWidth: 480, margin: '0 auto', border: `1px solid ${P.line}` }}
       >
         {/* Handle */}
-        <div className="w-10 h-1 bg-[rgba(255,255,255,0.08)] rounded-full mx-auto mb-1" />
+        <div className="w-10 h-1 rounded-full mx-auto mb-1" style={{ background: P.lineStrong }} />
 
         <div className="flex items-start justify-between">
           <div>
-            <p className="font-bold text-base">Hoe voelde het?</p>
-            <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[200px]">{exerciseName}</p>
+            <p style={{ color: P.ink, fontSize: 16, fontWeight: 800 }}>Hoe voelde het?</p>
+            <p
+              className="truncate max-w-[200px]"
+              style={{ color: P.inkMuted, fontSize: 12, marginTop: 2 }}
+            >
+              {exerciseName}
+            </p>
           </div>
           {autoCloseIn > 0 && (
             <div
-              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
-              style={{ background: MBT_GREEN }}
+              className="w-7 h-7 rounded-full flex items-center justify-center athletic-mono"
+              style={{ background: P.lime, color: P.bg, fontSize: 12, fontWeight: 900 }}
             >
               {autoCloseIn}
             </div>
@@ -192,15 +192,18 @@ function FeedbackModal({
               <button
                 key={val}
                 onClick={() => onChange({ smiley: selected ? null : val })}
-                className="flex-1 flex flex-col items-center gap-1 py-3 rounded-2xl transition-all active:scale-95"
+                className="athletic-tap flex-1 flex flex-col items-center gap-1 py-3 rounded-2xl transition-all"
                 style={{
-                  background: selected ? SMILEY_COLORS[i] + '22' : '#1C2425',
-                  border: selected ? `2px solid ${SMILEY_COLORS[i]}` : '2px solid transparent',
+                  background: selected ? SMILEY_COLORS[i] + '22' : P.surfaceHi,
+                  border: selected ? `2px solid ${SMILEY_COLORS[i]}` : `2px solid ${P.line}`,
                   minHeight: 44,
                 }}
               >
                 <span className="text-2xl">{emoji}</span>
-                <span className="text-[10px] font-medium" style={{ color: selected ? SMILEY_COLORS[i] : '#7B8889' }}>
+                <span
+                  className="athletic-mono"
+                  style={{ color: selected ? SMILEY_COLORS[i] : P.inkMuted, fontSize: 10, fontWeight: 700, letterSpacing: '0.06em' }}
+                >
                   {SMILEY_LABELS[i]}
                 </span>
               </button>
@@ -212,8 +215,15 @@ function FeedbackModal({
         {tendinopathyMode ? (
           <div>
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium">Pijn tijdens oefening (NRS)</p>
-              <span className="text-sm font-bold" style={{ color: feedback.painDuring !== null ? painColor(feedback.painDuring ?? 0, true) : '#7B8889' }}>
+              <p style={{ color: P.ink, fontSize: 13, fontWeight: 600 }}>Pijn tijdens oefening (NRS)</p>
+              <span
+                className="athletic-mono"
+                style={{
+                  color: feedback.painDuring !== null ? painColor(feedback.painDuring ?? 0, true) : P.inkMuted,
+                  fontSize: 13,
+                  fontWeight: 900,
+                }}
+              >
                 {feedback.painDuring !== null ? `${feedback.painDuring}/10 — ${painLabel(feedback.painDuring ?? 0, true)}` : 'Geen'}
               </span>
             </div>
@@ -222,11 +232,13 @@ function FeedbackModal({
                 <button
                   key={i}
                   onClick={() => onChange({ painDuring: feedback.painDuring === i ? null : i, pain: feedback.painDuring === i ? null : i })}
-                  className="flex-1 rounded-lg text-xs font-semibold transition-all active:scale-95"
+                  className="athletic-tap flex-1 rounded-lg athletic-mono transition-all"
                   style={{
                     height: 44,
-                    background: feedback.painDuring === i ? painColor(i, true) : '#1C2425',
-                    color: feedback.painDuring === i ? 'white' : '#7B8889',
+                    background: feedback.painDuring === i ? painColor(i, true) : P.surfaceHi,
+                    color: feedback.painDuring === i ? P.bg : P.inkMuted,
+                    fontSize: 12,
+                    fontWeight: 900,
                   }}
                 >
                   {i}
@@ -235,10 +247,12 @@ function FeedbackModal({
             </div>
             {(feedback.painDuring ?? 0) > 5 && (
               <div
-                className="mt-2 rounded-xl px-3 py-2 text-xs font-medium"
+                className="mt-2 rounded-xl px-3 py-2"
                 style={{
-                  background: (feedback.painDuring ?? 0) > 7 ? 'rgba(248,113,113,0.10)' : '#fff7ed',
-                  color: (feedback.painDuring ?? 0) > 7 ? '#F87171' : '#c2410c',
+                  background: (feedback.painDuring ?? 0) > 7 ? 'rgba(248,113,113,0.10)' : 'rgba(244,194,97,0.10)',
+                  color: (feedback.painDuring ?? 0) > 7 ? P.danger : P.gold,
+                  fontSize: 12,
+                  fontWeight: 600,
                 }}
               >
                 {(feedback.painDuring ?? 0) > 7
@@ -246,15 +260,22 @@ function FeedbackModal({
                   : '⚠️ Verhoogde pijn. Noteer dit en monitor de volgende sessies.'}
               </div>
             )}
-            <p className="text-[10px] text-muted-foreground mt-1.5">
+            <p style={{ color: P.inkMuted, fontSize: 10, marginTop: 6 }}>
               Je ontvangt morgenochtend een herinnering voor de 24u-check.
             </p>
           </div>
         ) : (
           <div>
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium">Pijn tijdens oefening</p>
-              <span className="text-sm font-bold" style={{ color: feedback.pain !== null ? painColor(feedback.pain ?? 0) : MBT_GREEN }}>
+              <p style={{ color: P.ink, fontSize: 13, fontWeight: 600 }}>Pijn tijdens oefening</p>
+              <span
+                className="athletic-mono"
+                style={{
+                  color: feedback.pain !== null ? painColor(feedback.pain ?? 0) : P.lime,
+                  fontSize: 13,
+                  fontWeight: 900,
+                }}
+              >
                 {feedback.pain !== null ? `${feedback.pain}/10` : 'Geen'}
               </span>
             </div>
@@ -263,11 +284,13 @@ function FeedbackModal({
                 <button
                   key={i}
                   onClick={() => onChange({ pain: feedback.pain === i ? null : i })}
-                  className="flex-1 rounded-lg text-xs font-semibold transition-all active:scale-95"
+                  className="athletic-tap flex-1 rounded-lg athletic-mono transition-all"
                   style={{
                     height: 44,
-                    background: feedback.pain === i ? painColor(i) : '#1C2425',
-                    color: feedback.pain === i ? 'white' : '#7B8889',
+                    background: feedback.pain === i ? painColor(i) : P.surfaceHi,
+                    color: feedback.pain === i ? P.bg : P.inkMuted,
+                    fontSize: 12,
+                    fontWeight: 900,
                   }}
                 >
                   {i}
@@ -280,17 +303,24 @@ function FeedbackModal({
         {/* Optional weight / RPE */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1.5">Gewicht (kg)</p>
-            <div className="flex items-center gap-2 justify-between border rounded-xl px-3" style={{ height: 44 }}>
+            <MetaLabel style={{ marginBottom: 6 }}>GEWICHT (KG)</MetaLabel>
+            <div
+              className="flex items-center gap-2 justify-between rounded-xl px-3"
+              style={{ height: 44, background: P.surfaceHi, border: `1px solid ${P.lineStrong}` }}
+            >
               <button
-                className="p-1"
+                className="athletic-tap p-1"
+                style={{ color: P.ink }}
                 onClick={() => onChange({ weight: Math.max(0, (feedback.weight ?? 0) - 2.5) })}
               >
                 <Minus className="w-3.5 h-3.5" />
               </button>
-              <span className="font-semibold text-sm">{feedback.weight ?? 0}</span>
+              <span className="athletic-mono" style={{ color: P.ink, fontSize: 14, fontWeight: 800 }}>
+                {feedback.weight ?? 0}
+              </span>
               <button
-                className="p-1"
+                className="athletic-tap p-1"
+                style={{ color: P.ink }}
                 onClick={() => onChange({ weight: (feedback.weight ?? 0) + 2.5 })}
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -298,17 +328,24 @@ function FeedbackModal({
             </div>
           </div>
           <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1.5">RPE (/10)</p>
-            <div className="flex items-center gap-2 justify-between border rounded-xl px-3" style={{ height: 44 }}>
+            <MetaLabel style={{ marginBottom: 6 }}>RPE (/10)</MetaLabel>
+            <div
+              className="flex items-center gap-2 justify-between rounded-xl px-3"
+              style={{ height: 44, background: P.surfaceHi, border: `1px solid ${P.lineStrong}` }}
+            >
               <button
-                className="p-1"
+                className="athletic-tap p-1"
+                style={{ color: P.ink }}
                 onClick={() => onChange({ rpe: Math.max(1, (feedback.rpe ?? 5) - 1) })}
               >
                 <Minus className="w-3.5 h-3.5" />
               </button>
-              <span className="font-semibold text-sm">{feedback.rpe ?? 5}</span>
+              <span className="athletic-mono" style={{ color: P.ink, fontSize: 14, fontWeight: 800 }}>
+                {feedback.rpe ?? 5}
+              </span>
               <button
-                className="p-1"
+                className="athletic-tap p-1"
+                style={{ color: P.ink }}
                 onClick={() => onChange({ rpe: Math.min(10, (feedback.rpe ?? 5) + 1) })}
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -317,13 +354,9 @@ function FeedbackModal({
           </div>
         </div>
 
-        <Button
-          onClick={onSave}
-          className="w-full font-semibold text-base"
-          style={{ height: 48, background: MBT_GREEN }}
-        >
-          Opslaan
-        </Button>
+        <DarkButton onClick={onSave} size="lg">
+          OPSLAAN
+        </DarkButton>
       </div>
     </div>
   )
@@ -365,82 +398,114 @@ function SessionSummary({
   const avgSmileyIdx = avgSmiley !== null ? Math.round(avgSmiley) - 1 : null
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#0A0E0F' }}>
-      {/* Header */}
-      <div className="px-5 pt-14 pb-6 text-center" style={{ background: MBT_DARK }}>
-        <div className="text-5xl mb-3">🎉</div>
-        <h1 className="text-white text-2xl font-bold">Sessie voltooid!</h1>
-        <p className="text-[#7B8889] text-sm mt-1">{exercises.length} oefeningen</p>
+    <div className="min-h-screen flex flex-col" style={{ background: P.bg, color: P.ink }}>
+      <div className="max-w-lg w-full mx-auto px-4 pt-10 pb-8 space-y-4">
+        {/* Hero */}
+        <div className="text-center">
+          <div className="text-5xl mb-3">🎉</div>
+          <Kicker>SESSIE VOLTOOID</Kicker>
+          <h1
+            className="athletic-display"
+            style={{
+              color: P.ink,
+              fontWeight: 900,
+              letterSpacing: '-0.04em',
+              lineHeight: 1.02,
+              fontSize: 'clamp(40px, 10vw, 64px)',
+              paddingTop: 4,
+              textTransform: 'uppercase',
+              margin: 0,
+            }}
+          >
+            KLAAR
+          </h1>
+          <MetaLabel style={{ marginTop: 6 }}>{exercises.length} OEFENINGEN</MetaLabel>
+        </div>
 
-        {/* Editable duration with computed start/finish times */}
-        <div className="mt-4 bg-[#141A1B]/10 rounded-2xl px-4 py-3 space-y-2">
+        {/* Editable duration */}
+        <Tile>
           <div className="flex items-center justify-between">
-            <span className="text-[#7B8889] text-xs">Duur</span>
+            <MetaLabel>DUUR</MetaLabel>
             <div className="flex items-center gap-3">
               <button
-                className="w-8 h-8 rounded-full flex items-center justify-center"
-                style={{ background: 'rgba(255,255,255,0.15)' }}
+                className="athletic-tap w-8 h-8 rounded-full flex items-center justify-center"
+                style={{ background: P.surfaceHi, color: P.ink }}
                 onClick={() => setDurationMinutes(m => Math.max(1, m - 5))}
               >
-                <Minus className="w-3.5 h-3.5 text-white" />
+                <Minus className="w-3.5 h-3.5" />
               </button>
-              <span className="text-white font-bold text-lg w-16 text-center tabular-nums">
+              <span
+                className="athletic-mono w-16 text-center"
+                style={{ color: P.ink, fontSize: 18, fontWeight: 900 }}
+              >
                 {durationMinutes} min
               </span>
               <button
-                className="w-8 h-8 rounded-full flex items-center justify-center"
-                style={{ background: 'rgba(255,255,255,0.15)' }}
+                className="athletic-tap w-8 h-8 rounded-full flex items-center justify-center"
+                style={{ background: P.surfaceHi, color: P.ink }}
                 onClick={() => setDurationMinutes(m => m + 5)}
               >
-                <Plus className="w-3.5 h-3.5 text-white" />
+                <Plus className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
-          <div className="flex justify-between text-xs text-[#7B8889]">
-            <span>Start: {fmtTime(startTime)}</span>
-            <span>Einde: {fmtTime(finishTime)}</span>
+          <div className="flex justify-between mt-3">
+            <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11 }}>
+              Start: {fmtTime(startTime)}
+            </span>
+            <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11 }}>
+              Einde: {fmtTime(finishTime)}
+            </span>
           </div>
-        </div>
-      </div>
+        </Tile>
 
-      <div className="flex-1 px-4 py-4 space-y-4">
         {/* Avg feeling */}
         {avgSmileyIdx !== null && (
-          <Card style={{ borderRadius: '14px' }}>
-            <CardContent className="px-4 py-4 flex items-center gap-3">
+          <Tile>
+            <div className="flex items-center gap-3">
               <div className="text-3xl">{SMILIES[avgSmileyIdx]}</div>
               <div>
-                <p className="font-semibold text-sm">Gemiddeld gevoel</p>
-                <p className="text-xs text-muted-foreground">
+                <p style={{ color: P.ink, fontSize: 14, fontWeight: 800 }}>Gemiddeld gevoel</p>
+                <MetaLabel style={{ textTransform: 'none', fontWeight: 500 }}>
                   {SMILEY_LABELS[avgSmileyIdx]} · {avgSmiley?.toFixed(1)}/5
-                </p>
+                </MetaLabel>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Tile>
         )}
 
         {/* 1RM PRs */}
         {sessionOneRmPRs && Object.keys(sessionOneRmPRs).length > 0 && (
-          <Card style={{ borderRadius: '14px', border: '2px solid #BEF264' }}>
-            <CardContent className="px-4 py-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <Trophy className="w-4 h-4" style={{ color: '#BEF264' }} />
-                <p className="font-bold text-sm" style={{ color: '#BEF264' }}>Nieuw(e) 1RM PR(s)! 🎉</p>
-              </div>
+          <Tile accentBar={P.lime}>
+            <div className="flex items-center gap-2 mb-2">
+              <Trophy className="w-4 h-4" style={{ color: P.lime }} />
+              <p
+                className="athletic-mono"
+                style={{ color: P.lime, fontSize: 13, fontWeight: 900, letterSpacing: '0.12em' }}
+              >
+                NIEUW(E) 1RM PR(S)! 🎉
+              </p>
+            </div>
+            <div className="space-y-1">
               {exercises.filter(e => sessionOneRmPRs[e.uid]).map(e => (
-                <div key={e.uid} className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground truncate">{e.name}</span>
-                  <span className="font-bold" style={{ color: '#BEF264' }}>{sessionOneRmPRs[e.uid]} kg</span>
+                <div key={e.uid} className="flex items-center justify-between">
+                  <span className="truncate" style={{ color: P.inkMuted, fontSize: 13 }}>{e.name}</span>
+                  <span
+                    className="athletic-mono"
+                    style={{ color: P.lime, fontSize: 14, fontWeight: 900 }}
+                  >
+                    {sessionOneRmPRs[e.uid]} kg
+                  </span>
                 </div>
               ))}
-            </CardContent>
-          </Card>
+            </div>
+          </Tile>
         )}
 
         {/* Exercise recap */}
-        <Card style={{ borderRadius: '14px' }}>
-          <CardContent className="px-4 py-3 space-y-3">
-            <p className="font-semibold text-sm">Oefeningen</p>
+        <Tile>
+          <MetaLabel style={{ marginBottom: 8 }}>OEFENINGEN</MetaLabel>
+          <div className="space-y-3">
             {exercises.map(e => {
               const fb = feedback[e.uid]
               const pain = tendinopathyMode ? (fb?.painDuring ?? fb?.pain) : fb?.pain
@@ -448,13 +513,16 @@ function SessionSummary({
                 <div key={e.uid} className="flex items-center gap-3">
                   <div
                     className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-lg"
-                    style={{ background: fb?.smiley ? SMILEY_COLORS[(fb.smiley - 1)] + '22' : '#1C2425' }}
+                    style={{ background: fb?.smiley ? SMILEY_COLORS[(fb.smiley - 1)] + '22' : P.surfaceHi }}
                   >
                     {fb?.smiley ? SMILIES[fb.smiley - 1] : '—'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{e.name}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="truncate" style={{ color: P.ink, fontSize: 13, fontWeight: 600 }}>{e.name}</p>
+                    <p
+                      className="athletic-mono"
+                      style={{ color: P.inkMuted, fontSize: 11, marginTop: 2 }}
+                    >
                       {e.sets} sets
                       {(() => {
                         const ws = setWeights[e.uid]
@@ -469,8 +537,8 @@ function SessionSummary({
                   </div>
                   {pain !== null && pain !== undefined && (
                     <div
-                      className="w-6 h-6 rounded-full text-[10px] font-bold flex items-center justify-center text-white shrink-0"
-                      style={{ background: painColor(pain ?? 0, tendinopathyMode) }}
+                      className="w-6 h-6 rounded-full athletic-mono flex items-center justify-center shrink-0"
+                      style={{ background: painColor(pain ?? 0, tendinopathyMode), color: P.bg, fontSize: 10, fontWeight: 900 }}
                     >
                       {pain}
                     </div>
@@ -478,68 +546,69 @@ function SessionSummary({
                 </div>
               )
             })}
-          </CardContent>
-        </Card>
+          </div>
+        </Tile>
 
         {/* Tendinopathie follow-up reminder */}
         {tendinopathyMode && (
-          <Card style={{ borderRadius: '14px', background: 'rgba(190,242,100,0.10)', border: '1.5px solid #BEF26433' }}>
-            <CardContent className="px-4 py-3 flex items-start gap-3">
-              <Bell className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#BEF264' }} />
+          <Tile accentBar={P.lime}>
+            <div className="flex items-start gap-3">
+              <Bell className="w-4 h-4 mt-0.5 shrink-0" style={{ color: P.lime }} />
               <div>
-                <p className="text-sm font-semibold" style={{ color: '#BEF264' }}>24u follow-up herinnering</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p
+                  className="athletic-mono"
+                  style={{ color: P.lime, fontSize: 12, fontWeight: 900, letterSpacing: '0.12em' }}
+                >
+                  24U FOLLOW-UP HERINNERING
+                </p>
+                <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 4 }}>
                   Morgenochtend ontvang je een herinnering om de pijn 24u na de sessie en de ochtend stijfheid in te vullen.
                 </p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Tile>
         )}
 
         {/* Overall session smiley */}
-        <Card style={{ borderRadius: '14px' }}>
-          <CardContent className="px-4 py-4">
-            <p className="font-semibold text-sm mb-1">Hoe voelt je lichaam nu?</p>
-            <p className="text-xs text-muted-foreground mb-3">Totale sessie gevoel</p>
-            <div className="flex gap-2 justify-between">
-              {SMILIES.map((emoji, i) => {
-                const val = i + 1
-                const selected = sessionSmiley === val
-                return (
-                  <button
-                    key={val}
-                    onClick={() => setSessionSmiley(selected ? null : val)}
-                    className="flex-1 flex flex-col items-center gap-1 py-3 rounded-2xl transition-all active:scale-95"
-                    style={{
-                      minHeight: 44,
-                      background: selected ? SMILEY_COLORS[i] + '22' : '#1C2425',
-                      border: selected ? `2px solid ${SMILEY_COLORS[i]}` : '2px solid transparent',
-                    }}
+        <Tile>
+          <p style={{ color: P.ink, fontSize: 14, fontWeight: 800 }}>Hoe voelt je lichaam nu?</p>
+          <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>Totale sessie gevoel</MetaLabel>
+          <div className="flex gap-2 justify-between mt-3">
+            {SMILIES.map((emoji, i) => {
+              const val = i + 1
+              const selected = sessionSmiley === val
+              return (
+                <button
+                  key={val}
+                  onClick={() => setSessionSmiley(selected ? null : val)}
+                  className="athletic-tap flex-1 flex flex-col items-center gap-1 py-3 rounded-2xl transition-all"
+                  style={{
+                    minHeight: 44,
+                    background: selected ? SMILEY_COLORS[i] + '22' : P.surfaceHi,
+                    border: selected ? `2px solid ${SMILEY_COLORS[i]}` : `2px solid ${P.line}`,
+                  }}
+                >
+                  <span className="text-2xl">{emoji}</span>
+                  <span
+                    className="athletic-mono"
+                    style={{ color: selected ? SMILEY_COLORS[i] : P.inkMuted, fontSize: 10, fontWeight: 700 }}
                   >
-                    <span className="text-2xl">{emoji}</span>
-                    <span
-                      className="text-[10px] font-medium"
-                      style={{ color: selected ? SMILEY_COLORS[i] : '#7B8889' }}
-                    >
-                      {SMILEY_LABELS[i]}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                    {SMILEY_LABELS[i]}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </Tile>
 
-      <div className="px-4 pb-8">
-        <Button
+        <DarkButton
           onClick={() => onFinish(sessionSmiley, durationMinutes * 60)}
           disabled={isSaving}
-          className="w-full text-base font-semibold"
-          style={{ height: 48, background: MBT_GREEN }}
+          loading={isSaving}
+          size="lg"
         >
-          {isSaving ? 'Opslaan…' : 'Opslaan & afsluiten'}
-        </Button>
+          {isSaving ? 'OPSLAAN…' : 'OPSLAAN & AFSLUITEN'}
+        </DarkButton>
       </div>
     </div>
   )
@@ -756,21 +825,21 @@ export default function SessionPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0A0E0F' }}>
-        <p className="text-muted-foreground text-sm">Sessie laden…</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: P.bg, color: P.ink }}>
+        <span className="athletic-mono text-[11px]" style={{ color: P.inkMuted, letterSpacing: '0.16em' }}>SESSIE LADEN…</span>
       </div>
     )
   }
 
   if (!sessionData?.program || exercises.length === 0) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: '#0A0E0F' }}>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: P.bg, color: P.ink }}>
         <div className="text-5xl">🏖️</div>
-        <p className="font-semibold text-lg">Geen sessie vandaag</p>
-        <p className="text-muted-foreground text-sm">Je hebt vandaag geen oefeningen gepland. Geniet van je rustdag!</p>
-        <Button variant="outline" onClick={() => router.push('/patient/dashboard')}>
+        <p style={{ color: P.ink, fontSize: 18, fontWeight: 800 }}>Geen sessie vandaag</p>
+        <p style={{ color: P.inkMuted, fontSize: 13 }}>Je hebt vandaag geen oefeningen gepland. Geniet van je rustdag!</p>
+        <DarkButton variant="secondary" onClick={() => router.push('/patient/dashboard')}>
           Terug naar dashboard
-        </Button>
+        </DarkButton>
       </div>
     )
   }
@@ -813,28 +882,38 @@ export default function SessionPage() {
       <div key={e.uid}>
         {/* Header row */}
         <button
-          className="w-full flex items-center gap-3 text-left px-4 py-3"
+          className="athletic-tap w-full flex items-center gap-3 text-left px-4 py-3"
           style={{ minHeight: 56 }}
           onClick={() => setExpanded(isExpanded ? null : e.uid)}
         >
           <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-sm font-bold transition-all"
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 athletic-mono transition-all"
             style={{
-              background: isDone ? MBT_GREEN : allSetsDone && !isDone ? MBT_GREEN + '33' : '#1C2425',
-              color: isDone ? 'white' : '#52525b',
+              background: isDone ? P.lime : allSetsDone && !isDone ? P.lime + '33' : P.surfaceHi,
+              color: isDone ? P.bg : P.inkMuted,
+              fontSize: 12,
+              fontWeight: 900,
             }}
           >
             {isDone ? '✓' : e.sets > 0 ? `${sets}/${e.sets}` : '—'}
           </div>
           <div className="flex-1 min-w-0">
-            <p className={cn('font-semibold text-sm truncate', isDone && 'line-through text-muted-foreground')}>
+            <p
+              className={cn('truncate', isDone && 'line-through')}
+              style={{ color: isDone ? P.inkMuted : P.ink, fontSize: 14, fontWeight: 700 }}
+            >
               {e.name}
             </p>
-            <p className="text-xs text-muted-foreground">{e.sets} × {e.reps} {e.repUnit}</p>
+            <p
+              className="athletic-mono"
+              style={{ color: P.inkMuted, fontSize: 11, marginTop: 2 }}
+            >
+              {e.sets} × {e.reps} {e.repUnit}
+            </p>
           </div>
           {isExpanded
-            ? <ChevronUp className="w-4 h-4 text-[#7B8889] shrink-0" />
-            : <ChevronDown className="w-4 h-4 text-[#7B8889] shrink-0" />
+            ? <ChevronUp className="w-4 h-4 shrink-0" style={{ color: P.inkMuted }} />
+            : <ChevronDown className="w-4 h-4 shrink-0" style={{ color: P.inkMuted }} />
           }
         </button>
 
@@ -842,7 +921,7 @@ export default function SessionPage() {
         {isExpanded && isDone && (() => {
           const fb = feedback[e.uid]
           return (
-            <div className="border-t px-4 pb-4 pt-3 space-y-3">
+            <div className="px-4 pb-4 pt-3 space-y-3" style={{ borderTop: `1px solid ${P.line}` }}>
               <div className="space-y-1.5">
                 {Array.from({ length: e.sets }, (_, i) => {
                   const w = setWeights[e.uid]?.[i] ?? 0
@@ -850,10 +929,15 @@ export default function SessionPage() {
                     <div
                       key={i}
                       className="flex items-center justify-between px-4 rounded-xl"
-                      style={{ height: 44, background: MBT_GREEN + '15', border: `1px solid ${MBT_GREEN}33` }}
+                      style={{ height: 44, background: P.lime + '15', border: `1px solid ${P.lime}33` }}
                     >
-                      <span className="text-sm font-medium" style={{ color: MBT_GREEN }}>Set {i + 1} ✓</span>
-                      <span className="text-sm text-muted-foreground">{w > 0 ? `${w} kg` : '—'}</span>
+                      <span
+                        className="athletic-mono"
+                        style={{ color: P.lime, fontSize: 13, fontWeight: 800 }}
+                      >
+                        Set {i + 1} ✓
+                      </span>
+                      <span style={{ color: P.inkMuted, fontSize: 13 }}>{w > 0 ? `${w} kg` : '—'}</span>
                     </div>
                   )
                 })}
@@ -861,7 +945,7 @@ export default function SessionPage() {
               {fb && (fb.smiley !== null || fb.pain !== null) && (
                 <div className="flex items-center gap-3 px-1">
                   {fb.smiley !== null && <span className="text-2xl">{SMILIES[fb.smiley - 1]}</span>}
-                  <span className="text-xs text-muted-foreground">
+                  <span style={{ color: P.inkMuted, fontSize: 11 }}>
                     {fb.smiley !== null && SMILEY_LABELS[fb.smiley - 1]}
                     {fb.pain !== null && `${fb.smiley !== null ? ' · ' : ''}Pijn ${fb.pain}/10`}
                   </span>
@@ -873,7 +957,7 @@ export default function SessionPage() {
 
         {/* Expanded content */}
         {isExpanded && !isDone && (
-          <div className="border-t px-4 pb-4 pt-3 space-y-4">
+          <div className="px-4 pb-4 pt-3 space-y-4" style={{ borderTop: `1px solid ${P.line}` }}>
             {/* Video player */}
             {e.videoUrl && (
               <div className="rounded-2xl overflow-hidden bg-black aspect-video">
@@ -886,9 +970,9 @@ export default function SessionPage() {
                   playIcon={
                     <div
                       className="w-14 h-14 rounded-full flex items-center justify-center"
-                      style={{ background: MBT_GREEN }}
+                      style={{ background: P.lime }}
                     >
-                      <span className="text-white text-xl ml-1">▶</span>
+                      <span style={{ color: P.bg, fontSize: 20, marginLeft: 4 }}>▶</span>
                     </div>
                   }
                 />
@@ -914,16 +998,18 @@ export default function SessionPage() {
                     <button
                       disabled={isSetDone || sets < setNum - 1}
                       onClick={() => !isSetDone && markSetDone(e.uid, e.restTime || 60, e.sets)}
-                      className="w-full flex items-center justify-between px-4 rounded-2xl text-sm font-semibold transition-all active:scale-[0.98]"
+                      className="athletic-tap w-full flex items-center justify-between px-4 rounded-2xl athletic-mono transition-all"
                       style={{
                         height: 48,
                         background: isSetDone
-                          ? MBT_GREEN + '22'
-                          : sets === setNum - 1 ? MBT_DARK : '#1C2425',
+                          ? P.lime + '22'
+                          : sets === setNum - 1 ? P.surfaceHi : P.surface,
                         color: isSetDone
-                          ? MBT_GREEN
-                          : sets === setNum - 1 ? 'white' : '#a1a1aa',
-                        border: isSetDone ? `1.5px solid ${MBT_GREEN}` : '1.5px solid transparent',
+                          ? P.lime
+                          : sets === setNum - 1 ? P.ink : P.inkMuted,
+                        border: isSetDone ? `1.5px solid ${P.lime}` : `1.5px solid ${P.line}`,
+                        fontSize: 13,
+                        fontWeight: 800,
                       }}
                     >
                       <span>Set {setNum}</span>
@@ -931,10 +1017,10 @@ export default function SessionPage() {
                     </button>
                     {isSetDone && (
                       <div className="flex items-center gap-2 px-2 py-1">
-                        <span className="text-xs text-muted-foreground flex-1">Gewicht set {setNum}</span>
+                        <span style={{ color: P.inkMuted, fontSize: 11 }} className="flex-1">Gewicht set {setNum}</span>
                         <button
-                          className="w-7 h-7 rounded-lg flex items-center justify-center"
-                          style={{ background: '#1C2425' }}
+                          className="athletic-tap w-7 h-7 rounded-lg flex items-center justify-center"
+                          style={{ background: P.surfaceHi, color: P.ink }}
                           onClick={() => {
                             adjustSetWeight(e.uid, i, -2.5)
                             if (sessionData?.program?.trackOneRepMax) {
@@ -946,10 +1032,15 @@ export default function SessionPage() {
                         >
                           <Minus className="w-3 h-3" />
                         </button>
-                        <span className="text-sm font-semibold w-14 text-center tabular-nums">{w} kg</span>
+                        <span
+                          className="athletic-mono w-14 text-center"
+                          style={{ color: P.ink, fontSize: 13, fontWeight: 800 }}
+                        >
+                          {w} kg
+                        </span>
                         <button
-                          className="w-7 h-7 rounded-lg flex items-center justify-center"
-                          style={{ background: '#1C2425' }}
+                          className="athletic-tap w-7 h-7 rounded-lg flex items-center justify-center"
+                          style={{ background: P.surfaceHi, color: P.ink }}
                           onClick={() => {
                             adjustSetWeight(e.uid, i, 2.5)
                             if (sessionData?.program?.trackOneRepMax) {
@@ -980,21 +1071,24 @@ export default function SessionPage() {
                 <div
                   className="flex items-center gap-2 rounded-2xl px-4 py-2.5"
                   style={{
-                    background: isPR ? '#BEF26422' : '#1C2425',
-                    border: isPR ? '1.5px solid #BEF264' : '1.5px solid transparent',
+                    background: isPR ? P.lime + '22' : P.surfaceHi,
+                    border: isPR ? `1.5px solid ${P.lime}` : `1.5px solid ${P.line}`,
                   }}
                 >
-                  <TrendingUp className="w-4 h-4 shrink-0" style={{ color: isPR ? '#BEF264' : '#a1a1aa' }} />
+                  <TrendingUp className="w-4 h-4 shrink-0" style={{ color: isPR ? P.lime : P.inkMuted }} />
                   <div className="flex-1">
-                    <span className="text-xs text-muted-foreground">Geschatte 1RM</span>
-                    <span className="text-sm font-bold ml-2" style={{ color: isPR ? '#BEF264' : '#1a1a1a' }}>
+                    <span style={{ color: P.inkMuted, fontSize: 11 }}>Geschatte 1RM</span>
+                    <span
+                      className="athletic-mono ml-2"
+                      style={{ color: isPR ? P.lime : P.ink, fontSize: 14, fontWeight: 900 }}
+                    >
                       {est1rm} kg
                     </span>
                   </div>
                   {isPR && (
                     <span
-                      className="text-xs font-bold px-2 py-0.5 rounded-full text-white animate-bounce"
-                      style={{ background: '#BEF264' }}
+                      className="athletic-mono animate-bounce px-2 py-0.5 rounded-full"
+                      style={{ background: P.lime, color: P.bg, fontSize: 10, fontWeight: 900, letterSpacing: '0.06em' }}
                     >
                       NIEUW PR! 🎉
                     </span>
@@ -1007,29 +1101,38 @@ export default function SessionPage() {
             <div>
               <button
                 onClick={() => setShowExtraFor(showExtraFor === e.uid ? null : e.uid)}
-                className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
+                className="athletic-tap flex items-center gap-1.5 athletic-mono"
+                style={{ color: P.inkMuted, fontSize: 11, fontWeight: 700, letterSpacing: '0.08em' }}
               >
                 {showExtraFor === e.uid
                   ? <ChevronUp className="w-3.5 h-3.5" />
                   : <ChevronDown className="w-3.5 h-3.5" />}
-                Extra parameters
+                EXTRA PARAMETERS
               </button>
               {showExtraFor === e.uid && (
-                <div className="mt-2 border rounded-2xl p-3 space-y-2">
+                <div
+                  className="mt-2 rounded-2xl p-3 space-y-2"
+                  style={{ background: P.surfaceHi, border: `1px solid ${P.line}` }}
+                >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium">Reps gedaan</span>
+                    <span style={{ color: P.ink, fontSize: 11, fontWeight: 600 }}>Reps gedaan</span>
                     <div className="flex items-center gap-2">
                       <button
-                        className="w-7 h-7 rounded-lg flex items-center justify-center"
-                        style={{ background: '#1C2425' }}
+                        className="athletic-tap w-7 h-7 rounded-lg flex items-center justify-center"
+                        style={{ background: P.surface, color: P.ink }}
                         onClick={() => setExtraReps(prev => ({ ...prev, [e.uid]: Math.max(1, (prev[e.uid] ?? e.reps) - 1) }))}
                       >
                         <Minus className="w-3 h-3" />
                       </button>
-                      <span className="text-sm font-semibold w-8 text-center tabular-nums">{extraReps[e.uid] ?? e.reps}</span>
+                      <span
+                        className="athletic-mono w-8 text-center"
+                        style={{ color: P.ink, fontSize: 13, fontWeight: 800 }}
+                      >
+                        {extraReps[e.uid] ?? e.reps}
+                      </span>
                       <button
-                        className="w-7 h-7 rounded-lg flex items-center justify-center"
-                        style={{ background: '#1C2425' }}
+                        className="athletic-tap w-7 h-7 rounded-lg flex items-center justify-center"
+                        style={{ background: P.surface, color: P.ink }}
                         onClick={() => setExtraReps(prev => ({ ...prev, [e.uid]: (prev[e.uid] ?? e.reps) + 1 }))}
                       >
                         <Plus className="w-3 h-3" />
@@ -1045,17 +1148,26 @@ export default function SessionPage() {
               <div>
                 <button
                   onClick={() => setShowCuesFor(showCues ? null : e.uid)}
-                  className="flex items-center gap-1.5 text-xs font-semibold mb-2"
-                  style={{ color: MBT_GREEN }}
+                  className="athletic-tap flex items-center gap-1.5 athletic-mono mb-2"
+                  style={{ color: P.lime, fontSize: 11, fontWeight: 900, letterSpacing: '0.1em' }}
                 >
                   <Lightbulb className="w-3.5 h-3.5" />
-                  Coaching cues {showCues ? '▲' : '▼'}
+                  COACHING CUES {showCues ? '▲' : '▼'}
                 </button>
                 {showCues && (
                   <ul className="space-y-1.5">
                     {cues.map((cue, i) => (
-                      <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
-                        <span className="font-bold mt-px" style={{ color: MBT_GREEN }}>·</span>
+                      <li
+                        key={i}
+                        className="flex items-start gap-2"
+                        style={{ color: P.inkMuted, fontSize: 12 }}
+                      >
+                        <span
+                          className="mt-px"
+                          style={{ color: P.lime, fontWeight: 900 }}
+                        >
+                          ·
+                        </span>
                         {cue}
                       </li>
                     ))}
@@ -1068,18 +1180,24 @@ export default function SessionPage() {
             {(variants.easier || variants.harder) && (
               <div className="space-y-1.5">
                 {variants.easier && (
-                  <div className="flex items-center gap-2 text-xs rounded-xl px-3 py-2" style={{ background: '#fefce8' }}>
-                    <TrendingDown className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    <span className="text-amber-700">
-                      <span className="font-semibold">Te moeilijk?</span> Probeer: {variants.easier}
+                  <div
+                    className="flex items-center gap-2 rounded-xl px-3 py-2"
+                    style={{ background: 'rgba(244,194,97,0.10)' }}
+                  >
+                    <TrendingDown className="w-3.5 h-3.5 shrink-0" style={{ color: P.gold }} />
+                    <span style={{ color: P.gold, fontSize: 12 }}>
+                      <span style={{ fontWeight: 700 }}>Te moeilijk?</span> Probeer: {variants.easier}
                     </span>
                   </div>
                 )}
                 {variants.harder && (
-                  <div className="flex items-center gap-2 text-xs rounded-xl px-3 py-2" style={{ background: 'rgba(190,242,100,0.10)' }}>
-                    <TrendingUp className="w-3.5 h-3.5 shrink-0" style={{ color: MBT_GREEN }} />
-                    <span style={{ color: '#BEF264' }}>
-                      <span className="font-semibold">Te makkelijk?</span> Probeer: {variants.harder}
+                  <div
+                    className="flex items-center gap-2 rounded-xl px-3 py-2"
+                    style={{ background: 'rgba(190,242,100,0.10)' }}
+                  >
+                    <TrendingUp className="w-3.5 h-3.5 shrink-0" style={{ color: P.lime }} />
+                    <span style={{ color: P.lime, fontSize: 12 }}>
+                      <span style={{ fontWeight: 700 }}>Te makkelijk?</span> Probeer: {variants.harder}
                     </span>
                   </div>
                 )}
@@ -1088,14 +1206,13 @@ export default function SessionPage() {
 
             {/* Mark exercise done — only shown after all sets are ticked */}
             {allSetsDone && (
-              <button
+              <DarkButton
                 onClick={() => markExerciseDone(e.uid)}
-                className="w-full rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-                style={{ height: 48, background: MBT_GREEN }}
+                size="lg"
               >
-                <CheckCircle2 className="w-4 h-4" />
-                Oefening afgerond
-              </button>
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+                OEFENING AFGEROND
+              </DarkButton>
             )}
           </div>
         )}
@@ -1117,93 +1234,116 @@ export default function SessionPage() {
         <div
           key={`superset-${e.supersetGroup}`}
           className="rounded-2xl overflow-hidden"
-          style={{ border: `2px solid ${colors.border}`, background: colors.bg }}
+          style={{ border: `2px solid ${colors.border}`, background: P.surface }}
         >
-          <div className="px-4 py-1.5 flex items-center gap-1.5" style={{ background: colors.border + '44' }}>
-            <span className="text-[10px] font-bold tracking-wider" style={{ color: colors.text }}>
+          <div
+            className="px-4 py-1.5 flex items-center gap-1.5"
+            style={{ background: colors.border + '22' }}
+          >
+            <span
+              className="athletic-mono"
+              style={{ color: colors.text, fontSize: 10, fontWeight: 900, letterSpacing: '0.16em' }}
+            >
               SUPERSET {e.supersetGroup}
             </span>
           </div>
-          <div className="divide-y" style={{ borderColor: colors.border + '44' }}>
-            {group.map(ex => renderExercise(ex))}
+          <div style={{ borderTop: `1px solid ${colors.border}33` }}>
+            {group.map((ex, idx) => (
+              <div key={ex.uid} style={{ borderTop: idx > 0 ? `1px solid ${colors.border}33` : 'none' }}>
+                {renderExercise(ex)}
+              </div>
+            ))}
           </div>
         </div>
       )
     } else {
       cards.push(
-        <Card key={e.uid} style={{ borderRadius: '14px' }}>
-          <CardContent className="p-0">
-            {renderExercise(e)}
-          </CardContent>
-        </Card>
+        <Tile key={e.uid} style={{ padding: 0 }}>
+          {renderExercise(e)}
+        </Tile>
       )
     }
   })
 
   return (
-    <div className="min-h-screen pb-6" style={{ background: '#0A0E0F' }}>
+    <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
       {/* Top bar */}
-      <div className="sticky top-0 z-10 px-4 pt-12 pb-3 border-b" style={{ background: '#fff' }}>
+      <div
+        className="sticky top-0 z-10 px-4 pt-10 pb-3"
+        style={{ background: P.bg, borderBottom: `1px solid ${P.line}` }}
+      >
         <div className="flex items-center justify-between mb-2">
-          <button onClick={() => router.back()} className="p-2 -ml-2" style={{ minWidth: 44, minHeight: 44 }}>
+          <button
+            onClick={() => router.back()}
+            className="athletic-tap p-2 -ml-2"
+            style={{ minWidth: 44, minHeight: 44, color: P.ink }}
+          >
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div className="text-center">
-            <p className="text-xs text-muted-foreground">
-              {sessionData.program.name} · Week {sessionData.program.currentWeek}
-            </p>
-            <p className="font-semibold text-sm">
-              <span style={{ color: doneCount > 0 ? MBT_GREEN : undefined }}>{doneCount}</span>
-              /{exercises.length} gedaan
+            <span
+              className="athletic-mono"
+              style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.14em', fontWeight: 700 }}
+            >
+              {sessionData.program.name.toUpperCase()} · WEEK {sessionData.program.currentWeek}
+            </span>
+            <p
+              className="athletic-mono"
+              style={{ color: P.ink, fontSize: 13, fontWeight: 800, marginTop: 2 }}
+            >
+              <span style={{ color: doneCount > 0 ? P.lime : P.ink }}>{doneCount}</span>
+              /{exercises.length} GEDAAN
             </p>
           </div>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground tabular-nums pr-1">
+          <div
+            className="flex items-center gap-1 athletic-mono pr-1"
+            style={{ color: P.inkMuted, fontSize: 12 }}
+          >
             <Clock className="w-3.5 h-3.5" />
             {mins}:{secs.toString().padStart(2, '0')}
           </div>
         </div>
-        <Progress
-          value={progress}
-          className="h-2"
-          style={{ '--progress-color': MBT_GREEN } as React.CSSProperties}
-        />
+        {/* Progress bar */}
+        <div className="h-2 rounded-full overflow-hidden" style={{ background: P.surfaceHi }}>
+          <div
+            className="h-full rounded-full transition-all duration-300"
+            style={{ background: P.lime, width: `${progress}%` }}
+          />
+        </div>
       </div>
 
       {/* Exercise cards */}
-      <div className="px-4 pt-4 space-y-3">
+      <div className="max-w-lg mx-auto px-4 pt-4 pb-6 space-y-3">
         {cards}
-      </div>
 
-      {/* Finish CTA */}
-      {doneCount > 0 && (
-        <div className="px-4 pt-4">
-          <Button
-            onClick={() => setPhase('summary')}
-            className="w-full text-base font-semibold"
-            style={{
-              height: 48,
-              background: doneCount === exercises.length ? MBT_GREEN : MBT_DARK,
-            }}
-          >
-            {doneCount === exercises.length
-              ? 'Sessie afronden 🎉'
-              : `Doorgaan (${doneCount}/${exercises.length})`}
-          </Button>
-        </div>
-      )}
+        {/* Finish CTA */}
+        {doneCount > 0 && (
+          <div className="pt-2">
+            <DarkButton
+              onClick={() => setPhase('summary')}
+              size="lg"
+              variant={doneCount === exercises.length ? 'primary' : 'secondary'}
+            >
+              {doneCount === exercises.length
+                ? 'SESSIE AFRONDEN 🎉'
+                : `DOORGAAN (${doneCount}/${exercises.length})`}
+            </DarkButton>
+          </div>
+        )}
+      </div>
 
       {/* Rest Timer overlay */}
       {showRestTimer && (
         <div
           className="fixed inset-0 z-40 flex items-center justify-center"
-          style={{ background: 'rgba(0,0,0,0.6)' }}
+          style={{ background: 'rgba(0,0,0,0.7)' }}
         >
           <div
             className="rounded-3xl px-8 py-8 text-center space-y-2 mx-4 w-full max-w-xs"
-            style={{ background: '#fff' }}
+            style={{ background: P.surface, border: `1px solid ${P.line}` }}
           >
-            <p className="font-bold text-lg">Rust</p>
-            <p className="text-xs text-muted-foreground mb-4">Adem rustig door je neus</p>
+            <Kicker>RUST</Kicker>
+            <p style={{ color: P.inkMuted, fontSize: 11, marginBottom: 8 }}>Adem rustig door je neus</p>
             <CircularTimer seconds={restSecondsLeft} total={restDuration} onSkip={skipRest} />
           </div>
         </div>
@@ -1229,12 +1369,17 @@ function ParamPill({ label, value, highlight }: { label: string; value: string; 
   return (
     <div
       className="rounded-xl p-2 text-center"
-      style={{ background: highlight ? MBT_GREEN + '22' : '#1C2425' }}
+      style={{ background: highlight ? P.lime + '22' : P.surfaceHi, border: `1px solid ${P.line}` }}
     >
-      <p className="text-xs text-muted-foreground">{label}</p>
       <p
-        className="text-sm font-bold mt-0.5"
-        style={{ color: highlight ? MBT_GREEN : undefined }}
+        className="athletic-mono"
+        style={{ color: P.inkMuted, fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase' }}
+      >
+        {label}
+      </p>
+      <p
+        className="athletic-mono mt-1"
+        style={{ color: highlight ? P.lime : P.ink, fontSize: 13, fontWeight: 900 }}
       >
         {value}
       </p>

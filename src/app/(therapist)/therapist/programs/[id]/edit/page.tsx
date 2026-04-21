@@ -5,6 +5,7 @@ import { ProgramBuilder } from '@/components/programs/ProgramBuilder'
 import { trpc } from '@/lib/trpc/client'
 import { notFound } from 'next/navigation'
 import type { BuilderExercise } from '@/components/programs/types'
+import { P } from '@/components/dark-ui'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -16,12 +17,25 @@ export default function EditProgramPage({ params }: Props) {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-4 h-full">
-        <div className="flex gap-3 items-center">
-          <div className="h-8 flex-1 bg-[#1C2425] rounded animate-pulse" />
-          <div className="h-8 w-24 bg-[#1C2425] rounded animate-pulse" />
+      <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+        <div className="max-w-5xl mx-auto px-4 pt-10 pb-8">
+          <div className="flex flex-col gap-4 h-full">
+            <div className="flex gap-3 items-center">
+              <div
+                className="h-8 flex-1 rounded animate-pulse"
+                style={{ background: P.surfaceHi }}
+              />
+              <div
+                className="h-8 w-24 rounded animate-pulse"
+                style={{ background: P.surfaceHi }}
+              />
+            </div>
+            <div
+              className="flex-1 min-h-[320px] rounded-xl animate-pulse"
+              style={{ background: P.surfaceHi }}
+            />
+          </div>
         </div>
-        <div className="flex-1 bg-[#1C2425] rounded-xl animate-pulse" />
       </div>
     )
   }

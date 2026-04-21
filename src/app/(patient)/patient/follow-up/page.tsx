@@ -1,27 +1,28 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
-import { ArrowLeft, CheckCircle2, Clock } from 'lucide-react'
-import { IconStop, IconWarning, IconCheck } from '@/components/icons'
 import { toast } from 'sonner'
-
-const MBT_GREEN = '#BEF264'
-const MBT_DARK = '#1C2425'
+import {
+  DarkButton,
+  DarkHeader,
+  DarkScreen,
+  Display,
+  Kicker,
+  MetaLabel,
+  P,
+  Tile,
+} from '@/components/dark-ui'
 
 // ─── Silbernagel pain color (tendinopathie: ≤5 groen, 5-7 geel, >7 rood) ──────
 function silbernagelColor(pain: number): string {
-  if (pain <= 5) return MBT_GREEN
-  if (pain <= 7) return '#f97316'
-  return '#ef4444'
+  if (pain <= 5) return P.lime
+  if (pain <= 7) return P.gold
+  return P.danger
 }
 
 function silbernagelLabel(pain: number): string {
   if (pain <= 5) return 'OK'
-  if (pain <= 7) return 'Let op'
+  if (pain <= 7) return 'LET OP'
   return 'STOP'
 }
 
@@ -71,16 +72,25 @@ function NrsPicker({
     <div className="flex gap-1">
       {Array.from({ length: 11 }, (_, i) => {
         const selected = value === i
-        const color = isTendinopathy ? silbernagelColor(i) : (i < 3 ? MBT_GREEN : i <= 5 ? '#f97316' : '#ef4444')
+        const color = isTendinopathy
+          ? silbernagelColor(i)
+          : i < 3
+            ? P.lime
+            : i <= 5
+              ? P.gold
+              : P.danger
         return (
           <button
             key={i}
+            type="button"
             onClick={() => onChange(selected ? null : i)}
-            className="flex-1 rounded-lg text-xs font-semibold transition-all active:scale-95"
+            className="athletic-tap athletic-mono flex-1 rounded-lg text-xs transition-all"
             style={{
               height: 40,
-              background: selected ? color : '#1C2425',
-              color: selected ? 'white' : '#7B8889',
+              backgroundColor: selected ? color : P.surfaceHi,
+              color: selected ? P.bg : P.inkMuted,
+              fontWeight: 900,
+              border: selected ? 'none' : `1px solid ${P.lineStrong}`,
             }}
           >
             {i}
@@ -111,45 +121,96 @@ function FollowUpCard({
 
   if (saved) {
     return (
-      <Card style={{ borderRadius: '14px', background: 'rgba(190,242,100,0.10)', border: '1.5px solid #BEF26433' }}>
-        <CardContent className="px-4 py-4 flex items-center gap-3">
-          <CheckCircle2 className="w-5 h-5" style={{ color: MBT_GREEN }} />
-          <div>
-            <p className="text-sm font-semibold" style={{ color: '#BEF264' }}>{item.exerciseName}</p>
-            <p className="text-xs text-muted-foreground">
+      <Tile accentBar={P.lime}>
+        <div className="flex items-center gap-3">
+          <span
+            className="athletic-mono"
+            style={{ color: P.lime, fontSize: 20, fontWeight: 900 }}
+            aria-hidden
+          >
+            ✓
+          </span>
+          <div className="flex-1 min-w-0">
+            <p
+              className="athletic-mono"
+              style={{
+                color: P.lime,
+                fontSize: 13,
+                fontWeight: 900,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {item.exerciseName}
+            </p>
+            <p
+              className="athletic-mono"
+              style={{ color: P.inkMuted, fontSize: 11, marginTop: 2 }}
+            >
               24u pijn: {pain24h ?? '—'}/10 · Stijfheid: {stiffness ?? '—'}/10
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Tile>
     )
   }
 
+  const duringColor = silbernagelColor(item.painDuringSession)
+
   return (
-    <Card style={{ borderRadius: '14px' }}>
-      <CardContent className="px-4 py-4 space-y-4">
+    <Tile>
+      <div className="flex flex-col gap-4">
         {/* Header */}
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="font-semibold text-sm">{item.exerciseName}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Sessie {new Date(item.sessionDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })} · {item.hoursAgo}u geleden
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p
+              style={{ color: P.ink, fontSize: 14, fontWeight: 800 }}
+              className="truncate"
+            >
+              {item.exerciseName}
+            </p>
+            <p
+              className="athletic-mono"
+              style={{
+                color: P.inkMuted,
+                fontSize: 11,
+                marginTop: 2,
+                textTransform: 'none',
+                fontWeight: 500,
+              }}
+            >
+              Sessie{' '}
+              {new Date(item.sessionDate).toLocaleDateString('nl-NL', {
+                day: 'numeric',
+                month: 'long',
+              })}{' '}
+              · {item.hoursAgo}u geleden
             </p>
           </div>
-          <div
-            className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
-            style={{ background: `${silbernagelColor(item.painDuringSession)}22`, color: silbernagelColor(item.painDuringSession) }}
+          <span
+            className="athletic-mono px-2 py-1 rounded-full shrink-0"
+            style={{
+              backgroundColor: P.surfaceHi,
+              color: duringColor,
+              fontSize: 10,
+              fontWeight: 900,
+              letterSpacing: '0.1em',
+              border: `1px solid ${duringColor}`,
+            }}
           >
-            Tijdens: {item.painDuringSession}/10
-          </div>
+            TIJDENS {item.painDuringSession}/10
+          </span>
         </div>
 
         {/* 24h pain */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-medium">Pijn 24u na oefening</p>
+            <MetaLabel>Pijn 24u na oefening</MetaLabel>
             {pain24h !== null && (
-              <span className="text-xs font-bold" style={{ color: silbernagelColor(pain24h) }}>
+              <span
+                className="athletic-mono"
+                style={{ color: silbernagelColor(pain24h), fontSize: 11, fontWeight: 900 }}
+              >
                 {pain24h}/10 — {silbernagelLabel(pain24h)}
               </span>
             )}
@@ -157,15 +218,25 @@ function FollowUpCard({
           <NrsPicker value={pain24h} onChange={setPain24h} />
           {pain24h !== null && pain24h > 5 && (
             <div
-              className="mt-2 rounded-xl px-3 py-2 text-xs font-medium"
+              className="mt-2 rounded-xl px-3 py-2"
               style={{
-                background: pain24h > 7 ? 'rgba(248,113,113,0.10)' : '#fffbeb',
-                color: pain24h > 7 ? '#F87171' : '#c2410c',
+                backgroundColor: P.surfaceHi,
+                borderLeft: `3px solid ${pain24h > 7 ? P.danger : P.gold}`,
               }}
             >
-              {pain24h > 7
-                ? <span className="inline-flex items-center gap-1"><IconStop size={14} /> Pijn te hoog — bespreek met je therapeut voor de volgende sessie.</span>
-                : <span className="inline-flex items-center gap-1"><IconWarning size={14} /> Verhoogde pijn na sessie. Monitor het verloop.</span>}
+              <p
+                className="athletic-mono"
+                style={{
+                  color: pain24h > 7 ? P.danger : P.gold,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  lineHeight: '16px',
+                }}
+              >
+                {pain24h > 7
+                  ? 'STOP · Pijn te hoog — bespreek met je therapeut voor de volgende sessie.'
+                  : 'LET OP · Verhoogde pijn na sessie. Monitor het verloop.'}
+              </p>
             </div>
           )}
         </div>
@@ -173,9 +244,12 @@ function FollowUpCard({
         {/* Morning stiffness */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-medium">Ochtend stijfheid</p>
+            <MetaLabel>Ochtend stijfheid</MetaLabel>
             {stiffness !== null && (
-              <span className="text-xs font-bold text-muted-foreground">
+              <span
+                className="athletic-mono"
+                style={{ color: P.inkMuted, fontSize: 11, fontWeight: 900 }}
+              >
                 {stiffness}/10
               </span>
             )}
@@ -183,16 +257,14 @@ function FollowUpCard({
           <NrsPicker value={stiffness} onChange={setStiffness} isTendinopathy={false} />
         </div>
 
-        <Button
+        <DarkButton
           onClick={handleSave}
-          className="w-full font-semibold"
-          style={{ height: 44, background: MBT_GREEN }}
           disabled={pain24h === null && stiffness === null}
         >
-          Opslaan
-        </Button>
-      </CardContent>
-    </Card>
+          OPSLAAN
+        </DarkButton>
+      </div>
+    </Tile>
   )
 }
 
@@ -201,84 +273,118 @@ export default function FollowUpPage() {
   const [items, setItems] = useState<FollowUpItem[]>(MOCK_PENDING)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
 
-  const handleSave = (id: string, painAfter24h: number | null, morningStiffness: number | null) => {
-    setItems(prev => prev.map(item =>
-      item.id === id ? { ...item, painAfter24h, morningStiffness } : item
-    ))
-    setSavedIds(prev => new Set(prev).add(id))
+  const handleSave = (
+    id: string,
+    painAfter24h: number | null,
+    morningStiffness: number | null,
+  ) => {
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, painAfter24h, morningStiffness } : item,
+      ),
+    )
+    setSavedIds((prev) => new Set(prev).add(id))
   }
 
-  const allDone = items.length > 0 && items.every(item => savedIds.has(item.id))
+  const allDone = items.length > 0 && items.every((item) => savedIds.has(item.id))
 
   return (
-    <div className="min-h-screen pb-24" style={{ background: '#0A0E0F' }}>
-      {/* Header */}
-      <div className="px-4 pt-12 pb-5" style={{ background: MBT_DARK }}>
-        <Link href="/patient/progress" className="inline-flex items-center gap-1.5 text-[#7B8889] text-sm mb-3 hover:text-white transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Terug
-        </Link>
-        <h1 className="text-white text-xl font-bold">24u Follow-up</h1>
-        <p className="text-[#7B8889] text-xs mt-0.5">Hoe voelen je pezen vandaag?</p>
-      </div>
+    <DarkScreen>
+      <DarkHeader title="Follow-up" backHref="/patient/progress" />
 
-      <div className="px-4 py-4 space-y-4">
+      <div className="max-w-lg w-full mx-auto px-4 pt-4 pb-8 flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <Kicker>24u check</Kicker>
+          <Display size="md">
+            HOE VOELEN
+            <br />
+            JE PEZEN?
+          </Display>
+        </div>
+
         {/* Info banner */}
-        <div
-          className="flex items-start gap-3 rounded-2xl px-4 py-3 text-xs"
-          style={{ background: 'rgba(190,242,100,0.10)', border: '1.5px solid #BEF26433' }}
-        >
-          <Clock className="w-4 h-4 mt-0.5 shrink-0" style={{ color: MBT_GREEN }} />
-          <div style={{ color: '#BEF264' }}>
-            <p className="font-semibold mb-0.5">Silbernagel protocol</p>
-            <p>
-              Voor tendinopathie volgen we pijn <strong>tijdens</strong> de oefening, <strong>24u erna</strong> en{' '}
-              <strong>ochtend stijfheid</strong>. Dit helpt bepalen of de belasting juist is.
+        <Tile accentBar={P.lime}>
+          <div className="flex flex-col gap-1">
+            <MetaLabel style={{ color: P.lime }}>Silbernagel protocol</MetaLabel>
+            <p style={{ color: P.ink, fontSize: 12, lineHeight: '17px' }}>
+              Voor tendinopathie volgen we pijn <strong>tijdens</strong> de oefening,{' '}
+              <strong>24u erna</strong> en <strong>ochtend stijfheid</strong>. Dit helpt bepalen of
+              de belasting juist is.
             </p>
           </div>
-        </div>
+        </Tile>
 
         {/* Pending items */}
         {items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-            <div><IconCheck size={40} /></div>
-            <p className="font-semibold">Geen follow-ups</p>
-            <p className="text-sm text-muted-foreground">Je hebt geen openstaande 24u checks.</p>
-          </div>
+          <Tile>
+            <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
+              <span className="athletic-mono" style={{ color: P.lime, fontSize: 32, fontWeight: 900 }}>
+                ✓
+              </span>
+              <p style={{ color: P.ink, fontSize: 14, fontWeight: 800 }}>GEEN FOLLOW-UPS</p>
+              <p style={{ color: P.inkMuted, fontSize: 12 }}>
+                Je hebt geen openstaande 24u checks.
+              </p>
+            </div>
+          </Tile>
         ) : allDone ? (
-          <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
-            <CheckCircle2 className="w-12 h-12" style={{ color: MBT_GREEN }} />
-            <p className="font-semibold">Alles ingevuld!</p>
-            <p className="text-sm text-muted-foreground">Je therapeut kan nu je voortgang monitoren.</p>
-            <Link href="/patient/progress">
-              <Button variant="outline" className="mt-2">Naar voortgang</Button>
-            </Link>
-          </div>
+          <Tile accentBar={P.lime}>
+            <div className="flex flex-col items-center justify-center py-6 gap-3 text-center">
+              <span
+                className="athletic-mono"
+                style={{ color: P.lime, fontSize: 40, fontWeight: 900 }}
+              >
+                ✓
+              </span>
+              <p style={{ color: P.ink, fontSize: 14, fontWeight: 800 }}>ALLES INGEVULD</p>
+              <p style={{ color: P.inkMuted, fontSize: 12 }}>
+                Je therapeut kan nu je voortgang monitoren.
+              </p>
+              <DarkButton variant="secondary" href="/patient/progress">
+                NAAR VOORTGANG
+              </DarkButton>
+            </div>
+          </Tile>
         ) : (
-          items.map(item => (
+          items.map((item) => (
             <FollowUpCard key={item.id} item={item} onSave={handleSave} />
           ))
         )}
 
         {/* Legend */}
-        <Card style={{ borderRadius: '14px', background: '#fafafa' }}>
-          <CardContent className="px-4 py-3">
-            <p className="text-xs font-semibold text-muted-foreground mb-2">Silbernagel grenzen (pijn tijdens/na)</p>
-            <div className="space-y-1">
+        <Tile>
+          <div className="flex flex-col gap-2">
+            <MetaLabel>Silbernagel grenzen</MetaLabel>
+            <div className="flex flex-col gap-1.5">
               {[
-                { label: '0–5', desc: 'Groen — belasting OK', color: MBT_GREEN },
-                { label: '5–7', desc: 'Geel — let op, monitor', color: '#f97316' },
-                { label: '> 7', desc: 'Rood — stop, bespreek met therapeut', color: '#ef4444' },
-              ].map(r => (
-                <div key={r.label} className="flex items-center gap-2 text-xs">
-                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: r.color }} />
-                  <span className="font-semibold w-8">{r.label}</span>
-                  <span className="text-muted-foreground">{r.desc}</span>
+                { label: '0–5', desc: 'Belasting OK', color: P.lime },
+                { label: '5–7', desc: 'Let op, monitor', color: P.gold },
+                { label: '> 7', desc: 'Stop, bespreek met therapeut', color: P.danger },
+              ].map((r) => (
+                <div key={r.label} className="flex items-center gap-2">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: r.color }}
+                  />
+                  <span
+                    className="athletic-mono"
+                    style={{
+                      color: r.color,
+                      fontSize: 11,
+                      fontWeight: 900,
+                      width: 48,
+                      letterSpacing: '0.08em',
+                    }}
+                  >
+                    {r.label}
+                  </span>
+                  <span style={{ color: P.inkMuted, fontSize: 12 }}>{r.desc}</span>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </Tile>
       </div>
-    </div>
+    </DarkScreen>
   )
 }

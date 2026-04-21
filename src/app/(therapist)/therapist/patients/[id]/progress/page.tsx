@@ -4,47 +4,52 @@ import { use, useState } from 'react'
 import Link from 'next/link'
 import {
   LineChart, Line, BarChart, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
-import { Card, CardContent } from '@/components/ui/card'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { trpc } from '@/lib/trpc/client'
 import {
-  ArrowLeft, TrendingUp, TrendingDown, Activity,
-  CheckCircle2, Clock, Zap,
-} from 'lucide-react'
-
-const G = '#BEF264'
-const DARK = '#F5F7F6'
-const SURFACE_HI = '#1C2425'
+  DARK_CHART_STYLES,
+  DarkChartTooltip,
+  DarkTabs as Tabs,
+  DarkTabsContent as TabsContent,
+  DarkTabsList as TabsList,
+  DarkTabsTrigger as TabsTrigger,
+  Display,
+  Kicker,
+  MetaLabel,
+  P,
+  Tile,
+} from '@/components/dark-ui'
 
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <Card style={{ borderRadius: '12px' }}>
-      <CardContent className="p-4">
-        <p className="text-sm font-semibold mb-4">{title}</p>
+    <Tile>
+      <div className="space-y-3">
+        <MetaLabel>{title}</MetaLabel>
         {children}
-      </CardContent>
-    </Card>
+      </div>
+    </Tile>
   )
 }
 
-function StatChip({ label, value, sub, trend }: {
-  label: string; value: string | number; sub?: string; trend?: 'up' | 'down' | 'neutral'
+function StatChip({ label, value, sub, tint }: {
+  label: string; value: string | number; sub?: string; tint?: string
 }) {
   return (
-    <div className="bg-[#141A1B] rounded-xl p-4 border" style={{ borderColor: 'rgba(255,255,255,0.12)' }}>
-      <p className="text-xs uppercase tracking-wide font-semibold" style={{ color: '#7B8889' }}>{label}</p>
+    <div
+      className="rounded-2xl p-4"
+      style={{ background: P.surface, border: `1px solid ${P.line}` }}
+    >
+      <MetaLabel>{label.toUpperCase()}</MetaLabel>
       <div className="flex items-baseline gap-2 mt-1">
-        <span className="text-2xl font-bold" style={{ color: DARK }}>{value}</span>
-        {sub && <span className="text-sm" style={{ color: '#7B8889' }}>{sub}</span>}
+        <span
+          className="athletic-display"
+          style={{ color: tint ?? P.ink, fontSize: 28, lineHeight: '32px', letterSpacing: '-0.03em' }}
+        >
+          {value}
+        </span>
+        {sub && <span style={{ color: P.inkMuted, fontSize: 12 }}>{sub}</span>}
       </div>
-      {trend && (
-        <div className="flex items-center gap-1 mt-1">
-          {trend === 'up'      && <TrendingUp  className="w-3.5 h-3.5" style={{ color: G }} />}
-          {trend === 'down'    && <TrendingDown className="w-3.5 h-3.5 text-red-400" />}
-        </div>
-      )}
     </div>
   )
 }
@@ -75,22 +80,28 @@ function SessionCalendar({ sessions }: { sessions: { date: string }[] }) {
     <div>
       <div className="grid grid-cols-7 gap-1.5 mb-1.5">
         {dayLabels.map(d => (
-          <div key={d} className="text-center text-xs text-muted-foreground font-medium">{d}</div>
+          <div
+            key={d}
+            className="athletic-mono text-center"
+            style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.1em', fontWeight: 700 }}
+          >
+            {d.toUpperCase()}
+          </div>
         ))}
       </div>
       {weekRows.map((row, ri) => (
         <div key={ri} className="grid grid-cols-7 gap-1.5 mb-1.5">
           {row.map((day, di) => {
             if (!day) return <div key={di} className="aspect-square rounded-md" />
-            const bg = day.isFuture ? '#f8fafc'
-              : day.completed ? 'rgba(190,242,100,0.12)' : 'rgba(255,255,255,0.06)'
-            const border = day.isFuture ? '#e2e8f0'
-              : day.completed ? G : '#4A5454'
+            const bg = day.isFuture ? P.surfaceLow
+              : day.completed ? 'rgba(190,242,100,0.18)' : P.surfaceHi
+            const border = day.isFuture ? P.line
+              : day.completed ? P.lime : P.inkDim
             return (
               <div
                 key={di}
-                className="aspect-square rounded-md border-2"
-                style={{ background: bg, borderColor: border }}
+                className="aspect-square rounded-md"
+                style={{ background: bg, border: `2px solid ${border}` }}
                 title={`${day.date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}${day.completed ? ': Sessie' : ''}`}
               />
             )
@@ -99,12 +110,20 @@ function SessionCalendar({ sessions }: { sessions: { date: string }[] }) {
       ))}
       <div className="flex items-center gap-4 mt-3">
         {[
-          { color: 'rgba(190,242,100,0.12)', border: G,       label: 'Sessie' },
-          { color: 'rgba(255,255,255,0.06)', border: '#4A5454', label: 'Geen sessie' },
+          { color: 'rgba(190,242,100,0.18)', border: P.lime,   label: 'Sessie' },
+          { color: P.surfaceHi,               border: P.inkDim, label: 'Geen sessie' },
         ].map(({ color, border, label }) => (
           <div key={label} className="flex items-center gap-1.5">
-            <div className="w-3.5 h-3.5 rounded border-2" style={{ background: color, borderColor: border }} />
-            <span className="text-xs text-muted-foreground">{label}</span>
+            <div
+              className="w-3.5 h-3.5 rounded"
+              style={{ background: color, border: `2px solid ${border}` }}
+            />
+            <span
+              className="athletic-mono"
+              style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.08em' }}
+            >
+              {label}
+            </span>
           </div>
         ))}
       </div>
@@ -145,191 +164,251 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
 
   if (isLoading) {
     return (
-      <div className="space-y-4 max-w-3xl animate-pulse">
-        <div className="h-5 w-32 bg-[#1C2425] rounded" />
-        <div className="h-24 bg-[#1C2425] rounded-xl" />
-        <div className="h-48 bg-[#1C2425] rounded-xl" />
+      <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+        <div className="max-w-3xl mx-auto px-4 pt-10 pb-8 space-y-4 animate-pulse">
+          <div className="h-5 w-32 rounded" style={{ background: P.surfaceHi }} />
+          <div className="h-24 rounded-xl" style={{ background: P.surfaceHi }} />
+          <div className="h-48 rounded-xl" style={{ background: P.surfaceHi }} />
+        </div>
       </div>
     )
   }
 
+  const painTrendLabel = painTrend === 'down' ? 'verbetering' : painTrend === 'up' ? 'verslechtering' : 'stabiel'
+
   return (
-    <div className="space-y-5 max-w-3xl">
-      {/* Back */}
-      <Link
-        href={`/therapist/patients/${id}`}
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" /> {patient?.name ?? 'Patiënt'}
-      </Link>
+    <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+      <div className="max-w-3xl mx-auto px-4 pt-10 pb-8 space-y-5">
+        {/* Back */}
+        <Link
+          href={`/therapist/patients/${id}`}
+          className="athletic-mono inline-flex items-center gap-1.5"
+          style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.16em' }}
+        >
+          ← {(patient?.name ?? 'PATIËNT').toUpperCase()}
+        </Link>
 
-      <div>
-        <h1 className="text-xl font-bold">Voortgangsrapport</h1>
-        <p className="text-sm text-muted-foreground">Laatste 90 dagen · {sessions.length} sessies</p>
-      </div>
+        <div className="flex flex-col gap-1">
+          <Kicker>Voortgang</Kicker>
+          <Display size="md">RAPPORT</Display>
+          <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
+            Laatste 90 dagen · {sessions.length} sessies
+          </MetaLabel>
+        </div>
 
-      {/* Summary stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatChip label="Sessies" value={progress?.totalSessions ?? 0}
-          icon={<CheckCircle2 className="w-4 h-4" />} />
-        <StatChip label="Gem. pijn" value={progress?.avgPain !== null && progress?.avgPain !== undefined ? `${progress.avgPain}/10` : '—'}
-          trend={painTrend === 'down' ? 'up' : painTrend === 'up' ? 'down' : 'neutral'} />
-        <StatChip label="Gem. RPE" value={progress?.avgExertion !== null && progress?.avgExertion !== undefined ? `${progress.avgExertion}/10` : '—'} />
-        <StatChip label="Oefeningen" value={exerciseNames.length} sub="met 1RM" />
-      </div>
+        {/* Summary stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <StatChip label="Sessies" value={progress?.totalSessions ?? 0} tint={P.lime} />
+          <StatChip
+            label="Gem. pijn"
+            value={progress?.avgPain !== null && progress?.avgPain !== undefined ? `${progress.avgPain}/10` : '—'}
+            sub={painSessions.length > 0 ? painTrendLabel : undefined}
+            tint={P.danger}
+          />
+          <StatChip
+            label="Gem. RPE"
+            value={progress?.avgExertion !== null && progress?.avgExertion !== undefined ? `${progress.avgExertion}/10` : '—'}
+            tint={P.gold}
+          />
+          <StatChip label="Oefeningen" value={exerciseNames.length} sub="met 1RM" tint={P.ice} />
+        </div>
 
-      {sessions.length === 0 ? (
-        <Card style={{ borderRadius: '14px' }}>
-          <CardContent className="py-12 text-center">
-            <Activity className="w-10 h-10 mx-auto mb-3 text-zinc-300" />
-            <p className="font-semibold text-sm">Nog geen sessies</p>
-            <p className="text-xs text-muted-foreground mt-1">Zodra de patiënt sessies afrondt verschijnen hier de gegevens.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Tabs defaultValue="sessies" className="space-y-4">
-          <TabsList className="w-full grid grid-cols-3">
-            <TabsTrigger value="sessies" className="text-xs">Sessies</TabsTrigger>
-            <TabsTrigger value="kalender" className="text-xs">Kalender</TabsTrigger>
-            <TabsTrigger value="krachtopbouw" className="text-xs">1RM</TabsTrigger>
-          </TabsList>
+        {sessions.length === 0 ? (
+          <Tile>
+            <div className="py-12 text-center">
+              <p style={{ color: P.ink, fontSize: 14, fontWeight: 700 }}>Nog geen sessies</p>
+              <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 6 }}>
+                Zodra de patiënt sessies afrondt verschijnen hier de gegevens.
+              </p>
+            </div>
+          </Tile>
+        ) : (
+          <Tabs defaultValue="sessies" className="space-y-4">
+            <TabsList
+              className="w-full grid grid-cols-3 rounded-xl"
+              style={{ background: P.surface, border: `1px solid ${P.line}` }}
+            >
+              <TabsTrigger value="sessies" className="text-xs">Sessies</TabsTrigger>
+              <TabsTrigger value="kalender" className="text-xs">Kalender</TabsTrigger>
+              <TabsTrigger value="krachtopbouw" className="text-xs">1RM</TabsTrigger>
+            </TabsList>
 
-          {/* ── Sessies tab ── */}
-          <TabsContent value="sessies" className="space-y-4">
-            {sessionChartData.some(s => s.Pijn !== null) && (
-              <ChartCard title="Pijn per sessie (NRS 0–10)">
-                <ResponsiveContainer width="100%" height={180}>
-                  <LineChart data={sessionChartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="date" tick={{ fontSize: 9 }} interval="preserveStartEnd" />
-                    <YAxis domain={[0, 10]} tick={{ fontSize: 10 }} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="Pijn" stroke="#f87171" strokeWidth={2} dot={{ r: 3 }} connectNulls />
-                  </LineChart>
-                </ResponsiveContainer>
-              </ChartCard>
-            )}
-            {sessionChartData.some(s => s.Inspanning !== null) && (
-              <ChartCard title="Inspanning per sessie (RPE 0–10)">
+            {/* ── Sessies tab ── */}
+            <TabsContent value="sessies" className="space-y-4">
+              {sessionChartData.some(s => s.Pijn !== null) && (
+                <ChartCard title="Pijn per sessie (NRS 0–10)">
+                  <ResponsiveContainer width="100%" height={180}>
+                    <LineChart data={sessionChartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                      <CartesianGrid {...DARK_CHART_STYLES.grid} />
+                      <XAxis dataKey="date" {...DARK_CHART_STYLES.axis} interval="preserveStartEnd" />
+                      <YAxis domain={[0, 10]} {...DARK_CHART_STYLES.axis} />
+                      <Tooltip content={<DarkChartTooltip />} />
+                      <Line type="monotone" dataKey="Pijn" stroke={P.danger} strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              )}
+              {sessionChartData.some(s => s.Inspanning !== null) && (
+                <ChartCard title="Inspanning per sessie (RPE 0–10)">
+                  <ResponsiveContainer width="100%" height={160}>
+                    <LineChart data={sessionChartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                      <CartesianGrid {...DARK_CHART_STYLES.grid} />
+                      <XAxis dataKey="date" {...DARK_CHART_STYLES.axis} interval="preserveStartEnd" />
+                      <YAxis domain={[0, 10]} {...DARK_CHART_STYLES.axis} />
+                      <Tooltip content={<DarkChartTooltip />} />
+                      <Line type="monotone" dataKey="Inspanning" stroke={P.lime} strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              )}
+              <ChartCard title="Sessieduur (minuten)">
                 <ResponsiveContainer width="100%" height={160}>
-                  <LineChart data={sessionChartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="date" tick={{ fontSize: 9 }} interval="preserveStartEnd" />
-                    <YAxis domain={[0, 10]} tick={{ fontSize: 10 }} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="Inspanning" stroke={G} strokeWidth={2} dot={{ r: 3 }} connectNulls />
-                  </LineChart>
+                  <BarChart data={sessionChartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                    <CartesianGrid {...DARK_CHART_STYLES.grid} />
+                    <XAxis dataKey="date" {...DARK_CHART_STYLES.axis} interval="preserveStartEnd" />
+                    <YAxis {...DARK_CHART_STYLES.axis} />
+                    <Tooltip content={<DarkChartTooltip />} />
+                    <Bar dataKey="Duur" fill={P.lime} radius={[4, 4, 0, 0]} />
+                  </BarChart>
                 </ResponsiveContainer>
               </ChartCard>
-            )}
-            <ChartCard title="Sessieduur (minuten)">
-              <ResponsiveContainer width="100%" height={160}>
-                <BarChart data={sessionChartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="date" tick={{ fontSize: 9 }} interval="preserveStartEnd" />
-                  <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip />
-                  <Bar dataKey="Duur" fill={G} radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartCard>
-          </TabsContent>
+            </TabsContent>
 
-          {/* ── Kalender tab ── */}
-          <TabsContent value="kalender">
-            <Card style={{ borderRadius: '12px' }}>
-              <CardContent className="p-4">
-                <p className="text-sm font-semibold mb-4">Sessie-aanwezigheid (laatste 8 weken)</p>
-                <SessionCalendar sessions={sessions} />
-                <div className="mt-4 pt-4 border-t grid grid-cols-3 gap-3 text-center">
-                  <div>
-                    <p className="text-lg font-bold">{sessions.length}</p>
-                    <p className="text-xs text-muted-foreground">Sessies</p>
-                  </div>
-                  <div>
-                    <p className="text-lg font-bold">{sessions.filter(s => s.durationMinutes > 0).reduce((s, l) => s + l.durationMinutes, 0)}</p>
-                    <p className="text-xs text-muted-foreground">Totaal min.</p>
-                  </div>
-                  <div>
-                    <p className="text-lg font-bold">{progress?.avgExertion !== null && progress?.avgExertion !== undefined ? progress.avgExertion : '—'}</p>
-                    <p className="text-xs text-muted-foreground">Gem. RPE</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* ── 1RM tab ── */}
-          <TabsContent value="krachtopbouw" className="space-y-4">
-            {exerciseNames.length === 0 ? (
-              <Card style={{ borderRadius: '14px' }}>
-                <CardContent className="py-8 text-center">
-                  <Zap className="w-8 h-8 mx-auto mb-2 text-zinc-300" />
-                  <p className="text-sm text-muted-foreground">Nog geen gewichtsdata gelogd</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                {/* Exercise selector */}
-                <div className="flex gap-2 flex-wrap">
-                  {exerciseNames.map(name => (
-                    <button
-                      key={name}
-                      onClick={() => setSelectedExercise(name)}
-                      className="text-xs px-3 py-1.5 rounded-full border font-medium transition-all"
-                      style={{
-                        background: (activeEx === name) ? G : SURFACE_HI,
-                        color: (activeEx === name) ? '#0A0E0F' : '#7B8889',
-                        borderColor: (activeEx === name) ? G : 'rgba(255,255,255,0.12)',
-                      }}
-                    >
-                      {name}
-                    </button>
-                  ))}
-                </div>
-                {activeEx && oneRmData.length > 0 && (
-                  <ChartCard title={`${activeEx} — Geschat 1RM (kg)`}>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <LineChart data={oneRmData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                        <XAxis dataKey="date" tick={{ fontSize: 9 }} interval="preserveStartEnd" />
-                        <YAxis tick={{ fontSize: 10 }} />
-                        <Tooltip />
-                        <Line type="monotone" dataKey="1RM (kg)" stroke={G} strokeWidth={2.5} dot={{ r: 4, fill: G }} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                    <div className="mt-3 grid grid-cols-3 gap-3 text-center pt-3 border-t">
-                      <div>
-                        <p className="text-lg font-bold">{oneRmData[0]?.['1RM (kg)'] ?? '—'}</p>
-                        <p className="text-xs text-muted-foreground">Start</p>
-                      </div>
-                      <div>
-                        <p className="text-lg font-bold">{oneRmData[oneRmData.length - 1]?.['1RM (kg)'] ?? '—'}</p>
-                        <p className="text-xs text-muted-foreground">Huidig</p>
-                      </div>
-                      <div>
-                        {(() => {
-                          const start = oneRmData[0]?.['1RM (kg)'] ?? 0
-                          const current = oneRmData[oneRmData.length - 1]?.['1RM (kg)'] ?? 0
-                          const diff = current - start
-                          return (
-                            <>
-                              <p className="text-lg font-bold" style={{ color: diff >= 0 ? G : '#f87171' }}>
-                                {diff >= 0 ? '+' : ''}{diff} kg
-                              </p>
-                              <p className="text-xs text-muted-foreground">Verschil</p>
-                            </>
-                          )
-                        })()}
-                      </div>
+            {/* ── Kalender tab ── */}
+            <TabsContent value="kalender">
+              <Tile>
+                <div className="space-y-4">
+                  <MetaLabel>Sessie-aanwezigheid (laatste 8 weken)</MetaLabel>
+                  <SessionCalendar sessions={sessions} />
+                  <div
+                    className="mt-4 pt-4 grid grid-cols-3 gap-3 text-center"
+                    style={{ borderTop: `1px solid ${P.line}` }}
+                  >
+                    <div>
+                      <p
+                        className="athletic-display"
+                        style={{ color: P.ink, fontSize: 22, lineHeight: '26px' }}
+                      >
+                        {sessions.length}
+                      </p>
+                      <MetaLabel>Sessies</MetaLabel>
                     </div>
-                  </ChartCard>
-                )}
-              </>
-            )}
-          </TabsContent>
-        </Tabs>
-      )}
+                    <div>
+                      <p
+                        className="athletic-display"
+                        style={{ color: P.ink, fontSize: 22, lineHeight: '26px' }}
+                      >
+                        {sessions.filter(s => s.durationMinutes > 0).reduce((s, l) => s + l.durationMinutes, 0)}
+                      </p>
+                      <MetaLabel>Totaal min.</MetaLabel>
+                    </div>
+                    <div>
+                      <p
+                        className="athletic-display"
+                        style={{ color: P.ink, fontSize: 22, lineHeight: '26px' }}
+                      >
+                        {progress?.avgExertion !== null && progress?.avgExertion !== undefined ? progress.avgExertion : '—'}
+                      </p>
+                      <MetaLabel>Gem. RPE</MetaLabel>
+                    </div>
+                  </div>
+                </div>
+              </Tile>
+            </TabsContent>
+
+            {/* ── 1RM tab ── */}
+            <TabsContent value="krachtopbouw" className="space-y-4">
+              {exerciseNames.length === 0 ? (
+                <Tile>
+                  <div className="py-8 text-center">
+                    <p style={{ color: P.inkMuted, fontSize: 13 }}>Nog geen gewichtsdata gelogd</p>
+                  </div>
+                </Tile>
+              ) : (
+                <>
+                  {/* Exercise selector */}
+                  <div className="flex gap-2 flex-wrap">
+                    {exerciseNames.map(name => (
+                      <button
+                        key={name}
+                        onClick={() => setSelectedExercise(name)}
+                        className="athletic-tap athletic-mono text-xs px-3 py-1.5 rounded-full font-bold transition-all"
+                        style={{
+                          background: activeEx === name ? P.lime : P.surfaceHi,
+                          color: activeEx === name ? P.bg : P.inkMuted,
+                          border: `1px solid ${activeEx === name ? P.lime : P.lineStrong}`,
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                  {activeEx && oneRmData.length > 0 && (
+                    <ChartCard title={`${activeEx} — Geschat 1RM (kg)`}>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <LineChart data={oneRmData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                          <CartesianGrid {...DARK_CHART_STYLES.grid} />
+                          <XAxis dataKey="date" {...DARK_CHART_STYLES.axis} interval="preserveStartEnd" />
+                          <YAxis {...DARK_CHART_STYLES.axis} />
+                          <Tooltip content={<DarkChartTooltip />} />
+                          <Line type="monotone" dataKey="1RM (kg)" stroke={P.lime} strokeWidth={2.5} dot={{ r: 4, fill: P.lime }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                      <div
+                        className="mt-3 grid grid-cols-3 gap-3 text-center pt-3"
+                        style={{ borderTop: `1px solid ${P.line}` }}
+                      >
+                        <div>
+                          <p
+                            className="athletic-display"
+                            style={{ color: P.ink, fontSize: 22, lineHeight: '26px' }}
+                          >
+                            {oneRmData[0]?.['1RM (kg)'] ?? '—'}
+                          </p>
+                          <MetaLabel>Start</MetaLabel>
+                        </div>
+                        <div>
+                          <p
+                            className="athletic-display"
+                            style={{ color: P.ink, fontSize: 22, lineHeight: '26px' }}
+                          >
+                            {oneRmData[oneRmData.length - 1]?.['1RM (kg)'] ?? '—'}
+                          </p>
+                          <MetaLabel>Huidig</MetaLabel>
+                        </div>
+                        <div>
+                          {(() => {
+                            const start = oneRmData[0]?.['1RM (kg)'] ?? 0
+                            const current = oneRmData[oneRmData.length - 1]?.['1RM (kg)'] ?? 0
+                            const diff = current - start
+                            return (
+                              <>
+                                <p
+                                  className="athletic-display"
+                                  style={{
+                                    color: diff >= 0 ? P.lime : P.danger,
+                                    fontSize: 22,
+                                    lineHeight: '26px',
+                                  }}
+                                >
+                                  {diff >= 0 ? '+' : ''}{diff} kg
+                                </p>
+                                <MetaLabel>Verschil</MetaLabel>
+                              </>
+                            )
+                          })()}
+                        </div>
+                      </div>
+                    </ChartCard>
+                  )}
+                </>
+              )}
+            </TabsContent>
+          </Tabs>
+        )}
+      </div>
     </div>
   )
 }

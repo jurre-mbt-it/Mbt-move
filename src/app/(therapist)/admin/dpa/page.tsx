@@ -1,12 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { trpc } from '@/lib/trpc/client'
-import { CheckCircle2, Clock, Download, Search, Users } from 'lucide-react'
+import { DarkButton, DarkInput, Kicker, MetaLabel, MetricTile, P, Tile } from '@/components/dark-ui'
 import { DPA_VERSION } from '@/lib/dpa-constants'
 
 export default function AdminDpaPage() {
@@ -49,123 +45,137 @@ export default function AdminDpaPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-5xl w-full flex flex-col gap-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Verwerkingsovereenkomst (DPA)</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            Overzicht patiëntacceptaties · Huidige versie: {DPA_VERSION}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <Kicker>Beheer</Kicker>
+          <h1
+            className="athletic-display"
+            style={{ fontSize: 32, lineHeight: '38px', letterSpacing: '-0.025em', paddingTop: 2 }}
+          >
+            VERWERKINGSOVEREENKOMST
+          </h1>
+          <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 4 }}>
+            Overzicht patiëntacceptaties · Huidige versie:{' '}
+            <span className="athletic-mono" style={{ color: P.ink, fontWeight: 700 }}>
+              {DPA_VERSION}
+            </span>
           </p>
         </div>
-        <Button
-          variant="outline"
-          className="gap-2 shrink-0"
+        <DarkButton
+          variant="secondary"
+          size="sm"
           onClick={downloadCsv}
           disabled={patients.length === 0}
         >
-          <Download className="w-4 h-4" />
           CSV exporteren
-        </Button>
+        </DarkButton>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card style={{ borderRadius: '14px' }}>
-          <CardContent className="px-4 py-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Users className="w-4 h-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Totaal patiënten</span>
-            </div>
-            <p className="text-2xl font-bold">{patients.length}</p>
-          </CardContent>
-        </Card>
-        <Card style={{ borderRadius: '14px' }}>
-          <CardContent className="px-4 py-4">
-            <div className="flex items-center gap-2 mb-1">
-              <CheckCircle2 className="w-4 h-4" style={{ color: '#BEF264' }} />
-              <span className="text-xs text-muted-foreground">Geaccepteerd</span>
-            </div>
-            <p className="text-2xl font-bold" style={{ color: '#BEF264' }}>{acceptedCount}</p>
-          </CardContent>
-        </Card>
-        <Card style={{ borderRadius: '14px' }}>
-          <CardContent className="px-4 py-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Clock className="w-4 h-4 text-amber-500" />
-              <span className="text-xs text-muted-foreground">Openstaand</span>
-            </div>
-            <p className="text-2xl font-bold text-amber-600">{pendingCount}</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-3 gap-3">
+        <MetricTile label="Totaal patiënten" value={patients.length} tint={P.ink} />
+        <MetricTile label="Geaccepteerd" value={acceptedCount} tint={P.lime} />
+        <MetricTile label="Openstaand" value={pendingCount} tint={P.gold} />
       </div>
 
       {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Zoek op naam of e-mail…"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          className="pl-9"
-        />
-      </div>
+      <DarkInput
+        placeholder="Zoek op naam of e-mail…"
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        className="max-w-sm"
+      />
 
       {/* Table */}
-      <Card style={{ borderRadius: '14px', overflow: 'hidden' }}>
+      <Tile style={{ padding: 0, overflow: 'hidden' }}>
         {isLoading ? (
-          <div className="p-6 space-y-3">
+          <div className="p-4 flex flex-col gap-2">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-12 rounded-xl bg-[#1C2425] animate-pulse" />
+              <div key={i} className="h-12 rounded-xl animate-pulse" style={{ background: P.surfaceHi }} />
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-16 text-center text-muted-foreground">
-            <Users className="w-8 h-8 mx-auto mb-3 opacity-30" />
-            <p className="text-sm">
-              {query ? 'Geen patiënten gevonden' : 'Geen patiënten gekoppeld aan uw account'}
-            </p>
+          <div className="py-16 text-center" style={{ color: P.inkMuted, fontSize: 13 }}>
+            {query ? 'Geen patiënten gevonden' : 'Geen patiënten gekoppeld aan uw account'}
           </div>
         ) : (
-          <div className="divide-y">
+          <div>
             {/* Header row */}
-            <div className="grid grid-cols-4 gap-4 px-4 py-3 bg-[#1C2425] text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            <div
+              className="grid grid-cols-4 gap-4 px-4 py-3 athletic-mono"
+              style={{
+                background: P.surfaceHi,
+                color: P.inkMuted,
+                fontSize: 11,
+                letterSpacing: '0.14em',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                borderBottom: `1px solid ${P.line}`,
+              }}
+            >
               <span>Patiënt</span>
               <span>Status</span>
               <span>Versie</span>
               <span>Datum</span>
             </div>
-            {filtered.map(p => (
-              <div key={p.id} className="grid grid-cols-4 gap-4 px-4 py-3 items-center hover:bg-[#1C2425] transition-colors">
+            {filtered.map((p, idx) => (
+              <div
+                key={p.id}
+                className="grid grid-cols-4 gap-4 px-4 py-3 items-center"
+                style={{ borderBottom: idx === filtered.length - 1 ? 'none' : `1px solid ${P.line}` }}
+              >
                 <div className="min-w-0">
-                  <p className="font-medium text-sm truncate">{p.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">{p.email}</p>
+                  <p className="truncate" style={{ color: P.ink, fontSize: 13, fontWeight: 600 }}>
+                    {p.name}
+                  </p>
+                  <p
+                    className="athletic-mono truncate"
+                    style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.04em', fontWeight: 500 }}
+                  >
+                    {p.email}
+                  </p>
                 </div>
                 <div>
                   {p.accepted ? (
-                    <Badge
-                      className="text-xs gap-1"
-                      style={{ background: 'rgba(190,242,100,0.10)', color: '#BEF264', border: 'none' }}
+                    <span
+                      className="athletic-mono inline-flex items-center gap-1.5 px-2 py-1 rounded-full"
+                      style={{
+                        background: 'rgba(190,242,100,0.12)',
+                        color: P.lime,
+                        fontSize: 10,
+                        letterSpacing: '0.12em',
+                        fontWeight: 800,
+                      }}
                     >
-                      <CheckCircle2 className="w-3 h-3" /> Geaccepteerd
-                    </Badge>
+                      ● GEACCEPTEERD
+                    </span>
                   ) : (
-                    <Badge
-                      variant="outline"
-                      className="text-xs gap-1 text-amber-600 border-amber-200"
+                    <span
+                      className="athletic-mono inline-flex items-center gap-1.5 px-2 py-1 rounded-full"
+                      style={{
+                        background: 'rgba(244,194,97,0.12)',
+                        color: P.gold,
+                        fontSize: 10,
+                        letterSpacing: '0.12em',
+                        fontWeight: 800,
+                      }}
                     >
-                      <Clock className="w-3 h-3" /> Openstaand
-                    </Badge>
+                      ○ OPENSTAAND
+                    </span>
                   )}
                 </div>
-                <div className="text-sm">
+                <div>
                   {p.dpaAcceptedVersion ? (
-                    <span className="font-mono text-xs">{p.dpaAcceptedVersion}</span>
+                    <span className="athletic-mono" style={{ color: P.ink, fontSize: 12, fontWeight: 700 }}>
+                      {p.dpaAcceptedVersion}
+                    </span>
                   ) : (
-                    <span className="text-muted-foreground text-xs">—</span>
+                    <span style={{ color: P.inkDim, fontSize: 12 }}>—</span>
                   )}
                 </div>
-                <div className="text-xs text-muted-foreground">
+                <div style={{ color: P.inkMuted, fontSize: 12 }}>
                   {p.dpaAcceptedAt
                     ? new Date(p.dpaAcceptedAt).toLocaleDateString('nl-NL', {
                         day: 'numeric', month: 'short', year: 'numeric',
@@ -176,9 +186,9 @@ export default function AdminDpaPage() {
             ))}
           </div>
         )}
-      </Card>
+      </Tile>
 
-      <p className="text-xs text-muted-foreground">
+      <p style={{ color: P.inkDim, fontSize: 11, lineHeight: 1.5 }}>
         Dit overzicht toont uitsluitend patiënten die aan uw account zijn gekoppeld.
         Bewaar deze export conform de bewaartermijn van 15 jaar (WGBO).
       </p>
