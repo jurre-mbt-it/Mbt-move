@@ -20,8 +20,8 @@ import {
 import { trpc } from '@/lib/trpc/client'
 import { CARDIO_ICON_MAP } from '@/components/icons'
 
-const MBT_GREEN = '#3ECF6A'
-const MBT_TEAL = '#4ECDC4'
+const MBT_GREEN = '#BEF264'
+const MBT_TEAL = '#BEF264'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -303,7 +303,7 @@ function CardioProgramBuilderContent() {
                     key={key}
                     onClick={() => set('activity', key)}
                     className="flex flex-col items-center gap-1 p-3 rounded-xl border text-center transition-all"
-                    style={form.activity === key ? { borderColor: MBT_GREEN, background: '#f0fdf4' } : {}}
+                    style={form.activity === key ? { borderColor: MBT_GREEN, background: 'rgba(190,242,100,0.10)' } : {}}
                   >
                     <span className="text-2xl">{(() => { const Icon = CARDIO_ICON_MAP[key]; return Icon ? <Icon size={28} /> : act.icon })()}</span>
                     <span className="text-xs font-medium leading-tight">{act.label}</span>
@@ -415,7 +415,7 @@ function CardioProgramBuilderContent() {
                     type="range" min={1} max={10} step={1}
                     value={form.targetRpe ?? 5}
                     onChange={e => set('targetRpe', +e.target.value)}
-                    className="flex-1 accent-[#3ECF6A]"
+                    className="flex-1 accent-[#BEF264]"
                   />
                   <span className="w-6 text-sm font-bold text-center">{form.targetRpe ?? '—'}</span>
                   {form.targetRpe && (

@@ -18,17 +18,17 @@ export default function AthleteProfilePage() {
 
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
-      <div className="px-4 pt-12 pb-8" style={{ background: '#1A3A3A' }}>
+      <div className="px-4 pt-12 pb-8" style={{ background: '#1C2425' }}>
         <div className="flex flex-col items-center gap-3">
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center font-bold text-2xl text-white"
-            style={{ background: '#4ECDC4' }}
+            style={{ background: '#BEF264' }}
           >
             AT
           </div>
           <div className="text-center">
             <h1 className="text-white text-xl font-bold">Atleet</h1>
-            <p className="text-zinc-400 text-sm mt-0.5">Atleet Dashboard</p>
+            <p className="text-[#7B8889] text-sm mt-0.5">Atleet Dashboard</p>
           </div>
         </div>
       </div>

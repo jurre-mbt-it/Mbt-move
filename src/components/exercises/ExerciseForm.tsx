@@ -196,9 +196,9 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
                     'px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors',
                     form.category === c.value
                       ? 'border-transparent text-white'
-                      : 'border-zinc-200 text-muted-foreground hover:border-zinc-300'
+                      : 'border-[rgba(255,255,255,0.12)] text-muted-foreground hover:border-[rgba(255,255,255,0.16)]'
                   )}
-                  style={form.category === c.value ? { background: '#4ECDC4' } : {}}
+                  style={form.category === c.value ? { background: '#BEF264' } : {}}
                 >
                   {c.label}
                 </button>
@@ -218,8 +218,8 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
                   className={cn(
                     'flex-1 py-2 rounded-lg text-sm font-medium border transition-colors',
                     form.difficulty === d.value
-                      ? 'border-transparent bg-zinc-900 text-white'
-                      : 'border-zinc-200 text-muted-foreground hover:border-zinc-400'
+                      ? 'border-transparent bg-[#BEF264] text-white'
+                      : 'border-[rgba(255,255,255,0.12)] text-muted-foreground hover:border-[rgba(255,255,255,0.2)]'
                   )}
                 >
                   {d.label}
@@ -240,8 +240,8 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
                   className={cn(
                     'px-3 py-1 rounded-full text-xs font-medium border transition-colors',
                     form.bodyRegion.includes(r.value)
-                      ? 'bg-zinc-900 text-white border-zinc-900'
-                      : 'border-zinc-200 text-muted-foreground hover:border-zinc-400'
+                      ? 'bg-[#BEF264] text-white border-[#BEF264]'
+                      : 'border-[rgba(255,255,255,0.12)] text-muted-foreground hover:border-[rgba(255,255,255,0.2)]'
                   )}
                 >
                   {r.label}
@@ -357,7 +357,7 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
                   className={cn(
                     'rounded-lg border px-3 py-2 text-sm text-left transition-colors',
                     form.loadType === opt.value
-                      ? 'border-[#4ECDC4] bg-[#4ECDC410] font-medium'
+                      ? 'border-[#BEF264] bg-[#BEF26410] font-medium'
                       : 'border-input hover:bg-accent'
                   )}
                   onClick={() => set('loadType', opt.value)}
@@ -409,7 +409,7 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
               toast.success(`${Object.keys(estimated).length} spiergroepen automatisch ingeschat`)
             }}
           >
-            <Sparkles className="w-4 h-4" style={{ color: '#4ECDC4' }} />
+            <Sparkles className="w-4 h-4" style={{ color: '#BEF264' }} />
             Auto-inschatting spierbelasting
           </Button>
           <MuscleLoadSliders
@@ -435,12 +435,12 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
       <Separator />
 
       {/* Actions — sticky on mobile, inline on desktop */}
-      <div className="fixed md:relative bottom-16 md:bottom-auto left-0 md:left-auto right-0 md:right-auto z-10 md:z-auto bg-white md:bg-transparent border-t md:border-t-0 px-4 py-3 md:px-0 md:py-0 flex gap-3">
+      <div className="fixed md:relative bottom-16 md:bottom-auto left-0 md:left-auto right-0 md:right-auto z-10 md:z-auto bg-[#141A1B] md:bg-transparent border-t md:border-t-0 px-4 py-3 md:px-0 md:py-0 flex gap-3">
         <Button
           onClick={handleSave}
           disabled={saving}
           className="gap-2 flex-1 md:flex-none"
-          style={{ background: '#4ECDC4' }}
+          style={{ background: '#BEF264' }}
         >
           <Save className="w-4 h-4" />
           {saving ? 'Opslaan...' : mode === 'create' ? 'Oefening aanmaken' : 'Wijzigingen opslaan'}

@@ -21,7 +21,7 @@ import { CSS } from '@dnd-kit/utilities'
 import type { CustomParameter } from './types'
 
 const CATEGORY_COLORS: Record<string, string> = {
-  STRENGTH: '#4ECDC4', MOBILITY: '#60a5fa', PLYOMETRICS: '#f59e0b',
+  STRENGTH: '#BEF264', MOBILITY: '#60a5fa', PLYOMETRICS: '#f59e0b',
   CARDIO: '#f87171', STABILITY: '#a78bfa',
 }
 
@@ -57,7 +57,7 @@ function InlineNumber({
       value={value}
       onChange={e => onChange(Math.max(min, Number(e.target.value)))}
       className={cn(
-        'w-12 h-6 text-center text-xs font-semibold bg-zinc-100 rounded border-0 focus:outline-none focus:ring-1 focus:ring-[#4ECDC4]',
+        'w-12 h-6 text-center text-xs font-semibold bg-[#1C2425] rounded border-0 focus:outline-none focus:ring-1 focus:ring-[#BEF264]',
         className
       )}
     />
@@ -76,7 +76,7 @@ export function ProgramExerciseBlock({
   })
 
   const style = { transform: CSS.Transform.toString(transform), transition }
-  const color = CATEGORY_COLORS[exercise.category] ?? '#4ECDC4'
+  const color = CATEGORY_COLORS[exercise.category] ?? '#BEF264'
 
   const addParam = (tpl: { label: string; type: 'number' | 'text' | 'select' | 'slider'; unit?: string; options?: string[]; min?: number; max?: number; defaultValue?: string | number }) => {
     if (exercise.extraParams.find(p => p.label === tpl.label)) return
@@ -121,9 +121,9 @@ export function ProgramExerciseBlock({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'group rounded-lg border bg-white transition-all',
-        isDragging ? 'opacity-50 shadow-xl z-50' : 'hover:border-zinc-300',
-        exercise.selected && 'ring-2 ring-[#4ECDC4] border-[#4ECDC4]',
+        'group rounded-lg border bg-[#141A1B] transition-all',
+        isDragging ? 'opacity-50 shadow-xl z-50' : 'hover:border-[rgba(255,255,255,0.16)]',
+        exercise.selected && 'ring-2 ring-[#BEF264] border-[#BEF264]',
         isInSuperset && 'border-transparent'
       )}
     >
@@ -134,7 +134,7 @@ export function ProgramExerciseBlock({
           <button
             {...attributes}
             {...listeners}
-            className="text-zinc-300 hover:text-zinc-500 cursor-grab shrink-0 touch-none"
+            className="text-zinc-300 hover:text-[#7B8889] cursor-grab shrink-0 touch-none"
           >
             <GripVertical className="w-4 h-4" />
           </button>
@@ -143,7 +143,7 @@ export function ProgramExerciseBlock({
             type="checkbox"
             checked={exercise.selected}
             onChange={() => onToggleSelect(exercise.uid)}
-            className="w-3.5 h-3.5 shrink-0 accent-[#4ECDC4]"
+            className="w-3.5 h-3.5 shrink-0 accent-[#BEF264]"
           />
 
           <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
@@ -228,13 +228,13 @@ export function ProgramExerciseBlock({
           <select
             value={exercise.repUnit}
             onChange={e => onUpdate(exercise.uid, { repUnit: e.target.value as RepUnit })}
-            className="text-xs bg-zinc-100 border-0 rounded px-1 h-6 focus:outline-none focus:ring-1 focus:ring-[#4ECDC4]"
+            className="text-xs bg-[#1C2425] border-0 rounded px-1 h-6 focus:outline-none focus:ring-1 focus:ring-[#BEF264]"
           >
             {REP_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
           </select>
           <span className="text-zinc-300 mx-0.5">·</span>
           <InlineNumber value={exercise.rest} onChange={v => onUpdate(exercise.uid, { rest: v })} min={0} className="w-10" />
-          <span className="text-zinc-400">s</span>
+          <span className="text-[#7B8889]">s</span>
         </div>
       </div>
 
@@ -251,8 +251,8 @@ export function ProgramExerciseBlock({
             <VideoPlayer url={exercise.videoUrl} />
           ) : (
             <div className="flex flex-col items-center justify-center py-10 text-center rounded-xl border-2 border-dashed">
-              <div className="w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center mb-3">
-                <Play className="w-5 h-5 text-zinc-400" />
+              <div className="w-12 h-12 rounded-full bg-[#1C2425] flex items-center justify-center mb-3">
+                <Play className="w-5 h-5 text-[#7B8889]" />
               </div>
               <p className="text-sm font-medium">Nog geen video gekoppeld</p>
               <p className="text-xs text-muted-foreground mt-1">Voeg een video URL toe bij het bewerken van de oefening</p>
@@ -265,7 +265,7 @@ export function ProgramExerciseBlock({
       {exercise.extraParams.length > 0 && (
         <div className="px-8 pb-2 flex flex-wrap gap-2">
           {exercise.extraParams.map(param => (
-            <div key={param.id} className="flex items-center gap-1 bg-zinc-50 border rounded-md px-2 py-1 text-xs group/param">
+            <div key={param.id} className="flex items-center gap-1 bg-[#1C2425] border rounded-md px-2 py-1 text-xs group/param">
               <span className="text-muted-foreground">{param.label}:</span>
               {param.type === 'number' ? (
                 <input
@@ -284,7 +284,7 @@ export function ProgramExerciseBlock({
                     max={param.max ?? 10}
                     value={param.value as number}
                     onChange={e => updateParam(param.id, Number(e.target.value))}
-                    className="w-16 h-1 accent-[#4ECDC4]"
+                    className="w-16 h-1 accent-[#BEF264]"
                   />
                   <span className="font-semibold w-4 text-center">{param.value}</span>
                 </div>
@@ -306,7 +306,7 @@ export function ProgramExerciseBlock({
               )}
               {param.unit && <span className="text-muted-foreground">{param.unit}</span>}
               <button onClick={() => removeParam(param.id)} className="opacity-0 group-hover/param:opacity-100 ml-0.5">
-                <X className="w-2.5 h-2.5 text-zinc-400 hover:text-destructive" />
+                <X className="w-2.5 h-2.5 text-[#7B8889] hover:text-destructive" />
               </button>
             </div>
           ))}

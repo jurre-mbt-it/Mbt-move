@@ -193,15 +193,27 @@ model WellnessCheck {
   @@map("wellness_checks")
 }
 
+enum PatientAccessStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  REVOKED
+}
+
 model PatientTherapist {
-  id          String   @id @default(cuid())
-  therapist   User     @relation("TherapistRelation", fields: [therapistId], references: [id])
-  therapistId String
-  patient     User     @relation("PatientRelation", fields: [patientId], references: [id])
-  patientId   String
-  createdAt   DateTime @default(now())
-  isActive    Boolean  @default(true)
-  notes       String?
+  id           String              @id @default(cuid())
+  therapist    User                @relation("TherapistRelation", fields: [therapistId], references: [id])
+  therapistId  String
+  patient      User                @relation("PatientRelation", fields: [patientId], references: [id])
+  patientId    String
+  createdAt    DateTime            @default(now())
+  isActive     Boolean             @default(true)
+  // Consent-workflow: patient moet expliciet toestemming geven. Bestaande
+  // rijen krijgen default APPROVED om huidige koppelingen niet te breken.
+  status       PatientAccessStatus @default(APPROVED)
+  requestedAt  DateTime?
+  respondedAt  DateTime?
+  notes        String?
 
   @@unique([therapistId, patientId])
   @@map("patient_therapists")

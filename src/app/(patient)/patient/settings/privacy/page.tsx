@@ -63,10 +63,10 @@ export default function PrivacySettingsPage() {
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
       {/* Header */}
-      <div className="px-4 pt-12 pb-6" style={{ background: '#1A3A3A' }}>
+      <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-1.5 text-zinc-400 text-sm mb-4"
+          className="flex items-center gap-1.5 text-[#7B8889] text-sm mb-4"
         >
           <ChevronLeft className="w-4 h-4" />
           Terug
@@ -74,13 +74,13 @@ export default function PrivacySettingsPage() {
         <div className="flex items-center gap-3">
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-            style={{ background: '#4ECDC420' }}
+            style={{ background: '#BEF26420' }}
           >
-            <ShieldCheck className="w-5 h-5" style={{ color: '#4ECDC4' }} />
+            <ShieldCheck className="w-5 h-5" style={{ color: '#BEF264' }} />
           </div>
           <div>
             <h1 className="text-white text-xl font-bold">Privacy & onderzoek</h1>
-            <p className="text-zinc-400 text-sm">Beheer je gegevensdeling</p>
+            <p className="text-[#7B8889] text-sm">Beheer je gegevensdeling</p>
           </div>
         </div>
       </div>
@@ -101,7 +101,7 @@ export default function PrivacySettingsPage() {
                       <>
                         <Badge
                           className="text-xs px-2 py-0.5 font-medium"
-                          style={{ background: '#f0fdfa', color: '#0f766e', border: 'none' }}
+                          style={{ background: 'rgba(190,242,100,0.10)', color: '#0f766e', border: 'none' }}
                         >
                           Toestemming gegeven
                         </Badge>
@@ -112,7 +112,7 @@ export default function PrivacySettingsPage() {
                     ) : (
                       <Badge
                         variant="outline"
-                        className="text-xs px-2 py-0.5 font-medium text-zinc-500"
+                        className="text-xs px-2 py-0.5 font-medium text-[#7B8889]"
                       >
                         Geen toestemming
                       </Badge>
@@ -148,13 +148,13 @@ export default function PrivacySettingsPage() {
                   className="w-4 h-4 rounded-full flex items-center justify-center mt-0.5 shrink-0 text-xs font-bold"
                   style={
                     item.included
-                      ? { background: '#f0fdfa', color: '#0f766e' }
-                      : { background: '#fef2f2', color: '#dc2626' }
+                      ? { background: 'rgba(190,242,100,0.10)', color: '#0f766e' }
+                      : { background: 'rgba(248,113,113,0.10)', color: '#F87171' }
                   }
                 >
                   {item.included ? '✓' : '✕'}
                 </div>
-                <span className={item.included ? 'text-zinc-700' : 'text-zinc-400 line-through'}>
+                <span className={item.included ? 'text-[#F5F7F6]' : 'text-[#7B8889] line-through'}>
                   {item.text}
                 </span>
               </div>
@@ -174,10 +174,10 @@ export default function PrivacySettingsPage() {
               'De koppeling tussen jou en je anonieme ID wordt ook gewist',
               'Data is nooit herleidbaar naar jou als persoon',
             ].map((item, i) => (
-              <div key={i} className="flex items-start gap-2.5 text-sm text-zinc-600">
+              <div key={i} className="flex items-start gap-2.5 text-sm text-[#7B8889]">
                 <CheckCircle2
                   className="w-4 h-4 mt-0.5 shrink-0"
-                  style={{ color: '#4ECDC4' }}
+                  style={{ color: '#BEF264' }}
                 />
                 <span>{item}</span>
               </div>
@@ -199,7 +199,7 @@ export default function PrivacySettingsPage() {
                 <p className="font-semibold text-sm">Verwerkingsovereenkomst</p>
                 <p className="text-xs text-muted-foreground">Bekijk hoe wij uw persoonsgegevens verwerken (AVG)</p>
               </div>
-              <ExternalLink className="w-4 h-4 text-zinc-400 shrink-0" />
+              <ExternalLink className="w-4 h-4 text-[#7B8889] shrink-0" />
             </CardContent>
           </Card>
         </Link>

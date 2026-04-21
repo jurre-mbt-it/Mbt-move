@@ -165,7 +165,7 @@ export function RegisterForm() {
           <Button
             type="submit"
             className="w-full"
-            style={{ background: '#4ECDC4' }}
+            style={{ background: '#BEF264' }}
             disabled={loading}
           >
             {loading ? 'Account aanmaken…' : 'Account aanmaken'}
@@ -174,7 +174,7 @@ export function RegisterForm() {
 
         <p className="text-center text-sm text-muted-foreground mt-4">
           Al een account?{' '}
-          <a href="/login" className="underline" style={{ color: '#4ECDC4' }}>
+          <a href="/login" className="underline" style={{ color: '#BEF264' }}>
             Inloggen
           </a>
         </p>

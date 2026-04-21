@@ -62,26 +62,26 @@ export default function AthleteDashboard() {
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
       {/* Header */}
-      <div className="px-4 pt-12 pb-8" style={{ background: '#1A3A3A' }}>
-        <p className="text-zinc-400 text-sm">{greeting}</p>
+      <div className="px-4 pt-12 pb-8" style={{ background: '#1C2425' }}>
+        <p className="text-[#7B8889] text-sm">{greeting}</p>
         <h1 className="text-white text-2xl font-bold mt-0.5">{userName ? userName.split(' ')[0] : ''}</h1>
-        <p className="text-zinc-400 text-xs mt-1">Atleet Dashboard</p>
+        <p className="text-[#7B8889] text-xs mt-1">Atleet Dashboard</p>
       </div>
 
       <div className="px-4 -mt-3 space-y-4 pb-6">
         {/* Stats row */}
         <div className="grid grid-cols-3 gap-3">
           <StatCard icon={<Flame className="w-4 h-4" style={{ color: '#f97316' }} />} value={streak} label="Streak" />
-          <StatCard icon={<CheckCircle2 className="w-4 h-4" style={{ color: '#4ECDC4' }} />} value={sessionHistory?.length ?? 0} label="Sessies" />
+          <StatCard icon={<CheckCircle2 className="w-4 h-4" style={{ color: '#BEF264' }} />} value={sessionHistory?.length ?? 0} label="Sessies" />
           <StatCard icon={<TrendingUp className="w-4 h-4" style={{ color: '#6366f1' }} />} value={`${Math.round(weekProgress)}%`} label="Deze week" />
         </div>
 
         {/* Quick workout action */}
         <Link href="/athlete/session?mode=quick">
-          <Card style={{ borderRadius: '14px', borderLeft: '3px solid #4ECDC4' }} className="hover:shadow-md transition-shadow">
+          <Card style={{ borderRadius: '14px', borderLeft: '3px solid #BEF264' }} className="hover:shadow-md transition-shadow">
             <CardContent className="p-4 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: '#4ECDC420' }}>
-                <Zap className="w-6 h-6" style={{ color: '#4ECDC4' }} />
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: '#BEF26420' }}>
+                <Zap className="w-6 h-6" style={{ color: '#BEF264' }} />
               </div>
               <div className="flex-1">
                 <p className="font-bold text-base">Quick Workout</p>
@@ -97,8 +97,8 @@ export default function AthleteDashboard() {
           <Link href="/athlete/programs/new">
             <Card style={{ borderRadius: '14px' }} className="hover:shadow-md transition-shadow">
               <CardContent className="p-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#4ECDC420' }}>
-                  <Plus className="w-5 h-5" style={{ color: '#4ECDC4' }} />
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#BEF26420' }}>
+                  <Plus className="w-5 h-5" style={{ color: '#BEF264' }} />
                 </div>
                 <div>
                   <p className="text-sm font-semibold">Programma</p>
@@ -125,7 +125,7 @@ export default function AthleteDashboard() {
         {/* Today's session */}
         {(todayExercises.length > 0 || completedToday) && (
           <Card style={{ borderRadius: '14px', overflow: 'hidden' }}>
-            <div className="px-4 py-3 flex items-center justify-between" style={{ background: '#4ECDC4' }}>
+            <div className="px-4 py-3 flex items-center justify-between" style={{ background: '#BEF264' }}>
               <div>
                 <p className="text-white text-xs font-medium opacity-80">Vandaag · {DAY_NAMES[todayDayNum - 1]}</p>
                 <p className="text-white font-bold text-base">
@@ -134,7 +134,7 @@ export default function AthleteDashboard() {
               </div>
               {!completedToday && (
                 <Link href="/athlete/session">
-                  <Button size="sm" className="bg-white gap-1.5 font-semibold text-xs" style={{ color: '#0D6B6E' }}>
+                  <Button size="sm" className="bg-[#141A1B] gap-1.5 font-semibold text-xs" style={{ color: '#BEF264' }}>
                     <Play className="w-3 h-3 fill-current" /> Start
                   </Button>
                 </Link>
@@ -150,7 +150,7 @@ export default function AthleteDashboard() {
                 <>
                   {todayExercises.slice(0, 3).map(e => (
                     <div key={e.uid} className="flex items-center gap-3">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-sm" style={{ background: '#f4f4f5' }}>
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-sm" style={{ background: '#1C2425' }}>
                         <IconStrength size={16} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -191,9 +191,9 @@ export default function AthleteDashboard() {
                       <div
                         className="w-full aspect-square rounded-full flex items-center justify-center text-xs font-medium max-w-[36px]"
                         style={
-                          isDone ? { background: '#4ECDC4', color: 'white' }
-                            : isToday ? { background: '#1A3A3A', color: 'white' }
-                              : { background: 'transparent', color: '#d4d4d8' }
+                          isDone ? { background: '#BEF264', color: 'white' }
+                            : isToday ? { background: '#1C2425', color: 'white' }
+                              : { background: 'transparent', color: '#4A5454' }
                         }
                       >
                         {isDone ? '✓' : label.slice(0, 2)}
@@ -218,13 +218,13 @@ export default function AthleteDashboard() {
             <CardContent className="px-4 py-4">
               <div className="flex items-center justify-between mb-3">
                 <p className="font-semibold text-sm">Laatste sessie</p>
-                <Link href="/athlete/history" className="text-xs flex items-center gap-0.5" style={{ color: '#4ECDC4' }}>
+                <Link href="/athlete/history" className="text-xs flex items-center gap-0.5" style={{ color: '#BEF264' }}>
                   Alles <ChevronRight className="w-3 h-3" />
                 </Link>
               </div>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#f0fdfa' }}>
-                  <Calendar className="w-5 h-5" style={{ color: '#4ECDC4' }} />
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(190,242,100,0.10)' }}>
+                  <Calendar className="w-5 h-5" style={{ color: '#BEF264' }} />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium">

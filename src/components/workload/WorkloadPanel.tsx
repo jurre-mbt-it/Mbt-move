@@ -131,7 +131,7 @@ export function WorkloadPanel({ sessions }: Props) {
               {acwr.weeklyHistory.map((week, i) => {
                 const pct = (week.totalSRPE / maxWeekly) * 100
                 const isCurrentWeek = i === acwr.weeklyHistory.length - 1
-                const barColor = isCurrentWeek ? zone.color : '#d4d4d8'
+                const barColor = isCurrentWeek ? zone.color : '#4A5454'
 
                 return (
                   <div key={week.weekLabel} className="flex-1 flex flex-col items-center gap-1">
@@ -155,14 +155,14 @@ export function WorkloadPanel({ sessions }: Props) {
             {Math.abs(acwr.weekOverWeekChange) > 10 && (
               <div
                 className="mt-3 rounded-lg p-2.5 flex items-start gap-2"
-                style={{ background: Math.abs(acwr.weekOverWeekChange) > 25 ? '#fee2e2' : '#fef3c7' }}
+                style={{ background: Math.abs(acwr.weekOverWeekChange) > 25 ? 'rgba(248,113,113,0.14)' : 'rgba(244,194,97,0.14)' }}
               >
                 <AlertTriangle
                   className="w-4 h-4 shrink-0 mt-0.5"
                   style={{ color: Math.abs(acwr.weekOverWeekChange) > 25 ? '#ef4444' : '#f59e0b' }}
                 />
                 <div className="text-xs">
-                  <p className="font-semibold" style={{ color: Math.abs(acwr.weekOverWeekChange) > 25 ? '#991b1b' : '#92400e' }}>
+                  <p className="font-semibold" style={{ color: Math.abs(acwr.weekOverWeekChange) > 25 ? '#F87171' : '#92400e' }}>
                     {acwr.weekOverWeekChange > 25
                       ? 'Sterke stijging in belasting'
                       : acwr.weekOverWeekChange > 10

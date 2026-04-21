@@ -43,22 +43,22 @@ export function ConsentPopup() {
         onEscapeKeyDown={e => e.preventDefault()}
       >
         {/* Header */}
-        <div className="px-5 pt-6 pb-4" style={{ background: '#1A3A3A' }}>
+        <div className="px-5 pt-6 pb-4" style={{ background: '#141A1B' }}>
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
-            style={{ background: '#4ECDC420' }}
+            style={{ background: '#1C2425', border: '1px solid #BEF264' }}
           >
-            <ShieldCheck className="w-5 h-5" style={{ color: '#4ECDC4' }} />
+            <ShieldCheck className="w-5 h-5" style={{ color: '#BEF264' }} />
           </div>
-          <h2 className="text-white text-lg font-bold leading-tight">Data toestemming</h2>
-          <p className="text-zinc-400 text-sm mt-1">
+          <h2 className="text-lg font-bold leading-tight" style={{ color: '#F5F7F6' }}>Data toestemming</h2>
+          <p className="text-sm mt-1" style={{ color: '#7B8889' }}>
             Movement Based Therapy verzamelt geanonimiseerde trainingsdata om onze behandelingen te verbeteren.
           </p>
         </div>
 
         {/* Body */}
-        <div className="px-5 py-4 space-y-3">
-          <p className="text-sm font-semibold text-zinc-800">Wat betekent dit?</p>
+        <div className="px-5 py-4 space-y-3" style={{ background: '#0A0E0F' }}>
+          <p className="text-sm font-semibold" style={{ color: '#F5F7F6' }}>Wat betekent dit?</p>
           <ul className="space-y-2">
             {[
               'Alleen trainingsgegevens (oefeningen, gewicht, scores)',
@@ -67,23 +67,23 @@ export function ConsentPopup() {
               'Data is niet herleidbaar naar jou als persoon',
               'Je kunt toestemming altijd intrekken in je instellingen',
             ].map((item, i) => (
-              <li key={i} className="flex items-start gap-2.5 text-sm text-zinc-600">
+              <li key={i} className="flex items-start gap-2.5 text-sm" style={{ color: '#7B8889' }}>
                 <CheckCircle2
                   className="w-4 h-4 mt-0.5 shrink-0"
-                  style={{ color: '#4ECDC4' }}
+                  style={{ color: '#BEF264' }}
                 />
                 <span>{item}</span>
               </li>
             ))}
           </ul>
 
-          <p className="text-xs text-zinc-400 pt-1">
+          <p className="text-xs pt-1" style={{ color: '#4A5454' }}>
             Je kunt dit later altijd wijzigen via Instellingen.
           </p>
         </div>
 
         {/* Actions */}
-        <div className="px-5 pb-6 flex gap-3">
+        <div className="px-5 pb-6 flex gap-3" style={{ background: '#0A0E0F' }}>
           <Button
             variant="outline"
             className="flex-1"
@@ -93,8 +93,8 @@ export function ConsentPopup() {
             Nee, liever niet
           </Button>
           <Button
-            className="flex-1 text-white font-semibold"
-            style={{ background: '#4ECDC4' }}
+            className="flex-1 font-semibold"
+            style={{ background: '#BEF264', color: '#0A0E0F' }}
             onClick={handleAccept}
             disabled={setConsent.isPending}
           >

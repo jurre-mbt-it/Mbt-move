@@ -7,7 +7,32 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* MBT Brand Colors — dark teal + seafoam palette */
+  /* ─── Athletic-dark palette (MBT-Gym parity) ──────────────────────────
+     Whoop/Strava/Nike-stijl. Dark-first, electric lime accent.
+     Deze tokens leven naast de shadcn-tokens. De `--color-*` theme-mappings
+     worden in .athletic-dark overridden zodat bestaande shadcn-componenten
+     automatisch het nieuwe palet gebruiken wanneer de context dark is. */
+  --p-bg: #0A0E0F;
+  --p-surface: #141A1B;
+  --p-surface-hi: #1C2425;
+  --p-surface-low: #0F1415;
+  --p-line: rgba(255,255,255,0.06);
+  --p-line-strong: rgba(255,255,255,0.12);
+  --p-ink: #F5F7F6;
+  --p-ink-muted: #7B8889;
+  --p-ink-dim: #4A5454;
+  --p-lime: #BEF264;
+  --p-lime-dark: #65A30D;
+  --p-danger: #F87171;
+  --p-danger-dark: #991B1B;
+  --p-gold: #F4C261;
+  --p-ice: #93C5FD;
+  --p-purple: #C084FC;
+
+  /* Monospace stack (Menlo-first to match iOS) */
+  --font-mono-athletic: Menlo, 'SF Mono', SFMono-Regular, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+
+  /* MBT Brand Colors — dark teal + seafoam palette (legacy — behouden voor transitie) */
   --mbt-green: #4ECDC4;
   --mbt-green-dark: #3BB8B0;
   --mbt-green-light: #7EDCD6;
@@ -135,4 +160,96 @@ body {
   font-family: 'Satoshi', ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Athletic-dark context ──────────────────────────────────────────────
+   Een pagina/root die deze class krijgt, krijgt automatisch het near-black
+   oppervlak + lime accents én override van shadcn-tokens zodat bestaande
+   Radix/shadcn-componenten binnen de context mee-theme'en. */
+.athletic-dark {
+  /* Override shadcn tokens naar athletic-dark equivalenten */
+  --background: var(--p-bg);
+  --foreground: var(--p-ink);
+  --card: var(--p-surface);
+  --card-foreground: var(--p-ink);
+  --popover: var(--p-surface);
+  --popover-foreground: var(--p-ink);
+  --primary: var(--p-lime);
+  --primary-foreground: var(--p-bg);
+  --secondary: var(--p-surface-hi);
+  --secondary-foreground: var(--p-ink);
+  --muted: var(--p-surface-hi);
+  --muted-foreground: var(--p-ink-muted);
+  --accent: var(--p-surface-hi);
+  --accent-foreground: var(--p-ink);
+  --destructive: var(--p-danger);
+  --destructive-foreground: var(--p-bg);
+  --border: var(--p-line);
+  --input: var(--p-surface-hi);
+  --ring: var(--p-lime);
+
+  --sidebar: var(--p-bg);
+  --sidebar-foreground: var(--p-ink);
+  --sidebar-primary: var(--p-lime);
+  --sidebar-primary-foreground: var(--p-bg);
+  --sidebar-accent: var(--p-surface-hi);
+  --sidebar-accent-foreground: var(--p-ink);
+  --sidebar-border: var(--p-line-strong);
+  --sidebar-ring: var(--p-lime);
+
+  background: var(--p-bg);
+  color: var(--p-ink);
+  color-scheme: dark;
+}
+
+/* ─── Utility classes voor athletic-dark typografie ─────────────────────── */
+.athletic-mono {
+  font-family: var(--font-mono-athletic);
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.athletic-display {
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: var(--p-ink);
+  font-family: 'Satoshi', ui-sans-serif, system-ui, sans-serif;
+}
+
+.athletic-kicker {
+  font-family: var(--font-mono-athletic);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--p-ink-muted);
+  text-transform: uppercase;
+}
+
+.athletic-meta {
+  font-family: var(--font-mono-athletic);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--p-ink-muted);
+  text-transform: uppercase;
+}
+
+/* Pulsing dot animatie — matcht `PulsingDot` in iOS */
+@keyframes athletic-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.athletic-pulse {
+  animation: athletic-pulse 1.8s ease-in-out infinite;
+}
+
+/* Tap-scale (voor buttons / pressable tiles) */
+.athletic-tap {
+  transition: transform 140ms ease, opacity 140ms ease, background-color 140ms ease;
+}
+.athletic-tap:active {
+  transform: scale(0.97);
+  opacity: 0.92;
 }

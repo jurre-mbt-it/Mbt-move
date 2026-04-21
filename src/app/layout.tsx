@@ -17,12 +17,21 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="h-full overflow-x-hidden">
-      <body className="min-h-full flex flex-col antialiased overflow-x-hidden w-full max-w-[100vw]">
+    <html lang="en" className="h-full overflow-x-hidden athletic-dark">
+      <body className="athletic-dark min-h-full flex flex-col antialiased overflow-x-hidden w-full max-w-[100vw]">
         <TRPCProvider>
           {children}
         </TRPCProvider>
-        <Toaster />
+        <Toaster
+          theme="dark"
+          toastOptions={{
+            style: {
+              background: '#141A1B',
+              color: '#F5F7F6',
+              border: '1px solid rgba(255,255,255,0.12)',
+            },
+          }}
+        />
       </body>
     </html>
   )

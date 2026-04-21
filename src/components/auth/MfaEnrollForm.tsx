@@ -152,7 +152,7 @@ export function MfaEnrollForm() {
           <Button
             type="submit"
             className="w-full"
-            style={{ background: '#4ECDC4' }}
+            style={{ background: '#BEF264' }}
             disabled={loading || verifyCode.length !== 6}
           >
             {loading ? 'Verifying…' : 'Enable 2FA'}

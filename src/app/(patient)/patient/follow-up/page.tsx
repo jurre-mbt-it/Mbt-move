@@ -9,8 +9,8 @@ import { ArrowLeft, CheckCircle2, Clock } from 'lucide-react'
 import { IconStop, IconWarning, IconCheck } from '@/components/icons'
 import { toast } from 'sonner'
 
-const MBT_GREEN = '#3ECF6A'
-const MBT_DARK = '#1A3A3A'
+const MBT_GREEN = '#BEF264'
+const MBT_DARK = '#1C2425'
 
 // ─── Silbernagel pain color (tendinopathie: ≤5 groen, 5-7 geel, >7 rood) ──────
 function silbernagelColor(pain: number): string {
@@ -79,8 +79,8 @@ function NrsPicker({
             className="flex-1 rounded-lg text-xs font-semibold transition-all active:scale-95"
             style={{
               height: 40,
-              background: selected ? color : '#f4f4f5',
-              color: selected ? 'white' : '#71717a',
+              background: selected ? color : '#1C2425',
+              color: selected ? 'white' : '#7B8889',
             }}
           >
             {i}
@@ -111,11 +111,11 @@ function FollowUpCard({
 
   if (saved) {
     return (
-      <Card style={{ borderRadius: '14px', background: '#f0fdf4', border: '1.5px solid #3ECF6A33' }}>
+      <Card style={{ borderRadius: '14px', background: 'rgba(190,242,100,0.10)', border: '1.5px solid #BEF26433' }}>
         <CardContent className="px-4 py-4 flex items-center gap-3">
           <CheckCircle2 className="w-5 h-5" style={{ color: MBT_GREEN }} />
           <div>
-            <p className="text-sm font-semibold" style={{ color: '#166534' }}>{item.exerciseName}</p>
+            <p className="text-sm font-semibold" style={{ color: '#BEF264' }}>{item.exerciseName}</p>
             <p className="text-xs text-muted-foreground">
               24u pijn: {pain24h ?? '—'}/10 · Stijfheid: {stiffness ?? '—'}/10
             </p>
@@ -159,8 +159,8 @@ function FollowUpCard({
             <div
               className="mt-2 rounded-xl px-3 py-2 text-xs font-medium"
               style={{
-                background: pain24h > 7 ? '#fef2f2' : '#fffbeb',
-                color: pain24h > 7 ? '#dc2626' : '#c2410c',
+                background: pain24h > 7 ? 'rgba(248,113,113,0.10)' : '#fffbeb',
+                color: pain24h > 7 ? '#F87171' : '#c2410c',
               }}
             >
               {pain24h > 7
@@ -214,21 +214,21 @@ export default function FollowUpPage() {
     <div className="min-h-screen pb-24" style={{ background: '#FAFAFA' }}>
       {/* Header */}
       <div className="px-4 pt-12 pb-5" style={{ background: MBT_DARK }}>
-        <Link href="/patient/progress" className="inline-flex items-center gap-1.5 text-zinc-400 text-sm mb-3 hover:text-white transition-colors">
+        <Link href="/patient/progress" className="inline-flex items-center gap-1.5 text-[#7B8889] text-sm mb-3 hover:text-white transition-colors">
           <ArrowLeft className="w-4 h-4" /> Terug
         </Link>
         <h1 className="text-white text-xl font-bold">24u Follow-up</h1>
-        <p className="text-zinc-400 text-xs mt-0.5">Hoe voelen je pezen vandaag?</p>
+        <p className="text-[#7B8889] text-xs mt-0.5">Hoe voelen je pezen vandaag?</p>
       </div>
 
       <div className="px-4 py-4 space-y-4">
         {/* Info banner */}
         <div
           className="flex items-start gap-3 rounded-2xl px-4 py-3 text-xs"
-          style={{ background: '#f0fdf4', border: '1.5px solid #3ECF6A33' }}
+          style={{ background: 'rgba(190,242,100,0.10)', border: '1.5px solid #BEF26433' }}
         >
           <Clock className="w-4 h-4 mt-0.5 shrink-0" style={{ color: MBT_GREEN }} />
-          <div style={{ color: '#166534' }}>
+          <div style={{ color: '#BEF264' }}>
             <p className="font-semibold mb-0.5">Silbernagel protocol</p>
             <p>
               Voor tendinopathie volgen we pijn <strong>tijdens</strong> de oefening, <strong>24u erna</strong> en{' '}

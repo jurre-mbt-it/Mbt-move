@@ -6,7 +6,10 @@ export const metadata = {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#0A0A0A' }}>
+    <div
+      className="athletic-dark min-h-screen flex items-center justify-center p-4"
+      style={{ background: '#0A0E0F' }}
+    >
       <LoginForm />
     </div>
   )

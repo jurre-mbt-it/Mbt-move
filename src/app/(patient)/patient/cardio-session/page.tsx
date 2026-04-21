@@ -13,9 +13,9 @@ import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, HR_ZONES, HRZone } from '@/lib/car
 import { cn } from '@/lib/utils'
 import { CARDIO_ICON_MAP, IconRunning, IconWalking, IconWarning, IconFinishFlag, IconCheck } from '@/components/icons'
 
-const MBT_GREEN = '#3ECF6A'
-const MBT_TEAL = '#4ECDC4'
-const MBT_DARK = '#1A3A3A'
+const MBT_GREEN = '#BEF264'
+const MBT_TEAL = '#BEF264'
+const MBT_DARK = '#1C2425'
 
 // ── Mock sessie data ──────────────────────────────────────────────────────────
 
@@ -446,7 +446,7 @@ export default function CardioSessionPage() {
             {/* Voortgangsbalk */}
             {phase !== 'IDLE' && (
               <div className="w-64 mx-auto mt-4">
-                <div className="h-2 rounded-full bg-white/20 overflow-hidden">
+                <div className="h-2 rounded-full bg-[#141A1B]/20 overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-1000"
                     style={{ background: MBT_GREEN, width: `${Math.min((elapsedSec / (session.targetDurationMin * 60)) * 100, 100)}%` }}
@@ -548,7 +548,7 @@ export default function CardioSessionPage() {
             </div>
             <input
               type="number" min={40} max={220} placeholder="bpm"
-              className="w-20 h-8 rounded-lg border bg-white/10 text-white text-center text-sm"
+              className="w-20 h-8 rounded-lg border bg-[#141A1B]/10 text-white text-center text-sm"
             />
           </div>
         )}

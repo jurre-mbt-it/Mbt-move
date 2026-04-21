@@ -41,8 +41,8 @@ export default function RootPage() {
   }, [router])
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#0A0A0A' }}>
-      <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#4ECDC4', borderTopColor: 'transparent' }} />
+    <div className="athletic-dark min-h-screen flex items-center justify-center" style={{ background: '#0A0E0F' }}>
+      <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#BEF264', borderTopColor: 'transparent' }} />
     </div>
   )
 }

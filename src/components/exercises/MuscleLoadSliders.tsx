@@ -9,7 +9,7 @@ interface MuscleLoadSlidersProps {
 }
 
 const LOAD_LABELS = ['', 'Licht', 'Matig', 'Gemiddeld', 'Hoog', 'Maximaal']
-const LOAD_COLORS = ['', '#c6f7f2', '#5eead4', '#4ECDC4', '#0D9488', '#134E4A']
+const LOAD_COLORS = ['', '#c6f7f2', '#5eead4', '#BEF264', '#0D9488', '#134E4A']
 
 export function MuscleLoadSliders({ value, onChange }: MuscleLoadSlidersProps) {
   const handleChange = (muscle: MuscleGroup, load: number) => {
@@ -51,9 +51,9 @@ export function MuscleLoadSliders({ value, onChange }: MuscleLoadSlidersProps) {
                 className="w-full h-2 rounded-full appearance-none cursor-pointer"
                 style={{
                   background: load === 0
-                    ? '#e4e4e7'
+                    ? 'rgba(255,255,255,0.12)'
                     : `linear-gradient(to right, ${color} 0%, ${color} ${(load / 5) * 100}%, #e4e4e7 ${(load / 5) * 100}%, #e4e4e7 100%)`,
-                  accentColor: '#4ECDC4',
+                  accentColor: '#BEF264',
                 }}
               />
               <span
@@ -76,7 +76,7 @@ export function MuscleLoadSliders({ value, onChange }: MuscleLoadSlidersProps) {
               <span
                 key={muscle}
                 className="text-xs px-2 py-0.5 rounded-full text-white font-medium"
-                style={{ background: LOAD_COLORS[load ?? 0] ?? '#4ECDC4' }}
+                style={{ background: LOAD_COLORS[load ?? 0] ?? '#BEF264' }}
               >
                 {muscle} · {load}
               </span>

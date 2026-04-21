@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function MfaChallengePage() {
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#FAFAFA' }}>
+    <div className="athletic-dark min-h-screen flex items-center justify-center p-4" style={{ background: '#0A0E0F' }}>
       <MfaChallenge />
     </div>
   )

@@ -14,9 +14,9 @@ import {
 } from 'lucide-react'
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  ACTIVE:    { label: 'Actief',    bg: '#dcfce7', text: '#15803d' },
-  DRAFT:     { label: 'Concept',   bg: '#fef9c3', text: '#a16207' },
-  COMPLETED: { label: 'Afgerond', bg: '#f1f5f9', text: '#475569' },
+  ACTIVE:    { label: 'Actief',    bg: 'rgba(190,242,100,0.12)', text: '#15803d' },
+  DRAFT:     { label: 'Concept',   bg: 'rgba(244,194,97,0.14)', text: '#F4C261' },
+  COMPLETED: { label: 'Afgerond', bg: 'rgba(255,255,255,0.06)', text: '#7B8889' },
 }
 
 export default function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -33,9 +33,9 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   if (isLoading) {
     return (
       <div className="space-y-4 max-w-2xl animate-pulse">
-        <div className="h-5 w-32 bg-zinc-100 rounded" />
-        <div className="h-20 bg-zinc-100 rounded-xl" />
-        <div className="h-24 bg-zinc-100 rounded-xl" />
+        <div className="h-5 w-32 bg-[#1C2425] rounded" />
+        <div className="h-20 bg-[#1C2425] rounded-xl" />
+        <div className="h-24 bg-[#1C2425] rounded-xl" />
       </div>
     )
   }
@@ -68,7 +68,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       <div className="flex items-start gap-3 flex-wrap">
         <div
           className="w-14 h-14 rounded-full flex items-center justify-center font-bold text-xl text-white shrink-0"
-          style={{ background: '#1A3A3A' }}
+          style={{ background: '#1C2425' }}
         >
           {patient.avatarInitials}
         </div>
@@ -88,13 +88,13 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         <div className="flex flex-col items-end gap-1.5 ml-auto">
           {patient.programId ? (
             <Link href={`/therapist/programs/${patient.programId}/edit`}>
-              <Button size="sm" className="gap-1.5" style={{ background: '#4ECDC4' }}>
+              <Button size="sm" className="gap-1.5" style={{ background: '#BEF264' }}>
                 <ClipboardList className="w-3.5 h-3.5" /> Programma
               </Button>
             </Link>
           ) : (
             <Link href={`/therapist/programs/new?patientId=${patient.id}`}>
-              <Button size="sm" className="gap-1.5" style={{ background: '#4ECDC4' }}>
+              <Button size="sm" className="gap-1.5" style={{ background: '#BEF264' }}>
                 <Plus className="w-3.5 h-3.5" /> Programma
               </Button>
             </Link>
@@ -109,7 +109,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <StatCard icon={<Activity className="w-4 h-4" style={{ color: '#4ECDC4' }} />}
+        <StatCard icon={<Activity className="w-4 h-4" style={{ color: '#BEF264' }} />}
           value={activePrograms.length} label="Actieve prog." />
         <StatCard icon={<ClipboardList className="w-4 h-4" style={{ color: '#60a5fa' }} />}
           value={programs.length} label="Totaal prog." />
@@ -181,7 +181,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             <Card style={{ borderRadius: '14px' }}>
               <CardContent className="py-8 text-center">
                 <p className="text-sm text-muted-foreground">Geen programma's gevonden</p>
-                <Button size="sm" className="mt-3 gap-1.5" style={{ background: '#4ECDC4' }}
+                <Button size="sm" className="mt-3 gap-1.5" style={{ background: '#BEF264' }}
                   onClick={() => router.push(`/therapist/programs/new?patientId=${patient.id}`)}>
                   <Plus className="w-3.5 h-3.5" /> Programma aanmaken
                 </Button>
@@ -220,7 +220,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           <Link href={`/therapist/patients/${patient.id}/progress`}>
             <Card style={{ borderRadius: '14px' }} className="hover:shadow-md transition-shadow cursor-pointer">
               <CardContent className="p-4 flex items-center gap-3">
-                <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: '#4ECDC4' }} />
+                <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: '#BEF264' }} />
                 <div>
                   <p className="font-semibold text-sm">Voortgangsrapport bekijken</p>
                   <p className="text-xs text-muted-foreground">Sessies, pijn, workload en 1RM trends</p>

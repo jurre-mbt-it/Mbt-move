@@ -62,18 +62,18 @@ export default function DpaPage() {
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
       {/* Header */}
-      <div className="px-4 pt-12 pb-5 print:hidden" style={{ background: '#1A3A3A' }}>
-        <Link href="/patient/settings/privacy" className="inline-flex items-center gap-1 text-zinc-400 text-sm mb-4">
+      <div className="px-4 pt-12 pb-5 print:hidden" style={{ background: '#1C2425' }}>
+        <Link href="/patient/settings/privacy" className="inline-flex items-center gap-1 text-[#7B8889] text-sm mb-4">
           <ChevronLeft className="w-4 h-4" /> Terug
         </Link>
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-white text-xl font-bold">Verwerkingsovereenkomst</h1>
-            <p className="text-zinc-400 text-xs mt-1">Versie {DPA_VERSION} · {EFFECTIVE_DATE}</p>
+            <p className="text-[#7B8889] text-xs mt-1">Versie {DPA_VERSION} · {EFFECTIVE_DATE}</p>
           </div>
           <button
             onClick={handlePrint}
-            className="flex items-center gap-1.5 text-zinc-400 text-sm mt-1 shrink-0"
+            className="flex items-center gap-1.5 text-[#7B8889] text-sm mt-1 shrink-0"
           >
             <Download className="w-4 h-4" />
             PDF
@@ -81,8 +81,8 @@ export default function DpaPage() {
         </div>
 
         {alreadyAccepted && (
-          <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: '#4ECDC420' }}>
-            <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: '#4ECDC4' }} />
+          <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: '#BEF26420' }}>
+            <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: '#BEF264' }} />
             <span className="text-xs text-zinc-300">Geaccepteerd op {acceptedDate}</span>
           </div>
         )}
@@ -97,8 +97,8 @@ export default function DpaPage() {
             <FileText className="w-5 h-5" />
             <span className="font-bold text-lg">Verwerkingsovereenkomst</span>
           </div>
-          <p className="text-xs text-zinc-500">Versie {DPA_VERSION} · Ingangsdatum {EFFECTIVE_DATE}</p>
-          <p className="text-xs text-zinc-500">{CONTROLLER} · {CONTROLLER_ADDRESS}</p>
+          <p className="text-xs text-[#7B8889]">Versie {DPA_VERSION} · Ingangsdatum {EFFECTIVE_DATE}</p>
+          <p className="text-xs text-[#7B8889]">{CONTROLLER} · {CONTROLLER_ADDRESS}</p>
           <hr className="mt-3" />
         </div>
 
@@ -107,11 +107,11 @@ export default function DpaPage() {
             De verwerkingsverantwoordelijke in de zin van de Algemene Verordening Gegevensbescherming
             (AVG / GDPR) is:
           </p>
-          <div className="mt-2 p-3 rounded-xl border bg-white space-y-0.5">
+          <div className="mt-2 p-3 rounded-xl border bg-[#141A1B] space-y-0.5">
             <p className="font-semibold">{CONTROLLER}</p>
-            <p className="text-zinc-500">{CONTROLLER_ADDRESS}</p>
-            <p className="text-zinc-500">KVK: {CONTROLLER_KVK}</p>
-            <p className="text-zinc-500">E-mail: {CONTROLLER_EMAIL}</p>
+            <p className="text-[#7B8889]">{CONTROLLER_ADDRESS}</p>
+            <p className="text-[#7B8889]">KVK: {CONTROLLER_KVK}</p>
+            <p className="text-[#7B8889]">E-mail: {CONTROLLER_EMAIL}</p>
           </div>
         </Section>
 
@@ -130,8 +130,8 @@ export default function DpaPage() {
               'PROMs (Patient-Reported Outcome Measures)',
               'Sessieduur en sessie-aantekeningen',
             ].map((item, i) => (
-              <li key={i} className="flex items-start gap-2 text-zinc-700">
-                <span className="mt-1 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#4ECDC4' }} />
+              <li key={i} className="flex items-start gap-2 text-[#F5F7F6]">
+                <span className="mt-1 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#BEF264' }} />
                 {item}
               </li>
             ))}
@@ -149,8 +149,8 @@ export default function DpaPage() {
               'Communicatie tussen u en uw behandelend therapeut',
               'Wettelijke verplichtingen voortvloeiend uit de WGBO',
             ].map((item, i) => (
-              <li key={i} className="flex items-start gap-2 text-zinc-700">
-                <span className="mt-1 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#4ECDC4' }} />
+              <li key={i} className="flex items-start gap-2 text-[#F5F7F6]">
+                <span className="mt-1 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#BEF264' }} />
                 {item}
               </li>
             ))}
@@ -162,16 +162,16 @@ export default function DpaPage() {
             De verwerking is gebaseerd op de volgende rechtsgronden (art. 6 AVG):
           </p>
           <ul className="mt-2 space-y-1.5">
-            <li className="flex items-start gap-2 text-zinc-700">
-              <span className="mt-1 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#4ECDC4' }} />
+            <li className="flex items-start gap-2 text-[#F5F7F6]">
+              <span className="mt-1 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#BEF264' }} />
               <span><strong>Overeenkomst</strong> — uitvoering van de behandelovereenkomst (art. 6 lid 1 sub b AVG)</span>
             </li>
-            <li className="flex items-start gap-2 text-zinc-700">
-              <span className="mt-1 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#4ECDC4' }} />
+            <li className="flex items-start gap-2 text-[#F5F7F6]">
+              <span className="mt-1 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#BEF264' }} />
               <span><strong>Wettelijke verplichting</strong> — bewaarplicht op grond van de WGBO (art. 6 lid 1 sub c AVG)</span>
             </li>
-            <li className="flex items-start gap-2 text-zinc-700">
-              <span className="mt-1 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#4ECDC4' }} />
+            <li className="flex items-start gap-2 text-[#F5F7F6]">
+              <span className="mt-1 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#BEF264' }} />
               <span><strong>Gerechtvaardigde belangen</strong> — behandelkwaliteit en veiligheid (art. 6 lid 1 sub f AVG)</span>
             </li>
           </ul>
@@ -183,7 +183,7 @@ export default function DpaPage() {
             uw dossier gedurende <strong>15 jaar</strong> na het einde van de behandelrelatie,
             of zoveel langer als nodig is voor een goede zorgverlening.
           </p>
-          <p className="mt-2 text-zinc-500">
+          <p className="mt-2 text-[#7B8889]">
             Na het verstrijken van de bewaartermijn worden uw gegevens veilig vernietigd.
           </p>
         </Section>
@@ -199,13 +199,13 @@ export default function DpaPage() {
               { right: 'Recht op beperking (art. 18)', desc: 'U kunt verzoeken de verwerking te beperken.' },
               { right: 'Klachtrecht (art. 77)', desc: `U kunt een klacht indienen bij de Autoriteit Persoonsgegevens (${AP_URL}).` },
             ].map(({ right, desc }) => (
-              <div key={right} className="p-3 rounded-xl border bg-white">
+              <div key={right} className="p-3 rounded-xl border bg-[#141A1B]">
                 <p className="font-semibold text-xs">{right}</p>
-                <p className="text-zinc-500 text-xs mt-0.5">{desc}</p>
+                <p className="text-[#7B8889] text-xs mt-0.5">{desc}</p>
               </div>
             ))}
           </div>
-          <p className="mt-2 text-zinc-500">
+          <p className="mt-2 text-[#7B8889]">
             Verzoeken kunt u richten aan <a href={`mailto:${CONTROLLER_EMAIL}`} className="underline">{CONTROLLER_EMAIL}</a>.
             Wij reageren binnen 30 dagen.
           </p>
@@ -244,8 +244,8 @@ export default function DpaPage() {
               'Multi-factor authenticatie voor behandelaars',
               'Minimale toegangsrechten (least privilege)',
             ].map((item, i) => (
-              <li key={i} className="flex items-start gap-2 text-zinc-700">
-                <span className="mt-1 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#4ECDC4' }} />
+              <li key={i} className="flex items-start gap-2 text-[#F5F7F6]">
+                <span className="mt-1 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#BEF264' }} />
                 {item}
               </li>
             ))}
@@ -268,8 +268,8 @@ export default function DpaPage() {
           </p>
         </Section>
 
-        <div className="p-4 rounded-xl border" style={{ background: '#f0fdfa', borderColor: '#bbf7d0' }}>
-          <p className="text-xs text-zinc-600">
+        <div className="p-4 rounded-xl border" style={{ background: 'rgba(190,242,100,0.10)', borderColor: '#bbf7d0' }}>
+          <p className="text-xs text-[#7B8889]">
             <strong>Versie:</strong> {DPA_VERSION} &nbsp;|&nbsp;
             <strong>Ingangsdatum:</strong> {EFFECTIVE_DATE} &nbsp;|&nbsp;
             <strong>Verwerkingsverantwoordelijke:</strong> {CONTROLLER}
@@ -286,7 +286,7 @@ export default function DpaPage() {
               className="w-full text-white font-semibold shadow-lg"
               style={{
                 height: 52,
-                background: hasScrolled ? '#4ECDC4' : '#a1a1aa',
+                background: hasScrolled ? '#BEF264' : '#a1a1aa',
                 transition: 'background 0.3s',
               }}
               disabled={!hasScrolled || accept.isPending}
@@ -302,9 +302,9 @@ export default function DpaPage() {
         )}
 
         {alreadyAccepted && (
-          <div className="flex items-center gap-2 p-3 rounded-xl print:hidden" style={{ background: '#f0fdfa' }}>
-            <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: '#4ECDC4' }} />
-            <span className="text-sm text-zinc-600">
+          <div className="flex items-center gap-2 p-3 rounded-xl print:hidden" style={{ background: 'rgba(190,242,100,0.10)' }}>
+            <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: '#BEF264' }} />
+            <span className="text-sm text-[#7B8889]">
               Geaccepteerd op {acceptedDate} (versie {status?.acceptedVersion})
             </span>
           </div>
@@ -317,8 +317,8 @@ export default function DpaPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-2">
-      <h2 className="font-bold text-base" style={{ color: '#1A3A3A' }}>{title}</h2>
-      <div className="text-zinc-700 space-y-2">{children}</div>
+      <h2 className="font-bold text-base" style={{ color: '#1C2425' }}>{title}</h2>
+      <div className="text-[#F5F7F6] space-y-2">{children}</div>
     </section>
   )
 }
@@ -329,9 +329,9 @@ function SubprocessorCard({
   name: string; purpose: string; location: string; safeguard: string
 }) {
   return (
-    <div className="p-3 rounded-xl border bg-white space-y-0.5">
+    <div className="p-3 rounded-xl border bg-[#141A1B] space-y-0.5">
       <p className="font-semibold text-xs">{name}</p>
-      <p className="text-zinc-500 text-xs">{purpose}</p>
+      <p className="text-[#7B8889] text-xs">{purpose}</p>
       <div className="flex flex-wrap gap-2 mt-1">
         <Badge variant="outline" className="text-xs px-1.5 py-0">{location}</Badge>
         <Badge variant="outline" className="text-xs px-1.5 py-0">{safeguard}</Badge>

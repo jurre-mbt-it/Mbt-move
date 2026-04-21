@@ -16,10 +16,10 @@ import { cn } from '@/lib/utils'
 import { IconRunning, IconCardio } from '@/components/icons'
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }> = {
-  ACTIVE:    { bg: '#ccfbf1', text: '#0D6B6E', label: 'Actief' },
-  DRAFT:     { bg: '#fef9c3', text: '#a16207', label: 'Concept' },
-  COMPLETED: { bg: '#f1f5f9', text: '#475569', label: 'Afgerond' },
-  ARCHIVED:  { bg: '#f1f5f9', text: '#9ca3af', label: 'Gearchiveerd' },
+  ACTIVE:    { bg: 'rgba(190,242,100,0.14)', text: '#BEF264', label: 'Actief' },
+  DRAFT:     { bg: 'rgba(244,194,97,0.14)', text: '#F4C261', label: 'Concept' },
+  COMPLETED: { bg: 'rgba(255,255,255,0.06)', text: '#7B8889', label: 'Afgerond' },
+  ARCHIVED:  { bg: 'rgba(255,255,255,0.06)', text: '#7B8889', label: 'Gearchiveerd' },
 }
 
 const TEMPLATE_CATEGORIES = ['Knie', 'Schouder', 'Rug', 'Heup', 'Enkel', 'Full Body', 'Revalidatie', 'Preventie']
@@ -81,10 +81,10 @@ export default function ProgramsPage() {
   if (isLoading) {
     return (
       <div className="space-y-6 max-w-4xl">
-        <div className="h-8 w-48 bg-zinc-100 rounded animate-pulse" />
+        <div className="h-8 w-48 bg-[#1C2425] rounded animate-pulse" />
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-24 bg-zinc-100 rounded-xl animate-pulse" />
+            <div key={i} className="h-24 bg-[#1C2425] rounded-xl animate-pulse" />
           ))}
         </div>
       </div>
@@ -105,12 +105,12 @@ export default function ProgramsPage() {
             </Button>
           </Link>
           <Link href="/therapist/programs/new/cardio">
-            <Button variant="outline" className="gap-2 border-[#4ECDC4] text-[#4ECDC4] hover:bg-[#4ECDC4]/10">
+            <Button variant="outline" className="gap-2 border-[#BEF264] text-[#BEF264] hover:bg-[#BEF264]/10">
               <IconCardio size={16} /> Nieuw Cardio
             </Button>
           </Link>
           <Link href="/therapist/programs/new">
-            <Button style={{ background: '#4ECDC4' }} className="gap-2">
+            <Button style={{ background: '#BEF264' }} className="gap-2">
               <Plus className="w-4 h-4" />
               Nieuw Kracht
             </Button>
@@ -191,13 +191,13 @@ export default function ProgramsPage() {
                 id="asTemplate"
                 checked={duplicateAsTemplate}
                 onChange={e => setDuplicateAsTemplate(e.target.checked)}
-                className="accent-[#4ECDC4]"
+                className="accent-[#BEF264]"
               />
               <label htmlFor="asTemplate" className="text-sm">Opslaan als template</label>
             </div>
             <div className="flex gap-2">
               <Button
-                style={{ background: '#4ECDC4' }}
+                style={{ background: '#BEF264' }}
                 onClick={handleDuplicate}
                 disabled={duplicateMutation.isPending}
                 className="flex-1"

@@ -181,22 +181,22 @@ export default function AthleteSessionPage() {
   if (state === 'ready') {
     return (
       <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
-        <div className="px-4 pt-12 pb-8" style={{ background: '#1A3A3A' }}>
-          <Link href="/athlete/dashboard" className="text-zinc-400 flex items-center gap-1 text-sm mb-4">
+        <div className="px-4 pt-12 pb-8" style={{ background: '#1C2425' }}>
+          <Link href="/athlete/dashboard" className="text-[#7B8889] flex items-center gap-1 text-sm mb-4">
             <ArrowLeft className="w-4 h-4" /> Terug
           </Link>
           {isQuickMode ? (
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <Zap className="w-5 h-5" style={{ color: '#4ECDC4' }} />
+                <Zap className="w-5 h-5" style={{ color: '#BEF264' }} />
                 <h1 className="text-white text-xl font-bold">Quick Workout</h1>
               </div>
-              <p className="text-zinc-400 text-sm">Voeg oefeningen toe en start direct</p>
+              <p className="text-[#7B8889] text-sm">Voeg oefeningen toe en start direct</p>
             </div>
           ) : (
             <div>
               <h1 className="text-white text-xl font-bold">{DAY_NAMES[todayDayNum - 1]}</h1>
-              <p className="text-zinc-400 text-sm mt-1">{exercises.length} oefeningen</p>
+              <p className="text-[#7B8889] text-sm mt-1">{exercises.length} oefeningen</p>
             </div>
           )}
         </div>
@@ -206,10 +206,10 @@ export default function AthleteSessionPage() {
           {exercises.length === 0 && isQuickMode ? (
             <div
               className="flex flex-col items-center justify-center py-12 rounded-2xl text-center gap-3"
-              style={{ background: '#f0fdfa', border: '2px dashed #4ECDC480' }}
+              style={{ background: 'rgba(190,242,100,0.10)', border: '2px dashed #BEF26480' }}
             >
               <div className="text-4xl"><IconStrength size={40} /></div>
-              <p className="font-semibold" style={{ color: '#0D6B6E' }}>Voeg je eerste oefening toe</p>
+              <p className="font-semibold" style={{ color: '#BEF264' }}>Voeg je eerste oefening toe</p>
               <p className="text-sm text-muted-foreground max-w-[240px]">
                 Kies oefeningen uit de bibliotheek en begin met trainen
               </p>
@@ -219,7 +219,7 @@ export default function AthleteSessionPage() {
               <Card key={e.uid} style={{ borderRadius: '14px' }}>
                 <CardContent className="p-4 flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold"
-                    style={{ background: '#f0fdfa', color: '#4ECDC4' }}>
+                    style={{ background: 'rgba(190,242,100,0.10)', color: '#BEF264' }}>
                     {i + 1}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -235,7 +235,7 @@ export default function AthleteSessionPage() {
           <button
             onClick={() => setShowAddExercise(true)}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-medium border-2 border-dashed transition-all active:scale-[0.98]"
-            style={{ borderColor: '#4ECDC480', color: '#0D6B6E' }}
+            style={{ borderColor: '#BEF26480', color: '#BEF264' }}
           >
             <PlusCircle className="w-4 h-4" />
             Oefening toevoegen
@@ -243,7 +243,7 @@ export default function AthleteSessionPage() {
 
           <Button
             className="w-full gap-2 text-white"
-            style={{ background: exercises.length > 0 ? '#4ECDC4' : '#a1a1aa' }}
+            style={{ background: exercises.length > 0 ? '#BEF264' : '#a1a1aa' }}
             disabled={exercises.length === 0}
             onClick={() => setState('active')}
           >
@@ -270,8 +270,8 @@ export default function AthleteSessionPage() {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#FAFAFA' }}>
         <div className="text-center space-y-4 px-4">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style={{ background: '#f0fdfa' }}>
-            <CheckCircle2 className="w-8 h-8" style={{ color: '#4ECDC4' }} />
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style={{ background: 'rgba(190,242,100,0.10)' }}>
+            <CheckCircle2 className="w-8 h-8" style={{ color: '#BEF264' }} />
           </div>
           <h2 className="text-xl font-bold">Sessie voltooid!</h2>
           <p className="text-muted-foreground text-sm">
@@ -279,7 +279,7 @@ export default function AthleteSessionPage() {
           </p>
           {error && <p className="text-sm text-red-500">{error}</p>}
           <Button
-            style={{ background: '#4ECDC4' }}
+            style={{ background: '#BEF264' }}
             className="text-white"
             disabled={logSession.isPending}
             onClick={handleFinish}
@@ -294,21 +294,21 @@ export default function AthleteSessionPage() {
   // Active state
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
-      <div className="px-4 pt-12 pb-6" style={{ background: '#1A3A3A' }}>
+      <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
         <div className="flex items-center justify-between mb-3">
-          <button onClick={() => setState('ready')} className="text-zinc-400 flex items-center gap-1 text-sm">
+          <button onClick={() => setState('ready')} className="text-[#7B8889] flex items-center gap-1 text-sm">
             <ArrowLeft className="w-4 h-4" /> Overzicht
           </button>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1 text-zinc-400 text-sm tabular-nums">
+            <div className="flex items-center gap-1 text-[#7B8889] text-sm tabular-nums">
               <Clock className="w-3.5 h-3.5" />
               {mins}:{secs.toString().padStart(2, '0')}
             </div>
-            <span className="text-zinc-400 text-sm">{currentIndex + 1}/{exercises.length}</span>
+            <span className="text-[#7B8889] text-sm">{currentIndex + 1}/{exercises.length}</span>
           </div>
         </div>
         <h1 className="text-white text-lg font-bold">{current?.name ?? '—'}</h1>
-        <p className="text-zinc-400 text-sm mt-1">
+        <p className="text-[#7B8889] text-sm mt-1">
           {current ? `${current.sets} × ${current.reps} ${current.repUnit}` : ''}
         </p>
       </div>
@@ -323,7 +323,7 @@ export default function AthleteSessionPage() {
           </CardContent>
         </Card>
 
-        <Button className="w-full gap-2 text-white" style={{ background: '#4ECDC4' }} onClick={markDone}>
+        <Button className="w-full gap-2 text-white" style={{ background: '#BEF264' }} onClick={markDone}>
           <CheckCircle2 className="w-4 h-4" />
           {currentIndex < exercises.length - 1 ? 'Volgende oefening' : 'Sessie afronden'}
         </Button>
@@ -332,7 +332,7 @@ export default function AthleteSessionPage() {
         <button
           onClick={() => setShowAddExercise(true)}
           className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border border-dashed transition-all active:scale-[0.98]"
-          style={{ borderColor: '#4ECDC480', color: '#0D6B6E' }}
+          style={{ borderColor: '#BEF26480', color: '#BEF264' }}
         >
           <Plus className="w-4 h-4" />
           Oefening toevoegen aan sessie
@@ -345,7 +345,7 @@ export default function AthleteSessionPage() {
               key={i}
               className="w-2 h-2 rounded-full"
               style={{
-                background: completed.has(i) ? '#4ECDC4' : i === currentIndex ? '#1A3A3A' : '#d4d4d8'
+                background: completed.has(i) ? '#BEF264' : i === currentIndex ? '#1C2425' : '#4A5454'
               }}
             />
           ))}
@@ -392,10 +392,10 @@ function AddExerciseSheet({
         style={{ background: '#fff', maxWidth: 480, margin: '0 auto', maxHeight: '80vh' }}
       >
         <div className="flex-none px-5 pt-4 pb-3">
-          <div className="w-10 h-1 bg-zinc-200 rounded-full mx-auto mb-3" />
+          <div className="w-10 h-1 bg-[rgba(255,255,255,0.08)] rounded-full mx-auto mb-3" />
           <div className="flex items-center justify-between">
             <p className="font-bold text-base">Oefening toevoegen</p>
-            <button onClick={onClose}><X className="w-5 h-5 text-zinc-400" /></button>
+            <button onClick={onClose}><X className="w-5 h-5 text-[#7B8889]" /></button>
           </div>
           <div className="relative mt-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -421,14 +421,14 @@ function AddExerciseSheet({
                   key={ex.id}
                   className="w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all active:scale-[0.98]"
                   style={{
-                    background: alreadyAdded ? '#f0fdfa' : '#fff',
-                    borderColor: alreadyAdded ? '#4ECDC4' : '#e4e4e7',
+                    background: alreadyAdded ? 'rgba(190,242,100,0.10)' : '#fff',
+                    borderColor: alreadyAdded ? '#BEF264' : 'rgba(255,255,255,0.12)',
                   }}
                   onClick={() => onAdd(ex)}
                 >
                   <div
                     className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold text-white"
-                    style={{ background: alreadyAdded ? '#4ECDC4' : '#1A3A3A' }}
+                    style={{ background: alreadyAdded ? '#BEF264' : '#1C2425' }}
                   >
                     {alreadyAdded ? '✓' : ex.name[0]}
                   </div>
@@ -437,7 +437,7 @@ function AddExerciseSheet({
                     <p className="text-xs text-muted-foreground">{ex.category} · 3 × 10 reps</p>
                   </div>
                   {!alreadyAdded && (
-                    <Plus className="w-4 h-4 shrink-0 text-zinc-400" />
+                    <Plus className="w-4 h-4 shrink-0 text-[#7B8889]" />
                   )}
                 </button>
               )

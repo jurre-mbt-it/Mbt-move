@@ -14,8 +14,9 @@ import {
   CheckCircle2, Clock, Zap,
 } from 'lucide-react'
 
-const G = '#4ECDC4'
-const DARK = '#1A3A3A'
+const G = '#BEF264'
+const DARK = '#F5F7F6'
+const SURFACE_HI = '#1C2425'
 
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -32,11 +33,11 @@ function StatChip({ label, value, sub, trend }: {
   label: string; value: string | number; sub?: string; trend?: 'up' | 'down' | 'neutral'
 }) {
   return (
-    <div className="bg-white rounded-xl p-4 border" style={{ borderColor: '#e2e8f0' }}>
-      <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">{label}</p>
+    <div className="bg-[#141A1B] rounded-xl p-4 border" style={{ borderColor: 'rgba(255,255,255,0.12)' }}>
+      <p className="text-xs uppercase tracking-wide font-semibold" style={{ color: '#7B8889' }}>{label}</p>
       <div className="flex items-baseline gap-2 mt-1">
         <span className="text-2xl font-bold" style={{ color: DARK }}>{value}</span>
-        {sub && <span className="text-sm text-muted-foreground">{sub}</span>}
+        {sub && <span className="text-sm" style={{ color: '#7B8889' }}>{sub}</span>}
       </div>
       {trend && (
         <div className="flex items-center gap-1 mt-1">
@@ -82,9 +83,9 @@ function SessionCalendar({ sessions }: { sessions: { date: string }[] }) {
           {row.map((day, di) => {
             if (!day) return <div key={di} className="aspect-square rounded-md" />
             const bg = day.isFuture ? '#f8fafc'
-              : day.completed ? '#dcfce7' : '#f1f5f9'
+              : day.completed ? 'rgba(190,242,100,0.12)' : 'rgba(255,255,255,0.06)'
             const border = day.isFuture ? '#e2e8f0'
-              : day.completed ? G : '#d4d4d8'
+              : day.completed ? G : '#4A5454'
             return (
               <div
                 key={di}
@@ -98,8 +99,8 @@ function SessionCalendar({ sessions }: { sessions: { date: string }[] }) {
       ))}
       <div className="flex items-center gap-4 mt-3">
         {[
-          { color: '#dcfce7', border: G,       label: 'Sessie' },
-          { color: '#f1f5f9', border: '#d4d4d8', label: 'Geen sessie' },
+          { color: 'rgba(190,242,100,0.12)', border: G,       label: 'Sessie' },
+          { color: 'rgba(255,255,255,0.06)', border: '#4A5454', label: 'Geen sessie' },
         ].map(({ color, border, label }) => (
           <div key={label} className="flex items-center gap-1.5">
             <div className="w-3.5 h-3.5 rounded border-2" style={{ background: color, borderColor: border }} />
@@ -145,9 +146,9 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
   if (isLoading) {
     return (
       <div className="space-y-4 max-w-3xl animate-pulse">
-        <div className="h-5 w-32 bg-zinc-100 rounded" />
-        <div className="h-24 bg-zinc-100 rounded-xl" />
-        <div className="h-48 bg-zinc-100 rounded-xl" />
+        <div className="h-5 w-32 bg-[#1C2425] rounded" />
+        <div className="h-24 bg-[#1C2425] rounded-xl" />
+        <div className="h-48 bg-[#1C2425] rounded-xl" />
       </div>
     )
   }
@@ -277,9 +278,9 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
                       onClick={() => setSelectedExercise(name)}
                       className="text-xs px-3 py-1.5 rounded-full border font-medium transition-all"
                       style={{
-                        background: (activeEx === name) ? DARK : '#fff',
-                        color: (activeEx === name) ? '#fff' : '#52525b',
-                        borderColor: (activeEx === name) ? DARK : '#e4e4e7',
+                        background: (activeEx === name) ? G : SURFACE_HI,
+                        color: (activeEx === name) ? '#0A0E0F' : '#7B8889',
+                        borderColor: (activeEx === name) ? G : 'rgba(255,255,255,0.12)',
                       }}
                     >
                       {name}

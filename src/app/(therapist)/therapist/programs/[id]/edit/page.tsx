@@ -18,10 +18,10 @@ export default function EditProgramPage({ params }: Props) {
     return (
       <div className="flex flex-col gap-4 h-full">
         <div className="flex gap-3 items-center">
-          <div className="h-8 flex-1 bg-zinc-100 rounded animate-pulse" />
-          <div className="h-8 w-24 bg-zinc-100 rounded animate-pulse" />
+          <div className="h-8 flex-1 bg-[#1C2425] rounded animate-pulse" />
+          <div className="h-8 w-24 bg-[#1C2425] rounded animate-pulse" />
         </div>
-        <div className="flex-1 bg-zinc-100 rounded-xl animate-pulse" />
+        <div className="flex-1 bg-[#1C2425] rounded-xl animate-pulse" />
       </div>
     )
   }

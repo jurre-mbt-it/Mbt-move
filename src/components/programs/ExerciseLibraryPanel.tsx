@@ -11,7 +11,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 
 const CATEGORY_COLORS: Record<string, string> = {
-  STRENGTH:    '#4ECDC4',
+  STRENGTH:    '#BEF264',
   MOBILITY:    '#60a5fa',
   PLYOMETRICS: '#f59e0b',
   CARDIO:      '#f87171',
@@ -49,7 +49,7 @@ function DraggableLibraryItem({
   })
 
   const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined
-  const color = CATEGORY_COLORS[exercise.category] ?? '#4ECDC4'
+  const color = CATEGORY_COLORS[exercise.category] ?? '#BEF264'
 
   return (
     <div
@@ -58,8 +58,8 @@ function DraggableLibraryItem({
       {...attributes}
       {...listeners}
       className={cn(
-        'group flex items-center gap-2 px-2 py-2 rounded-lg border bg-white transition-all text-sm touch-none',
-        isDragging ? 'opacity-40 shadow-lg cursor-grabbing' : 'hover:border-zinc-300 hover:bg-zinc-50 cursor-grab'
+        'group flex items-center gap-2 px-2 py-2 rounded-lg border bg-[#141A1B] transition-all text-sm touch-none',
+        isDragging ? 'opacity-40 shadow-lg cursor-grabbing' : 'hover:border-[rgba(255,255,255,0.16)] hover:bg-[#1C2425] cursor-grab'
       )}
     >
       <GripVertical className="w-3.5 h-3.5 text-zinc-300 shrink-0" />
@@ -75,7 +75,7 @@ function DraggableLibraryItem({
         type="button"
         onPointerDown={e => e.stopPropagation()}
         onClick={() => onAdd(exercise)}
-        className="opacity-0 group-hover:opacity-100 transition-opacity w-5 h-5 rounded flex items-center justify-center hover:bg-zinc-200 shrink-0"
+        className="opacity-0 group-hover:opacity-100 transition-opacity w-5 h-5 rounded flex items-center justify-center hover:bg-[rgba(255,255,255,0.08)] shrink-0"
       >
         <Plus className="w-3 h-3" />
       </button>
@@ -128,7 +128,7 @@ export function ExerciseLibraryPanel({ onAdd, exercises: propExercises }: Exerci
                 'px-1.5 py-0.5 rounded text-xs font-medium transition-colors border',
                 category === c.value
                   ? 'text-white border-transparent'
-                  : 'border-zinc-200 text-muted-foreground hover:border-zinc-400 bg-white'
+                  : 'border-[rgba(255,255,255,0.12)] text-muted-foreground hover:border-[rgba(255,255,255,0.2)] bg-[#141A1B]'
               )}
               style={category === c.value ? { background: CATEGORY_COLORS[c.value] } : {}}
             >

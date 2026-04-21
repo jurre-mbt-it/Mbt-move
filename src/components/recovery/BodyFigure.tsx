@@ -150,7 +150,7 @@ export function BodyFigure({ recoveryStates }: Props) {
             const state = recoveryMap.get(muscle)
             const color = state
               ? getRecoveryColor(state.recoveryPercent)
-              : '#e4e4e7' // untrained: light gray
+              : 'rgba(255,255,255,0.12)' // untrained: light gray
             const isHovered = hoveredMuscle === muscle
 
             return (
@@ -180,7 +180,7 @@ export function BodyFigure({ recoveryStates }: Props) {
           className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
             activeView === 'front'
               ? 'bg-[#1A3A3A] text-white'
-              : 'bg-zinc-100 text-muted-foreground hover:bg-zinc-200'
+              : 'bg-[#1C2425] text-muted-foreground hover:bg-[rgba(255,255,255,0.08)]'
           }`}
           onClick={() => setActiveView('front')}
         >
@@ -191,7 +191,7 @@ export function BodyFigure({ recoveryStates }: Props) {
           className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
             activeView === 'back'
               ? 'bg-[#1A3A3A] text-white'
-              : 'bg-zinc-100 text-muted-foreground hover:bg-zinc-200'
+              : 'bg-[#1C2425] text-muted-foreground hover:bg-[rgba(255,255,255,0.08)]'
           }`}
           onClick={() => setActiveView('back')}
         >

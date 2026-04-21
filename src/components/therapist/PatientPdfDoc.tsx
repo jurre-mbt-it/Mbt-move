@@ -22,8 +22,8 @@ interface Props {
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const MBT_GREEN = '#3ECF6A'
-const MBT_DARK  = '#1A3A3A'
+const MBT_GREEN = '#BEF264'
+const MBT_DARK  = '#1C2425'
 
 const styles = StyleSheet.create({
   page: {
@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
   },
   paramChip: {
     borderRadius: 4,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: 'rgba(190,242,100,0.10)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     flexDirection: 'row',

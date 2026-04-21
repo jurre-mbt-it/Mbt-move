@@ -58,7 +58,7 @@ export default function ProfilePage() {
 function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-zinc-400" style={{ background: '#f4f4f5' }}>
+      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-[#7B8889]" style={{ background: '#1C2425' }}>
         {icon}
       </div>
       <div className="flex-1 min-w-0">

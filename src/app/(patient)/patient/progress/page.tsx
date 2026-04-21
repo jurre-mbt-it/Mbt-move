@@ -111,9 +111,9 @@ export default function ProgressPage() {
   return (
     <div className="min-h-screen pb-6" style={{ background: '#FAFAFA' }}>
       {/* Header */}
-      <div className="px-4 pt-12 pb-5" style={{ background: '#1A3A3A' }}>
+      <div className="px-4 pt-12 pb-5" style={{ background: '#1C2425' }}>
         <h1 className="text-white text-xl font-bold">Voortgang</h1>
-        {program && <p className="text-zinc-400 text-xs mt-0.5">{program.name}</p>}
+        {program && <p className="text-[#7B8889] text-xs mt-0.5">{program.name}</p>}
       </div>
 
       <div className="px-4 py-4 space-y-4">
@@ -127,7 +127,7 @@ export default function ProgressPage() {
             bg="#fff7ed"
           />
           <StatCard
-            icon={<CheckCircle2 className="w-5 h-5" style={{ color: '#4ECDC4' }} />}
+            icon={<CheckCircle2 className="w-5 h-5" style={{ color: '#BEF264' }} />}
             value={history.length}
             unit="sessies"
             label="Voltooid"
@@ -144,7 +144,7 @@ export default function ProgressPage() {
                   <Target className="w-4 h-4 text-muted-foreground" />
                   <p className="font-semibold text-sm">Adherentie</p>
                 </div>
-                <span className="text-sm font-bold" style={{ color: '#4ECDC4' }}>{adherence}%</span>
+                <span className="text-sm font-bold" style={{ color: '#BEF264' }}>{adherence}%</span>
               </div>
               <Progress value={adherence} className="h-2.5 mb-2" />
               <p className="text-xs text-muted-foreground">
@@ -160,7 +160,7 @@ export default function ProgressPage() {
             <CardContent className="px-4 py-4">
               <div className="flex items-center gap-2 mb-3">
                 {painImproving
-                  ? <TrendingDown className="w-4 h-4" style={{ color: '#4ECDC4' }} />
+                  ? <TrendingDown className="w-4 h-4" style={{ color: '#BEF264' }} />
                   : <TrendingUp className="w-4 h-4" style={{ color: '#f97316' }} />}
                 <p className="font-semibold text-sm">Pijnverloop</p>
                 {avgPain !== null && (
@@ -173,7 +173,7 @@ export default function ProgressPage() {
                 {[...history].reverse().slice(0, 10).map((s, i) => {
                   const pain = s.painLevel ?? 0
                   const heightPct = (pain / 10) * 100
-                  const color = pain <= 3 ? '#4ECDC4' : pain <= 6 ? '#f97316' : '#ef4444'
+                  const color = pain <= 3 ? '#BEF264' : pain <= 6 ? '#f97316' : '#ef4444'
                   return (
                     <div key={s.id} className="flex-1 flex flex-col items-center gap-1">
                       <div
@@ -185,13 +185,13 @@ export default function ProgressPage() {
                           {pain}
                         </span>
                       </div>
-                      <span className="text-[10px] text-zinc-400">S{i + 1}</span>
+                      <span className="text-[10px] text-[#7B8889]">S{i + 1}</span>
                     </div>
                   )
                 })}
               </div>
               {painImproving && (
-                <p className="text-xs" style={{ color: '#0D6B6E' }}>
+                <p className="text-xs" style={{ color: '#BEF264' }}>
                   ↓ Je pijn verbetert de laatste 3 sessies — goed bezig!
                 </p>
               )}
@@ -215,18 +215,18 @@ export default function ProgressPage() {
                   return (
                     <div key={w.week} className="flex-1 flex flex-col items-center gap-1">
                       <span className="text-[10px] font-semibold"
-                        style={{ color: isCurrent ? '#4ECDC4' : '#71717a' }}>
+                        style={{ color: isCurrent ? '#BEF264' : '#7B8889' }}>
                         {w.volume}
                       </span>
                       <div
                         className="w-full rounded-t-lg"
                         style={{
                           height: `${heightPct}%`,
-                          background: isCurrent ? '#4ECDC4' : '#e4e4e7',
+                          background: isCurrent ? '#BEF264' : 'rgba(255,255,255,0.12)',
                           minHeight: 4,
                         }}
                       />
-                      <span className="text-[10px] text-zinc-400">{w.label}</span>
+                      <span className="text-[10px] text-[#7B8889]">{w.label}</span>
                     </div>
                   )
                 })}
@@ -252,14 +252,14 @@ export default function ProgressPage() {
                     <div
                       className="w-full aspect-square rounded-xl flex items-center justify-center text-xs font-semibold max-w-[36px]"
                       style={
-                        hadSession ? { background: '#4ECDC4', color: 'white' }
-                          : isToday ? { background: '#1A3A3A', color: 'white' }
-                            : { background: '#f4f4f5', color: '#d4d4d8' }
+                        hadSession ? { background: '#BEF264', color: 'white' }
+                          : isToday ? { background: '#1C2425', color: 'white' }
+                            : { background: '#1C2425', color: '#4A5454' }
                       }
                     >
                       {hadSession ? '✓' : d.slice(0, 1)}
                     </div>
-                    <span className="text-[10px] text-zinc-400">{d}</span>
+                    <span className="text-[10px] text-[#7B8889]">{d}</span>
                   </div>
                 )
               })}
@@ -271,7 +271,7 @@ export default function ProgressPage() {
         <Card style={{ borderRadius: '14px' }}>
           <CardContent className="px-4 py-4">
             <div className="flex items-center gap-2 mb-3">
-              <Trophy className="w-4 h-4" style={{ color: '#3ECF6A' }} />
+              <Trophy className="w-4 h-4" style={{ color: '#BEF264' }} />
               <p className="font-semibold text-sm">1RM Progressie</p>
             </div>
             <div className="space-y-4">
@@ -298,8 +298,8 @@ export default function ProgressPage() {
                         <span
                           className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
                           style={{
-                            background: pctChange >= 0 ? '#3ECF6A22' : '#fef2f2',
-                            color: pctChange >= 0 ? '#3ECF6A' : '#dc2626',
+                            background: pctChange >= 0 ? '#BEF26422' : 'rgba(248,113,113,0.10)',
+                            color: pctChange >= 0 ? '#BEF264' : '#F87171',
                           }}
                         >
                           {pctChange >= 0 ? '+' : ''}{pctChange}%
@@ -310,7 +310,7 @@ export default function ProgressPage() {
                     <svg viewBox={`0 0 ${ex.data.length * 30} 40`} className="w-full" style={{ height: 40 }}>
                       <polyline
                         fill="none"
-                        stroke="#3ECF6A"
+                        stroke="#BEF264"
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -326,8 +326,8 @@ export default function ProgressPage() {
                         const isLast = i === ex.data.length - 1
                         return (
                           <circle key={i} cx={x} cy={y} r={isLast ? 4 : 2.5}
-                            fill={isLast ? '#3ECF6A' : 'white'}
-                            stroke="#3ECF6A" strokeWidth="1.5"
+                            fill={isLast ? '#BEF264' : 'white'}
+                            stroke="#BEF264" strokeWidth="1.5"
                           />
                         )
                       })}
@@ -358,9 +358,9 @@ export default function ProgressPage() {
               if (latestPain > 7 || rising) status = 'red'
               else if (latestPain > 5) status = 'yellow'
               const statusConfig = {
-                green:  { label: 'Groen — belasting OK', bg: '#f0fdf4', color: '#166534', dot: '#3ECF6A' },
+                green:  { label: 'Groen — belasting OK', bg: 'rgba(190,242,100,0.10)', color: '#BEF264', dot: '#BEF264' },
                 yellow: { label: 'Geel — verhoogde pijn, monitor', bg: '#fffbeb', color: '#92400e', dot: '#f97316' },
-                red:    { label: 'Rood — stop, consult therapeut', bg: '#fef2f2', color: '#991b1b', dot: '#ef4444' },
+                red:    { label: 'Rood — stop, consult therapeut', bg: 'rgba(248,113,113,0.10)', color: '#F87171', dot: '#ef4444' },
               }[status]
               return (
                 <div
@@ -395,7 +395,7 @@ export default function ProgressPage() {
                     <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block" style={{ background: '#60a5fa' }} />24u na</span>
                     <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block" style={{ background: '#a78bfa' }} />Ochtend</span>
                   </div>
-                  <Link href="/patient/follow-up" className="inline-flex items-center gap-1 text-[11px] font-medium mt-1" style={{ color: '#3ECF6A' }}>
+                  <Link href="/patient/follow-up" className="inline-flex items-center gap-1 text-[11px] font-medium mt-1" style={{ color: '#BEF264' }}>
                     <Plus className="w-3 h-3" />
                     24u follow-up invullen
                   </Link>
@@ -408,9 +408,9 @@ export default function ProgressPage() {
         {/* Pain report CTA */}
         <Link
           href="/patient/pain"
-          className="flex items-center gap-3 p-4 rounded-2xl border bg-white"
+          className="flex items-center gap-3 p-4 rounded-2xl border bg-[#141A1B]"
         >
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#fef2f2' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(248,113,113,0.10)' }}>
             <Plus className="w-5 h-5" style={{ color: '#ef4444' }} />
           </div>
           <div className="flex-1">

@@ -9,7 +9,7 @@ import {
 } from 'recharts'
 
 function PainDot({ level }: { level: number }) {
-  const color = level <= 3 ? '#22c55e' : level <= 6 ? '#f97316' : '#ef4444'
+  const color = level <= 3 ? '#BEF264' : level <= 6 ? '#f97316' : '#ef4444'
   return (
     <span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color }}>
       <span className="w-2 h-2 rounded-full inline-block" style={{ background: color }} />
@@ -54,7 +54,7 @@ export default function HistoryPage() {
       {/* Header */}
       <div className="px-4 pt-12 pb-5" style={{ background: '#1A1A1A' }}>
         <h1 className="text-white text-xl font-bold">Voortgang</h1>
-        <p className="text-zinc-400 text-xs mt-0.5">{sessions.length} sessies afgerond</p>
+        <p className="text-[#7B8889] text-xs mt-0.5">{sessions.length} sessies afgerond</p>
       </div>
 
       <div className="px-4 py-4 space-y-4">
@@ -72,9 +72,9 @@ export default function HistoryPage() {
           <Card style={{ borderRadius: '14px' }}>
             <CardContent className="px-3 py-3 text-center">
               <div className="flex justify-center mb-1">
-                <CheckCircle2 className="w-4 h-4" style={{ color: '#3ECF6A' }} />
+                <CheckCircle2 className="w-4 h-4" style={{ color: '#BEF264' }} />
               </div>
-              <p className="text-xl font-bold" style={{ color: '#3ECF6A' }}>
+              <p className="text-xl font-bold" style={{ color: '#BEF264' }}>
                 {avgPain !== null ? avgPain.toFixed(1) : '—'}
               </p>
               <p className="text-xs text-muted-foreground">Gem. pijn</p>
@@ -97,7 +97,7 @@ export default function HistoryPage() {
             <CardContent className="px-4 py-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" style={{ color: '#3ECF6A' }} />
+                  <TrendingUp className="w-4 h-4" style={{ color: '#BEF264' }} />
                   <p className="font-semibold text-sm">Grafiek</p>
                 </div>
                 <div className="flex rounded-xl overflow-hidden border text-xs font-semibold">
@@ -106,7 +106,7 @@ export default function HistoryPage() {
                     className="px-3 py-1.5 transition-all"
                     style={{
                       background: activeChart === 'volume' ? '#1A1A1A' : 'transparent',
-                      color: activeChart === 'volume' ? '#fff' : '#71717a',
+                      color: activeChart === 'volume' ? '#fff' : '#7B8889',
                     }}
                   >
                     Volume
@@ -116,7 +116,7 @@ export default function HistoryPage() {
                     className="px-3 py-1.5 transition-all"
                     style={{
                       background: activeChart === 'pain' ? '#1A1A1A' : 'transparent',
-                      color: activeChart === 'pain' ? '#fff' : '#71717a',
+                      color: activeChart === 'pain' ? '#fff' : '#7B8889',
                     }}
                   >
                     Pijn
@@ -128,7 +128,7 @@ export default function HistoryPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" vertical={false} />
                   <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} />
-                  <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f4f4f5' }} />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: '#1C2425' }} />
                   <Bar
                     dataKey={activeChart === 'volume' ? 'duur' : 'pain'}
                     name={activeChart === 'volume' ? 'Duur (min)' : 'Pijn (/10)'}
@@ -139,8 +139,8 @@ export default function HistoryPage() {
                         key={`cell-${index}`}
                         fill={
                           activeChart === 'volume'
-                            ? '#3ECF6A'
-                            : entry.pain <= 3 ? '#3ECF6A' : entry.pain <= 6 ? '#f97316' : '#ef4444'
+                            ? '#BEF264'
+                            : entry.pain <= 3 ? '#BEF264' : entry.pain <= 6 ? '#f97316' : '#ef4444'
                         }
                       />
                     ))}
@@ -181,7 +181,7 @@ export default function HistoryPage() {
                   >
                     <div
                       className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-sm font-bold"
-                      style={{ background: '#f0fdf4', color: '#3ECF6A' }}
+                      style={{ background: 'rgba(190,242,100,0.10)', color: '#BEF264' }}
                     >
                       ✓
                     </div>
@@ -194,7 +194,7 @@ export default function HistoryPage() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {session.painLevel !== null && <PainDot level={session.painLevel} />}
-                      {isOpen ? <ChevronUp className="w-4 h-4 text-zinc-400" /> : <ChevronDown className="w-4 h-4 text-zinc-400" />}
+                      {isOpen ? <ChevronUp className="w-4 h-4 text-[#7B8889]" /> : <ChevronDown className="w-4 h-4 text-[#7B8889]" />}
                     </div>
                   </button>
 
@@ -215,7 +215,7 @@ export default function HistoryPage() {
                         </div>
                       </div>
                       {session.notes && (
-                        <p className="text-xs text-muted-foreground italic bg-zinc-50 rounded-lg px-3 py-2">
+                        <p className="text-xs text-muted-foreground italic bg-[#1C2425] rounded-lg px-3 py-2">
                           &ldquo;{session.notes}&rdquo;
                         </p>
                       )}

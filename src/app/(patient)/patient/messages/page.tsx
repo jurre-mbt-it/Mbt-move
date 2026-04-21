@@ -56,16 +56,16 @@ export default function MessagesPage() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#FAFAFA' }}>
       {/* Header */}
-      <div className="px-4 pt-12 pb-4 flex items-center gap-3" style={{ background: '#1A3A3A' }}>
+      <div className="px-4 pt-12 pb-4 flex items-center gap-3" style={{ background: '#1C2425' }}>
         <div
           className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
-          style={{ background: '#4ECDC4' }}
+          style={{ background: '#BEF264' }}
         >
           {THERAPIST_NAME.split(' ').map(n => n[0]).join('').slice(0, 2)}
         </div>
         <div>
           <p className="text-white font-bold text-base">{THERAPIST_NAME}</p>
-          <p className="text-zinc-400 text-xs">Jouw therapeut</p>
+          <p className="text-[#7B8889] text-xs">Jouw therapeut</p>
         </div>
         {unread > 0 && (
           <div
@@ -86,7 +86,7 @@ export default function MessagesPage() {
             <div key={msg.id}>
               {showDate && (
                 <div className="flex justify-center my-2">
-                  <span className="text-[11px] text-zinc-400 bg-zinc-100 rounded-full px-3 py-1">
+                  <span className="text-[11px] text-[#7B8889] bg-[#1C2425] rounded-full px-3 py-1">
                     {new Date(msg.date).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}
                   </span>
                 </div>
@@ -96,8 +96,8 @@ export default function MessagesPage() {
                   <div
                     className="rounded-2xl px-4 py-3 text-sm leading-relaxed"
                     style={{
-                      background: isPatient ? '#4ECDC4' : '#fff',
-                      color: isPatient ? '#fff' : '#1A3A3A',
+                      background: isPatient ? '#BEF264' : '#fff',
+                      color: isPatient ? '#fff' : '#1C2425',
                       borderBottomRightRadius: isPatient ? 4 : undefined,
                       borderBottomLeftRadius: !isPatient ? 4 : undefined,
                       boxShadow: !isPatient ? '0 1px 3px rgba(0,0,0,0.08)' : undefined,
@@ -105,7 +105,7 @@ export default function MessagesPage() {
                   >
                     {msg.content}
                   </div>
-                  <p className={`text-[10px] text-zinc-400 mt-1 ${isPatient ? 'text-right' : 'text-left'}`}>
+                  <p className={`text-[10px] text-[#7B8889] mt-1 ${isPatient ? 'text-right' : 'text-left'}`}>
                     {formatTime(msg.date)}
                   </p>
                 </div>
@@ -128,14 +128,14 @@ export default function MessagesPage() {
           onKeyDown={e => e.key === 'Enter' && send()}
           placeholder="Typ een bericht..."
           className="flex-1 rounded-2xl px-4 py-2.5 text-sm outline-none"
-          style={{ background: '#f4f4f5', border: 'none' }}
+          style={{ background: '#1C2425', border: 'none' }}
         />
         <button
           onClick={send}
           disabled={!input.trim()}
           className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all"
           style={{
-            background: input.trim() ? '#4ECDC4' : '#f4f4f5',
+            background: input.trim() ? '#BEF264' : '#1C2425',
             color: input.trim() ? 'white' : '#a1a1aa',
           }}
         >

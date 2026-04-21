@@ -11,7 +11,7 @@ import { Plus, Search, Loader2, Dumbbell } from 'lucide-react'
 import { EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
 
 const CATEGORY_COLORS: Record<string, string> = {
-  STRENGTH: '#4ECDC4',
+  STRENGTH: '#BEF264',
   MOBILITY: '#60a5fa',
   PLYOMETRICS: '#f97316',
   CARDIO: '#ef4444',
@@ -33,14 +33,14 @@ export default function AthleteExercisesPage() {
 
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
-      <div className="px-4 pt-12 pb-6" style={{ background: '#1A3A3A' }}>
+      <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-white text-2xl font-bold">Oefeningen</h1>
-            <p className="text-zinc-400 text-xs mt-1">{exercises.length} oefeningen beschikbaar</p>
+            <p className="text-[#7B8889] text-xs mt-1">{exercises.length} oefeningen beschikbaar</p>
           </div>
           <Link href="/athlete/exercises/new">
-            <Button size="sm" className="gap-1.5" style={{ background: '#4ECDC4' }}>
+            <Button size="sm" className="gap-1.5" style={{ background: '#BEF264' }}>
               <Plus className="w-4 h-4" /> Toevoegen
             </Button>
           </Link>
@@ -55,7 +55,7 @@ export default function AthleteExercisesPage() {
             placeholder="Zoek oefening..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-9 bg-white"
+            className="pl-9 bg-[#141A1B]"
             style={{ borderRadius: '12px' }}
           />
         </div>
@@ -64,7 +64,7 @@ export default function AthleteExercisesPage() {
         <div className="flex gap-2 overflow-x-auto pb-1">
           <button
             className={`text-xs px-3 py-1.5 rounded-full shrink-0 transition-colors ${
-              !categoryFilter ? 'bg-[#1A3A3A] text-white' : 'bg-white text-muted-foreground border'
+              !categoryFilter ? 'bg-[#1A3A3A] text-white' : 'bg-[#141A1B] text-muted-foreground border'
             }`}
             onClick={() => setCategoryFilter(null)}
           >
@@ -74,7 +74,7 @@ export default function AthleteExercisesPage() {
             <button
               key={cat.value}
               className={`text-xs px-3 py-1.5 rounded-full shrink-0 transition-colors ${
-                categoryFilter === cat.value ? 'text-white' : 'bg-white text-muted-foreground border'
+                categoryFilter === cat.value ? 'text-white' : 'bg-[#141A1B] text-muted-foreground border'
               }`}
               style={categoryFilter === cat.value ? { background: CATEGORY_COLORS[cat.value] } : {}}
               onClick={() => setCategoryFilter(categoryFilter === cat.value ? null : cat.value)}
@@ -99,9 +99,9 @@ export default function AthleteExercisesPage() {
                 <CardContent className="p-3 flex items-center gap-3">
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ background: (CATEGORY_COLORS[ex.category] ?? '#4ECDC4') + '20' }}
+                    style={{ background: (CATEGORY_COLORS[ex.category] ?? '#BEF264') + '20' }}
                   >
-                    <Dumbbell className="w-5 h-5" style={{ color: CATEGORY_COLORS[ex.category] ?? '#4ECDC4' }} />
+                    <Dumbbell className="w-5 h-5" style={{ color: CATEGORY_COLORS[ex.category] ?? '#BEF264' }} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate">{ex.name}</p>
@@ -109,7 +109,7 @@ export default function AthleteExercisesPage() {
                   </div>
                   <span
                     className="text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0"
-                    style={{ background: (CATEGORY_COLORS[ex.category] ?? '#4ECDC4') + '20', color: CATEGORY_COLORS[ex.category] ?? '#4ECDC4' }}
+                    style={{ background: (CATEGORY_COLORS[ex.category] ?? '#BEF264') + '20', color: CATEGORY_COLORS[ex.category] ?? '#BEF264' }}
                   >
                     {EXERCISE_CATEGORIES.find(c => c.value === ex.category)?.label ?? ex.category}
                   </span>

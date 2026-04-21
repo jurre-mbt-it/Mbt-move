@@ -33,9 +33,9 @@ export default function WeekPlannerPage() {
   if (isLoading) {
     return (
       <div className="space-y-6 max-w-4xl">
-        <div className="h-8 w-48 bg-zinc-100 rounded animate-pulse" />
+        <div className="h-8 w-48 bg-[#1C2425] rounded animate-pulse" />
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-28 bg-zinc-100 rounded-xl animate-pulse" />
+          <div key={i} className="h-28 bg-[#1C2425] rounded-xl animate-pulse" />
         ))}
       </div>
     )
@@ -49,7 +49,7 @@ export default function WeekPlannerPage() {
           <p className="text-muted-foreground text-sm mt-0.5">Plan per weekdag welk programma een patiënt doet</p>
         </div>
         <Link href="/therapist/week-planner/new">
-          <Button style={{ background: '#4ECDC4' }} className="gap-2">
+          <Button style={{ background: '#BEF264' }} className="gap-2">
             <Plus className="w-4 h-4" />
             Nieuw schema
           </Button>
@@ -135,8 +135,8 @@ function WeekScheduleCard({ schedule, onDelete }: { schedule: ScheduleItem; onDe
                     <div
                       className="w-5 h-5 rounded-sm text-[9px] flex items-center justify-center font-bold"
                       style={{
-                        background: hasProgram ? '#ccfbf1' : '#f4f4f5',
-                        color: hasProgram ? '#0D6B6E' : '#a1a1aa',
+                        background: hasProgram ? 'rgba(190,242,100,0.14)' : '#1C2425',
+                        color: hasProgram ? '#BEF264' : '#a1a1aa',
                       }}
                     >
                       {hasProgram ? '●' : '–'}

@@ -12,7 +12,7 @@ export interface IconProps {
 
 const D = '#4a5568'   // primary dark
 const M = '#5a6577'   // mid tone
-const L = '#9ca3af'   // light accent
+const L = '#7B8889'   // light accent
 
 // ─── General / UI icons ─────────────────────────────────────────────────────
 

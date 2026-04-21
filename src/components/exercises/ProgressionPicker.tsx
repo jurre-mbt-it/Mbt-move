@@ -56,7 +56,7 @@ function ExercisePicker({
         >
           <span className="font-medium">{selected.name}</span>
           <button type="button" onClick={() => onSelect(null)}>
-            <X className="w-4 h-4 text-zinc-400 hover:text-destructive" />
+            <X className="w-4 h-4 text-[#7B8889] hover:text-destructive" />
           </button>
         </div>
       ) : (
@@ -72,7 +72,7 @@ function ExercisePicker({
           </Button>
 
           {open && (
-            <div className="absolute top-full mt-1 w-full z-50 bg-white border rounded-xl shadow-lg overflow-hidden">
+            <div className="absolute top-full mt-1 w-full z-50 bg-[#141A1B] border rounded-xl shadow-lg overflow-hidden">
               <div className="p-2 border-b">
                 <Input
                   placeholder="Zoeken..."
@@ -94,7 +94,7 @@ function ExercisePicker({
                     <button
                       key={ex.id}
                       type="button"
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-zinc-50 flex items-center justify-between"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-[#1C2425] flex items-center justify-between"
                       onClick={() => { onSelect(ex.id); setOpen(false); setQuery('') }}
                     >
                       <span>{ex.name}</span>

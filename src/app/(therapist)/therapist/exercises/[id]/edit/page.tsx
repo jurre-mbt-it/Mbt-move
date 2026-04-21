@@ -18,10 +18,10 @@ export default function EditExercisePage({ params }: Props) {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="h-8 w-48 bg-zinc-100 rounded animate-pulse" />
+        <div className="h-8 w-48 bg-[#1C2425] rounded animate-pulse" />
         <div className="space-y-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-12 bg-zinc-100 rounded-xl animate-pulse" />
+            <div key={i} className="h-12 bg-[#1C2425] rounded-xl animate-pulse" />
           ))}
         </div>
       </div>

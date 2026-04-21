@@ -1,22 +1,25 @@
 'use client'
 
 import Link from 'next/link'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
 import { trpc } from '@/lib/trpc/client'
-import { Users, ClipboardList, TrendingUp, ChevronRight, Plus } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import {
+  ActionTile,
+  DarkButton,
+  Display,
+  Kicker,
+  MetaLabel,
+  MetricTile,
+  P,
+  Tile,
+} from '@/components/dark-ui'
 
 export default function TherapistDashboard() {
-  const router = useRouter()
-
   const { data: patients = [], isLoading: patientsLoading } = trpc.patients.list.useQuery()
   const { data: programsRaw = [], isLoading: programsLoading } = trpc.programs.list.useQuery()
   const programs = programsRaw as Array<{ status: string; isTemplate: boolean }>
 
-  const activePatients = patients.filter(p => p.programStatus === 'ACTIVE')
-  const activePrograms = programs.filter(p => p.status === 'ACTIVE' && !p.isTemplate)
+  const activePatients = patients.filter((p) => p.programStatus === 'ACTIVE')
+  const activePrograms = programs.filter((p) => p.status === 'ACTIVE' && !p.isTemplate)
 
   function weeksCurrent(startDate: Date | string | null | undefined): number {
     if (!startDate) return 1
@@ -26,93 +29,153 @@ export default function TherapistDashboard() {
 
   const isLoading = patientsLoading || programsLoading
 
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Goedemorgen' : hour < 18 ? 'Goedemiddag' : 'Goedenavond'
+
   return (
-    <div className="space-y-5 max-w-4xl">
-      <div>
-        <h1 className="text-xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground text-sm">Goedemorgen — hier is je overzicht van vandaag.</p>
+    <div className="max-w-5xl w-full flex flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <Kicker>{greeting}</Kicker>
+        <Display size="md">DASHBOARD</Display>
+        <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
+          Overzicht van vandaag
+        </MetaLabel>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <StatCard icon={<Users className="w-4 h-4" style={{ color: '#4ECDC4' }} />} value={isLoading ? '…' : activePatients.length} label="Actieve patiënten" />
-        <StatCard icon={<ClipboardList className="w-4 h-4" style={{ color: '#60a5fa' }} />} value={isLoading ? '…' : activePrograms.length} label="Actieve programma's" />
-        <StatCard icon={<TrendingUp className="w-4 h-4" style={{ color: '#a78bfa' }} />} value={isLoading ? '…' : patients.length} label="Totaal patiënten" />
+        <MetricTile
+          label="Actief"
+          value={isLoading ? '…' : activePatients.length}
+          tint={P.lime}
+          sub="Patiënten met programma"
+          href="/therapist/patients?filter=active"
+        />
+        <MetricTile
+          label="Programma's"
+          value={isLoading ? '…' : activePrograms.length}
+          tint={P.ice}
+          sub="Lopend"
+          href="/therapist/programs"
+        />
+        <MetricTile
+          label="Totaal"
+          value={isLoading ? '…' : patients.length}
+          tint={P.gold}
+          sub="Patiënten in zorg"
+          href="/therapist/patients"
+        />
       </div>
 
       {/* Active patients */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-sm">Actieve patiënten</h2>
-          <Link href="/therapist/patients" className="text-xs flex items-center gap-0.5" style={{ color: '#4ECDC4' }}>
-            Alles <ChevronRight className="w-3 h-3" />
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <Kicker>Actieve patiënten</Kicker>
+          <Link
+            href="/therapist/patients"
+            className="athletic-mono"
+            style={{ color: P.lime, fontSize: 11, letterSpacing: '0.12em' }}
+          >
+            ALLES →
           </Link>
         </div>
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           {isLoading && (
-            <p className="text-sm text-muted-foreground py-2">Laden…</p>
+            <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11, padding: 8 }}>
+              LADEN…
+            </span>
           )}
           {!isLoading && activePatients.length === 0 && (
-            <Card style={{ borderRadius: '12px' }}>
-              <CardContent className="py-6 text-center">
-                <p className="text-sm text-muted-foreground">Geen actieve patiënten</p>
-              </CardContent>
-            </Card>
+            <Tile>
+              <p style={{ color: P.inkMuted, fontSize: 13, textAlign: 'center', padding: 12 }}>
+                Geen actieve patiënten
+              </p>
+            </Tile>
           )}
-          {activePatients.slice(0, 3).map(p => {
+          {activePatients.slice(0, 4).map((p) => {
             const current = weeksCurrent(p.startDate)
             const total = p.weeksTotal || 1
+            const pct = Math.min(100, (Math.min(current, total) / total) * 100)
             return (
-              <Link key={p.id} href={`/therapist/patients/${p.id}`} className="block">
-                <Card style={{ borderRadius: '12px' }} className="hover:shadow-md transition-shadow cursor-pointer">
-                  <CardContent className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0" style={{ background: '#1A3A3A' }}>
-                        {p.avatarInitials}
+              <Tile key={p.id} href={`/therapist/patients/${p.id}`}>
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 athletic-mono"
+                    style={{ background: P.surfaceHi, color: P.lime, fontSize: 13, fontWeight: 900 }}
+                  >
+                    {p.avatarInitials}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p style={{ color: P.ink, fontSize: 14, fontWeight: 700 }} className="truncate">
+                      {p.name}
+                    </p>
+                    <p
+                      className="athletic-mono"
+                      style={{
+                        color: P.inkMuted,
+                        fontSize: 11,
+                        letterSpacing: '0.04em',
+                        textTransform: 'none',
+                        fontWeight: 500,
+                      }}
+                    >
+                      {p.programName ?? 'Geen programma'}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <div
+                        className="flex-1 h-1 rounded-full overflow-hidden"
+                        style={{ backgroundColor: P.surfaceHi }}
+                      >
+                        <div
+                          className="h-full"
+                          style={{ width: `${pct}%`, backgroundColor: P.lime }}
+                        />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm">{p.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{p.programName ?? 'Geen programma'}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Progress value={(Math.min(current, total) / total) * 100} className="h-1 flex-1" />
-                          <span className="text-xs text-muted-foreground shrink-0">W{Math.min(current, total)}/{total}</span>
-                        </div>
-                      </div>
+                      <span
+                        className="athletic-mono shrink-0"
+                        style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.08em' }}
+                      >
+                        W{Math.min(current, total)}/{total}
+                      </span>
                     </div>
-                  </CardContent>
-                </Card>
-              </Link>
+                  </div>
+                </div>
+              </Tile>
             )
           })}
         </div>
       </div>
 
       {/* Quick actions */}
-      <div>
-        <h2 className="font-semibold text-sm mb-3">Snelle acties</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <Button variant="outline" className="h-12 gap-2 justify-start" onClick={() => router.push('/therapist/programs/new')}>
-            <Plus className="w-4 h-4" style={{ color: '#4ECDC4' }} />
-            Nieuw programma
-          </Button>
-          <Button variant="outline" className="h-12 gap-2 justify-start" onClick={() => router.push('/therapist/exercises/new')}>
-            <Plus className="w-4 h-4" style={{ color: '#60a5fa' }} />
-            Nieuwe oefening
-          </Button>
+      <div className="flex flex-col gap-2">
+        <Kicker>Snelle acties</Kicker>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <ActionTile
+            href="/therapist/programs/new"
+            label="Nieuw programma"
+            sub="Strength / cardio / walk-run"
+            bar={P.lime}
+          />
+          <ActionTile
+            href="/therapist/exercises/new"
+            label="Nieuwe oefening"
+            sub="Toevoegen aan bibliotheek"
+            bar={P.ice}
+          />
+          <ActionTile
+            href="/therapist/week-planner"
+            label="Weekschema"
+            sub="Plan programmas in"
+            bar={P.gold}
+          />
+          <ActionTile
+            href="/therapist/patients"
+            label="Patiënt uitnodigen"
+            sub="Nieuwe patiënt aanmaken"
+            bar={P.purple}
+          />
         </div>
       </div>
     </div>
-  )
-}
-
-function StatCard({ icon, value, label }: { icon: React.ReactNode; value: string | number; label: string }) {
-  return (
-    <Card style={{ borderRadius: '12px' }}>
-      <CardContent className="px-3 py-3">
-        <div className="mb-1">{icon}</div>
-        <p className="text-xl font-bold">{value}</p>
-        <p className="text-xs text-muted-foreground">{label}</p>
-      </CardContent>
-    </Card>
   )
 }

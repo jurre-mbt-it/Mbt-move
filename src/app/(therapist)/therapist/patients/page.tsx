@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -19,18 +19,28 @@ import { Plus, Search, Users, CheckCircle2, AlertCircle, Clock, Mail, Loader2 } 
 import { toast } from 'sonner'
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  ACTIVE:    { label: 'Actief',    bg: '#ccfbf1', text: '#0D6B6E' },
-  DRAFT:     { label: 'Concept',   bg: '#fef9c3', text: '#a16207' },
-  COMPLETED: { label: 'Afgerond',  bg: '#f1f5f9', text: '#475569' },
-  ARCHIVED:  { label: 'Gearchiveerd', bg: '#f1f5f9', text: '#475569' },
+  ACTIVE:    { label: 'Actief',    bg: 'rgba(190,242,100,0.14)', text: '#BEF264' },
+  DRAFT:     { label: 'Concept',   bg: 'rgba(244,194,97,0.14)', text: '#F4C261' },
+  COMPLETED: { label: 'Afgerond',  bg: 'rgba(255,255,255,0.06)', text: '#7B8889' },
+  ARCHIVED:  { label: 'Gearchiveerd', bg: 'rgba(255,255,255,0.06)', text: '#7B8889' },
 }
 
 type QuickFilter = 'all' | 'active' | 'low-compliance'
 
 export default function PatientsPage() {
+  return (
+    <Suspense fallback={null}>
+      <PatientsPageInner />
+    </Suspense>
+  )
+}
+
+function PatientsPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialFilter = (searchParams.get('filter') as QuickFilter | null) ?? 'all'
   const [search, setSearch] = useState('')
-  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all')
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>(initialFilter)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteName, setInviteName] = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
@@ -93,7 +103,7 @@ export default function PatientsPage() {
           <p className="text-muted-foreground text-sm mt-0.5">Beheer en monitor je patiënten</p>
         </div>
         <Button
-          style={{ background: '#4ECDC4' }}
+          style={{ background: '#BEF264' }}
           className="gap-2"
           onClick={() => setInviteOpen(true)}
         >
@@ -112,7 +122,7 @@ export default function PatientsPage() {
           onClick={() => setQuickFilter('all')}
         />
         <QuickStat
-          icon={<CheckCircle2 className="w-4 h-4" style={{ color: '#4ECDC4' }} />}
+          icon={<CheckCircle2 className="w-4 h-4" style={{ color: '#BEF264' }} />}
           value={activeCount}
           label="Actief"
           active={quickFilter === 'active'}
@@ -164,7 +174,7 @@ export default function PatientsPage() {
                     {/* Avatar */}
                     <div
                       className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white shrink-0"
-                      style={{ background: '#1A3A3A' }}
+                      style={{ background: '#1C2425' }}
                     >
                       {patient.avatarInitials}
                     </div>
@@ -206,7 +216,7 @@ export default function PatientsPage() {
                         <Button
                           size="sm"
                           className="text-xs h-7 px-3"
-                          style={{ background: '#4ECDC4' }}
+                          style={{ background: '#BEF264' }}
                           onClick={() => router.push(`/therapist/programs/new?patientId=${patient.id}`)}
                         >
                           + Programma
@@ -271,7 +281,7 @@ export default function PatientsPage() {
               <Label>Rol</Label>
               <div className="grid grid-cols-3 gap-2">
                 {([
-                  { value: 'PATIENT', label: 'Patiënt', color: '#4ECDC4' },
+                  { value: 'PATIENT', label: 'Patiënt', color: '#BEF264' },
                   { value: 'ATHLETE', label: 'Atleet', color: '#f59e0b' },
                   { value: 'THERAPIST', label: 'Therapeut', color: '#6366f1' },
                 ] as const).map(r => (
@@ -282,7 +292,7 @@ export default function PatientsPage() {
                     className="px-3 py-2 rounded-lg text-sm font-medium border-2 transition-colors"
                     style={inviteRole === r.value
                       ? { borderColor: r.color, background: r.color + '15', color: r.color }
-                      : { borderColor: '#e4e4e7', color: '#71717a' }
+                      : { borderColor: 'rgba(255,255,255,0.12)', color: '#7B8889' }
                     }
                   >
                     {r.label}
@@ -315,7 +325,7 @@ export default function PatientsPage() {
               <Button
                 type="submit"
                 className="w-full gap-2"
-                style={{ background: '#4ECDC4' }}
+                style={{ background: '#BEF264' }}
                 disabled={inviteLoading}
               >
                 <Mail className="w-4 h-4" />
@@ -334,8 +344,8 @@ function QuickStat({ icon, value, label, active, onClick }: {
 }) {
   return (
     <Card
-      style={{ borderRadius: '12px', borderColor: active ? '#4ECDC4' : undefined }}
-      className={`cursor-pointer transition-all hover:shadow-md ${active ? 'ring-2 ring-[#4ECDC4] bg-[#4ECDC408]' : ''}`}
+      style={{ borderRadius: '12px', borderColor: active ? '#BEF264' : undefined }}
+      className={`cursor-pointer transition-all hover:shadow-md ${active ? 'ring-2 ring-[#BEF264] bg-[#BEF26408]' : ''}`}
       onClick={onClick}
     >
       <CardContent className="p-3">

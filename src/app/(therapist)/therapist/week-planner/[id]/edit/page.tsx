@@ -16,9 +16,9 @@ export default function EditWeekPlannerPage({ params }: Props) {
   if (isLoading) {
     return (
       <div className="max-w-2xl space-y-4">
-        <div className="h-8 w-48 bg-zinc-100 rounded animate-pulse" />
+        <div className="h-8 w-48 bg-[#1C2425] rounded animate-pulse" />
         {Array.from({ length: 7 }).map((_, i) => (
-          <div key={i} className="h-14 bg-zinc-100 rounded-xl animate-pulse" />
+          <div key={i} className="h-14 bg-[#1C2425] rounded-xl animate-pulse" />
         ))}
       </div>
     )

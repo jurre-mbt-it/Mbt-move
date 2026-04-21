@@ -71,7 +71,7 @@ export function VideoInput({ value, onChange }: VideoInputProps) {
           <div
             className={cn(
               'border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors',
-              dragging ? 'border-[#4ECDC4] bg-[#4ECDC410]' : 'border-zinc-200 hover:border-[#4ECDC4] hover:bg-[#4ECDC405]'
+              dragging ? 'border-[#BEF264] bg-[#BEF26410]' : 'border-[rgba(255,255,255,0.12)] hover:border-[#BEF264] hover:bg-[#BEF26405]'
             )}
             onDragOver={e => { e.preventDefault(); setDragging(true) }}
             onDragLeave={() => setDragging(false)}
@@ -85,7 +85,7 @@ export function VideoInput({ value, onChange }: VideoInputProps) {
               className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }}
             />
-            <Film className="w-10 h-10 mx-auto mb-3 text-zinc-400" />
+            <Film className="w-10 h-10 mx-auto mb-3 text-[#7B8889]" />
             <p className="font-medium text-sm">Sleep een video hiernaartoe</p>
             <p className="text-xs text-muted-foreground mt-1">MP4, MOV, WebM • max 500 MB</p>
             <Button variant="outline" size="sm" className="mt-3" type="button">
@@ -99,10 +99,10 @@ export function VideoInput({ value, onChange }: VideoInputProps) {
                 <span>{value.url}</span>
                 <span>{uploadProgress}%</span>
               </div>
-              <div className="h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-[#1C2425] rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-300"
-                  style={{ width: `${uploadProgress}%`, background: '#4ECDC4' }}
+                  style={{ width: `${uploadProgress}%`, background: '#BEF264' }}
                 />
               </div>
               {uploadProgress < 100 && (
@@ -144,7 +144,7 @@ export function VideoInput({ value, onChange }: VideoInputProps) {
       </Tabs>
 
       {value.mediaType === 'UPLOAD' && value.url && uploadProgress === null && (
-        <div className="flex items-center justify-between text-sm bg-zinc-50 rounded-lg px-3 py-2">
+        <div className="flex items-center justify-between text-sm bg-[#1C2425] rounded-lg px-3 py-2">
           <span className="text-muted-foreground truncate">{value.url}</span>
           <button type="button" onClick={clearVideo}>
             <X className="w-4 h-4 text-muted-foreground hover:text-destructive" />

@@ -151,7 +151,7 @@ export const patientRouter = createTRPCRouter({
         where: {
           therapistId: ctx.user.id,
           patientId: input.patientId,
-          isActive: true,
+          isActive: true, status: 'APPROVED',
         },
       })
       if (!relation && ctx.user.role !== 'ADMIN') {
@@ -275,7 +275,7 @@ export const patientRouter = createTRPCRouter({
           where: {
             therapistId: ctx.user!.id,
             patientId: input.patientId,
-            isActive: true,
+            isActive: true, status: 'APPROVED',
           },
         })
         if (!relation && ctx.user!.role !== 'ADMIN') {
@@ -509,4 +509,74 @@ export const patientRouter = createTRPCRouter({
       })
     )
   }),
+
+  // ── Therapist-access consent (Phase C) ──────────────────────────────────
+  // Patient ziet welke therapeuten toegang hebben of aanvragen, en kan
+  // accepteren, afwijzen, of toegang intrekken.
+
+  getTherapistAccess: protectedProcedure.query(async ({ ctx }) => {
+    const relations = await ctx.prisma.patientTherapist.findMany({
+      where: { patientId: ctx.user!.id, isActive: true },
+      include: {
+        therapist: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            specialty: true,
+            avatarUrl: true,
+          },
+        },
+      },
+      orderBy: [
+        { status: 'asc' },
+        { requestedAt: 'desc' },
+      ],
+    })
+    return relations.map((r) => ({
+      id: r.id,
+      status: r.status,
+      requestedAt: r.requestedAt,
+      respondedAt: r.respondedAt,
+      therapist: r.therapist,
+    }))
+  }),
+
+  respondToTherapistAccess: protectedProcedure
+    .input(z.object({ relationId: z.string(), accept: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const relation = await ctx.prisma.patientTherapist.findUnique({
+        where: { id: input.relationId },
+      })
+      if (!relation) throw new TRPCError({ code: 'NOT_FOUND' })
+      if (relation.patientId !== ctx.user!.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Dit is niet jouw koppeling' })
+      }
+      return ctx.prisma.patientTherapist.update({
+        where: { id: input.relationId },
+        data: {
+          status: input.accept ? 'APPROVED' : 'DECLINED',
+          respondedAt: new Date(),
+        },
+      })
+    }),
+
+  revokeTherapistAccess: protectedProcedure
+    .input(z.object({ relationId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const relation = await ctx.prisma.patientTherapist.findUnique({
+        where: { id: input.relationId },
+      })
+      if (!relation) throw new TRPCError({ code: 'NOT_FOUND' })
+      if (relation.patientId !== ctx.user!.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Dit is niet jouw koppeling' })
+      }
+      return ctx.prisma.patientTherapist.update({
+        where: { id: input.relationId },
+        data: {
+          status: 'REVOKED',
+          respondedAt: new Date(),
+        },
+      })
+    }),
 })

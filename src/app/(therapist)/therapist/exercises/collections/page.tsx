@@ -121,7 +121,7 @@ export default function CollectionsPage() {
               Organiseer oefeningen in persoonlijke collecties
             </p>
           </div>
-          <Button onClick={openCreate} style={{ background: '#4ECDC4' }} className="gap-2">
+          <Button onClick={openCreate} style={{ background: '#BEF264' }} className="gap-2">
             <Plus className="w-4 h-4" />
             Nieuwe collectie
           </Button>
@@ -215,7 +215,7 @@ export default function CollectionsPage() {
                   </div>
                 ) : (
                   collectionExercises.map(ex => (
-                    <div key={ex.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-zinc-50 group">
+                    <div key={ex.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-[#1C2425] group">
                       <GripVertical className="w-4 h-4 text-zinc-300 cursor-grab shrink-0" />
                       <div
                         className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0"
@@ -229,7 +229,7 @@ export default function CollectionsPage() {
                       </div>
                       <button
                         onClick={() => removeExercise(ex.id)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-destructive"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-[#7B8889] hover:text-destructive"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -286,7 +286,7 @@ export default function CollectionsPage() {
             <div className="flex gap-2 pt-2">
               <Button
                 onClick={handleSave}
-                style={{ background: '#4ECDC4' }}
+                style={{ background: '#BEF264' }}
                 className="flex-1"
                 disabled={createMutation.isPending || updateMutation.isPending}
               >

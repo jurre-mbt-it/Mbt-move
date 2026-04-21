@@ -42,14 +42,14 @@ export default function AccessCodeLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#FAFAFA' }}>
+    <div className="athletic-dark min-h-screen flex items-center justify-center p-4" style={{ background: '#0A0E0F' }}>
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex justify-center mb-8">
           <img src="/Logo.jpg" alt="MBT Gym" className="h-10 w-auto" />
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border p-8 space-y-6" style={{ borderColor: '#e4e4e7' }}>
+        <div className="bg-[#141A1B] rounded-2xl shadow-sm border p-8 space-y-6" style={{ borderColor: '#e4e4e7' }}>
           {/* Icon */}
           <div className="flex flex-col items-center gap-2 text-center">
             <div

@@ -7,8 +7,11 @@ export default function PatientLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen pb-16" style={{ background: '#FAFAFA' }}>
-      <main><PageTransition>{children}</PageTransition></main>
+    <div
+      className="athletic-dark min-h-screen flex flex-col pb-16"
+      style={{ background: '#0A0E0F', color: '#F5F7F6' }}
+    >
+      <main className="flex-1"><PageTransition>{children}</PageTransition></main>
       <PatientBottomNav />
     </div>
   )

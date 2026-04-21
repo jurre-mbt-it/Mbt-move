@@ -80,9 +80,9 @@ export default function PatientSchedulePage() {
   return (
     <div className="min-h-screen pb-6" style={{ background: '#FAFAFA' }}>
       {/* Header */}
-      <div className="px-4 pt-12 pb-4" style={{ background: '#1A3A3A' }}>
+      <div className="px-4 pt-12 pb-4" style={{ background: '#1C2425' }}>
         <h1 className="text-white text-xl font-bold">Weekschema</h1>
-        <p className="text-zinc-400 text-xs mt-0.5">Week {program.currentWeek} · {program.name}</p>
+        <p className="text-[#7B8889] text-xs mt-0.5">Week {program.currentWeek} · {program.name}</p>
       </div>
 
       {/* 7-day strip */}
@@ -101,29 +101,29 @@ export default function PatientSchedulePage() {
                 className="flex flex-col items-center gap-1.5 min-w-[44px] rounded-2xl p-2.5 transition-all"
                 style={{
                   background: isSelected
-                    ? '#1A3A3A'
+                    ? '#1C2425'
                     : isTd
-                      ? '#f0fdfa'
+                      ? 'rgba(190,242,100,0.10)'
                       : hasSession
                         ? '#fff'
-                        : '#f4f4f5',
+                        : '#1C2425',
                   border: isSelected
-                    ? '2px solid #4ECDC4'
+                    ? '2px solid #BEF264'
                     : isTd
-                      ? '2px solid #4ECDC4'
+                      ? '2px solid #BEF264'
                       : '2px solid transparent',
-                  color: isSelected ? '#fff' : hasSession ? '#1A3A3A' : '#a1a1aa',
+                  color: isSelected ? '#fff' : hasSession ? '#1C2425' : '#a1a1aa',
                 }}
               >
                 <span className="text-[11px] font-bold">{DAY_SHORT[i]}</span>
                 <div className="w-6 h-6 flex items-center justify-center">
                   {hasSession
-                    ? <Dumbbell className="w-3.5 h-3.5" style={{ color: isSelected ? '#4ECDC4' : '#52525b' }} />
+                    ? <Dumbbell className="w-3.5 h-3.5" style={{ color: isSelected ? '#BEF264' : '#52525b' }} />
                     : <Moon className="w-3.5 h-3.5" />
                   }
                 </div>
                 {hasSession && (
-                  <span className="text-[10px] font-medium" style={{ color: isSelected ? '#4ECDC4' : '#71717a' }}>
+                  <span className="text-[10px] font-medium" style={{ color: isSelected ? '#BEF264' : '#7B8889' }}>
                     {count}
                   </span>
                 )}
@@ -139,7 +139,7 @@ export default function PatientSchedulePage() {
           <h2 className="font-bold text-base">{DAY_NAMES[selectedDay - 1]}{isToday ? ' · Vandaag' : ''}</h2>
           {hasExercises && isToday && (
             <Link href="/patient/session">
-              <Button size="sm" className="gap-1.5 text-xs font-semibold h-8" style={{ background: '#4ECDC4' }}>
+              <Button size="sm" className="gap-1.5 text-xs font-semibold h-8" style={{ background: '#BEF264' }}>
                 <Play className="w-3 h-3 fill-current" /> Start sessie
               </Button>
             </Link>
@@ -155,7 +155,7 @@ export default function PatientSchedulePage() {
                     className="rounded-2xl overflow-hidden"
                     style={{ border: '2px solid #93c5fd', background: '#eff6ff' }}
                   >
-                    <div className="px-3 py-1.5 flex items-center gap-1.5" style={{ background: '#dbeafe' }}>
+                    <div className="px-3 py-1.5 flex items-center gap-1.5" style={{ background: 'rgba(147,197,253,0.14)' }}>
                       <span className="text-[10px] font-bold tracking-wider" style={{ color: '#1d4ed8' }}>
                         SUPERSET {exercises[0].supersetGroup}
                       </span>
@@ -180,7 +180,7 @@ export default function PatientSchedulePage() {
               <Link href="/patient/session">
                 <div
                   className="flex items-center justify-center gap-2 py-4 rounded-2xl mt-2"
-                  style={{ background: '#4ECDC4' }}
+                  style={{ background: '#BEF264' }}
                 >
                   <Play className="w-4 h-4 fill-white text-white" />
                   <span className="text-white font-bold text-sm">Start sessie — {exercisesForSelectedDay.length} oefeningen</span>
@@ -191,16 +191,16 @@ export default function PatientSchedulePage() {
         ) : (
           <div
             className="rounded-2xl px-5 py-8 flex flex-col items-center text-center gap-3"
-            style={{ background: '#f0fdfa', border: '2px solid #bbf7d0' }}
+            style={{ background: 'rgba(190,242,100,0.10)', border: '2px solid #bbf7d0' }}
           >
             <div><IconLeaf size={40} /></div>
             <div>
-              <p className="font-bold text-base" style={{ color: '#0D6B6E' }}>Rustdag</p>
-              <p className="text-sm mt-1.5 leading-relaxed" style={{ color: '#166534' }}>
+              <p className="font-bold text-base" style={{ color: '#BEF264' }}>Rustdag</p>
+              <p className="text-sm mt-1.5 leading-relaxed" style={{ color: '#BEF264' }}>
                 Vandaag is een rustdag. Goed herstel is onderdeel van je programma.
               </p>
             </div>
-            <p className="text-xs text-zinc-400 mt-1">
+            <p className="text-xs text-[#7B8889] mt-1">
               Lichaam en geest herstellen terwijl je rust — dat is training.
             </p>
           </div>
@@ -215,9 +215,9 @@ function ExerciseRow({ exercise, isToday }: { exercise: ProgramExercise; isToday
     <div className="flex items-center gap-3 px-4 py-3">
       <div
         className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-        style={{ background: '#f4f4f5' }}
+        style={{ background: '#1C2425' }}
       >
-        <Dumbbell className="w-4 h-4 text-zinc-500" />
+        <Dumbbell className="w-4 h-4 text-[#7B8889]" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-sm truncate">{exercise.name}</p>

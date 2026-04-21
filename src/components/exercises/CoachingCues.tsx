@@ -45,13 +45,13 @@ export function CoachingCues({
           {value.map((cue, i) => (
             <li key={i} className="flex items-center gap-2 group">
               <span className="text-xs text-muted-foreground w-5 text-right shrink-0">{i + 1}.</span>
-              <div className="flex-1 flex items-center gap-2 bg-zinc-50 rounded-lg px-3 py-2 text-sm border border-zinc-200">
+              <div className="flex-1 flex items-center gap-2 bg-[#1C2425] rounded-lg px-3 py-2 text-sm border border-[rgba(255,255,255,0.12)]">
                 <GripVertical className="w-3.5 h-3.5 text-zinc-300 shrink-0 cursor-grab" />
                 <span className="flex-1">{cue}</span>
                 <button
                   type="button"
                   onClick={() => remove(i)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-destructive"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-[#7B8889] hover:text-destructive"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -61,7 +61,7 @@ export function CoachingCues({
                   type="button"
                   disabled={i === 0}
                   onClick={() => move(i, i - 1)}
-                  className="text-zinc-400 hover:text-zinc-700 disabled:opacity-30 text-xs leading-none"
+                  className="text-[#7B8889] hover:text-[#F5F7F6] disabled:opacity-30 text-xs leading-none"
                 >
                   ↑
                 </button>
@@ -69,7 +69,7 @@ export function CoachingCues({
                   type="button"
                   disabled={i === value.length - 1}
                   onClick={() => move(i, i + 1)}
-                  className="text-zinc-400 hover:text-zinc-700 disabled:opacity-30 text-xs leading-none"
+                  className="text-[#7B8889] hover:text-[#F5F7F6] disabled:opacity-30 text-xs leading-none"
                 >
                   ↓
                 </button>

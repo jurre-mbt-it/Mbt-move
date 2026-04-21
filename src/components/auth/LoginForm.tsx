@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Mail, Lock, ArrowRight, Sparkles } from 'lucide-react'
+import { P, DarkButton, DarkInput, Kicker } from '@/components/dark-ui'
 
 function getRoleRedirect(role?: string) {
   if (role === 'PATIENT') return '/patient/dashboard'
@@ -78,60 +79,88 @@ export function LoginForm() {
   return (
     <div className="w-full max-w-sm">
       {/* Logo */}
-      <div className="flex flex-col items-center mb-10">
-        <img src="/Logo.jpg" alt="MBT" className="h-12 w-auto mb-4 rounded-lg" />
-        <p className="text-zinc-500 text-sm tracking-wide">MOVEMENT BASED THERAPY</p>
+      <div className="flex flex-col items-center mb-10 gap-3">
+        <div className="flex items-baseline gap-2">
+          <span
+            className="athletic-display"
+            style={{ color: P.ink, fontSize: 44, letterSpacing: '-0.04em', fontWeight: 900 }}
+          >
+            MBT
+          </span>
+          <span
+            className="athletic-mono"
+            style={{ color: P.lime, fontSize: 24, fontWeight: 900, letterSpacing: '0.16em' }}
+          >
+            GYM
+          </span>
+        </div>
+        <Kicker>Movement Based Therapy</Kicker>
       </div>
 
       {magicLinkSent ? (
         <div className="text-center py-8">
-          <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: '#4ECDC420' }}>
-            <Mail className="w-7 h-7" style={{ color: '#4ECDC4' }} />
+          <div
+            className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
+            style={{ background: P.surfaceHi, border: `1px solid ${P.lime}` }}
+          >
+            <Mail className="w-7 h-7" style={{ color: P.lime }} />
           </div>
-          <h2 className="text-white text-lg font-semibold mb-2">Check je e-mail</h2>
-          <p className="text-zinc-400 text-sm">
-            We hebben een magic link gestuurd naar<br />
-            <span className="text-white font-medium">{email}</span>
+          <h2
+            className="athletic-display mb-2"
+            style={{ color: P.ink, fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em' }}
+          >
+            CHECK JE E-MAIL
+          </h2>
+          <p style={{ color: P.inkMuted, fontSize: 14 }}>
+            We hebben een magic link gestuurd naar
+            <br />
+            <span style={{ color: P.ink, fontWeight: 700 }}>{email}</span>
           </p>
           <button
             onClick={() => { setMagicLinkSent(false); setMode('password') }}
-            className="mt-6 text-sm text-zinc-500 hover:text-white transition-colors"
+            className="athletic-mono mt-6 transition-colors"
+            style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.12em' }}
+            type="button"
           >
-            Terug naar inloggen
+            TERUG NAAR INLOGGEN
           </button>
         </div>
       ) : (
         <>
           {/* Form */}
-          <form onSubmit={mode === 'password' ? handleEmailPassword : handleMagicLink} className="space-y-4">
+          <form onSubmit={mode === 'password' ? handleEmailPassword : handleMagicLink} className="flex flex-col gap-3">
             {/* Email field */}
             <div className="relative">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
-              <input
+              <Mail
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5"
+                style={{ color: P.inkDim }}
+              />
+              <DarkInput
                 type="email"
                 placeholder="Email"
                 value={email}
-                onChange={e => setEmail(e.target.value)}
+                onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={loading}
-                className="w-full h-14 pl-12 pr-4 rounded-xl text-white placeholder-zinc-500 outline-none transition-all focus:ring-2 focus:ring-[#4ECDC4]/50"
-                style={{ background: '#1A3A3A', border: '1px solid #2A4A4A' }}
+                style={{ paddingLeft: 48, height: 56 }}
               />
             </div>
 
             {/* Password field */}
             {mode === 'password' && (
               <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
-                <input
+                <Lock
+                  className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5"
+                  style={{ color: P.inkDim }}
+                />
+                <DarkInput
                   type="password"
-                  placeholder="Password"
+                  placeholder="Wachtwoord"
                   value={password}
-                  onChange={e => setPassword(e.target.value)}
+                  onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={loading}
-                  className="w-full h-14 pl-12 pr-4 rounded-xl text-white placeholder-zinc-500 outline-none transition-all focus:ring-2 focus:ring-[#4ECDC4]/50"
-                  style={{ background: '#1A3A3A', border: '1px solid #2A4A4A' }}
+                  style={{ paddingLeft: 48, height: 56 }}
                 />
               </div>
             )}
@@ -141,89 +170,103 @@ export function LoginForm() {
               <div className="text-right">
                 <button
                   type="button"
-                  className="text-xs font-semibold tracking-wider uppercase transition-colors hover:text-white"
-                  style={{ color: '#4ECDC4' }}
+                  className="athletic-mono transition-colors"
+                  style={{ color: P.lime, fontSize: 10, letterSpacing: '0.14em' }}
                   onClick={() => setMode('magic')}
                 >
-                  Wachtwoord vergeten
+                  WACHTWOORD VERGETEN
                 </button>
               </div>
             )}
 
             {/* Error */}
             {error && (
-              <div className="rounded-lg px-4 py-3 text-sm" style={{ background: '#2A1215', color: '#f87171', border: '1px solid #3A1A1D' }}>
+              <div
+                className="rounded-xl px-4 py-3 text-sm"
+                style={{
+                  background: 'rgba(248,113,113,0.08)',
+                  color: P.danger,
+                  border: `1px solid ${P.danger}`,
+                }}
+              >
                 {error}
               </div>
             )}
 
             {/* Submit button */}
-            <button
+            <DarkButton
               type="submit"
               disabled={loading}
-              className="w-full h-14 rounded-xl font-semibold text-white flex items-center justify-center gap-2 transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
-              style={{
-                background: mode === 'password'
-                  ? 'linear-gradient(135deg, #4ECDC4, #2BA853)'
-                  : '#1A3A3A',
-                border: mode === 'magic' ? '1px solid #2A4A4A' : 'none',
-              }}
+              loading={loading}
+              size="lg"
+              variant={mode === 'password' ? 'primary' : 'secondary'}
             >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : mode === 'password' ? (
-                <>
+              {mode === 'password' ? (
+                <span className="flex items-center gap-2">
                   SIGN IN
                   <ArrowRight className="w-5 h-5" />
-                </>
+                </span>
               ) : (
-                <>
+                <span className="flex items-center gap-2">
                   <Sparkles className="w-5 h-5" />
                   STUUR MAGIC LINK
-                </>
+                </span>
               )}
-            </button>
+            </DarkButton>
           </form>
 
           {/* Divider */}
           <div className="flex items-center gap-4 my-6">
-            <div className="flex-1 h-px bg-zinc-800" />
-            <span className="text-zinc-600 text-xs font-medium tracking-wider">OF</span>
-            <div className="flex-1 h-px bg-zinc-800" />
+            <div className="flex-1 h-px" style={{ background: P.lineStrong }} />
+            <span
+              className="athletic-mono"
+              style={{ color: P.inkDim, fontSize: 10, letterSpacing: '0.2em' }}
+            >
+              OF
+            </span>
+            <div className="flex-1 h-px" style={{ background: P.lineStrong }} />
           </div>
 
           {/* Toggle mode */}
-          <button
+          <DarkButton
             type="button"
+            size="lg"
+            variant="ghost"
             onClick={() => setMode(mode === 'password' ? 'magic' : 'password')}
-            className="w-full h-14 rounded-xl font-semibold text-white flex items-center justify-center gap-2 transition-all hover:bg-zinc-800 active:scale-[0.98]"
-            style={{ background: '#141414', border: '1px solid #2A4A4A' }}
           >
             {mode === 'password' ? (
-              <>
-                <Sparkles className="w-5 h-5" style={{ color: '#4ECDC4' }} />
-                SIGN IN WITH A MAGIC LINK
-              </>
+              <span className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5" style={{ color: P.lime }} />
+                MAGIC LINK
+              </span>
             ) : (
-              <>
-                <Lock className="w-5 h-5" style={{ color: '#4ECDC4' }} />
-                SIGN IN WITH PASSWORD
-              </>
+              <span className="flex items-center gap-2">
+                <Lock className="w-5 h-5" style={{ color: P.lime }} />
+                WACHTWOORD
+              </span>
             )}
-          </button>
+          </DarkButton>
 
           {/* Footer links */}
-          <div className="mt-8 text-center space-y-3">
-            <p className="text-sm text-zinc-500">
+          <div className="mt-8 text-center">
+            <p style={{ color: P.inkMuted, fontSize: 13 }}>
               Nog geen account?{' '}
-              <a href="/register" className="font-semibold uppercase text-xs tracking-wider hover:text-white transition-colors" style={{ color: '#4ECDC4' }}>
-                Maak een account
+              <a
+                href="/register"
+                className="athletic-mono transition-colors"
+                style={{ color: P.lime, fontSize: 11, letterSpacing: '0.14em' }}
+              >
+                MAAK EEN ACCOUNT
               </a>
             </p>
           </div>
 
-          {/* Version */}
-          <p className="text-center text-zinc-700 text-xs mt-10">MBT Move v1.0.0</p>
+          <p
+            className="athletic-mono text-center mt-10"
+            style={{ color: P.inkDim, fontSize: 10, letterSpacing: '0.16em' }}
+          >
+            MBT GYM v1.0
+          </p>
         </>
       )}
     </div>

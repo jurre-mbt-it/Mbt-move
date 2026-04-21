@@ -38,17 +38,17 @@ export default function PatientProfilePage() {
 
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
-      <div className="px-4 pt-12 pb-8" style={{ background: '#1A3A3A' }}>
+      <div className="px-4 pt-12 pb-8" style={{ background: '#1C2425' }}>
         <div className="flex flex-col items-center gap-3">
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center font-bold text-2xl text-white"
-            style={{ background: '#4ECDC4' }}
+            style={{ background: '#BEF264' }}
           >
             {initials}
           </div>
           <div className="text-center">
             <h1 className="text-white text-xl font-bold">{user?.name || '...'}</h1>
-            <p className="text-zinc-400 text-sm mt-0.5">{user?.email || ''}</p>
+            <p className="text-[#7B8889] text-sm mt-0.5">{user?.email || ''}</p>
           </div>
         </div>
       </div>
@@ -80,7 +80,7 @@ export default function PatientProfilePage() {
 function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-zinc-400" style={{ background: '#f4f4f5' }}>
+      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-[#7B8889]" style={{ background: '#1C2425' }}>
         {icon}
       </div>
       <div className="flex-1 min-w-0">

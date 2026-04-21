@@ -108,7 +108,7 @@ export function WeekPlannerEditor({ initialData }: Props) {
           <h1 className="text-xl font-bold">{isEdit ? 'Schema bewerken' : 'Nieuw weekschema'}</h1>
         </div>
         <Button
-          style={{ background: '#4ECDC4' }}
+          style={{ background: '#BEF264' }}
           className="gap-2"
           onClick={handleSave}
           disabled={saving}
@@ -119,7 +119,7 @@ export function WeekPlannerEditor({ initialData }: Props) {
       </div>
 
       {/* Meta */}
-      <div className="space-y-3 p-4 border rounded-xl bg-white">
+      <div className="space-y-3 p-4 border rounded-xl bg-[#141A1B]">
         <div>
           <Label className="text-xs">Naam</Label>
           <Input value={name} onChange={e => setName(e.target.value)} className="mt-1.5" placeholder="bv. Knie revalidatie week 1–4" />
@@ -134,7 +134,7 @@ export function WeekPlannerEditor({ initialData }: Props) {
             <select
               value={patientId}
               onChange={e => setPatientId(e.target.value)}
-              className="mt-1.5 w-full h-9 text-sm border rounded-md px-3 bg-white focus:outline-none focus:ring-1 focus:ring-[#4ECDC4]"
+              className="mt-1.5 w-full h-9 text-sm border rounded-md px-3 bg-[#141A1B] focus:outline-none focus:ring-1 focus:ring-[#BEF264]"
             >
               <option value="">— Geen patiënt —</option>
               {patientOptions.map(p => (
@@ -148,7 +148,7 @@ export function WeekPlannerEditor({ initialData }: Props) {
               id="isTemplate"
               checked={isTemplate}
               onChange={e => setIsTemplate(e.target.checked)}
-              className="accent-[#4ECDC4]"
+              className="accent-[#BEF264]"
             />
             <label htmlFor="isTemplate" className="text-sm">Template</label>
           </div>
@@ -164,7 +164,7 @@ export function WeekPlannerEditor({ initialData }: Props) {
             return (
               <div
                 key={i}
-                className="flex items-center gap-3 p-3 border rounded-xl bg-white"
+                className="flex items-center gap-3 p-3 border rounded-xl bg-[#141A1B]"
               >
                 {/* Day label */}
                 <div className="w-24 shrink-0">
@@ -176,7 +176,7 @@ export function WeekPlannerEditor({ initialData }: Props) {
                 <select
                   value={day.programId ?? ''}
                   onChange={e => setDayProgram(i, e.target.value || null)}
-                  className="flex-1 h-9 text-sm border rounded-md px-3 bg-white focus:outline-none focus:ring-1 focus:ring-[#4ECDC4]"
+                  className="flex-1 h-9 text-sm border rounded-md px-3 bg-[#141A1B] focus:outline-none focus:ring-1 focus:ring-[#BEF264]"
                 >
                   <option value="">Rustdag</option>
                   {programs
@@ -189,7 +189,7 @@ export function WeekPlannerEditor({ initialData }: Props) {
                 {/* Color indicator */}
                 <div
                   className="w-3 h-3 rounded-full shrink-0"
-                  style={{ background: day.programId ? '#4ECDC4' : '#e4e4e7' }}
+                  style={{ background: day.programId ? '#BEF264' : 'rgba(255,255,255,0.12)' }}
                 />
               </div>
             )
@@ -198,7 +198,7 @@ export function WeekPlannerEditor({ initialData }: Props) {
       </div>
 
       {/* Summary */}
-      <div className="p-3 bg-zinc-50 rounded-xl text-xs text-muted-foreground">
+      <div className="p-3 bg-[#1C2425] rounded-xl text-xs text-muted-foreground">
         {days.filter(d => d.programId).length} trainingsdagen · {days.filter(d => !d.programId).length} rustdagen
       </div>
     </div>

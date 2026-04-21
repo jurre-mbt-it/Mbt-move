@@ -34,9 +34,9 @@ export default function AthleteSchedulePage() {
 
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
-      <div className="px-4 pt-12 pb-6" style={{ background: '#1A3A3A' }}>
+      <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
         <h1 className="text-white text-xl font-bold">Weekschema</h1>
-        <p className="text-zinc-400 text-sm mt-1">Week {currentWeek}</p>
+        <p className="text-[#7B8889] text-sm mt-1">Week {currentWeek}</p>
       </div>
 
       <div className="px-4 -mt-3 space-y-4 pb-6">
@@ -56,9 +56,9 @@ export default function AthleteSchedulePage() {
                     className="flex-1 flex flex-col items-center gap-1 py-2 rounded-xl transition-colors"
                     style={
                       isSelected
-                        ? { background: '#4ECDC4', color: 'white' }
+                        ? { background: '#BEF264', color: 'white' }
                         : isToday
-                          ? { background: '#f0fdfa', color: '#1A3A3A', fontWeight: 700 }
+                          ? { background: 'rgba(190,242,100,0.10)', color: '#1C2425', fontWeight: 700 }
                           : {}
                     }
                   >
@@ -66,18 +66,18 @@ export default function AthleteSchedulePage() {
                     {isToday && !isSelected && (
                       <span
                         className="w-1.5 h-1.5 rounded-full"
-                        style={{ background: '#4ECDC4' }}
+                        style={{ background: '#BEF264' }}
                       />
                     )}
                     {hasExercises && !isToday && (
                       <span
                         className="w-1.5 h-1.5 rounded-full"
-                        style={{ background: isSelected ? 'white' : '#4ECDC4' }}
+                        style={{ background: isSelected ? 'white' : '#BEF264' }}
                       />
                     )}
                     {isToday && isSelected && (
                       <span
-                        className="w-1.5 h-1.5 rounded-full bg-white"
+                        className="w-1.5 h-1.5 rounded-full bg-[#141A1B]"
                       />
                     )}
                   </button>
@@ -92,14 +92,14 @@ export default function AthleteSchedulePage() {
           <h2 className="text-base font-bold">
             {DAY_NAMES[selectedDay - 1]}
             {selectedDay === todayDayNum && (
-              <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: '#4ECDC420', color: '#4ECDC4' }}>
+              <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: '#BEF26420', color: '#BEF264' }}>
                 Vandaag
               </span>
             )}
           </h2>
           {!isRestDay && selectedDay === todayDayNum && (
             <Link href="/athlete/session">
-              <Button size="sm" className="gap-1.5 text-xs font-semibold" style={{ background: '#4ECDC4' }}>
+              <Button size="sm" className="gap-1.5 text-xs font-semibold" style={{ background: '#BEF264' }}>
                 <Play className="w-3 h-3 fill-current" /> Start sessie
               </Button>
             </Link>
@@ -130,7 +130,7 @@ export default function AthleteSchedulePage() {
                 <CardContent className="p-4 flex items-center gap-3">
                   <div
                     className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-sm font-bold"
-                    style={{ background: '#f0fdfa', color: '#4ECDC4' }}
+                    style={{ background: 'rgba(190,242,100,0.10)', color: '#BEF264' }}
                   >
                     {i + 1}
                   </div>

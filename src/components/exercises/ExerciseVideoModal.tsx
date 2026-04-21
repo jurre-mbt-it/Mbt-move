@@ -11,10 +11,10 @@ import { EXERCISE_CATEGORIES, DIFFICULTIES } from '@/lib/exercise-constants'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ReactPlayer = dynamic(() => import('react-player') as any, { ssr: false }) as any
 
-const MBT_GREEN = '#3ECF6A'
+const MBT_GREEN = '#BEF264'
 
 const CATEGORY_COLORS: Record<string, string> = {
-  STRENGTH:    '#4ECDC4',
+  STRENGTH:    '#BEF264',
   MOBILITY:    '#60a5fa',
   PLYOMETRICS: '#f59e0b',
   CARDIO:      '#f87171',
@@ -49,7 +49,7 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
 
   const categoryLabel = EXERCISE_CATEGORIES.find(c => c.value === exercise.category)?.label ?? exercise.category
   const difficultyLabel = DIFFICULTIES.find(d => d.value === exercise.difficulty)?.label ?? exercise.difficulty
-  const color = CATEGORY_COLORS[exercise.category ?? ''] ?? '#4ECDC4'
+  const color = CATEGORY_COLORS[exercise.category ?? ''] ?? '#BEF264'
 
   const primaryMuscles = exercise.muscleLoads
     ? Object.entries(exercise.muscleLoads)
@@ -76,7 +76,7 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
                 playIcon={
                   <div
                     className="w-14 h-14 rounded-full flex items-center justify-center"
-                    style={{ background: '#4ECDC4' }}
+                    style={{ background: '#BEF264' }}
                   >
                     <span className="text-white text-xl ml-1">▶</span>
                   </div>
@@ -88,8 +88,8 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
               className="aspect-video flex flex-col items-center justify-center gap-2"
               style={{ background: `${color}15` }}
             >
-              <VideoOff className="w-8 h-8 text-zinc-400" />
-              <p className="text-sm text-zinc-400">Geen video beschikbaar</p>
+              <VideoOff className="w-8 h-8 text-[#7B8889]" />
+              <p className="text-sm text-[#7B8889]">Geen video beschikbaar</p>
             </div>
           )}
 
@@ -139,13 +139,13 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
 
           {/* Description */}
           {exercise.description && (
-            <p className="text-sm text-zinc-600 leading-relaxed">{exercise.description}</p>
+            <p className="text-sm text-[#7B8889] leading-relaxed">{exercise.description}</p>
           )}
 
           {/* Muscle groups */}
           {primaryMuscles.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2">Spiergroepen</p>
+              <p className="text-xs font-semibold text-[#7B8889] uppercase tracking-wide mb-2">Spiergroepen</p>
               <div className="flex flex-wrap gap-1.5">
                 {primaryMuscles.map(([muscle, load]) => (
                   <div
@@ -172,13 +172,13 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
           {/* Coaching cues */}
           {exercise.coachingCues && exercise.coachingCues.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+              <p className="text-xs font-semibold text-[#7B8889] uppercase tracking-wide mb-2 flex items-center gap-1.5">
                 <Lightbulb className="w-3.5 h-3.5" style={{ color: MBT_GREEN }} />
                 Coaching cues
               </p>
               <ul className="space-y-1.5">
                 {exercise.coachingCues.map((cue, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-zinc-600">
+                  <li key={i} className="flex items-start gap-2 text-sm text-[#7B8889]">
                     <span className="font-bold mt-0.5 shrink-0" style={{ color: MBT_GREEN }}>·</span>
                     {cue}
                   </li>
@@ -199,9 +199,9 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
                 </div>
               )}
               {exercise.harderVariant && (
-                <div className="flex items-center gap-2 text-xs rounded-xl px-3 py-2" style={{ background: '#f0fdf4' }}>
+                <div className="flex items-center gap-2 text-xs rounded-xl px-3 py-2" style={{ background: 'rgba(190,242,100,0.10)' }}>
                   <TrendingUp className="w-3.5 h-3.5 shrink-0" style={{ color: MBT_GREEN }} />
-                  <span style={{ color: '#166534' }}>
+                  <span style={{ color: '#BEF264' }}>
                     <span className="font-semibold">Te makkelijk?</span> Probeer: {exercise.harderVariant}
                   </span>
                 </div>

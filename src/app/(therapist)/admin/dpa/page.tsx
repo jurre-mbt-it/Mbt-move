@@ -83,10 +83,10 @@ export default function AdminDpaPage() {
         <Card style={{ borderRadius: '14px' }}>
           <CardContent className="px-4 py-4">
             <div className="flex items-center gap-2 mb-1">
-              <CheckCircle2 className="w-4 h-4" style={{ color: '#4ECDC4' }} />
+              <CheckCircle2 className="w-4 h-4" style={{ color: '#BEF264' }} />
               <span className="text-xs text-muted-foreground">Geaccepteerd</span>
             </div>
-            <p className="text-2xl font-bold" style={{ color: '#0D6B6E' }}>{acceptedCount}</p>
+            <p className="text-2xl font-bold" style={{ color: '#BEF264' }}>{acceptedCount}</p>
           </CardContent>
         </Card>
         <Card style={{ borderRadius: '14px' }}>
@@ -116,7 +116,7 @@ export default function AdminDpaPage() {
         {isLoading ? (
           <div className="p-6 space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-12 rounded-xl bg-zinc-100 animate-pulse" />
+              <div key={i} className="h-12 rounded-xl bg-[#1C2425] animate-pulse" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
@@ -129,14 +129,14 @@ export default function AdminDpaPage() {
         ) : (
           <div className="divide-y">
             {/* Header row */}
-            <div className="grid grid-cols-4 gap-4 px-4 py-3 bg-zinc-50 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            <div className="grid grid-cols-4 gap-4 px-4 py-3 bg-[#1C2425] text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               <span>Patiënt</span>
               <span>Status</span>
               <span>Versie</span>
               <span>Datum</span>
             </div>
             {filtered.map(p => (
-              <div key={p.id} className="grid grid-cols-4 gap-4 px-4 py-3 items-center hover:bg-zinc-50 transition-colors">
+              <div key={p.id} className="grid grid-cols-4 gap-4 px-4 py-3 items-center hover:bg-[#1C2425] transition-colors">
                 <div className="min-w-0">
                   <p className="font-medium text-sm truncate">{p.name}</p>
                   <p className="text-xs text-muted-foreground truncate">{p.email}</p>
@@ -145,7 +145,7 @@ export default function AdminDpaPage() {
                   {p.accepted ? (
                     <Badge
                       className="text-xs gap-1"
-                      style={{ background: '#f0fdfa', color: '#0D6B6E', border: 'none' }}
+                      style={{ background: 'rgba(190,242,100,0.10)', color: '#BEF264', border: 'none' }}
                     >
                       <CheckCircle2 className="w-3 h-3" /> Geaccepteerd
                     </Badge>

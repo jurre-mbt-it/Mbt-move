@@ -139,7 +139,7 @@ function MuscleRecoveryRow({ state }: { state: MuscleRecoveryState }) {
       </span>
 
       {/* Progress bar */}
-      <div className="w-16 h-1.5 bg-zinc-100 rounded-full overflow-hidden shrink-0">
+      <div className="w-16 h-1.5 bg-[#1C2425] rounded-full overflow-hidden shrink-0">
         <div
           className="h-full rounded-full transition-all duration-500"
           style={{ width: `${state.recoveryPercent}%`, background: color }}

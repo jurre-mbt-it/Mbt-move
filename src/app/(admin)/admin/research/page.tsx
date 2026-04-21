@@ -45,7 +45,7 @@ export default function AdminResearchPage() {
       label: 'Geanonimiseerde records',
       value: isLoading ? '…' : (aggregates?.totalRecords ?? 0).toLocaleString('nl-NL'),
       icon: Database,
-      bg: '#f0fdfa',
+      bg: 'rgba(190,242,100,0.10)',
       color: '#0f766e',
     },
     {
@@ -60,7 +60,7 @@ export default function AdminResearchPage() {
       value: isLoading ? '…' : aggregates?.averageAge ? `${aggregates.averageAge} jr` : '—',
       icon: TrendingUp,
       bg: '#fefce8',
-      color: '#a16207',
+      color: '#F4C261',
     },
     {
       label: 'Gem. pijnniveau',
@@ -79,7 +79,7 @@ export default function AdminResearchPage() {
           <h1 className="text-2xl font-bold">Research Database</h1>
           <p className="text-muted-foreground text-sm mt-0.5">
             Geanonimiseerde trainingsdata van patiënten met toestemming.{' '}
-            <span className="font-medium text-zinc-700">
+            <span className="font-medium text-[#F5F7F6]">
               Alleen aggregaties zichtbaar — geen individuele records.
             </span>
           </p>
@@ -135,7 +135,7 @@ export default function AdminResearchPage() {
       <Card style={{ borderRadius: '12px' }}>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <BarChart3 className="w-4 h-4" style={{ color: '#4ECDC4' }} />
+            <BarChart3 className="w-4 h-4" style={{ color: '#BEF264' }} />
             Verdeling per diagnose categorie
           </CardTitle>
         </CardHeader>
@@ -156,10 +156,10 @@ export default function AdminResearchPage() {
                 return (
                   <div key={row.category} className="flex items-center gap-3">
                     <span className="text-sm font-medium w-40 shrink-0 truncate">{row.category}</span>
-                    <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: '#f4f4f5' }}>
+                    <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: '#1C2425' }}>
                       <div
                         className="h-full rounded-full transition-all"
-                        style={{ width: `${pct}%`, background: '#4ECDC4' }}
+                        style={{ width: `${pct}%`, background: '#BEF264' }}
                       />
                     </div>
                     <Badge
@@ -180,14 +180,14 @@ export default function AdminResearchPage() {
       <Card style={{ borderRadius: '12px' }}>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
-            <Download className="w-4 h-4" style={{ color: '#4ECDC4' }} />
+            <Download className="w-4 h-4" style={{ color: '#BEF264' }} />
             Data export
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            De CSV export bevat uitsluitend rijen uit de <code className="bg-zinc-100 px-1 rounded text-xs">anonymized_records</code> tabel.
-            De koppeltabel <code className="bg-zinc-100 px-1 rounded text-xs">anonymous_id_mappings</code> is nooit inbegrepen in exports.
+            De CSV export bevat uitsluitend rijen uit de <code className="bg-[#1C2425] px-1 rounded text-xs">anonymized_records</code> tabel.
+            De koppeltabel <code className="bg-[#1C2425] px-1 rounded text-xs">anonymous_id_mappings</code> is nooit inbegrepen in exports.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             {[
@@ -199,7 +199,7 @@ export default function AdminResearchPage() {
               { col: 'recordDate', desc: 'Datum van de sessie (geen tijdstip)' },
             ].map(item => (
               <div key={item.col} className="flex flex-col gap-0.5">
-                <code className="text-xs font-mono bg-zinc-100 px-1.5 py-0.5 rounded w-fit">
+                <code className="text-xs font-mono bg-[#1C2425] px-1.5 py-0.5 rounded w-fit">
                   {item.col}
                 </code>
                 <span className="text-xs text-muted-foreground">{item.desc}</span>
@@ -208,7 +208,7 @@ export default function AdminResearchPage() {
           </div>
           <Button
             className="gap-2 text-white"
-            style={{ background: '#4ECDC4' }}
+            style={{ background: '#BEF264' }}
             onClick={handleExportCSV}
             disabled={isExporting || isLoading || (aggregates?.totalRecords ?? 0) === 0}
           >

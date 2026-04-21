@@ -19,7 +19,7 @@ const MUSCLE_PAIRS: [string, string][] = [
 ]
 
 const LOAD_COLORS = [
-  '', '#c6f7f2', '#5eead4', '#4ECDC4', '#0D9488', '#134E4A',
+  '', '#c6f7f2', '#5eead4', '#BEF264', '#0D9488', '#134E4A',
 ]
 
 export function MuscleBalancePanel({ exercises, currentDay, currentWeek }: Props) {
@@ -65,7 +65,7 @@ export function MuscleBalancePanel({ exercises, currentDay, currentWeek }: Props
           sorted.map(([muscle, load]) => {
             const pct = Math.round((load / maxLoad) * 100)
             const intensity = Math.min(5, Math.ceil((load / maxLoad) * 5))
-            const color = LOAD_COLORS[intensity] ?? '#4ECDC4'
+            const color = LOAD_COLORS[intensity] ?? '#BEF264'
 
             return (
               <div key={muscle} className="space-y-0.5">
@@ -73,7 +73,7 @@ export function MuscleBalancePanel({ exercises, currentDay, currentWeek }: Props
                   <span className="text-muted-foreground truncate">{muscle}</span>
                   <span className="font-semibold shrink-0 ml-1" style={{ color }}>{load}</span>
                 </div>
-                <div className="h-1.5 bg-zinc-100 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-[#1C2425] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-300"
                     style={{ width: `${pct}%`, background: color }}

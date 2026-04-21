@@ -33,7 +33,7 @@ interface ExerciseCardProps {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  STRENGTH:    '#4ECDC4',
+  STRENGTH:    '#BEF264',
   MOBILITY:    '#60a5fa',
   PLYOMETRICS: '#f59e0b',
   CARDIO:      '#f87171',
@@ -45,7 +45,7 @@ const DIFFICULTY_DOTS = { BEGINNER: 1, INTERMEDIATE: 2, ADVANCED: 3 }
 export function ExerciseCard({ exercise, onAddToCollection, onPreview }: ExerciseCardProps) {
   const category = EXERCISE_CATEGORIES.find(c => c.value === exercise.category)
   const difficulty = DIFFICULTIES.find(d => d.value === exercise.difficulty)
-  const color = CATEGORY_COLORS[exercise.category] ?? '#4ECDC4'
+  const color = CATEGORY_COLORS[exercise.category] ?? '#BEF264'
   const dots = DIFFICULTY_DOTS[exercise.difficulty as keyof typeof DIFFICULTY_DOTS] ?? 1
 
   const hasVideo = exercise.mediaType === 'YOUTUBE' || exercise.mediaType === 'VIMEO'
@@ -90,7 +90,7 @@ export function ExerciseCard({ exercise, onAddToCollection, onPreview }: Exercis
           <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-all">
             <div
               className="w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-              style={{ background: '#4ECDC4' }}
+              style={{ background: '#BEF264' }}
             >
               <Play className="w-5 h-5 text-white ml-0.5" />
             </div>
@@ -184,9 +184,20 @@ export function ExerciseCard({ exercise, onAddToCollection, onPreview }: Exercis
 
   if (onPreview) {
     return (
-      <button className="block w-full text-left" onClick={onPreview}>
+      <div
+        role="button"
+        tabIndex={0}
+        className="block w-full text-left cursor-pointer"
+        onClick={onPreview}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onPreview()
+          }
+        }}
+      >
         {cardInner}
-      </button>
+      </div>
     )
   }
 

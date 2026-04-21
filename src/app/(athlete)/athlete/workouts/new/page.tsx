@@ -188,12 +188,12 @@ export default function NewWorkoutPage() {
   if (step === 'pick-type') {
     return (
       <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
-        <div className="px-4 pt-12 pb-6" style={{ background: '#1A3A3A' }}>
-          <button onClick={() => router.back()} className="text-zinc-400 flex items-center gap-1 text-sm mb-3">
+        <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
+          <button onClick={() => router.back()} className="text-[#7B8889] flex items-center gap-1 text-sm mb-3">
             <ArrowLeft className="w-4 h-4" /> Terug
           </button>
           <h1 className="text-white text-xl font-bold">Nieuwe Workout</h1>
-          <p className="text-zinc-400 text-sm mt-1">Kies je workout type</p>
+          <p className="text-[#7B8889] text-sm mt-1">Kies je workout type</p>
         </div>
         <div className="px-4 -mt-3 pb-6">
           <div className="grid grid-cols-2 gap-3">
@@ -235,12 +235,12 @@ export default function NewWorkoutPage() {
 
     return (
       <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
-        <div className="px-4 pt-12 pb-6" style={{ background: '#1A3A3A' }}>
-          <p className="text-zinc-400 text-xs uppercase tracking-wider">Workout Voltooid</p>
+        <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
+          <p className="text-[#7B8889] text-xs uppercase tracking-wider">Workout Voltooid</p>
           <h1 className="text-white text-xl font-bold mt-1">{workoutName}</h1>
           <div className="flex items-center gap-1 mt-1">
             <span className="text-lg">{typeInfo?.icon}</span>
-            <span className="text-zinc-400 text-sm">{typeInfo?.label}</span>
+            <span className="text-[#7B8889] text-sm">{typeInfo?.label}</span>
           </div>
         </div>
 
@@ -265,7 +265,7 @@ export default function NewWorkoutPage() {
                       min={0}
                       value={duration}
                       onChange={e => setManualDuration(Math.max(0, Number(e.target.value) || 0))}
-                      className="w-14 text-lg font-bold text-center bg-zinc-50 rounded-lg border-0 focus:outline-none focus:ring-1 focus:ring-[#4ECDC4]"
+                      className="w-14 text-lg font-bold text-center bg-[#1C2425] rounded-lg border-0 focus:outline-none focus:ring-1 focus:ring-[#BEF264]"
                     />
                     <span className="text-lg font-bold">&apos;</span>
                   </div>
@@ -285,7 +285,7 @@ export default function NewWorkoutPage() {
                 onChange={v => setFeedback(f => ({ ...f, effort: v }))}
                 min={1} max={10}
                 leftLabel="Makkelijk" rightLabel="Maximaal"
-                color="#4ECDC4"
+                color="#BEF264"
               />
               <FeedbackSlider
                 label="Pijn"
@@ -310,7 +310,7 @@ export default function NewWorkoutPage() {
                   value={feedback.notes}
                   onChange={e => setFeedback(f => ({ ...f, notes: e.target.value }))}
                   placeholder="Hoe ging het? Opmerkingen..."
-                  className="w-full border rounded-xl p-3 text-sm resize-none h-20 bg-white"
+                  className="w-full border rounded-xl p-3 text-sm resize-none h-20 bg-[#141A1B]"
                 />
               </div>
             </CardContent>
@@ -325,7 +325,7 @@ export default function NewWorkoutPage() {
                 <button
                   onClick={() => setSaveAsProgram(p => !p)}
                   className="flex-1 py-2 rounded-xl text-sm font-semibold border-2 transition-colors"
-                  style={saveAsProgram ? { borderColor: '#4ECDC4', color: '#4ECDC4', background: '#4ECDC410' } : { borderColor: '#e4e4e7', color: '#a1a1aa' }}
+                  style={saveAsProgram ? { borderColor: '#BEF264', color: '#BEF264', background: '#BEF26410' } : { borderColor: 'rgba(255,255,255,0.12)', color: '#a1a1aa' }}
                 >
                   {saveAsProgram ? '✓ Opslaan als programma' : 'Opslaan als programma'}
                 </button>
@@ -336,7 +336,7 @@ export default function NewWorkoutPage() {
                   value={workoutName}
                   onChange={e => setWorkoutName(e.target.value)}
                   placeholder="Naam van het programma..."
-                  className="mt-2 w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4ECDC4]"
+                  className="mt-2 w-full border rounded-xl p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#BEF264]"
                 />
               )}
             </CardContent>
@@ -347,7 +347,7 @@ export default function NewWorkoutPage() {
           )}
           <Button
             className="w-full text-white font-semibold"
-            style={{ background: '#4ECDC4', borderRadius: '14px', height: '48px' }}
+            style={{ background: '#BEF264', borderRadius: '14px', height: '48px' }}
             onClick={saveAndFinish}
             disabled={logSession.isPending}
           >
@@ -364,9 +364,9 @@ export default function NewWorkoutPage() {
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
       {/* Header */}
-      <div className="px-4 pt-12 pb-4" style={{ background: '#1A3A3A' }}>
+      <div className="px-4 pt-12 pb-4" style={{ background: '#1C2425' }}>
         <div className="flex items-center justify-between mb-2">
-          <button onClick={() => isActive ? undefined : router.back()} className="text-zinc-400 flex items-center gap-1 text-sm">
+          <button onClick={() => isActive ? undefined : router.back()} className="text-[#7B8889] flex items-center gap-1 text-sm">
             {isActive ? <ChevronDown className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
             {isActive ? '' : 'Terug'}
           </button>
@@ -374,7 +374,7 @@ export default function NewWorkoutPage() {
             {isActive ? (
               <div
                 className="flex items-center gap-2 px-3 py-1.5 rounded-full text-white text-sm font-mono font-bold"
-                style={{ background: paused ? '#a78bfa' : '#4ECDC4' }}
+                style={{ background: paused ? '#a78bfa' : '#BEF264' }}
               >
                 {paused ? <Play className="w-3.5 h-3.5" onClick={() => setPaused(false)} /> : <Pause className="w-3.5 h-3.5" onClick={() => setPaused(true)} />}
                 {formatTime(elapsed)}
@@ -383,7 +383,7 @@ export default function NewWorkoutPage() {
               <Button
                 size="sm"
                 className="text-white font-semibold gap-1.5"
-                style={{ background: '#4ECDC4' }}
+                style={{ background: '#BEF264' }}
                 onClick={startWorkout}
                 disabled={exercises.length === 0}
               >
@@ -401,9 +401,9 @@ export default function NewWorkoutPage() {
         </div>
         <div className="flex items-center gap-1.5 mt-0.5">
           <span className="text-base">{typeInfo?.icon}</span>
-          <span className="text-zinc-400 text-sm">{typeInfo?.label}</span>
+          <span className="text-[#7B8889] text-sm">{typeInfo?.label}</span>
           {isActive && (
-            <span className="text-zinc-500 text-xs ml-auto">{completedSets}/{totalSets} sets</span>
+            <span className="text-[#7B8889] text-xs ml-auto">{completedSets}/{totalSets} sets</span>
           )}
         </div>
       </div>
@@ -427,7 +427,7 @@ export default function NewWorkoutPage() {
         {/* Add exercise button */}
         {!isActive && (
           <button
-            className="w-full border-2 border-dashed rounded-2xl p-4 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-[#4ECDC4] hover:text-[#4ECDC4] transition-colors"
+            className="w-full border-2 border-dashed rounded-2xl p-4 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-[#BEF264] hover:text-[#BEF264] transition-colors"
             onClick={() => setStep('pick-exercises')}
           >
             <Plus className="w-4 h-4" /> Oefening toevoegen
@@ -447,7 +447,7 @@ export default function NewWorkoutPage() {
         <div className="fixed bottom-20 left-0 right-0 px-4 pb-4">
           <Button
             className="w-full font-semibold text-base"
-            style={{ background: '#1A3A3A', borderRadius: '14px', height: '52px' }}
+            style={{ background: '#1C2425', borderRadius: '14px', height: '52px' }}
             onClick={completeWorkout}
           >
             Workout Afronden
@@ -468,18 +468,18 @@ function Stepper({ value, onChange, min = 0, step = 1, label, unit }: {
       <div className="flex items-center gap-0">
         <button
           onClick={() => onChange(Math.max(min, value - step))}
-          className="w-7 h-7 rounded-l-lg bg-zinc-100 flex items-center justify-center active:bg-zinc-200 transition-colors"
+          className="w-7 h-7 rounded-l-lg bg-[#1C2425] flex items-center justify-center active:bg-[rgba(255,255,255,0.08)] transition-colors"
         >
-          <Minus className="w-3 h-3 text-zinc-500" />
+          <Minus className="w-3 h-3 text-[#7B8889]" />
         </button>
-        <div className="h-7 min-w-[2.5rem] px-1 bg-zinc-50 flex items-center justify-center border-y border-zinc-100">
+        <div className="h-7 min-w-[2.5rem] px-1 bg-[#1C2425] flex items-center justify-center border-y border-[rgba(255,255,255,0.06)]">
           <span className="text-sm font-bold tabular-nums">{value}{unit ? <span className="text-[10px] text-muted-foreground ml-0.5">{unit}</span> : null}</span>
         </div>
         <button
           onClick={() => onChange(value + step)}
-          className="w-7 h-7 rounded-r-lg bg-zinc-100 flex items-center justify-center active:bg-zinc-200 transition-colors"
+          className="w-7 h-7 rounded-r-lg bg-[#1C2425] flex items-center justify-center active:bg-[rgba(255,255,255,0.08)] transition-colors"
         >
-          <Plus className="w-3 h-3 text-zinc-500" />
+          <Plus className="w-3 h-3 text-[#7B8889]" />
         </button>
       </div>
     </div>
@@ -499,7 +499,7 @@ function ExerciseCard({
   onToggleComplete: (idx: number) => void
   onToggleExercise: () => void
 }) {
-  const color = exercise.category === 'STRENGTH' ? '#4ECDC4'
+  const color = exercise.category === 'STRENGTH' ? '#BEF264'
     : exercise.category === 'MOBILITY' ? '#60a5fa'
     : exercise.category === 'PLYOMETRICS' ? '#f97316'
     : exercise.category === 'CARDIO' ? '#ef4444' : '#a78bfa'
@@ -511,8 +511,8 @@ function ExerciseCard({
 
   return (
     <div
-      className="rounded-xl border bg-white overflow-hidden transition-all"
-      style={allCompleted && isActive ? { borderColor: '#4ECDC4', background: '#4ECDC408' } : {}}
+      className="rounded-xl border bg-[#141A1B] overflow-hidden transition-all"
+      style={allCompleted && isActive ? { borderColor: '#BEF264', background: '#BEF26408' } : {}}
     >
       {/* Header: circle + name + remove */}
       <div className="flex items-center gap-2.5 px-3 pt-3 pb-2">
@@ -521,8 +521,8 @@ function ExerciseCard({
             onClick={onToggleExercise}
             className="w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors"
             style={allCompleted
-              ? { borderColor: '#4ECDC4', background: '#4ECDC4' }
-              : { borderColor: '#d4d4d8' }
+              ? { borderColor: '#BEF264', background: '#BEF264' }
+              : { borderColor: '#4A5454' }
             }
           >
             {allCompleted && <Check className="w-3.5 h-3.5 text-white" />}
@@ -574,8 +574,8 @@ function ExerciseCard({
               onClick={() => onToggleComplete(idx)}
               className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors shrink-0"
               style={set.completed
-                ? { background: '#4ECDC420', color: '#4ECDC4' }
-                : { background: '#f4f4f5', color: '#a1a1aa' }
+                ? { background: '#BEF26420', color: '#BEF264' }
+                : { background: '#1C2425', color: '#a1a1aa' }
               }
             >
               <Check className="w-3 h-3" />
@@ -610,7 +610,7 @@ function ExercisePickerView({
   const addedIds = new Set(exercises.map(e => e.exerciseId))
 
   const CATEGORY_COLORS: Record<string, string> = {
-    STRENGTH: '#4ECDC4',
+    STRENGTH: '#BEF264',
     MOBILITY: '#60a5fa',
     PLYOMETRICS: '#f97316',
     CARDIO: '#ef4444',
@@ -619,9 +619,9 @@ function ExercisePickerView({
 
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
-      <div className="px-4 pt-12 pb-6" style={{ background: '#1A3A3A' }}>
+      <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
         <div className="flex items-center justify-between">
-          <button onClick={onBack} className="text-zinc-400 flex items-center gap-1 text-sm">
+          <button onClick={onBack} className="text-[#7B8889] flex items-center gap-1 text-sm">
             <ArrowLeft className="w-4 h-4" /> Terug
           </button>
           <h1 className="text-white text-lg font-bold">Oefeningen</h1>
@@ -638,7 +638,7 @@ function ExercisePickerView({
               placeholder="Zoek oefeningen..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="pl-9 bg-white"
+              className="pl-9 bg-[#141A1B]"
               style={{ borderRadius: '12px' }}
             />
           </div>
@@ -646,7 +646,7 @@ function ExercisePickerView({
 
         <div className="flex gap-2 overflow-x-auto pb-1">
           <button
-            className={`text-xs px-3 py-1.5 rounded-full shrink-0 transition-colors ${!categoryFilter ? 'bg-[#1A3A3A] text-white' : 'bg-white text-muted-foreground border'}`}
+            className={`text-xs px-3 py-1.5 rounded-full shrink-0 transition-colors ${!categoryFilter ? 'bg-[#1A3A3A] text-white' : 'bg-[#141A1B] text-muted-foreground border'}`}
             onClick={() => setCategoryFilter(null)}
           >
             Alles
@@ -654,7 +654,7 @@ function ExercisePickerView({
           {EXERCISE_CATEGORIES.map(cat => (
             <button
               key={cat.value}
-              className={`text-xs px-3 py-1.5 rounded-full shrink-0 transition-colors ${categoryFilter === cat.value ? 'text-white' : 'bg-white text-muted-foreground border'}`}
+              className={`text-xs px-3 py-1.5 rounded-full shrink-0 transition-colors ${categoryFilter === cat.value ? 'text-white' : 'bg-[#141A1B] text-muted-foreground border'}`}
               style={categoryFilter === cat.value ? { background: CATEGORY_COLORS[cat.value] } : {}}
               onClick={() => setCategoryFilter(categoryFilter === cat.value ? null : cat.value)}
             >
@@ -672,7 +672,7 @@ function ExercisePickerView({
           <div className="space-y-2">
             {allExercises.map(ex => {
               const alreadyAdded = addedIds.has(ex.id)
-              const color = CATEGORY_COLORS[ex.category] ?? '#4ECDC4'
+              const color = CATEGORY_COLORS[ex.category] ?? '#BEF264'
               const muscles = Object.keys(ex.muscleLoads ?? {}).join(', ')
               return (
                 <Card
@@ -695,11 +695,11 @@ function ExercisePickerView({
                       </p>
                     </div>
                     {alreadyAdded ? (
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: '#4ECDC4' }}>
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: '#BEF264' }}>
                         <Check className="w-4 h-4 text-white" />
                       </div>
                     ) : (
-                      <div className="w-7 h-7 rounded-full border-2 border-zinc-200" />
+                      <div className="w-7 h-7 rounded-full border-2 border-[rgba(255,255,255,0.12)]" />
                     )}
                   </CardContent>
                 </Card>

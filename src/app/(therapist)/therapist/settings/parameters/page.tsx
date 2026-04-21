@@ -52,7 +52,7 @@ function SortableParamCard({
             <button
               {...attributes}
               {...listeners}
-              className="text-zinc-300 hover:text-zinc-500 cursor-grab active:cursor-grabbing shrink-0 touch-none"
+              className="text-zinc-300 hover:text-[#7B8889] cursor-grab active:cursor-grabbing shrink-0 touch-none"
             >
               <GripVertical className="w-4 h-4" />
             </button>
@@ -62,7 +62,7 @@ function SortableParamCard({
                 <Badge variant="secondary" className="text-xs">{TYPE_LABELS[p.type]}</Badge>
                 {p.unit && <span className="text-xs text-muted-foreground">{p.unit}</span>}
                 {p.isGlobal && (
-                  <span className="text-xs px-1.5 py-0 rounded-full font-medium text-white" style={{ background: '#4ECDC4' }}>
+                  <span className="text-xs px-1.5 py-0 rounded-full font-medium text-white" style={{ background: '#BEF264' }}>
                     Globaal
                   </span>
                 )}
@@ -188,7 +188,7 @@ export default function ParametersPage() {
               Definieer eigen parameters · Sleep om volgorde te wijzigen
             </p>
           </div>
-          <Button onClick={openCreate} style={{ background: '#4ECDC4' }} className="gap-2 shrink-0">
+          <Button onClick={openCreate} style={{ background: '#BEF264' }} className="gap-2 shrink-0">
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">Nieuwe parameter</span>
           </Button>
@@ -247,7 +247,7 @@ export default function ParametersPage() {
                     onClick={() => setForm(f => ({ ...f, type: t }))}
                     className={cn(
                       'py-1.5 rounded text-xs font-medium border transition-colors',
-                      form.type === t ? 'bg-zinc-900 text-white border-zinc-900' : 'border-zinc-200 text-muted-foreground hover:border-zinc-400'
+                      form.type === t ? 'bg-[#BEF264] text-white border-[#BEF264]' : 'border-[rgba(255,255,255,0.12)] text-muted-foreground hover:border-[rgba(255,255,255,0.2)]'
                     )}
                   >
                     {TYPE_LABELS[t]}
@@ -303,9 +303,9 @@ export default function ParametersPage() {
                 </div>
                 <div className="flex flex-wrap gap-1 mt-1.5">
                   {(form.options ?? []).map((o, i) => (
-                    <span key={i} className="flex items-center gap-1 text-xs bg-zinc-100 rounded px-2 py-0.5">
+                    <span key={i} className="flex items-center gap-1 text-xs bg-[#1C2425] rounded px-2 py-0.5">
                       {o}
-                      <button onClick={() => removeOption(i)} className="text-zinc-400 hover:text-destructive">×</button>
+                      <button onClick={() => removeOption(i)} className="text-[#7B8889] hover:text-destructive">×</button>
                     </span>
                   ))}
                 </div>
@@ -334,7 +334,7 @@ export default function ParametersPage() {
             </div>
 
             <div className="flex gap-2 pt-1">
-              <Button style={{ background: '#4ECDC4' }} onClick={handleSave} className="flex-1">
+              <Button style={{ background: '#BEF264' }} onClick={handleSave} className="flex-1">
                 {editing ? 'Opslaan' : 'Aanmaken'}
               </Button>
               <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuleren</Button>

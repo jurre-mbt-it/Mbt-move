@@ -18,8 +18,8 @@ import {
 const ReactPlayer = dynamic(() => import('react-player') as any, { ssr: false }) as any
 
 // ─── Brand colors ─────────────────────────────────────────────────────────────
-const MBT_GREEN = '#3ECF6A'
-const MBT_DARK = '#1A3A3A'
+const MBT_GREEN = '#BEF264'
+const MBT_DARK = '#1C2425'
 
 // ─── Static coaching data ─────────────────────────────────────────────────────
 
@@ -133,7 +133,7 @@ function CircularTimer({ seconds, total, onSkip }: { seconds: number; total: num
       </div>
       <button
         onClick={onSkip}
-        className="flex items-center gap-1.5 text-sm text-zinc-400 font-medium"
+        className="flex items-center gap-1.5 text-sm text-[#7B8889] font-medium"
       >
         <SkipForward className="w-4 h-4" /> Sla rust over
       </button>
@@ -166,7 +166,7 @@ function FeedbackModal({
         style={{ background: '#fff', maxWidth: 480, margin: '0 auto' }}
       >
         {/* Handle */}
-        <div className="w-10 h-1 bg-zinc-200 rounded-full mx-auto mb-1" />
+        <div className="w-10 h-1 bg-[rgba(255,255,255,0.08)] rounded-full mx-auto mb-1" />
 
         <div className="flex items-start justify-between">
           <div>
@@ -194,13 +194,13 @@ function FeedbackModal({
                 onClick={() => onChange({ smiley: selected ? null : val })}
                 className="flex-1 flex flex-col items-center gap-1 py-3 rounded-2xl transition-all active:scale-95"
                 style={{
-                  background: selected ? SMILEY_COLORS[i] + '22' : '#f4f4f5',
+                  background: selected ? SMILEY_COLORS[i] + '22' : '#1C2425',
                   border: selected ? `2px solid ${SMILEY_COLORS[i]}` : '2px solid transparent',
                   minHeight: 44,
                 }}
               >
                 <span className="text-2xl">{emoji}</span>
-                <span className="text-[10px] font-medium" style={{ color: selected ? SMILEY_COLORS[i] : '#71717a' }}>
+                <span className="text-[10px] font-medium" style={{ color: selected ? SMILEY_COLORS[i] : '#7B8889' }}>
                   {SMILEY_LABELS[i]}
                 </span>
               </button>
@@ -213,7 +213,7 @@ function FeedbackModal({
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-medium">Pijn tijdens oefening (NRS)</p>
-              <span className="text-sm font-bold" style={{ color: feedback.painDuring !== null ? painColor(feedback.painDuring ?? 0, true) : '#71717a' }}>
+              <span className="text-sm font-bold" style={{ color: feedback.painDuring !== null ? painColor(feedback.painDuring ?? 0, true) : '#7B8889' }}>
                 {feedback.painDuring !== null ? `${feedback.painDuring}/10 — ${painLabel(feedback.painDuring ?? 0, true)}` : 'Geen'}
               </span>
             </div>
@@ -225,8 +225,8 @@ function FeedbackModal({
                   className="flex-1 rounded-lg text-xs font-semibold transition-all active:scale-95"
                   style={{
                     height: 44,
-                    background: feedback.painDuring === i ? painColor(i, true) : '#f4f4f5',
-                    color: feedback.painDuring === i ? 'white' : '#71717a',
+                    background: feedback.painDuring === i ? painColor(i, true) : '#1C2425',
+                    color: feedback.painDuring === i ? 'white' : '#7B8889',
                   }}
                 >
                   {i}
@@ -237,8 +237,8 @@ function FeedbackModal({
               <div
                 className="mt-2 rounded-xl px-3 py-2 text-xs font-medium"
                 style={{
-                  background: (feedback.painDuring ?? 0) > 7 ? '#fef2f2' : '#fff7ed',
-                  color: (feedback.painDuring ?? 0) > 7 ? '#dc2626' : '#c2410c',
+                  background: (feedback.painDuring ?? 0) > 7 ? 'rgba(248,113,113,0.10)' : '#fff7ed',
+                  color: (feedback.painDuring ?? 0) > 7 ? '#F87171' : '#c2410c',
                 }}
               >
                 {(feedback.painDuring ?? 0) > 7
@@ -266,8 +266,8 @@ function FeedbackModal({
                   className="flex-1 rounded-lg text-xs font-semibold transition-all active:scale-95"
                   style={{
                     height: 44,
-                    background: feedback.pain === i ? painColor(i) : '#f4f4f5',
-                    color: feedback.pain === i ? 'white' : '#71717a',
+                    background: feedback.pain === i ? painColor(i) : '#1C2425',
+                    color: feedback.pain === i ? 'white' : '#7B8889',
                   }}
                 >
                   {i}
@@ -370,12 +370,12 @@ function SessionSummary({
       <div className="px-5 pt-14 pb-6 text-center" style={{ background: MBT_DARK }}>
         <div className="text-5xl mb-3">🎉</div>
         <h1 className="text-white text-2xl font-bold">Sessie voltooid!</h1>
-        <p className="text-zinc-400 text-sm mt-1">{exercises.length} oefeningen</p>
+        <p className="text-[#7B8889] text-sm mt-1">{exercises.length} oefeningen</p>
 
         {/* Editable duration with computed start/finish times */}
-        <div className="mt-4 bg-white/10 rounded-2xl px-4 py-3 space-y-2">
+        <div className="mt-4 bg-[#141A1B]/10 rounded-2xl px-4 py-3 space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-zinc-400 text-xs">Duur</span>
+            <span className="text-[#7B8889] text-xs">Duur</span>
             <div className="flex items-center gap-3">
               <button
                 className="w-8 h-8 rounded-full flex items-center justify-center"
@@ -396,7 +396,7 @@ function SessionSummary({
               </button>
             </div>
           </div>
-          <div className="flex justify-between text-xs text-zinc-400">
+          <div className="flex justify-between text-xs text-[#7B8889]">
             <span>Start: {fmtTime(startTime)}</span>
             <span>Einde: {fmtTime(finishTime)}</span>
           </div>
@@ -421,16 +421,16 @@ function SessionSummary({
 
         {/* 1RM PRs */}
         {sessionOneRmPRs && Object.keys(sessionOneRmPRs).length > 0 && (
-          <Card style={{ borderRadius: '14px', border: '2px solid #3ECF6A' }}>
+          <Card style={{ borderRadius: '14px', border: '2px solid #BEF264' }}>
             <CardContent className="px-4 py-3 space-y-2">
               <div className="flex items-center gap-2">
-                <Trophy className="w-4 h-4" style={{ color: '#3ECF6A' }} />
-                <p className="font-bold text-sm" style={{ color: '#3ECF6A' }}>Nieuw(e) 1RM PR(s)! 🎉</p>
+                <Trophy className="w-4 h-4" style={{ color: '#BEF264' }} />
+                <p className="font-bold text-sm" style={{ color: '#BEF264' }}>Nieuw(e) 1RM PR(s)! 🎉</p>
               </div>
               {exercises.filter(e => sessionOneRmPRs[e.uid]).map(e => (
                 <div key={e.uid} className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground truncate">{e.name}</span>
-                  <span className="font-bold" style={{ color: '#3ECF6A' }}>{sessionOneRmPRs[e.uid]} kg</span>
+                  <span className="font-bold" style={{ color: '#BEF264' }}>{sessionOneRmPRs[e.uid]} kg</span>
                 </div>
               ))}
             </CardContent>
@@ -448,7 +448,7 @@ function SessionSummary({
                 <div key={e.uid} className="flex items-center gap-3">
                   <div
                     className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-lg"
-                    style={{ background: fb?.smiley ? SMILEY_COLORS[(fb.smiley - 1)] + '22' : '#f4f4f5' }}
+                    style={{ background: fb?.smiley ? SMILEY_COLORS[(fb.smiley - 1)] + '22' : '#1C2425' }}
                   >
                     {fb?.smiley ? SMILIES[fb.smiley - 1] : '—'}
                   </div>
@@ -483,11 +483,11 @@ function SessionSummary({
 
         {/* Tendinopathie follow-up reminder */}
         {tendinopathyMode && (
-          <Card style={{ borderRadius: '14px', background: '#f0fdf4', border: '1.5px solid #3ECF6A33' }}>
+          <Card style={{ borderRadius: '14px', background: 'rgba(190,242,100,0.10)', border: '1.5px solid #BEF26433' }}>
             <CardContent className="px-4 py-3 flex items-start gap-3">
-              <Bell className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#3ECF6A' }} />
+              <Bell className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#BEF264' }} />
               <div>
-                <p className="text-sm font-semibold" style={{ color: '#166534' }}>24u follow-up herinnering</p>
+                <p className="text-sm font-semibold" style={{ color: '#BEF264' }}>24u follow-up herinnering</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Morgenochtend ontvang je een herinnering om de pijn 24u na de sessie en de ochtend stijfheid in te vullen.
                 </p>
@@ -512,14 +512,14 @@ function SessionSummary({
                     className="flex-1 flex flex-col items-center gap-1 py-3 rounded-2xl transition-all active:scale-95"
                     style={{
                       minHeight: 44,
-                      background: selected ? SMILEY_COLORS[i] + '22' : '#f4f4f5',
+                      background: selected ? SMILEY_COLORS[i] + '22' : '#1C2425',
                       border: selected ? `2px solid ${SMILEY_COLORS[i]}` : '2px solid transparent',
                     }}
                   >
                     <span className="text-2xl">{emoji}</span>
                     <span
                       className="text-[10px] font-medium"
-                      style={{ color: selected ? SMILEY_COLORS[i] : '#71717a' }}
+                      style={{ color: selected ? SMILEY_COLORS[i] : '#7B8889' }}
                     >
                       {SMILEY_LABELS[i]}
                     </span>
@@ -820,7 +820,7 @@ export default function SessionPage() {
           <div
             className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-sm font-bold transition-all"
             style={{
-              background: isDone ? MBT_GREEN : allSetsDone && !isDone ? MBT_GREEN + '33' : '#f4f4f5',
+              background: isDone ? MBT_GREEN : allSetsDone && !isDone ? MBT_GREEN + '33' : '#1C2425',
               color: isDone ? 'white' : '#52525b',
             }}
           >
@@ -833,8 +833,8 @@ export default function SessionPage() {
             <p className="text-xs text-muted-foreground">{e.sets} × {e.reps} {e.repUnit}</p>
           </div>
           {isExpanded
-            ? <ChevronUp className="w-4 h-4 text-zinc-400 shrink-0" />
-            : <ChevronDown className="w-4 h-4 text-zinc-400 shrink-0" />
+            ? <ChevronUp className="w-4 h-4 text-[#7B8889] shrink-0" />
+            : <ChevronDown className="w-4 h-4 text-[#7B8889] shrink-0" />
           }
         </button>
 
@@ -919,7 +919,7 @@ export default function SessionPage() {
                         height: 48,
                         background: isSetDone
                           ? MBT_GREEN + '22'
-                          : sets === setNum - 1 ? MBT_DARK : '#f4f4f5',
+                          : sets === setNum - 1 ? MBT_DARK : '#1C2425',
                         color: isSetDone
                           ? MBT_GREEN
                           : sets === setNum - 1 ? 'white' : '#a1a1aa',
@@ -934,7 +934,7 @@ export default function SessionPage() {
                         <span className="text-xs text-muted-foreground flex-1">Gewicht set {setNum}</span>
                         <button
                           className="w-7 h-7 rounded-lg flex items-center justify-center"
-                          style={{ background: '#f4f4f5' }}
+                          style={{ background: '#1C2425' }}
                           onClick={() => {
                             adjustSetWeight(e.uid, i, -2.5)
                             if (sessionData?.program?.trackOneRepMax) {
@@ -949,7 +949,7 @@ export default function SessionPage() {
                         <span className="text-sm font-semibold w-14 text-center tabular-nums">{w} kg</span>
                         <button
                           className="w-7 h-7 rounded-lg flex items-center justify-center"
-                          style={{ background: '#f4f4f5' }}
+                          style={{ background: '#1C2425' }}
                           onClick={() => {
                             adjustSetWeight(e.uid, i, 2.5)
                             if (sessionData?.program?.trackOneRepMax) {
@@ -980,21 +980,21 @@ export default function SessionPage() {
                 <div
                   className="flex items-center gap-2 rounded-2xl px-4 py-2.5"
                   style={{
-                    background: isPR ? '#3ECF6A22' : '#f4f4f5',
-                    border: isPR ? '1.5px solid #3ECF6A' : '1.5px solid transparent',
+                    background: isPR ? '#BEF26422' : '#1C2425',
+                    border: isPR ? '1.5px solid #BEF264' : '1.5px solid transparent',
                   }}
                 >
-                  <TrendingUp className="w-4 h-4 shrink-0" style={{ color: isPR ? '#3ECF6A' : '#a1a1aa' }} />
+                  <TrendingUp className="w-4 h-4 shrink-0" style={{ color: isPR ? '#BEF264' : '#a1a1aa' }} />
                   <div className="flex-1">
                     <span className="text-xs text-muted-foreground">Geschatte 1RM</span>
-                    <span className="text-sm font-bold ml-2" style={{ color: isPR ? '#3ECF6A' : '#1a1a1a' }}>
+                    <span className="text-sm font-bold ml-2" style={{ color: isPR ? '#BEF264' : '#1a1a1a' }}>
                       {est1rm} kg
                     </span>
                   </div>
                   {isPR && (
                     <span
                       className="text-xs font-bold px-2 py-0.5 rounded-full text-white animate-bounce"
-                      style={{ background: '#3ECF6A' }}
+                      style={{ background: '#BEF264' }}
                     >
                       NIEUW PR! 🎉
                     </span>
@@ -1021,7 +1021,7 @@ export default function SessionPage() {
                     <div className="flex items-center gap-2">
                       <button
                         className="w-7 h-7 rounded-lg flex items-center justify-center"
-                        style={{ background: '#f4f4f5' }}
+                        style={{ background: '#1C2425' }}
                         onClick={() => setExtraReps(prev => ({ ...prev, [e.uid]: Math.max(1, (prev[e.uid] ?? e.reps) - 1) }))}
                       >
                         <Minus className="w-3 h-3" />
@@ -1029,7 +1029,7 @@ export default function SessionPage() {
                       <span className="text-sm font-semibold w-8 text-center tabular-nums">{extraReps[e.uid] ?? e.reps}</span>
                       <button
                         className="w-7 h-7 rounded-lg flex items-center justify-center"
-                        style={{ background: '#f4f4f5' }}
+                        style={{ background: '#1C2425' }}
                         onClick={() => setExtraReps(prev => ({ ...prev, [e.uid]: (prev[e.uid] ?? e.reps) + 1 }))}
                       >
                         <Plus className="w-3 h-3" />
@@ -1076,9 +1076,9 @@ export default function SessionPage() {
                   </div>
                 )}
                 {variants.harder && (
-                  <div className="flex items-center gap-2 text-xs rounded-xl px-3 py-2" style={{ background: '#f0fdf4' }}>
+                  <div className="flex items-center gap-2 text-xs rounded-xl px-3 py-2" style={{ background: 'rgba(190,242,100,0.10)' }}>
                     <TrendingUp className="w-3.5 h-3.5 shrink-0" style={{ color: MBT_GREEN }} />
-                    <span style={{ color: '#166534' }}>
+                    <span style={{ color: '#BEF264' }}>
                       <span className="font-semibold">Te makkelijk?</span> Probeer: {variants.harder}
                     </span>
                   </div>
@@ -1229,7 +1229,7 @@ function ParamPill({ label, value, highlight }: { label: string; value: string; 
   return (
     <div
       className="rounded-xl p-2 text-center"
-      style={{ background: highlight ? MBT_GREEN + '22' : '#f4f4f5' }}
+      style={{ background: highlight ? MBT_GREEN + '22' : '#1C2425' }}
     >
       <p className="text-xs text-muted-foreground">{label}</p>
       <p

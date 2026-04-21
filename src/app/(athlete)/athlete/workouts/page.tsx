@@ -30,9 +30,9 @@ export default function MyWorkoutsPage() {
 
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
-      <div className="px-4 pt-12 pb-6" style={{ background: '#1A3A3A' }}>
+      <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
         <h1 className="text-white text-2xl font-bold">Mijn Workouts</h1>
-        <p className="text-zinc-400 text-xs mt-1">{workouts.length} workouts</p>
+        <p className="text-[#7B8889] text-xs mt-1">{workouts.length} workouts</p>
       </div>
 
       <div className="px-4 -mt-3 space-y-4 pb-6">
@@ -43,17 +43,17 @@ export default function MyWorkoutsPage() {
             placeholder="Zoek workouts..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-9 bg-white"
+            className="pl-9 bg-[#141A1B]"
             style={{ borderRadius: '12px' }}
           />
         </div>
 
         {/* Quick Start */}
         <Link href="/athlete/workouts/new">
-          <Card style={{ borderRadius: '14px', borderLeft: '3px solid #4ECDC4' }} className="hover:shadow-md transition-shadow">
+          <Card style={{ borderRadius: '14px', borderLeft: '3px solid #BEF264' }} className="hover:shadow-md transition-shadow">
             <CardContent className="p-4 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: '#4ECDC420' }}>
-                <Zap className="w-6 h-6" style={{ color: '#4ECDC4' }} />
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: '#BEF26420' }}>
+                <Zap className="w-6 h-6" style={{ color: '#BEF264' }} />
               </div>
               <div className="flex-1">
                 <p className="font-bold text-base">Quick Start</p>
@@ -102,7 +102,7 @@ export default function MyWorkoutsPage() {
 
 function WorkoutCard({ workout, onDelete }: { workout: Workout; onDelete: (id: string) => void }) {
   const type = WORKOUT_TYPES.find(t => t.value === workout.type)
-  const color = type?.color ?? '#4ECDC4'
+  const color = type?.color ?? '#BEF264'
 
   return (
     <Card style={{ borderRadius: '12px', borderLeft: `3px solid ${color}` }} className="hover:shadow-md transition-shadow">

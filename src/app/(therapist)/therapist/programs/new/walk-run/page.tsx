@@ -14,8 +14,8 @@ import { WALK_RUN_TEMPLATES, WalkRunTemplate, WalkRunWeek } from '@/lib/cardio-c
 import { trpc } from '@/lib/trpc/client'
 import { IconRunning, IconSquat, IconLunge, IconNote, IconClipboard, IconCheck } from '@/components/icons'
 
-const MBT_GREEN = '#3ECF6A'
-const MBT_TEAL = '#4ECDC4'
+const MBT_GREEN = '#BEF264'
+const MBT_TEAL = '#BEF264'
 
 // ── Wizard stappen ────────────────────────────────────────────────────────────
 
@@ -44,7 +44,7 @@ const DEFAULT: WizardState = {
 const FITNESS_OPTIONS = [
   { value: 'SLECHT', label: 'Slecht', description: 'Geen of weinig conditionele basis. Begin conservatief.', color: '#ef4444' },
   { value: 'MATIG',  label: 'Matig',  description: 'Beperkte conditie. Normaal progressietempo.', color: '#f59e0b' },
-  { value: 'GOED',   label: 'Goed',   description: 'Redelijke conditie. Iets sneller opbouwen.', color: '#22c55e' },
+  { value: 'GOED',   label: 'Goed',   description: 'Redelijke conditie. Iets sneller opbouwen.', color: '#BEF264' },
 ] as const
 
 const INJURY_TEMPLATES = [
@@ -246,7 +246,7 @@ export default function WalkRunWizardPage() {
                     key={tpl.id}
                     onClick={() => loadTemplate(tpl.id)}
                     className="w-full text-left p-3 rounded-xl border transition-all flex items-start gap-3"
-                    style={state.templateId === tpl.id ? { borderColor: MBT_GREEN, background: '#f0fdf4' } : {}}
+                    style={state.templateId === tpl.id ? { borderColor: MBT_GREEN, background: 'rgba(190,242,100,0.10)' } : {}}
                   >
                     <span className="text-2xl">{tpl.icon === 'running' ? <IconRunning size={24} /> : tpl.icon === 'squat' ? <IconSquat size={24} /> : <IconLunge size={24} />}</span>
                     <div className="flex-1">

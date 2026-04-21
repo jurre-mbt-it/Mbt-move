@@ -81,12 +81,12 @@ export default function PatientProgramPage() {
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
       {/* Header */}
-      <div className="px-4 pt-12 pb-5" style={{ background: '#1A3A3A' }}>
-        <Link href="/patient/dashboard" className="inline-flex items-center gap-1 text-zinc-400 text-sm mb-3">
+      <div className="px-4 pt-12 pb-5" style={{ background: '#1C2425' }}>
+        <Link href="/patient/dashboard" className="inline-flex items-center gap-1 text-[#7B8889] text-sm mb-3">
           <ChevronLeft className="w-4 h-4" /> Terug
         </Link>
         <h1 className="text-white text-xl font-bold">{program.name}</h1>
-        <p className="text-zinc-400 text-xs mt-1">{program.weeks} weken · {program.daysPerWeek}×/week</p>
+        <p className="text-[#7B8889] text-xs mt-1">{program.weeks} weken · {program.daysPerWeek}×/week</p>
 
         {/* Week tabs */}
         <div className="flex gap-2 mt-4 overflow-x-auto pb-1">
@@ -97,7 +97,7 @@ export default function PatientProgramPage() {
               className="shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors"
               style={
                 activeWeek === w
-                  ? { background: '#4ECDC4', color: 'white' }
+                  ? { background: '#BEF264', color: 'white' }
                   : { background: 'rgba(255,255,255,0.1)', color: '#a1a1aa' }
               }
             >
@@ -109,7 +109,7 @@ export default function PatientProgramPage() {
 
       <div className="px-4 py-4 space-y-3">
         {isFutureWeek && (
-          <div className="flex items-center gap-2 p-3 rounded-xl text-sm" style={{ background: '#fef9c3', color: '#a16207' }}>
+          <div className="flex items-center gap-2 p-3 rounded-xl text-sm" style={{ background: 'rgba(244,194,97,0.14)', color: '#F4C261' }}>
             <Lock className="w-4 h-4 shrink-0" />
             Week {activeWeek} is beschikbaar na het voltooien van week {activeWeek - 1}.
           </div>
@@ -135,9 +135,9 @@ export default function PatientProgramPage() {
                     <div
                       className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
                       style={
-                        isPast ? { background: '#4ECDC4', color: 'white' }
-                          : isToday ? { background: '#1A3A3A', color: 'white' }
-                            : { background: '#f4f4f5', color: '#52525b' }
+                        isPast ? { background: '#BEF264', color: 'white' }
+                          : isToday ? { background: '#1C2425', color: 'white' }
+                            : { background: '#1C2425', color: '#52525b' }
                       }
                     >
                       {isPast ? '✓' : dayLabel.slice(0, 2)}
@@ -149,12 +149,12 @@ export default function PatientProgramPage() {
                   </div>
 
                   {isPast ? (
-                    <Badge className="text-xs gap-1" style={{ background: '#f0fdfa', color: '#0D6B6E', border: 'none' }}>
+                    <Badge className="text-xs gap-1" style={{ background: 'rgba(190,242,100,0.10)', color: '#BEF264', border: 'none' }}>
                       <CheckCircle2 className="w-3 h-3" /> Afgerond
                     </Badge>
                   ) : isToday ? (
                     <Link href="/patient/session">
-                      <Button size="sm" className="gap-1.5 text-xs h-7" style={{ background: '#4ECDC4' }}>
+                      <Button size="sm" className="gap-1.5 text-xs h-7" style={{ background: '#BEF264' }}>
                         <Play className="w-3 h-3 fill-current" /> Start
                       </Button>
                     </Link>
@@ -165,15 +165,15 @@ export default function PatientProgramPage() {
                   {dayExercises.map(e => (
                     <button
                       key={e.uid}
-                      className="w-full flex items-center gap-2 text-left rounded-lg px-2 py-1.5 hover:bg-zinc-50 active:scale-[0.98] transition-all group"
+                      className="w-full flex items-center gap-2 text-left rounded-lg px-2 py-1.5 hover:bg-[#1C2425] active:scale-[0.98] transition-all group"
                       onClick={() => openExerciseModal(e)}
                       disabled={isFutureWeek}
                     >
-                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: isPast ? '#4ECDC4' : '#d4d4d8' }} />
+                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: isPast ? '#BEF264' : '#4A5454' }} />
                       <span className="text-sm flex-1 truncate">{e.name}</span>
                       <span className="text-xs text-muted-foreground shrink-0">{e.sets}×{e.reps}</span>
                       {e.videoUrl && (
-                        <Play className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: '#4ECDC4' }} />
+                        <Play className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: '#BEF264' }} />
                       )}
                     </button>
                   ))}

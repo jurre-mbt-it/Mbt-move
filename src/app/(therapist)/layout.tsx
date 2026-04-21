@@ -9,7 +9,10 @@ export default function TherapistLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div
+      className="athletic-dark flex h-screen overflow-hidden"
+      style={{ background: '#0A0E0F', color: '#F5F7F6' }}
+    >
       {/* Sidebar: alleen op desktop */}
       <div className="hidden md:flex">
         <TherapistSidebar />
@@ -18,7 +21,10 @@ export default function TherapistLayout({
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
         {/* Extra padding-bottom op mobiel voor bottom nav */}
-        <main className="flex-1 overflow-y-auto px-4 pt-4 pb-24 md:px-6 md:pt-6 md:pb-8" style={{ background: '#FAFAFA' }}>
+        <main
+          className="flex-1 overflow-y-auto px-4 pt-4 pb-24 md:px-8 md:pt-6 md:pb-8"
+          style={{ background: '#0A0E0F' }}
+        >
           <PageTransition>{children}</PageTransition>
         </main>
       </div>

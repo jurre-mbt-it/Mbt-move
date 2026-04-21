@@ -121,7 +121,7 @@ export default function ExercisesPage() {
           onClick={() => setActiveCollection(null)}
           className={cn(
             'w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-colors',
-            activeCollection === null ? 'bg-zinc-100 font-medium' : 'text-muted-foreground hover:bg-zinc-50'
+            activeCollection === null ? 'bg-[#1C2425] font-medium' : 'text-muted-foreground hover:bg-[#1C2425]'
           )}
         >
           <FolderOpen className="w-4 h-4" />
@@ -135,7 +135,7 @@ export default function ExercisesPage() {
             onClick={() => setActiveCollection(activeCollection === col.id ? null : col.id)}
             className={cn(
               'w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-colors',
-              activeCollection === col.id ? 'bg-zinc-100 font-medium' : 'text-muted-foreground hover:bg-zinc-50'
+              activeCollection === col.id ? 'bg-[#1C2425] font-medium' : 'text-muted-foreground hover:bg-[#1C2425]'
             )}
           >
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: col.color }} />
@@ -163,9 +163,9 @@ export default function ExercisesPage() {
             onClick={() => setActiveCollection(null)}
             className={cn(
               'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
-              activeCollection === null ? 'text-white border-transparent' : 'border-zinc-200 text-muted-foreground'
+              activeCollection === null ? 'text-white border-transparent' : 'border-[rgba(255,255,255,0.12)] text-muted-foreground'
             )}
-            style={activeCollection === null ? { background: '#4ECDC4' } : {}}
+            style={activeCollection === null ? { background: '#BEF264' } : {}}
           >
             Alle ({exercises.length})
           </button>
@@ -175,7 +175,7 @@ export default function ExercisesPage() {
               onClick={() => setActiveCollection(activeCollection === col.id ? null : col.id)}
               className={cn(
                 'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
-                activeCollection === col.id ? 'text-white border-transparent' : 'border-zinc-200 text-muted-foreground'
+                activeCollection === col.id ? 'text-white border-transparent' : 'border-[rgba(255,255,255,0.12)] text-muted-foreground'
               )}
               style={activeCollection === col.id ? { background: col.color } : {}}
             >
@@ -197,7 +197,7 @@ export default function ExercisesPage() {
             </p>
           </div>
           <Link href="/therapist/exercises/new">
-            <Button style={{ background: '#4ECDC4' }} className="gap-2">
+            <Button style={{ background: '#BEF264' }} className="gap-2">
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Nieuwe oefening</span>
             </Button>
@@ -230,7 +230,7 @@ export default function ExercisesPage() {
             <Filter className="w-4 h-4" />
             Filters
             {activeFilterCount > 0 && (
-              <Badge className="h-4 w-4 p-0 text-xs flex items-center justify-center" style={{ background: '#4ECDC4' }}>
+              <Badge className="h-4 w-4 p-0 text-xs flex items-center justify-center" style={{ background: '#BEF264' }}>
                 {activeFilterCount}
               </Badge>
             )}
@@ -239,13 +239,13 @@ export default function ExercisesPage() {
           <div className="flex border rounded-lg overflow-hidden">
             <button
               onClick={() => setView('grid')}
-              className={cn('px-3 py-2 transition-colors', view === 'grid' ? 'bg-zinc-900 text-white' : 'hover:bg-zinc-50')}
+              className={cn('px-3 py-2 transition-colors', view === 'grid' ? 'bg-[#BEF264] text-white' : 'hover:bg-[#1C2425]')}
             >
               <LayoutGrid className="w-4 h-4" />
             </button>
             <button
               onClick={() => setView('list')}
-              className={cn('px-3 py-2 transition-colors', view === 'list' ? 'bg-zinc-900 text-white' : 'hover:bg-zinc-50')}
+              className={cn('px-3 py-2 transition-colors', view === 'list' ? 'bg-[#BEF264] text-white' : 'hover:bg-[#1C2425]')}
             >
               <List className="w-4 h-4" />
             </button>
@@ -254,7 +254,7 @@ export default function ExercisesPage() {
 
         {/* Filters */}
         {showFilters && (
-          <div className="flex flex-wrap gap-4 p-4 bg-zinc-50 rounded-xl border">
+          <div className="flex flex-wrap gap-4 p-4 bg-[#1C2425] rounded-xl border">
             {/* Category filter */}
             <div className="space-y-1.5">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Categorie</p>
@@ -267,9 +267,9 @@ export default function ExercisesPage() {
                       'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
                       selectedCategory === c.value
                         ? 'border-transparent text-white'
-                        : 'border-zinc-200 bg-white text-muted-foreground hover:border-zinc-400'
+                        : 'border-[rgba(255,255,255,0.12)] bg-[#141A1B] text-muted-foreground hover:border-[rgba(255,255,255,0.2)]'
                     )}
-                    style={selectedCategory === c.value ? { background: '#4ECDC4' } : {}}
+                    style={selectedCategory === c.value ? { background: '#BEF264' } : {}}
                   >
                     {c.label}
                   </button>
@@ -288,8 +288,8 @@ export default function ExercisesPage() {
                     className={cn(
                       'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
                       selectedRegion === r.value
-                        ? 'bg-zinc-900 text-white border-zinc-900'
-                        : 'border-zinc-200 bg-white text-muted-foreground hover:border-zinc-400'
+                        ? 'bg-[#BEF264] text-white border-[#BEF264]'
+                        : 'border-[rgba(255,255,255,0.12)] bg-[#141A1B] text-muted-foreground hover:border-[rgba(255,255,255,0.2)]'
                     )}
                   >
                     {r.label}
@@ -309,8 +309,8 @@ export default function ExercisesPage() {
                     className={cn(
                       'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
                       selectedDifficulty === d.value
-                        ? 'bg-zinc-900 text-white border-zinc-900'
-                        : 'border-zinc-200 bg-white text-muted-foreground hover:border-zinc-400'
+                        ? 'bg-[#BEF264] text-white border-[#BEF264]'
+                        : 'border-[rgba(255,255,255,0.12)] bg-[#141A1B] text-muted-foreground hover:border-[rgba(255,255,255,0.2)]'
                     )}
                   >
                     {d.label}
@@ -333,13 +333,13 @@ export default function ExercisesPage() {
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-40 rounded-xl bg-zinc-100 animate-pulse" />
+              <div key={i} className="h-40 rounded-xl bg-[#1C2425] animate-pulse" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-14 h-14 rounded-full bg-zinc-100 flex items-center justify-center mb-4">
-              <Search className="w-6 h-6 text-zinc-400" />
+            <div className="w-14 h-14 rounded-full bg-[#1C2425] flex items-center justify-center mb-4">
+              <Search className="w-6 h-6 text-[#7B8889]" />
             </div>
             <h3 className="font-medium">Geen oefeningen gevonden</h3>
             <p className="text-sm text-muted-foreground mt-1">Probeer andere zoektermen of filters</p>
@@ -364,12 +364,12 @@ export default function ExercisesPage() {
             {filtered.map((ex) => (
               <div
                 key={ex.id}
-                className="flex items-center gap-4 p-4 rounded-xl border hover:border-zinc-300 hover:bg-zinc-50 transition-colors cursor-pointer"
+                className="flex items-center gap-4 p-4 rounded-xl border hover:border-[rgba(255,255,255,0.16)] hover:bg-[#1C2425] transition-colors cursor-pointer"
                 onClick={() => openPreview(ex)}
               >
                 <div
                   className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-white font-bold text-sm"
-                  style={{ background: '#4ECDC4' }}
+                  style={{ background: '#BEF264' }}
                 >
                   {ex.name[0]}
                 </div>
@@ -385,17 +385,17 @@ export default function ExercisesPage() {
                     {DIFFICULTIES.find(d => d.value === ex.difficulty)?.label}
                   </Badge>
                   {ex.videoUrl && (
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: '#4ECDC420' }}>
-                      <Play className="w-3.5 h-3.5" style={{ color: '#4ECDC4' }} />
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: '#BEF26420' }}>
+                      <Play className="w-3.5 h-3.5" style={{ color: '#BEF264' }} />
                     </div>
                   )}
                 </div>
                 <Link
                   href={`/therapist/exercises/${ex.id}/edit`}
                   onClick={e => e.stopPropagation()}
-                  className="p-1.5 rounded-lg hover:bg-zinc-200 transition-colors shrink-0"
+                  className="p-1.5 rounded-lg hover:bg-[rgba(255,255,255,0.08)] transition-colors shrink-0"
                 >
-                  <Edit className="w-4 h-4 text-zinc-500" />
+                  <Edit className="w-4 h-4 text-[#7B8889]" />
                 </Link>
               </div>
             ))}

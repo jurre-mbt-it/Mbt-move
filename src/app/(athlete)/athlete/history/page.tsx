@@ -14,9 +14,9 @@ export default function AthleteHistoryPage() {
 
   return (
     <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
-      <div className="px-4 pt-12 pb-6" style={{ background: '#1A3A3A' }}>
+      <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
         <h1 className="text-white text-xl font-bold">Voortgang</h1>
-        <p className="text-zinc-400 text-sm mt-1">{history.length} sessies afgerond</p>
+        <p className="text-[#7B8889] text-sm mt-1">{history.length} sessies afgerond</p>
       </div>
 
       <div className="px-4 -mt-3 space-y-3 pb-6">
@@ -31,7 +31,7 @@ export default function AthleteHistoryPage() {
           </Card>
           <Card style={{ borderRadius: '14px' }}>
             <CardContent className="px-3 py-3 text-center">
-              <CheckCircle2 className="w-5 h-5 mx-auto mb-1" style={{ color: '#4ECDC4' }} />
+              <CheckCircle2 className="w-5 h-5 mx-auto mb-1" style={{ color: '#BEF264' }} />
               <p className="text-lg font-bold">{history.length}</p>
               <p className="text-[10px] text-muted-foreground">Totaal</p>
             </CardContent>
@@ -68,7 +68,7 @@ export default function AthleteHistoryPage() {
                 <CardContent className="p-4 flex items-center gap-3">
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-sm font-bold"
-                    style={{ background: '#f0fdfa', color: '#4ECDC4' }}
+                    style={{ background: 'rgba(190,242,100,0.10)', color: '#BEF264' }}
                   >
                     ✓
                   </div>
@@ -86,32 +86,32 @@ export default function AthleteHistoryPage() {
                       <p className="text-xs text-muted-foreground">Pijn {session.painLevel}/10</p>
                     )}
                     {isOpen
-                      ? <ChevronUp className="w-4 h-4 text-zinc-400" />
-                      : <ChevronDown className="w-4 h-4 text-zinc-400" />
+                      ? <ChevronUp className="w-4 h-4 text-[#7B8889]" />
+                      : <ChevronDown className="w-4 h-4 text-[#7B8889]" />
                     }
                   </div>
                 </CardContent>
               </button>
 
               {isOpen && (
-                <div className="px-4 pb-4 pt-0 border-t border-zinc-100 space-y-2">
+                <div className="px-4 pb-4 pt-0 border-t border-[rgba(255,255,255,0.06)] space-y-2">
                   <div className="grid grid-cols-2 gap-2 pt-3">
-                    <div className="rounded-xl p-3 text-center" style={{ background: '#f4f4f5' }}>
+                    <div className="rounded-xl p-3 text-center" style={{ background: '#1C2425' }}>
                       <p className="text-sm font-bold">{session.durationMinutes} min</p>
                       <p className="text-[10px] text-muted-foreground">Duur</p>
                     </div>
-                    <div className="rounded-xl p-3 text-center" style={{ background: '#f4f4f5' }}>
+                    <div className="rounded-xl p-3 text-center" style={{ background: '#1C2425' }}>
                       <p className="text-sm font-bold">{session.exerciseCount}</p>
                       <p className="text-[10px] text-muted-foreground">Oefeningen</p>
                     </div>
                     {session.painLevel !== null && (
-                      <div className="rounded-xl p-3 text-center" style={{ background: '#f4f4f5' }}>
+                      <div className="rounded-xl p-3 text-center" style={{ background: '#1C2425' }}>
                         <p className="text-sm font-bold">{session.painLevel}/10</p>
                         <p className="text-[10px] text-muted-foreground">Pijn</p>
                       </div>
                     )}
                     {session.exertionLevel !== null && (
-                      <div className="rounded-xl p-3 text-center" style={{ background: '#f4f4f5' }}>
+                      <div className="rounded-xl p-3 text-center" style={{ background: '#1C2425' }}>
                         <p className="text-sm font-bold">{session.exertionLevel}/10</p>
                         <p className="text-[10px] text-muted-foreground">Inspanning</p>
                       </div>
