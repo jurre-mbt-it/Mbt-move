@@ -1,8 +1,28 @@
 import { z } from 'zod'
 import { createTRPCRouter, therapistProcedure, creatorProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
+import type { PrismaClient } from '@prisma/client'
 
 const createId = () => crypto.randomUUID()
+
+async function assertCanAssignPatient(
+  prisma: PrismaClient,
+  user: { id: string; role: string },
+  patientId: string | null | undefined,
+) {
+  if (!patientId) return
+  if (user.role === 'ADMIN') return
+  if (patientId === user.id) return
+  const relation = await prisma.patientTherapist.findFirst({
+    where: { therapistId: user.id, patientId, isActive: true, status: 'APPROVED' },
+  })
+  if (!relation) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Geen actieve koppeling met deze patiënt',
+    })
+  }
+}
 
 const ProgramExerciseInput = z.object({
   id: z.string().optional(), // existing id for updates
@@ -75,6 +95,7 @@ export const programsRouter = createTRPCRouter({
     }))
     .mutation(async ({ ctx, input }) => {
       const { patientId, ...rest } = input
+      await assertCanAssignPatient(ctx.prisma, ctx.user!, patientId)
       return ctx.prisma.program.create({
         data: {
           id: createId(),
@@ -107,6 +128,10 @@ export const programsRouter = createTRPCRouter({
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
       if (existing.creatorId !== ctx.user!.id && ctx.user!.role !== 'ADMIN') {
         throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+
+      if (data.patientId !== undefined) {
+        await assertCanAssignPatient(ctx.prisma, ctx.user!, data.patientId)
       }
 
       const updateData: Record<string, unknown> = { ...data }
@@ -166,6 +191,7 @@ export const programsRouter = createTRPCRouter({
       const targetPatientId = input.patientId !== undefined
         ? (input.patientId != null ? input.patientId : undefined)
         : (source.patientId ?? undefined)
+      await assertCanAssignPatient(ctx.prisma, ctx.user!, targetPatientId)
       return ctx.prisma.program.create({
         data: {
           id: newId,

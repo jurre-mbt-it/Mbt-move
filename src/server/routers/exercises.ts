@@ -50,22 +50,27 @@ export const exercisesRouter = createTRPCRouter({
       })
       const favoriteIds = new Set(favs.map(f => f.exerciseId))
 
+      // Belangrijk: de privacy-filter (eigen oefening of public) MOET via een AND
+       // met de query-OR gecombineerd worden. Wanneer we beide via losse `OR`-keys
+       // in hetzelfde object zouden plaatsen, overschrijft de tweede de eerste en
+       // verdwijnt de privacy-check — zie security review #4.
       const exercises = await ctx.prisma.exercise.findMany({
         where: {
-          OR: [
-            { createdById: ctx.user!.id },
-            { isPublic: true },
+          AND: [
+            { OR: [{ createdById: ctx.user!.id }, { isPublic: true }] },
+            ...(input?.query
+              ? [{
+                  OR: [
+                    { name: { contains: input.query, mode: 'insensitive' as const } },
+                    { tags: { has: input.query.toLowerCase() } },
+                  ],
+                }]
+              : []),
           ],
           ...(input?.category ? { category: input.category as never } : {}),
           ...(input?.difficulty ? { difficulty: input.difficulty as never } : {}),
           ...(input?.bodyRegion ? { bodyRegion: { has: input.bodyRegion as never } } : {}),
           ...(input?.favoritesOnly ? { id: { in: Array.from(favoriteIds) } } : {}),
-          ...(input?.query ? {
-            OR: [
-              { name: { contains: input.query, mode: 'insensitive' } },
-              { tags: { has: input.query.toLowerCase() } },
-            ],
-          } : {}),
         },
         include: {
           muscleLoads: true,
@@ -344,6 +349,17 @@ export const exercisesRouter = createTRPCRouter({
   getCollectionExercises: protectedProcedure
     .input(z.object({ collectionId: z.string() }))
     .query(async ({ ctx, input }) => {
+      // Collectie is eigendom van de therapeut. Alleen de maker (of ADMIN) mag
+      // de inhoud zien — zie security review #7.
+      const collection = await ctx.prisma.exerciseCollection.findUnique({
+        where: { id: input.collectionId },
+        select: { therapistId: true },
+      })
+      if (!collection) throw new TRPCError({ code: 'NOT_FOUND' })
+      if (collection.therapistId !== ctx.user!.id && ctx.user!.role !== 'ADMIN') {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+
       const items = await ctx.prisma.exerciseCollectionItem.findMany({
         where: { collectionId: input.collectionId },
         include: {
@@ -351,9 +367,14 @@ export const exercisesRouter = createTRPCRouter({
         },
         orderBy: { addedAt: 'asc' },
       })
-      return items.map(item => ({
-        ...item.exercise,
-        muscleLoads: Object.fromEntries(item.exercise.muscleLoads.map(ml => [ml.muscle, ml.load])),
-      }))
+      // Filter: alleen oefeningen die de caller hoort te zien (public of eigen).
+      // Voorkomt dat een collectie met een private oefening van een andere
+      // therapeut alsnog lekt als die oefening aan deze collectie is toegevoegd.
+      return items
+        .filter((item) => item.exercise.isPublic || item.exercise.createdById === ctx.user!.id)
+        .map((item) => ({
+          ...item.exercise,
+          muscleLoads: Object.fromEntries(item.exercise.muscleLoads.map((ml) => [ml.muscle, ml.load])),
+        }))
     }),
 })

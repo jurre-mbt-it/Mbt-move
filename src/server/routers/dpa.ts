@@ -50,7 +50,7 @@ export const dpaRouter = createTRPCRouter({
       where: {
         role: 'PATIENT',
         patientTherapists: {
-          some: { therapistId: ctx.user.id, isActive: true },
+          some: { therapistId: ctx.user.id, isActive: true, status: 'APPROVED' },
         },
       },
       select: {

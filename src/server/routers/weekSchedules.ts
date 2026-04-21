@@ -1,8 +1,33 @@
 import { z } from 'zod'
 import { createTRPCRouter, therapistProcedure, protectedProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
+import type { PrismaClient } from '@prisma/client'
 
 const createId = () => crypto.randomUUID()
+
+/**
+ * Security: zorg dat een therapeut alleen een schedule kan koppelen aan een
+ * patiënt waarmee een actieve relatie bestaat. Admin mag altijd.
+ * Zie security review #5.
+ */
+async function assertPatientLink(
+  prisma: PrismaClient,
+  user: { id: string; role: string },
+  patientId: string | null | undefined,
+) {
+  if (!patientId) return
+  if (user.role === 'ADMIN') return
+  if (patientId === user.id) return
+  const relation = await prisma.patientTherapist.findFirst({
+    where: { therapistId: user.id, patientId, isActive: true, status: 'APPROVED' },
+  })
+  if (!relation) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Geen actieve koppeling met deze patiënt',
+    })
+  }
+}
 
 const DayInput = z.object({
   dayOfWeek: z.number().int().min(0).max(6),
@@ -54,6 +79,7 @@ export const weekSchedulesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const id = createId()
       const { patientId, days, startDate, endDate, ...rest } = input
+      await assertPatientLink(ctx.prisma, ctx.user, patientId)
       return ctx.prisma.weekSchedule.create({
         data: {
           id,
@@ -89,6 +115,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       const { id, days, patientId, startDate, endDate, ...rest } = input
       const existing = await ctx.prisma.weekSchedule.findFirst({ where: { id, creatorId: ctx.user.id } })
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
+      await assertPatientLink(ctx.prisma, ctx.user, patientId)
 
       await ctx.prisma.weekScheduleDay.deleteMany({ where: { weekScheduleId: id } })
 
@@ -169,7 +196,7 @@ export const weekSchedulesRouter = createTRPCRouter({
 
       // Check dat patient gekoppeld is aan deze therapist
       const relation = await ctx.prisma.patientTherapist.findFirst({
-        where: { therapistId: ctx.user.id, patientId: input.patientId, isActive: true },
+        where: { therapistId: ctx.user.id, patientId: input.patientId, isActive: true, status: 'APPROVED' },
       })
       if (!relation) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Patient is niet aan jou gekoppeld' })

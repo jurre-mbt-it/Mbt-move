@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
 import { createTRPCRouter, publicProcedure, protectedProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
 
@@ -34,15 +35,27 @@ export const authRouter = createTRPCRouter({
   }),
 
   /**
-   * Mobile client roept dit aan na succesvolle MFA enroll/unenroll zodat
-   * User.mfaEnabled synchroon blijft met Supabase factors.
+   * Sync User.mfaEnabled met de werkelijke Supabase MFA-factoren van de user.
+   * De client bepaalt NIET zelf de status — we vragen het aan Supabase op
+   * (security review #3). Input werd weggehaald; client roept dit gewoon
+   * aan na enroll/unenroll en de server bepaalt de echte stand.
    */
   setMfaStatus: protectedProcedure
-    .input(z.object({ enabled: z.boolean() }))
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx }) => {
+      const supabaseAdmin = createSupabaseAdminClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      )
+      const { data, error } = await supabaseAdmin.auth.admin.mfa.listFactors({
+        userId: ctx.user.id,
+      })
+      if (error) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
+      }
+      const enabled = (data?.factors ?? []).some((f) => f.status === 'verified')
       return ctx.prisma.user.update({
         where: { id: ctx.user.id },
-        data: { mfaEnabled: input.enabled },
+        data: { mfaEnabled: enabled },
       })
     }),
 

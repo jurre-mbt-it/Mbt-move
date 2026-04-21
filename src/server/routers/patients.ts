@@ -8,7 +8,7 @@ const createId = () => crypto.randomUUID()
 export const patientsRouter = createTRPCRouter({
   list: therapistProcedure.query(async ({ ctx }) => {
     const relations = await ctx.prisma.patientTherapist.findMany({
-      where: { therapistId: ctx.user.id, isActive: true },
+      where: { therapistId: ctx.user.id, isActive: true, status: 'APPROVED' },
       include: {
         patient: {
           select: {
@@ -69,7 +69,7 @@ export const patientsRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const relation = await ctx.prisma.patientTherapist.findFirst({
-        where: { therapistId: ctx.user.id, patientId: input.id, isActive: true },
+        where: { therapistId: ctx.user.id, patientId: input.id, isActive: true, status: 'APPROVED' },
         include: {
           patient: {
             select: {
@@ -136,16 +136,30 @@ export const patientsRouter = createTRPCRouter({
   changeRole: therapistProcedure
     .input(z.object({
       id: z.string(),
-      role: z.enum(['PATIENT', 'ATHLETE', 'THERAPIST']),
+      // Therapeuten mogen alleen tussen PATIENT en ATHLETE wisselen — NIET promoveren
+      // naar THERAPIST of ADMIN. Zie security review #1.
+      role: z.enum(['PATIENT', 'ATHLETE']),
     }))
     .mutation(async ({ ctx, input }) => {
       // Verify this is a patient of the current therapist
       const relation = await ctx.prisma.patientTherapist.findFirst({
-        where: { therapistId: ctx.user.id, patientId: input.id },
+        where: { therapistId: ctx.user.id, patientId: input.id, isActive: true, status: 'APPROVED' },
       })
-      if (!relation) {
-        throw new Error('Patiënt niet gevonden')
+      if (!relation && ctx.user.role !== 'ADMIN') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Patiënt niet gevonden' })
       }
+
+      // Extra defense: zorg dat de target-user geen THERAPIST/ADMIN is die we hiermee
+      // zouden degraderen naar PATIENT/ATHLETE.
+      const target = await ctx.prisma.user.findUnique({
+        where: { id: input.id },
+        select: { role: true },
+      })
+      if (!target) throw new TRPCError({ code: 'NOT_FOUND' })
+      if (target.role !== 'PATIENT' && target.role !== 'ATHLETE') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Kan rol van deze gebruiker niet wijzigen' })
+      }
+
       return ctx.prisma.user.update({
         where: { id: input.id },
         data: { role: input.role },
@@ -161,7 +175,9 @@ export const patientsRouter = createTRPCRouter({
       z.object({
         email: z.string().email('Ongeldig e-mailadres'),
         name: z.string().min(1, 'Naam is verplicht'),
-        role: z.enum(['PATIENT', 'ATHLETE', 'THERAPIST']).default('PATIENT'),
+        // Therapeuten mogen ALLEEN patiënten/atleten uitnodigen. Nieuwe therapeuten
+        // aanmaken is admin-only; nooit via deze procedure (security review #2).
+        role: z.enum(['PATIENT', 'ATHLETE']).default('PATIENT'),
         resend: z.boolean().optional(),
       }),
     )
@@ -173,11 +189,47 @@ export const patientsRouter = createTRPCRouter({
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
       )
 
+      // Als er al een User-record bestaat met dit e-mailadres: verifieer dat
+      // (a) het een PATIENT/ATHLETE is en (b) de caller een actieve relatie heeft
+      // (of ADMIN is). Anders kan een kwaadwillende therapeut via `resend: true`
+      // Supabase auth-users van willekeurige e-mailadressen laten verwijderen.
+      const existingDbUser = await ctx.prisma.user.findUnique({
+        where: { email },
+        select: { id: true, role: true },
+      })
+      if (existingDbUser) {
+        if (existingDbUser.role !== 'PATIENT' && existingDbUser.role !== 'ATHLETE') {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Dit e-mailadres hoort bij een bestaand therapeut- of admin-account.',
+          })
+        }
+        if (ctx.user.role !== 'ADMIN') {
+          const relation = await ctx.prisma.patientTherapist.findFirst({
+            where: { therapistId: ctx.user.id, patientId: existingDbUser.id },
+          })
+          if (!relation) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Deze gebruiker is al bekend en niet aan jou gekoppeld.',
+            })
+          }
+        }
+      }
+
       // If resend: delete the existing Supabase auth user first so we can re-invite
       if (resend) {
         const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
         const existingUser = users.find(u => u.email === email)
         if (existingUser) {
+          // Alleen verwijderen als we hierboven hebben geverifieerd dat het een
+          // eigen patiënt/atleet is (of de caller admin is).
+          if (!existingDbUser && ctx.user.role !== 'ADMIN') {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Kan deze uitnodiging niet opnieuw versturen.',
+            })
+          }
           await supabaseAdmin.auth.admin.deleteUser(existingUser.id)
         }
       }
@@ -216,7 +268,8 @@ export const patientsRouter = createTRPCRouter({
         },
       })
 
-      // Link therapist ↔ patient (only for PATIENT/ATHLETE)
+      // Link therapist ↔ patient (only for PATIENT/ATHLETE). Status = PENDING
+      // zodat de patiënt zelf moet bevestigen voordat de therapeut data inziet.
       if (role === 'PATIENT' || role === 'ATHLETE') {
         await ctx.prisma.patientTherapist.upsert({
           where: {
@@ -229,6 +282,8 @@ export const patientsRouter = createTRPCRouter({
           create: {
             therapistId: ctx.user.id,
             patientId: patient.id,
+            status: 'PENDING',
+            requestedAt: new Date(),
           },
         })
       }
@@ -240,7 +295,7 @@ export const patientsRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const relation = await ctx.prisma.patientTherapist.findFirst({
-        where: { therapistId: ctx.user.id, patientId: input.id, isActive: true },
+        where: { therapistId: ctx.user.id, patientId: input.id, isActive: true, status: 'APPROVED' },
       })
       if (!relation && ctx.user.role !== 'ADMIN') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Geen actieve koppeling met deze patiënt' })
@@ -333,7 +388,7 @@ export const patientsRouter = createTRPCRouter({
         where: {
           therapistId: ctx.user.id,
           patientId: input.patientId,
-          isActive: true,
+          isActive: true, status: 'APPROVED',
         },
       })
       if (!relation && ctx.user.role !== 'ADMIN') {
@@ -383,7 +438,7 @@ export const patientsRouter = createTRPCRouter({
         where: {
           therapistId: ctx.user.id,
           patientId: input.patientId,
-          isActive: true,
+          isActive: true, status: 'APPROVED',
         },
       })
       if (!relation && ctx.user.role !== 'ADMIN') {
@@ -466,7 +521,7 @@ export const patientsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       // Verify access
       const relation = await ctx.prisma.patientTherapist.findFirst({
-        where: { therapistId: ctx.user.id, patientId: input.patientId, isActive: true },
+        where: { therapistId: ctx.user.id, patientId: input.patientId, isActive: true, status: 'APPROVED' },
       })
       if (!relation) throw new TRPCError({ code: 'FORBIDDEN' })
 
@@ -540,19 +595,39 @@ export const patientsRouter = createTRPCRouter({
       }
     }),
 
-  // Get all patients (including unlinked) for the therapist to invite/link
+  // Search binnen eigen gekoppelde patiënten. ADMIN mag globaal zoeken.
+  // Eerder leverde deze endpoint PII van alle patiënten in de DB op — zie
+  // security review #6.
   search: therapistProcedure
     .input(z.object({ query: z.string().optional() }))
     .query(async ({ ctx, input }) => {
+      const baseWhere = {
+        ...(input.query ? {
+          OR: [
+            { name: { contains: input.query, mode: 'insensitive' as const } },
+            { email: { contains: input.query, mode: 'insensitive' as const } },
+          ],
+        } : {}),
+      }
+
+      if (ctx.user.role === 'ADMIN') {
+        return ctx.prisma.user.findMany({
+          where: {
+            role: { in: ['PATIENT', 'ATHLETE'] },
+            ...baseWhere,
+          },
+          select: { id: true, name: true, email: true },
+          take: 20,
+        })
+      }
+
       return ctx.prisma.user.findMany({
         where: {
-          role: 'PATIENT',
-          ...(input.query ? {
-            OR: [
-              { name: { contains: input.query, mode: 'insensitive' } },
-              { email: { contains: input.query, mode: 'insensitive' } },
-            ],
-          } : {}),
+          role: { in: ['PATIENT', 'ATHLETE'] },
+          patientTherapists: {
+            some: { therapistId: ctx.user.id, isActive: true, status: 'APPROVED' },
+          },
+          ...baseWhere,
         },
         select: { id: true, name: true, email: true },
         take: 20,
