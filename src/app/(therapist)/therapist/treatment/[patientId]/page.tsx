@@ -56,15 +56,18 @@ export default function TreatmentPage({
   })
 
   const [startedAt] = useState(() => new Date())
+  const [mode, setMode] = useState<'choose' | 'program' | 'free'>('choose')
   const [rows, setRows] = useState<LogRow[]>([])
+  const [dirty, setDirty] = useState(false) // gebruiker heeft lijst aangepast; niet meer auto-repoppen
   const [painLevel, setPainLevel] = useState<number | null>(null)
   const [exertionLevel, setExertionLevel] = useState<number | null>(null)
   const [notes, setNotes] = useState('')
   const [nowTick, setNowTick] = useState(Date.now())
 
-  // Load today's exercises into rows when data arrives
+  // Bij "Volg programma" → laad programma-oefeningen één keer in.
+  // `dirty` voorkomt dat auto-repop na verwijderen van alle rijen gebeurt.
   useEffect(() => {
-    if (todayData?.exercises && rows.length === 0) {
+    if (mode === 'program' && todayData?.exercises && !dirty && rows.length === 0) {
       setRows(
         todayData.exercises.map((e) => ({
           uid: e.uid,
@@ -80,7 +83,7 @@ export default function TreatmentPage({
         })),
       )
     }
-  }, [todayData, rows.length])
+  }, [mode, todayData, dirty, rows.length])
 
   // Live timer tick
   useEffect(() => {
@@ -90,10 +93,20 @@ export default function TreatmentPage({
 
   const durationMin = Math.max(1, Math.round((nowTick - startedAt.getTime()) / 60000))
 
-  const updateRow = (uid: string, patch: Partial<LogRow>) =>
+  const updateRow = (uid: string, patch: Partial<LogRow>) => {
+    setDirty(true)
     setRows((prev) => prev.map((r) => (r.uid === uid ? { ...r, ...patch } : r)))
+  }
 
-  const removeRow = (uid: string) => setRows((prev) => prev.filter((r) => r.uid !== uid))
+  const removeRow = (uid: string) => {
+    setDirty(true)
+    setRows((prev) => prev.filter((r) => r.uid !== uid))
+  }
+
+  const resetToProgram = () => {
+    setDirty(false)
+    setRows([]) // triggert de useEffect opnieuw
+  }
 
   const canSubmit = useMemo(() => rows.length > 0 && !logMutation.isPending, [rows, logMutation.isPending])
 
@@ -168,10 +181,63 @@ export default function TreatmentPage({
           )}
         </div>
 
+        {/* Mode chooser */}
+        {mode === 'choose' && (
+          <section className="flex flex-col gap-3">
+            <Kicker>Hoe wil je starten?</Kicker>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setMode('program')}
+                disabled={!todayData?.program}
+                className="athletic-tap rounded-xl p-5 text-left"
+                style={{
+                  background: P.surface,
+                  border: `1px solid ${P.lime}`,
+                  opacity: todayData?.program ? 1 : 0.4,
+                }}
+              >
+                <Kicker>Volg programma</Kicker>
+                <p style={{ color: P.ink, fontSize: 15, fontWeight: 700, marginTop: 6 }}>
+                  {todayData?.program?.name ?? 'Geen actief programma'}
+                </p>
+                <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 2 }}>
+                  {todayData?.exercises.length ?? 0} oefeningen voor vandaag. Je kunt tijdens de sessie aanpassen.
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('free')}
+                className="athletic-tap rounded-xl p-5 text-left"
+                style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+              >
+                <Kicker>Vrije workout</Kicker>
+                <p style={{ color: P.ink, fontSize: 15, fontWeight: 700, marginTop: 6 }}>
+                  Leeg starten
+                </p>
+                <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 2 }}>
+                  Log wat je nu samen doet zonder programma als basis.
+                </p>
+              </button>
+            </div>
+          </section>
+        )}
+
         {/* Exercise rows */}
+        {mode !== 'choose' && (
         <section className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <Kicker>Oefeningen · {rows.length}</Kicker>
+            {mode === 'program' && dirty && (
+              <button
+                type="button"
+                onClick={resetToProgram}
+                className="athletic-mono"
+                style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.14em' }}
+              >
+                HERSTEL PROGRAMMA
+              </button>
+            )}
           </div>
           {rows.length === 0 && (
             <Tile>
@@ -181,7 +247,7 @@ export default function TreatmentPage({
             </Tile>
           )}
           {rows.map((r) => (
-            <Tile key={r.uid}>
+            <Tile key={r.uid}>{/* exercise row */}
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <span style={{ color: P.ink, fontSize: 14, fontWeight: 700 }}>{r.name}</span>
@@ -204,8 +270,10 @@ export default function TreatmentPage({
             </Tile>
           ))}
         </section>
+        )}
 
         {/* Overall pain + RPE */}
+        {mode !== 'choose' && (
         <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Tile>
             <MetaLabel>Algehele pijn /10</MetaLabel>
@@ -216,18 +284,23 @@ export default function TreatmentPage({
             <ScalePicker value={exertionLevel} onChange={setExertionLevel} colorHigh={P.gold} />
           </Tile>
         </section>
+        )}
 
         {/* Notes */}
+        {mode !== 'choose' && (
         <section className="flex flex-col gap-2">
           <MetaLabel>Notities</MetaLabel>
           <DarkTextarea value={notes} onChange={(e) => setNotes(e.target.value)}
             placeholder="Bevindingen, aanpassingen, vervolgplan…" rows={3} />
         </section>
+        )}
 
+        {mode !== 'choose' && (
         <DarkButton size="lg" onClick={handleSubmit}
           disabled={!canSubmit} loading={logMutation.isPending}>
           {logMutation.isPending ? 'OPSLAAN…' : `BEHANDELING AFRONDEN (${durationMin}M)`}
         </DarkButton>
+        )}
       </div>
     </DarkScreen>
   )

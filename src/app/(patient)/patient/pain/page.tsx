@@ -44,7 +44,7 @@ export default function PainReportPage() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center gap-4" style={{ background: '#FAFAFA' }}>
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center gap-4" style={{ background: '#0A0E0F' }}>
         <div
           className="w-20 h-20 rounded-full flex items-center justify-center text-white"
           style={{ background: '#BEF264' }}
@@ -75,7 +75,7 @@ export default function PainReportPage() {
   }
 
   return (
-    <div className="min-h-screen pb-8" style={{ background: '#FAFAFA' }}>
+    <div className="min-h-screen pb-8" style={{ background: '#0A0E0F' }}>
       {/* Header */}
       <div className="px-4 pt-12 pb-4 flex items-center gap-3" style={{ background: '#1C2425' }}>
         <button onClick={() => router.back()} className="p-1 -ml-1">

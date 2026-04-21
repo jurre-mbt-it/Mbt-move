@@ -60,7 +60,7 @@ export default function DpaPage() {
     : null
 
   return (
-    <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
+    <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
       {/* Header */}
       <div className="px-4 pt-12 pb-5 print:hidden" style={{ background: '#1C2425' }}>
         <Link href="/patient/settings/privacy" className="inline-flex items-center gap-1 text-[#7B8889] text-sm mb-4">

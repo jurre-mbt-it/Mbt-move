@@ -61,7 +61,7 @@ export default function PrivacySettingsPage() {
     : null
 
   return (
-    <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
+    <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
       {/* Header */}
       <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
         <button

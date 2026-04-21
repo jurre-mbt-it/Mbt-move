@@ -28,8 +28,28 @@ export function MuscleBalancePanel({ exercises, currentDay, currentWeek }: Props
   const totals = useMemo(() => {
     const acc: Record<string, number> = {}
     for (const ex of dayExercises) {
+      // Spier-belasting = muscleLoad × sets × repFactor × weightFactor
+      //  - repFactor: lage reps = zwaarder (spierkracht), hoge reps = lichter
+      //  - weightFactor: extra gewicht in kg uit extraParams
+      // Blijft in-balans zodat gewicht een redelijke boost geeft zonder
+      // bodyweight-oefeningen marginaal te maken.
+      const reps = ex.reps ?? 10
+      const repFactor =
+        reps <= 5 ? 1.4 :
+        reps <= 8 ? 1.2 :
+        reps <= 12 ? 1.0 :
+        reps <= 20 ? 0.85 :
+        0.75
+      const weightParam = ex.extraParams?.find(p =>
+        /gewicht|weight|kg/i.test(p.label) && typeof p.value === 'number',
+      )
+      const weightKg = typeof weightParam?.value === 'number' ? weightParam.value : 0
+      const weightFactor = 1 + Math.min(weightKg / 60, 1.5) // cap bij +150%
+
+      const effectiveLoad = ex.sets * repFactor * weightFactor
+
       for (const [muscle, load] of Object.entries(ex.muscleLoads ?? {})) {
-        acc[muscle] = (acc[muscle] ?? 0) + (load * ex.sets)
+        acc[muscle] = (acc[muscle] ?? 0) + (load * effectiveLoad)
       }
     }
     return acc

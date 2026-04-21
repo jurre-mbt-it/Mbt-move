@@ -36,7 +36,7 @@ export default function PatientProgramPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#FAFAFA' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0A0E0F' }}>
         <p className="text-muted-foreground text-sm">Laden…</p>
       </div>
     )
@@ -44,7 +44,7 @@ export default function PatientProgramPage() {
 
   if (!program) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: '#FAFAFA' }}>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: '#0A0E0F' }}>
         <div><IconClipboard size={48} /></div>
         <p className="font-semibold text-lg">Geen actief programma</p>
         <p className="text-muted-foreground text-sm">Je therapeut heeft nog geen programma voor je aangemaakt.</p>
@@ -79,7 +79,7 @@ export default function PatientProgramPage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
+    <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
       {/* Header */}
       <div className="px-4 pt-12 pb-5" style={{ background: '#1C2425' }}>
         <Link href="/patient/dashboard" className="inline-flex items-center gap-1 text-[#7B8889] text-sm mb-3">

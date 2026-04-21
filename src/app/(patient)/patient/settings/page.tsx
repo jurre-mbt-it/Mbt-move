@@ -12,15 +12,26 @@ import {
 export default function PatientSettingsPage() {
   // Pending therapist-verzoeken laten we direct zien als accent op de access-tile
   const { data: accessRelations = [] } = trpc.patient.getTherapistAccess.useQuery()
+  const { data: me } = trpc.auth.getMe.useQuery()
   const pendingCount = (accessRelations as Array<{ status: string }>).filter(
     (r) => r.status === 'PENDING',
   ).length
+  const isTherapist = me?.role === 'THERAPIST' || me?.role === 'ADMIN'
 
   return (
     <DarkScreen>
       <DarkHeader title="Instellingen" backHref="/patient/dashboard" />
 
       <div className="max-w-lg w-full mx-auto px-4 py-4 flex flex-col gap-3">
+        {isTherapist && (
+          <ActionTile
+            href="/therapist/dashboard"
+            label="Schakel naar therapeut-modus"
+            sub="Terug naar je therapeut-dashboard"
+            bar={P.gold}
+          />
+        )}
+
         <Kicker>Privacy &amp; profiel</Kicker>
 
         <ActionTile

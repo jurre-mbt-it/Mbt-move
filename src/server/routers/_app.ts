@@ -8,6 +8,7 @@ import { researchRouter } from './research'
 import { patientRouter } from './patient'
 import { dpaRouter } from './dpa'
 import { wellnessRouter } from './wellness'
+import { adminRouter } from './admin'
 
 export const appRouter = createTRPCRouter({
   auth: authRouter,
@@ -19,6 +20,7 @@ export const appRouter = createTRPCRouter({
   patient: patientRouter,
   dpa: dpaRouter,
   wellness: wellnessRouter,
+  admin: adminRouter,
 })
 
 export type AppRouter = typeof appRouter

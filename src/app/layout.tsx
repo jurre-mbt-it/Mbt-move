@@ -9,6 +9,12 @@ export const metadata: Metadata = {
     default: 'MBT Gym',
   },
   description: 'Exercise prescription and rehabilitation platform for clinicians and patients.',
+  themeColor: '#0A0E0F',
+}
+
+export const viewport = {
+  themeColor: '#0A0E0F',
+  colorScheme: 'dark',
 }
 
 export default function RootLayout({

@@ -29,7 +29,7 @@ export default function MyWorkoutsPage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
+    <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
       <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
         <h1 className="text-white text-2xl font-bold">Mijn Workouts</h1>
         <p className="text-[#7B8889] text-xs mt-1">{workouts.length} workouts</p>

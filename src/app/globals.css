@@ -154,8 +154,14 @@
   border-color: var(--border);
 }
 
+/* Forceer athletic-dark bg op html+body zodat mobile-browser-chrome én
+   overscroll-areas niet wit flashen. `.athletic-dark` class op root
+   overridet alle shadcn-tokens. */
+html, body {
+  background: #0A0E0F;
+}
+
 body {
-  background: var(--background);
   color: var(--foreground);
   font-family: 'Satoshi', ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;

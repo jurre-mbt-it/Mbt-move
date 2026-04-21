@@ -187,7 +187,7 @@ export default function NewWorkoutPage() {
   // Step 1: Pick workout type
   if (step === 'pick-type') {
     return (
-      <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
+      <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
         <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
           <button onClick={() => router.back()} className="text-[#7B8889] flex items-center gap-1 text-sm mb-3">
             <ArrowLeft className="w-4 h-4" /> Terug
@@ -234,7 +234,7 @@ export default function NewWorkoutPage() {
     const endStr = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
 
     return (
-      <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
+      <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
         <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
           <p className="text-[#7B8889] text-xs uppercase tracking-wider">Workout Voltooid</p>
           <h1 className="text-white text-xl font-bold mt-1">{workoutName}</h1>
@@ -362,7 +362,7 @@ export default function NewWorkoutPage() {
   const isActive = step === 'active'
 
   return (
-    <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
+    <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
       {/* Header */}
       <div className="px-4 pt-12 pb-4" style={{ background: '#1C2425' }}>
         <div className="flex items-center justify-between mb-2">
@@ -618,7 +618,7 @@ function ExercisePickerView({
   }
 
   return (
-    <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
+    <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
       <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
         <div className="flex items-center justify-between">
           <button onClick={onBack} className="text-[#7B8889] flex items-center gap-1 text-sm">

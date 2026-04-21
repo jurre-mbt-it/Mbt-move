@@ -12,6 +12,7 @@ export interface Context {
     id: string
     email: string
     role: string
+    practiceId: string | null
   } | null
 }
 
@@ -54,10 +55,10 @@ export async function createTRPCContext(opts: { req?: NextRequest }): Promise<Co
         // Één DB-query, resultaat wordt gecached
         const dbUser = await prisma.user.findUnique({
           where: { email: supabaseUser.email },
-          select: { id: true, email: true, role: true },
+          select: { id: true, email: true, role: true, practiceId: true },
         })
         if (dbUser) {
-          user = { id: dbUser.id, email: dbUser.email, role: dbUser.role }
+          user = { id: dbUser.id, email: dbUser.email, role: dbUser.role, practiceId: dbUser.practiceId }
           userCache.set(supabaseUser.id, { user, expiresAt: Date.now() + USER_CACHE_TTL })
         }
       }

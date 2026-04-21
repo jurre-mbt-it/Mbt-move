@@ -211,7 +211,7 @@ export default function FollowUpPage() {
   const allDone = items.length > 0 && items.every(item => savedIds.has(item.id))
 
   return (
-    <div className="min-h-screen pb-24" style={{ background: '#FAFAFA' }}>
+    <div className="min-h-screen pb-24" style={{ background: '#0A0E0F' }}>
       {/* Header */}
       <div className="px-4 pt-12 pb-5" style={{ background: MBT_DARK }}>
         <Link href="/patient/progress" className="inline-flex items-center gap-1.5 text-[#7B8889] text-sm mb-3 hover:text-white transition-colors">

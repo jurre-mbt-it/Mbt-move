@@ -50,7 +50,7 @@ export default function HistoryPage() {
   }))
 
   return (
-    <div className="min-h-screen pb-6" style={{ background: '#FAFAFA' }}>
+    <div className="min-h-screen pb-6" style={{ background: '#0A0E0F' }}>
       {/* Header */}
       <div className="px-4 pt-12 pb-5" style={{ background: '#1A1A1A' }}>
         <h1 className="text-white text-xl font-bold">Voortgang</h1>

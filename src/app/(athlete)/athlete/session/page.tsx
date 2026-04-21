@@ -158,7 +158,7 @@ export default function AthleteSessionPage() {
 
   if (isLoading && !isQuickMode) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#FAFAFA' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0A0E0F' }}>
         <p className="text-muted-foreground text-sm">Laden…</p>
       </div>
     )
@@ -167,7 +167,7 @@ export default function AthleteSessionPage() {
   // Non-quick mode with no exercises: show empty state
   if (!isQuickMode && exercises.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#FAFAFA' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0A0E0F' }}>
         <div className="text-center space-y-3">
           <p className="text-muted-foreground">Geen oefeningen voor vandaag</p>
           <Link href="/athlete/dashboard">
@@ -180,7 +180,7 @@ export default function AthleteSessionPage() {
 
   if (state === 'ready') {
     return (
-      <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
+      <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
         <div className="px-4 pt-12 pb-8" style={{ background: '#1C2425' }}>
           <Link href="/athlete/dashboard" className="text-[#7B8889] flex items-center gap-1 text-sm mb-4">
             <ArrowLeft className="w-4 h-4" /> Terug
@@ -268,7 +268,7 @@ export default function AthleteSessionPage() {
 
   if (state === 'done') {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#FAFAFA' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0A0E0F' }}>
         <div className="text-center space-y-4 px-4">
           <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style={{ background: 'rgba(190,242,100,0.10)' }}>
             <CheckCircle2 className="w-8 h-8" style={{ color: '#BEF264' }} />
@@ -293,7 +293,7 @@ export default function AthleteSessionPage() {
 
   // Active state
   return (
-    <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
+    <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
       <div className="px-4 pt-12 pb-6" style={{ background: '#1C2425' }}>
         <div className="flex items-center justify-between mb-3">
           <button onClick={() => setState('ready')} className="text-[#7B8889] flex items-center gap-1 text-sm">

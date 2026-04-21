@@ -365,7 +365,7 @@ function SessionSummary({
   const avgSmileyIdx = avgSmiley !== null ? Math.round(avgSmiley) - 1 : null
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#FAFAFA' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: '#0A0E0F' }}>
       {/* Header */}
       <div className="px-5 pt-14 pb-6 text-center" style={{ background: MBT_DARK }}>
         <div className="text-5xl mb-3">🎉</div>
@@ -756,7 +756,7 @@ export default function SessionPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#FAFAFA' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0A0E0F' }}>
         <p className="text-muted-foreground text-sm">Sessie laden…</p>
       </div>
     )
@@ -764,7 +764,7 @@ export default function SessionPage() {
 
   if (!sessionData?.program || exercises.length === 0) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: '#FAFAFA' }}>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: '#0A0E0F' }}>
         <div className="text-5xl">🏖️</div>
         <p className="font-semibold text-lg">Geen sessie vandaag</p>
         <p className="text-muted-foreground text-sm">Je hebt vandaag geen oefeningen gepland. Geniet van je rustdag!</p>
@@ -1141,7 +1141,7 @@ export default function SessionPage() {
   })
 
   return (
-    <div className="min-h-screen pb-6" style={{ background: '#FAFAFA' }}>
+    <div className="min-h-screen pb-6" style={{ background: '#0A0E0F' }}>
       {/* Top bar */}
       <div className="sticky top-0 z-10 px-4 pt-12 pb-3 border-b" style={{ background: '#fff' }}>
         <div className="flex items-center justify-between mb-2">

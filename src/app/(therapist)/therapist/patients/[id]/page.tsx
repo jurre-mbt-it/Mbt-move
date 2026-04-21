@@ -193,22 +193,18 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             return (
               <Card key={prog.id} style={{ borderRadius: '14px' }}>
                 <CardContent className="p-4 flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
+                  <Link href={`/therapist/programs/${prog.id}/edit`} className="flex-1 min-w-0 cursor-pointer">
                     <p className="font-semibold text-sm truncate">{prog.name}</p>
                     <p className="text-xs text-muted-foreground">
                       {prog.weeks} weken · {prog.daysPerWeek}×/week
                       {prog.startDate && ` · Start ${new Date(prog.startDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`}
                     </p>
-                  </div>
+                  </Link>
                   <span className="text-xs px-2 py-0.5 rounded-full font-medium shrink-0"
                     style={{ background: progStatus.bg, color: progStatus.text }}>
                     {progStatus.label}
                   </span>
-                  <Link href={`/therapist/programs/${prog.id}/edit`}>
-                    <Button variant="outline" size="sm" className="text-xs shrink-0">
-                      <Edit3 className="w-3 h-3" />
-                    </Button>
-                  </Link>
+                  <ProgramActions programId={prog.id} status={prog.status} patientId={patient.id} />
                 </CardContent>
               </Card>
             )
@@ -244,5 +240,53 @@ function StatCard({ icon, value, label }: { icon: React.ReactNode; value: string
         <p className="text-xs text-muted-foreground">{label}</p>
       </CardContent>
     </Card>
+  )
+}
+
+function ProgramActions({
+  programId,
+  status,
+  patientId,
+}: {
+  programId: string
+  status: string
+  patientId: string
+}) {
+  const utils = trpc.useUtils()
+  const save = trpc.programs.save.useMutation({
+    onSuccess: () => {
+      utils.programs.list.invalidate()
+      utils.patients.get.invalidate({ id: patientId })
+    },
+  })
+
+  const isActive = status === 'ACTIVE'
+
+  return (
+    <div className="flex items-center gap-2 shrink-0">
+      {!isActive && (
+        <Button
+          size="sm"
+          className="text-xs gap-1"
+          style={{ background: '#BEF264', color: '#0A0E0F' }}
+          disabled={save.isPending}
+          onClick={() =>
+            save.mutate({
+              id: programId,
+              status: 'ACTIVE',
+              patientId,
+              startDate: new Date().toISOString(),
+            })
+          }
+        >
+          ▶ Start
+        </Button>
+      )}
+      <Link href={`/therapist/programs/${programId}/edit`}>
+        <Button variant="outline" size="sm" className="text-xs">
+          Wijzig
+        </Button>
+      </Link>
+    </div>
   )
 }

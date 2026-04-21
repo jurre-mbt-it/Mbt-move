@@ -50,14 +50,22 @@ export const exercisesRouter = createTRPCRouter({
       })
       const favoriteIds = new Set(favs.map(f => f.exerciseId))
 
-      // Belangrijk: de privacy-filter (eigen oefening of public) MOET via een AND
-       // met de query-OR gecombineerd worden. Wanneer we beide via losse `OR`-keys
-       // in hetzelfde object zouden plaatsen, overschrijft de tweede de eerste en
-       // verdwijnt de privacy-check — zie security review #4.
+      // Zichtbaarheid:
+      //   - eigen oefeningen (createdById = me)
+      //   - public / globaal (isPublic = true)  → door admin beheerd
+      //   - oefeningen van dezelfde praktijk (practiceId = user.practiceId)
+      // Als user.practiceId null is, valt praktijk-clausule weg.
+      const visibility: Array<Record<string, unknown>> = [
+        { createdById: ctx.user!.id },
+        { isPublic: true },
+      ]
+      if (ctx.user!.practiceId) {
+        visibility.push({ practiceId: ctx.user!.practiceId })
+      }
       const exercises = await ctx.prisma.exercise.findMany({
         where: {
           AND: [
-            { OR: [{ createdById: ctx.user!.id }, { isPublic: true }] },
+            { OR: visibility },
             ...(input?.query
               ? [{
                   OR: [
@@ -174,6 +182,8 @@ export const exercisesRouter = createTRPCRouter({
           ...data,
           id,
           createdById: ctx.user!.id,
+          // Scope naar eigen praktijk tenzij admin expliciet public maakt.
+          practiceId: data.isPublic ? null : ctx.user!.practiceId ?? null,
           muscleLoads: {
             create: Object.entries(muscleLoads).map(([muscle, load]) => ({
               id: createId(),

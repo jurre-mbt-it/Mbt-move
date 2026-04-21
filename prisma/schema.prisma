@@ -153,6 +153,10 @@ model User {
   mfaEnabled    Boolean   @default(false)
   mfaSecret     String?
 
+  // Multi-tenant: praktijk-scope. null = legacy / admin / cross-tenant.
+  practiceId    String?
+  practice      Practice? @relation(fields: [practiceId], references: [id], onDelete: SetNull)
+
   // Relations
   therapistPatients      PatientTherapist[]     @relation("TherapistRelation")
   patientTherapists      PatientTherapist[]     @relation("PatientRelation")
@@ -257,7 +261,25 @@ model Exercise {
   collectionItems  ExerciseCollectionItem[]
   favoritedBy      FavoriteExercise[]
 
+  // Multi-tenant: oefening is zichtbaar binnen deze praktijk. null = globaal
+  // (admin-beheerd / legacy). Gecombineerd met isPublic (true = ook globaal
+  // zichtbaar) voor de resolution-regels.
+  practiceId  String?
+  practice    Practice? @relation(fields: [practiceId], references: [id], onDelete: SetNull)
+
+  @@index([practiceId])
   @@map("exercises")
+}
+
+model Practice {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]
+  exercises Exercise[]
+
+  @@map("practices")
 }
 
 model FavoriteExercise {

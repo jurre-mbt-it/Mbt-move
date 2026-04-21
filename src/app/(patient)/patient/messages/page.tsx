@@ -54,7 +54,7 @@ export default function MessagesPage() {
   const unread = messages.filter(m => m.from === 'therapist' && !m.read).length
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#FAFAFA' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: '#0A0E0F' }}>
       {/* Header */}
       <div className="px-4 pt-12 pb-4 flex items-center gap-3" style={{ background: '#1C2425' }}>
         <div

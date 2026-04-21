@@ -60,7 +60,7 @@ export default function AthleteDashboard() {
   const greeting = hour < 12 ? 'Goedemorgen' : hour < 18 ? 'Goedemiddag' : 'Goedenavond'
 
   return (
-    <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
+    <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
       {/* Header */}
       <div className="px-4 pt-12 pb-8" style={{ background: '#1C2425' }}>
         <p className="text-[#7B8889] text-sm">{greeting}</p>

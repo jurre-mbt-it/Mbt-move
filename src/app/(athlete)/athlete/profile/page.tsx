@@ -17,7 +17,7 @@ export default function AthleteProfilePage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: '#FAFAFA' }}>
+    <div className="min-h-screen" style={{ background: '#0A0E0F' }}>
       <div className="px-4 pt-12 pb-8" style={{ background: '#1C2425' }}>
         <div className="flex flex-col items-center gap-3">
           <div
