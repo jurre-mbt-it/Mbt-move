@@ -41,7 +41,7 @@ type Program = {
 export default function ProgramsPage() {
   const router = useRouter()
   const utils = trpc.useUtils()
-  const { data = [], isLoading } = trpc.programs.list.useQuery(undefined, { staleTime: 30_000 })
+  const { data: rawData, isLoading } = trpc.programs.list.useQuery(undefined, { staleTime: 30_000 })
   const duplicateMutation = trpc.programs.duplicate.useMutation()
   const deleteMutation = trpc.programs.delete.useMutation()
 
@@ -49,6 +49,9 @@ export default function ProgramsPage() {
   const [duplicateName, setDuplicateName] = useState('')
   const [duplicateAsTemplate, setDuplicateAsTemplate] = useState(false)
 
+  // Cast tRPC-inferred list to local Program[] — the inferred type is too deep
+  // (bevat Prisma-relations) en laat TS struikelen in de build.
+  const data: Program[] = (rawData ?? []) as Program[]
   const templates = data.filter(p => p.isTemplate)
   const programs  = data.filter(p => !p.isTemplate)
 

@@ -185,7 +185,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
       const targetId = direction === 'easier' ? e.easierVariantId : e.harderVariantId
       if (!targetId) return e
       const source = libraryExercises
-      const target = source.find((le: { id: string }) => le.id === targetId) as typeof MOCK_EXERCISES[number] | undefined
+      const target = source.find((le: { id: string }) => le.id === targetId) as typeof libraryExercises[number] | undefined
       if (!target) { toast.error('Variant niet gevonden in bibliotheek'); return e }
       toast.success(`Gewisseld naar: ${target.name}`)
       return {
