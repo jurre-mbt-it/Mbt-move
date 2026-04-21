@@ -148,7 +148,7 @@ export default function PatientDashboard() {
         </Tile>
 
         {/* Stats row */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <MetricTile
             label="Sessies"
             value={sessionHistory?.length ?? 0}

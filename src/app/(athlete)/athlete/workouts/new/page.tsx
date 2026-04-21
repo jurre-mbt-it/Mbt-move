@@ -248,7 +248,7 @@ export default function NewWorkoutPage() {
           {/* Time summary */}
           <Card style={{ borderRadius: '14px' }}>
             <CardContent className="p-4">
-              <div className="grid grid-cols-3 gap-4 text-center">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 text-center">
                 <div>
                   <p className="text-xs text-muted-foreground uppercase">Start</p>
                   <p className="text-lg font-bold mt-1">{startStr}</p>

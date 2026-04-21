@@ -21,7 +21,7 @@ export default function AthleteHistoryPage() {
 
       <div className="px-4 -mt-3 space-y-3 pb-6">
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <Card style={{ borderRadius: '14px' }}>
             <CardContent className="px-3 py-3 text-center">
               <Flame className="w-5 h-5 mx-auto mb-1" style={{ color: '#f97316' }} />

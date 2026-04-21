@@ -70,7 +70,7 @@ export default function AthleteDashboard() {
 
       <div className="px-4 -mt-3 space-y-4 pb-6">
         {/* Stats row */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <StatCard icon={<Flame className="w-4 h-4" style={{ color: '#f97316' }} />} value={streak} label="Streak" />
           <StatCard icon={<CheckCircle2 className="w-4 h-4" style={{ color: '#BEF264' }} />} value={sessionHistory?.length ?? 0} label="Sessies" />
           <StatCard icon={<TrendingUp className="w-4 h-4" style={{ color: '#6366f1' }} />} value={`${Math.round(weekProgress)}%`} label="Deze week" />

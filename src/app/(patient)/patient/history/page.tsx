@@ -59,7 +59,7 @@ export default function HistoryPage() {
 
       <div className="px-4 py-4 space-y-4">
         {/* Stats row */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <Card style={{ borderRadius: '14px' }}>
             <CardContent className="px-3 py-3 text-center">
               <div className="flex justify-center mb-1">

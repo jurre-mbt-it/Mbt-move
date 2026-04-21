@@ -86,24 +86,24 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
         {/* Actions */}
         <div className="flex flex-col items-end gap-1.5 ml-auto">
+          <Link href={`/therapist/treatment/${patient.id}`}>
+            <Button size="sm" className="gap-1.5" style={{ background: '#BEF264', color: '#0A0E0F' }}>
+              ▶ Start behandeling
+            </Button>
+          </Link>
           {patient.programId ? (
             <Link href={`/therapist/programs/${patient.programId}/edit`}>
-              <Button size="sm" className="gap-1.5" style={{ background: '#BEF264' }}>
+              <Button size="sm" variant="outline" className="gap-1.5 w-full">
                 <ClipboardList className="w-3.5 h-3.5" /> Programma
               </Button>
             </Link>
           ) : (
             <Link href={`/therapist/programs/new?patientId=${patient.id}`}>
-              <Button size="sm" className="gap-1.5" style={{ background: '#BEF264' }}>
+              <Button size="sm" variant="outline" className="gap-1.5 w-full">
                 <Plus className="w-3.5 h-3.5" /> Programma
               </Button>
             </Link>
           )}
-          <Link href={`/therapist/programs/new?patientId=${patient.id}`}>
-            <Button size="sm" variant="outline" className="gap-1.5 w-full">
-              <Edit3 className="w-3.5 h-3.5" /> Nieuw programma
-            </Button>
-          </Link>
         </div>
       </div>
 
