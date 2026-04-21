@@ -256,7 +256,8 @@ export const patientsRouter = createTRPCRouter({
         })
       }
 
-      // Create/update the user record
+      // Create/update the user record. Nieuwe user krijgt dezelfde practiceId
+      // als de uitnodigende therapeut, zodat multi-tenant scope klopt.
       const patient = await ctx.prisma.user.upsert({
         where: { email },
         update: { name },
@@ -265,6 +266,7 @@ export const patientsRouter = createTRPCRouter({
           email,
           name,
           role,
+          practiceId: ctx.user.practiceId ?? null,
         },
       })
 
@@ -627,6 +629,10 @@ export const patientsRouter = createTRPCRouter({
           patientTherapists: {
             some: { therapistId: ctx.user.id, isActive: true, status: 'APPROVED' },
           },
+          // Defensive: limit naar eigen praktijk (null = legacy, zichtbaar).
+          ...(ctx.user.practiceId
+            ? { OR: [{ practiceId: ctx.user.practiceId }, { practiceId: null }] }
+            : {}),
           ...baseWhere,
         },
         select: { id: true, name: true, email: true },

@@ -108,6 +108,25 @@ export default function TreatmentPage({
     setRows([]) // triggert de useEffect opnieuw
   }
 
+  const addRow = (ex: { id: string; name: string }) => {
+    setDirty(true)
+    setRows((prev) => [
+      ...prev,
+      {
+        uid: `new-${Date.now()}-${ex.id}`,
+        exerciseId: ex.id,
+        name: ex.name,
+        targetSets: 3,
+        targetReps: 10,
+        repUnit: 'reps',
+        setsCompleted: '3',
+        repsCompleted: '10',
+        weight: '',
+        painDuring: '',
+      },
+    ])
+  }
+
   const canSubmit = useMemo(() => rows.length > 0 && !logMutation.isPending, [rows, logMutation.isPending])
 
   function handleSubmit() {
@@ -246,6 +265,8 @@ export default function TreatmentPage({
               </p>
             </Tile>
           )}
+          <AddExerciseRow onAdd={addRow} />
+
           {rows.map((r) => (
             <Tile key={r.uid}>{/* exercise row */}
               <div className="flex items-start justify-between gap-2">
@@ -325,6 +346,66 @@ function LabeledInput({
       <DarkInput value={value} onChange={(e) => onChange(e.target.value)}
         inputMode={inputMode} style={{ padding: '8px 10px', fontSize: 14 }} />
     </div>
+  )
+}
+
+function AddExerciseRow({ onAdd }: { onAdd: (ex: { id: string; name: string }) => void }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const { data: exercises = [] } = trpc.exercises.list.useQuery(
+    { query: query || undefined },
+    { enabled: open, staleTime: 30_000 },
+  )
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="athletic-tap w-full rounded-xl py-3 flex items-center justify-center gap-2"
+        style={{
+          background: P.surface,
+          border: `1px dashed ${P.lineStrong}`,
+          color: P.lime,
+          fontSize: 13,
+          fontWeight: 700,
+        }}
+      >
+        + Oefening toevoegen
+      </button>
+    )
+  }
+
+  return (
+    <Tile>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <MetaLabel>Zoek oefening</MetaLabel>
+        <button type="button" onClick={() => { setOpen(false); setQuery('') }}
+          className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.14em' }}>
+          SLUITEN
+        </button>
+      </div>
+      <DarkInput value={query} onChange={(e) => setQuery(e.target.value)}
+        placeholder="Bijv. squat, lunge, mobility…" autoFocus />
+      <div className="flex flex-col gap-1 mt-3 max-h-60 overflow-y-auto">
+        {(exercises as Array<{ id: string; name: string; category: string }>).slice(0, 15).map((ex) => (
+          <button key={ex.id} type="button"
+            onClick={() => { onAdd({ id: ex.id, name: ex.name }); setOpen(false); setQuery('') }}
+            className="athletic-tap text-left rounded-lg px-3 py-2"
+            style={{ background: P.surfaceHi }}>
+            <span style={{ color: P.ink, fontSize: 13, fontWeight: 600 }}>{ex.name}</span>
+            <span className="athletic-mono ml-2" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.1em' }}>
+              {ex.category}
+            </span>
+          </button>
+        ))}
+        {exercises.length === 0 && query && (
+          <p style={{ color: P.inkMuted, fontSize: 12, padding: 8, textAlign: 'center' }}>
+            Geen resultaten. Probeer andere zoektermen.
+          </p>
+        )}
+      </div>
+    </Tile>
   )
 }
 

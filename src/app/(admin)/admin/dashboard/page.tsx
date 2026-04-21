@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, Activity, ShieldCheck, Server, ClipboardList, Dumbbell, Database, ChevronRight } from 'lucide-react'
+import { Users, Activity, ShieldCheck, Server, ClipboardList, Dumbbell, Database, ChevronRight, UserCog, Building2 } from 'lucide-react'
 
 export const metadata = {
   title: 'Admin Dashboard – MBT Gym',
@@ -14,6 +14,8 @@ const stats = [
 ]
 
 const quickLinks = [
+  { href: '/admin/users', icon: UserCog, label: 'Users & rollen', description: 'Wijs rollen toe + koppel aan praktijk' },
+  { href: '/admin/practices', icon: Building2, label: 'Praktijken', description: 'Multi-tenant groepen beheren' },
   { href: '/therapist/patients', icon: Users, label: 'Patiënten', description: 'Beheer patiënten en hun programma\'s' },
   { href: '/therapist/exercises', icon: Dumbbell, label: 'Oefeningen', description: 'Oefeningenbibliotheek beheren' },
   { href: '/therapist/programs', icon: ClipboardList, label: "Programma's", description: "Revalidatieprogramma's beheren" },

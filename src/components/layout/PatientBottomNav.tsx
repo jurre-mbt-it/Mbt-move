@@ -2,16 +2,17 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, CalendarDays, MessageSquare, TrendingUp, User, Activity } from 'lucide-react'
+import { Home, CalendarDays, Dumbbell, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { P } from '@/components/dark-ui'
 
+// iOS-parity: 4 tabs, uppercase mono labels. Wellness is accessible via
+// dashboard-tile, niet als eigen tab.
 const NAV_ITEMS = [
-  { href: '/patient/dashboard', label: 'Home', icon: Home },
-  { href: '/patient/schedule', label: 'Schema', icon: CalendarDays },
-  { href: '/patient/wellness', label: 'Check-in', icon: Activity },
-  { href: '/patient/history', label: 'Voortgang', icon: TrendingUp },
-  { href: '/patient/profile', label: 'Profiel', icon: User },
+  { href: '/patient/dashboard', label: 'HOME', icon: Home },
+  { href: '/patient/schedule', label: 'SCHEMA', icon: CalendarDays },
+  { href: '/patient/session', label: 'TRAINING', icon: Dumbbell },
+  { href: '/patient/profile', label: 'PROFIEL', icon: User },
 ]
 
 export function PatientBottomNav() {
@@ -29,17 +30,22 @@ export function PatientBottomNav() {
             <Link
               key={href}
               href={href}
-              className={cn(
-                'flex flex-col items-center gap-1 flex-1 py-2 athletic-mono transition-colors',
-              )}
+              className={cn('flex flex-col items-center gap-1 flex-1 py-2 transition-colors')}
               style={{
                 color: active ? P.lime : P.inkMuted,
-                fontSize: 9,
-                letterSpacing: '0.14em',
               }}
             >
               <Icon className="w-5 h-5" />
-              <span>{label}</span>
+              <span
+                className="athletic-mono"
+                style={{
+                  fontSize: 10,
+                  letterSpacing: '0.14em',
+                  fontWeight: active ? 900 : 700,
+                }}
+              >
+                {label}
+              </span>
             </Link>
           )
         })}

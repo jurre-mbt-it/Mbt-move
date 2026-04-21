@@ -7,11 +7,12 @@ import { Home, CalendarDays, Zap, User, Menu, X, Dumbbell, ChevronRight } from '
 import { cn } from '@/lib/utils'
 import { P } from '@/components/dark-ui'
 
+// iOS-parity: 4 tabs, uppercase mono labels.
 const MAIN_NAV = [
-  { href: '/athlete/dashboard', label: 'Home', icon: Home },
-  { href: '/athlete/schedule', label: 'Schema', icon: CalendarDays },
-  { href: '/athlete/workouts', label: 'Workout', icon: Zap },
-  { href: '/athlete/profile', label: 'Profiel', icon: User },
+  { href: '/athlete/dashboard', label: 'HOME', icon: Home },
+  { href: '/athlete/schedule', label: 'SCHEMA', icon: CalendarDays },
+  { href: '/athlete/workouts', label: 'TRAINING', icon: Zap },
+  { href: '/athlete/profile', label: 'PROFIEL', icon: User },
 ]
 
 const DRAWER_ITEMS = [
