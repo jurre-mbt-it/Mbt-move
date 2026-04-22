@@ -13,6 +13,8 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
+import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
+import { auditLog } from '@/server/audit'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -231,7 +233,11 @@ export const patientRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      return ctx.prisma.sessionLog.create({
+      const rl = await rateLimit('patient.logSession', ctx.user.id, RATE_LIMITS.sessionLog)
+      if (!rl.ok) {
+        throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
+      }
+      const sessionLog = await ctx.prisma.sessionLog.create({
         data: {
           patientId: ctx.user.id,
           programId: input.programId ?? undefined,
@@ -255,6 +261,19 @@ export const patientRouter = createTRPCRouter({
         },
         select: { id: true },
       })
+      await auditLog({
+        event: 'SESSION_LOGGED',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        resource: 'SessionLog',
+        resourceId: sessionLog.id,
+        metadata: {
+          exerciseCount: input.exercises.length,
+          durationSeconds: input.durationSeconds,
+        },
+        req: ctx.req,
+      })
+      return sessionLog
     }),
 
   // ── Last weights per exercise ─────────────────────────────────────────────

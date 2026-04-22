@@ -15,6 +15,14 @@ const DAY_SHORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 
 type DayState = { programId: string | null }
 
+// Local shape om tRPC deep-inference te omzeilen (TS2589)
+type ProgramLite = {
+  id: string
+  name: string
+  isTemplate?: boolean
+  patient?: { id: string; name: string | null; email: string } | null
+}
+
 type InitialData = {
   id?: string
   name?: string
@@ -43,8 +51,8 @@ export function WeekPlannerEditor({ initialData }: Props) {
     }))
   )
 
-  const { data: programs = [] } = trpc.programs.list.useQuery(undefined, { staleTime: 30_000 })
-  const { data: patients = [] } = trpc.programs.list.useQuery(undefined, { staleTime: 30_000, enabled: false })
+  const { data: programsRaw } = trpc.programs.list.useQuery(undefined, { staleTime: 30_000 })
+  const programs: ProgramLite[] = (programsRaw ?? []) as ProgramLite[]
 
   // Use a simpler patient list from programs data
   const patientOptions = Array.from(

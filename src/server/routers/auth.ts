@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
 import { createTRPCRouter, publicProcedure, protectedProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
+import { auditLog } from '@/server/audit'
 
 export const authRouter = createTRPCRouter({
   getSession: publicProcedure.query(({ ctx }) => {
@@ -53,10 +54,18 @@ export const authRouter = createTRPCRouter({
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
       }
       const enabled = (data?.factors ?? []).some((f) => f.status === 'verified')
-      return ctx.prisma.user.update({
+      const updated = await ctx.prisma.user.update({
         where: { id: ctx.user.id },
         data: { mfaEnabled: enabled },
       })
+      await auditLog({
+        event: enabled ? 'MFA_VERIFIED' : 'MFA_ENROLLED',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        metadata: { mfaEnabled: enabled },
+        req: ctx.req,
+      })
+      return updated
     }),
 
   updateProfile: protectedProcedure

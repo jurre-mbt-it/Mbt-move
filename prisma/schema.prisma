@@ -153,6 +153,10 @@ model User {
   mfaEnabled    Boolean   @default(false)
   mfaSecret     String?
 
+  // AVG art. 17 — right to be forgotten
+  deletedAt             DateTime?  // soft-delete tombstone (records stay during 30-day grace)
+  deletionRequestedAt   DateTime?  // when patient requested deletion
+
   // Multi-tenant: praktijk-scope. null = legacy / admin / cross-tenant.
   practiceId    String?
   practice      Practice? @relation(fields: [practiceId], references: [id], onDelete: SetNull)
@@ -175,7 +179,10 @@ model User {
   researchConsent        ResearchConsent?
   favoriteExercises      FavoriteExercise[]
   wellnessChecks         WellnessCheck[]
+  invitesSent            InviteCode[]           @relation("InviteSender")
+  auditLogs              AuditLog[]
 
+  @@index([deletedAt])
   @@map("users")
 }
 
@@ -272,14 +279,63 @@ model Exercise {
 }
 
 model Practice {
-  id        String   @id @default(cuid())
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  users     User[]
-  exercises Exercise[]
+  id          String       @id @default(cuid())
+  name        String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  users       User[]
+  exercises   Exercise[]
+  inviteCodes InviteCode[]
 
   @@map("practices")
+}
+
+/// Physitrack-achtige invite-flow: therapeut genereert een 6-cijfer code,
+/// mailt die naar de patiënt. Patiënt logt in met e-mail + geboortejaar + code.
+/// Only codeHash is stored — klare code bestaat alleen tijdens de request.
+model InviteCode {
+  id             String    @id @default(cuid())
+  codeHash       String    @unique
+  email          String
+  name           String
+  dateOfBirth    DateTime  // full date; alleen year wordt gecontroleerd bij redeem
+  role           UserRole  @default(PATIENT)
+  practiceId     String?
+  practice       Practice? @relation(fields: [practiceId], references: [id], onDelete: SetNull)
+  invitedById    String
+  invitedBy      User      @relation("InviteSender", fields: [invitedById], references: [id], onDelete: Cascade)
+  expiresAt      DateTime
+  usedAt         DateTime?
+  usedByUserId  String?    // link naar de aangemaakte/bestaande User na redeem
+  attempts       Int       @default(0)
+  lastAttemptAt  DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([email])
+  @@index([invitedById])
+  @@index([expiresAt])
+  @@map("invite_codes")
+}
+
+/// AVG art. 32 — audit-trail van kritieke acties (login, data-view, consent, export, delete).
+/// Nooit patient-vrije PII direct in metadata; alleen IDs + event-type.
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  actorEmail  String?  // fallback als user verwijderd is
+  event       String   // bv. LOGIN_SUCCESS, INVITE_CREATED, DATA_EXPORTED
+  resource    String?  // bv. 'Patient', 'Program', 'SessionLog'
+  resourceId  String?
+  ip          String?
+  userAgent   String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([event, createdAt])
+  @@index([createdAt])
+  @@map("audit_logs")
 }
 
 model FavoriteExercise {

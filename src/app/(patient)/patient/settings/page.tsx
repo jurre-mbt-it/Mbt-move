@@ -61,6 +61,15 @@ export default function PatientSettingsPage() {
           sub="Bekijk je profielgegevens"
           bar={P.inkDim}
         />
+
+        <Kicker style={{ marginTop: 12 }}>Mijn data (AVG)</Kicker>
+
+        <ActionTile
+          href="/patient/settings/data-rights"
+          label="Mijn data downloaden of verwijderen"
+          sub="AVG art. 15, 17 en 20 — export of vergeetverzoek"
+          bar={P.purple}
+        />
       </div>
     </DarkScreen>
   )

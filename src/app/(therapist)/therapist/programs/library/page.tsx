@@ -35,8 +35,9 @@ type Program = {
 export default function ProgramLibraryPage() {
   const router = useRouter()
   const utils = trpc.useUtils()
-  const { data = [], isLoading } = trpc.programs.list.useQuery({ isTemplate: true }, { staleTime: 30_000 })
+  const { data: rawTemplates, isLoading } = trpc.programs.list.useQuery({ isTemplate: true }, { staleTime: 30_000 })
   const duplicateMutation = trpc.programs.duplicate.useMutation()
+  const data: Program[] = (rawTemplates ?? []) as Program[]
 
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('Alle')
@@ -45,7 +46,8 @@ export default function ProgramLibraryPage() {
   const [copyName, setCopyName] = useState('')
 
   // Collect patients from existing non-template programs
-  const { data: allPrograms = [] } = trpc.programs.list.useQuery(undefined, { staleTime: 30_000 })
+  const { data: allProgramsRaw } = trpc.programs.list.useQuery(undefined, { staleTime: 30_000 })
+  const allPrograms: Program[] = (allProgramsRaw ?? []) as Program[]
   const patients = Array.from(
     new Map(
       allPrograms.filter(p => p.patient).map(p => [p.patient!.id, p.patient!])

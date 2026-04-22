@@ -1,43 +1,123 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useRef, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { PATIENTS } from '@/lib/mock-data'
-import { DarkButton, DarkInput, Kicker, P } from '@/components/dark-ui'
+import { trpc } from '@/lib/trpc/client'
+import { createClient } from '@/lib/supabase/client'
+import { DarkButton, DarkInput, Kicker, MetaLabel, P } from '@/components/dark-ui'
 
-export default function AccessCodeLoginPage() {
+export default function AccessCodePage() {
+  return (
+    <Suspense>
+      <AccessCodeInner />
+    </Suspense>
+  )
+}
+
+function AccessCodeInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const prefillEmail = searchParams.get('email') ?? ''
+
+  const [step, setStep] = useState<'request' | 'verify'>('request')
+  const [email, setEmail] = useState(prefillEmail)
+  const [birthYear, setBirthYear] = useState('')
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
   const [loading, setLoading] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const codeInputRef = useRef<HTMLInputElement>(null)
 
-  async function handleSubmit(e: React.FormEvent) {
+  const currentYear = new Date().getFullYear()
+
+  const requestMutation = trpc.invite.request.useMutation()
+  const finalizeMutation = trpc.invite.finalize.useMutation()
+
+  async function handleRequest(e: React.FormEvent) {
     e.preventDefault()
-    if (!code.trim()) return
-
-    setLoading(true)
     setError('')
-
-    // Normalize: uppercase, strip spaces
-    const normalized = code.trim().toUpperCase().replace(/\s/g, '')
-
-    // Look up in mock data
-    await new Promise(r => setTimeout(r, 400)) // simulate network
-    const patient = PATIENTS.find(p => p.accessCode.replace('-', '') === normalized.replace('-', ''))
-
-    if (!patient) {
-      setError('Toegangscode niet herkend. Controleer de code en probeer opnieuw.')
-      setLoading(false)
-      inputRef.current?.select()
+    setInfo('')
+    const year = parseInt(birthYear, 10)
+    if (!email.trim() || !Number.isInteger(year) || year < 1900 || year > currentYear) {
+      setError('Vul een geldig e-mailadres en geboortejaar in (bijv. 1985).')
       return
     }
 
-    // In production: exchange code for session via Supabase / API
-    // For now: redirect to patient dashboard
-    router.push('/patient/dashboard')
+    setLoading(true)
+    try {
+      await requestMutation.mutateAsync({
+        email: email.trim().toLowerCase(),
+        birthYear: year,
+      })
+      setInfo(
+        'We hebben je een 6-cijfer code gemaild. Controleer je inbox — kan tot een minuut duren.',
+      )
+      setStep('verify')
+      setTimeout(() => codeInputRef.current?.focus(), 100)
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Er ging iets mis. Probeer het opnieuw.',
+      )
+    } finally {
+      setLoading(false)
+    }
   }
+
+  async function handleVerify(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    const normalizedCode = code.replace(/\D/g, '')
+    if (normalizedCode.length !== 6) {
+      setError('De code bestaat uit 6 cijfers.')
+      return
+    }
+
+    setLoading(true)
+    try {
+      // Stap 1: Supabase OTP verifiëren — geeft sessie in cookies
+      const supabase = createClient()
+      const { error: otpError } = await supabase.auth.verifyOtp({
+        email: email.trim().toLowerCase(),
+        token: normalizedCode,
+        type: 'email',
+      })
+      if (otpError) {
+        // Probeer ook als 'magiclink' want Supabase gebruikt verschillende types
+        const { error: otpError2 } = await supabase.auth.verifyOtp({
+          email: email.trim().toLowerCase(),
+          token: normalizedCode,
+          type: 'signup',
+        })
+        if (otpError2) {
+          throw new Error(
+            'De code klopt niet. Controleer je mail of vraag een nieuwe aan.',
+          )
+        }
+      }
+
+      // Stap 2: tRPC finaliseer — markeert InviteCode als used + maakt PatientTherapist relatie
+      await finalizeMutation.mutateAsync()
+
+      // Stap 3: sync user via bestaande API (maakt Prisma-row als 'ie nog niet bestaat)
+      await fetch('/api/auth/sync-user', { method: 'POST' }).catch(() => {})
+
+      router.replace('/patient/dashboard')
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Inloggen mislukt. Probeer het opnieuw.',
+      )
+      setLoading(false)
+    }
+  }
+
+  const heroTitle = step === 'request' ? 'JOUW TOEGANG' : 'VUL JE CODE IN'
+  const heroKicker =
+    step === 'request' ? 'PATIËNT · ONBOARDING' : 'STAP 2 · CODE UIT JE MAIL'
 
   return (
     <div
@@ -45,76 +125,171 @@ export default function AccessCodeLoginPage() {
       style={{ background: P.bg, color: P.ink }}
     >
       <div className="w-full max-w-sm flex flex-col gap-6">
-        {/* Logo */}
-        <div className="flex justify-center">
-          <img src="/Logo.jpg" alt="MBT Gym" className="h-10 w-auto" />
-        </div>
-
         <div
-          className="rounded-2xl p-8 flex flex-col gap-6"
+          className="rounded-3xl p-6 sm:p-8 flex flex-col gap-6"
           style={{ background: P.surface, border: `1px solid ${P.line}` }}
         >
-          {/* Heading */}
-          <div className="flex flex-col items-center gap-2 text-center">
-            <Kicker>Patiënt toegang</Kicker>
+          {/* Hero */}
+          <div className="flex flex-col gap-2">
+            <Kicker>{heroKicker}</Kicker>
             <h1
               className="athletic-display"
-              style={{ fontSize: 24, lineHeight: '28px', letterSpacing: '-0.02em', color: P.ink }}
+              style={{
+                fontSize: 32,
+                lineHeight: '36px',
+                letterSpacing: '-0.035em',
+                color: P.ink,
+                fontWeight: 900,
+                paddingTop: 2,
+                textTransform: 'uppercase',
+              }}
             >
-              TOEGANGSCODE
+              {heroTitle}
             </h1>
-            <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 4 }}>
-              Voer de code in die je van je therapeut hebt ontvangen.
+            <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 4, lineHeight: 1.5 }}>
+              {step === 'request'
+                ? 'Jouw therapeut heeft je uitgenodigd. Vul je e-mail en geboortejaar in — we sturen je een 6-cijfer code.'
+                : `We hebben een code gestuurd naar ${email}. Vul 'm hieronder in.`}
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <DarkInput
-              ref={inputRef}
-              placeholder="MBT-JV24"
-              value={code}
-              onChange={e => {
-                setCode(e.target.value.toUpperCase())
-                setError('')
-              }}
-              className="athletic-mono"
-              style={{
-                textAlign: 'center',
-                fontSize: 22,
-                letterSpacing: '0.3em',
-                fontWeight: 800,
-                height: 56,
-                color: P.ink,
-              }}
-              autoComplete="off"
-              autoFocus
-              maxLength={12}
-            />
+          {step === 'request' ? (
+            <form onSubmit={handleRequest} className="flex flex-col gap-4">
+              <label className="flex flex-col gap-1.5">
+                <MetaLabel>E-MAIL</MetaLabel>
+                <DarkInput
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="jij@voorbeeld.nl"
+                  autoFocus={!prefillEmail}
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <MetaLabel>GEBOORTEJAAR</MetaLabel>
+                <DarkInput
+                  type="tel"
+                  inputMode="numeric"
+                  value={birthYear}
+                  onChange={(e) => setBirthYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="1985"
+                  autoFocus={!!prefillEmail}
+                  maxLength={4}
+                  required
+                />
+              </label>
 
-            {error && (
-              <p
-                className="athletic-mono text-center"
-                style={{ color: P.danger, fontSize: 12, letterSpacing: '0.04em' }}
+              {error && (
+                <p
+                  className="athletic-mono text-center rounded-lg px-3 py-2"
+                  style={{
+                    color: P.danger,
+                    fontSize: 12,
+                    letterSpacing: '0.04em',
+                    background: 'rgba(248,113,113,0.08)',
+                    border: `1px solid ${P.danger}33`,
+                  }}
+                >
+                  {error}
+                </p>
+              )}
+
+              <DarkButton type="submit" disabled={loading} loading={loading}>
+                {loading ? 'Code versturen…' : 'Stuur mij een code'}
+              </DarkButton>
+            </form>
+          ) : (
+            <form onSubmit={handleVerify} className="flex flex-col gap-4">
+              <label className="flex flex-col gap-1.5">
+                <MetaLabel>6-CIJFER CODE</MetaLabel>
+                <DarkInput
+                  ref={codeInputRef}
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={code}
+                  onChange={(e) => {
+                    setCode(e.target.value.replace(/\D/g, '').slice(0, 6))
+                    setError('')
+                  }}
+                  placeholder="123456"
+                  style={{
+                    textAlign: 'center',
+                    fontSize: 28,
+                    letterSpacing: '0.4em',
+                    fontWeight: 900,
+                    height: 64,
+                    fontFamily: 'ui-monospace, Menlo, monospace',
+                  }}
+                  maxLength={6}
+                  required
+                />
+              </label>
+
+              {info && (
+                <p
+                  className="athletic-mono text-center rounded-lg px-3 py-2"
+                  style={{
+                    color: P.lime,
+                    fontSize: 12,
+                    letterSpacing: '0.04em',
+                    background: 'rgba(190,242,100,0.08)',
+                    border: `1px solid ${P.lime}33`,
+                  }}
+                >
+                  {info}
+                </p>
+              )}
+
+              {error && (
+                <p
+                  className="athletic-mono text-center rounded-lg px-3 py-2"
+                  style={{
+                    color: P.danger,
+                    fontSize: 12,
+                    letterSpacing: '0.04em',
+                    background: 'rgba(248,113,113,0.08)',
+                    border: `1px solid ${P.danger}33`,
+                  }}
+                >
+                  {error}
+                </p>
+              )}
+
+              <DarkButton
+                type="submit"
+                disabled={code.length !== 6 || loading}
+                loading={loading}
               >
-                {error}
-              </p>
-            )}
+                {loading ? 'Inloggen…' : 'Inloggen'}
+              </DarkButton>
 
-            <DarkButton
-              type="submit"
-              disabled={!code.trim() || loading}
-              loading={loading}
-            >
-              {loading ? 'Controleren…' : 'Inloggen'}
-            </DarkButton>
-          </form>
-
-          <div className="text-center" style={{ color: P.inkMuted, fontSize: 13 }}>
-            Heb je een account?{' '}
-            <Link href="/login" style={{ color: P.lime, fontWeight: 700 }}>
-              Inloggen met e-mail
-            </Link>
-          </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep('request')
+                  setCode('')
+                  setError('')
+                  setInfo('')
+                }}
+                className="athletic-mono"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: P.inkMuted,
+                  fontSize: 11,
+                  letterSpacing: '0.16em',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                }}
+              >
+                ← TERUG
+              </button>
+            </form>
+          )}
         </div>
 
         <div className="text-center">
@@ -123,7 +298,7 @@ export default function AccessCodeLoginPage() {
             className="athletic-mono"
             style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.16em' }}
           >
-            ← TERUG NAAR INLOGGEN
+            BEN JE THERAPEUT? LOG HIER IN
           </Link>
         </div>
       </div>

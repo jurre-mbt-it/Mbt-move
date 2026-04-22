@@ -45,17 +45,53 @@ function PatientsPageInner() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteName, setInviteName] = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteDob, setInviteDob] = useState('') // YYYY-MM-DD
   const [inviteRole, setInviteRole] = useState<'PATIENT' | 'THERAPIST' | 'ATHLETE'>('PATIENT')
   const [inviteLoading, setInviteLoading] = useState(false)
   const [inviteExists, setInviteExists] = useState(false)
+  const [inviteResult, setInviteResult] = useState<{
+    url: string
+    expiresAt: Date
+  } | null>(null)
 
   const { data: patients = [], isLoading } = trpc.patients.list.useQuery()
+  const createInvite = trpc.invite.create.useMutation()
+
+  function resetInviteForm() {
+    setInviteName('')
+    setInviteEmail('')
+    setInviteDob('')
+    setInviteRole('PATIENT')
+    setInviteExists(false)
+    setInviteResult(null)
+  }
 
   async function handleInvite(e: React.FormEvent, resend = false) {
     e.preventDefault()
     setInviteLoading(true)
     setInviteExists(false)
     try {
+      // PATIENT + ATHLETE → nieuwe Physitrack-achtige code-flow (geboortedatum vereist)
+      if (inviteRole === 'PATIENT' || inviteRole === 'ATHLETE') {
+        if (!inviteDob) {
+          toast.error('Geboortedatum is verplicht voor een toegangscode-invite.')
+          return
+        }
+        const res = await createInvite.mutateAsync({
+          email: inviteEmail,
+          name: inviteName,
+          dateOfBirth: inviteDob,
+          role: inviteRole,
+        })
+        setInviteResult({
+          url: res.instructionUrl,
+          expiresAt: new Date(res.expiresAt),
+        })
+        toast.success('Invite aangemaakt — deel de code-URL met je patiënt.')
+        return
+      }
+
+      // THERAPIST → oude magic-link flow (hoeft geen DOB)
       const res = await fetch('/api/auth/invite-patient', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -71,10 +107,7 @@ function PatientsPageInner() {
         ? `Nieuwe uitnodiging verstuurd naar ${inviteEmail}`
         : `Uitnodiging verstuurd naar ${inviteEmail}`)
       setInviteOpen(false)
-      setInviteName('')
-      setInviteEmail('')
-      setInviteRole('PATIENT')
-      setInviteExists(false)
+      resetInviteForm()
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Er ging iets mis')
     } finally {
@@ -273,7 +306,7 @@ function PatientsPageInner() {
         )}
 
         {/* Invite modal */}
-        <Dialog open={inviteOpen} onOpenChange={(open) => { setInviteOpen(open); if (!open) setInviteExists(false) }}>
+        <Dialog open={inviteOpen} onOpenChange={(open) => { setInviteOpen(open); if (!open) resetInviteForm() }}>
           <DialogContent
             style={{
               borderRadius: '16px',
@@ -285,86 +318,169 @@ function PatientsPageInner() {
             <DialogHeader>
               <DialogTitle style={{ color: P.ink }}>Gebruiker uitnodigen</DialogTitle>
               <DialogDescription style={{ color: P.inkMuted }}>
-                De gebruiker ontvangt een e-mail met een link om een account aan te maken.
+                {inviteRole === 'PATIENT' || inviteRole === 'ATHLETE'
+                  ? 'Patiënt logt in met e-mail + geboortejaar + 6-cijfer code.'
+                  : 'Therapeut ontvangt een e-mail met een magic-link om in te loggen.'}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleInvite} className="space-y-4 mt-2">
-              <div className="space-y-1.5">
-                <MetaLabel>Volledige naam</MetaLabel>
-                <DarkInput
-                  id="invite-name"
-                  placeholder="Jan de Vries"
-                  value={inviteName}
-                  onChange={e => { setInviteName(e.target.value); setInviteExists(false) }}
-                  required
-                />
-              </div>
-              <div className="space-y-1.5">
-                <MetaLabel>E-mailadres</MetaLabel>
-                <DarkInput
-                  id="invite-email"
-                  type="email"
-                  placeholder="jan@example.com"
-                  value={inviteEmail}
-                  onChange={e => { setInviteEmail(e.target.value); setInviteExists(false) }}
-                  required
-                />
-              </div>
-              <div className="space-y-1.5">
-                <MetaLabel>Rol</MetaLabel>
-                <div className="grid grid-cols-3 gap-2">
-                  {([
-                    { value: 'PATIENT', label: 'Patiënt', color: P.lime },
-                    { value: 'ATHLETE', label: 'Atleet', color: P.gold },
-                    { value: 'THERAPIST', label: 'Therapeut', color: P.ice },
-                  ] as const).map(r => (
-                    <button
-                      key={r.value}
-                      type="button"
-                      onClick={() => setInviteRole(r.value)}
-                      className="athletic-tap px-3 py-2 rounded-lg text-sm font-bold transition-colors"
-                      style={inviteRole === r.value
-                        ? { border: `2px solid ${r.color}`, background: r.color + '15', color: r.color }
-                        : { border: `2px solid ${P.lineStrong}`, color: P.inkMuted, background: 'transparent' }
-                      }
-                    >
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
 
-              {inviteExists && (
+            {inviteResult ? (
+              <div className="space-y-4 mt-2">
                 <div
-                  className="rounded-lg p-3 space-y-2"
-                  style={{ border: `1px solid ${P.gold}`, background: 'rgba(244,194,97,0.08)' }}
+                  className="rounded-lg p-4 space-y-3"
+                  style={{ border: `1px solid ${P.lime}`, background: 'rgba(190,242,100,0.08)' }}
                 >
-                  <p style={{ color: P.gold, fontSize: 13 }}>
-                    Deze patiënt is al uitgenodigd.
+                  <div>
+                    <MetaLabel style={{ color: P.lime }}>INVITE AANGEMAAKT</MetaLabel>
+                    <p style={{ color: P.ink, fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>
+                      Deel deze URL met <strong>{inviteEmail}</strong>. Bij openen ziet de patiënt het code-scherm.
+                      Supabase stuurt de 6-cijfer code vanzelf zodra de patiënt z&apos;n geboortejaar invult.
+                    </p>
+                  </div>
+                  <div
+                    className="rounded-md p-2 flex items-center gap-2"
+                    style={{ background: P.surfaceLow, border: `1px solid ${P.line}` }}
+                  >
+                    <code
+                      className="athletic-mono flex-1 truncate"
+                      style={{ fontSize: 11, color: P.ink, letterSpacing: '0.02em' }}
+                    >
+                      {inviteResult.url}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(inviteResult.url)
+                        toast.success('Gekopieerd')
+                      }}
+                      className="athletic-tap athletic-mono"
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        background: P.lime,
+                        color: P.bg,
+                        fontSize: 10,
+                        fontWeight: 900,
+                        letterSpacing: '0.12em',
+                      }}
+                    >
+                      COPY
+                    </button>
+                  </div>
+                  <p style={{ color: P.inkMuted, fontSize: 11 }}>
+                    Verloopt op {new Date(inviteResult.expiresAt).toLocaleString('nl-NL')}
                   </p>
+                </div>
+                <DarkButton
+                  variant="secondary"
+                  className="w-full"
+                  onClick={() => {
+                    setInviteOpen(false)
+                    resetInviteForm()
+                  }}
+                >
+                  Sluiten
+                </DarkButton>
+              </div>
+            ) : (
+              <form onSubmit={handleInvite} className="space-y-4 mt-2">
+                <div className="space-y-1.5">
+                  <MetaLabel>Volledige naam</MetaLabel>
+                  <DarkInput
+                    id="invite-name"
+                    placeholder="Jan de Vries"
+                    value={inviteName}
+                    onChange={e => { setInviteName(e.target.value); setInviteExists(false) }}
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <MetaLabel>E-mailadres</MetaLabel>
+                  <DarkInput
+                    id="invite-email"
+                    type="email"
+                    placeholder="jan@example.com"
+                    value={inviteEmail}
+                    onChange={e => { setInviteEmail(e.target.value); setInviteExists(false) }}
+                    required
+                  />
+                </div>
+                {(inviteRole === 'PATIENT' || inviteRole === 'ATHLETE') && (
+                  <div className="space-y-1.5">
+                    <MetaLabel>Geboortedatum</MetaLabel>
+                    <DarkInput
+                      id="invite-dob"
+                      type="date"
+                      value={inviteDob}
+                      onChange={e => setInviteDob(e.target.value)}
+                      max={new Date().toISOString().slice(0, 10)}
+                      required
+                    />
+                    <p style={{ color: P.inkMuted, fontSize: 11, marginTop: 2 }}>
+                      Bij inloggen controleren we het geboortejaar — alleen de echte patiënt weet dit.
+                    </p>
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  <MetaLabel>Rol</MetaLabel>
+                  <div className="grid grid-cols-3 gap-2">
+                    {([
+                      { value: 'PATIENT', label: 'Patiënt', color: P.lime },
+                      { value: 'ATHLETE', label: 'Atleet', color: P.gold },
+                      { value: 'THERAPIST', label: 'Therapeut', color: P.ice },
+                    ] as const).map(r => (
+                      <button
+                        key={r.value}
+                        type="button"
+                        onClick={() => setInviteRole(r.value)}
+                        className="athletic-tap px-3 py-2 rounded-lg text-sm font-bold transition-colors"
+                        style={inviteRole === r.value
+                          ? { border: `2px solid ${r.color}`, background: r.color + '15', color: r.color }
+                          : { border: `2px solid ${P.lineStrong}`, color: P.inkMuted, background: 'transparent' }
+                        }
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {inviteExists && (
+                  <div
+                    className="rounded-lg p-3 space-y-2"
+                    style={{ border: `1px solid ${P.gold}`, background: 'rgba(244,194,97,0.08)' }}
+                  >
+                    <p style={{ color: P.gold, fontSize: 13 }}>
+                      Deze gebruiker is al uitgenodigd.
+                    </p>
+                    <DarkButton
+                      variant="secondary"
+                      size="sm"
+                      className="w-full"
+                      disabled={inviteLoading}
+                      onClick={() => handleInvite({ preventDefault: () => {} } as React.FormEvent, true)}
+                    >
+                      {inviteLoading ? 'Versturen...' : 'Uitnodiging opnieuw versturen'}
+                    </DarkButton>
+                  </div>
+                )}
+
+                {!inviteExists && (
                   <DarkButton
-                    variant="secondary"
-                    size="sm"
+                    type="submit"
+                    variant="primary"
                     className="w-full"
                     disabled={inviteLoading}
-                    onClick={() => handleInvite({ preventDefault: () => {} } as React.FormEvent, true)}
                   >
-                    {inviteLoading ? 'Versturen...' : 'Uitnodiging opnieuw versturen'}
+                    {inviteLoading
+                      ? 'Bezig...'
+                      : inviteRole === 'PATIENT' || inviteRole === 'ATHLETE'
+                        ? 'Code-invite aanmaken'
+                        : 'Uitnodiging versturen'}
                   </DarkButton>
-                </div>
-              )}
-
-              {!inviteExists && (
-                <DarkButton
-                  type="submit"
-                  variant="primary"
-                  className="w-full"
-                  disabled={inviteLoading}
-                >
-                  {inviteLoading ? 'Versturen...' : 'Uitnodiging versturen'}
-                </DarkButton>
-              )}
-            </form>
+                )}
+              </form>
+            )}
           </DialogContent>
         </Dialog>
       </div>
