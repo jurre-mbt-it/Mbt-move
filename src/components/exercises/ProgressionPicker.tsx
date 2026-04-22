@@ -1,11 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { ArrowDown, ArrowUp, X, Search, Loader2 } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
+import { P, DarkInput, MetaLabel } from '@/components/dark-ui'
 
 interface ProgressionPickerProps {
   easierVariantId: string | null
@@ -38,67 +36,127 @@ function ExercisePicker({
   })
 
   const exercises = allExercises.filter(
-    e => e.id !== excludeId && e.name.toLowerCase().includes(query.toLowerCase())
+    e => e.id !== excludeId && e.name.toLowerCase().includes(query.toLowerCase()),
   )
   const selected = allExercises.find(e => e.id === selectedId)
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2 text-sm font-medium">
+      <div
+        className="flex items-center gap-2"
+        style={{
+          color: P.ink,
+          fontSize: 13,
+          fontWeight: 800,
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase',
+        }}
+      >
         {icon}
         <span>{label}</span>
       </div>
 
       {selected ? (
         <div
-          className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm border"
-          style={{ borderColor: `${color}40`, background: `${color}10` }}
+          className="flex items-center justify-between rounded-lg"
+          style={{
+            background: `${color}18`,
+            border: `1px solid ${color}55`,
+            padding: '10px 14px',
+          }}
         >
-          <span className="font-medium">{selected.name}</span>
-          <button type="button" onClick={() => onSelect(null)}>
-            <X className="w-4 h-4 text-[#7B8889] hover:text-destructive" />
+          <span style={{ color: P.ink, fontSize: 14, fontWeight: 700 }}>
+            {selected.name}
+          </span>
+          <button
+            type="button"
+            onClick={() => onSelect(null)}
+            className="athletic-tap"
+            style={{ color: P.inkMuted }}
+            aria-label="Verwijder"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
       ) : (
         <div className="relative">
-          <Button
+          <button
             type="button"
-            variant="outline"
-            className="w-full justify-start text-muted-foreground"
             onClick={() => setOpen(o => !o)}
+            className="athletic-tap w-full flex items-center gap-2 rounded-xl"
+            style={{
+              background: P.surfaceHi,
+              border: `1px solid ${P.lineStrong}`,
+              color: P.inkMuted,
+              padding: '12px 14px',
+              fontSize: 13,
+              fontWeight: 700,
+              textAlign: 'left',
+            }}
           >
-            <Search className="w-4 h-4 mr-2" />
+            <Search className="w-4 h-4" />
             Zoek oefening...
-          </Button>
+          </button>
 
           {open && (
-            <div className="absolute top-full mt-1 w-full z-50 bg-[#141A1B] border rounded-xl shadow-lg overflow-hidden">
-              <div className="p-2 border-b">
-                <Input
+            <div
+              className="absolute top-full mt-1 w-full z-50 rounded-xl overflow-hidden"
+              style={{
+                background: P.surface,
+                border: `1px solid ${P.lineStrong}`,
+                boxShadow: '0 10px 30px -10px rgba(0,0,0,0.6)',
+              }}
+            >
+              <div className="p-2" style={{ borderBottom: `1px solid ${P.line}` }}>
+                <DarkInput
                   placeholder="Zoeken..."
                   value={query}
                   onChange={e => setQuery(e.target.value)}
                   autoFocus
-                  className="h-8"
+                  style={{ padding: '8px 12px', fontSize: 13 }}
                 />
               </div>
-              <div className="max-h-48 overflow-y-auto">
+              <div className="max-h-56 overflow-y-auto">
                 {isLoading ? (
                   <div className="flex items-center justify-center py-4">
-                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                    <Loader2 className="w-4 h-4 animate-spin" style={{ color: P.inkMuted }} />
                   </div>
                 ) : exercises.length === 0 ? (
-                  <p className="text-sm text-muted-foreground px-3 py-2">Geen oefeningen gevonden</p>
+                  <p
+                    className="athletic-mono"
+                    style={{
+                      color: P.inkMuted,
+                      padding: '10px 14px',
+                      fontSize: 11,
+                      letterSpacing: '0.14em',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    Geen oefeningen gevonden
+                  </p>
                 ) : (
                   exercises.map(ex => (
                     <button
                       key={ex.id}
                       type="button"
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-[#1C2425] flex items-center justify-between"
-                      onClick={() => { onSelect(ex.id); setOpen(false); setQuery('') }}
+                      className="athletic-tap w-full text-left flex items-center justify-between transition-colors"
+                      style={{
+                        padding: '10px 14px',
+                        color: P.ink,
+                        fontSize: 13,
+                        fontWeight: 700,
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = P.surfaceHi)}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      onClick={() => {
+                        onSelect(ex.id)
+                        setOpen(false)
+                        setQuery('')
+                      }}
                     >
                       <span>{ex.name}</span>
-                      <Badge variant="secondary" className="text-xs">{ex.difficulty}</Badge>
+                      <MetaLabel style={{ color: P.inkMuted }}>{ex.difficulty}</MetaLabel>
                     </button>
                   ))
                 )}
@@ -122,16 +180,16 @@ export function ProgressionPicker({
     <div className="space-y-4">
       <ExercisePicker
         label="Makkelijkere variant"
-        icon={<ArrowDown className="w-4 h-4 text-blue-500" />}
-        color="#60a5fa"
+        icon={<ArrowDown className="w-4 h-4" style={{ color: P.ice }} />}
+        color={P.ice}
         selectedId={easierVariantId}
         excludeId={currentId}
         onSelect={onChangeEasier}
       />
       <ExercisePicker
         label="Moeilijkere variant"
-        icon={<ArrowUp className="w-4 h-4 text-amber-500" />}
-        color="#f59e0b"
+        icon={<ArrowUp className="w-4 h-4" style={{ color: P.gold }} />}
+        color={P.gold}
         selectedId={harderVariantId}
         excludeId={currentId}
         onSelect={onChangeHarder}

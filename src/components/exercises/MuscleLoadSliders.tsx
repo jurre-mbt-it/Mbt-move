@@ -1,15 +1,16 @@
 'use client'
 
 import { MUSCLE_GROUPS, type MuscleGroup } from '@/lib/exercise-constants'
-import { cn } from '@/lib/utils'
+import { P } from '@/components/dark-ui'
 
 interface MuscleLoadSlidersProps {
   value: Partial<Record<MuscleGroup, number>>
   onChange: (v: Partial<Record<MuscleGroup, number>>) => void
 }
 
-const LOAD_LABELS = ['', 'Licht', 'Matig', 'Gemiddeld', 'Hoog', 'Maximaal']
-const LOAD_COLORS = ['', '#c6f7f2', '#5eead4', '#BEF264', '#0D9488', '#134E4A']
+const LOAD_LABELS = ['', 'LICHT', 'MATIG', 'GEMIDDELD', 'HOOG', 'MAX']
+// Athletic-dark: licht→ice, matig→lime-soft, gemiddeld→lime, hoog→gold, max→orange/danger
+const LOAD_COLORS = ['', P.ice, P.limeMid, P.lime, P.gold, P.orange]
 
 export function MuscleLoadSliders({ value, onChange }: MuscleLoadSlidersProps) {
   const handleChange = (muscle: MuscleGroup, load: number) => {
@@ -26,8 +27,19 @@ export function MuscleLoadSliders({ value, onChange }: MuscleLoadSlidersProps) {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">
-        {activeCount > 0 ? `${activeCount} spiergroep${activeCount !== 1 ? 'en' : ''} actief` : 'Schuif een slider om spiergroepbelasting in te stellen'}
+      <p
+        className="athletic-mono"
+        style={{
+          color: P.inkMuted,
+          fontSize: 10,
+          letterSpacing: '0.14em',
+          fontWeight: 700,
+          textTransform: 'uppercase',
+        }}
+      >
+        {activeCount > 0
+          ? `${activeCount} SPIERGROEP${activeCount !== 1 ? 'EN' : ''} ACTIEF`
+          : 'SCHUIF EEN SLIDER OM BELASTING IN TE STELLEN'}
       </p>
 
       <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
@@ -37,8 +49,20 @@ export function MuscleLoadSliders({ value, onChange }: MuscleLoadSlidersProps) {
           const label = LOAD_LABELS[load] ?? ''
 
           return (
-            <div key={muscle} className="grid grid-cols-[140px_1fr_60px] items-center gap-3">
-              <span className={cn('text-sm truncate', load > 0 ? 'font-medium' : 'text-muted-foreground')}>
+            <div
+              key={muscle}
+              className="grid items-center gap-3"
+              style={{ gridTemplateColumns: '120px 1fr 60px' }}
+            >
+              <span
+                className="truncate"
+                style={{
+                  color: load > 0 ? P.ink : P.inkMuted,
+                  fontSize: 13,
+                  fontWeight: load > 0 ? 800 : 600,
+                  letterSpacing: '-0.01em',
+                }}
+              >
                 {muscle}
               </span>
               <input
@@ -50,15 +74,21 @@ export function MuscleLoadSliders({ value, onChange }: MuscleLoadSlidersProps) {
                 onChange={e => handleChange(muscle, Number(e.target.value))}
                 className="w-full h-2 rounded-full appearance-none cursor-pointer"
                 style={{
-                  background: load === 0
-                    ? 'rgba(255,255,255,0.12)'
-                    : `linear-gradient(to right, ${color} 0%, ${color} ${(load / 5) * 100}%, #e4e4e7 ${(load / 5) * 100}%, #e4e4e7 100%)`,
-                  accentColor: '#BEF264',
+                  background:
+                    load === 0
+                      ? P.surfaceHi
+                      : `linear-gradient(to right, ${color} 0%, ${color} ${(load / 5) * 100}%, ${P.surfaceHi} ${(load / 5) * 100}%, ${P.surfaceHi} 100%)`,
+                  accentColor: color || P.lime,
                 }}
               />
               <span
-                className="text-xs text-right font-medium"
-                style={{ color: load > 0 ? LOAD_COLORS[load] : '#a1a1aa' }}
+                className="athletic-mono text-right"
+                style={{
+                  color: load > 0 ? color : P.inkDim,
+                  fontSize: 10,
+                  fontWeight: 900,
+                  letterSpacing: '0.12em',
+                }}
               >
                 {load > 0 ? label : '—'}
               </span>
@@ -75,8 +105,16 @@ export function MuscleLoadSliders({ value, onChange }: MuscleLoadSlidersProps) {
             .map(([muscle, load]) => (
               <span
                 key={muscle}
-                className="text-xs px-2 py-0.5 rounded-full text-white font-medium"
-                style={{ background: LOAD_COLORS[load ?? 0] ?? '#BEF264' }}
+                className="athletic-mono rounded-full"
+                style={{
+                  background: LOAD_COLORS[load ?? 0] ?? P.lime,
+                  color: P.bg,
+                  padding: '3px 10px',
+                  fontSize: 10,
+                  fontWeight: 900,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                }}
               >
                 {muscle} · {load}
               </span>

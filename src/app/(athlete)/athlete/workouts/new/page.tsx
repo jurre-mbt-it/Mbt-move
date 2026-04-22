@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   WORKOUT_TYPES,
   saveWorkout,
+  getSavedWorkouts,
   type Workout,
   type WorkoutExercise,
   type WorkoutSet,
@@ -46,12 +47,16 @@ function categoryColor(cat: string): string {
 
 export default function NewWorkoutPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const editId = searchParams.get('id')
   const utils = trpc.useUtils()
   const logSession = trpc.patient.logSession.useMutation()
-  const [step, setStep] = useState<Step>('pick-type')
+  const [step, setStep] = useState<Step>(editId ? 'build' : 'pick-type')
   const [workoutType, setWorkoutType] = useState('')
   const [workoutName, setWorkoutName] = useState('Nieuwe Workout')
   const [exercises, setExercises] = useState<WorkoutExercise[]>([])
+  const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null)
+  const [editingCreatedAt, setEditingCreatedAt] = useState<string | null>(null)
   const [startTime, setStartTime] = useState<Date | null>(null)
   const [elapsed, setElapsed] = useState(0)
   const [paused, setPaused] = useState(false)
@@ -60,6 +65,21 @@ export default function NewWorkoutPage() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveAsProgram, setSaveAsProgram] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Hydrate from saved workout wanneer ?id= aanwezig is (iOS-parity voor tap-op-row)
+  useEffect(() => {
+    if (!editId) return
+    const all = getSavedWorkouts()
+    const w = all.find((x) => x.id === editId)
+    if (!w) return
+    setEditingWorkoutId(w.id)
+    setEditingCreatedAt(w.createdAt)
+    setWorkoutType(w.type)
+    setWorkoutName(w.name || 'Workout')
+    setExercises(w.exercises)
+    if (w.feedback) setFeedback(w.feedback)
+    setStep('build')
+  }, [editId])
 
   // Timer
   useEffect(() => {
@@ -153,12 +173,12 @@ export default function NewWorkoutPage() {
     const durationSeconds = Math.max(durationMinutes * 60, 60)
 
     const workout: Workout = {
-      id: `w-${Date.now()}`,
+      id: editingWorkoutId ?? `w-${Date.now()}`,
       name: workoutName,
       type: workoutType,
       description: '',
       exercises,
-      createdAt: now.toISOString(),
+      createdAt: editingCreatedAt ?? now.toISOString(),
       startedAt: startTime?.toISOString(),
       completedAt: now.toISOString(),
       duration: durationMinutes,

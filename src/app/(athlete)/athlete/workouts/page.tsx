@@ -202,63 +202,73 @@ function WorkoutRow({
 
   return (
     <div
-      className="flex items-center gap-3 rounded-xl overflow-hidden"
+      className="flex items-stretch gap-0 rounded-xl overflow-hidden"
       style={{
         background: P.surface,
-        padding: '12px 14px',
         borderLeft: `3px solid ${color}`,
         border: `1px solid ${P.line}`,
       }}
     >
-      <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+      <Link
+        href={`/athlete/workouts/new?id=${workout.id}`}
+        className="athletic-tap flex items-center gap-3 flex-1 min-w-0"
         style={{
-          background: P.surfaceHi,
-          border: `1px solid ${P.line}`,
+          padding: '12px 14px',
+          textDecoration: 'none',
         }}
       >
-        {Icon ? <Icon size={20} /> : <span>💪</span>}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p
-          className="truncate"
-          style={{
-            color: P.ink,
-            fontSize: 14,
-            fontWeight: 800,
-            letterSpacing: '-0.01em',
-          }}
-        >
-          {workout.name || 'Workout'}
-        </p>
         <div
-          className="flex items-center gap-2"
+          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
           style={{
-            fontFamily:
-              'ui-monospace, Menlo, "SF Mono", "Cascadia Code", monospace',
-            fontSize: 10,
-            letterSpacing: '0.14em',
-            fontWeight: 700,
-            color: P.inkMuted,
-            marginTop: 3,
-            textTransform: 'uppercase',
+            background: P.surfaceHi,
+            border: `1px solid ${P.line}`,
           }}
         >
-          <span style={{ color }}>{type?.label ?? workout.type}</span>
-          <span style={{ color: P.inkDim }}>·</span>
-          <span>{workout.exercises.length} OEF</span>
-          {workout.duration && (
-            <>
-              <span style={{ color: P.inkDim }}>·</span>
-              <Clock className="w-3 h-3 inline" style={{ color: P.inkMuted }} />
-              <span>{workout.duration} MIN</span>
-            </>
-          )}
+          {Icon ? <Icon size={20} /> : <span>💪</span>}
         </div>
-      </div>
+        <div className="flex-1 min-w-0">
+          <p
+            className="truncate"
+            style={{
+              color: P.ink,
+              fontSize: 14,
+              fontWeight: 800,
+              letterSpacing: '-0.01em',
+            }}
+          >
+            {workout.name || 'Workout'}
+          </p>
+          <div
+            className="flex items-center gap-2"
+            style={{
+              fontFamily:
+                'ui-monospace, Menlo, "SF Mono", "Cascadia Code", monospace',
+              fontSize: 10,
+              letterSpacing: '0.14em',
+              fontWeight: 700,
+              color: P.inkMuted,
+              marginTop: 3,
+              textTransform: 'uppercase',
+            }}
+          >
+            <span style={{ color }}>{type?.label ?? workout.type}</span>
+            <span style={{ color: P.inkDim }}>·</span>
+            <span>{workout.exercises.length} OEF</span>
+            {workout.duration && (
+              <>
+                <span style={{ color: P.inkDim }}>·</span>
+                <Clock className="w-3 h-3 inline" style={{ color: P.inkMuted }} />
+                <span>{workout.duration} MIN</span>
+              </>
+            )}
+          </div>
+        </div>
+      </Link>
       <button
-        onClick={() => onDelete(workout.id)}
-        className="p-2 transition-colors"
+        onClick={() => {
+          if (confirm(`Verwijder "${workout.name || 'Workout'}"?`)) onDelete(workout.id)
+        }}
+        className="athletic-tap px-3 transition-colors"
         style={{ color: P.inkDim }}
         type="button"
         aria-label="Verwijder"

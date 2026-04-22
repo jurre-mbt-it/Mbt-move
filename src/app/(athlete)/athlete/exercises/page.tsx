@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
 import { Search } from 'lucide-react'
 import { EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
@@ -23,7 +23,6 @@ function categoryColor(cat: string): string {
 }
 
 export default function AthleteExercisesPage() {
-  const router = useRouter()
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
 
@@ -151,14 +150,16 @@ export default function AthleteExercisesPage() {
                 EXERCISE_CATEGORIES.find((c) => c.value === ex.category)?.label ??
                 ex.category
               return (
-                <div
+                <Link
                   key={ex.id}
-                  className="flex items-center gap-3 rounded-xl"
+                  href={`/athlete/exercises/${ex.id}`}
+                  className="athletic-tap flex items-center gap-3 rounded-xl"
                   style={{
                     background: P.surface,
                     padding: '12px 14px',
                     borderLeft: `3px solid ${color}`,
                     border: `1px solid ${P.line}`,
+                    textDecoration: 'none',
                   }}
                 >
                   <div
@@ -207,7 +208,10 @@ export default function AthleteExercisesPage() {
                       )}
                     </div>
                   </div>
-                </div>
+                  <span style={{ color: P.inkDim, fontSize: 18, fontWeight: 900 }} aria-hidden>
+                    →
+                  </span>
+                </Link>
               )
             })}
 

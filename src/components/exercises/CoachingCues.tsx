@@ -1,9 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Plus, X, GripVertical } from 'lucide-react'
+import { P, DarkInput } from '@/components/dark-ui'
 
 interface CoachingCuesProps {
   label?: string
@@ -14,7 +13,6 @@ interface CoachingCuesProps {
 }
 
 export function CoachingCues({
-  label = 'Coaching cues',
   placeholder = 'Voeg een cue toe...',
   value,
   onChange,
@@ -44,24 +42,57 @@ export function CoachingCues({
         <ol className="space-y-1.5">
           {value.map((cue, i) => (
             <li key={i} className="flex items-center gap-2 group">
-              <span className="text-xs text-muted-foreground w-5 text-right shrink-0">{i + 1}.</span>
-              <div className="flex-1 flex items-center gap-2 bg-[#1C2425] rounded-lg px-3 py-2 text-sm border border-[rgba(255,255,255,0.12)]">
-                <GripVertical className="w-3.5 h-3.5 text-zinc-300 shrink-0 cursor-grab" />
-                <span className="flex-1">{cue}</span>
+              <span
+                className="athletic-mono shrink-0 text-right"
+                style={{
+                  color: P.inkMuted,
+                  fontSize: 11,
+                  fontWeight: 800,
+                  letterSpacing: '0.04em',
+                  width: 20,
+                }}
+              >
+                {i + 1}.
+              </span>
+              <div
+                className="flex-1 flex items-center gap-2 rounded-lg"
+                style={{
+                  background: P.surfaceHi,
+                  border: `1px solid ${P.line}`,
+                  padding: '8px 12px',
+                }}
+              >
+                <GripVertical
+                  className="w-3.5 h-3.5 shrink-0 cursor-grab"
+                  style={{ color: P.inkDim }}
+                />
+                <span
+                  className="flex-1"
+                  style={{ color: P.ink, fontSize: 13, lineHeight: '18px' }}
+                >
+                  {cue}
+                </span>
                 <button
                   type="button"
                   onClick={() => remove(i)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity text-[#7B8889] hover:text-destructive"
+                  className="athletic-tap opacity-60 group-hover:opacity-100 transition-opacity"
+                  style={{ color: P.inkMuted }}
+                  aria-label="Verwijder"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex flex-col gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
                 <button
                   type="button"
                   disabled={i === 0}
                   onClick={() => move(i, i - 1)}
-                  className="text-[#7B8889] hover:text-[#F5F7F6] disabled:opacity-30 text-xs leading-none"
+                  className="athletic-tap leading-none"
+                  style={{
+                    color: i === 0 ? P.inkDim : P.inkMuted,
+                    fontSize: 11,
+                  }}
+                  aria-label="Omhoog"
                 >
                   ↑
                 </button>
@@ -69,7 +100,12 @@ export function CoachingCues({
                   type="button"
                   disabled={i === value.length - 1}
                   onClick={() => move(i, i + 1)}
-                  className="text-[#7B8889] hover:text-[#F5F7F6] disabled:opacity-30 text-xs leading-none"
+                  className="athletic-tap leading-none"
+                  style={{
+                    color: i === value.length - 1 ? P.inkDim : P.inkMuted,
+                    fontSize: 11,
+                  }}
+                  aria-label="Omlaag"
                 >
                   ↓
                 </button>
@@ -81,16 +117,36 @@ export function CoachingCues({
 
       {value.length < maxItems && (
         <div className="flex gap-2">
-          <Input
+          <DarkInput
             placeholder={placeholder}
             value={draft}
             onChange={e => setDraft(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                add()
+              }
+            }}
             className="flex-1"
           />
-          <Button type="button" variant="outline" size="icon" onClick={add} disabled={!draft.trim()}>
+          <button
+            type="button"
+            onClick={add}
+            disabled={!draft.trim()}
+            className="athletic-tap rounded-xl shrink-0 flex items-center justify-center"
+            style={{
+              background: draft.trim() ? P.lime : P.surfaceHi,
+              color: draft.trim() ? P.bg : P.inkDim,
+              border: `1px solid ${draft.trim() ? P.lime : P.lineStrong}`,
+              width: 48,
+              height: 48,
+              fontSize: 16,
+              fontWeight: 900,
+            }}
+            aria-label="Toevoegen"
+          >
             <Plus className="w-4 h-4" />
-          </Button>
+          </button>
         </div>
       )}
     </div>

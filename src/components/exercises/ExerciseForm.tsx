@@ -2,13 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import { Switch } from '@/components/ui/switch'
 import { VideoInput } from './VideoInput'
 import { MuscleLoadSliders } from './MuscleLoadSliders'
 import { CoachingCues } from './CoachingCues'
@@ -26,10 +19,18 @@ import {
   type LoadType,
   type MovementPattern,
 } from '@/lib/strain-estimation'
-import { cn } from '@/lib/utils'
 import { Save, X, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { trpc } from '@/lib/trpc/client'
+import {
+  P,
+  Kicker,
+  MetaLabel,
+  DarkInput,
+  DarkTextarea,
+  DarkButton,
+  CATEGORY_COLORS,
+} from '@/components/dark-ui'
 
 interface ExerciseFormData {
   name: string
@@ -77,20 +78,80 @@ const defaultData: ExerciseFormData = {
   movementPattern: null,
 }
 
-function Section({ title, children, collapsible = false }: { title: string; children: React.ReactNode; collapsible?: boolean }) {
+function categoryColor(cat: string): string {
+  return (CATEGORY_COLORS as Record<string, string>)[cat] ?? P.lime
+}
+
+function Section({
+  title,
+  children,
+  collapsible = false,
+}: {
+  title: string
+  children: React.ReactNode
+  collapsible?: boolean
+}) {
   const [open, setOpen] = useState(true)
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <button
         type="button"
         onClick={() => collapsible && setOpen(o => !o)}
-        className={cn('flex items-center justify-between w-full text-left', collapsible && 'cursor-pointer')}
+        className={collapsible ? 'athletic-tap cursor-pointer' : ''}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          width: '100%',
+          textAlign: 'left',
+        }}
       >
-        <h3 className="font-semibold text-base">{title}</h3>
-        {collapsible && (open ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />)}
+        <Kicker>{title.toUpperCase()}</Kicker>
+        {collapsible &&
+          (open ? (
+            <ChevronUp className="w-4 h-4" style={{ color: P.inkMuted }} />
+          ) : (
+            <ChevronDown className="w-4 h-4" style={{ color: P.inkMuted }} />
+          ))}
       </button>
       {open && children}
     </div>
+  )
+}
+
+function Toggle({
+  checked,
+  onChange,
+}: {
+  checked: boolean
+  onChange: (v: boolean) => void
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className="athletic-tap rounded-full transition-colors relative shrink-0"
+      style={{
+        width: 44,
+        height: 26,
+        background: checked ? P.lime : P.surfaceHi,
+        border: `1px solid ${checked ? P.lime : P.lineStrong}`,
+      }}
+    >
+      <span
+        aria-hidden
+        className="block rounded-full transition-transform"
+        style={{
+          width: 20,
+          height: 20,
+          background: checked ? P.bg : P.inkMuted,
+          transform: `translateX(${checked ? 20 : 2}px)`,
+          marginTop: 2,
+        }}
+      />
+    </button>
   )
 }
 
@@ -107,18 +168,27 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
     setForm(f => ({ ...f, [key]: val }))
 
   const toggleBodyRegion = (v: string) => {
-    set('bodyRegion', form.bodyRegion.includes(v)
-      ? form.bodyRegion.filter(r => r !== v)
-      : [...form.bodyRegion, v])
+    set(
+      'bodyRegion',
+      form.bodyRegion.includes(v)
+        ? form.bodyRegion.filter(r => r !== v)
+        : [...form.bodyRegion, v],
+    )
   }
 
   const addTag = () => {
     const t = tagDraft.trim().toLowerCase()
-    if (t && !form.tags.includes(t)) { set('tags', [...form.tags, t]); setTagDraft('') }
+    if (t && !form.tags.includes(t)) {
+      set('tags', [...form.tags, t])
+      setTagDraft('')
+    }
   }
 
   const handleSave = async () => {
-    if (!form.name.trim()) { toast.error('Naam is verplicht'); return }
+    if (!form.name.trim()) {
+      toast.error('Naam is verplicht')
+      return
+    }
 
     const payload = {
       name: form.name,
@@ -158,14 +228,15 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
   }
 
   return (
-    <div className="max-w-3xl space-y-8">
+    <div className="max-w-3xl space-y-6">
       {/* Basis info */}
       <Section title="Basis informatie">
-        <div className="grid gap-4">
+        <div className="space-y-4">
           <div>
-            <Label htmlFor="name">Naam <span className="text-destructive">*</span></Label>
-            <Input
-              id="name"
+            <MetaLabel>
+              NAAM <span style={{ color: P.danger }}>*</span>
+            </MetaLabel>
+            <DarkInput
               placeholder="bv. Bulgarian Split Squat"
               value={form.name}
               onChange={e => set('name', e.target.value)}
@@ -173,135 +244,221 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
             />
           </div>
           <div>
-            <Label htmlFor="desc">Beschrijving</Label>
-            <Textarea
-              id="desc"
+            <MetaLabel>BESCHRIJVING</MetaLabel>
+            <DarkTextarea
               placeholder="Korte omschrijving van de oefening..."
               value={form.description}
               onChange={e => set('description', e.target.value)}
-              className="mt-1.5 min-h-[80px]"
+              className="mt-1.5"
+              style={{ minHeight: 80 }}
             />
           </div>
 
           {/* Category */}
           <div>
-            <Label>Categorie</Label>
-            <div className="flex flex-wrap gap-2 mt-1.5">
-              {EXERCISE_CATEGORIES.map(c => (
-                <button
-                  key={c.value}
-                  type="button"
-                  onClick={() => set('category', c.value)}
-                  className={cn(
-                    'px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors',
-                    form.category === c.value
-                      ? 'border-transparent text-white'
-                      : 'border-[rgba(255,255,255,0.12)] text-muted-foreground hover:border-[rgba(255,255,255,0.16)]'
-                  )}
-                  style={form.category === c.value ? { background: '#BEF264' } : {}}
-                >
-                  {c.label}
-                </button>
-              ))}
+            <MetaLabel>CATEGORIE</MetaLabel>
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              {EXERCISE_CATEGORIES.map(c => {
+                const active = form.category === c.value
+                const color = categoryColor(c.value)
+                return (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => set('category', c.value)}
+                    className="athletic-tap athletic-mono rounded-lg transition-colors"
+                    style={{
+                      padding: '7px 14px',
+                      background: active ? color : P.surface,
+                      color: active ? P.bg : P.inkMuted,
+                      border: `1px solid ${active ? color : P.line}`,
+                      fontSize: 11,
+                      fontWeight: 900,
+                      letterSpacing: '0.14em',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {c.label}
+                  </button>
+                )
+              })}
             </div>
           </div>
 
           {/* Difficulty */}
           <div>
-            <Label>Moeilijkheidsgraad</Label>
-            <div className="flex gap-2 mt-1.5">
-              {DIFFICULTIES.map(d => (
-                <button
-                  key={d.value}
-                  type="button"
-                  onClick={() => set('difficulty', d.value)}
-                  className={cn(
-                    'flex-1 py-2 rounded-lg text-sm font-medium border transition-colors',
-                    form.difficulty === d.value
-                      ? 'border-transparent bg-[#BEF264] text-white'
-                      : 'border-[rgba(255,255,255,0.12)] text-muted-foreground hover:border-[rgba(255,255,255,0.2)]'
-                  )}
-                >
-                  {d.label}
-                </button>
-              ))}
+            <MetaLabel>MOEILIJKHEIDSGRAAD</MetaLabel>
+            <div className="flex gap-1.5 mt-1.5">
+              {DIFFICULTIES.map(d => {
+                const active = form.difficulty === d.value
+                return (
+                  <button
+                    key={d.value}
+                    type="button"
+                    onClick={() => set('difficulty', d.value)}
+                    className="athletic-tap athletic-mono flex-1 rounded-lg transition-colors"
+                    style={{
+                      padding: '10px 0',
+                      background: active ? P.lime : P.surface,
+                      color: active ? P.bg : P.inkMuted,
+                      border: `1px solid ${active ? P.lime : P.line}`,
+                      fontSize: 11,
+                      fontWeight: 900,
+                      letterSpacing: '0.14em',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {d.label}
+                  </button>
+                )
+              })}
             </div>
           </div>
 
           {/* Body regions */}
           <div>
-            <Label>Lichaamsdelen</Label>
-            <div className="flex flex-wrap gap-2 mt-1.5">
-              {BODY_REGIONS.map(r => (
-                <button
-                  key={r.value}
-                  type="button"
-                  onClick={() => toggleBodyRegion(r.value)}
-                  className={cn(
-                    'px-3 py-1 rounded-full text-xs font-medium border transition-colors',
-                    form.bodyRegion.includes(r.value)
-                      ? 'bg-[#BEF264] text-white border-[#BEF264]'
-                      : 'border-[rgba(255,255,255,0.12)] text-muted-foreground hover:border-[rgba(255,255,255,0.2)]'
-                  )}
-                >
-                  {r.label}
-                </button>
-              ))}
+            <MetaLabel>LICHAAMSDELEN</MetaLabel>
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              {BODY_REGIONS.map(r => {
+                const active = form.bodyRegion.includes(r.value)
+                return (
+                  <button
+                    key={r.value}
+                    type="button"
+                    onClick={() => toggleBodyRegion(r.value)}
+                    className="athletic-tap athletic-mono rounded-full transition-colors"
+                    style={{
+                      padding: '6px 12px',
+                      background: active ? P.lime : P.surface,
+                      color: active ? P.bg : P.inkMuted,
+                      border: `1px solid ${active ? P.lime : P.line}`,
+                      fontSize: 10,
+                      fontWeight: 900,
+                      letterSpacing: '0.12em',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {r.label}
+                  </button>
+                )
+              })}
             </div>
           </div>
 
           {/* Tags */}
           <div>
-            <Label>Tags</Label>
+            <MetaLabel>TAGS</MetaLabel>
             <div className="flex gap-2 mt-1.5">
-              <Input
+              <DarkInput
                 placeholder="bv. kniepreventie, excentrisch..."
                 value={tagDraft}
                 onChange={e => setTagDraft(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    addTag()
+                  }
+                }}
+                className="flex-1"
               />
-              <Button type="button" variant="outline" onClick={addTag} disabled={!tagDraft.trim()}>
+              <button
+                type="button"
+                onClick={addTag}
+                disabled={!tagDraft.trim()}
+                className="athletic-tap rounded-xl shrink-0 flex items-center justify-center"
+                style={{
+                  background: tagDraft.trim() ? P.lime : P.surfaceHi,
+                  color: tagDraft.trim() ? P.bg : P.inkDim,
+                  border: `1px solid ${tagDraft.trim() ? P.lime : P.lineStrong}`,
+                  width: 48,
+                  height: 48,
+                  fontSize: 18,
+                  fontWeight: 900,
+                }}
+                aria-label="Tag toevoegen"
+              >
                 +
-              </Button>
+              </button>
             </div>
             {form.tags.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {form.tags.map(tag => (
-                  <Badge key={tag} variant="secondary" className="gap-1">
-                    {tag}
-                    <button type="button" onClick={() => set('tags', form.tags.filter(t => t !== tag))}>
+                  <span
+                    key={tag}
+                    className="athletic-mono inline-flex items-center gap-1.5 rounded-full"
+                    style={{
+                      background: P.surfaceHi,
+                      color: P.inkMuted,
+                      padding: '4px 10px',
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: '0.08em',
+                    }}
+                  >
+                    #{tag.toUpperCase()}
+                    <button
+                      type="button"
+                      onClick={() => set('tags', form.tags.filter(t => t !== tag))}
+                      className="athletic-tap"
+                      style={{ color: P.inkDim }}
+                      aria-label="Verwijder tag"
+                    >
                       <X className="w-3 h-3" />
                     </button>
-                  </Badge>
+                  </span>
                 ))}
               </div>
             )}
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border p-3">
+          <div
+            className="flex items-center justify-between rounded-xl"
+            style={{
+              background: P.surface,
+              border: `1px solid ${P.line}`,
+              padding: '12px 14px',
+            }}
+          >
             <div>
-              <p className="text-sm font-medium">Publiek beschikbaar</p>
-              <p className="text-xs text-muted-foreground">Zichtbaar voor alle therapeuten in de praktijk</p>
+              <p
+                style={{
+                  color: P.ink,
+                  fontSize: 13,
+                  fontWeight: 800,
+                  letterSpacing: '0.01em',
+                }}
+              >
+                PUBLIEK BESCHIKBAAR
+              </p>
+              <p
+                style={{
+                  color: P.inkMuted,
+                  fontSize: 12,
+                  marginTop: 2,
+                }}
+              >
+                Zichtbaar voor alle therapeuten in de praktijk
+              </p>
             </div>
-            <Switch
-              checked={form.isPublic}
-              onCheckedChange={v => set('isPublic', v)}
-            />
+            <Toggle checked={form.isPublic} onChange={v => set('isPublic', v)} />
           </div>
         </div>
       </Section>
 
-      <Separator />
+      <Divider />
 
       {/* Video */}
       <Section title="Video">
         <VideoInput
           value={{ mediaType: form.mediaType, url: form.videoUrl }}
-          onChange={v => { set('mediaType', v.mediaType); set('videoUrl', v.url) }}
+          onChange={v => {
+            set('mediaType', v.mediaType)
+            set('videoUrl', v.url)
+          }}
         />
       </Section>
 
-      <Separator />
+      <Divider />
 
       {/* Coaching cues */}
       <Section title="Coaching cues (uitvoering)">
@@ -313,7 +470,7 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
         />
       </Section>
 
-      <Separator />
+      <Divider />
 
       <Section title="Tips & aandachtspunten" collapsible>
         <CoachingCues
@@ -324,18 +481,25 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
         />
       </Section>
 
-      <Separator />
+      <Divider />
 
       {/* Exercise properties for strain estimation */}
       <Section title="Oefening-eigenschappen" collapsible>
         <div className="space-y-4">
           {/* Movement Pattern */}
-          <div className="space-y-1.5">
-            <Label className="text-sm">Bewegingspatroon</Label>
+          <div>
+            <MetaLabel>BEWEGINGSPATROON</MetaLabel>
             <select
-              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              className="w-full rounded-xl mt-1.5 outline-none transition-colors"
               value={form.movementPattern ?? ''}
               onChange={e => set('movementPattern', e.target.value || null)}
+              style={{
+                background: P.surfaceHi,
+                border: `1px solid ${P.lineStrong}`,
+                color: P.ink,
+                padding: '12px 14px',
+                fontSize: 14,
+              }}
             >
               <option value="">Selecteer patroon...</option>
               {MOVEMENT_PATTERN_OPTIONS.map(opt => (
@@ -347,51 +511,72 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
           </div>
 
           {/* Load Type */}
-          <div className="space-y-1.5">
-            <Label className="text-sm">Type belasting</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {LOAD_TYPE_OPTIONS.map(opt => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  className={cn(
-                    'rounded-lg border px-3 py-2 text-sm text-left transition-colors',
-                    form.loadType === opt.value
-                      ? 'border-[#BEF264] bg-[#BEF26410] font-medium'
-                      : 'border-input hover:bg-accent'
-                  )}
-                  onClick={() => set('loadType', opt.value)}
-                >
-                  {opt.label}
-                </button>
-              ))}
+          <div>
+            <MetaLabel>TYPE BELASTING</MetaLabel>
+            <div className="grid grid-cols-2 gap-2 mt-1.5">
+              {LOAD_TYPE_OPTIONS.map(opt => {
+                const active = form.loadType === opt.value
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className="athletic-tap rounded-xl text-left transition-colors"
+                    style={{
+                      background: active ? 'rgba(190,242,100,0.08)' : P.surface,
+                      border: `1px solid ${active ? P.lime : P.line}`,
+                      color: active ? P.lime : P.ink,
+                      padding: '10px 14px',
+                      fontSize: 13,
+                      fontWeight: active ? 800 : 600,
+                    }}
+                    onClick={() => set('loadType', opt.value)}
+                  >
+                    {opt.label}
+                  </button>
+                )
+              })}
             </div>
           </div>
 
           {/* Unilateral toggle */}
-          <div className="flex items-center justify-between">
+          <div
+            className="flex items-center justify-between rounded-xl"
+            style={{
+              background: P.surface,
+              border: `1px solid ${P.line}`,
+              padding: '12px 14px',
+            }}
+          >
             <div>
-              <Label className="text-sm">Unilateraal (eenzijdig)</Label>
-              <p className="text-xs text-muted-foreground">Single leg, single arm, etc.</p>
+              <p
+                style={{
+                  color: P.ink,
+                  fontSize: 13,
+                  fontWeight: 800,
+                  letterSpacing: '0.01em',
+                }}
+              >
+                UNILATERAAL (EENZIJDIG)
+              </p>
+              <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 2 }}>
+                Single leg, single arm, etc.
+              </p>
             </div>
-            <Switch
+            <Toggle
               checked={form.isUnilateral}
-              onCheckedChange={v => set('isUnilateral', v)}
+              onChange={v => set('isUnilateral', v)}
             />
           </div>
         </div>
       </Section>
 
-      <Separator />
+      <Divider />
 
       {/* Muscle loads */}
       <Section title="Spiergroep belasting" collapsible>
         <div className="space-y-3">
-          <Button
+          <button
             type="button"
-            variant="outline"
-            size="sm"
-            className="gap-2 w-full"
             onClick={() => {
               const estimated = estimateMuscleStrain({
                 movementPattern: (form.movementPattern as MovementPattern) ?? null,
@@ -406,12 +591,25 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
                 return
               }
               set('muscleLoads', estimated)
-              toast.success(`${Object.keys(estimated).length} spiergroepen automatisch ingeschat`)
+              toast.success(
+                `${Object.keys(estimated).length} spiergroepen automatisch ingeschat`,
+              )
+            }}
+            className="athletic-tap athletic-mono w-full flex items-center justify-center gap-2 rounded-xl"
+            style={{
+              background: P.surfaceHi,
+              border: `1px solid ${P.lineStrong}`,
+              color: P.ink,
+              padding: '12px 16px',
+              fontSize: 12,
+              fontWeight: 900,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
             }}
           >
-            <Sparkles className="w-4 h-4" style={{ color: '#BEF264' }} />
-            Auto-inschatting spierbelasting
-          </Button>
+            <Sparkles className="w-4 h-4" style={{ color: P.lime }} />
+            AUTO-INSCHATTING SPIERBELASTING
+          </button>
           <MuscleLoadSliders
             value={form.muscleLoads}
             onChange={v => set('muscleLoads', v)}
@@ -419,7 +617,7 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
         </div>
       </Section>
 
-      <Separator />
+      <Divider />
 
       {/* Progression */}
       <Section title="Progressie-varianten" collapsible>
@@ -432,25 +630,54 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
         />
       </Section>
 
-      <Separator />
+      <Divider />
 
       {/* Actions — sticky on mobile, inline on desktop */}
-      <div className="fixed md:relative bottom-16 md:bottom-auto left-0 md:left-auto right-0 md:right-auto z-10 md:z-auto bg-[#141A1B] md:bg-transparent border-t md:border-t-0 px-4 py-3 md:px-0 md:py-0 flex gap-3">
-        <Button
+      <div
+        className="fixed md:relative bottom-16 md:bottom-auto left-0 md:left-auto right-0 md:right-auto z-10 md:z-auto px-4 py-3 md:px-0 md:py-0 flex gap-3"
+        style={{
+          background: 'transparent',
+        }}
+      >
+        <div
+          className="md:hidden absolute inset-0 pointer-events-none"
+          style={{
+            background: P.surface,
+            borderTop: `1px solid ${P.lineStrong}`,
+          }}
+        />
+        <DarkButton
           onClick={handleSave}
           disabled={saving}
-          className="gap-2 flex-1 md:flex-none"
-          style={{ background: '#BEF264' }}
+          variant="primary"
+          className="flex-1 md:flex-none gap-2 relative"
         >
           <Save className="w-4 h-4" />
-          {saving ? 'Opslaan...' : mode === 'create' ? 'Oefening aanmaken' : 'Wijzigingen opslaan'}
-        </Button>
-        <Button variant="outline" onClick={() => router.push('/therapist/exercises')} className="flex-1 md:flex-none">
+          {saving
+            ? 'Opslaan...'
+            : mode === 'create'
+              ? 'Oefening aanmaken'
+              : 'Wijzigingen opslaan'}
+        </DarkButton>
+        <DarkButton
+          variant="secondary"
+          onClick={() => router.push('/therapist/exercises')}
+          className="flex-1 md:flex-none relative"
+        >
           Annuleren
-        </Button>
+        </DarkButton>
       </div>
       {/* Spacer so content isn't hidden behind sticky bar on mobile */}
       <div className="h-20 md:hidden" />
     </div>
+  )
+}
+
+function Divider() {
+  return (
+    <div
+      aria-hidden
+      style={{ height: 1, background: P.line, marginTop: 12, marginBottom: 12 }}
+    />
   )
 }
