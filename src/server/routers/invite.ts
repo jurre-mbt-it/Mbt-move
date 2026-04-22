@@ -32,11 +32,13 @@ import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
 import {
   createTRPCRouter,
   therapistProcedure,
+  mfaTherapistProcedure,
   publicProcedure,
   protectedProcedure,
 } from '@/server/trpc'
 import { auditLog } from '@/server/audit'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
+import { inviteMail, sendMail } from '@/server/mail'
 
 const CODE_TTL_HOURS = 24
 const MAX_REDEEM_ATTEMPTS = 5
@@ -55,7 +57,7 @@ export const inviteRouter = createTRPCRouter({
    * Therapeut nodigt een patiënt uit met e-mail + naam + geboortedatum.
    * De InviteCode dient als whitelist + identity-factor voor `/login/code`.
    */
-  create: therapistProcedure
+  create: mfaTherapistProcedure
     .input(
       z.object({
         email: z.string().email('Ongeldig e-mailadres'),
@@ -111,13 +113,34 @@ export const inviteRouter = createTRPCRouter({
         },
       })
 
+      // Stuur een branded invite-mail via Resend (als geconfigureerd). Bevat
+      // de URL naar /login/code. De 6-cijfer code zelf komt later via
+      // Supabase's OTP-mail wanneer de patiënt op de URL "Stuur code" klikt.
+      const instructionUrl = `${
+        process.env.NEXT_PUBLIC_APP_URL ?? 'https://mbt-move.vercel.app'
+      }/login/code?email=${encodeURIComponent(email)}`
+
+      const mail = inviteMail({
+        recipientName: input.name.trim(),
+        codeUrl: instructionUrl,
+        therapistName: ctx.user!.email.split('@')[0],
+        expiresAt: invite.expiresAt,
+      })
+      mail.to = email
+      const mailResult = await sendMail(mail)
+
       await auditLog({
         event: 'INVITE_CREATED',
         userId: ctx.user!.id,
         actorEmail: ctx.user!.email,
         resource: 'InviteCode',
         resourceId: invite.id,
-        metadata: { email, role: input.role },
+        metadata: {
+          email,
+          role: input.role,
+          mailProvider: mailResult.provider,
+          mailSent: mailResult.ok,
+        },
         req: ctx.req,
       })
 
@@ -125,11 +148,9 @@ export const inviteRouter = createTRPCRouter({
         id: invite.id,
         email,
         expiresAt: invite.expiresAt,
-        // De patiënt moet zelf naar /login/code gaan — we sturen geen
-        // automatische mail bij `create`, maar bij `request`. Dat geeft de
-        // therapeut controle (bv. "ik geef de URL in de kamer + patiënt
-        // checkt straks thuis z'n mail voor de code").
-        instructionUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://mbt-move.vercel.app'}/login/code?email=${encodeURIComponent(email)}`,
+        instructionUrl,
+        mailDelivered: mailResult.ok,
+        mailProvider: mailResult.provider,
       }
     }),
 

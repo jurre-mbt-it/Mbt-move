@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
-import { createTRPCRouter, therapistProcedure } from '@/server/trpc'
+import { createTRPCRouter, therapistProcedure, mfaTherapistProcedure } from '@/server/trpc'
 
 const createId = () => crypto.randomUUID()
 
@@ -133,7 +133,7 @@ export const patientsRouter = createTRPCRouter({
       }
     }),
 
-  changeRole: therapistProcedure
+  changeRole: mfaTherapistProcedure
     .input(z.object({
       id: z.string(),
       // Therapeuten mogen alleen tussen PATIENT en ATHLETE wisselen — NIET promoveren
@@ -333,7 +333,7 @@ export const patientsRouter = createTRPCRouter({
       return { success: true }
     }),
 
-  delete: therapistProcedure
+  delete: mfaTherapistProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const relation = await ctx.prisma.patientTherapist.findFirst({

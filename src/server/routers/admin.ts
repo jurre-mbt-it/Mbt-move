@@ -1,6 +1,10 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
-import { createTRPCRouter, adminProcedure } from '@/server/trpc'
+import {
+  createTRPCRouter,
+  adminProcedure,
+  mfaAdminProcedure,
+} from '@/server/trpc'
 
 /**
  * Admin-only router. Beheer van users, rollen en praktijken.
@@ -48,7 +52,7 @@ export const adminRouter = createTRPCRouter({
       })
     }),
 
-  setUserRole: adminProcedure
+  setUserRole: mfaAdminProcedure
     .input(
       z.object({
         userId: z.string(),
@@ -70,7 +74,7 @@ export const adminRouter = createTRPCRouter({
       })
     }),
 
-  setUserPractice: adminProcedure
+  setUserPractice: mfaAdminProcedure
     .input(
       z.object({
         userId: z.string(),
@@ -102,7 +106,7 @@ export const adminRouter = createTRPCRouter({
     })
   }),
 
-  createPractice: adminProcedure
+  createPractice: mfaAdminProcedure
     .input(z.object({ name: z.string().min(2) }))
     .mutation(({ ctx, input }) => {
       return ctx.prisma.practice.create({
@@ -110,7 +114,7 @@ export const adminRouter = createTRPCRouter({
       })
     }),
 
-  renamePractice: adminProcedure
+  renamePractice: mfaAdminProcedure
     .input(z.object({ id: z.string(), name: z.string().min(2) }))
     .mutation(({ ctx, input }) => {
       return ctx.prisma.practice.update({
@@ -119,7 +123,7 @@ export const adminRouter = createTRPCRouter({
       })
     }),
 
-  deletePractice: adminProcedure
+  deletePractice: mfaAdminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Users blijven bestaan (practiceId wordt gezet op null door Prisma SetNull)

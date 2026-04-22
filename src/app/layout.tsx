@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { TRPCProvider } from '@/lib/trpc/Provider'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
@@ -9,10 +9,9 @@ export const metadata: Metadata = {
     default: 'MBT Gym',
   },
   description: 'Exercise prescription and rehabilitation platform for clinicians and patients.',
-  themeColor: '#0A0E0F',
 }
 
-export const viewport = {
+export const viewport: Viewport = {
   themeColor: '#0A0E0F',
   colorScheme: 'dark',
 }

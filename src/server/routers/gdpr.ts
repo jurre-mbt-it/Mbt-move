@@ -14,7 +14,12 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
-import { createTRPCRouter, protectedProcedure, adminProcedure } from '@/server/trpc'
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  adminProcedure,
+  mfaAdminProcedure,
+} from '@/server/trpc'
 import { auditLog } from '@/server/audit'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 
@@ -282,7 +287,7 @@ export const gdprRouter = createTRPCRouter({
    *
    * Bedoeld om via een cron-job of handmatig te draaien. Nu admin-only procedure.
    */
-  confirmDeletion: adminProcedure
+  confirmDeletion: mfaAdminProcedure
     .input(z.object({ userId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const user = await ctx.prisma.user.findUnique({

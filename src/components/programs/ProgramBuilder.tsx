@@ -33,7 +33,7 @@ import { trpc } from '@/lib/trpc/client'
 import { cn } from '@/lib/utils'
 
 import {
-  Save, Eye, Copy, FileDown, Plus, Trash2, Rocket,
+  Save, Eye, Copy, Plus, Trash2, Rocket,
   ChevronLeft, Layers, Search, CheckCircle2, X, BarChart2, Info,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -549,10 +549,6 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
             <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={() => setPreviewOpen(true)}>
               <Eye className="w-3.5 h-3.5" />
               Preview
-            </Button>
-            <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={() => toast.info('PDF export beschikbaar zodra de database is gekoppeld')}>
-              <FileDown className="w-3.5 h-3.5" />
-              PDF
             </Button>
           </div>
 

@@ -125,26 +125,46 @@ export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   return next({ ctx })
 })
 
-/**
- * Procedure die MFA vereist voor THERAPIST/ADMIN. Gebruikt een lichte DB-check
- * (user.mfaEnabled). Rollen zonder MFA-verplichting (PATIENT/ATHLETE) worden
- * gewoon doorgelaten. Gebruik deze voor gevoelige acties zoals
- * data-export van patient-dossiers, bulk-mutations, admin-acties.
- */
+const MFA_REQUIRED_MESSAGE =
+  'Deze actie vereist MFA. Schakel Two-Factor Authentication in via Instellingen → Beveiliging.'
+
+/** Algemene MFA-required procedure (rol-agnostisch). Voor uitgaande features. */
 export const mfaRequiredProcedure = protectedProcedure.use(async ({ ctx, next }) => {
   const role = ctx.user!.role
-  if (role !== 'THERAPIST' && role !== 'ADMIN') {
-    return next({ ctx })
-  }
+  if (role !== 'THERAPIST' && role !== 'ADMIN') return next({ ctx })
   const user = await ctx.prisma.user.findUnique({
     where: { id: ctx.user!.id },
     select: { mfaEnabled: true },
   })
   if (!user?.mfaEnabled) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Schakel eerst MFA (Authenticator) in voordat je deze actie kunt uitvoeren.',
-    })
+    throw new TRPCError({ code: 'FORBIDDEN', message: MFA_REQUIRED_MESSAGE })
+  }
+  return next({ ctx })
+})
+
+/**
+ * Therapist OR admin met MFA aan. Gebruik voor gevoelige therapist-mutations
+ * zoals patient-delete, program-delete, invite-create, role-changes.
+ */
+export const mfaTherapistProcedure = therapistProcedure.use(async ({ ctx, next }) => {
+  const user = await ctx.prisma.user.findUnique({
+    where: { id: ctx.user!.id },
+    select: { mfaEnabled: true },
+  })
+  if (!user?.mfaEnabled) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: MFA_REQUIRED_MESSAGE })
+  }
+  return next({ ctx })
+})
+
+/** Admin met MFA aan. Voor alle admin-mutations + GDPR confirmDeletion. */
+export const mfaAdminProcedure = adminProcedure.use(async ({ ctx, next }) => {
+  const user = await ctx.prisma.user.findUnique({
+    where: { id: ctx.user!.id },
+    select: { mfaEnabled: true },
+  })
+  if (!user?.mfaEnabled) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: MFA_REQUIRED_MESSAGE })
   }
   return next({ ctx })
 })
