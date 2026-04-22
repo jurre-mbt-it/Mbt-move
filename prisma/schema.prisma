@@ -428,6 +428,9 @@ model Program {
   patient   User?   @relation("ProgramPatient", fields: [patientId], references: [id])
   patientId String?
 
+  // Multi-tenant scope — defensief. Null = legacy (van vóór practice-scoping).
+  practiceId String?
+
   exercises        ProgramExercise[]
   sessionLogs      SessionLog[]
   weekScheduleDays WeekScheduleDay[]
@@ -436,6 +439,8 @@ model Program {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([practiceId])
+  @@index([creatorId, practiceId])
   @@map("programs")
 }
 
@@ -478,6 +483,11 @@ model WeekSchedule {
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
+  // Multi-tenant scope. Null = legacy.
+  practiceId  String?
+
+  @@index([practiceId])
+  @@index([creatorId, practiceId])
   @@map("week_schedules")
 }
 

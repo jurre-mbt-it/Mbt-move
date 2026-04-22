@@ -38,9 +38,12 @@ export const weekSchedulesRouter = createTRPCRouter({
   list: therapistProcedure
     .input(z.object({ patientId: z.string().optional(), isTemplate: z.boolean().optional() }).optional())
     .query(async ({ ctx, input }) => {
+      const isAdmin = ctx.user.role === 'ADMIN'
+      const practiceId = ctx.user.practiceId
       return ctx.prisma.weekSchedule.findMany({
         where: {
-          creatorId: ctx.user.id,
+          ...(isAdmin ? {} : { creatorId: ctx.user.id }),
+          ...(practiceId && !isAdmin ? { practiceId } : {}),
           ...(input?.patientId !== undefined ? { patientId: input.patientId } : {}),
           ...(input?.isTemplate !== undefined ? { isTemplate: input.isTemplate } : {}),
         },
@@ -55,14 +58,24 @@ export const weekSchedulesRouter = createTRPCRouter({
   get: therapistProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const ws = await ctx.prisma.weekSchedule.findFirst({
-        where: { id: input.id, creatorId: ctx.user.id },
+      const ws = await ctx.prisma.weekSchedule.findUnique({
+        where: { id: input.id },
         include: {
           patient: { select: { id: true, name: true, email: true } },
           days: { include: { program: { select: { id: true, name: true, status: true, weeks: true, daysPerWeek: true, _count: { select: { exercises: true } } } } }, orderBy: { dayOfWeek: 'asc' } },
         },
       })
       if (!ws) throw new TRPCError({ code: 'NOT_FOUND' })
+      const isAdmin = ctx.user.role === 'ADMIN'
+      const isOwner = ws.creatorId === ctx.user.id
+      const isAssignedPatient = ws.patientId === ctx.user.id
+      const isSamePractice =
+        !!ctx.user.practiceId &&
+        !!ws.practiceId &&
+        ws.practiceId === ctx.user.practiceId
+      if (!isAdmin && !isOwner && !isAssignedPatient && !isSamePractice) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
       return ws
     }),
 
@@ -88,6 +101,7 @@ export const weekSchedulesRouter = createTRPCRouter({
           ...(startDate ? { startDate: new Date(startDate) } : {}),
           ...(endDate ? { endDate: new Date(endDate) } : {}),
           creatorId: ctx.user.id,
+          practiceId: ctx.user.practiceId ?? null,
           days: {
             create: days.map(d => ({
               id: createId(),
@@ -274,6 +288,7 @@ export const weekSchedulesRouter = createTRPCRouter({
           id: createId(),
           name: `Weekplan · ${patientLabel}`,
           creatorId: ctx.user.id,
+          practiceId: ctx.user.practiceId ?? null,
           patientId: input.patientId,
           startDate: now,
           endDate,

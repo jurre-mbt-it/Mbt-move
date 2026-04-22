@@ -63,6 +63,30 @@ const checks: Check[] = [
       }
     },
   },
+  {
+    name: 'programs.practiceId kolom',
+    migration: '20260424_practice_scope_program_weekschedule.sql',
+    run: async () => {
+      try {
+        await prisma.$queryRaw`SELECT "practiceId" FROM programs LIMIT 1`
+        return true
+      } catch {
+        return false
+      }
+    },
+  },
+  {
+    name: 'week_schedules.practiceId kolom',
+    migration: '20260424_practice_scope_program_weekschedule.sql',
+    run: async () => {
+      try {
+        await prisma.$queryRaw`SELECT "practiceId" FROM week_schedules LIMIT 1`
+        return true
+      } catch {
+        return false
+      }
+    },
+  },
 ]
 
 async function main() {

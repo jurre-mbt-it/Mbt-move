@@ -46,9 +46,15 @@ export const programsRouter = createTRPCRouter({
       isTemplate: z.boolean().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
+      // Multi-tenant scope: admins zien alles, anderen alleen eigen creator-row
+      // én binnen dezelfde practice (als die gezet is). Practice-filter is
+      // defense-in-depth bovenop creatorId.
+      const isAdmin = ctx.user!.role === 'ADMIN'
+      const practiceId = ctx.user!.practiceId
       return ctx.prisma.program.findMany({
         where: {
-          creatorId: ctx.user!.id,
+          ...(isAdmin ? {} : { creatorId: ctx.user!.id }),
+          ...(practiceId && !isAdmin ? { practiceId } : {}),
           ...(input?.patientId !== undefined ? { patientId: input.patientId } : {}),
           ...(input?.isTemplate !== undefined ? { isTemplate: input.isTemplate } : {}),
         },
@@ -78,7 +84,17 @@ export const programsRouter = createTRPCRouter({
         },
       })
       if (!program) throw new TRPCError({ code: 'NOT_FOUND' })
-      if (program.creatorId !== ctx.user!.id && ctx.user!.role !== 'ADMIN') {
+      const isAdmin = ctx.user!.role === 'ADMIN'
+      const isOwner = program.creatorId === ctx.user!.id
+      // Patient mag zijn eigen programma zien (assigned)
+      const isAssignedPatient = program.patientId === ctx.user!.id
+      // Therapist in dezelfde practice mag collega-programma zien
+      const isSamePractice =
+        !!ctx.user!.practiceId &&
+        !!program.practiceId &&
+        program.practiceId === ctx.user!.practiceId &&
+        (ctx.user!.role === 'THERAPIST' || ctx.user!.role === 'ADMIN')
+      if (!isAdmin && !isOwner && !isAssignedPatient && !isSamePractice) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
       return program
@@ -102,6 +118,7 @@ export const programsRouter = createTRPCRouter({
           ...rest,
           patientId: patientId ?? null,
           creatorId: ctx.user!.id,
+          practiceId: ctx.user!.practiceId ?? null,
           status: patientId ? 'ACTIVE' : 'DRAFT',
         },
       })
@@ -202,6 +219,7 @@ export const programsRouter = createTRPCRouter({
           isTemplate: input.isTemplate ?? source.isTemplate,
           ...(targetPatientId ? { patientId: targetPatientId } : {}),
           creatorId: ctx.user!.id,
+          practiceId: ctx.user!.practiceId ?? null,
           status: 'DRAFT',
           exercises: {
             create: source.exercises.map(ex => ({
