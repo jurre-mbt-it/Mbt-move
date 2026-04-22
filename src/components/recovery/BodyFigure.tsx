@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { MuscleRecoveryState } from '@/lib/recovery-estimation'
 import { getRecoveryColor, getRecoveryLabel, formatHoursRemaining } from '@/lib/recovery-estimation'
+import { P, MetaLabel } from '@/components/dark-ui'
 
 interface Props {
   recoveryStates: MuscleRecoveryState[]
@@ -114,14 +115,14 @@ const BODY_FRONT_OUTLINE = `
   L84,375 Q82,365 80,350 Q78,330 76,310 Q74,290 76,260 Z
 `
 
-const BODY_BACK_OUTLINE = BODY_FRONT_OUTLINE // Same silhouette mirrored
+const BODY_BACK_OUTLINE = BODY_FRONT_OUTLINE
 
 function BodySilhouette({ view }: { view: 'front' | 'back' }) {
   return (
     <path
       d={view === 'front' ? BODY_FRONT_OUTLINE : BODY_BACK_OUTLINE}
-      fill="#f4f4f5"
-      stroke="#d4d4d8"
+      fill={P.surfaceHi}
+      stroke={P.lineStrong}
       strokeWidth="1"
     />
   )
@@ -133,7 +134,6 @@ export function BodyFigure({ recoveryStates }: Props) {
   const [hoveredMuscle, setHoveredMuscle] = useState<string | null>(null)
   const [activeView, setActiveView] = useState<'front' | 'back'>('front')
 
-  // Build lookup: muscle → recovery state
   const recoveryMap = new Map<string, MuscleRecoveryState>()
   for (const state of recoveryStates) {
     recoveryMap.set(state.muscle, state)
@@ -150,7 +150,7 @@ export function BodyFigure({ recoveryStates }: Props) {
             const state = recoveryMap.get(muscle)
             const color = state
               ? getRecoveryColor(state.recoveryPercent)
-              : 'rgba(255,255,255,0.12)' // untrained: light gray
+              : 'rgba(255,255,255,0.06)'
             const isHovered = hoveredMuscle === muscle
 
             return (
@@ -158,8 +158,8 @@ export function BodyFigure({ recoveryStates }: Props) {
                 key={`${muscle}-${i}`}
                 d={region.path}
                 fill={color}
-                fillOpacity={state ? (isHovered ? 0.95 : 0.75) : 0.3}
-                stroke={isHovered ? '#1a1a1a' : 'rgba(0,0,0,0.15)'}
+                fillOpacity={state ? (isHovered ? 0.95 : 0.8) : 0.4}
+                stroke={isHovered ? P.ink : 'rgba(255,255,255,0.08)'}
                 strokeWidth={isHovered ? 1.5 : 0.5}
                 className="cursor-pointer transition-all duration-200"
                 onMouseEnter={() => setHoveredMuscle(muscle)}
@@ -174,43 +174,45 @@ export function BodyFigure({ recoveryStates }: Props) {
   return (
     <div className="space-y-3">
       {/* View toggle */}
-      <div className="flex justify-center gap-1">
-        <button
-          type="button"
-          className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
-            activeView === 'front'
-              ? 'bg-[#1A3A3A] text-white'
-              : 'bg-[#1C2425] text-muted-foreground hover:bg-[rgba(255,255,255,0.08)]'
-          }`}
-          onClick={() => setActiveView('front')}
-        >
-          Voorkant
-        </button>
-        <button
-          type="button"
-          className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
-            activeView === 'back'
-              ? 'bg-[#1A3A3A] text-white'
-              : 'bg-[#1C2425] text-muted-foreground hover:bg-[rgba(255,255,255,0.08)]'
-          }`}
-          onClick={() => setActiveView('back')}
-        >
-          Achterkant
-        </button>
+      <div
+        className="inline-flex items-center gap-1 rounded-xl p-1 mx-auto"
+        style={{
+          backgroundColor: P.surfaceLow,
+          border: `1px solid ${P.line}`,
+          display: 'flex',
+          width: 'fit-content',
+          marginInline: 'auto',
+        }}
+      >
+        <ViewToggle active={activeView === 'front'} onClick={() => setActiveView('front')}>
+          VOORKANT
+        </ViewToggle>
+        <ViewToggle active={activeView === 'back'} onClick={() => setActiveView('back')}>
+          ACHTERKANT
+        </ViewToggle>
       </div>
 
       {/* SVG body figure */}
       <div className="flex justify-center">
         <svg
           viewBox="30 10 140 380"
-          className="w-full max-w-[220px] h-auto"
+          className="w-full max-w-[200px] h-auto"
           xmlns="http://www.w3.org/2000/svg"
         >
           {/* Head */}
-          <circle cx="100" cy="25" r="14" fill="#f4f4f5" stroke="#d4d4d8" strokeWidth="1" />
+          <circle cx="100" cy="25" r="14" fill={P.surfaceHi} stroke={P.lineStrong} strokeWidth="1" />
 
           {/* Neck */}
-          <rect x="94" y="39" width="12" height="12" rx="3" fill="#f4f4f5" stroke="#d4d4d8" strokeWidth="0.5" />
+          <rect
+            x="94"
+            y="39"
+            width="12"
+            height="12"
+            rx="3"
+            fill={P.surfaceHi}
+            stroke={P.lineStrong}
+            strokeWidth="0.5"
+          />
 
           {/* Body silhouette */}
           <BodySilhouette view={activeView} />
@@ -222,49 +224,138 @@ export function BodyFigure({ recoveryStates }: Props) {
 
       {/* Tooltip / info */}
       {hoveredState ? (
-        <div className="rounded-xl border p-3 space-y-1.5" style={{ borderColor: getRecoveryColor(hoveredState.recoveryPercent) + '60' }}>
+        <div
+          className="rounded-xl p-3 space-y-2"
+          style={{
+            backgroundColor: P.surfaceLow,
+            border: `1px solid ${getRecoveryColor(hoveredState.recoveryPercent)}55`,
+          }}
+        >
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold">{hoveredState.muscle}</span>
             <span
-              className="text-xs font-medium px-2 py-0.5 rounded-full text-white"
-              style={{ background: getRecoveryColor(hoveredState.recoveryPercent) }}
+              style={{
+                color: P.ink,
+                fontSize: 13,
+                fontWeight: 800,
+                letterSpacing: '0.01em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {hoveredState.muscle}
+            </span>
+            <span
+              className="athletic-mono rounded-full px-2.5 py-0.5"
+              style={{
+                color: P.bg,
+                background: getRecoveryColor(hoveredState.recoveryPercent),
+                fontSize: 10,
+                fontWeight: 900,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+              }}
             >
               {getRecoveryLabel(hoveredState.recoveryPercent)}
             </span>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center">
-            <div>
-              <p className="text-lg font-bold">{hoveredState.recoveryPercent}%</p>
-              <p className="text-[10px] text-muted-foreground">Herstel</p>
-            </div>
-            <div>
-              <p className="text-lg font-bold">{formatHoursRemaining(hoveredState.hoursRemaining)}</p>
-              <p className="text-[10px] text-muted-foreground">Resterend</p>
-            </div>
-            <div>
-              <p className="text-lg font-bold">{hoveredState.totalRecoveryHours}u</p>
-              <p className="text-[10px] text-muted-foreground">Totaal herstel</p>
-            </div>
+            <TooltipStat value={`${hoveredState.recoveryPercent}%`} label="HERSTEL" />
+            <TooltipStat
+              value={formatHoursRemaining(hoveredState.hoursRemaining)}
+              label="RESTEREND"
+            />
+            <TooltipStat value={`${hoveredState.totalRecoveryHours}u`} label="TOTAAL" />
           </div>
         </div>
       ) : (
-        <p className="text-xs text-center text-muted-foreground">
-          Tik op een spiergroep voor details
+        <p
+          className="athletic-mono text-center"
+          style={{
+            color: P.inkMuted,
+            fontSize: 10,
+            letterSpacing: '0.12em',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+          }}
+        >
+          TIK OP EEN SPIERGROEP VOOR DETAILS
         </p>
       )}
 
       {/* Legend */}
-      <div className="flex justify-center gap-3 text-[10px] text-muted-foreground">
-        <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#14B8A6' }} /> Hersteld
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#f59e0b' }} /> Herstellende
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#ef4444' }} /> Belast
-        </span>
+      <div className="flex justify-center gap-4">
+        <LegendItem color={P.lime} label="HERSTELD" />
+        <LegendItem color={P.gold} label="HERSTELLEND" />
+        <LegendItem color={P.danger} label="BELAST" />
       </div>
     </div>
+  )
+}
+
+function ViewToggle({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="athletic-mono athletic-tap rounded-lg px-4 py-1.5 transition-colors"
+      style={{
+        backgroundColor: active ? P.lime : 'transparent',
+        color: active ? P.bg : P.inkMuted,
+        fontSize: 11,
+        fontWeight: 900,
+        letterSpacing: '0.14em',
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function TooltipStat({ value, label }: { value: React.ReactNode; label: string }) {
+  return (
+    <div>
+      <div
+        className="athletic-display"
+        style={{
+          color: P.ink,
+          fontSize: 18,
+          lineHeight: '22px',
+          fontWeight: 900,
+          letterSpacing: '-0.02em',
+        }}
+      >
+        {value}
+      </div>
+      <MetaLabel style={{ color: P.inkMuted, fontSize: 9, marginTop: 2 }}>{label}</MetaLabel>
+    </div>
+  )
+}
+
+function LegendItem({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span
+        aria-hidden
+        style={{ width: 8, height: 8, borderRadius: 4, background: color, display: 'inline-block' }}
+      />
+      <span
+        className="athletic-mono"
+        style={{
+          color: P.inkMuted,
+          fontSize: 9,
+          fontWeight: 700,
+          letterSpacing: '0.12em',
+        }}
+      >
+        {label}
+      </span>
+    </span>
   )
 }

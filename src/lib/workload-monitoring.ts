@@ -65,28 +65,29 @@ export const ACWR_ZONE_CONFIG: Record<ACWRZone, {
   bg: string
   description: string
 }> = {
+  // Athletic-dark palette — synchroon met P.* in components/dark-ui
   undertrained: {
     label: 'Onderbelast',
-    color: '#3b82f6',
-    bg: '#dbeafe',
+    color: '#93C5FD',   // P.ice
+    bg: 'rgba(147,197,253,0.14)',
     description: 'Trainingsbelasting is te laag. Risico op detraining.',
   },
   optimal: {
     label: 'Optimaal',
-    color: '#14B8A6',
-    bg: '#ccfbf1',
+    color: '#BEF264',   // P.lime
+    bg: 'rgba(190,242,100,0.14)',
     description: 'Trainingsbelasting in de sweet spot. Laagste blessurerisico.',
   },
   danger: {
     label: 'Verhoogd risico',
-    color: '#f59e0b',
-    bg: '#fef3c7',
+    color: '#F4C261',   // P.gold
+    bg: 'rgba(244,194,97,0.14)',
     description: 'Belasting stijgt snel. Let op tekenen van overbelasting.',
   },
   high_risk: {
     label: 'Hoog risico',
-    color: '#ef4444',
-    bg: '#fee2e2',
+    color: '#F87171',   // P.danger
+    bg: 'rgba(248,113,113,0.14)',
     description: 'Acute belasting veel hoger dan chronisch. Blessurerisico sterk verhoogd.',
   },
 }

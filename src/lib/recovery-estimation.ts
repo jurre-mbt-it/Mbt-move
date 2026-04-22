@@ -203,11 +203,12 @@ export function calculateRecoveryStates(
 // ── Color helpers ────────────────────────────────────────────────────────────
 
 export function getRecoveryColor(percent: number): string {
-  if (percent >= 85) return '#14B8A6'   // green-500
-  if (percent >= 60) return '#84cc16'   // lime-500
-  if (percent >= 45) return '#f59e0b'   // amber-500
-  if (percent >= 25) return '#f97316'   // orange-500
-  return '#ef4444'                       // red-500
+  // Athletic-dark palette — synchroon met P.* in components/dark-ui
+  if (percent >= 85) return '#BEF264'   // P.lime
+  if (percent >= 60) return '#84CC16'   // P.limeDeep
+  if (percent >= 45) return '#F4C261'   // P.gold
+  if (percent >= 25) return '#F39644'   // P.goldWarm
+  return '#F87171'                       // P.danger
 }
 
 export function getRecoveryLabel(percent: number): string {
