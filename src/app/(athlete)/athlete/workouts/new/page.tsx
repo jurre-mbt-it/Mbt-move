@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   WORKOUT_TYPES,
@@ -46,6 +46,18 @@ function categoryColor(cat: string): string {
 }
 
 export default function NewWorkoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen" style={{ background: P.bg, color: P.ink }} />
+      }
+    >
+      <NewWorkoutPageInner />
+    </Suspense>
+  )
+}
+
+function NewWorkoutPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const editId = searchParams.get('id')
