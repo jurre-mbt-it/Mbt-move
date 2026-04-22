@@ -14,6 +14,24 @@ import {
 
 const DAY_LABELS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 
+/**
+ * Maak een korte chip-label van een programma-naam.
+ *  - "Full Body"                → "FULL BODY"
+ *  - "Week 1 — Upper"           → "UPPER"
+ *  - "[Knie] Revalidatie W1"    → "KNIE"
+ *  - Valt terug op eerste ~10 chars.
+ */
+function shortProgramLabel(name: string): string {
+  const clean = name.trim()
+  // Pak inhoud tussen [ ] als tag-prefix
+  const bracket = clean.match(/^\[([^\]]+)\]/)
+  if (bracket) return bracket[1].slice(0, 10).toUpperCase()
+  // Pak laatste segment na em-dash / en-dash / streepje
+  const segments = clean.split(/[—–\-]/).map(s => s.trim()).filter(Boolean)
+  const last = segments[segments.length - 1] ?? clean
+  return last.slice(0, 10).toUpperCase()
+}
+
 export default function WeekPlannerPage() {
   const utils = trpc.useUtils()
   const { data = [], isLoading } = trpc.weekSchedules.list.useQuery(undefined, { staleTime: 30_000 })
@@ -141,34 +159,44 @@ function WeekScheduleCard({ schedule, onDelete }: { schedule: ScheduleItem; onDe
               {schedule.description}
             </p>
           )}
-          {/* 7-day grid */}
-          <div className="flex gap-1.5 mt-3">
+          {/* 7-day grid — toont de programma-naam per dag */}
+          <div className="grid grid-cols-7 gap-1.5 mt-3">
             {Array.from({ length: 7 }).map((_, i) => {
               const day = schedule.days.find(d => d.dayOfWeek === i)
-              const hasProgram = !!day?.program
+              const program = day?.program
               return (
                 <div
                   key={i}
-                  className="flex flex-col items-center gap-1"
-                  title={day?.program?.name ?? 'Rustdag'}
+                  className="flex flex-col items-stretch gap-1 min-w-0"
+                  title={program?.name ?? 'Rustdag'}
                 >
                   <span
-                    className="athletic-mono"
+                    className="athletic-mono text-center"
                     style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.1em', fontWeight: 700 }}
                   >
                     {DAY_LABELS[i].toUpperCase()}
                   </span>
                   <div
-                    className="w-7 h-7 rounded flex items-center justify-center athletic-mono"
+                    className="rounded-md flex items-center justify-center px-1.5 py-1 min-w-0"
                     style={{
-                      background: hasProgram ? P.lime : P.surface,
-                      color: hasProgram ? P.bg : P.inkDim,
-                      border: `1px solid ${hasProgram ? P.lime : P.line}`,
-                      fontSize: 10,
-                      fontWeight: 900,
+                      background: program ? 'rgba(190,242,100,0.12)' : P.surfaceLow,
+                      border: `1px solid ${program ? P.lime : P.line}`,
+                      minHeight: 30,
                     }}
                   >
-                    {hasProgram ? '●' : '–'}
+                    <span
+                      className="truncate athletic-mono"
+                      style={{
+                        color: program ? P.lime : P.inkDim,
+                        fontSize: 10,
+                        fontWeight: 900,
+                        letterSpacing: '0.04em',
+                        textTransform: 'uppercase',
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {program ? shortProgramLabel(program.name) : 'RUST'}
+                    </span>
                   </div>
                 </div>
               )

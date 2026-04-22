@@ -156,6 +156,47 @@ export function ProgramExerciseBlock({
             {exercise.name}
           </button>
 
+          {/* Variant-swap quick-chips — direct zichtbaar zodat therapeut
+              weet dat er een progressie/regressie beschikbaar is. */}
+          {(easierEx || harderEx) && (
+            <div className="hidden sm:flex items-center gap-1 shrink-0">
+              {easierEx && (
+                <button
+                  type="button"
+                  onClick={() => onSwapVariant(exercise.uid, 'easier')}
+                  title={`Wissel naar gemakkelijker: ${easierEx.name}`}
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide border transition-colors"
+                  style={{
+                    color: '#93C5FD',
+                    borderColor: 'rgba(147,197,253,0.3)',
+                    background: 'rgba(147,197,253,0.08)',
+                    letterSpacing: '0.08em',
+                  }}
+                >
+                  <ArrowDown className="w-3 h-3" />
+                  EASY
+                </button>
+              )}
+              {harderEx && (
+                <button
+                  type="button"
+                  onClick={() => onSwapVariant(exercise.uid, 'harder')}
+                  title={`Wissel naar zwaarder: ${harderEx.name}`}
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide border transition-colors"
+                  style={{
+                    color: '#F4C261',
+                    borderColor: 'rgba(244,194,97,0.3)',
+                    background: 'rgba(244,194,97,0.08)',
+                    letterSpacing: '0.08em',
+                  }}
+                >
+                  <ArrowUp className="w-3 h-3" />
+                  HARD
+                </button>
+              )}
+            </div>
+          )}
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-6 w-6 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">

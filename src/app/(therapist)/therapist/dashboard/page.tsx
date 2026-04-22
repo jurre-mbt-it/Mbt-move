@@ -16,6 +16,7 @@ import {
 export default function TherapistDashboard() {
   const { data: patients = [], isLoading: patientsLoading } = trpc.patients.list.useQuery()
   const { data: programsRaw = [], isLoading: programsLoading } = trpc.programs.list.useQuery()
+  const { data: me } = trpc.auth.getMe.useQuery()
   const programs = programsRaw as Array<{ status: string; isTemplate: boolean }>
 
   const activePatients = patients.filter((p) => p.programStatus === 'ACTIVE')
@@ -41,6 +42,59 @@ export default function TherapistDashboard() {
           Overzicht van vandaag
         </MetaLabel>
       </div>
+
+      {/* MFA-enforcement banner — rood zolang MFA nog niet aan staat voor
+          therapist/admin. Patiënten-dossiers zijn gevoelige medische data. */}
+      {me?.mfaEnforcementPending && (
+        <Link
+          href="/therapist/settings/security"
+          className="group block rounded-2xl transition-colors"
+          style={{
+            background: 'rgba(248,113,113,0.08)',
+            border: `1px solid ${P.danger}`,
+            padding: 16,
+          }}
+        >
+          <div className="flex items-start gap-3">
+            <span
+              aria-hidden
+              className="flex items-center justify-center shrink-0 rounded-lg"
+              style={{
+                width: 32,
+                height: 32,
+                background: P.danger,
+                color: P.bg,
+                fontSize: 18,
+                fontWeight: 900,
+              }}
+            >
+              !
+            </span>
+            <div className="flex-1 min-w-0">
+              <Kicker style={{ color: P.danger }}>MFA VERPLICHT</Kicker>
+              <p style={{ color: P.ink, fontSize: 14, fontWeight: 700, marginTop: 4 }}>
+                Zet Two-Factor Authentication nu aan
+              </p>
+              <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>
+                Je behandelt medische data. Zonder MFA staat het patiënt-dossier open bij één
+                gelekt wachtwoord. Neemt 2 minuten.
+              </p>
+            </div>
+            <span
+              className="athletic-mono"
+              style={{
+                color: P.danger,
+                fontSize: 11,
+                letterSpacing: '0.2em',
+                fontWeight: 900,
+                alignSelf: 'center',
+              }}
+            >
+              REGEL →
+            </span>
+          </div>
+        </Link>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

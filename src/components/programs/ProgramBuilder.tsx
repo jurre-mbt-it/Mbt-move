@@ -249,6 +249,72 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
 
   const clearSelection = () => setExercises(prev => prev.map(e => ({ ...e, selected: false })))
 
+  // ── Bulk-kopie: dag → dag / week → week ───────────────────────────────────
+  const copyDayTo = (toWeek: number, toDay: number) => {
+    const fromWeek = program.currentWeek
+    const fromDay = program.currentDay
+    if (fromWeek === toWeek && fromDay === toDay) return
+
+    const source = exercises.filter(e => e.week === fromWeek && e.day === fromDay)
+    if (source.length === 0) {
+      toast.error('Deze dag heeft geen oefeningen om te kopiëren')
+      return
+    }
+    const existing = exercises.filter(e => e.week === toWeek && e.day === toDay)
+    if (existing.length > 0) {
+      const ok = confirm(
+        `W${toWeek} D${toDay} heeft al ${existing.length} oefening(en). Overschrijven?`
+      )
+      if (!ok) return
+    }
+
+    const now = Date.now()
+    const clones: BuilderExercise[] = source.map((e, idx) => ({
+      ...e,
+      uid: `uid-${now}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+      week: toWeek,
+      day: toDay,
+      selected: false,
+    }))
+
+    setExercises(prev => [
+      ...prev.filter(e => !(e.week === toWeek && e.day === toDay)),
+      ...clones,
+    ])
+    toast.success(
+      `${source.length} oefening(en) gekopieerd naar W${toWeek} D${toDay}`
+    )
+  }
+
+  const copyWeekTo = (toWeek: number) => {
+    const fromWeek = program.currentWeek
+    if (fromWeek === toWeek) return
+    const source = exercises.filter(e => e.week === fromWeek)
+    if (source.length === 0) {
+      toast.error('Deze week heeft geen oefeningen om te kopiëren')
+      return
+    }
+    const existing = exercises.filter(e => e.week === toWeek)
+    if (existing.length > 0) {
+      const ok = confirm(
+        `Week ${toWeek} heeft al ${existing.length} oefening(en). Overschrijven?`
+      )
+      if (!ok) return
+    }
+    const now = Date.now()
+    const clones: BuilderExercise[] = source.map((e, idx) => ({
+      ...e,
+      uid: `uid-${now}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+      week: toWeek,
+      selected: false,
+    }))
+    setExercises(prev => [
+      ...prev.filter(e => e.week !== toWeek),
+      ...clones,
+    ])
+    toast.success(`Week ${fromWeek} gekopieerd naar Week ${toWeek}`)
+  }
+
   // ── dnd-kit handlers ─────────────────────────────────────────────────────────
   const handleDragStart = ({ active }: DragStartEvent) => {
     setActiveId(active.id as string)
@@ -667,8 +733,23 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
                 </button>
               )}
 
+              {/* Bulk-kopie menu — toont alleen als er iets te kopiëren is */}
+              {dayExercises.length > 0 && (
+                <div className="ml-auto shrink-0">
+                  <CopyMenu
+                    weeks={weeks}
+                    days={days}
+                    currentWeek={program.currentWeek}
+                    currentDay={program.currentDay}
+                    exerciseCountForDay={exerciseCountForDay}
+                    onCopyDay={copyDayTo}
+                    onCopyWeek={copyWeekTo}
+                  />
+                </div>
+              )}
+
               {selectedUids.length >= 2 && (
-                <div className="ml-auto flex items-center gap-2 shrink-0">
+                <div className={cn('flex items-center gap-2 shrink-0', dayExercises.length > 0 ? '' : 'ml-auto')}>
                   <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={createSuperset}>
                     <Layers className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Superset</span>
@@ -1010,5 +1091,175 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
         </DialogContent>
       </Dialog>
     </DndContext>
+  )
+}
+
+// ─── Bulk-copy menu (dag → dag / week → week) ─────────────────────────────────
+
+function CopyMenu({
+  weeks,
+  days,
+  currentWeek,
+  currentDay,
+  exerciseCountForDay,
+  onCopyDay,
+  onCopyWeek,
+}: {
+  weeks: number[]
+  days: number[]
+  currentWeek: number
+  currentDay: number
+  exerciseCountForDay: (day: number, week: number) => number
+  onCopyDay: (toWeek: number, toDay: number) => void
+  onCopyWeek: (toWeek: number) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [mode, setMode] = useState<'day' | 'week'>('day')
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title="Kopieer deze dag of week"
+        className="shrink-0 flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:bg-[#1C2425] transition-colors"
+      >
+        <Copy className="w-3.5 h-3.5" />
+        <span className="hidden sm:inline">Kopieer</span>
+      </button>
+    )
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(false)}
+        className="shrink-0 flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
+        style={{ background: '#1C2425', color: '#BEF264' }}
+      >
+        <Copy className="w-3.5 h-3.5" />
+        <span className="hidden sm:inline">Kopieer</span>
+      </button>
+      <>
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setOpen(false)}
+        />
+        <div
+          className="absolute right-0 top-full mt-1 z-50 rounded-xl shadow-2xl overflow-hidden"
+          style={{
+            background: '#141A1B',
+            border: '1px solid rgba(255,255,255,0.12)',
+            minWidth: 280,
+          }}
+        >
+          <div className="flex border-b" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+            <button
+              type="button"
+              onClick={() => setMode('day')}
+              className={cn(
+                'flex-1 px-3 py-2 text-xs font-bold tracking-wider uppercase transition-colors',
+                mode === 'day' ? 'text-[#BEF264]' : 'text-muted-foreground',
+              )}
+              style={mode === 'day' ? { background: 'rgba(190,242,100,0.08)' } : {}}
+            >
+              Dag → dag
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('week')}
+              className={cn(
+                'flex-1 px-3 py-2 text-xs font-bold tracking-wider uppercase transition-colors',
+                mode === 'week' ? 'text-[#BEF264]' : 'text-muted-foreground',
+              )}
+              style={mode === 'week' ? { background: 'rgba(190,242,100,0.08)' } : {}}
+            >
+              Week → week
+            </button>
+          </div>
+
+          <div className="p-3">
+            <p className="text-[10px] text-muted-foreground mb-2 uppercase tracking-wider font-semibold">
+              {mode === 'day'
+                ? `Kopieer W${currentWeek} D${currentDay} naar …`
+                : `Kopieer Week ${currentWeek} naar …`}
+            </p>
+
+            {mode === 'day' ? (
+              <div className="space-y-3 max-h-60 overflow-y-auto">
+                {weeks.map((w) => (
+                  <div key={w}>
+                    <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
+                      Week {w}
+                    </p>
+                    <div className="grid grid-cols-7 gap-1">
+                      {days.map((d) => {
+                        const isCurrent = w === currentWeek && d === currentDay
+                        const cnt = exerciseCountForDay(d, w)
+                        return (
+                          <button
+                            key={`${w}-${d}`}
+                            type="button"
+                            disabled={isCurrent}
+                            onClick={() => {
+                              onCopyDay(w, d)
+                              setOpen(false)
+                            }}
+                            title={isCurrent ? 'Huidige dag' : `W${w} D${d}${cnt > 0 ? ` (${cnt})` : ''}`}
+                            className={cn(
+                              'aspect-square rounded text-[10px] font-bold transition-colors flex flex-col items-center justify-center',
+                              isCurrent
+                                ? 'opacity-30 cursor-not-allowed'
+                                : 'hover:bg-[#BEF264] hover:text-black',
+                            )}
+                            style={{
+                              background: cnt > 0 ? 'rgba(190,242,100,0.08)' : 'rgba(255,255,255,0.04)',
+                              color: cnt > 0 ? '#BEF264' : '#7B8889',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                            }}
+                          >
+                            <span>D{d}</span>
+                            {cnt > 0 && <span className="text-[8px] opacity-70">{cnt}</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1 max-h-60 overflow-y-auto">
+                {weeks.filter(w => w !== currentWeek).map((w) => {
+                  const total = days.reduce((acc, d) => acc + exerciseCountForDay(d, w), 0)
+                  return (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => {
+                        onCopyWeek(w)
+                        setOpen(false)
+                      }}
+                      className="flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium hover:bg-[#1C2425] transition-colors"
+                      style={{ color: '#F5F7F6' }}
+                    >
+                      <span>Week {w}</span>
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        {total > 0 ? `${total} bestaand` : 'leeg'}
+                      </span>
+                    </button>
+                  )
+                })}
+                {weeks.length <= 1 && (
+                  <p className="text-xs text-muted-foreground text-center py-3">
+                    Er is maar één week. Voeg eerst een week toe om te kopiëren.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </>
+    </div>
   )
 }

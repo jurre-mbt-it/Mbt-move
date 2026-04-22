@@ -150,8 +150,10 @@ model User {
   dpaAcceptedAt      DateTime?
 
   // MFA
-  mfaEnabled    Boolean   @default(false)
-  mfaSecret     String?
+  mfaEnabled        Boolean   @default(false)
+  mfaSecret         String?
+  mfaEnforcedAt     DateTime? // moment waarop admin/therapist rol MFA verplicht kreeg
+  mfaLastBackupCodesGeneratedAt DateTime?
 
   // AVG art. 17 — right to be forgotten
   deletedAt             DateTime?  // soft-delete tombstone (records stay during 30-day grace)
@@ -181,9 +183,26 @@ model User {
   wellnessChecks         WellnessCheck[]
   invitesSent            InviteCode[]           @relation("InviteSender")
   auditLogs              AuditLog[]
+  mfaBackupCodes         MfaBackupCode[]
 
   @@index([deletedAt])
   @@map("users")
+}
+
+/// Eén-voor-één-bruikbare MFA recovery-codes. We slaan ALLEEN de hash op,
+/// patient/therapist moet ze zelf bewaren (print / password-manager).
+/// Bij `usedAt != null` is de code al verbrand en kan niet opnieuw.
+model MfaBackupCode {
+  id          String    @id @default(cuid())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  codeHash    String    @unique
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([userId, usedAt])
+  @@map("mfa_backup_codes")
 }
 
 model WellnessCheck {

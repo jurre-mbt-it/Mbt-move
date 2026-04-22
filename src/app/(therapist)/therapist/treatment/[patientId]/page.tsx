@@ -100,7 +100,30 @@ export default function TreatmentPage({
 
   const removeRow = (uid: string) => {
     setDirty(true)
-    setRows((prev) => prev.filter((r) => r.uid !== uid))
+    setRows((prev) => {
+      const row = prev.find((r) => r.uid === uid)
+      const idx = prev.findIndex((r) => r.uid === uid)
+      const next = prev.filter((r) => r.uid !== uid)
+
+      if (row && idx >= 0) {
+        // Toon toast met Undo — herstelt op dezelfde positie
+        toast(`"${row.name}" verwijderd`, {
+          duration: 5000,
+          action: {
+            label: 'Undo',
+            onClick: () => {
+              setRows((cur) => {
+                if (cur.some((r) => r.uid === uid)) return cur
+                const copy = [...cur]
+                copy.splice(Math.min(idx, copy.length), 0, row)
+                return copy
+              })
+            },
+          },
+        })
+      }
+      return next
+    })
   }
 
   const resetToProgram = () => {
@@ -293,15 +316,39 @@ export default function TreatmentPage({
         </section>
         )}
 
-        {/* Overall pain + RPE */}
+        {/* Overall pain + RPE — visueel onderscheiden met kleur-accenten */}
         {mode !== 'choose' && (
         <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Tile>
-            <MetaLabel>Algehele pijn /10</MetaLabel>
+          <Tile accentBar={P.danger}>
+            <div className="flex items-center gap-2">
+              <span
+                aria-hidden
+                className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
+                style={{ background: 'rgba(248,113,113,0.12)', color: P.danger, fontSize: 14 }}
+              >
+                ♥
+              </span>
+              <MetaLabel style={{ color: P.danger }}>PIJN /10</MetaLabel>
+            </div>
+            <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, marginTop: 4, letterSpacing: '0.04em' }}>
+              0 = geen pijn · 10 = ondraaglijk
+            </p>
             <ScalePicker value={painLevel} onChange={setPainLevel} colorHigh={P.danger} />
           </Tile>
-          <Tile>
-            <MetaLabel>RPE (inspanning) /10</MetaLabel>
+          <Tile accentBar={P.gold}>
+            <div className="flex items-center gap-2">
+              <span
+                aria-hidden
+                className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
+                style={{ background: 'rgba(244,194,97,0.12)', color: P.gold, fontSize: 14 }}
+              >
+                ⚡
+              </span>
+              <MetaLabel style={{ color: P.gold }}>RPE (inspanning) /10</MetaLabel>
+            </div>
+            <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, marginTop: 4, letterSpacing: '0.04em' }}>
+              0 = rust · 10 = maximale inspanning
+            </p>
             <ScalePicker value={exertionLevel} onChange={setExertionLevel} colorHigh={P.gold} />
           </Tile>
         </section>
@@ -352,10 +399,42 @@ function LabeledInput({
 function AddExerciseRow({ onAdd }: { onAdd: (ex: { id: string; name: string }) => void }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const { data: exercises = [] } = trpc.exercises.list.useQuery(
-    { query: query || undefined },
-    { enabled: open, staleTime: 30_000 },
+  const [collectionId, setCollectionId] = useState<string | null>(null)
+
+  // Collecties voor quick-access chips
+  const { data: collections = [] } = trpc.exercises.listCollections.useQuery(
+    undefined,
+    { enabled: open, staleTime: 60_000 },
   )
+
+  // Normale zoekresultaten (als geen collectie geselecteerd is)
+  const { data: searchResults = [] } = trpc.exercises.list.useQuery(
+    { query: query || undefined },
+    { enabled: open && !collectionId, staleTime: 30_000 },
+  )
+
+  // Oefeningen in geselecteerde collectie
+  const { data: collectionExercises = [] } =
+    trpc.exercises.getCollectionExercises.useQuery(
+      { collectionId: collectionId ?? '' },
+      { enabled: open && !!collectionId, staleTime: 30_000 },
+    )
+
+  const exercises = (collectionId ? collectionExercises : searchResults) as Array<{
+    id: string
+    name: string
+    category: string
+  }>
+
+  const filtered = collectionId && query.trim()
+    ? exercises.filter((ex) => ex.name.toLowerCase().includes(query.toLowerCase()))
+    : exercises
+
+  const close = () => {
+    setOpen(false)
+    setQuery('')
+    setCollectionId(null)
+  }
 
   if (!open) {
     return (
@@ -379,33 +458,130 @@ function AddExerciseRow({ onAdd }: { onAdd: (ex: { id: string; name: string }) =
   return (
     <Tile>
       <div className="flex items-center justify-between gap-2 mb-2">
-        <MetaLabel>Zoek oefening</MetaLabel>
-        <button type="button" onClick={() => { setOpen(false); setQuery('') }}
-          className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.14em' }}>
+        <MetaLabel>
+          {collectionId
+            ? collections.find((c) => c.id === collectionId)?.name ?? 'Collectie'
+            : 'Zoek oefening'}
+        </MetaLabel>
+        <button
+          type="button"
+          onClick={close}
+          className="athletic-mono"
+          style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.14em' }}
+        >
           SLUITEN
         </button>
       </div>
-      <DarkInput value={query} onChange={(e) => setQuery(e.target.value)}
-        placeholder="Bijv. squat, lunge, mobility…" autoFocus />
+
+      {/* Collection chips voor snelle selectie */}
+      {collections.length > 0 && (
+        <div
+          className="flex gap-1.5 overflow-x-auto pb-1"
+          style={{ marginBottom: 8 }}
+        >
+          <Chip
+            active={!collectionId}
+            onClick={() => setCollectionId(null)}
+            color={P.ink}
+          >
+            ALLE
+          </Chip>
+          {collections.map((c) => (
+            <Chip
+              key={c.id}
+              active={collectionId === c.id}
+              onClick={() => setCollectionId(c.id)}
+              color={c.color}
+              count={c.count}
+            >
+              {c.name.toUpperCase()}
+            </Chip>
+          ))}
+        </div>
+      )}
+
+      <DarkInput
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={
+          collectionId
+            ? 'Filter binnen deze collectie…'
+            : 'Bijv. squat, lunge, mobility…'
+        }
+        autoFocus
+      />
       <div className="flex flex-col gap-1 mt-3 max-h-60 overflow-y-auto">
-        {(exercises as Array<{ id: string; name: string; category: string }>).slice(0, 15).map((ex) => (
-          <button key={ex.id} type="button"
-            onClick={() => { onAdd({ id: ex.id, name: ex.name }); setOpen(false); setQuery('') }}
+        {filtered.slice(0, 20).map((ex) => (
+          <button
+            key={ex.id}
+            type="button"
+            onClick={() => {
+              onAdd({ id: ex.id, name: ex.name })
+              close()
+            }}
             className="athletic-tap text-left rounded-lg px-3 py-2"
-            style={{ background: P.surfaceHi }}>
+            style={{ background: P.surfaceHi }}
+          >
             <span style={{ color: P.ink, fontSize: 13, fontWeight: 600 }}>{ex.name}</span>
-            <span className="athletic-mono ml-2" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.1em' }}>
+            <span
+              className="athletic-mono ml-2"
+              style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.1em' }}
+            >
               {ex.category}
             </span>
           </button>
         ))}
-        {exercises.length === 0 && query && (
-          <p style={{ color: P.inkMuted, fontSize: 12, padding: 8, textAlign: 'center' }}>
-            Geen resultaten. Probeer andere zoektermen.
+        {filtered.length === 0 && (
+          <p
+            style={{
+              color: P.inkMuted,
+              fontSize: 12,
+              padding: 8,
+              textAlign: 'center',
+            }}
+          >
+            {collectionId
+              ? 'Geen resultaten in deze collectie.'
+              : query
+                ? 'Geen resultaten. Probeer andere zoektermen.'
+                : 'Typ om te zoeken of kies een collectie.'}
           </p>
         )}
       </div>
     </Tile>
+  )
+}
+
+function Chip({
+  children,
+  active,
+  onClick,
+  color,
+  count,
+}: {
+  children: React.ReactNode
+  active: boolean
+  onClick: () => void
+  color: string
+  count?: number
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="athletic-tap athletic-mono flex items-center gap-1 shrink-0 px-2.5 py-1 rounded-full text-[10px] font-black"
+      style={{
+        background: active ? color : P.surfaceHi,
+        color: active ? P.bg : P.inkMuted,
+        border: `1px solid ${active ? color : P.lineStrong}`,
+        letterSpacing: '0.1em',
+      }}
+    >
+      {children}
+      {count !== undefined && (
+        <span style={{ opacity: 0.7 }}>{count}</span>
+      )}
+    </button>
   )
 }
 
