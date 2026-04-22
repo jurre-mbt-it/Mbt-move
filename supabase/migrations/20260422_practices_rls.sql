@@ -10,13 +10,15 @@
 
 ALTER TABLE public.practices ENABLE ROW LEVEL SECURITY;
 
--- SELECT: own practice of ADMIN
+-- SELECT: own practice of ADMIN. Inline sub-select zodat deze migratie
+-- niet afhangt van auth.user_practice_id() (pas in 20260422_practice_scope_rls
+-- toegevoegd — die was op productie nog niet applied toen de Advisor fired).
 DROP POLICY IF EXISTS "practices_select" ON public.practices;
 CREATE POLICY "practices_select" ON public.practices
   FOR SELECT
   USING (
     public.is_admin()
-    OR id = auth.user_practice_id()
+    OR id = (SELECT "practiceId" FROM public.users WHERE id = auth.uid()::text LIMIT 1)
   );
 
 -- INSERT/UPDATE/DELETE: alleen ADMIN via authenticated role.
