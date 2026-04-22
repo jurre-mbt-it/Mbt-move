@@ -47,6 +47,9 @@ export const MUSCLE_GROUPS = [
   'Adductoren',
   'Abductoren',
   'Rotatorcuff',
+  'Diepe halsflexoren',
+  'Tibialis anterior',
+  'Intrinsieke voetspieren',
 ] as const
 
 export type MuscleGroup = (typeof MUSCLE_GROUPS)[number]
