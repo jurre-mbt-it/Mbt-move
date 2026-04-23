@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/gdpr-cleanup",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/compute-insights",
+      "schedule": "0 */4 * * *"
     }
   ]
 }
