@@ -7,7 +7,7 @@
  */
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
-import { createTRPCRouter, therapistProcedure } from '@/server/trpc'
+import { createTRPCRouter, therapistProcedure, adminProcedure, mfaAdminProcedure } from '@/server/trpc'
 
 const ACTIVE_LINK = { isActive: true, status: 'APPROVED' as const }
 
@@ -338,6 +338,159 @@ export const rehabRouter = createTRPCRouter({
           updatedById: ctx.user.id,
         },
       })
+      return { ok: true }
+    }),
+
+  // ── ADMIN-ONLY: protocol catalog management ──────────────────────────────
+
+  /** Admin: lijst alle protocollen incl. tellingen, actief + inactief. */
+  adminListProtocols: adminProcedure.query(async ({ ctx }) => {
+    const protocols = await ctx.prisma.rehabProtocol.findMany({
+      orderBy: { name: 'asc' },
+      include: {
+        _count: { select: { phases: true, trackers: true } },
+        phases: {
+          select: { _count: { select: { criteria: true } } },
+        },
+      },
+    })
+    return protocols.map((p) => ({
+      id: p.id,
+      key: p.key,
+      name: p.name,
+      description: p.description,
+      specialty: p.specialty,
+      sourceReference: p.sourceReference,
+      isActive: p.isActive,
+      phaseCount: p._count.phases,
+      trackerCount: p._count.trackers,
+      criteriaCount: p.phases.reduce((sum, ph) => sum + ph._count.criteria, 0),
+    }))
+  }),
+
+  /** Admin: volledig protocol-detail incl alle phases en criteria. */
+  adminGetProtocol: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const p = await ctx.prisma.rehabProtocol.findUnique({
+        where: { id: input.id },
+        include: {
+          phases: {
+            orderBy: { order: 'asc' },
+            include: { criteria: { orderBy: { order: 'asc' } } },
+          },
+        },
+      })
+      if (!p) throw new TRPCError({ code: 'NOT_FOUND' })
+      return p
+    }),
+
+  adminUpdateProtocol: mfaAdminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        name: z.string().min(2).optional(),
+        description: z.string().nullable().optional(),
+        specialty: z.string().min(1).optional(),
+        sourceReference: z.string().nullable().optional(),
+        isActive: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...patch } = input
+      await ctx.prisma.rehabProtocol.update({
+        where: { id },
+        data: patch,
+      })
+      return { ok: true }
+    }),
+
+  adminCreateProtocol: mfaAdminProcedure
+    .input(
+      z.object({
+        key: z.string().min(3).regex(/^[a-z0-9-]+$/, 'Key: alleen lowercase + cijfers + streepjes'),
+        name: z.string().min(2),
+        description: z.string().optional(),
+        specialty: z.string().min(1),
+        sourceReference: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const p = await ctx.prisma.rehabProtocol.create({
+        data: { ...input, isActive: true },
+      })
+      return { id: p.id }
+    }),
+
+  adminDeleteProtocol: mfaAdminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // Alleen verwijderen als geen trackers dit protocol gebruiken
+      const trackers = await ctx.prisma.patientRehabTracker.count({
+        where: { protocolId: input.id },
+      })
+      if (trackers > 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Protocol wordt gebruikt door ${trackers} patient-tracker(s). Zet eerst deactivateForPatient uit voor alle patients of zet isActive=false.`,
+        })
+      }
+      await ctx.prisma.rehabProtocol.delete({ where: { id: input.id } })
+      return { ok: true }
+    }),
+
+  // Criteria CRUD (phase toevoegen laten we voor nu uit scope — fases komen via seed)
+
+  adminUpdateCriterion: mfaAdminProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        name: z.string().min(2).optional(),
+        testDescription: z.string().min(2).optional(),
+        reference: z.string().nullable().optional(),
+        targetValue: z.string().min(1).optional(),
+        targetUnit: z.string().nullable().optional(),
+        inputType: z.enum(['NUMERIC', 'TEXT', 'PASS_FAIL']).optional(),
+        isBonus: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...patch } = input
+      await ctx.prisma.rehabCriterion.update({ where: { id }, data: patch })
+      return { ok: true }
+    }),
+
+  adminCreateCriterion: mfaAdminProcedure
+    .input(
+      z.object({
+        phaseId: z.string(),
+        name: z.string().min(2),
+        testDescription: z.string().min(2),
+        reference: z.string().optional(),
+        targetValue: z.string().min(1),
+        targetUnit: z.string().optional(),
+        inputType: z.enum(['NUMERIC', 'TEXT', 'PASS_FAIL']).default('NUMERIC'),
+        isBonus: z.boolean().default(false),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const maxOrder = await ctx.prisma.rehabCriterion.findFirst({
+        where: { phaseId: input.phaseId },
+        orderBy: { order: 'desc' },
+        select: { order: true },
+      })
+      const order = (maxOrder?.order ?? -1) + 1
+      const { phaseId, ...rest } = input
+      const c = await ctx.prisma.rehabCriterion.create({
+        data: { phaseId, order, ...rest },
+      })
+      return { id: c.id }
+    }),
+
+  adminDeleteCriterion: mfaAdminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.rehabCriterion.delete({ where: { id: input.id } })
       return { ok: true }
     }),
 })

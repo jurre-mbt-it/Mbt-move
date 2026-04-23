@@ -8,6 +8,8 @@ import { trpc } from '@/lib/trpc/client'
 export default function SettingsPage() {
   const router = useRouter()
   const { data: mfa } = trpc.auth.mfaStatus.useQuery()
+  const { data: me } = trpc.auth.getMe.useQuery()
+  const isAdmin = me?.role === 'ADMIN'
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -62,6 +64,34 @@ export default function SettingsPage() {
           sub="Aangepaste meetparameters voor programma's"
           bar={P.ice}
         />
+        {isAdmin && (
+          <>
+            <ActionTile
+              href="/admin/dashboard"
+              label="Admin-dashboard"
+              sub="Beheer users, praktijken en protocollen"
+              bar={P.lime}
+            />
+            <ActionTile
+              href="/admin/users"
+              label="Users & rollen"
+              sub="Rollen wijzigen, aan praktijk koppelen"
+              bar={P.ice}
+            />
+            <ActionTile
+              href="/admin/practices"
+              label="Praktijken"
+              sub="Multi-tenant groepen beheren"
+              bar={P.ice}
+            />
+            <ActionTile
+              href="/admin/rehab-protocols"
+              label="Revalidatie-protocollen"
+              sub="Protocol-catalog + criteria bewerken"
+              bar={P.purple}
+            />
+          </>
+        )}
       </div>
 
       <DarkButton variant="danger" onClick={handleSignOut}>

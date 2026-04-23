@@ -11,11 +11,13 @@ import {
   Library,
   MessageSquare,
   AlertCircle,
+  Shield,
   Settings,
   LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { trpc } from '@/lib/trpc/client'
 import { P } from '@/components/dark-ui'
 
 const navItems = [
@@ -33,6 +35,8 @@ export function TherapistSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  const { data: me } = trpc.auth.getMe.useQuery()
+  const isAdmin = me?.role === 'ADMIN'
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -101,6 +105,16 @@ export function TherapistSidebar() {
         className="p-3 flex flex-col gap-1 border-t"
         style={{ borderColor: P.lineStrong }}
       >
+        {isAdmin && (
+          <Link
+            href="/admin/dashboard"
+            className="athletic-tap flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors"
+            style={{ color: P.lime, fontWeight: 700 }}
+          >
+            <Shield className="w-4.5 h-4.5 shrink-0" />
+            Admin
+          </Link>
+        )}
         <Link
           href="/therapist/settings"
           className="athletic-tap flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors"
