@@ -60,7 +60,10 @@ export async function computeInsights(
     errors: [],
   }
 
-  // 1. Load candidate patients: enabled + no objection + practice has cieEnabled
+  // 1. Load candidate patients: enabled + no objection + (legacy practiceId=null
+  //    OR practice.cieEnabled=true). Legacy-patients zonder praktijk zijn van
+  //    vóór de multi-tenant uitrol; we laten ze standaard opt-in doen omdat er
+  //    geen praktijk-gate is.
   const statuses = await prisma.patientInsightStatus.findMany({
     where: {
       enabled: true,
@@ -68,7 +71,10 @@ export async function computeInsights(
       ...(opts.patientId ? { patientId: opts.patientId } : {}),
       patient: {
         deletedAt: null,
-        practice: { cieEnabled: true },
+        OR: [
+          { practiceId: null },
+          { practice: { cieEnabled: true } },
+        ],
       },
     },
     include: {

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useMemo } from 'react'
 import { trpc } from '@/lib/trpc/client'
 import { Display, Kicker, MetaLabel, P, Tile } from '@/components/dark-ui'
-import { InsightCard } from '@/components/insights/InsightCard'
+import { InsightCard, type InsightCardData } from '@/components/insights/InsightCard'
 
 const URGENCY_ORDER: Record<string, number> = {
   CRITICAL: 0,
@@ -16,14 +16,14 @@ const URGENCY_ORDER: Record<string, number> = {
 export default function SignalsDashboardPage() {
   const { data, isLoading, refetch } = trpc.insights.getDashboard.useQuery()
 
-  const insights = data?.insights ?? []
+  const insights = (data?.insights ?? []) as unknown as InsightCardData[]
   const silentPatients = data?.silentPatients ?? []
 
   const { today, thisWeek } = useMemo(() => {
     const now = Date.now()
     const oneDay = 24 * 3600 * 1000
-    const today: typeof insights = []
-    const thisWeek: typeof insights = []
+    const today: InsightCardData[] = []
+    const thisWeek: InsightCardData[] = []
     for (const i of insights) {
       const ageMs = now - new Date(i.createdAt).getTime()
       if (i.urgency === 'CRITICAL' || i.urgency === 'HIGH') {
