@@ -65,6 +65,7 @@ export function RehabActivationToggle({
 
   const [setupOpen, setSetupOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [deactivateOpen, setDeactivateOpen] = useState(false)
   const [selectedProtocolId, setSelectedProtocolId] = useState(protocols[0]?.id ?? '')
   const [surgeryDate, setSurgeryDate] = useState('')
   const [injuryDate, setInjuryDate] = useState('')
@@ -253,18 +254,46 @@ export function RehabActivationToggle({
               </div>
             </DarkDialogContent>
           </DarkDialog>
-          <DarkButton
-            variant="secondary"
-            size="sm"
-            disabled={deactivate.isPending}
-            onClick={() => {
-              if (confirm('Revalidatie-tracker uitzetten? Criteria-statussen blijven bewaard.')) {
-                deactivate.mutate({ patientId })
-              }
-            }}
-          >
-            Uitzetten
-          </DarkButton>
+          <DarkDialog open={deactivateOpen} onOpenChange={setDeactivateOpen}>
+            <DarkDialogTrigger asChild>
+              <DarkButton
+                variant="secondary"
+                size="sm"
+                onClick={() => setDeactivateOpen(true)}
+              >
+                Uitzetten
+              </DarkButton>
+            </DarkDialogTrigger>
+            <DarkDialogContent>
+              <DarkDialogHeader>
+                <DarkDialogTitle>Revalidatie-tracker uitzetten?</DarkDialogTitle>
+              </DarkDialogHeader>
+              <p style={{ color: P.inkMuted, fontSize: 13, lineHeight: 1.55 }}>
+                Weet je het zeker? Het protocol en alle fases verdwijnen uit het dashboard van <strong style={{ color: P.ink }}>{patientName}</strong>.
+              </p>
+              <p style={{ color: P.inkMuted, fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
+                Ingevulde meetwaarden en statussen blijven bewaard en komen terug als je de tracker later opnieuw aanzet.
+              </p>
+              <div className="flex justify-end gap-2 mt-5">
+                <DarkButton variant="ghost" size="sm" onClick={() => setDeactivateOpen(false)}>
+                  Annuleren
+                </DarkButton>
+                <DarkButton
+                  variant="danger"
+                  size="sm"
+                  disabled={deactivate.isPending}
+                  onClick={() => {
+                    deactivate.mutate(
+                      { patientId },
+                      { onSuccess: () => setDeactivateOpen(false) },
+                    )
+                  }}
+                >
+                  Ja, uitzetten
+                </DarkButton>
+              </div>
+            </DarkDialogContent>
+          </DarkDialog>
         </div>
       </div>
     </Tile>

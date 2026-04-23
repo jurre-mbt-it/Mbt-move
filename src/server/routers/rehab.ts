@@ -59,8 +59,10 @@ export const rehabRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       await assertTreating(ctx.prisma, ctx.user, input.patientId)
 
-      const tracker = await ctx.prisma.patientRehabTracker.findUnique({
-        where: { patientId: input.patientId },
+      const tracker = await ctx.prisma.patientRehabTracker.findFirst({
+        // Alleen actieve tracker tonen — gedeactiveerde trackers zijn soft-deleted
+        // maar blijven in de DB (criterion statuses worden bewaard voor re-activatie).
+        where: { patientId: input.patientId, deactivatedAt: null },
         include: {
           protocol: {
             include: {
