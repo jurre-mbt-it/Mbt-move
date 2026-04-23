@@ -35,6 +35,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const router = useRouter()
   const { data: patient, isLoading } = trpc.patients.get.useQuery({ id })
   const { data: programsRaw = [] } = trpc.programs.list.useQuery({ patientId: id })
+  const { data: recentSessions = [] } = trpc.patients.recentSessions.useQuery({ patientId: id, limit: 5 })
   const programs = programsRaw as Array<{
     id: string; name: string; status: string; weeks: number;
     daysPerWeek: number; startDate: Date | null; endDate: Date | null; isTemplate: boolean
@@ -163,11 +164,12 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         {/* Tabs */}
         <Tabs defaultValue="profiel" className="space-y-4">
           <TabsList
-            className="w-full grid grid-cols-3 rounded-xl"
+            className="w-full grid grid-cols-4 rounded-xl"
             style={{ background: P.surface, border: `1px solid ${P.line}` }}
           >
             <TabsTrigger value="profiel" className="text-xs px-1">Profiel</TabsTrigger>
             <TabsTrigger value="programmas" className="text-xs px-1">Programma&apos;s</TabsTrigger>
+            <TabsTrigger value="geschiedenis" className="text-xs px-1">Geschiedenis</TabsTrigger>
             <TabsTrigger value="voortgang" className="text-xs px-1">Voortgang</TabsTrigger>
           </TabsList>
 
@@ -301,6 +303,112 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                 </Tile>
               )
             })}
+          </TabsContent>
+
+          {/* ── TAB: Geschiedenis ─────────────────────────────────── */}
+          <TabsContent value="geschiedenis" className="space-y-3">
+            <div className="flex items-center justify-between">
+              <MetaLabel>
+                Laatste {recentSessions.length} sessie{recentSessions.length !== 1 ? 's' : ''}
+              </MetaLabel>
+            </div>
+            {recentSessions.length === 0 ? (
+              <Tile>
+                <div className="py-8 text-center">
+                  <p style={{ color: P.inkMuted, fontSize: 13 }}>
+                    Nog geen gelogde sessies
+                  </p>
+                </div>
+              </Tile>
+            ) : (
+              recentSessions.map((session) => (
+                <Tile key={session.id} accentBar={session.painLevel != null && session.painLevel >= 6 ? P.danger : P.lime}>
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div>
+                        <p
+                          className="athletic-mono"
+                          style={{ color: P.ink, fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}
+                        >
+                          {session.completedAt
+                            ? new Date(session.completedAt).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
+                            : '—'}
+                        </p>
+                        {session.programName && (
+                          <p
+                            className="athletic-mono"
+                            style={{ color: P.inkMuted, fontSize: 11, marginTop: 2, letterSpacing: '0.04em' }}
+                          >
+                            {session.programName}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {session.durationMinutes != null && (
+                          <span
+                            className="athletic-mono"
+                            style={{ color: P.ice, fontSize: 11, letterSpacing: '0.08em' }}
+                          >
+                            {session.durationMinutes} MIN
+                          </span>
+                        )}
+                        {session.painLevel != null && (
+                          <span
+                            className="athletic-mono"
+                            style={{
+                              background: session.painLevel >= 6 ? 'rgba(248,113,113,0.15)' : 'rgba(190,242,100,0.14)',
+                              color: session.painLevel >= 6 ? P.danger : P.lime,
+                              fontSize: 10,
+                              padding: '2px 8px',
+                              borderRadius: 999,
+                              fontWeight: 800,
+                              letterSpacing: '0.08em',
+                            }}
+                          >
+                            NRS {session.painLevel}
+                          </span>
+                        )}
+                        {session.exertionLevel != null && (
+                          <span
+                            className="athletic-mono"
+                            style={{ color: P.gold, fontSize: 10, letterSpacing: '0.08em' }}
+                          >
+                            RPE {session.exertionLevel}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {session.exercises.length > 0 && (
+                      <div className="space-y-1 pt-1 border-t" style={{ borderColor: P.line }}>
+                        {session.exercises.map((ex) => (
+                          <div
+                            key={ex.id}
+                            className="flex items-center justify-between gap-2 text-xs"
+                            style={{ color: P.inkMuted }}
+                          >
+                            <span style={{ color: P.ink }}>{ex.name}</span>
+                            <span className="athletic-mono" style={{ fontSize: 10, letterSpacing: '0.06em' }}>
+                              {ex.sets != null && ex.reps != null
+                                ? `${ex.sets}×${ex.reps}`
+                                : ex.sets != null
+                                  ? `${ex.sets} sets`
+                                  : '—'}
+                              {ex.weight != null && ` · ${ex.weight}kg`}
+                              {ex.painLevel != null && ` · NRS ${ex.painLevel}`}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {session.notes && (
+                      <p className="pt-1 border-t" style={{ color: P.inkMuted, fontSize: 12, whiteSpace: 'pre-wrap', borderColor: P.line }}>
+                        {session.notes}
+                      </p>
+                    )}
+                  </div>
+                </Tile>
+              ))
+            )}
           </TabsContent>
 
           {/* ── TAB: Voortgang ───────────────────────────────────── */}

@@ -602,6 +602,64 @@ export const patientsRouter = createTRPCRouter({
   // Search binnen eigen gekoppelde patiënten. ADMIN mag globaal zoeken.
   // Eerder leverde deze endpoint PII van alle patiënten in de DB op — zie
   // security review #6.
+  /** Laatste N gelogde sessies van deze patient, voor de geschiedenis-tab. */
+  recentSessions: therapistProcedure
+    .input(z.object({ patientId: z.string(), limit: z.number().int().min(1).max(50).default(5) }))
+    .query(async ({ ctx, input }) => {
+      const relation = await ctx.prisma.patientTherapist.findFirst({
+        where: { therapistId: ctx.user.id, patientId: input.patientId, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
+      })
+      if (!relation && ctx.user.role !== 'ADMIN') throw new TRPCError({ code: 'FORBIDDEN' })
+
+      const sessions = await ctx.prisma.sessionLog.findMany({
+        where: { patientId: input.patientId, status: 'COMPLETED' },
+        orderBy: { completedAt: 'desc' },
+        take: input.limit,
+        include: {
+          program: { select: { id: true, name: true } },
+          exerciseLogs: {
+            select: {
+              id: true,
+              exerciseId: true,
+              setsCompleted: true,
+              repsCompleted: true,
+              painLevel: true,
+              weight: true,
+              notes: true,
+            },
+          },
+        },
+      })
+
+      const exerciseIds = Array.from(new Set(sessions.flatMap((s) => s.exerciseLogs.map((el) => el.exerciseId))))
+      const exercises = exerciseIds.length
+        ? await ctx.prisma.exercise.findMany({
+            where: { id: { in: exerciseIds } },
+            select: { id: true, name: true },
+          })
+        : []
+      const exerciseNameById = new Map(exercises.map((e) => [e.id, e.name]))
+
+      return sessions.map((s) => ({
+        id: s.id,
+        completedAt: s.completedAt,
+        durationMinutes: s.duration ? Math.round(s.duration / 60) : null,
+        programName: s.program?.name ?? null,
+        painLevel: s.painLevel,
+        exertionLevel: s.exertionLevel,
+        notes: s.notes,
+        exercises: s.exerciseLogs.map((el) => ({
+          id: el.id,
+          name: exerciseNameById.get(el.exerciseId) ?? 'Oefening',
+          sets: el.setsCompleted,
+          reps: el.repsCompleted,
+          painLevel: el.painLevel,
+          weight: el.weight,
+          notes: el.notes,
+        })),
+      }))
+    }),
+
   search: therapistProcedure
     .input(z.object({ query: z.string().optional() }))
     .query(async ({ ctx, input }) => {
