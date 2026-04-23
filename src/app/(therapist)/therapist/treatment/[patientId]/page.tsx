@@ -400,6 +400,11 @@ function AddExerciseRow({ onAdd }: { onAdd: (ex: { id: string; name: string }) =
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [collectionId, setCollectionId] = useState<string | null>(null)
+  const [quickAddCategory, setQuickAddCategory] = useState<string | null>(null)
+  const utils = trpc.useUtils()
+  const createExercise = trpc.exercises.create.useMutation({
+    onSuccess: () => utils.exercises.list.invalidate(),
+  })
 
   // Collecties voor quick-access chips
   const { data: collections = [] } = trpc.exercises.listCollections.useQuery(
@@ -548,6 +553,95 @@ function AddExerciseRow({ onAdd }: { onAdd: (ex: { id: string; name: string }) =
           </p>
         )}
       </div>
+
+      {/* Quick-add: typ een niet-bestaande naam, voeg toe met categorie */}
+      {!collectionId && query.trim().length >= 2 && (
+        <div
+          className="mt-3 pt-3 rounded-lg"
+          style={{ borderTop: `1px dashed ${P.lineStrong}` }}
+        >
+          {!quickAddCategory ? (
+            <button
+              type="button"
+              onClick={() => setQuickAddCategory('STRENGTH')}
+              className="athletic-tap w-full rounded-lg py-2 flex items-center justify-center gap-2"
+              style={{
+                background: 'transparent',
+                border: `1px dashed ${P.lime}`,
+                color: P.lime,
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              + Voeg &ldquo;{query.trim()}&rdquo; toe als nieuwe oefening
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <MetaLabel>Categorie voor &ldquo;{query.trim()}&rdquo;</MetaLabel>
+              <div className="flex flex-wrap gap-1.5">
+                {(['STRENGTH', 'MOBILITY', 'PLYOMETRICS', 'CARDIO', 'STABILITY'] as const).map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setQuickAddCategory(cat)}
+                    className="athletic-mono athletic-tap px-2.5 py-1 rounded-full"
+                    style={{
+                      background: quickAddCategory === cat ? P.lime : P.surfaceHi,
+                      color: quickAddCategory === cat ? P.bg : P.inkMuted,
+                      border: `1px solid ${quickAddCategory === cat ? P.lime : P.lineStrong}`,
+                      fontSize: 10,
+                      letterSpacing: '0.1em',
+                      fontWeight: 900,
+                    }}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="athletic-tap athletic-mono rounded-lg px-3 py-2"
+                  style={{ background: P.lime, color: P.bg, fontSize: 11, fontWeight: 900, letterSpacing: '0.1em' }}
+                  disabled={createExercise.isPending}
+                  onClick={async () => {
+                    try {
+                      const created = await createExercise.mutateAsync({
+                        name: query.trim(),
+                        category: quickAddCategory as 'STRENGTH' | 'MOBILITY' | 'PLYOMETRICS' | 'CARDIO' | 'STABILITY',
+                        bodyRegion: [],
+                        difficulty: 'BEGINNER',
+                        instructions: [],
+                        tips: [],
+                        tags: [],
+                        isPublic: false,
+                        muscleLoads: {},
+                        loadType: 'BODYWEIGHT',
+                        isUnilateral: false,
+                      })
+                      onAdd({ id: created.id, name: created.name })
+                      close()
+                      toast.success(`Oefening "${created.name}" toegevoegd aan je bibliotheek`)
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : 'Toevoegen mislukt')
+                    }
+                  }}
+                >
+                  TOEVOEGEN
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQuickAddCategory(null)}
+                  className="athletic-mono"
+                  style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.1em' }}
+                >
+                  ANNULEREN
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </Tile>
   )
 }

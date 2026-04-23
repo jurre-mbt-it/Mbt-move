@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils'
 import { Search, Plus, GripVertical, X } from 'lucide-react'
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
+import { trpc } from '@/lib/trpc/client'
+import { toast } from 'sonner'
 
 const CATEGORY_COLORS: Record<string, string> = {
   STRENGTH:    '#BEF264',
@@ -91,6 +93,11 @@ interface ExerciseLibraryPanelProps {
 export function ExerciseLibraryPanel({ onAdd, exercises: propExercises }: ExerciseLibraryPanelProps) {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<string | null>(null)
+  const [quickAddCategory, setQuickAddCategory] = useState<string | null>(null)
+  const utils = trpc.useUtils()
+  const createExercise = trpc.exercises.create.useMutation({
+    onSuccess: () => utils.exercises.list.invalidate(),
+  })
 
   const allExercises = (propExercises ?? []) as LibraryExercise[]
 
@@ -145,6 +152,93 @@ export function ExerciseLibraryPanel({ onAdd, exercises: propExercises }: Exerci
           filtered.map(ex => (
             <DraggableLibraryItem key={ex.id} exercise={ex} onAdd={onAdd} />
           ))
+        )}
+
+        {/* Quick-add: wanneer er niks matcht en er is een zoekterm */}
+        {query.trim().length >= 2 && filtered.length === 0 && (
+          <div className="mt-2 p-2 rounded border border-dashed" style={{ borderColor: '#BEF264' }}>
+            {!quickAddCategory ? (
+              <button
+                type="button"
+                onClick={() => setQuickAddCategory('STRENGTH')}
+                className="w-full text-xs text-left px-2 py-1.5 rounded hover:bg-white/5"
+                style={{ color: '#BEF264', fontWeight: 700 }}
+              >
+                + Voeg &ldquo;{query.trim()}&rdquo; toe als nieuwe oefening
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Categorie voor &ldquo;{query.trim()}&rdquo;</p>
+                <div className="flex flex-wrap gap-1">
+                  {EXERCISE_CATEGORIES.map((c) => (
+                    <button
+                      key={c.value}
+                      onClick={() => setQuickAddCategory(c.value)}
+                      className={cn(
+                        'px-1.5 py-0.5 rounded text-xs font-medium border',
+                        quickAddCategory === c.value ? 'text-white border-transparent' : 'border-[rgba(255,255,255,0.12)] text-muted-foreground',
+                      )}
+                      style={quickAddCategory === c.value ? { background: CATEGORY_COLORS[c.value] } : {}}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    disabled={createExercise.isPending}
+                    onClick={async () => {
+                      try {
+                        const created = await createExercise.mutateAsync({
+                          name: query.trim(),
+                          category: quickAddCategory as 'STRENGTH' | 'MOBILITY' | 'PLYOMETRICS' | 'CARDIO' | 'STABILITY',
+                          bodyRegion: [],
+                          difficulty: 'BEGINNER',
+                          instructions: [],
+                          tips: [],
+                          tags: [],
+                          isPublic: false,
+                          muscleLoads: {},
+                          loadType: 'BODYWEIGHT',
+                          isUnilateral: false,
+                        })
+                        onAdd({
+                          id: created.id,
+                          name: created.name,
+                          category: created.category,
+                          bodyRegion: created.bodyRegion as string[],
+                          difficulty: created.difficulty,
+                          tags: created.tags,
+                          instructions: created.instructions,
+                          muscleLoads: created.muscleLoads as unknown as Record<string, number>,
+                          isPublic: created.isPublic,
+                          createdById: created.createdById,
+                          createdAt: new Date(created.createdAt),
+                        })
+                        setQuery('')
+                        setQuickAddCategory(null)
+                        toast.success(`"${created.name}" toegevoegd`)
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : 'Toevoegen mislukt')
+                      }
+                    }}
+                    className="px-2 py-1 rounded text-xs font-bold"
+                    style={{ background: '#BEF264', color: '#0A0E0F' }}
+                  >
+                    TOEVOEGEN
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuickAddCategory(null)}
+                    className="px-2 py-1 text-xs text-muted-foreground"
+                  >
+                    Annuleren
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
