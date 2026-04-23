@@ -150,6 +150,20 @@ enum InsightActionType {
   REOPENED
 }
 
+// ─── Revalidatie-protocollen (stoplicht-tracker) ─────────────────────────────
+
+enum RehabCriterionStatusValue {
+  NOT_MET       // rood
+  IN_PROGRESS   // oranje — bijna
+  MET           // groen — behaald
+}
+
+enum RehabCriterionInputType {
+  NUMERIC   // bv 125 (graden), 95 (%), 20 (reps)
+  TEXT      // kwalitatief ("goed" / "matig" / "slecht")
+  PASS_FAIL // slagen / niet slagen
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -217,6 +231,11 @@ model User {
   insightStatusChanges   Insight[]              @relation("InsightStatusChanger")
   insightActions         InsightAction[]        @relation("InsightActionActor")
   insightPrefs           TherapistInsightPref?
+
+  // Rehab-tracker relations
+  rehabTracker           PatientRehabTracker?   @relation("RehabTrackerPatient")
+  rehabTrackersActivated PatientRehabTracker[]  @relation("RehabTrackerActivator")
+  rehabStatusUpdates     RehabCriterionStatus[] @relation("RehabStatusUpdater")
 
   @@index([deletedAt])
   @@map("users")
@@ -781,4 +800,108 @@ model InsightRule {
   updatedAt        DateTime       @updatedAt
 
   @@map("insight_rules")
+}
+
+// ─── Revalidatie-protocollen (catalog + per-patient tracker) ─────────────────
+// Therapist-facing tracker voor fasegebonden revalidatie-criteria (stoplicht-UI).
+// Admin beheert de catalog (RehabProtocol/Phase/Criterion); therapeut activeert
+// per patient en vinkt criteria R/O/G af.
+
+/// Admin-beheerd protocol uit een evidence-based bron (bv Melbourne VKB 2.0).
+model RehabProtocol {
+  id              String       @id @default(cuid())
+  key             String       @unique // stabiele seed-key, bv "melbourne-acl-2"
+  name            String
+  description     String?
+  specialty       String       // "knee_acl", "meniscus", "shoulder"...
+  sourceReference String?      // bv "Cooper & Hughes (2024). Melbourne VKB Protocol 2.0"
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  phases          RehabPhase[]
+  trackers        PatientRehabTracker[]
+
+  @@map("rehab_protocols")
+}
+
+/// E\u00e9n fase binnen een protocol (bv "Fase 2 \u2014 Kracht en Neuromusculaire Controle").
+model RehabPhase {
+  id                String            @id @default(cuid())
+  protocolId        String
+  protocol          RehabProtocol     @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+  order             Int               // 0 = pre-op, 1..N = reguliere fases
+  shortName         String            // bv "Pre-op", "Fase 1"
+  name              String            // volledige naam
+  description       String?
+  keyGoals          String[]          // 3 belangrijkste doelen als bullets
+  // Indicatieve tijdlijn t.o.v. operatie (weken). Negatieve waarde = pre-op.
+  // null = niet van toepassing / doorlopend.
+  typicalStartWeek  Int?
+  typicalEndWeek    Int?
+
+  criteria          RehabCriterion[]
+
+  @@unique([protocolId, order])
+  @@map("rehab_phases")
+}
+
+/// Een afvinkbaar criterium/uitkomstmaat binnen een fase.
+model RehabCriterion {
+  id              String                  @id @default(cuid())
+  phaseId         String
+  phase           RehabPhase              @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  order           Int
+  name            String                  // bv "Passieve Knie Flexie"
+  testDescription String                  // hoe de test uit te voeren
+  reference       String?                 // bv "Norkin & White, 1995"
+  targetValue     String                  // doel als tekst, bv ">125\u00b0" of "90% vs contralateral"
+  targetUnit      String?                 // "\u00b0", "%", "reps", "seconden"
+  inputType       RehabCriterionInputType @default(NUMERIC)
+  isBonus         Boolean                 @default(false)
+
+  statuses        RehabCriterionStatus[]
+
+  @@unique([phaseId, order])
+  @@map("rehab_criteria")
+}
+
+/// Per-patient activation van \u00e9\u00e9n protocol tegelijk (toggle + dropdown).
+model PatientRehabTracker {
+  patientId      String        @id
+  patient        User          @relation("RehabTrackerPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  protocolId     String
+  protocol       RehabProtocol @relation(fields: [protocolId], references: [id])
+  activatedById  String
+  activatedBy    User          @relation("RehabTrackerActivator", fields: [activatedById], references: [id])
+  activatedAt    DateTime      @default(now())
+  deactivatedAt  DateTime?
+  // Operatiedatum: basis voor indicatieve fase-berekening (week-based).
+  surgeryDate    DateTime?
+  // Optioneel: datum van blessure (voor pre-op contextualisering).
+  injuryDate     DateTime?
+  notes          String?
+  updatedAt      DateTime      @updatedAt
+
+  @@map("patient_rehab_trackers")
+}
+
+/// Per patient \u00d7 criterium de R/O/G status + meetwaarde + datum.
+model RehabCriterionStatus {
+  id                String                    @id @default(cuid())
+  patientId         String
+  criterionId       String
+  criterion         RehabCriterion            @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+  status            RehabCriterionStatusValue @default(NOT_MET)
+  measurementValue  String?                   // vrije tekst: "128\u00b0", "95%", "22 reps"
+  measurementDate   DateTime?
+  notes             String?
+  updatedById       String
+  updatedBy         User                      @relation("RehabStatusUpdater", fields: [updatedById], references: [id])
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  @@unique([patientId, criterionId])
+  @@index([patientId])
+  @@map("rehab_criterion_status")
 }

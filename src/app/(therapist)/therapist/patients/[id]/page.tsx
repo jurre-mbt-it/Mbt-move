@@ -19,6 +19,8 @@ import {
 } from '@/components/dark-ui'
 import { InsightActivationToggle } from '@/components/insights/InsightActivationToggle'
 import { InsightTimeline } from '@/components/insights/InsightTimeline'
+import { RehabActivationToggle } from '@/components/rehab/RehabActivationToggle'
+import { RehabTracker } from '@/components/rehab/RehabTracker'
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
   ACTIVE:    { label: 'Actief',    bg: 'rgba(190,242,100,0.14)', text: P.lime },
@@ -166,12 +168,13 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         {/* Tabs */}
         <Tabs defaultValue="profiel" className="space-y-4">
           <TabsList
-            className="w-full grid grid-cols-5 rounded-xl"
+            className="w-full grid grid-cols-6 rounded-xl"
             style={{ background: P.surface, border: `1px solid ${P.line}` }}
           >
             <TabsTrigger value="profiel" className="text-xs px-1">Profiel</TabsTrigger>
             <TabsTrigger value="programmas" className="text-xs px-1">Progr.</TabsTrigger>
             <TabsTrigger value="geschiedenis" className="text-xs px-1">Historie</TabsTrigger>
+            <TabsTrigger value="revalidatie" className="text-xs px-1">Revalidatie</TabsTrigger>
             <TabsTrigger value="signalen" className="text-xs px-1">Signalen</TabsTrigger>
             <TabsTrigger value="voortgang" className="text-xs px-1">Voortgang</TabsTrigger>
           </TabsList>
@@ -412,6 +415,12 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                 </Tile>
               ))
             )}
+          </TabsContent>
+
+          {/* ── TAB: Revalidatie (stoplicht-tracker) ──────────────── */}
+          <TabsContent value="revalidatie" className="space-y-4">
+            <RehabActivationToggle patientId={patient.id} patientName={patient.name} />
+            <RehabTracker patientId={patient.id} />
           </TabsContent>
 
           {/* ── TAB: Signalen (CIE) ───────────────────────────────── */}
