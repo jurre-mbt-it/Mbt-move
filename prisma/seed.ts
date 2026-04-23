@@ -294,6 +294,125 @@ async function main() {
   }
   console.log(`Progression links: ${linksCreated} configured, ${linksSkipped} skipped (exercise not found)`)
 
+  // ───────────────────────────────────────────────────────────────────────────
+  // CIE — insight_rules seed (6 rules v1)
+  // ───────────────────────────────────────────────────────────────────────────
+  console.log('Seeding Clinical Insight Engine rules...')
+  const INSIGHT_RULES = [
+    {
+      signalType: 'pain_flare',
+      category: 'pain',
+      defaultUrgency: 'HIGH' as const,
+      defaultConfig: {
+        deltaAbove: 2, // NRS points above baseline
+        recentSessions: 3,
+        baselineWindowDays: 14,
+      },
+      evidenceRefs: [
+        'Silbernagel KG, Thomeé R, Thomeé P, Karlsson J. Eccentric overload training for patients with chronic Achilles tendon pain. Scand J Med Sci Sports 2001.',
+        'Smith BE et al. Musculoskeletal pain and exercise-prescribing load. BJSM 2017 — pain-monitoring-model.',
+      ],
+    },
+    {
+      signalType: 'pain_red_flag',
+      category: 'pain',
+      defaultUrgency: 'CRITICAL' as const,
+      defaultConfig: {
+        singleSessionThreshold: 8, // NRS >= 8 single session
+        consecutiveSessionsThreshold: 6, // NRS >= 6 on 2 consecutive sessions
+        consecutiveSessionsCount: 2,
+        dedupHours: 24,
+      },
+      evidenceRefs: [
+        'Thomeé R. A comprehensive treatment approach for patellofemoral pain syndrome. Phys Ther 1997.',
+      ],
+    },
+    {
+      signalType: 'ready_for_progression',
+      category: 'progression',
+      defaultUrgency: 'LOW' as const,
+      defaultConfig: {
+        painBelow: 3, // NRS < 3
+        feedbackPositiveThreshold: 2, // painLevel <= 2 counts as positive smiley
+        recentSessions: 3,
+        adherencePct: 80,
+        adherenceWindowDays: 7,
+      },
+      evidenceRefs: [
+        'Saragiotto BT, Maher CG et al. Motor control exercise for chronic low back pain. Cochrane 2016 — progressive overload principle.',
+      ],
+    },
+    {
+      signalType: 'plateau',
+      category: 'progression',
+      defaultUrgency: 'LOW' as const,
+      defaultConfig: {
+        daysWithoutChange: 14,
+        metrics: ['pain', 'smiley', 'load'],
+      },
+      evidenceRefs: [
+        'Bourdon PC et al. Monitoring athlete training loads: consensus statement. IJSPP 2017 — stagnation detection.',
+      ],
+    },
+    {
+      signalType: 'adherence_drop',
+      category: 'adherence',
+      defaultUrgency: 'MEDIUM' as const,
+      defaultConfig: {
+        recentWindowDays: 7,
+        baselineWindowDays: 14,
+        dropRatio: 0.5, // recent < 50% of baseline
+        silentDays: 5, // or: no sessions in 5+ days
+      },
+      evidenceRefs: [
+        'Jack K et al. Barriers to treatment adherence in physiotherapy outpatient clinics. Man Ther 2010.',
+      ],
+    },
+    {
+      signalType: 'exercise_specific_pain',
+      category: 'pattern',
+      defaultUrgency: 'MEDIUM' as const,
+      defaultConfig: {
+        deltaAbove: 2, // NRS points above other exercises avg
+        minExecutions: 3,
+      },
+      evidenceRefs: [
+        'Cook JL, Purdam CR. Is tendon pathology a continuum? BJSM 2009 — pattern-recognition in tendinopathy.',
+      ],
+    },
+  ]
+
+  let rulesCreated = 0
+  let rulesUpdated = 0
+  for (const rule of INSIGHT_RULES) {
+    const existing = await prisma.insightRule.findUnique({ where: { signalType: rule.signalType } })
+    if (existing) {
+      await prisma.insightRule.update({
+        where: { signalType: rule.signalType },
+        data: {
+          category: rule.category,
+          defaultUrgency: rule.defaultUrgency,
+          defaultConfig: rule.defaultConfig,
+          evidenceRefs: rule.evidenceRefs,
+        },
+      })
+      rulesUpdated++
+    } else {
+      await prisma.insightRule.create({
+        data: {
+          signalType: rule.signalType,
+          category: rule.category,
+          defaultUrgency: rule.defaultUrgency,
+          defaultConfig: rule.defaultConfig,
+          evidenceRefs: rule.evidenceRefs,
+          enabledGlobally: true,
+        },
+      })
+      rulesCreated++
+    }
+  }
+  console.log(`Insight rules: ${rulesCreated} created, ${rulesUpdated} updated`)
+
   console.log('Seeding complete!')
 }
 

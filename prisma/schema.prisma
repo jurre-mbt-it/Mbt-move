@@ -125,6 +125,31 @@ enum CardioProtocol {
   WALK_RUN
 }
 
+// ─── Clinical Insight Engine (CIE) ───────────────────────────────────────────
+
+enum InsightUrgency {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum InsightStatus {
+  OPEN
+  FOLLOWED_UP
+  DISMISSED
+  SNOOZED
+  EXPIRED
+}
+
+enum InsightActionType {
+  VIEWED
+  FOLLOWED_UP
+  DISMISSED
+  SNOOZED
+  REOPENED
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -184,6 +209,14 @@ model User {
   invitesSent            InviteCode[]           @relation("InviteSender")
   auditLogs              AuditLog[]
   mfaBackupCodes         MfaBackupCode[]
+
+  // CIE relations
+  patientInsightStatus   PatientInsightStatus?  @relation("PatientInsightStatusPatient")
+  insightStatusEnabled   PatientInsightStatus[] @relation("PatientInsightStatusEnabler")
+  insights               Insight[]              @relation("InsightPatient")
+  insightStatusChanges   Insight[]              @relation("InsightStatusChanger")
+  insightActions         InsightAction[]        @relation("InsightActionActor")
+  insightPrefs           TherapistInsightPref?
 
   @@index([deletedAt])
   @@map("users")
@@ -286,6 +319,7 @@ model Exercise {
   programExercises ProgramExercise[]
   collectionItems  ExerciseCollectionItem[]
   favoritedBy      FavoriteExercise[]
+  insights         Insight[]
 
   // Multi-tenant: oefening is zichtbaar binnen deze praktijk. null = globaal
   // (admin-beheerd / legacy). Gecombineerd met isPublic (true = ook globaal
@@ -302,6 +336,8 @@ model Practice {
   name        String
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+  // Clinical Insight Engine — gefaseerde rollout per praktijk.
+  cieEnabled  Boolean      @default(false)
   users       User[]
   exercises   Exercise[]
   inviteCodes InviteCode[]
@@ -650,4 +686,99 @@ model AnonymizedRecord {
   createdAt         DateTime @default(now())
 
   @@map("anonymized_records")
+}
+
+// ─── Clinical Insight Engine (CIE) ───────────────────────────────────────────
+// Rule-based suggestion engine for therapists. Patients never see insights.
+// See supabase/migrations/20260501_clinical_insight_engine.sql for RLS.
+
+/// Opt-in tracking per patient + patient-objection flag (AVG art. 21).
+/// One row per patient; absence = not-yet-enabled.
+model PatientInsightStatus {
+  patientId             String    @id
+  patient               User      @relation("PatientInsightStatusPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  enabled               Boolean   @default(false)
+  enabledById           String?
+  enabledBy             User?     @relation("PatientInsightStatusEnabler", fields: [enabledById], references: [id])
+  enabledAt             DateTime?
+  disabledAt            DateTime?
+  patientObjection      Boolean   @default(false)
+  patientObjectionAt    DateTime?
+  patientObjectionNote  String?
+  updatedAt             DateTime  @updatedAt
+
+  @@map("patient_insight_status")
+}
+
+/// Generated insight row — one per detected trigger.
+/// patientId-scoped (NOT therapist-scoped) so all treating therapists see the same.
+model Insight {
+  id                 String         @id @default(cuid())
+  patientId          String
+  patient            User           @relation("InsightPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  signalType         String         // matches InsightRule.signalType
+  urgency            InsightUrgency
+  title              String
+  suggestion         String
+  triggerData        Json           // explainability payload — what data triggered this
+  exerciseId         String?
+  exercise           Exercise?      @relation(fields: [exerciseId], references: [id])
+  status             InsightStatus  @default(OPEN)
+  statusChangedById  String?
+  statusChangedBy    User?          @relation("InsightStatusChanger", fields: [statusChangedById], references: [id])
+  statusChangedAt    DateTime?
+  snoozedUntil       DateTime?
+  createdAt          DateTime       @default(now())
+  expiresAt          DateTime
+
+  actions            InsightAction[]
+
+  @@index([patientId, status, urgency, createdAt])
+  @@index([patientId, createdAt])
+  @@index([patientId, signalType, createdAt])
+  @@map("insights")
+}
+
+/// Audit trail — every therapist action on an insight.
+/// note is ALWAYS optional (no accountability burden on therapist).
+model InsightAction {
+  id          String            @id @default(cuid())
+  insightId   String
+  insight     Insight           @relation(fields: [insightId], references: [id], onDelete: Cascade)
+  therapistId String
+  therapist   User              @relation("InsightActionActor", fields: [therapistId], references: [id])
+  action      InsightActionType
+  note        String?
+  createdAt   DateTime          @default(now())
+
+  @@index([insightId, createdAt])
+  @@index([therapistId, createdAt])
+  @@map("insight_actions")
+}
+
+/// Per-therapist CIE config: which signals, custom thresholds, quiet hours.
+model TherapistInsightPref {
+  therapistId        String   @id
+  therapist          User     @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  signalsEnabled     Json     @default("{}")  // { pain_flare: true, plateau: false, ... }
+  customThresholds   Json     @default("{}")  // { pain_flare: { delta: 2 }, ... }
+  notificationPrefs  Json     @default("{}")  // { critical: ["email","push"], high: ["digest"] }
+  quietHoursStart    Int?                     // 0-23 local hour
+  quietHoursEnd      Int?                     // 0-23 local hour
+  updatedAt          DateTime @updatedAt
+
+  @@map("therapist_insight_prefs")
+}
+
+/// Rule catalog — seeded with 6 rules for v1. Therapists override via TherapistInsightPref.
+model InsightRule {
+  signalType       String         @id
+  category         String         // "pain" | "progression" | "adherence" | "pattern"
+  defaultUrgency   InsightUrgency
+  defaultConfig    Json
+  evidenceRefs     String[]
+  enabledGlobally  Boolean        @default(true)
+  updatedAt        DateTime       @updatedAt
+
+  @@map("insight_rules")
 }
