@@ -35,6 +35,8 @@ type LogRow = {
   repsCompleted: string
   weight: string
   painDuring: string
+  /** Per-exercise visibility for toggleable parameters (sets/reps altijd zichtbaar). */
+  visible: { weight: boolean; pain: boolean }
 }
 
 export default function TreatmentPage({
@@ -80,6 +82,7 @@ export default function TreatmentPage({
           repsCompleted: String(e.reps),
           weight: '',
           painDuring: '',
+          visible: { weight: true, pain: true },
         })),
       )
     }
@@ -146,8 +149,20 @@ export default function TreatmentPage({
         repsCompleted: '10',
         weight: '',
         painDuring: '',
+        visible: { weight: true, pain: true },
       },
     ])
+  }
+
+  const toggleVisible = (uid: string, field: 'weight' | 'pain') => {
+    setDirty(true)
+    setRows((prev) =>
+      prev.map((r) =>
+        r.uid === uid
+          ? { ...r, visible: { ...r.visible, [field]: !r.visible[field] } }
+          : r,
+      ),
+    )
   }
 
   const canSubmit = useMemo(() => rows.length > 0 && !logMutation.isPending, [rows, logMutation.isPending])
@@ -167,8 +182,9 @@ export default function TreatmentPage({
         exerciseId: r.exerciseId,
         setsCompleted: r.setsCompleted ? Number(r.setsCompleted) : undefined,
         repsCompleted: r.repsCompleted ? Number(r.repsCompleted) : undefined,
-        weight: r.weight ? Number(r.weight) : null,
-        painDuring: r.painDuring ? Number(r.painDuring) : null,
+        // Verborgen parameters worden niet gelogd (null), zichtbare alleen als ingevuld.
+        weight: r.visible.weight && r.weight ? Number(r.weight) : null,
+        painDuring: r.visible.pain && r.painDuring ? Number(r.painDuring) : null,
       })),
     })
   }
@@ -305,12 +321,72 @@ export default function TreatmentPage({
                   ×
                 </button>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+              <div
+                className="grid gap-2 mt-3"
+                style={{
+                  gridTemplateColumns: `repeat(${2 + (r.visible.weight ? 1 : 0) + (r.visible.pain ? 1 : 0)}, minmax(0, 1fr))`,
+                }}
+              >
                 <LabeledInput label="Sets" value={r.setsCompleted} onChange={(v) => updateRow(r.uid, { setsCompleted: v })} inputMode="numeric" />
                 <LabeledInput label={`Reps (${r.repUnit})`} value={r.repsCompleted} onChange={(v) => updateRow(r.uid, { repsCompleted: v })} inputMode="numeric" />
-                <LabeledInput label="Gewicht (kg)" value={r.weight} onChange={(v) => updateRow(r.uid, { weight: v })} inputMode="decimal" />
-                <LabeledInput label="Pijn /10" value={r.painDuring} onChange={(v) => updateRow(r.uid, { painDuring: v })} inputMode="numeric" />
+                {r.visible.weight && (
+                  <LabeledInput
+                    label="Gewicht (kg)"
+                    value={r.weight}
+                    onChange={(v) => updateRow(r.uid, { weight: v })}
+                    inputMode="decimal"
+                    onRemove={() => toggleVisible(r.uid, 'weight')}
+                  />
+                )}
+                {r.visible.pain && (
+                  <LabeledInput
+                    label="Pijn /10"
+                    value={r.painDuring}
+                    onChange={(v) => updateRow(r.uid, { painDuring: v })}
+                    inputMode="numeric"
+                    onRemove={() => toggleVisible(r.uid, 'pain')}
+                  />
+                )}
               </div>
+              {/* Toggle-rij voor verborgen parameters */}
+              {(!r.visible.weight || !r.visible.pain) && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {!r.visible.weight && (
+                    <button
+                      type="button"
+                      onClick={() => toggleVisible(r.uid, 'weight')}
+                      className="athletic-mono athletic-tap px-2 py-1 rounded-full"
+                      style={{
+                        background: P.surfaceHi,
+                        color: P.inkMuted,
+                        border: `1px dashed ${P.lineStrong}`,
+                        fontSize: 10,
+                        letterSpacing: '0.08em',
+                        fontWeight: 800,
+                      }}
+                    >
+                      + GEWICHT
+                    </button>
+                  )}
+                  {!r.visible.pain && (
+                    <button
+                      type="button"
+                      onClick={() => toggleVisible(r.uid, 'pain')}
+                      className="athletic-mono athletic-tap px-2 py-1 rounded-full"
+                      style={{
+                        background: P.surfaceHi,
+                        color: P.inkMuted,
+                        border: `1px dashed ${P.lineStrong}`,
+                        fontSize: 10,
+                        letterSpacing: '0.08em',
+                        fontWeight: 800,
+                      }}
+                    >
+                      + PIJN
+                    </button>
+                  )}
+                </div>
+              )}
             </Tile>
           ))}
         </section>
@@ -379,14 +455,43 @@ function LabeledInput({
   value,
   onChange,
   inputMode,
+  onRemove,
 }: {
   label: string
   value: string
   onChange: (v: string) => void
   inputMode?: 'numeric' | 'decimal' | 'text'
+  onRemove?: () => void
 }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1" style={{ position: 'relative' }}>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Verberg ${label}`}
+          className="athletic-tap athletic-mono"
+          style={{
+            position: 'absolute',
+            top: -4,
+            right: -4,
+            width: 18,
+            height: 18,
+            borderRadius: 999,
+            background: P.surfaceHi,
+            color: P.inkMuted,
+            border: `1px solid ${P.lineStrong}`,
+            fontSize: 10,
+            lineHeight: 1,
+            zIndex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          ×
+        </button>
+      )}
       <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.12em' }}>
         {label.toUpperCase()}
       </span>
