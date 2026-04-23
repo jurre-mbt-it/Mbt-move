@@ -147,4 +147,11 @@ export const PROGRESSION_CHAINS: string[][] = [
 
   // Carry progressie (bilateraal → unilateraal voor anti-laterale flexie)
   ['Farmer\'s Walk', 'Suitcase Carry'],
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SPORT-SPECIFIEK (aanvullingen 2026-04-23)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Kettlebell deadlift — bilateraal → unilateraal (anti-rotatie progressie)
+  ['Kettlebell deadlift', 'Single arm kettlebell deadlift'],
 ]
