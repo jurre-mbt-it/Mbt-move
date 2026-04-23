@@ -59,11 +59,61 @@ type CriterionData = {
   targetUnit: string | null
   inputType: 'NUMERIC' | 'TEXT' | 'PASS_FAIL'
   isBonus: boolean
+  isBilateral: boolean
+  newtonMinGreen: number | null
+  newtonMinOrange: number | null
+  lsiMinGreen: number | null
+  lsiMinOrange: number | null
   status: StatusValue
   measurementValue: string | null
   measurementDate: string | Date | null
   notes: string | null
   updatedAt: string | Date | null
+}
+
+// Bilaterale meting opgeslagen als JSON in measurementValue
+type BilateralValue = { left?: number | null; right?: number | null }
+
+function parseBilateral(v: string | null): BilateralValue {
+  if (!v) return {}
+  try {
+    const parsed = JSON.parse(v)
+    if (parsed && typeof parsed === 'object') {
+      return {
+        left: typeof parsed.left === 'number' ? parsed.left : null,
+        right: typeof parsed.right === 'number' ? parsed.right : null,
+      }
+    }
+  } catch {
+    // niet bilateraal opgeslagen — laat leeg
+  }
+  return {}
+}
+
+function computeLSI(left: number | null | undefined, right: number | null | undefined): number | null {
+  if (left == null || right == null || left <= 0 || right <= 0) return null
+  return Math.round((Math.min(left, right) / Math.max(left, right)) * 100)
+}
+
+function deriveBilateralStatus(
+  c: Pick<
+    CriterionData,
+    'newtonMinGreen' | 'newtonMinOrange' | 'lsiMinGreen' | 'lsiMinOrange'
+  >,
+  left: number | null | undefined,
+  right: number | null | undefined,
+): StatusValue | null {
+  if (left == null || right == null) return null
+  const lsi = computeLSI(left, right)
+  if (lsi == null) return null
+  const minVal = Math.min(left, right)
+  const greenN = c.newtonMinGreen ?? 0
+  const orangeN = c.newtonMinOrange ?? 0
+  const greenLSI = c.lsiMinGreen ?? 0
+  const orangeLSI = c.lsiMinOrange ?? 0
+  if (minVal >= greenN && lsi >= greenLSI) return 'MET'
+  if (minVal >= orangeN && lsi >= orangeLSI) return 'IN_PROGRESS'
+  return 'NOT_MET'
 }
 
 function formatDate(d: Date | string | null): string {
@@ -390,6 +440,25 @@ function CriterionRow({
   )
   const [notes, setNotes] = useState(criterion.notes ?? '')
 
+  // Bilaterale state (alleen gebruikt als criterion.isBilateral)
+  const initialBilateral = parseBilateral(criterion.measurementValue)
+  const [leftN, setLeftN] = useState<string>(
+    initialBilateral.left != null ? String(initialBilateral.left) : '',
+  )
+  const [rightN, setRightN] = useState<string>(
+    initialBilateral.right != null ? String(initialBilateral.right) : '',
+  )
+  const leftNum = leftN ? Number(leftN) : null
+  const rightNum = rightN ? Number(rightN) : null
+  const computedLSI = criterion.isBilateral ? computeLSI(leftNum, rightNum) : null
+  const computedBilateralStatus = criterion.isBilateral
+    ? deriveBilateralStatus(criterion, leftNum, rightNum)
+    : null
+  const parsedStoredBilateral = parseBilateral(criterion.measurementValue)
+  const storedLSI = criterion.isBilateral
+    ? computeLSI(parsedStoredBilateral.left, parsedStoredBilateral.right)
+    : null
+
   function quickSetStatus(next: StatusValue) {
     updateMutation.mutate({
       patientId,
@@ -416,6 +485,32 @@ function CriterionRow({
   }
 
   function handleSave() {
+    // Bilaterale criteria: serialize L/R naar JSON + auto-status
+    if (criterion.isBilateral) {
+      const payload: BilateralValue = {}
+      if (leftNum != null) payload.left = leftNum
+      if (rightNum != null) payload.right = rightNum
+      const valueStr = Object.keys(payload).length > 0 ? JSON.stringify(payload) : null
+      const autoStatus = computedBilateralStatus ?? status
+      updateMutation.mutate(
+        {
+          patientId,
+          criterionId: criterion.id,
+          status: autoStatus,
+          measurementValue: valueStr,
+          measurementDate: measurementDate || new Date().toISOString().slice(0, 10),
+          notes: notes || null,
+        },
+        {
+          onSuccess: () => {
+            toast.success('Opgeslagen — status auto-berekend')
+            setOpen(false)
+          },
+        },
+      )
+      return
+    }
+    // Niet-bilateraal: oud pad
     updateMutation.mutate(
       {
         patientId,
@@ -474,7 +569,25 @@ function CriterionRow({
               </>
             )}
           </p>
-          {(criterion.measurementValue || criterion.measurementDate) && (
+          {criterion.isBilateral && (
+            <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, marginTop: 3, letterSpacing: '0.08em' }}>
+              {criterion.newtonMinGreen != null && `GROEN ≥${criterion.newtonMinGreen}N/zijde`}
+              {criterion.newtonMinOrange != null && ` · ORANJE ≥${criterion.newtonMinOrange}N`}
+              {criterion.lsiMinGreen != null && ` · LSI GROEN ≥${criterion.lsiMinGreen}%`}
+              {criterion.lsiMinOrange != null && ` (oranje ≥${criterion.lsiMinOrange}%)`}
+            </p>
+          )}
+          {criterion.isBilateral && (parsedStoredBilateral.left != null || parsedStoredBilateral.right != null) && (
+            <p
+              className="athletic-mono"
+              style={{ color: STATUS_COLOR[criterion.status], fontSize: 11, marginTop: 3, letterSpacing: '0.04em' }}
+            >
+              L: {parsedStoredBilateral.left ?? '—'}N · R: {parsedStoredBilateral.right ?? '—'}N
+              {storedLSI != null && ` · LSI ${storedLSI}%`}
+              {criterion.measurementDate && ` · ${formatDate(criterion.measurementDate)}`}
+            </p>
+          )}
+          {!criterion.isBilateral && (criterion.measurementValue || criterion.measurementDate) && (
             <p
               className="athletic-mono"
               style={{ color: STATUS_COLOR[criterion.status], fontSize: 11, marginTop: 3, letterSpacing: '0.04em' }}
@@ -538,46 +651,107 @@ function CriterionRow({
           </p>
 
           <div className="flex flex-col gap-3">
-            <div>
-              <MetaLabel>Status</MetaLabel>
-              <div className="flex gap-2 mt-1">
-                {(['NOT_MET', 'IN_PROGRESS', 'MET'] as const).map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setStatus(s)}
-                    className="athletic-mono athletic-tap flex-1 rounded-lg"
+            {!criterion.isBilateral && (
+              <div>
+                <MetaLabel>Status</MetaLabel>
+                <div className="flex gap-2 mt-1">
+                  {(['NOT_MET', 'IN_PROGRESS', 'MET'] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setStatus(s)}
+                      className="athletic-mono athletic-tap flex-1 rounded-lg"
+                      style={{
+                        background: status === s ? STATUS_COLOR[s] : P.surfaceHi,
+                        color: status === s ? P.bg : P.ink,
+                        border: `1px solid ${status === s ? STATUS_COLOR[s] : P.lineStrong}`,
+                        padding: '10px 8px',
+                        fontSize: 11,
+                        letterSpacing: '0.08em',
+                        fontWeight: 900,
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      {STATUS_LABEL[s]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {criterion.isBilateral ? (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <MetaLabel>Links (N)</MetaLabel>
+                    <DarkInput
+                      type="number"
+                      inputMode="numeric"
+                      value={leftN}
+                      onChange={(e) => setLeftN(e.target.value)}
+                      placeholder="bv. 165"
+                    />
+                  </div>
+                  <div>
+                    <MetaLabel>Rechts (N)</MetaLabel>
+                    <DarkInput
+                      type="number"
+                      inputMode="numeric"
+                      value={rightN}
+                      onChange={(e) => setRightN(e.target.value)}
+                      placeholder="bv. 172"
+                    />
+                  </div>
+                </div>
+                {(leftNum != null || rightNum != null) && (
+                  <div
+                    className="rounded-lg"
                     style={{
-                      background: status === s ? STATUS_COLOR[s] : P.surfaceHi,
-                      color: status === s ? P.bg : P.ink,
-                      border: `1px solid ${status === s ? STATUS_COLOR[s] : P.lineStrong}`,
-                      padding: '10px 8px',
-                      fontSize: 11,
-                      letterSpacing: '0.08em',
-                      fontWeight: 900,
-                      textTransform: 'uppercase',
+                      background: computedBilateralStatus ? STATUS_BG[computedBilateralStatus] : P.surfaceHi,
+                      border: `1px solid ${computedBilateralStatus ? STATUS_COLOR[computedBilateralStatus] : P.line}`,
+                      padding: '10px 12px',
                     }}
                   >
-                    {STATUS_LABEL[s]}
-                  </button>
-                ))}
+                    <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.1em' }}>
+                      AUTO-STATUS
+                    </p>
+                    <div className="flex items-center justify-between gap-2 mt-1">
+                      <span
+                        style={{
+                          color: computedBilateralStatus ? STATUS_COLOR[computedBilateralStatus] : P.inkMuted,
+                          fontSize: 14,
+                          fontWeight: 800,
+                        }}
+                      >
+                        {computedBilateralStatus ? STATUS_LABEL[computedBilateralStatus] : 'Vul beide velden'}
+                      </span>
+                      <span className="athletic-mono" style={{ color: P.ink, fontSize: 11, letterSpacing: '0.06em' }}>
+                        {computedLSI != null && `LSI ${computedLSI}%`}
+                        {leftNum != null && rightNum != null && ` · min ${Math.min(leftNum, rightNum)}N`}
+                      </span>
+                    </div>
+                    <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, marginTop: 4, letterSpacing: '0.04em' }}>
+                      Regel: GROEN als beide zijden ≥{criterion.newtonMinGreen}N én LSI ≥{criterion.lsiMinGreen}%. ORANJE bij ≥{criterion.newtonMinOrange}N + LSI ≥{criterion.lsiMinOrange}%. Anders ROOD.
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div>
+                <MetaLabel>Meetwaarde</MetaLabel>
+                <DarkInput
+                  value={measurementValue}
+                  onChange={(e) => setMeasurementValue(e.target.value)}
+                  placeholder={
+                    criterion.inputType === 'PASS_FAIL'
+                      ? 'bv. "Pass" of "Fail"'
+                      : criterion.targetUnit
+                        ? `bv. 128 ${criterion.targetUnit}`
+                        : 'Testresultaat'
+                  }
+                />
               </div>
-            </div>
-
-            <div>
-              <MetaLabel>Meetwaarde</MetaLabel>
-              <DarkInput
-                value={measurementValue}
-                onChange={(e) => setMeasurementValue(e.target.value)}
-                placeholder={
-                  criterion.inputType === 'PASS_FAIL'
-                    ? 'bv. "Pass" of "Fail"'
-                    : criterion.targetUnit
-                      ? `bv. 128 ${criterion.targetUnit}`
-                      : 'Testresultaat'
-                }
-              />
-            </div>
+            )}
 
             <div>
               <MetaLabel>Datum</MetaLabel>

@@ -860,6 +860,19 @@ model RehabCriterion {
   inputType       RehabCriterionInputType @default(NUMERIC)
   isBonus         Boolean                 @default(false)
 
+  // Bilaterale kracht-metingen met auto-stoplicht:
+  //   * isBilateral=true   \u2192 therapeut vult L + R waarde in, systeem berekent LSI
+  //   * newtonMinGreen     \u2192 absolute minimum Newton-waarde per zijde voor GROEN
+  //   * newtonMinOrange    \u2192 absolute minimum Newton-waarde per zijde voor ORANJE (onder = rood)
+  //   * lsiMinGreen        \u2192 minimum LSI% (min/max * 100) voor GROEN (typisch 90)
+  //   * lsiMinOrange       \u2192 minimum LSI% voor ORANJE (typisch 80)
+  // Status wordt GROEN als BEIDE N\u2265Green \u00e9n LSI\u2265Green. ORANJE als N\u2265Orange + LSI\u2265Orange.
+  isBilateral       Boolean @default(false)
+  newtonMinGreen    Int?
+  newtonMinOrange   Int?
+  lsiMinGreen       Int?
+  lsiMinOrange      Int?
+
   statuses        RehabCriterionStatus[]
 
   @@unique([phaseId, order])

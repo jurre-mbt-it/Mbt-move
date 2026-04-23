@@ -172,6 +172,11 @@ export const rehabRouter = createTRPCRouter({
                 targetUnit: c.targetUnit,
                 inputType: c.inputType,
                 isBonus: c.isBonus,
+                isBilateral: c.isBilateral,
+                newtonMinGreen: c.newtonMinGreen,
+                newtonMinOrange: c.newtonMinOrange,
+                lsiMinGreen: c.lsiMinGreen,
+                lsiMinOrange: c.lsiMinOrange,
                 status: s?.status ?? 'NOT_MET',
                 measurementValue: s?.measurementValue ?? null,
                 measurementDate: s?.measurementDate ?? null,
@@ -452,6 +457,11 @@ export const rehabRouter = createTRPCRouter({
         targetUnit: z.string().nullable().optional(),
         inputType: z.enum(['NUMERIC', 'TEXT', 'PASS_FAIL']).optional(),
         isBonus: z.boolean().optional(),
+        isBilateral: z.boolean().optional(),
+        newtonMinGreen: z.number().int().nullable().optional(),
+        newtonMinOrange: z.number().int().nullable().optional(),
+        lsiMinGreen: z.number().int().min(0).max(100).nullable().optional(),
+        lsiMinOrange: z.number().int().min(0).max(100).nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -471,6 +481,11 @@ export const rehabRouter = createTRPCRouter({
         targetUnit: z.string().optional(),
         inputType: z.enum(['NUMERIC', 'TEXT', 'PASS_FAIL']).default('NUMERIC'),
         isBonus: z.boolean().default(false),
+        isBilateral: z.boolean().default(false),
+        newtonMinGreen: z.number().int().optional(),
+        newtonMinOrange: z.number().int().optional(),
+        lsiMinGreen: z.number().int().min(0).max(100).optional(),
+        lsiMinOrange: z.number().int().min(0).max(100).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
