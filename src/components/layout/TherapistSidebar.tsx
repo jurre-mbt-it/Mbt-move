@@ -10,6 +10,7 @@ import {
   CalendarDays,
   Library,
   MessageSquare,
+  AlertCircle,
   Settings,
   LogOut,
 } from 'lucide-react'
@@ -20,6 +21,7 @@ import { P } from '@/components/dark-ui'
 const navItems = [
   { href: '/therapist/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/therapist/patients', label: 'Patiënten', icon: Users },
+  { href: '/therapist/signals', label: 'Signalen', icon: AlertCircle },
   { href: '/therapist/programs', label: "Programma's", icon: ClipboardList },
   { href: '/therapist/week-planner', label: 'Weekschema', icon: CalendarDays },
   { href: '/therapist/exercises', label: 'Oefeningen', icon: Dumbbell },

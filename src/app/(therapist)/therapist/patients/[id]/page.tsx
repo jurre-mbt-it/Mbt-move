@@ -17,6 +17,8 @@ import {
   P,
   Tile,
 } from '@/components/dark-ui'
+import { InsightActivationToggle } from '@/components/insights/InsightActivationToggle'
+import { InsightTimeline } from '@/components/insights/InsightTimeline'
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
   ACTIVE:    { label: 'Actief',    bg: 'rgba(190,242,100,0.14)', text: P.lime },
@@ -164,12 +166,13 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         {/* Tabs */}
         <Tabs defaultValue="profiel" className="space-y-4">
           <TabsList
-            className="w-full grid grid-cols-4 rounded-xl"
+            className="w-full grid grid-cols-5 rounded-xl"
             style={{ background: P.surface, border: `1px solid ${P.line}` }}
           >
             <TabsTrigger value="profiel" className="text-xs px-1">Profiel</TabsTrigger>
-            <TabsTrigger value="programmas" className="text-xs px-1">Programma&apos;s</TabsTrigger>
-            <TabsTrigger value="geschiedenis" className="text-xs px-1">Geschiedenis</TabsTrigger>
+            <TabsTrigger value="programmas" className="text-xs px-1">Progr.</TabsTrigger>
+            <TabsTrigger value="geschiedenis" className="text-xs px-1">Historie</TabsTrigger>
+            <TabsTrigger value="signalen" className="text-xs px-1">Signalen</TabsTrigger>
             <TabsTrigger value="voortgang" className="text-xs px-1">Voortgang</TabsTrigger>
           </TabsList>
 
@@ -409,6 +412,12 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                 </Tile>
               ))
             )}
+          </TabsContent>
+
+          {/* ── TAB: Signalen (CIE) ───────────────────────────────── */}
+          <TabsContent value="signalen" className="space-y-4">
+            <InsightActivationToggle patientId={patient.id} patientName={patient.name} />
+            <InsightTimeline patientId={patient.id} />
           </TabsContent>
 
           {/* ── TAB: Voortgang ───────────────────────────────────── */}

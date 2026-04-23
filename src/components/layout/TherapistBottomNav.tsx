@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, ClipboardList, Dumbbell, Settings } from 'lucide-react'
+import { LayoutDashboard, Users, AlertCircle, ClipboardList, Dumbbell, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { P } from '@/components/dark-ui'
 
 const navItems = [
   { href: '/therapist/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/therapist/patients', label: 'Patiënten', icon: Users },
+  { href: '/therapist/signals', label: 'Signalen', icon: AlertCircle },
   { href: '/therapist/programs', label: "Programma's", icon: ClipboardList },
   { href: '/therapist/exercises', label: 'Oefeningen', icon: Dumbbell },
   { href: '/therapist/settings', label: 'Instellingen', icon: Settings },
