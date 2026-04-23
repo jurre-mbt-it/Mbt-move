@@ -8,7 +8,7 @@ const createId = () => crypto.randomUUID()
 export const patientsRouter = createTRPCRouter({
   list: therapistProcedure.query(async ({ ctx }) => {
     const relations = await ctx.prisma.patientTherapist.findMany({
-      where: { therapistId: ctx.user.id, isActive: true, status: 'APPROVED' },
+      where: { therapistId: ctx.user.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
       include: {
         patient: {
           select: {
@@ -47,6 +47,7 @@ export const patientsRouter = createTRPCRouter({
         .slice(0, 2)
 
       return {
+        accessStatus: r.status,
         id: p.id,
         name: p.name ?? p.email,
         email: p.email,
@@ -69,7 +70,7 @@ export const patientsRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const relation = await ctx.prisma.patientTherapist.findFirst({
-        where: { therapistId: ctx.user.id, patientId: input.id, isActive: true, status: 'APPROVED' },
+        where: { therapistId: ctx.user.id, patientId: input.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
         include: {
           patient: {
             select: {
@@ -113,6 +114,7 @@ export const patientsRouter = createTRPCRouter({
 
       return {
         id: p.id,
+        accessStatus: relation.status,
         name: p.name ?? p.email,
         email: p.email,
         role: p.role,
@@ -143,7 +145,7 @@ export const patientsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       // Verify this is a patient of the current therapist
       const relation = await ctx.prisma.patientTherapist.findFirst({
-        where: { therapistId: ctx.user.id, patientId: input.id, isActive: true, status: 'APPROVED' },
+        where: { therapistId: ctx.user.id, patientId: input.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
       })
       if (!relation && ctx.user.role !== 'ADMIN') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Patiënt niet gevonden' })
@@ -297,7 +299,7 @@ export const patientsRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const relation = await ctx.prisma.patientTherapist.findFirst({
-        where: { therapistId: ctx.user.id, patientId: input.id, isActive: true, status: 'APPROVED' },
+        where: { therapistId: ctx.user.id, patientId: input.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
       })
       if (!relation && ctx.user.role !== 'ADMIN') {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Geen actieve koppeling met deze patiënt' })
@@ -390,7 +392,7 @@ export const patientsRouter = createTRPCRouter({
         where: {
           therapistId: ctx.user.id,
           patientId: input.patientId,
-          isActive: true, status: 'APPROVED',
+          isActive: true, status: { in: ['APPROVED', 'PENDING'] },
         },
       })
       if (!relation && ctx.user.role !== 'ADMIN') {
@@ -440,7 +442,7 @@ export const patientsRouter = createTRPCRouter({
         where: {
           therapistId: ctx.user.id,
           patientId: input.patientId,
-          isActive: true, status: 'APPROVED',
+          isActive: true, status: { in: ['APPROVED', 'PENDING'] },
         },
       })
       if (!relation && ctx.user.role !== 'ADMIN') {
@@ -523,7 +525,7 @@ export const patientsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       // Verify access
       const relation = await ctx.prisma.patientTherapist.findFirst({
-        where: { therapistId: ctx.user.id, patientId: input.patientId, isActive: true, status: 'APPROVED' },
+        where: { therapistId: ctx.user.id, patientId: input.patientId, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
       })
       if (!relation) throw new TRPCError({ code: 'FORBIDDEN' })
 
@@ -627,7 +629,7 @@ export const patientsRouter = createTRPCRouter({
         where: {
           role: { in: ['PATIENT', 'ATHLETE'] },
           patientTherapists: {
-            some: { therapistId: ctx.user.id, isActive: true, status: 'APPROVED' },
+            some: { therapistId: ctx.user.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
           },
           // Defensive: limit naar eigen praktijk (null = legacy, zichtbaar).
           ...(ctx.user.practiceId

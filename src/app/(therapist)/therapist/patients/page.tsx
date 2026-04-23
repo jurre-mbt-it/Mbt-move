@@ -241,6 +241,24 @@ function PatientsPageInner() {
                             {status.label}
                           </span>
                         )}
+                        {patient.accessStatus === 'PENDING' && (
+                          <span
+                            className="athletic-mono"
+                            title="Patiënt heeft de uitnodiging nog niet geaccepteerd"
+                            style={{
+                              background: 'rgba(244, 194, 97, 0.15)',
+                              color: P.gold,
+                              fontSize: 10,
+                              letterSpacing: '0.1em',
+                              padding: '2px 8px',
+                              borderRadius: 999,
+                              fontWeight: 800,
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            Uitnodiging open
+                          </span>
+                        )}
                       </div>
 
                       <p

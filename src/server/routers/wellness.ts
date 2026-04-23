@@ -72,7 +72,7 @@ export const wellnessRouter = createTRPCRouter({
         where: {
           therapistId: ctx.user!.id,
           patientId: input.patientId,
-          isActive: true, status: 'APPROVED',
+          isActive: true, status: { in: ['APPROVED', 'PENDING'] },
         },
       })
       if (!relation && ctx.user!.role !== 'ADMIN') {

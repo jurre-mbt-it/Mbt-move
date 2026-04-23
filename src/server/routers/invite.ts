@@ -113,6 +113,41 @@ export const inviteRouter = createTRPCRouter({
         },
       })
 
+      // Pre-create Prisma User + PatientTherapist (status=PENDING) zodat de
+      // therapeut al sessies kan loggen vóór de patiënt de invite accepteert.
+      // Bij `invite.finalize` wordt de User gekoppeld aan Supabase-auth via
+      // email-match en wordt PatientTherapist opgehoogd naar APPROVED.
+      if (input.role === 'PATIENT' || input.role === 'ATHLETE') {
+        const existingUser = await ctx.prisma.user.findUnique({ where: { email } })
+        const patientUser = existingUser ?? await ctx.prisma.user.create({
+          data: {
+            email,
+            name: input.name.trim(),
+            role: input.role,
+            dateOfBirth: dob,
+            practiceId: ctx.user!.practiceId,
+          },
+        })
+        await ctx.prisma.patientTherapist.upsert({
+          where: {
+            therapistId_patientId: {
+              therapistId: ctx.user!.id,
+              patientId: patientUser.id,
+            },
+          },
+          // Bestaande koppeling (bv. APPROVED van vorige redeem) niet overschrijven
+          update: {},
+          create: {
+            therapistId: ctx.user!.id,
+            patientId: patientUser.id,
+            status: 'PENDING',
+            isActive: true,
+            requestedAt: new Date(),
+            notes: `Aangemaakt via invite — wacht op acceptatie`,
+          },
+        })
+      }
+
       // Stuur een branded invite-mail via Resend (als geconfigureerd). Bevat
       // de URL naar /login/code. De 6-cijfer code zelf komt later via
       // Supabase's OTP-mail wanneer de patiënt op de URL "Stuur code" klikt.

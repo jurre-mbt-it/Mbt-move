@@ -14,7 +14,7 @@ async function assertCanAssignPatient(
   if (user.role === 'ADMIN') return
   if (patientId === user.id) return
   const relation = await prisma.patientTherapist.findFirst({
-    where: { therapistId: user.id, patientId, isActive: true, status: 'APPROVED' },
+    where: { therapistId: user.id, patientId, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
   })
   if (!relation) {
     throw new TRPCError({

@@ -19,7 +19,7 @@ async function assertPatientLink(
   if (user.role === 'ADMIN') return
   if (patientId === user.id) return
   const relation = await prisma.patientTherapist.findFirst({
-    where: { therapistId: user.id, patientId, isActive: true, status: 'APPROVED' },
+    where: { therapistId: user.id, patientId, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
   })
   if (!relation) {
     throw new TRPCError({
@@ -210,7 +210,7 @@ export const weekSchedulesRouter = createTRPCRouter({
 
       // Check dat patient gekoppeld is aan deze therapist
       const relation = await ctx.prisma.patientTherapist.findFirst({
-        where: { therapistId: ctx.user.id, patientId: input.patientId, isActive: true, status: 'APPROVED' },
+        where: { therapistId: ctx.user.id, patientId: input.patientId, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
       })
       if (!relation) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Patient is niet aan jou gekoppeld' })
