@@ -359,7 +359,18 @@ function TestRow({
 
   return (
     <div
-      className="rounded-lg"
+      role="button"
+      tabIndex={0}
+      onClick={() => setExpanded((v) => !v)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          setExpanded((v) => !v)
+        }
+      }}
+      aria-expanded={expanded}
+      aria-label={`Test ${test.name} — klik om ${expanded ? 'in te klappen' : 'uit te klappen'}`}
+      className="athletic-tap rounded-lg cursor-pointer"
       style={{
         background: SCORE_BG[currentScore],
         border: `1px solid ${P.line}`,
@@ -371,7 +382,12 @@ function TestRow({
         <div className="flex-1 min-w-0">
           <p style={{ color: P.ink, fontSize: 13, fontWeight: 700 }}>{test.name}</p>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
+        <div
+          className="flex items-center gap-1 shrink-0"
+          // Stop propagation: kliks op score-knoppen + expand-icon mogen de rij niet togglen
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
           {(['FAIL', 'PARTIAL', 'PASS'] as const).map((s) => (
             <button
               key={s}
@@ -394,25 +410,30 @@ function TestRow({
               {s === 'FAIL' ? 'R' : s === 'PARTIAL' ? 'O' : 'G'}
             </button>
           ))}
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
+          <span
+            aria-hidden
             className="athletic-mono"
             style={{
               color: P.inkMuted,
-              fontSize: 10,
+              fontSize: 12,
               letterSpacing: '0.12em',
               padding: '4px 8px',
               marginLeft: 4,
+              userSelect: 'none',
             }}
           >
             {expanded ? '−' : '+'}
-          </button>
+          </span>
         </div>
       </div>
 
       {expanded && (
-        <div className="mt-3 space-y-3" style={{ paddingTop: 10, borderTop: `1px solid ${P.line}` }}>
+        <div
+          className="mt-3 space-y-3"
+          style={{ paddingTop: 10, borderTop: `1px solid ${P.line}` }}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
           <div>
             <MetaLabel style={{ color: P.inkMuted }}>Uitvoering</MetaLabel>
             <p style={{ color: P.ink, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>{test.description}</p>
