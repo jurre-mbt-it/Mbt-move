@@ -164,6 +164,42 @@ enum RehabCriterionInputType {
   PASS_FAIL // slagen / niet slagen
 }
 
+// ─── Mobility Assessment (Ready State methodology) ───────────────────────────
+
+enum AssessmentArchetype {
+  LUMBAR_SPINE
+  SQUAT_HINGE
+  PISTOL
+  LUNGE
+  THORACIC_SPINE
+  OVERHEAD
+  FRONT_RACK
+  PRESS
+  HANG
+  BREATHING
+}
+
+enum AssessmentTestType {
+  ACTIVE
+  PASSIVE
+  MOTOR_CONTROL
+  BREATHING
+}
+
+enum AssessmentScore {
+  NOT_TESTED  // grijs / overgeslagen
+  FAIL        // rood
+  PARTIAL     // oranje
+  PASS        // groen
+}
+
+enum TissueLimitation {
+  JOINT
+  SLIDING_SURFACE
+  MUSCLE_DYNAMICS
+  MOTOR_CONTROL
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -193,6 +229,10 @@ model User {
   mfaSecret         String?
   mfaEnforcedAt     DateTime? // moment waarop admin/therapist rol MFA verplicht kreeg
   mfaLastBackupCodesGeneratedAt DateTime?
+
+  // Admin-toegekende feature-flags (opt-in per therapeut).
+  // Mobility Assessment (Ready State methodology) — admin schakelt per therapeut in.
+  canUseAssessment  Boolean   @default(false)
 
   // AVG art. 17 — right to be forgotten
   deletedAt             DateTime?  // soft-delete tombstone (records stay during 30-day grace)
@@ -236,6 +276,10 @@ model User {
   rehabTracker           PatientRehabTracker?   @relation("RehabTrackerPatient")
   rehabTrackersActivated PatientRehabTracker[]  @relation("RehabTrackerActivator")
   rehabStatusUpdates     RehabCriterionStatus[] @relation("RehabStatusUpdater")
+
+  // Mobility assessment relations
+  assessmentsAsPatient   PatientAssessment[]    @relation("AssessmentPatient")
+  assessmentsAsTherapist PatientAssessment[]    @relation("AssessmentTherapist")
 
   @@index([deletedAt])
   @@map("users")
@@ -339,6 +383,7 @@ model Exercise {
   collectionItems  ExerciseCollectionItem[]
   favoritedBy      FavoriteExercise[]
   insights         Insight[]
+  assessmentMobilizations AssessmentTestMobilization[]
 
   // Multi-tenant: oefening is zichtbaar binnen deze praktijk. null = globaal
   // (admin-beheerd / legacy). Gecombineerd met isPublic (true = ook globaal
@@ -917,4 +962,98 @@ model RehabCriterionStatus {
   @@unique([patientId, criterionId])
   @@index([patientId])
   @@map("rehab_criterion_status")
+}
+
+// ─── Mobility Assessment (The Ready State methodology) ───────────────────────
+// Catalog van ~55 tests verdeeld over 10 archetypes. Therapeut neemt een
+// assessment-sessie af en scoort elke test Pass/Partial/Fail. Bij FAIL worden
+// 3 voorgestelde mobilisaties getoond (gekoppeld aan Exercise-catalog).
+
+/// Catalog: \u00e9\u00e9n test-definitie (archetype + type + beschrijving + criteria).
+model AssessmentTest {
+  id             String              @id @default(cuid())
+  key            String              @unique
+  archetype      AssessmentArchetype
+  testType       AssessmentTestType
+  name           String
+  description    String              // hoe de test uit te voeren
+  criteria       String              // wat pass eruit ziet (bullets joined met \\n\u2022 )
+  order          Int                 // sort-order binnen archetype
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  suggestedMobilizations AssessmentTestMobilization[]
+  scores                 AssessmentTestScore[]
+
+  @@index([archetype, testType, order])
+  @@map("assessment_tests")
+}
+
+/// 3 voorgestelde mobilisaties per test (voor als deze FAIL is).
+model AssessmentTestMobilization {
+  id         String         @id @default(cuid())
+  testId     String
+  test       AssessmentTest @relation(fields: [testId], references: [id], onDelete: Cascade)
+  exerciseId String
+  exercise   Exercise       @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  order      Int            // 0, 1, 2
+
+  @@unique([testId, order])
+  @@map("assessment_test_mobilizations")
+}
+
+/// E\u00e9n assessment-sessie per datum per patient.
+model PatientAssessment {
+  id          String   @id @default(cuid())
+  patientId   String
+  patient     User     @relation("AssessmentPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  therapistId String
+  therapist   User     @relation("AssessmentTherapist", fields: [therapistId], references: [id])
+  performedAt DateTime @default(now())
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  scores             AssessmentTestScore[]
+  archetypeSummaries AssessmentArchetypeSummary[]
+
+  @@index([patientId, performedAt])
+  @@map("patient_assessments")
+}
+
+/// Score per test binnen een assessment-sessie.
+model AssessmentTestScore {
+  id           String              @id @default(cuid())
+  assessmentId String
+  assessment   PatientAssessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  testId       String
+  test         AssessmentTest      @relation(fields: [testId], references: [id])
+  score        AssessmentScore     @default(NOT_TESTED)
+  notes        String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@unique([assessmentId, testId])
+  @@index([assessmentId])
+  @@map("assessment_test_scores")
+}
+
+/// Per-archetype samenvatting + programming template binnen een assessment.
+model AssessmentArchetypeSummary {
+  id                         String              @id @default(cuid())
+  assessmentId               String
+  assessment                 PatientAssessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  archetype                  AssessmentArchetype
+  compensationStrategy       String?
+  primaryTissue              TissueLimitation?
+  // Programming Template — vrije tekst
+  mobilityJoint              String?
+  mobilitySlidingSurface     String?
+  mobilityLoadedEndRange     String?
+  motorSkillTransfer         String?
+  motorMovementModification  String?
+  updatedAt                  DateTime            @updatedAt
+
+  @@unique([assessmentId, archetype])
+  @@map("assessment_archetype_summaries")
 }

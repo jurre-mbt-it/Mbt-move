@@ -11,6 +11,7 @@ import {
   Library,
   MessageSquare,
   AlertCircle,
+  Activity,
   Shield,
   Settings,
   LogOut,
@@ -36,7 +37,9 @@ export function TherapistSidebar() {
   const router = useRouter()
   const supabase = createClient()
   const { data: me } = trpc.auth.getMe.useQuery()
+  const { data: assessmentAccess } = trpc.assessments.hasAccess.useQuery()
   const isAdmin = me?.role === 'ADMIN'
+  const canUseAssessment = !!assessmentAccess?.hasAccess
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -98,6 +101,27 @@ export function TherapistSidebar() {
             </Link>
           )
         })}
+        {canUseAssessment && (
+          <Link
+            href="/therapist/assessments"
+            className={cn(
+              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors',
+              'athletic-tap',
+            )}
+            style={{
+              backgroundColor: pathname.startsWith('/therapist/assessments') ? P.surfaceHi : 'transparent',
+              color: pathname.startsWith('/therapist/assessments') ? P.lime : P.inkMuted,
+              fontWeight: pathname.startsWith('/therapist/assessments') ? 800 : 600,
+              letterSpacing: pathname.startsWith('/therapist/assessments') ? '0.04em' : undefined,
+              borderLeft: pathname.startsWith('/therapist/assessments')
+                ? `2px solid ${P.lime}`
+                : '2px solid transparent',
+            }}
+          >
+            <Activity className="w-4.5 h-4.5 shrink-0" />
+            Assessment
+          </Link>
+        )}
       </nav>
 
       {/* Footer */}

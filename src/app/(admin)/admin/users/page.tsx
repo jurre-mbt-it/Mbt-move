@@ -46,6 +46,13 @@ export default function AdminUsersPage() {
     },
     onError: (e) => toast.error(e.message),
   })
+  const grantAssessment = trpc.assessments.adminGrantAccess.useMutation({
+    onSuccess: () => {
+      utils.admin.listUsers.invalidate()
+      toast.success('Assessment-toegang bijgewerkt')
+    },
+    onError: (e) => toast.error(e.message),
+  })
 
   return (
     <DarkScreen>
@@ -118,6 +125,21 @@ export default function AdminUsersPage() {
                       {practices.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </DarkSelect>
                   </div>
+                  {u.role === 'THERAPIST' && (
+                    <div className="flex flex-col gap-1">
+                      <MetaLabel>Assessment</MetaLabel>
+                      <DarkButton
+                        size="sm"
+                        variant={u.canUseAssessment ? 'primary' : 'secondary'}
+                        disabled={grantAssessment.isPending}
+                        onClick={() =>
+                          grantAssessment.mutate({ therapistId: u.id, enabled: !u.canUseAssessment })
+                        }
+                      >
+                        {u.canUseAssessment ? 'AAN' : 'UIT'}
+                      </DarkButton>
+                    </div>
+                  )}
                 </div>
               </div>
             </Tile>

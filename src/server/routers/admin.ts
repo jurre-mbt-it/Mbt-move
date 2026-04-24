@@ -46,6 +46,7 @@ export const adminRouter = createTRPCRouter({
           practiceId: true,
           createdAt: true,
           mfaEnabled: true,
+          canUseAssessment: true,
         },
         orderBy: { createdAt: 'desc' },
         take: 100,

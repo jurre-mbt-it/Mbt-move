@@ -13,6 +13,7 @@ import { inviteRouter } from './invite'
 import { gdprRouter } from './gdpr'
 import { insightsRouter } from './insights'
 import { rehabRouter } from './rehab'
+import { assessmentsRouter } from './assessments'
 
 export const appRouter = createTRPCRouter({
   auth: authRouter,
@@ -29,6 +30,7 @@ export const appRouter = createTRPCRouter({
   gdpr: gdprRouter,
   insights: insightsRouter,
   rehab: rehabRouter,
+  assessments: assessmentsRouter,
 })
 
 export type AppRouter = typeof appRouter
