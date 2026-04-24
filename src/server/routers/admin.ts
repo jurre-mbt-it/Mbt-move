@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
+import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
 import {
   createTRPCRouter,
   adminProcedure,
@@ -131,5 +132,51 @@ export const adminRouter = createTRPCRouter({
       return ctx.prisma.practice.delete({
         where: { id: input.id },
       })
+    }),
+
+  // ── Therapeut uitnodigen ───────────────────────────────────────────────
+
+  inviteTherapist: mfaAdminProcedure
+    .input(z.object({
+      email: z.string().email(),
+      name: z.string().min(1).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // Blokkeer als de gebruiker al in Prisma bestaat
+      const existing = await ctx.prisma.user.findUnique({
+        where: { email: input.email },
+        select: { id: true, role: true },
+      })
+      if (existing) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: `${input.email} bestaat al als ${existing.role}.`,
+        })
+      }
+
+      const supabaseAdmin = createSupabaseAdminClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      )
+
+      const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+        input.email,
+        { data: { role: 'THERAPIST', name: input.name ?? '' } },
+      )
+      if (inviteError) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: inviteError.message })
+      }
+
+      // Pre-create Prisma user zodat ze direct kunnen inloggen
+      const user = await ctx.prisma.user.create({
+        data: {
+          email: input.email,
+          name: input.name ?? input.email.split('@')[0],
+          role: 'THERAPIST',
+        },
+        select: { id: true, email: true, name: true, role: true },
+      })
+
+      return { ok: true, user }
     }),
 })

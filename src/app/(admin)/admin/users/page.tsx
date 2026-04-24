@@ -24,6 +24,8 @@ const ROLES = ['PATIENT', 'ATHLETE', 'THERAPIST', 'ADMIN'] as const
 export default function AdminUsersPage() {
   const [query, setQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('')
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteName, setInviteName] = useState('')
 
   const utils = trpc.useUtils()
   const { data: users = [], isLoading } = trpc.admin.listUsers.useQuery({
@@ -53,6 +55,15 @@ export default function AdminUsersPage() {
     },
     onError: (e) => toast.error(e.message),
   })
+  const invite = trpc.admin.inviteTherapist.useMutation({
+    onSuccess: (data) => {
+      utils.admin.listUsers.invalidate()
+      toast.success(`Uitnodiging verstuurd naar ${data.user.email}`)
+      setInviteEmail('')
+      setInviteName('')
+    },
+    onError: (e) => toast.error(e.message),
+  })
 
   return (
     <DarkScreen>
@@ -69,6 +80,45 @@ export default function AdminUsersPage() {
             Beheer user-rollen en koppel gebruikers aan praktijken.
           </p>
         </div>
+
+        {/* Therapeut uitnodigen */}
+        <Tile accentBar={P.lime}>
+          <Kicker style={{ color: P.lime }}>THERAPEUT UITNODIGEN</Kicker>
+          <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 4, marginBottom: 12, lineHeight: 1.5 }}>
+            Verstuur een uitnodigingsmail via Supabase. De therapeut kan een wachtwoord instellen en inloggen.
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              invite.mutate({ email: inviteEmail, name: inviteName || undefined })
+            }}
+            className="flex flex-col sm:flex-row gap-2"
+          >
+            <DarkInput
+              placeholder="naam (optioneel)"
+              value={inviteName}
+              onChange={(e) => setInviteName(e.target.value)}
+              className="sm:w-44"
+            />
+            <DarkInput
+              type="email"
+              placeholder="e-mailadres therapeut"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              required
+              className="flex-1"
+            />
+            <DarkButton
+              type="submit"
+              variant="primary"
+              size="sm"
+              disabled={invite.isPending || !inviteEmail}
+              loading={invite.isPending}
+            >
+              Uitnodigen
+            </DarkButton>
+          </form>
+        </Tile>
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-2">
