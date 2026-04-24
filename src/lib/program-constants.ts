@@ -17,14 +17,15 @@ export const REP_UNITS = [
   { value: 'min',  label: 'min'  },
 ]
 
-// Visual colors per superset group letter
+// Visual colors per superset group letter — athletic-dark palette: subtiele
+// gekleurde overlay op dark base, rand in accent-tint, tekst in lichte tint.
 export const SUPERSET_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  A: { bg: '#eff6ff', border: '#93c5fd', text: '#1d4ed8' },
-  B: { bg: '#fefce8', border: '#fde047', text: '#a16207' },
-  C: { bg: '#fdf4ff', border: '#d8b4fe', text: '#7e22ce' },
-  D: { bg: '#fff1f2', border: '#fda4af', text: '#be123c' },
-  E: { bg: '#f0fdfa', border: '#86efac', text: '#0D6B6E' },
-  F: { bg: '#fff7ed', border: '#fdba74', text: '#c2410c' },
+  A: { bg: 'rgba(96,165,250,0.06)',  border: 'rgba(96,165,250,0.35)',  text: '#93C5FD' },
+  B: { bg: 'rgba(244,194,97,0.06)',  border: 'rgba(244,194,97,0.35)',  text: '#F4C261' },
+  C: { bg: 'rgba(167,139,250,0.06)', border: 'rgba(167,139,250,0.35)', text: '#C4B5FD' },
+  D: { bg: 'rgba(251,113,133,0.06)', border: 'rgba(251,113,133,0.35)', text: '#FDA4AF' },
+  E: { bg: 'rgba(134,239,172,0.06)', border: 'rgba(134,239,172,0.35)', text: '#86EFAC' },
+  F: { bg: 'rgba(251,146,60,0.06)',  border: 'rgba(251,146,60,0.35)',  text: '#FDBA74' },
 }
 
 export const SUPERSET_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F']
