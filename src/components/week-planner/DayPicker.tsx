@@ -31,6 +31,10 @@ interface Props {
   patientId: string | null
   patientName?: string | null
   onPick: (programId: string | null) => void
+  /** Called nadat een nieuw programma via quick-create is aangemaakt. De
+   *  parent is verantwoordelijk voor het opslaan van het weekschema en
+   *  doornavigeren naar de program-editor (met returnTo). */
+  onCreated?: (programId: string) => Promise<void> | void
 }
 
 const CATEGORY_OPTIONS = [
@@ -41,7 +45,7 @@ const CATEGORY_OPTIONS = [
 type Mode = 'pick' | 'create'
 type Destination = 'patient' | 'library'
 
-export function DayPicker({ open, onOpenChange, dayLabel, programs, patientId, patientName, onPick }: Props) {
+export function DayPicker({ open, onOpenChange, dayLabel, programs, patientId, patientName, onPick, onCreated }: Props) {
   const [mode, setMode] = useState<Mode>('pick')
   const [category, setCategory] = useState<string>('ALL')
 
@@ -88,8 +92,13 @@ export function DayPicker({ open, onOpenChange, dayLabel, programs, patientId, p
         type: newCategory as 'STRENGTH' | 'MOBILITY' | 'PLYOMETRICS' | 'CARDIO' | 'STABILITY',
       })
       await utils.programs.list.invalidate()
-      toast.success('Programma aangemaakt en geplaatst — voeg oefeningen toe in de programma-editor')
-      handlePick(program.id)
+      if (onCreated) {
+        // Parent regelt schedule-save + doornavigatie naar program-editor
+        await onCreated(program.id)
+      } else {
+        toast.success('Programma aangemaakt en geplaatst')
+        handlePick(program.id)
+      }
       resetCreate()
     } catch {
       toast.error('Aanmaken mislukt')
@@ -301,7 +310,11 @@ export function DayPicker({ open, onOpenChange, dayLabel, programs, patientId, p
                 onClick={handleCreate}
                 disabled={createProgram.isPending || !newName.trim()}
               >
-                {createProgram.isPending ? 'Bezig…' : 'Aanmaken en plaatsen'}
+                {createProgram.isPending
+                  ? 'Bezig…'
+                  : onCreated
+                    ? 'Aanmaken en oefeningen toevoegen'
+                    : 'Aanmaken en plaatsen'}
               </Button>
             </div>
           </div>

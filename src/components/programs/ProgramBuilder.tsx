@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Label } from '@/components/ui/label'
 import { useCustomParams } from '@/hooks/useCustomParams'
 import {
@@ -84,6 +84,11 @@ interface ProgramBuilderProps {
 
 export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  // Na opslaan doorsturen naar een oorspronkelijke pagina (bv week-planner).
+  // Alleen relatieve paden geaccepteerd om open-redirect te voorkomen.
+  const rawReturnTo = searchParams?.get('returnTo') ?? null
+  const returnTo = rawReturnTo && rawReturnTo.startsWith('/') ? rawReturnTo : null
 
   const [program, setProgram] = useState<ProgramState>(() => ({
     name: initialState?.name ?? 'Nieuw programma',
@@ -416,6 +421,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
         return
       }
       toast.success('Programma opgeslagen')
+      if (returnTo) router.push(returnTo)
     } catch {
       toast.error('Opslaan mislukt')
     }

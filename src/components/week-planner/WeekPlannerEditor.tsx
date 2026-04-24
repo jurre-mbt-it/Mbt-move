@@ -188,6 +188,54 @@ export function WeekPlannerEditor({ initialData }: Props) {
     setPickerDay(null)
   }
 
+  /**
+   * Quick-create flow: sla eerst het weekschema op (met de nieuwe programId
+   * op de geselecteerde dag), dan door naar de program-editor zodat de
+   * therapeut direct oefeningen kan toevoegen. Na opslaan daar brengt de
+   * returnTo-param hem terug naar het weekschema.
+   */
+  const handleCreatedProgram = async (programId: string) => {
+    if (pickerDay === null) return
+    const dayIndex = pickerDay
+    const nextDays = days.map((d, i) => (i === dayIndex ? { programId } : d))
+    setDays(nextDays)
+    setPickerOpen(false)
+    setPickerDay(null)
+
+    const patientLabel = patientOptions.find(p => p.id === patientId)?.name ?? 'patiënt'
+    const finalName = name.trim() || `Weekplan · ${patientLabel}`
+    const daysPayload = nextDays.map((d, i) => ({ dayOfWeek: i, programId: d.programId }))
+
+    try {
+      let scheduleId = initialData?.id
+      if (scheduleId) {
+        await saveMutation.mutateAsync({
+          id: scheduleId,
+          name: finalName,
+          description: description.trim() || undefined,
+          patientId: patientId || null,
+          isTemplate,
+          days: daysPayload,
+        })
+      } else {
+        const created = await createMutation.mutateAsync({
+          name: finalName,
+          description: description.trim() || undefined,
+          patientId: patientId || undefined,
+          isTemplate,
+          days: daysPayload,
+        })
+        scheduleId = created.id
+        if (!name.trim()) setName(finalName)
+      }
+      await utils.weekSchedules.list.invalidate()
+      const returnTo = `/therapist/week-planner/${scheduleId}/edit`
+      router.push(`/therapist/programs/${programId}/edit?returnTo=${encodeURIComponent(returnTo)}`)
+    } catch {
+      toast.error('Schema opslaan mislukt — probeer het handmatig te Opslaan')
+    }
+  }
+
   const trainingDays = days.filter(d => d.programId).length
 
   return (
@@ -390,6 +438,7 @@ export function WeekPlannerEditor({ initialData }: Props) {
         patientId={patientId || null}
         patientName={patientOptions.find(p => p.id === patientId)?.name ?? null}
         onPick={handlePickProgram}
+        onCreated={handleCreatedProgram}
       />
       <BulkPlaceDialog
         open={bulkOpen}
