@@ -140,6 +140,7 @@ export const programsRouter = createTRPCRouter({
       weeks: z.number().int().min(1).default(4),
       daysPerWeek: z.number().int().min(1).default(3),
       isTemplate: z.boolean().default(false),
+      type: z.enum(['STRENGTH', 'MOBILITY', 'PLYOMETRICS', 'CARDIO', 'STABILITY', 'MIXED']).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const { patientId, ...rest } = input

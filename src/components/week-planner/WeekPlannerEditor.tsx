@@ -387,6 +387,8 @@ export function WeekPlannerEditor({ initialData }: Props) {
         onOpenChange={setPickerOpen}
         dayLabel={pickerDay !== null ? DAY_LABELS[pickerDay] : ''}
         programs={programs}
+        patientId={patientId || null}
+        patientName={patientOptions.find(p => p.id === patientId)?.name ?? null}
         onPick={handlePickProgram}
       />
       <BulkPlaceDialog

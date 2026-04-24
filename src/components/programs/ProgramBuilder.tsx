@@ -381,6 +381,9 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
     }))
 
     try {
+      // Bibliotheek-save mag geen patientId houden, anders staat een template
+      // gekoppeld aan een patiënt in de lijst.
+      const patientIdForSave = program.isTemplate ? null : program.patientId || undefined
       if (programId) {
         await saveProgram.mutateAsync({
           id: programId,
@@ -389,6 +392,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
           weeks: program.weeks,
           daysPerWeek: program.daysPerWeek,
           isTemplate: program.isTemplate,
+          patientId: patientIdForSave,
           exercises: exercisePayload,
         })
       } else {
@@ -398,7 +402,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
           weeks: program.weeks,
           daysPerWeek: program.daysPerWeek,
           isTemplate: program.isTemplate,
-          patientId: program.patientId || undefined,
+          patientId: patientIdForSave ?? undefined,
         })
         // Save exercises to the newly created program
         if (exercises.length > 0) {
@@ -635,6 +639,43 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
               Epley per sessie
             </span>
           )}
+
+          {/* Destination toggle — bepaalt of Opslaan naar deze patiënt of de
+              bibliotheek gaat. Zonder patiënt is alleen "Bibliotheek" mogelijk. */}
+          <div className="ml-auto hidden md:flex items-center gap-1">
+            <span className="athletic-mono text-[10px] tracking-wider text-[#7B8889] mr-1">
+              OPSLAAN ALS
+            </span>
+            <button
+              type="button"
+              onClick={() => setProgram(p => ({ ...p, isTemplate: false }))}
+              disabled={!program.patientId}
+              className="athletic-tap px-2.5 py-0.5 rounded text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                background: !program.isTemplate && program.patientId ? '#BEF264' : 'transparent',
+                color: !program.isTemplate && program.patientId ? '#0F1516' : '#7B8889',
+                border: '1px solid rgba(255,255,255,0.12)',
+                letterSpacing: '0.04em',
+              }}
+              title={!program.patientId ? 'Eerst een patiënt koppelen' : 'Alleen voor deze patiënt'}
+            >
+              Patiënt
+            </button>
+            <button
+              type="button"
+              onClick={() => setProgram(p => ({ ...p, isTemplate: true }))}
+              className="athletic-tap px-2.5 py-0.5 rounded text-[11px] font-bold transition-colors"
+              style={{
+                background: program.isTemplate ? '#BEF264' : 'transparent',
+                color: program.isTemplate ? '#0F1516' : '#7B8889',
+                border: '1px solid rgba(255,255,255,0.12)',
+                letterSpacing: '0.04em',
+              }}
+              title="Deel met de hele praktijk-bibliotheek"
+            >
+              Bibliotheek
+            </button>
+          </div>
         </div>
 
         {/* Mobile action row: week tabs + balance toggle */}

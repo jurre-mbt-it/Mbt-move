@@ -96,7 +96,10 @@ enum SessionStatus {
 
 enum ProgramType {
   STRENGTH
+  MOBILITY
+  PLYOMETRICS
   CARDIO
+  STABILITY
   MIXED
 }
 
