@@ -1,27 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
-import { ChevronLeft, Save } from 'lucide-react'
+import { ChevronLeft, Save, Plus, CalendarDays } from 'lucide-react'
 import Link from 'next/link'
+import { DarkButton, Kicker, P } from '@/components/dark-ui'
+import { EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
+import { DayPicker, type ProgramOption } from './DayPicker'
+import { BulkPlaceDialog } from './BulkPlaceDialog'
 
 const DAY_LABELS = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
-const DAY_SHORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
+const DAY_SHORT = ['MA', 'DI', 'WO', 'DO', 'VR', 'ZA', 'ZO']
 
 type DayState = { programId: string | null }
-
-// Local shape om tRPC deep-inference te omzeilen (TS2589)
-type ProgramLite = {
-  id: string
-  name: string
-  isTemplate?: boolean
-  patient?: { id: string; name: string | null; email: string } | null
-}
 
 type InitialData = {
   id?: string
@@ -36,6 +29,21 @@ interface Props {
   initialData?: InitialData
 }
 
+function categoryColor(cat: string | null | undefined): string {
+  switch (cat) {
+    case 'STRENGTH': return P.lime
+    case 'MOBILITY': return '#60a5fa'
+    case 'PLYOMETRICS': return '#f59e0b'
+    case 'CARDIO': return '#f87171'
+    case 'STABILITY': return '#a78bfa'
+    default: return P.inkDim
+  }
+}
+
+function categoryLabel(cat: string | null | undefined): string {
+  return EXERCISE_CATEGORIES.find(c => c.value === cat)?.label ?? ''
+}
+
 export function WeekPlannerEditor({ initialData }: Props) {
   const router = useRouter()
   const utils = trpc.useUtils()
@@ -48,27 +56,48 @@ export function WeekPlannerEditor({ initialData }: Props) {
   const [days, setDays] = useState<DayState[]>(() =>
     Array.from({ length: 7 }, (_, i) => ({
       programId: initialData?.days?.find(d => d.dayOfWeek === i)?.programId ?? null,
-    }))
+    })),
   )
+
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerDay, setPickerDay] = useState<number | null>(null)
+  const [bulkOpen, setBulkOpen] = useState(false)
 
   const { data: programsRaw } = trpc.programs.list.useQuery(undefined, { staleTime: 30_000 })
-  const programs: ProgramLite[] = (programsRaw ?? []) as ProgramLite[]
-
-  // Use a simpler patient list from programs data
-  const patientOptions = Array.from(
-    new Map(
-      programs
-        .filter(p => p.patient)
-        .map(p => [p.patient!.id, p.patient!])
-    ).values()
+  const programs = useMemo<ProgramOption[]>(
+    () =>
+      ((programsRaw as unknown as Array<{
+        id: string
+        name: string
+        isTemplate: boolean
+        dominantCategory?: string | null
+      }>) ?? []).map(p => ({
+        id: p.id,
+        name: p.name,
+        isTemplate: p.isTemplate,
+        dominantCategory: p.dominantCategory ?? null,
+      })),
+    [programsRaw],
   )
+
+  const patientOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string | null; email: string }>()
+    for (const p of (programsRaw as unknown as Array<{ patient?: { id: string; name: string | null; email: string } | null }> ?? [])) {
+      if (p.patient) map.set(p.patient.id, p.patient)
+    }
+    return Array.from(map.values())
+  }, [programsRaw])
 
   const createMutation = trpc.weekSchedules.create.useMutation()
   const saveMutation = trpc.weekSchedules.save.useMutation()
+  const scheduleProgramMutation = trpc.weekSchedules.scheduleProgram.useMutation()
   const saving = createMutation.isPending || saveMutation.isPending
 
   const handleSave = async () => {
-    if (!name.trim()) { toast.error('Geef het schema een naam'); return }
+    if (!name.trim()) {
+      toast.error('Geef het schema een naam')
+      return
+    }
     const daysPayload = days.map((d, i) => ({ dayOfWeek: i, programId: d.programId }))
     try {
       if (isEdit) {
@@ -100,115 +129,250 @@ export function WeekPlannerEditor({ initialData }: Props) {
   }
 
   const setDayProgram = (dayIndex: number, programId: string | null) => {
-    setDays(prev => prev.map((d, i) => i === dayIndex ? { programId } : d))
+    setDays(prev => prev.map((d, i) => (i === dayIndex ? { programId } : d)))
   }
 
+  const handleBulkPlace = async ({
+    programId,
+    weeks,
+    daysOfWeek,
+  }: {
+    programId: string
+    weeks: number
+    daysOfWeek: number[]
+  }) => {
+    if (!patientId) {
+      toast.error('Selecteer een patiënt')
+      return
+    }
+    try {
+      const result = await scheduleProgramMutation.mutateAsync({
+        programId,
+        patientId,
+        weeks,
+        daysOfWeek,
+      })
+      // Update lokale state zodat de kalender meteen de nieuwe dagen toont.
+      setDays(prev =>
+        prev.map((d, i) => {
+          if (daysOfWeek.includes(i)) return { programId }
+          // Als deze dag voorheen dit programma had maar nu niet in selectie → laat staan
+          return d
+        }),
+      )
+      await utils.weekSchedules.list.invalidate()
+      toast.success(`Geplaatst op ${daysOfWeek.length} dagen voor ${weeks} weken`)
+      // In new-mode heeft scheduleProgram een schema aangemaakt — redirect naar edit
+      if (!isEdit && result?.id) {
+        router.push(`/therapist/week-planner/${result.id}/edit`)
+      }
+    } catch {
+      toast.error('Plaatsen mislukt')
+    }
+  }
+
+  const openPicker = (dayIndex: number) => {
+    setPickerDay(dayIndex)
+    setPickerOpen(true)
+  }
+
+  const handlePickProgram = (programId: string | null) => {
+    if (pickerDay === null) return
+    setDayProgram(pickerDay, programId)
+    setPickerDay(null)
+  }
+
+  const trainingDays = days.filter(d => d.programId).length
+
   return (
-    <div className="max-w-2xl space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link href="/therapist/week-planner">
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-xl font-bold">{isEdit ? 'Schema bewerken' : 'Nieuw weekschema'}</h1>
-        </div>
-        <Button
-          style={{ background: '#BEF264' }}
-          className="gap-2"
-          onClick={handleSave}
-          disabled={saving}
-        >
-          <Save className="w-4 h-4" />
-          {saving ? 'Opslaan...' : 'Opslaan'}
-        </Button>
-      </div>
-
-      {/* Meta */}
-      <div className="space-y-3 p-4 border rounded-xl bg-[#141A1B]">
-        <div>
-          <Label className="text-xs">Naam</Label>
-          <Input value={name} onChange={e => setName(e.target.value)} className="mt-1.5" placeholder="bv. Knie revalidatie week 1–4" />
-        </div>
-        <div>
-          <Label className="text-xs">Beschrijving (optioneel)</Label>
-          <Input value={description} onChange={e => setDescription(e.target.value)} className="mt-1.5" placeholder="Korte omschrijving..." />
-        </div>
-        <div className="flex gap-4 items-start">
+    <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+      <div className="max-w-5xl mx-auto px-4 pt-6 pb-24 space-y-6">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <Link href="/therapist/week-planner">
+            <button className="athletic-tap w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: P.surfaceHi }}>
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          </Link>
           <div className="flex-1">
-            <Label className="text-xs">Patiënt (optioneel)</Label>
-            <select
-              value={patientId}
-              onChange={e => setPatientId(e.target.value)}
-              className="mt-1.5 w-full h-9 text-sm border rounded-md px-3 bg-[#141A1B] focus:outline-none focus:ring-1 focus:ring-[#BEF264]"
-            >
-              <option value="">— Geen patiënt —</option>
-              {patientOptions.map(p => (
-                <option key={p.id} value={p.id}>{p.name ?? p.email}</option>
-              ))}
-            </select>
+            <Kicker>{isEdit ? 'BEWERKEN' : 'NIEUW'}</Kicker>
+            <h1 className="text-xl font-bold" style={{ letterSpacing: '0.03em' }}>
+              {isEdit ? 'Weekschema bewerken' : 'Nieuw weekschema'}
+            </h1>
           </div>
-          <div className="flex items-center gap-2 pt-7">
+          <DarkButton
+            variant="primary"
+            onClick={handleSave}
+            disabled={saving}
+          >
+            <span className="inline-flex items-center gap-2">
+              <Save className="w-4 h-4" />
+              {saving ? 'Opslaan…' : 'Opslaan'}
+            </span>
+          </DarkButton>
+        </div>
+
+        {/* Meta */}
+        <div className="rounded-xl p-4 space-y-3" style={{ background: P.surface }}>
+          <div>
+            <label className="athletic-mono text-[10px] tracking-wider" style={{ color: P.inkMuted }}>
+              NAAM
+            </label>
             <input
-              type="checkbox"
-              id="isTemplate"
-              checked={isTemplate}
-              onChange={e => setIsTemplate(e.target.checked)}
-              className="accent-[#BEF264]"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              className="mt-1 w-full h-9 rounded-md px-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#BEF264]"
+              style={{ background: P.surfaceHi, color: P.ink, border: `1px solid ${P.line}` }}
+              placeholder="bv. Knie revalidatie week 1–4"
             />
-            <label htmlFor="isTemplate" className="text-sm">Template</label>
+          </div>
+          <div>
+            <label className="athletic-mono text-[10px] tracking-wider" style={{ color: P.inkMuted }}>
+              BESCHRIJVING (OPTIONEEL)
+            </label>
+            <input
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              className="mt-1 w-full h-9 rounded-md px-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#BEF264]"
+              style={{ background: P.surfaceHi, color: P.ink, border: `1px solid ${P.line}` }}
+              placeholder="Korte omschrijving…"
+            />
+          </div>
+          <div className="flex gap-4 items-end">
+            <div className="flex-1">
+              <label className="athletic-mono text-[10px] tracking-wider" style={{ color: P.inkMuted }}>
+                PATIËNT
+              </label>
+              <select
+                value={patientId}
+                onChange={e => setPatientId(e.target.value)}
+                className="mt-1 w-full h-9 rounded-md px-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#BEF264]"
+                style={{ background: P.surfaceHi, color: P.ink, border: `1px solid ${P.line}` }}
+              >
+                <option value="">— Geen patiënt (template) —</option>
+                {patientOptions.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.name ?? p.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <label className="flex items-center gap-2 pb-2">
+              <input
+                type="checkbox"
+                checked={isTemplate}
+                onChange={e => setIsTemplate(e.target.checked)}
+                className="w-4 h-4 accent-[#BEF264]"
+              />
+              <span className="text-sm" style={{ color: P.ink }}>Template</span>
+            </label>
           </div>
         </div>
-      </div>
 
-      {/* 7-day grid */}
-      <div className="space-y-2">
-        <h2 className="font-semibold text-sm">Weekindeling</h2>
-        <div className="space-y-2">
+        {/* Calendar header + bulk button */}
+        <div className="flex items-center justify-between gap-3">
+          <Kicker>Weekindeling</Kicker>
+          <DarkButton
+            variant="secondary"
+            size="sm"
+            onClick={() => setBulkOpen(true)}
+          >
+            <span className="inline-flex items-center gap-2">
+              <CalendarDays className="w-4 h-4" />
+              Meerdere weken plaatsen
+            </span>
+          </DarkButton>
+        </div>
+
+        {/* Calendar grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-7 gap-2">
           {days.map((day, i) => {
             const program = programs.find(p => p.id === day.programId)
+            const color = categoryColor(program?.dominantCategory)
             return (
-              <div
+              <button
                 key={i}
-                className="flex items-center gap-3 p-3 border rounded-xl bg-[#141A1B]"
+                type="button"
+                onClick={() => openPicker(i)}
+                className="athletic-tap text-left rounded-xl p-3 transition-colors hover:brightness-110 min-h-[92px] sm:min-h-[120px]"
+                style={{
+                  background: program ? 'rgba(190,242,100,0.06)' : P.surface,
+                  border: `1px solid ${program ? 'rgba(190,242,100,0.3)' : P.line}`,
+                }}
               >
-                {/* Day label */}
-                <div className="w-24 shrink-0">
-                  <span className="font-semibold text-sm">{DAY_LABELS[i]}</span>
-                  <span className="text-xs text-muted-foreground block">{DAY_SHORT[i]}</span>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span
+                    className="athletic-mono text-[10px] tracking-widest font-bold"
+                    style={{ color: P.inkMuted, letterSpacing: '0.14em' }}
+                  >
+                    {DAY_SHORT[i]}
+                  </span>
+                  <span className="sm:hidden text-xs" style={{ color: P.inkMuted }}>
+                    {DAY_LABELS[i]}
+                  </span>
                 </div>
-
-                {/* Program select */}
-                <select
-                  value={day.programId ?? ''}
-                  onChange={e => setDayProgram(i, e.target.value || null)}
-                  className="flex-1 h-9 text-sm border rounded-md px-3 bg-[#141A1B] focus:outline-none focus:ring-1 focus:ring-[#BEF264]"
-                >
-                  <option value="">Rustdag</option>
-                  {programs
-                    .filter(p => !p.isTemplate)
-                    .map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                </select>
-
-                {/* Color indicator */}
-                <div
-                  className="w-3 h-3 rounded-full shrink-0"
-                  style={{ background: day.programId ? '#BEF264' : 'rgba(255,255,255,0.12)' }}
-                />
-              </div>
+                {program ? (
+                  <>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
+                      <span
+                        className="athletic-mono text-[9px] tracking-wider uppercase"
+                        style={{ color: P.inkMuted }}
+                      >
+                        {categoryLabel(program.dominantCategory)}
+                      </span>
+                    </div>
+                    <p
+                      className="text-xs font-bold leading-tight"
+                      style={{
+                        color: P.ink,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {program.name}
+                    </p>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-1.5" style={{ color: P.inkDim }}>
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="athletic-mono text-[10px] tracking-wider uppercase">
+                      Toevoegen
+                    </span>
+                  </div>
+                )}
+              </button>
             )
           })}
         </div>
+
+        {/* Summary */}
+        <div
+          className="rounded-xl p-3 text-xs"
+          style={{ background: P.surfaceHi, color: P.inkMuted }}
+        >
+          {trainingDays} trainingsdagen · {7 - trainingDays} rustdagen
+        </div>
       </div>
 
-      {/* Summary */}
-      <div className="p-3 bg-[#1C2425] rounded-xl text-xs text-muted-foreground">
-        {days.filter(d => d.programId).length} trainingsdagen · {days.filter(d => !d.programId).length} rustdagen
-      </div>
+      {/* Dialogs */}
+      <DayPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        dayLabel={pickerDay !== null ? DAY_LABELS[pickerDay] : ''}
+        programs={programs}
+        onPick={handlePickProgram}
+      />
+      <BulkPlaceDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        programs={programs}
+        patientId={patientId || null}
+        onPlace={handleBulkPlace}
+        placing={scheduleProgramMutation.isPending}
+      />
     </div>
   )
 }

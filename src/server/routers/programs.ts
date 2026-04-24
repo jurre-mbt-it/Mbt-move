@@ -57,7 +57,7 @@ export const programsRouter = createTRPCRouter({
         : practiceId
           ? { OR: [{ creatorId: ctx.user!.id }, { practiceId }] }
           : { creatorId: ctx.user!.id }
-      return ctx.prisma.program.findMany({
+      const programs = await ctx.prisma.program.findMany({
         where: {
           ...ownership,
           ...(input?.patientId !== undefined ? { patientId: input.patientId } : {}),
@@ -66,8 +66,29 @@ export const programsRouter = createTRPCRouter({
         include: {
           patient: { select: { id: true, name: true, email: true } },
           _count: { select: { exercises: true } },
+          exercises: {
+            select: { exercise: { select: { category: true } } },
+          },
         },
         orderBy: { updatedAt: 'desc' },
+      })
+
+      // Derive dominantCategory zodat de week-planner programma's kan filteren
+      // op Kracht/Cardio/Mobiliteit/Plyometrie/Stabiliteit zonder een extra
+      // ronde naar de DB. CARDIO-programma's hebben vaak geen exercises en
+      // vallen terug op program.type.
+      return programs.map(({ exercises, ...rest }) => {
+        const counts: Record<string, number> = {}
+        for (const pe of exercises) {
+          const cat = pe.exercise?.category
+          if (cat) counts[cat] = (counts[cat] ?? 0) + 1
+        }
+        let dominantCategory: string | null = null
+        for (const [cat, n] of Object.entries(counts)) {
+          if (!dominantCategory || n > counts[dominantCategory]) dominantCategory = cat
+        }
+        if (!dominantCategory && rest.type) dominantCategory = rest.type
+        return { ...rest, dominantCategory }
       })
     }),
 
