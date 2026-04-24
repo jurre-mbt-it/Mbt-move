@@ -40,10 +40,16 @@ export const weekSchedulesRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const isAdmin = ctx.user.role === 'ADMIN'
       const practiceId = ctx.user.practiceId
+      // Eigen schema's altijd zichtbaar. Daarnaast: schema's van collega-
+      // therapeuten binnen dezelfde praktijk ook (practiceId-match).
+      const ownership = isAdmin
+        ? {}
+        : practiceId
+          ? { OR: [{ creatorId: ctx.user.id }, { practiceId }] }
+          : { creatorId: ctx.user.id }
       return ctx.prisma.weekSchedule.findMany({
         where: {
-          ...(isAdmin ? {} : { creatorId: ctx.user.id }),
-          ...(practiceId && !isAdmin ? { practiceId } : {}),
+          ...ownership,
           ...(input?.patientId !== undefined ? { patientId: input.patientId } : {}),
           ...(input?.isTemplate !== undefined ? { isTemplate: input.isTemplate } : {}),
         },

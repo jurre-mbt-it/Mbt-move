@@ -13,6 +13,7 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
+import { muscleLoadsRecord } from '@/server/lib/muscle-loads'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { auditLog } from '@/server/audit'
 
@@ -73,7 +74,7 @@ function mapProgramExercise(pe: {
     restTime: pe.restTime,
     videoUrl: pe.exercise.videoUrl ?? null,
     muscleLoads: pe.exercise.muscleLoads
-      ? Object.fromEntries(pe.exercise.muscleLoads.map(ml => [ml.muscle, ml.load]))
+      ? muscleLoadsRecord({ category: pe.exercise.category, muscleLoads: pe.exercise.muscleLoads })
       : {} as Record<string, number>,
     supersetGroup: pe.supersetGroup ?? null,
     supersetOrder: pe.supersetOrder,
@@ -517,7 +518,7 @@ export const patientRouter = createTRPCRouter({
         if (!ex) return []
         return [{
           exerciseId: log.exerciseId,
-          muscleLoads: Object.fromEntries(ex.muscleLoads.map(ml => [ml.muscle, ml.load])) as Record<string, number>,
+          muscleLoads: muscleLoadsRecord(ex),
           sets: log.setsCompleted ?? 3,
           reps: log.repsCompleted ?? 10,
           repUnit: 'reps',

@@ -1,44 +1,100 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
+import type { PrismaClient } from '@prisma/client'
 import { createTRPCRouter, therapistProcedure, mfaTherapistProcedure } from '@/server/trpc'
 
 const createId = () => crypto.randomUUID()
 
-export const patientsRouter = createTRPCRouter({
-  list: therapistProcedure.query(async ({ ctx }) => {
-    const relations = await ctx.prisma.patientTherapist.findMany({
-      where: { therapistId: ctx.user.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
-      include: {
-        patient: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            avatarUrl: true,
-            phone: true,
-            dateOfBirth: true,
-            createdAt: true,
-            patientPrograms: {
-              orderBy: { createdAt: 'desc' },
-              take: 1,
-              select: {
-                id: true,
-                name: true,
-                status: true,
-                weeks: true,
-                startDate: true,
-                endDate: true,
-              },
+/**
+ * Toegang tot een patient = directe PatientTherapist-koppeling, OF dezelfde
+ * praktijk als de patient. ADMIN krijgt altijd toegang.
+ */
+async function hasPatientAccess(
+  prisma: PrismaClient,
+  user: { id: string; role: string; practiceId: string | null },
+  patientId: string,
+): Promise<boolean> {
+  if (user.role === 'ADMIN') return true
+  const found = await prisma.user.findFirst({
+    where: {
+      id: patientId,
+      OR: [
+        {
+          patientTherapists: {
+            some: {
+              therapistId: user.id,
+              isActive: true,
+              status: { in: ['APPROVED', 'PENDING'] },
             },
           },
         },
+        ...(user.practiceId ? [{ practiceId: user.practiceId }] : []),
+      ],
+    },
+    select: { id: true },
+  })
+  return !!found
+}
+
+export const patientsRouter = createTRPCRouter({
+  list: therapistProcedure.query(async ({ ctx }) => {
+    // Zichtbaar = directe koppeling (PatientTherapist) OF zelfde praktijk.
+    // Dat laatste laat collega-therapeuten binnen één praktijk elkaars
+    // patiënten zien zonder aparte invite.
+    const me = ctx.user
+    const patients = await ctx.prisma.user.findMany({
+      where: {
+        role: { in: ['PATIENT', 'ATHLETE'] },
+        OR: [
+          {
+            patientTherapists: {
+              some: {
+                therapistId: me.id,
+                isActive: true,
+                status: { in: ['APPROVED', 'PENDING'] },
+              },
+            },
+          },
+          ...(me.practiceId ? [{ practiceId: me.practiceId }] : []),
+        ],
       },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        avatarUrl: true,
+        phone: true,
+        dateOfBirth: true,
+        createdAt: true,
+        patientPrograms: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            weeks: true,
+            startDate: true,
+            endDate: true,
+          },
+        },
+        patientTherapists: {
+          where: {
+            therapistId: me.id,
+            isActive: true,
+            status: { in: ['APPROVED', 'PENDING'] },
+          },
+          take: 1,
+          select: { status: true, notes: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
     })
 
-    return relations.map(r => {
-      const p = r.patient
+    return patients.map(p => {
       const program = p.patientPrograms[0] ?? null
+      const myRel = p.patientTherapists[0] ?? null
       const initials = (p.name ?? p.email)
         .split(' ')
         .map(w => w[0])
@@ -47,7 +103,7 @@ export const patientsRouter = createTRPCRouter({
         .slice(0, 2)
 
       return {
-        accessStatus: r.status,
+        accessStatus: myRel?.status ?? 'APPROVED',
         id: p.id,
         name: p.name ?? p.email,
         email: p.email,
@@ -55,7 +111,7 @@ export const patientsRouter = createTRPCRouter({
         avatarInitials: initials,
         dateOfBirth: p.dateOfBirth,
         createdAt: p.createdAt,
-        notes: r.notes,
+        notes: myRel?.notes ?? null,
         programId: program?.id ?? null,
         programName: program?.name ?? null,
         programStatus: program?.status ?? null,
@@ -69,41 +125,62 @@ export const patientsRouter = createTRPCRouter({
   get: therapistProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const relation = await ctx.prisma.patientTherapist.findFirst({
-        where: { therapistId: ctx.user.id, patientId: input.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
-        include: {
-          patient: {
-            select: {
-              id: true,
-              email: true,
-              name: true,
-              role: true,
-              avatarUrl: true,
-              phone: true,
-              dateOfBirth: true,
-              createdAt: true,
-              injuryInfo: true,
-              injuryVisibleToTherapist: true,
-              patientPrograms: {
-                orderBy: { createdAt: 'desc' },
-                select: {
-                  id: true,
-                  name: true,
-                  status: true,
-                  weeks: true,
-                  daysPerWeek: true,
-                  startDate: true,
-                  endDate: true,
+      const me = ctx.user
+      const p = await ctx.prisma.user.findFirst({
+        where: {
+          id: input.id,
+          role: { in: ['PATIENT', 'ATHLETE'] },
+          OR: [
+            {
+              patientTherapists: {
+                some: {
+                  therapistId: me.id,
+                  isActive: true,
+                  status: { in: ['APPROVED', 'PENDING'] },
                 },
               },
             },
+            ...(me.practiceId ? [{ practiceId: me.practiceId }] : []),
+          ],
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          avatarUrl: true,
+          phone: true,
+          dateOfBirth: true,
+          createdAt: true,
+          injuryInfo: true,
+          injuryVisibleToTherapist: true,
+          patientPrograms: {
+            orderBy: { createdAt: 'desc' },
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              weeks: true,
+              daysPerWeek: true,
+              startDate: true,
+              endDate: true,
+            },
+          },
+          patientTherapists: {
+            where: {
+              therapistId: me.id,
+              isActive: true,
+              status: { in: ['APPROVED', 'PENDING'] },
+            },
+            take: 1,
+            select: { status: true, notes: true },
           },
         },
       })
 
-      if (!relation) return null
+      if (!p) return null
 
-      const p = relation.patient
+      const myRel = p.patientTherapists[0] ?? null
       const program = p.patientPrograms[0] ?? null
       const initials = (p.name ?? p.email)
         .split(' ')
@@ -114,7 +191,7 @@ export const patientsRouter = createTRPCRouter({
 
       return {
         id: p.id,
-        accessStatus: relation.status,
+        accessStatus: myRel?.status ?? 'APPROVED',
         name: p.name ?? p.email,
         email: p.email,
         role: p.role,
@@ -124,7 +201,7 @@ export const patientsRouter = createTRPCRouter({
         createdAt: p.createdAt,
         // Alleen tonen als patient ermee instemt
         injuryInfo: p.injuryVisibleToTherapist ? p.injuryInfo : null,
-        notes: relation.notes,
+        notes: myRel?.notes ?? null,
         programId: program?.id ?? null,
         programName: program?.name ?? null,
         programStatus: program?.status ?? null,
@@ -438,14 +515,7 @@ export const patientsRouter = createTRPCRouter({
   getDashboardData: therapistProcedure
     .input(z.object({ patientId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const relation = await ctx.prisma.patientTherapist.findFirst({
-        where: {
-          therapistId: ctx.user.id,
-          patientId: input.patientId,
-          isActive: true, status: { in: ['APPROVED', 'PENDING'] },
-        },
-      })
-      if (!relation && ctx.user.role !== 'ADMIN') {
+      if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.patientId))) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
 
@@ -523,11 +593,9 @@ export const patientsRouter = createTRPCRouter({
   getProgress: therapistProcedure
     .input(z.object({ patientId: z.string() }))
     .query(async ({ ctx, input }) => {
-      // Verify access
-      const relation = await ctx.prisma.patientTherapist.findFirst({
-        where: { therapistId: ctx.user.id, patientId: input.patientId, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
-      })
-      if (!relation) throw new TRPCError({ code: 'FORBIDDEN' })
+      if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.patientId))) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
 
       // Sessions (last 90 days)
       const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
@@ -606,10 +674,9 @@ export const patientsRouter = createTRPCRouter({
   recentSessions: therapistProcedure
     .input(z.object({ patientId: z.string(), limit: z.number().int().min(1).max(50).default(5) }))
     .query(async ({ ctx, input }) => {
-      const relation = await ctx.prisma.patientTherapist.findFirst({
-        where: { therapistId: ctx.user.id, patientId: input.patientId, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
-      })
-      if (!relation && ctx.user.role !== 'ADMIN') throw new TRPCError({ code: 'FORBIDDEN' })
+      if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.patientId))) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
 
       const sessions = await ctx.prisma.sessionLog.findMany({
         where: { patientId: input.patientId, status: 'COMPLETED' },
@@ -686,13 +753,18 @@ export const patientsRouter = createTRPCRouter({
       return ctx.prisma.user.findMany({
         where: {
           role: { in: ['PATIENT', 'ATHLETE'] },
-          patientTherapists: {
-            some: { therapistId: ctx.user.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
-          },
-          // Defensive: limit naar eigen praktijk (null = legacy, zichtbaar).
-          ...(ctx.user.practiceId
-            ? { OR: [{ practiceId: ctx.user.practiceId }, { practiceId: null }] }
-            : {}),
+          OR: [
+            {
+              patientTherapists: {
+                some: {
+                  therapistId: ctx.user.id,
+                  isActive: true,
+                  status: { in: ['APPROVED', 'PENDING'] },
+                },
+              },
+            },
+            ...(ctx.user.practiceId ? [{ practiceId: ctx.user.practiceId }] : []),
+          ],
           ...baseWhere,
         },
         select: { id: true, name: true, email: true },

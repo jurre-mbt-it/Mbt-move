@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { createTRPCRouter, therapistProcedure, creatorProcedure, protectedProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
+import { muscleLoadsRecord } from '@/server/lib/muscle-loads'
 
 const createId = () => crypto.randomUUID()
 
@@ -89,7 +90,7 @@ export const exercisesRouter = createTRPCRouter({
       return exercises.map(ex => ({
         ...ex,
         isFavorite: favoriteIds.has(ex.id),
-        muscleLoads: Object.fromEntries(ex.muscleLoads.map(ml => [ml.muscle, ml.load])),
+        muscleLoads: muscleLoadsRecord(ex),
       }))
     }),
 
@@ -150,7 +151,7 @@ export const exercisesRouter = createTRPCRouter({
       return {
         ...ex,
         isFavorite: !!fav,
-        muscleLoads: Object.fromEntries(ex.muscleLoads.map(ml => [ml.muscle, ml.load])),
+        muscleLoads: muscleLoadsRecord(ex),
       }
     }),
 
@@ -384,7 +385,7 @@ export const exercisesRouter = createTRPCRouter({
         .filter((item) => item.exercise.isPublic || item.exercise.createdById === ctx.user!.id)
         .map((item) => ({
           ...item.exercise,
-          muscleLoads: Object.fromEntries(item.exercise.muscleLoads.map((ml) => [ml.muscle, ml.load])),
+          muscleLoads: muscleLoadsRecord(item.exercise),
         }))
     }),
 })

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { createTRPCRouter, therapistProcedure, creatorProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
 import type { PrismaClient } from '@prisma/client'
+import { maskMuscleLoadsArray } from '@/server/lib/muscle-loads'
 
 const createId = () => crypto.randomUUID()
 
@@ -46,15 +47,19 @@ export const programsRouter = createTRPCRouter({
       isTemplate: z.boolean().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
-      // Multi-tenant scope: admins zien alles, anderen alleen eigen creator-row
-      // én binnen dezelfde practice (als die gezet is). Practice-filter is
-      // defense-in-depth bovenop creatorId.
+      // Multi-tenant scope: admins zien alles. Therapeuten zien hun eigen
+      // programma's PLUS programma's van collega's binnen dezelfde praktijk
+      // (practiceId-match). Zonder practiceId: alleen eigen programma's.
       const isAdmin = ctx.user!.role === 'ADMIN'
       const practiceId = ctx.user!.practiceId
+      const ownership = isAdmin
+        ? {}
+        : practiceId
+          ? { OR: [{ creatorId: ctx.user!.id }, { practiceId }] }
+          : { creatorId: ctx.user!.id }
       return ctx.prisma.program.findMany({
         where: {
-          ...(isAdmin ? {} : { creatorId: ctx.user!.id }),
-          ...(practiceId && !isAdmin ? { practiceId } : {}),
+          ...ownership,
           ...(input?.patientId !== undefined ? { patientId: input.patientId } : {}),
           ...(input?.isTemplate !== undefined ? { isTemplate: input.isTemplate } : {}),
         },
@@ -97,7 +102,13 @@ export const programsRouter = createTRPCRouter({
       if (!isAdmin && !isOwner && !isAssignedPatient && !isSamePractice) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
-      return program
+      return {
+        ...program,
+        exercises: program.exercises.map(pe => ({
+          ...pe,
+          exercise: maskMuscleLoadsArray(pe.exercise),
+        })),
+      }
     }),
 
   create: creatorProcedure
@@ -176,7 +187,7 @@ export const programsRouter = createTRPCRouter({
         }
       }
 
-      return ctx.prisma.program.update({
+      const saved = await ctx.prisma.program.update({
         where: { id },
         data: updateData,
         include: {
@@ -186,6 +197,13 @@ export const programsRouter = createTRPCRouter({
           },
         },
       })
+      return {
+        ...saved,
+        exercises: saved.exercises.map(pe => ({
+          ...pe,
+          exercise: maskMuscleLoadsArray(pe.exercise),
+        })),
+      }
     }),
 
   duplicate: creatorProcedure

@@ -120,8 +120,10 @@ export function ProgramExerciseBlock({
     <div
       ref={setNodeRef}
       style={style}
+      {...attributes}
+      {...listeners}
       className={cn(
-        'group rounded-lg border bg-[#141A1B] transition-all',
+        'group rounded-lg border bg-[#141A1B] transition-all cursor-grab active:cursor-grabbing touch-none',
         isDragging ? 'opacity-50 shadow-xl z-50' : 'hover:border-[rgba(255,255,255,0.16)]',
         exercise.selected && 'ring-2 ring-[#BEF264] border-[#BEF264]',
         isInSuperset && 'border-transparent'
@@ -129,15 +131,9 @@ export function ProgramExerciseBlock({
     >
       {/* Header row */}
       <div className="flex flex-col px-2 pt-2 pb-1 gap-1">
-        {/* Top line: drag + checkbox + color + name + menu + X */}
+        {/* Top line: drag-indicator + checkbox + color + name + menu + X */}
         <div className="flex items-center gap-2">
-          <button
-            {...attributes}
-            {...listeners}
-            className="text-zinc-300 hover:text-[#7B8889] cursor-grab shrink-0 touch-none"
-          >
-            <GripVertical className="w-4 h-4" />
-          </button>
+          <GripVertical className="w-4 h-4 text-zinc-300 shrink-0" />
 
           <input
             type="checkbox"
