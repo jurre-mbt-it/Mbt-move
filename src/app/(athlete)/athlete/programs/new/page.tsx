@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { P, Kicker } from '@/components/dark-ui'
 import { ProgramBuilder } from '@/components/programs/ProgramBuilder'
@@ -44,7 +45,9 @@ export default function AthleteNewProgramPage() {
           </h1>
         </div>
 
-        <ProgramBuilder />
+        <Suspense>
+          <ProgramBuilder />
+        </Suspense>
       </div>
     </div>
   )

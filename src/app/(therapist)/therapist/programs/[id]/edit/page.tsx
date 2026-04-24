@@ -1,6 +1,6 @@
 'use client'
 
-import { use } from 'react'
+import { use, Suspense } from 'react'
 import { ProgramBuilder } from '@/components/programs/ProgramBuilder'
 import { trpc } from '@/lib/trpc/client'
 import { notFound } from 'next/navigation'
@@ -67,17 +67,19 @@ export default function EditProgramPage({ params }: Props) {
   }))
 
   return (
-    <ProgramBuilder
-      programId={id}
-      initialState={{
-        name: program.name,
-        description: program.description ?? '',
-        weeks: program.weeks,
-        daysPerWeek: program.daysPerWeek,
-        isTemplate: program.isTemplate,
-        patientId: program.patientId ?? null,
-        exercises,
-      }}
-    />
+    <Suspense>
+      <ProgramBuilder
+        programId={id}
+        initialState={{
+          name: program.name,
+          description: program.description ?? '',
+          weeks: program.weeks,
+          daysPerWeek: program.daysPerWeek,
+          isTemplate: program.isTemplate,
+          patientId: program.patientId ?? null,
+          exercises,
+        }}
+      />
+    </Suspense>
   )
 }
