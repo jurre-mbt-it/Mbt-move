@@ -380,6 +380,19 @@ async function main() {
         'Cook JL, Purdam CR. Is tendon pathology a continuum? BJSM 2009 — pattern-recognition in tendinopathy.',
       ],
     },
+    {
+      signalType: 'deload_needed',
+      category: 'progression',
+      defaultUrgency: 'MEDIUM' as const,
+      defaultConfig: {
+        painAbove: 5, // session NRS >= 5
+        recentSessions: 3, // over de laatste N sessies
+      },
+      evidenceRefs: [
+        'Haff GG, Triplett NT. Essentials of Strength Training and Conditioning, 4e. NSCA — deload/unload principles.',
+        'Stone MH et al. Principles of deloading in resistance training. Strength & Conditioning Journal 1982.',
+      ],
+    },
   ]
 
   let rulesCreated = 0

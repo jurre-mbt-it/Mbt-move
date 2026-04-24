@@ -22,6 +22,7 @@ import { readyForProgression } from './rules/readyForProgression'
 import { plateau } from './rules/plateau'
 import { adherenceDrop } from './rules/adherenceDrop'
 import { exerciseSpecificPain } from './rules/exerciseSpecificPain'
+import { deloadNeeded } from './rules/deloadNeeded'
 import { dispatchInsightNotifications } from './dispatcher'
 
 const EVALUATORS: Record<string, Evaluator> = {
@@ -31,6 +32,7 @@ const EVALUATORS: Record<string, Evaluator> = {
   plateau,
   adherence_drop: adherenceDrop,
   exercise_specific_pain: exerciseSpecificPain,
+  deload_needed: deloadNeeded,
 }
 
 const INSIGHT_TTL_DAYS = 14

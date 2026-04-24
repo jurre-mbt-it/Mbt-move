@@ -37,11 +37,12 @@ export const readyForProgression: Evaluator = (agg, rule) => {
 
   return {
     title: `${agg.patientName} lijkt klaar voor progressie`,
-    suggestion: `Laatste ${cfg.recentSessions} sessies: alle NRS < ${cfg.painBelow}, ${Math.round(positiveRatio * 100)}% positieve feedback per oefening, adherence ${agg.adherenceRatio != null ? Math.round(agg.adherenceRatio * 100) : '—'}%. Overweeg load of moeilijkheidsgraad op te hogen.`,
+    suggestion: `Laatste ${cfg.recentSessions} sessies: alle NRS < ${cfg.painBelow}, ${Math.round(positiveRatio * 100)}% positieve feedback per oefening, adherence ${agg.adherenceRatio != null ? Math.round(agg.adherenceRatio * 100) : '—'}%. Overweeg progressie: ongeveer +10% gewicht of +1–5 herhalingen per oefening. Max 5 reps boven de huidige waarde.`,
     triggerData: {
       recentSessionIds: recent.map((s) => s.id),
       positiveRatio,
       adherenceRatio: agg.adherenceRatio,
+      guidance: { weightPct: 10, repsDeltaMax: 5 },
     },
     urgency: rule.defaultUrgency,
   }

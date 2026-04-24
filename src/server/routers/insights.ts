@@ -22,14 +22,22 @@ const ACTIVE_LINK = { isActive: true, status: 'APPROVED' as const }
 
 async function assertTreating(
   prisma: typeof import('@/lib/prisma').prisma,
-  user: { id: string; role: string },
+  user: { id: string; role: string; practiceId: string | null },
   patientId: string,
 ) {
   if (user.role === 'ADMIN') return
-  const relation = await prisma.patientTherapist.findFirst({
-    where: { therapistId: user.id, patientId, ...ACTIVE_LINK },
+  // Toegang = directe PatientTherapist-relatie OF zelfde praktijk (Phase B).
+  const ok = await prisma.user.findFirst({
+    where: {
+      id: patientId,
+      OR: [
+        { patientTherapists: { some: { therapistId: user.id, ...ACTIVE_LINK } } },
+        ...(user.practiceId ? [{ practiceId: user.practiceId }] : []),
+      ],
+    },
+    select: { id: true },
   })
-  if (!relation) {
+  if (!ok) {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'Geen actieve behandelrelatie met deze patiënt',
@@ -145,6 +153,25 @@ export const insightsRouter = createTRPCRouter({
           therapistName: a.therapist.name ?? a.therapist.email,
         })),
       }))
+    }),
+
+  /** Aantal open signalen per patiënt — voor kalender-chip en dashboards. */
+  countOpenForPatient: therapistProcedure
+    .input(z.object({ patientId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await assertTreating(ctx.prisma, ctx.user, input.patientId)
+      const now = new Date()
+      const count = await ctx.prisma.insight.count({
+        where: {
+          patientId: input.patientId,
+          status: 'OPEN',
+          OR: [
+            { snoozedUntil: null },
+            { snoozedUntil: { lte: now } },
+          ],
+        },
+      })
+      return { count }
     }),
 
   /** Status voor activation-toggle op patient detail. */

@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
-import { ChevronLeft, Save, Plus, CalendarDays } from 'lucide-react'
+import { ChevronLeft, Save, Plus, CalendarDays, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { DarkButton, Kicker, P } from '@/components/dark-ui'
 import { EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
@@ -92,6 +92,12 @@ export function WeekPlannerEditor({ initialData }: Props) {
   const saveMutation = trpc.weekSchedules.save.useMutation()
   const scheduleProgramMutation = trpc.weekSchedules.scheduleProgram.useMutation()
   const saving = createMutation.isPending || saveMutation.isPending
+
+  // CIE — toon aantal open signalen als chip zodra er een patiënt gekoppeld is
+  const { data: openSignals } = trpc.insights.countOpenForPatient.useQuery(
+    { patientId: patientId || '' },
+    { enabled: !!patientId, staleTime: 60_000 },
+  )
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -269,9 +275,27 @@ export function WeekPlannerEditor({ initialData }: Props) {
           </div>
         </div>
 
-        {/* Calendar header + bulk button */}
-        <div className="flex items-center justify-between gap-3">
-          <Kicker>Weekindeling</Kicker>
+        {/* Calendar header + bulk button + signalen-chip */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Kicker>Weekindeling</Kicker>
+            {patientId && openSignals && openSignals.count > 0 && (
+              <Link
+                href="/therapist/signals"
+                className="athletic-tap inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold"
+                style={{
+                  background: 'rgba(244,194,97,0.1)',
+                  color: P.gold,
+                  border: `1px solid ${P.gold}`,
+                  letterSpacing: '0.04em',
+                }}
+                title="Open signalen voor deze patiënt bekijken"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                {openSignals.count} open {openSignals.count === 1 ? 'signaal' : 'signalen'}
+              </Link>
+            )}
+          </div>
           <DarkButton
             variant="secondary"
             size="sm"
