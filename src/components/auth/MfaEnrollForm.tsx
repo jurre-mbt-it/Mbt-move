@@ -3,10 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { trpc } from '@/lib/trpc/client'
+import { DarkButton, Kicker, MetaLabel, P, Tile } from '@/components/dark-ui'
 import { createClient } from '@/lib/supabase/client'
 
 interface FactorData {
@@ -25,6 +23,7 @@ export function MfaEnrollForm() {
   const [loading, setLoading] = useState(false)
   const [enrolling, setEnrolling] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const syncMfa = trpc.auth.setMfaStatus.useMutation()
 
   const supabase = createClient()
 
@@ -33,7 +32,7 @@ export function MfaEnrollForm() {
       try {
         const { data, error } = await supabase.auth.mfa.enroll({
           factorType: 'totp',
-          friendlyName: 'MBT Gym Authenticator',
+          friendlyName: 'MBT Move Authenticator',
         })
 
         if (error) {
@@ -43,7 +42,7 @@ export function MfaEnrollForm() {
 
         setFactorData(data as unknown as FactorData)
       } catch {
-        setError('Failed to initialize MFA enrollment.')
+        setError('MFA enrollment kon niet worden gestart.')
       } finally {
         setEnrolling(false)
       }
@@ -76,14 +75,17 @@ export function MfaEnrollForm() {
       })
 
       if (verifyError) {
-        setError(verifyError.message)
+        setError('Ongeldige code. Controleer de code in je authenticator-app en probeer opnieuw.')
         return
       }
 
-      router.push('/dashboard')
+      // Sync MFA-status naar de database zodat mfaEnabled = true
+      await syncMfa.mutateAsync()
+
+      router.push('/therapist/settings/security')
       router.refresh()
     } catch {
-      setError('Verification failed. Please check your code and try again.')
+      setError('Verificatie mislukt. Probeer opnieuw.')
     } finally {
       setLoading(false)
     }
@@ -91,74 +93,110 @@ export function MfaEnrollForm() {
 
   if (enrolling) {
     return (
-      <Card className="w-full max-w-md">
-        <CardContent className="flex items-center justify-center py-12">
-          <p className="text-muted-foreground">Setting up MFA...</p>
-        </CardContent>
-      </Card>
+      <div className="max-w-md w-full flex items-center justify-center py-16">
+        <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.14em' }}>
+          MFA INSTELLEN…
+        </span>
+      </div>
     )
   }
 
   return (
-    <Card className="w-full max-w-md shadow-lg" style={{ borderRadius: '12px' }}>
-      <CardHeader>
-        <CardTitle className="text-2xl font-bold">Enable 2-Factor Auth</CardTitle>
-        <CardDescription>
-          Scan the QR code with your authenticator app, then enter the verification code.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {factorData && (
-          <div className="flex justify-center">
-            <Image
-              src={factorData.totp.qr_code}
-              alt="MFA QR Code"
-              width={200}
-              height={200}
-              className="border rounded-lg p-2"
-            />
-          </div>
-        )}
+    <div className="max-w-md w-full flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <Kicker>Account · Beveiliging</Kicker>
+        <h1
+          className="athletic-display"
+          style={{ fontSize: 28, lineHeight: '34px', letterSpacing: '-0.025em', paddingTop: 2 }}
+        >
+          MFA INSCHAKELEN
+        </h1>
+        <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
+          Scan de QR-code met je authenticator-app (bijv. Google Authenticator, Authy of 1Password)
+        </MetaLabel>
+      </div>
 
-        {factorData && (
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground text-center">Manual entry code:</p>
-            <code className="block text-center text-sm font-mono bg-muted px-3 py-2 rounded break-all">
-              {factorData.totp.secret}
-            </code>
-          </div>
-        )}
+      {factorData && (
+        <Tile>
+          <div className="flex flex-col gap-4">
+            <div className="flex justify-center">
+              <Image
+                src={factorData.totp.qr_code}
+                alt="MFA QR Code"
+                width={200}
+                height={200}
+                className="rounded-lg"
+                style={{ border: `1px solid ${P.line}`, background: '#fff', padding: 4 }}
+              />
+            </div>
 
-        <form onSubmit={handleVerify} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="code">Verification Code</Label>
-            <Input
-              id="code"
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]{6}"
-              maxLength={6}
-              placeholder="000000"
-              value={verifyCode}
-              onChange={(e) => setVerifyCode(e.target.value)}
-              required
-              disabled={loading}
-              className="text-center text-lg tracking-widest"
-            />
+            <div>
+              <MetaLabel style={{ marginBottom: 6 }}>HANDMATIGE INVOER</MetaLabel>
+              <code
+                className="block text-center break-all rounded-lg px-3 py-2"
+                style={{
+                  background: P.surfaceLow,
+                  color: P.ink,
+                  fontSize: 11,
+                  fontFamily: '"SF Mono", Menlo, monospace',
+                  letterSpacing: '0.06em',
+                  border: `1px solid ${P.line}`,
+                  lineHeight: 1.6,
+                }}
+              >
+                {factorData.totp.secret}
+              </code>
+            </div>
           </div>
+        </Tile>
+      )}
+
+      <form onSubmit={handleVerify} className="flex flex-col gap-3">
+        <Tile accentBar={error ? P.danger : undefined}>
+          <MetaLabel style={{ marginBottom: 8 }}>VERIFICATIE CODE</MetaLabel>
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]{6}"
+            maxLength={6}
+            placeholder="000000"
+            value={verifyCode}
+            onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, ''))}
+            required
+            disabled={loading}
+            autoFocus
+            className="w-full text-center rounded-lg athletic-mono"
+            style={{
+              background: P.surfaceLow,
+              color: P.ink,
+              fontSize: 28,
+              letterSpacing: '0.24em',
+              padding: '10px 12px',
+              border: `1px solid ${error ? P.danger : P.line}`,
+              outline: 'none',
+              fontWeight: 900,
+              width: '100%',
+              boxSizing: 'border-box',
+            }}
+          />
           {error && (
-            <p className="text-sm text-destructive">{error}</p>
+            <p style={{ color: P.danger, fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>{error}</p>
           )}
-          <Button
-            type="submit"
-            className="w-full"
-            style={{ background: '#BEF264' }}
-            disabled={loading || verifyCode.length !== 6}
-          >
-            {loading ? 'Verifying…' : 'Enable 2FA'}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+        </Tile>
+
+        <DarkButton
+          type="submit"
+          variant="primary"
+          disabled={loading || verifyCode.length !== 6}
+          loading={loading}
+        >
+          MFA activeren
+        </DarkButton>
+
+        <DarkButton variant="ghost" href="/therapist/settings/security">
+          Annuleren
+        </DarkButton>
+      </form>
+    </div>
   )
 }

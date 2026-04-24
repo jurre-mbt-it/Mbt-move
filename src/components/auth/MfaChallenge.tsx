@@ -50,7 +50,7 @@ export function MfaChallenge() {
         return
       }
 
-      router.push('/dashboard')
+      router.push('/')
       router.refresh()
     } catch {
       setError('Verification failed. Please try again.')
