@@ -352,17 +352,14 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
       return
     }
 
-    // Reorder within canvas
+    // Reorder within canvas — verplaats in de hoofd-array zodat de render-
+    // volgorde (dayExercises is derived) meteen mee-schuift.
     if (activeData?.type === 'canvas-exercise' && active.id !== over.id) {
       setExercises(prev => {
-        const ids = prev.filter(e => e.day === program.currentDay && e.week === program.currentWeek)
-          .map(e => e.uid)
-        const oldIdx = ids.indexOf(active.id as string)
-        const newIdx = ids.indexOf(over.id as string)
+        const oldIdx = prev.findIndex(e => e.uid === active.id)
+        const newIdx = prev.findIndex(e => e.uid === over.id)
         if (oldIdx === -1 || newIdx === -1) return prev
-        const reordered = arrayMove(ids, oldIdx, newIdx)
-        const posMap = Object.fromEntries(reordered.map((uid, i) => [uid, i]))
-        return prev.map(e => posMap[e.uid] !== undefined ? { ...e, supersetOrder: posMap[e.uid] } : e)
+        return arrayMove(prev, oldIdx, newIdx)
       })
     }
   }
@@ -760,38 +757,38 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
             {/* Exercises */}
             <div className="flex-1 overflow-y-auto px-3 md:px-4 py-3 pb-32 md:pb-4">
               <DayDropZone day={program.currentDay} week={program.currentWeek} isEmpty={dayExercises.length === 0}>
-                <div className="space-y-2">
-                  {orderedItems.map(item => {
-                    if (item.type === 'superset') {
-                      const groupExercises = supersetGroups[item.group] ?? []
+                <SortableContext
+                  items={orderedItems.flatMap(i => i.type === 'free' ? [i.ex.uid] : [])}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-2">
+                    {orderedItems.map(item => {
+                      if (item.type === 'superset') {
+                        const groupExercises = supersetGroups[item.group] ?? []
+                        return (
+                          <div key={`ss-${item.group}`}>
+                            <SupersetGroupBlock
+                              groupLetter={item.group}
+                              exercises={groupExercises}
+                              onUpdate={updateEx}
+                              onRemove={removeEx}
+                              onToggleSelect={toggleSelect}
+                              onSwapVariant={swapVariant}
+                              allExercises={libraryExercises as never}
+                              customParams={customParams}
+                            />
+                            <button
+                              onClick={() => dissolveSuperset(item.group)}
+                              className="text-xs text-muted-foreground hover:text-destructive ml-2 mt-0.5"
+                            >
+                              Groep opheffen
+                            </button>
+                          </div>
+                        )
+                      }
                       return (
-                        <div key={`ss-${item.group}`}>
-                          <SupersetGroupBlock
-                            groupLetter={item.group}
-                            exercises={groupExercises}
-                            onUpdate={updateEx}
-                            onRemove={removeEx}
-                            onToggleSelect={toggleSelect}
-                            onSwapVariant={swapVariant}
-                            allExercises={libraryExercises as never}
-                            customParams={customParams}
-                          />
-                          <button
-                            onClick={() => dissolveSuperset(item.group)}
-                            className="text-xs text-muted-foreground hover:text-destructive ml-2 mt-0.5"
-                          >
-                            Groep opheffen
-                          </button>
-                        </div>
-                      )
-                    }
-                    return (
-                      <SortableContext
-                        key={item.ex.uid}
-                        items={[item.ex.uid]}
-                        strategy={verticalListSortingStrategy}
-                      >
                         <ProgramExerciseBlock
+                          key={item.ex.uid}
                           exercise={item.ex}
                           onUpdate={updateEx}
                           onRemove={removeEx}
@@ -800,10 +797,10 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
                           allExercises={libraryExercises as never}
                           customParams={customParams}
                         />
-                      </SortableContext>
-                    )
-                  })}
-                </div>
+                      )
+                    })}
+                  </div>
+                </SortableContext>
               </DayDropZone>
             </div>
 
