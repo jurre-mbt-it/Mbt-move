@@ -64,6 +64,13 @@ export default function AdminUsersPage() {
     },
     onError: (e) => toast.error(e.message),
   })
+  const deleteUser = trpc.admin.deleteUser.useMutation({
+    onSuccess: (data) => {
+      utils.admin.listUsers.invalidate()
+      toast.success(`${data.deletedEmail} verwijderd`)
+    },
+    onError: (e) => toast.error(e.message),
+  })
 
   return (
     <DarkScreen>
@@ -190,6 +197,24 @@ export default function AdminUsersPage() {
                       </DarkButton>
                     </div>
                   )}
+                  <div className="flex flex-col gap-1">
+                    <MetaLabel>Verwijder</MetaLabel>
+                    <DarkButton
+                      size="sm"
+                      variant="danger"
+                      disabled={deleteUser.isPending}
+                      onClick={() => {
+                        const ok = window.confirm(
+                          `Weet je zeker dat je ${u.email} permanent wilt verwijderen?\n\n` +
+                          `Dit verwijdert de gebruiker uit Supabase auth + alle gekoppelde data ` +
+                          `(programma's, sessies, signalen, etc.). Onomkeerbaar.`,
+                        )
+                        if (ok) deleteUser.mutate({ userId: u.id })
+                      }}
+                    >
+                      ✕
+                    </DarkButton>
+                  </div>
                 </div>
               </div>
             </Tile>

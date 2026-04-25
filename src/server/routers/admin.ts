@@ -97,6 +97,60 @@ export const adminRouter = createTRPCRouter({
       })
     }),
 
+  /**
+   * Verwijder een gebruiker direct (zonder 30-dagen GDPR-grace).
+   * Cascade-delete via Prisma + Supabase auth-user. Onomkeerbaar.
+   *
+   * Beveiligingen:
+   *   - Admin kan zichzelf niet verwijderen
+   *   - De laatste actieve ADMIN kan niet verwijderd worden
+   */
+  deleteUser: mfaAdminProcedure
+    .input(z.object({ userId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.userId === ctx.user.id) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Je kunt jezelf niet verwijderen.' })
+      }
+
+      const target = await ctx.prisma.user.findUnique({
+        where: { id: input.userId },
+        select: { id: true, email: true, name: true, role: true },
+      })
+      if (!target) throw new TRPCError({ code: 'NOT_FOUND', message: 'Gebruiker niet gevonden.' })
+
+      if (target.role === 'ADMIN') {
+        const adminCount = await ctx.prisma.user.count({
+          where: { role: 'ADMIN', deletedAt: null },
+        })
+        if (adminCount <= 1) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Kan de laatste admin niet verwijderen.',
+          })
+        }
+      }
+
+      // Stap 1: Supabase-auth user verwijderen (best-effort — Prisma-delete gaat sowieso door)
+      try {
+        const supabaseAdmin = createSupabaseAdminClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        )
+        const { data: sb } = await supabaseAdmin.auth.admin.listUsers()
+        const supaUser = sb.users.find((u) => u.email === target.email)
+        if (supaUser) {
+          await supabaseAdmin.auth.admin.deleteUser(supaUser.id)
+        }
+      } catch (err) {
+        console.warn('[admin.deleteUser] supabase-delete failed:', (err as Error).message)
+      }
+
+      // Stap 2: Prisma hard-delete (cascade via schema)
+      await ctx.prisma.user.delete({ where: { id: target.id } })
+
+      return { ok: true, deletedEmail: target.email, deletedRole: target.role }
+    }),
+
   // ── Practices ─────────────────────────────────────────────────────────
 
   listPractices: adminProcedure.query(({ ctx }) => {
