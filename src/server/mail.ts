@@ -10,7 +10,7 @@
  *   2. Koppel domein (of gebruik resend.dev voor dev/test)
  *   3. Set env-vars in Vercel:
  *        RESEND_API_KEY=re_...
- *        RESEND_FROM="Movement Based Therapy <noreply@movementbasedtherapy.nl>"
+ *        RESEND_FROM="Movement Based Therapy <noreply@mbt-gym.nl>"
  */
 
 export interface MailMessage {
@@ -31,7 +31,7 @@ export interface MailResult {
 /** Verzend e-mail via Resend of log naar console bij ontbrekende config. */
 export async function sendMail(msg: MailMessage): Promise<MailResult> {
   const apiKey = process.env.RESEND_API_KEY
-  const from = process.env.RESEND_FROM ?? 'Movement Based Therapy <noreply@movementbasedtherapy.nl>'
+  const from = process.env.RESEND_FROM ?? 'Movement Based Therapy <noreply@mbt-gym.nl>'
 
   if (!apiKey) {
     // Dev / ontbrekende config — log voor traceability, faal niet
