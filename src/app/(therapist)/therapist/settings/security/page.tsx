@@ -45,7 +45,7 @@ export default function SecuritySettingsPage() {
       return
     }
     win.document.write(`
-      <html><head><title>MBT-Move MFA backup-codes</title>
+      <html><head><title>MBT-Gym MFA backup-codes</title>
       <style>
         body { font-family: 'SF Mono', Menlo, monospace; padding: 24px; }
         h1 { font-size: 14px; letter-spacing: 0.2em; }

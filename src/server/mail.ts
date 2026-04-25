@@ -89,14 +89,14 @@ function layout(innerHtml: string): string {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>MBT·Move</title>
+<title>MBT·Gym</title>
 </head>
 <body style="margin:0;padding:0;background:${MBT_BRAND.bg};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${MBT_BRAND.bg};padding:32px 16px;">
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:${MBT_BRAND.surface};border:1px solid ${MBT_BRAND.line};border-radius:20px;overflow:hidden;">
         <tr><td style="padding:28px 28px 12px 28px;">
-          <div style="font-family:ui-monospace,Menlo,'SF Mono',monospace;font-size:11px;letter-spacing:0.2em;color:${MBT_BRAND.lime};font-weight:900;">● MBT · MOVE</div>
+          <div style="font-family:ui-monospace,Menlo,'SF Mono',monospace;font-size:11px;letter-spacing:0.2em;color:${MBT_BRAND.lime};font-weight:900;">● MBT · GYM</div>
         </td></tr>
         ${innerHtml}
         <tr><td style="padding:20px 28px 28px 28px;border-top:1px solid ${MBT_BRAND.line};">
@@ -139,7 +139,7 @@ export function inviteMail({
     </td></tr>
     <tr><td style="padding:16px 28px 0 28px;">
       <p style="margin:0;color:${MBT_BRAND.inkMuted};font-size:15px;line-height:22px;">
-        ${therapistLine} voor MBT·Move — onze begeleide trainings-app.
+        ${therapistLine} voor MBT·Gym — onze begeleide trainings-app.
       </p>
     </td></tr>
     <tr><td style="padding:24px 28px 0 28px;">
@@ -169,12 +169,12 @@ export function inviteMail({
   return {
     to: '', // gevuld door caller
     subject: therapistName
-      ? `${therapistName} heeft je uitgenodigd voor MBT·Move`
-      : 'Welkom bij MBT·Move',
+      ? `${therapistName} heeft je uitgenodigd voor MBT·Gym`
+      : 'Welkom bij MBT·Gym',
     html: layout(inner),
     text:
       `Hallo ${recipientName},\n\n` +
-      `${therapistName ? `${therapistName} heeft je uitgenodigd` : 'Je bent uitgenodigd'} voor MBT·Move.\n\n` +
+      `${therapistName ? `${therapistName} heeft je uitgenodigd` : 'Je bent uitgenodigd'} voor MBT·Gym.\n\n` +
       `Open deze link en vul je geboortejaar in:\n${codeUrl}\n\n` +
       `We sturen daarna een 6-cijfer code naar deze mail.\n\n` +
       `Verloopt: ${formatDate(expiresAt)}\n\n` +
