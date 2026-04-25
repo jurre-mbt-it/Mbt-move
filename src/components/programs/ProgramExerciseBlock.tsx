@@ -7,8 +7,10 @@ import { toast } from 'sonner'
 import type { BuilderExercise, ExtraParam, RepUnit } from './types'
 import { STANDARD_PARAMS, REP_UNITS } from '@/lib/program-constants'
 import { cn } from '@/lib/utils'
+import { useAutosave } from '@/hooks/useAutosave'
 import {
-  GripVertical, X, Plus, ArrowUp, ArrowDown, MoreHorizontal, Play, Save,
+  GripVertical, X, Plus, ArrowUp, ArrowDown, MoreHorizontal, Play,
+  Check, Loader2, AlertCircle,
 } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -103,28 +105,25 @@ export function ProgramExerciseBlock({
       extraParams: exercise.extraParams.map(p => p.id === id ? { ...p, value } : p),
     })
 
+  // Autosave de huidige extraParams als nieuwe standaard voor deze oefening
+  // in de library. Last-edit-wins: andere instances van dezelfde oefening in
+  // dit programma blijven ongemoeid (geen propagation), maar volgende keer
+  // dat je 'm uit de library sleept staan deze waarden er al op.
   const setDefaults = trpc.exercises.setDefaultExtraParams.useMutation()
-  const saveAsDefault = async () => {
-    try {
-      // Schoonmaken — instance-id's hoeven niet bewaard, server hergenereert ze.
+  const defaultsAutosave = useAutosave<ExtraParam[]>({
+    value: exercise.extraParams,
+    onSave: async (params) => {
       await setDefaults.mutateAsync({
         id: exercise.exerciseId,
-        defaultExtraParams: exercise.extraParams.map(p => ({
-          id: p.id,
-          label: p.label,
-          type: p.type,
-          value: p.value,
-          unit: p.unit,
-          options: p.options,
-          min: p.min,
-          max: p.max,
+        defaultExtraParams: params.map(p => ({
+          id: p.id, label: p.label, type: p.type, value: p.value,
+          unit: p.unit, options: p.options, min: p.min, max: p.max,
         })),
       })
-      toast.success('Parameters opgeslagen als standaard')
-    } catch {
-      toast.error('Opslaan mislukt')
-    }
-  }
+    },
+    debounceMs: 1000,
+    enabled: exercise.extraParams.length > 0,
+  })
 
   const easierEx = exercise.easierVariantId
     ? allExercises.find(e => e.id === exercise.easierVariantId)
@@ -326,16 +325,31 @@ export function ProgramExerciseBlock({
       {/* Extra params */}
       {exercise.extraParams.length > 0 && (
         <div className="px-8 pb-2 flex flex-wrap gap-2 items-center">
-          <button
-            type="button"
-            onClick={saveAsDefault}
-            disabled={setDefaults.isPending}
-            title="Bewaar deze parameters als standaard voor deze oefening — volgende keer dat je 'm aan een programma toevoegt staan ze er al op."
-            className="flex items-center gap-1 text-[10px] font-semibold text-[#7B8889] hover:text-[#BEF264] transition-colors px-2 py-1 rounded-md border border-dashed border-[#3A4444] hover:border-[#BEF264]/40 disabled:opacity-50"
-          >
-            <Save className="w-2.5 h-2.5" />
-            {setDefaults.isPending ? 'Opslaan…' : 'Onthoud'}
-          </button>
+          {defaultsAutosave.status !== 'idle' && (
+            <div
+              className="flex items-center gap-1 text-[10px] font-semibold text-[#7B8889] px-1"
+              title="Deze parameters worden automatisch als standaard onthouden voor deze oefening."
+            >
+              {defaultsAutosave.status === 'saving' && (
+                <><Loader2 className="w-2.5 h-2.5 animate-spin" /> Onthouden…</>
+              )}
+              {defaultsAutosave.status === 'pending' && (
+                <><Loader2 className="w-2.5 h-2.5 animate-spin opacity-50" /> Onthouden…</>
+              )}
+              {defaultsAutosave.status === 'saved' && (
+                <><Check className="w-2.5 h-2.5" style={{ color: '#BEF264' }} /> Onthouden</>
+              )}
+              {defaultsAutosave.status === 'error' && (
+                <button
+                  type="button"
+                  onClick={() => { void defaultsAutosave.saveNow() }}
+                  className="flex items-center gap-1 text-red-400 hover:text-red-300"
+                >
+                  <AlertCircle className="w-2.5 h-2.5" /> Mislukt — opnieuw
+                </button>
+              )}
+            </div>
+          )}
           {exercise.extraParams.map(param => (
             <div key={param.id} className="flex items-center gap-1 bg-[#1C2425] border rounded-md px-2 py-1 text-xs group/param">
               <span className="text-muted-foreground">{param.label}:</span>
