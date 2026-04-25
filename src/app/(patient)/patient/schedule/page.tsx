@@ -90,9 +90,20 @@ export default function PatientSchedulePage() {
     const targetDay = session.dayOfWeek
     let plannedDay: number | undefined
     if (programDaysInWeek.includes(targetDay) && !usedPlannedDays.has(targetDay)) {
+      // Exacte match: gepland op deze dag, vandaag gedaan.
       plannedDay = targetDay
     } else {
-      plannedDay = programDaysInWeek.find(d => !usedPlannedDays.has(d))
+      // Catch-up: prefer de meest recente onvervulde planned-day vóór deze
+      // sessie. Patient haalt meestal de meest recente miss in (niet de
+      // alleroudste). Bv: gepland Mon+Wed, sessie op Sat → match Wed (niet Mon).
+      plannedDay = [...programDaysInWeek]
+        .reverse()
+        .find(d => !usedPlannedDays.has(d) && d <= targetDay)
+      // Als alles in het verleden al gebruikt is: pak de eerstvolgende unused
+      // (zou kunnen als patient vooruit traint, ongebruikelijk).
+      if (plannedDay === undefined) {
+        plannedDay = programDaysInWeek.find(d => !usedPlannedDays.has(d))
+      }
     }
     if (plannedDay !== undefined) {
       usedPlannedDays.add(plannedDay)
