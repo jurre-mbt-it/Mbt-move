@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
-import { ChevronLeft, Save, Plus, CalendarDays, Sparkles } from 'lucide-react'
+import { useAutosave, loadDraft } from '@/hooks/useAutosave'
+import { ChevronLeft, Plus, CalendarDays, Sparkles, Check, Loader2, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 import { DarkButton, Kicker, P } from '@/components/dark-ui'
 import { EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
@@ -47,7 +48,6 @@ function categoryLabel(cat: string | null | undefined): string {
 export function WeekPlannerEditor({ initialData }: Props) {
   const router = useRouter()
   const utils = trpc.useUtils()
-  const isEdit = !!initialData?.id
 
   const [name, setName] = useState(initialData?.name ?? '')
   const [description, setDescription] = useState(initialData?.description ?? '')
@@ -58,6 +58,10 @@ export function WeekPlannerEditor({ initialData }: Props) {
       programId: initialData?.days?.find(d => d.dayOfWeek === i)?.programId ?? null,
     })),
   )
+  // Houdt het schedule-id bij dat we momenteel bewerken. Bij een nieuw
+  // schema wordt dit gevuld zodra autosave het record heeft aangemaakt.
+  const [currentScheduleId, setCurrentScheduleId] = useState<string | undefined>(initialData?.id)
+  const isEdit = !!currentScheduleId
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerDay, setPickerDay] = useState<number | null>(null)
@@ -91,7 +95,6 @@ export function WeekPlannerEditor({ initialData }: Props) {
   const createMutation = trpc.weekSchedules.create.useMutation()
   const saveMutation = trpc.weekSchedules.save.useMutation()
   const scheduleProgramMutation = trpc.weekSchedules.scheduleProgram.useMutation()
-  const saving = createMutation.isPending || saveMutation.isPending
 
   // CIE — toon aantal open signalen als chip zodra er een patiënt gekoppeld is
   const { data: openSignals } = trpc.insights.countOpenForPatient.useQuery(
@@ -99,40 +102,71 @@ export function WeekPlannerEditor({ initialData }: Props) {
     { enabled: !!patientId, staleTime: 60_000 },
   )
 
-  const handleSave = async () => {
-    if (!name.trim()) {
-      toast.error('Geef het schema een naam')
-      return
-    }
-    const daysPayload = days.map((d, i) => ({ dayOfWeek: i, programId: d.programId }))
-    try {
-      if (isEdit) {
-        await saveMutation.mutateAsync({
-          id: initialData!.id!,
-          name: name.trim(),
-          description: description.trim() || undefined,
-          patientId: patientId || null,
-          isTemplate,
-          days: daysPayload,
-        })
-        await utils.weekSchedules.list.invalidate()
-        toast.success('Schema opgeslagen')
-      } else {
-        await createMutation.mutateAsync({
-          name: name.trim(),
-          description: description.trim() || undefined,
-          patientId: patientId || undefined,
-          isTemplate,
-          days: daysPayload,
-        })
-        await utils.weekSchedules.list.invalidate()
-        toast.success('Schema aangemaakt')
-        router.push('/therapist/week-planner')
-      }
-    } catch {
-      toast.error('Opslaan mislukt')
-    }
+  // ── Autosave ──────────────────────────────────────────────────────────────
+  type AutosaveValue = {
+    name: string
+    description: string
+    patientId: string
+    isTemplate: boolean
+    days: DayState[]
   }
+  const draftKey = useMemo(
+    () => `mbt-weekschedule-draft-${initialData?.id ?? 'new'}`,
+    [initialData?.id],
+  )
+
+  // One-shot draft restore.
+  useEffect(() => {
+    const draft = loadDraft<AutosaveValue>(draftKey)
+    if (!draft) return
+    setName(draft.name)
+    setDescription(draft.description)
+    setPatientId(draft.patientId)
+    setIsTemplate(draft.isTemplate)
+    setDays(draft.days)
+    toast.info('Concept hersteld', { duration: 2000 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const formValue: AutosaveValue = useMemo(
+    () => ({ name, description, patientId, isTemplate, days }),
+    [name, description, patientId, isTemplate, days],
+  )
+
+  const persist = async (val: AutosaveValue) => {
+    const daysPayload = val.days.map((d, i) => ({ dayOfWeek: i, programId: d.programId }))
+    if (currentScheduleId) {
+      await saveMutation.mutateAsync({
+        id: currentScheduleId,
+        name: val.name.trim(),
+        description: val.description.trim() || undefined,
+        patientId: val.patientId || null,
+        isTemplate: val.isTemplate,
+        days: daysPayload,
+      })
+    } else {
+      const created = await createMutation.mutateAsync({
+        name: val.name.trim(),
+        description: val.description.trim() || undefined,
+        patientId: val.patientId || undefined,
+        isTemplate: val.isTemplate,
+        days: daysPayload,
+      })
+      setCurrentScheduleId(created.id)
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, '', `/therapist/week-planner/${created.id}/edit`)
+      }
+    }
+    await utils.weekSchedules.list.invalidate()
+  }
+
+  const autosave = useAutosave({
+    value: formValue,
+    onSave: persist,
+    draftKey,
+    debounceMs: 1500,
+    enabled: name.trim().length > 0,
+  })
 
   const setDayProgram = (dayIndex: number, programId: string | null) => {
     setDays(prev => prev.map((d, i) => (i === dayIndex ? { programId } : d)))
@@ -254,16 +288,34 @@ export function WeekPlannerEditor({ initialData }: Props) {
               {isEdit ? 'Weekschema bewerken' : 'Nieuw weekschema'}
             </h1>
           </div>
-          <DarkButton
-            variant="primary"
-            onClick={handleSave}
-            disabled={saving}
+          <div
+            className="flex items-center gap-1.5 text-xs select-none"
+            title={autosave.lastSavedAt ? `Laatst opgeslagen om ${autosave.lastSavedAt.toLocaleTimeString('nl-NL')}` : ''}
+            style={{ color: P.inkMuted }}
           >
-            <span className="inline-flex items-center gap-2">
-              <Save className="w-4 h-4" />
-              {saving ? 'Opslaan…' : 'Opslaan'}
-            </span>
-          </DarkButton>
+            {!name.trim() && (
+              <span style={{ color: P.danger }}>Geef het schema een naam</span>
+            )}
+            {name.trim() && autosave.status === 'saving' && (
+              <><Loader2 className="w-3 h-3 animate-spin" /> Opslaan…</>
+            )}
+            {name.trim() && autosave.status === 'pending' && (
+              <><Loader2 className="w-3 h-3 animate-spin opacity-50" /> Wijzigingen…</>
+            )}
+            {name.trim() && autosave.status === 'saved' && (
+              <><Check className="w-3 h-3" style={{ color: P.lime }} /> Opgeslagen</>
+            )}
+            {name.trim() && autosave.status === 'error' && (
+              <button
+                type="button"
+                onClick={() => { void autosave.saveNow() }}
+                className="flex items-center gap-1"
+                style={{ color: P.danger }}
+              >
+                <AlertCircle className="w-3 h-3" /> Opslaan mislukt — opnieuw
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Meta */}

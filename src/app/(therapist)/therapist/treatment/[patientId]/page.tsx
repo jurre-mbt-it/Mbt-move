@@ -23,6 +23,7 @@ import {
   Tile,
 } from '@/components/dark-ui'
 import { trpc } from '@/lib/trpc/client'
+import { useDraftBackup, loadDraft, clearStoredDraft } from '@/hooks/useAutosave'
 
 type LogRow = {
   uid: string
@@ -49,8 +50,10 @@ export default function TreatmentPage({
 
   const { data: patient, isLoading: patientLoading } = trpc.patients.get.useQuery({ id: patientId })
   const { data: todayData, isLoading: todayLoading } = trpc.patient.getTodayExercises.useQuery({ patientId })
+  const draftKey = `mbt-treatment-draft-${patientId}`
   const logMutation = trpc.patients.logSessionForPatient.useMutation({
     onSuccess: () => {
+      clearStoredDraft(draftKey)
       toast.success('Sessie gelogd in patient dossier')
       router.push(`/therapist/patients/${patientId}`)
     },
@@ -65,6 +68,35 @@ export default function TreatmentPage({
   const [exertionLevel, setExertionLevel] = useState<number | null>(null)
   const [notes, setNotes] = useState('')
   const [nowTick, setNowTick] = useState(Date.now())
+
+  // Live sessie-data wordt op elke wijziging in localStorage geback-upt zodat
+  // tab-close / refresh midden in een behandeling de sets niet kwijt maakt.
+  // Server-commit gebeurt pas bij "BEHANDELING AFRONDEN".
+  type DraftShape = {
+    mode: typeof mode
+    rows: LogRow[]
+    painLevel: number | null
+    exertionLevel: number | null
+    notes: string
+    dirty: boolean
+  }
+  useEffect(() => {
+    const draft = loadDraft<DraftShape>(draftKey)
+    if (!draft) return
+    setMode(draft.mode)
+    setRows(draft.rows)
+    setPainLevel(draft.painLevel)
+    setExertionLevel(draft.exertionLevel)
+    setNotes(draft.notes)
+    setDirty(draft.dirty)
+    toast.info('Live sessie hersteld', { duration: 2000 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useDraftBackup<DraftShape>({
+    key: draftKey,
+    value: { mode, rows, painLevel, exertionLevel, notes, dirty },
+    enabled: mode !== 'choose' || rows.length > 0 || notes.length > 0,
+  })
 
   // Bij "Volg programma" → laad programma-oefeningen één keer in.
   // `dirty` voorkomt dat auto-repop na verwijderen van alle rijen gebeurt.

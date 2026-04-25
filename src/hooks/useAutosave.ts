@@ -37,6 +37,38 @@ export function clearStoredDraft(key: string) {
   try { localStorage.removeItem(key) } catch {}
 }
 
+/**
+ * Lightweight variant of useAutosave: only mirrors `value` to localStorage on
+ * change. No server save, no clearing on commit (caller clears explicitly via
+ * `clearStoredDraft` when work is done). Use this for flows where the server
+ * commit happens once at the end (e.g. session logging) but you still want
+ * tab-close / refresh resilience while in progress.
+ */
+export function useDraftBackup<T>({
+  key,
+  value,
+  enabled = true,
+}: {
+  key: string
+  value: T
+  enabled?: boolean
+}): void {
+  const lastSerializedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!enabled || typeof window === 'undefined') return
+    const serialized = JSON.stringify(value)
+    if (lastSerializedRef.current === null) {
+      lastSerializedRef.current = serialized
+      return
+    }
+    if (serialized === lastSerializedRef.current) return
+    lastSerializedRef.current = serialized
+    try {
+      localStorage.setItem(key, JSON.stringify({ value, savedAt: Date.now() }))
+    } catch {}
+  }, [value, enabled, key])
+}
+
 export function useAutosave<T>({
   value,
   onSave,
