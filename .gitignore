@@ -49,3 +49,4 @@ next-env.d.ts
 .claire/
 dev-main.sh
 scripts/apply-practices-rls.mjs
+supabase/.temp/

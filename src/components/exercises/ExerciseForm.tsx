@@ -208,11 +208,10 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
     } else {
       const created = await createMutation.mutateAsync(payload)
       setCurrentExerciseId(created.id)
-      // Update URL geruisloos zodat refresh op het edit-record landt zonder
-      // re-mount; de form blijft staan met de huidige state.
-      if (typeof window !== 'undefined') {
-        window.history.replaceState(null, '', `/therapist/exercises/${created.id}/edit`)
-      }
+      // Navigeer naar de edit-pagina zodat de URL klopt en refresh blijft werken.
+      // (history.replaceState triggert een PageTransition-remount waardoor de
+      // form-state weg is.)
+      router.replace(`/therapist/exercises/${created.id}/edit`)
     }
   }
 

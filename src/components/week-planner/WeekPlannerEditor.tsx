@@ -153,9 +153,9 @@ export function WeekPlannerEditor({ initialData }: Props) {
         days: daysPayload,
       })
       setCurrentScheduleId(created.id)
-      if (typeof window !== 'undefined') {
-        window.history.replaceState(null, '', `/therapist/week-planner/${created.id}/edit`)
-      }
+      // Navigeer naar de edit-pagina (history.replaceState veroorzaakt een
+      // PageTransition-remount waardoor lokale state weg is).
+      router.replace(`/therapist/week-planner/${created.id}/edit`)
     }
     await utils.weekSchedules.list.invalidate()
   }

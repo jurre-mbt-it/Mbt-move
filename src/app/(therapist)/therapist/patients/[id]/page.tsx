@@ -19,6 +19,7 @@ import {
   P,
   Tile,
 } from '@/components/dark-ui'
+import { AssignFromTemplateDialog } from '@/components/patients/AssignFromTemplateDialog'
 import { InsightActivationToggle } from '@/components/insights/InsightActivationToggle'
 import { InsightTimeline } from '@/components/insights/InsightTimeline'
 import { RehabActivationToggle } from '@/components/rehab/RehabActivationToggle'
@@ -84,6 +85,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const [editPhone, setEditPhone] = useState('')
   const [editDob, setEditDob] = useState('')
   const [editNotes, setEditNotes] = useState('')
+  const [assignTemplateOpen, setAssignTemplateOpen] = useState(false)
 
   useEffect(() => {
     if (!editing && patient) {
@@ -193,14 +195,27 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
               Programma
             </DarkButton>
           ) : (
-            <DarkButton
-              variant="secondary"
-              href={`/therapist/programs/new?patientId=${patient.id}`}
-            >
-              + Programma
-            </DarkButton>
+            <>
+              <DarkButton
+                variant="secondary"
+                onClick={() => setAssignTemplateOpen(true)}
+              >
+                📋 Vanaf template
+              </DarkButton>
+              <DarkButton
+                variant="secondary"
+                href={`/therapist/programs/new?patientId=${patient.id}`}
+              >
+                + Programma
+              </DarkButton>
+            </>
           )}
         </div>
+        <AssignFromTemplateDialog
+          open={assignTemplateOpen}
+          onOpenChange={setAssignTemplateOpen}
+          patient={{ id: patient.id, name: patient.name }}
+        />
 
         {inviteFallback && (
           <Tile accentBar={P.gold}>

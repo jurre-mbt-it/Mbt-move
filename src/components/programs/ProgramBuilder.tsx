@@ -116,6 +116,9 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
   const [templateName, setTemplateName] = useState('')
   const [templateCategory, setTemplateCategory] = useState('')
   const [templateSaving, setTemplateSaving] = useState(false)
+  // Import-from-template (laad een bestaande template in dit programma)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [importQuery, setImportQuery] = useState('')
   const [previewOpen, setPreviewOpen] = useState(false)
   const [mobileLibraryOpen, setMobileLibraryOpen] = useState(false)
   const [mobileBalanceOpen, setMobileBalanceOpen] = useState(false)
@@ -131,9 +134,15 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
   const [currentStatus, setCurrentStatus] = useState<ProgramStatus>(initialStatus ?? 'DRAFT')
 
   const { params: customParams } = useCustomParams()
+  const utils = trpc.useUtils()
   const createProgram = trpc.programs.create.useMutation()
   const saveProgram = trpc.programs.save.useMutation()
   const duplicateProgram = trpc.programs.duplicate.useMutation()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: importTemplates = [] } = (trpc.programs.list.useQuery as any)(
+    { isTemplate: true },
+    { enabled: importDialogOpen, staleTime: 30_000 },
+  ) as { data: Array<{ id: string; name: string; weeks: number; daysPerWeek: number; _count: { exercises: number } }> }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: libraryExercises = [] } = (trpc.exercises.list.useQuery as any)(undefined, { staleTime: 60_000 }) as { data: Array<{
     id: string
@@ -516,11 +525,13 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
         await saveProgram.mutateAsync({ id: created.id, exercises: exercisePayload })
       }
       setCurrentProgramId(created.id)
-      // Update URL silently zodat refresh/back op het edit-record landt,
-      // zonder een echte navigatie en re-mount te triggeren.
-      if (typeof window !== 'undefined') {
-        window.history.replaceState(null, '', `/therapist/programs/${created.id}/edit`)
-      }
+      // Doorsturen naar de edit-pagina zodat de URL op /edit/{id} landt en
+      // de pagina door tRPC opnieuw vanuit de server geladen wordt (incl.
+      // exercises). N.B. `history.replaceState` werkt niet — PageTransition
+      // gebruikt `key={pathname}` waardoor een silent URL-change alsnog de
+      // hele subtree remount en lokale state (de net toegevoegde oefeningen)
+      // weggooit.
+      router.replace(`/therapist/programs/${created.id}/edit`)
     }
   }
 
@@ -596,6 +607,65 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
       toast.error('Opslaan mislukt')
     } finally {
       setTemplateSaving(false)
+    }
+  }
+
+  // ── Import vanaf template ────────────────────────────────────────────────────
+  async function handleImportTemplate(templateId: string) {
+    if (exercises.length > 0) {
+      const ok = window.confirm(
+        'Hiermee vervang je het huidige programma met de inhoud van de template. Doorgaan?',
+      )
+      if (!ok) return
+    }
+    try {
+      const tpl = await utils.programs.get.fetch({ id: templateId })
+      if (!tpl) { toast.error('Template niet gevonden'); return }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tplExercises = (tpl as any).exercises as Array<{
+        id: string; exerciseId: string; week: number; day: number;
+        sets: number; reps: number; repUnit: string; restTime: number;
+        supersetGroup: string | null; supersetOrder: number;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        exercise: any
+      }>
+      const mapped: BuilderExercise[] = tplExercises.map(pe => ({
+        uid: pe.id,
+        exerciseId: pe.exerciseId,
+        name: pe.exercise.name,
+        category: pe.exercise.category,
+        difficulty: pe.exercise.difficulty,
+        muscleLoads: Object.fromEntries((pe.exercise.muscleLoads ?? []).map((ml: { muscle: string; load: number }) => [ml.muscle, ml.load])),
+        easierVariantId: pe.exercise.easierVariantId ?? null,
+        harderVariantId: pe.exercise.harderVariantId ?? null,
+        videoUrl: pe.exercise.videoUrl ?? null,
+        trackOneRepMax: pe.exercise.trackOneRepMax ?? false,
+        sets: pe.sets,
+        reps: pe.reps,
+        repUnit: (pe.repUnit as 'reps' | 'sec' | 'min') ?? 'reps',
+        rest: pe.restTime,
+        extraParams: [],
+        supersetGroup: pe.supersetGroup ?? null,
+        supersetOrder: pe.supersetOrder,
+        selected: false,
+        day: pe.day,
+        week: pe.week,
+      }))
+      setProgram(p => ({
+        ...p,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        name: p.name && p.name !== 'Nieuw programma' ? p.name : (tpl as any).name,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        weeks: (tpl as any).weeks,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        daysPerWeek: (tpl as any).daysPerWeek,
+      }))
+      setExercises(mapped)
+      setImportDialogOpen(false)
+      setImportQuery('')
+      toast.success(`Template geladen — ${mapped.length} oefeningen overgenomen.`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Laden mislukt')
     }
   }
 
@@ -694,9 +764,13 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
 
           <div className="hidden md:flex items-center gap-1">
             <Separator orientation="vertical" className="h-5 mx-1" />
+            <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={() => setImportDialogOpen(true)}>
+              <Copy className="w-3.5 h-3.5" />
+              Vanaf template
+            </Button>
             <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={() => { setTemplateName(program.name); setTemplateCategory(''); setTemplateDialogOpen(true) }}>
               <Layers className="w-3.5 h-3.5" />
-              Template
+              Opslaan als template
             </Button>
             <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={() => setPreviewOpen(true)}>
               <Eye className="w-3.5 h-3.5" />
@@ -1156,7 +1230,55 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
         </DialogContent>
       </Dialog>
 
-      {/* Template / Bibliotheek dialog */}
+      {/* Vanaf-template import dialog */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Programma vanaf template</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-1">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Zoek template..."
+                value={importQuery}
+                onChange={e => setImportQuery(e.target.value)}
+                className="pl-8 h-8"
+              />
+            </div>
+            <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
+              {importTemplates.length === 0 && (
+                <p className="text-xs text-muted-foreground py-3 text-center">
+                  Nog geen templates in je bibliotheek.
+                </p>
+              )}
+              {importTemplates
+                .filter(t => !importQuery.trim() || t.name.toLowerCase().includes(importQuery.toLowerCase()))
+                .map(t => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => handleImportTemplate(t.id)}
+                    className="w-full text-left p-2.5 rounded-lg border hover:border-[#BEF264]/40 transition-colors"
+                    style={{ borderColor: 'rgba(255,255,255,0.10)' }}
+                  >
+                    <p className="text-sm font-medium truncate">{t.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t.weeks} wk · {t.daysPerWeek}/wk · {t._count.exercises} oefeningen
+                    </p>
+                  </button>
+                ))}
+            </div>
+            {exercises.length > 0 && (
+              <p className="text-[11px] text-amber-500/90">
+                ⚠ Huidige oefeningen worden vervangen door de template.
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Opslaan-als-template dialog */}
       <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
