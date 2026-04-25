@@ -331,9 +331,9 @@ enum PatientAccessStatus {
 
 model PatientTherapist {
   id           String              @id @default(cuid())
-  therapist    User                @relation("TherapistRelation", fields: [therapistId], references: [id])
+  therapist    User                @relation("TherapistRelation", fields: [therapistId], references: [id], onDelete: Cascade)
   therapistId  String
-  patient      User                @relation("PatientRelation", fields: [patientId], references: [id])
+  patient      User                @relation("PatientRelation", fields: [patientId], references: [id], onDelete: Cascade)
   patientId    String
   createdAt    DateTime            @default(now())
   isActive     Boolean             @default(true)
@@ -528,7 +528,7 @@ model Program {
 
   creator   User    @relation("ProgramCreator", fields: [creatorId], references: [id])
   creatorId String
-  patient   User?   @relation("ProgramPatient", fields: [patientId], references: [id])
+  patient   User?   @relation("ProgramPatient", fields: [patientId], references: [id], onDelete: Cascade)
   patientId String?
 
   // Multi-tenant scope — defensief. Null = legacy (van vóór practice-scoping).
@@ -549,9 +549,9 @@ model Program {
 
 model CardioLog {
   id           String          @id @default(cuid())
-  program      Program?        @relation(fields: [programId], references: [id])
+  program      Program?        @relation(fields: [programId], references: [id], onDelete: SetNull)
   programId    String?
-  patient      User            @relation(fields: [patientId], references: [id])
+  patient      User            @relation(fields: [patientId], references: [id], onDelete: Cascade)
   patientId    String
   activity     CardioActivity
   protocol     CardioProtocol
@@ -578,7 +578,7 @@ model WeekSchedule {
   creatorId   String
   creator     User              @relation("CreatedWeekSchedules", fields: [creatorId], references: [id])
   patientId   String?
-  patient     User?             @relation("PatientWeekSchedules", fields: [patientId], references: [id])
+  patient     User?             @relation("PatientWeekSchedules", fields: [patientId], references: [id], onDelete: Cascade)
   startDate   DateTime?
   endDate     DateTime?
   isTemplate  Boolean           @default(false)
@@ -627,9 +627,9 @@ model ProgramExercise {
 
 model SessionLog {
   id            String        @id @default(cuid())
-  program       Program?      @relation(fields: [programId], references: [id])
+  program       Program?      @relation(fields: [programId], references: [id], onDelete: SetNull)
   programId     String?
-  patient       User          @relation(fields: [patientId], references: [id])
+  patient       User          @relation(fields: [patientId], references: [id], onDelete: Cascade)
   patientId     String
   status        SessionStatus @default(PENDING)
   scheduledAt   DateTime
@@ -649,7 +649,7 @@ model SessionLog {
 
 model ExerciseLog {
   id                  String     @id @default(cuid())
-  session             SessionLog @relation(fields: [sessionId], references: [id])
+  session             SessionLog @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   sessionId           String
   exerciseId          String
   setsCompleted       Int?
@@ -668,9 +668,9 @@ model ExerciseLog {
 
 model Appointment {
   id          String            @id @default(cuid())
-  patient     User              @relation("PatientAppointments", fields: [patientId], references: [id])
+  patient     User              @relation("PatientAppointments", fields: [patientId], references: [id], onDelete: Cascade)
   patientId   String
-  therapist   User              @relation("TherapistAppointments", fields: [therapistId], references: [id])
+  therapist   User              @relation("TherapistAppointments", fields: [therapistId], references: [id], onDelete: Cascade)
   therapistId String
   status      AppointmentStatus @default(SCHEDULED)
   scheduledAt DateTime
@@ -686,7 +686,7 @@ model Appointment {
 
 model Notification {
   id        String   @id @default(cuid())
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
   title     String
   body      String
