@@ -366,8 +366,8 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                     <ProfileRow label="E-mail" value={patient.email} />
                     <ProfileRow label="Telefoon" value={patient.phone ?? '—'} />
                     <ProfileRow
-                      label="Geboortedatum"
-                      value={patient.dateOfBirth ? new Date(patient.dateOfBirth).toLocaleDateString('nl-NL') : '—'}
+                      label="Geboortejaar"
+                      value={patient.dateOfBirth ? String(new Date(patient.dateOfBirth).getUTCFullYear()) : '—'}
                     />
                     <ProfileRow
                       label="Aangemaakt"

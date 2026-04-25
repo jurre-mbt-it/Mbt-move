@@ -45,7 +45,7 @@ function PatientsPageInner() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteName, setInviteName] = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteDob, setInviteDob] = useState('') // YYYY-MM-DD
+  const [inviteBirthYear, setInviteBirthYear] = useState('') // YYYY
   const [inviteRole, setInviteRole] = useState<'PATIENT' | 'ATHLETE'>('PATIENT')
   const [inviteLoading, setInviteLoading] = useState(false)
   const [inviteResult, setInviteResult] = useState<{
@@ -60,23 +60,26 @@ function PatientsPageInner() {
   function resetInviteForm() {
     setInviteName('')
     setInviteEmail('')
-    setInviteDob('')
+    setInviteBirthYear('')
     setInviteRole('PATIENT')
     setInviteResult(null)
   }
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault()
-    if (!inviteDob) {
-      toast.error('Geboortedatum is verplicht voor een toegangscode-invite.')
+    const yearNum = Number(inviteBirthYear)
+    const currentYear = new Date().getFullYear()
+    if (!yearNum || yearNum < 1900 || yearNum > currentYear) {
+      toast.error('Geboortejaar is verplicht (vier cijfers).')
       return
     }
     setInviteLoading(true)
     try {
+      // Stuur als YYYY-01-01 — de server checkt alleen het jaartal bij login.
       const res = await createInvite.mutateAsync({
         email: inviteEmail,
         name: inviteName,
-        dateOfBirth: inviteDob,
+        dateOfBirth: `${yearNum}-01-01`,
         role: inviteRole,
       })
       setInviteResult({
@@ -415,13 +418,16 @@ function PatientsPageInner() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <MetaLabel>Geboortedatum</MetaLabel>
+                  <MetaLabel>Geboortejaar</MetaLabel>
                   <DarkInput
-                    id="invite-dob"
-                    type="date"
-                    value={inviteDob}
-                    onChange={e => setInviteDob(e.target.value)}
-                    max={new Date().toISOString().slice(0, 10)}
+                    id="invite-birth-year"
+                    type="number"
+                    inputMode="numeric"
+                    placeholder={String(new Date().getFullYear() - 30)}
+                    value={inviteBirthYear}
+                    onChange={e => setInviteBirthYear(e.target.value)}
+                    min={1900}
+                    max={new Date().getFullYear()}
                     required
                   />
                   <p style={{ color: P.inkMuted, fontSize: 11, marginTop: 2 }}>
