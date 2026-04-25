@@ -152,7 +152,7 @@ export const inviteRouter = createTRPCRouter({
       // de URL naar /login/code. De 6-cijfer code zelf komt later via
       // Supabase's OTP-mail wanneer de patiënt op de URL "Stuur code" klikt.
       const instructionUrl = `${
-        process.env.NEXT_PUBLIC_APP_URL ?? 'https://mbt-move.vercel.app'
+        process.env.NEXT_PUBLIC_APP_URL ?? 'https://mbt-gym.nl'
       }/login/code?email=${encodeURIComponent(email)}`
 
       const mail = inviteMail({
@@ -274,7 +274,7 @@ export const inviteRouter = createTRPCRouter({
       })
 
       const instructionUrl = `${
-        process.env.NEXT_PUBLIC_APP_URL ?? 'https://mbt-move.vercel.app'
+        process.env.NEXT_PUBLIC_APP_URL ?? 'https://mbt-gym.nl'
       }/login/code?email=${encodeURIComponent(email)}`
 
       const mail = inviteMail({

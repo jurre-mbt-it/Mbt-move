@@ -35,7 +35,7 @@ function renderCriticalEmail(insight: Insight, patientName: string): {
   text: string
 } {
   const subject = `[KRITIEK] ${insight.title}`
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://mbt-move.vercel.app'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://mbt-gym.nl'
   const dashboardUrl = `${appUrl}/therapist/signals`
 
   const html = `<!DOCTYPE html>

@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
   const html = `
     <div style="font-family: sans-serif; max-width: 540px; margin: 0 auto; padding: 32px 24px;">
-      <img src="https://mbt-move.nl/Logo.jpg" alt="MBT Gym" style="height: 36px; margin-bottom: 24px;" />
+      <img src="https://mbt-gym.nl/Logo.jpg" alt="MBT Gym" style="height: 36px; margin-bottom: 24px;" />
       <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 8px;">Hoi ${patientName}</h2>
       <p style="color: #52525b; margin: 0 0 24px;">
         Jouw therapeut heeft een revalidatieprogramma voor je klaarstaan.
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
         <p style="font-family: monospace; font-size: 28px; font-weight: 700; color: #1a1a1a; margin: 0; letter-spacing: 2px;">${accessCode}</p>
       </div>
 
-      <a href="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://mbt-move.nl'}/login/code"
+      <a href="${process.env.NEXT_PUBLIC_APP_URL ?? 'https://mbt-gym.nl'}/login/code"
          style="display: inline-block; background: #4ECDC4; color: white; font-weight: 600; padding: 12px 24px; border-radius: 10px; text-decoration: none;">
         Inloggen met toegangscode
       </a>
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: process.env.RESEND_FROM_EMAIL ?? 'noreply@mbt-move.nl',
+        from: process.env.RESEND_FROM_EMAIL ?? 'noreply@mbt-gym.nl',
         to,
         subject: `Je revalidatieprogramma is klaar — ${programName}`,
         html,

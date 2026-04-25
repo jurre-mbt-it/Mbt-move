@@ -11,7 +11,8 @@ import { createTRPCContext } from '@/server/trpc'
  */
 const ALLOWED_ORIGINS = new Set([
   process.env.NEXT_PUBLIC_APP_URL,
-  'https://mbt-move.vercel.app',
+  'https://mbt-gym.nl',
+  'https://www.mbt-gym.nl',
   'http://localhost:3000',
   'http://localhost:3001',
   // Expo dev — web-preview / capacitor schemes
