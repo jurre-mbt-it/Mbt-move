@@ -2,11 +2,13 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { trpc } from '@/lib/trpc/client'
+import { toast } from 'sonner'
 import type { BuilderExercise, ExtraParam, RepUnit } from './types'
 import { STANDARD_PARAMS, REP_UNITS } from '@/lib/program-constants'
 import { cn } from '@/lib/utils'
 import {
-  GripVertical, X, Plus, ArrowUp, ArrowDown, MoreHorizontal, Play,
+  GripVertical, X, Plus, ArrowUp, ArrowDown, MoreHorizontal, Play, Save,
 } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -100,6 +102,29 @@ export function ProgramExerciseBlock({
     onUpdate(exercise.uid, {
       extraParams: exercise.extraParams.map(p => p.id === id ? { ...p, value } : p),
     })
+
+  const setDefaults = trpc.exercises.setDefaultExtraParams.useMutation()
+  const saveAsDefault = async () => {
+    try {
+      // Schoonmaken — instance-id's hoeven niet bewaard, server hergenereert ze.
+      await setDefaults.mutateAsync({
+        id: exercise.exerciseId,
+        defaultExtraParams: exercise.extraParams.map(p => ({
+          id: p.id,
+          label: p.label,
+          type: p.type,
+          value: p.value,
+          unit: p.unit,
+          options: p.options,
+          min: p.min,
+          max: p.max,
+        })),
+      })
+      toast.success('Parameters opgeslagen als standaard')
+    } catch {
+      toast.error('Opslaan mislukt')
+    }
+  }
 
   const easierEx = exercise.easierVariantId
     ? allExercises.find(e => e.id === exercise.easierVariantId)
@@ -300,7 +325,17 @@ export function ProgramExerciseBlock({
 
       {/* Extra params */}
       {exercise.extraParams.length > 0 && (
-        <div className="px-8 pb-2 flex flex-wrap gap-2">
+        <div className="px-8 pb-2 flex flex-wrap gap-2 items-center">
+          <button
+            type="button"
+            onClick={saveAsDefault}
+            disabled={setDefaults.isPending}
+            title="Bewaar deze parameters als standaard voor deze oefening — volgende keer dat je 'm aan een programma toevoegt staan ze er al op."
+            className="flex items-center gap-1 text-[10px] font-semibold text-[#7B8889] hover:text-[#BEF264] transition-colors px-2 py-1 rounded-md border border-dashed border-[#3A4444] hover:border-[#BEF264]/40 disabled:opacity-50"
+          >
+            <Save className="w-2.5 h-2.5" />
+            {setDefaults.isPending ? 'Opslaan…' : 'Onthoud'}
+          </button>
           {exercise.extraParams.map(param => (
             <div key={param.id} className="flex items-center gap-1 bg-[#1C2425] border rounded-md px-2 py-1 text-xs group/param">
               <span className="text-muted-foreground">{param.label}:</span>

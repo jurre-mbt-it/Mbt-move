@@ -366,6 +366,10 @@ model Exercise {
   isUnilateral   Boolean          @default(false)
   movementPattern MovementPattern?
   trackOneRepMax Boolean          @default(false)
+  // Standaard-parameters die overgenomen worden wanneer deze oefening
+  // aan een programma wordt toegevoegd. Vorm: ExtraParam[] uit
+  // src/components/programs/types.ts.
+  defaultExtraParams Json         @default("[]")
   createdBy      User             @relation(fields: [createdById], references: [id])
   createdById    String
   createdAt      DateTime         @default(now())

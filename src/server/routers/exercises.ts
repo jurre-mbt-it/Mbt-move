@@ -236,6 +236,36 @@ export const exercisesRouter = createTRPCRouter({
       }
     }),
 
+  // Bewaart de huidige extraParams van een oefening als standaard, zodat ze
+  // automatisch worden overgenomen wanneer deze oefening de volgende keer aan
+  // een programma wordt toegevoegd.
+  setDefaultExtraParams: creatorProcedure
+    .input(z.object({
+      id: z.string(),
+      defaultExtraParams: z.array(z.object({
+        id: z.string(),
+        label: z.string(),
+        type: z.enum(['number', 'text', 'select', 'slider']),
+        value: z.union([z.string(), z.number()]),
+        unit: z.string().optional(),
+        options: z.array(z.string()).optional(),
+        min: z.number().optional(),
+        max: z.number().optional(),
+      })),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.prisma.exercise.findUnique({ where: { id: input.id } })
+      if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
+      const canEdit = existing.createdById === ctx.user!.id || ctx.user!.role === 'ADMIN'
+      if (!canEdit) throw new TRPCError({ code: 'FORBIDDEN' })
+
+      await ctx.prisma.exercise.update({
+        where: { id: input.id },
+        data: { defaultExtraParams: input.defaultExtraParams },
+      })
+      return { ok: true }
+    }),
+
   delete: creatorProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {

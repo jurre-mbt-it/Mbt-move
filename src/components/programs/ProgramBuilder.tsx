@@ -122,7 +122,19 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
   const createProgram = trpc.programs.create.useMutation()
   const saveProgram = trpc.programs.save.useMutation()
   const duplicateProgram = trpc.programs.duplicate.useMutation()
-  const { data: libraryExercises = [] } = trpc.exercises.list.useQuery(undefined, { staleTime: 60_000 })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: libraryExercises = [] } = (trpc.exercises.list.useQuery as any)(undefined, { staleTime: 60_000 }) as { data: Array<{
+    id: string
+    name: string
+    category: string
+    difficulty: string
+    videoUrl: string | null
+    easierVariantId: string | null
+    harderVariantId: string | null
+    muscleLoads: Record<string, number>
+    trackOneRepMax?: boolean
+    defaultExtraParams?: unknown
+  }> }
   const saving = createProgram.isPending || saveProgram.isPending
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
@@ -207,7 +219,18 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
     }))
   }, [libraryExercises])
 
-  const addFromLibrary = useCallback((ex: { id: string; name: string; category: string; difficulty: string; muscleLoads: unknown; videoUrl?: string | null; easierVariantId?: string | null; harderVariantId?: string | null }) => {
+  const addFromLibrary = useCallback((ex: {
+    id: string; name: string; category: string; difficulty: string;
+    muscleLoads: unknown; videoUrl?: string | null;
+    easierVariantId?: string | null; harderVariantId?: string | null;
+    trackOneRepMax?: boolean;
+    defaultExtraParams?: unknown;
+  }) => {
+    const inheritedParams = (Array.isArray(ex.defaultExtraParams) ? ex.defaultExtraParams : [])
+      .map((p, i) => ({
+        ...(p as object),
+        id: `p-${Date.now()}-${i}`, // nieuwe instance-id zodat update-by-id niet kruist met andere exercises
+      })) as BuilderExercise['extraParams']
     const newEx: BuilderExercise = {
       uid: `uid-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       exerciseId: ex.id,
@@ -222,11 +245,11 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
       reps: 10,
       repUnit: 'reps',
       rest: 60,
-      extraParams: [],
+      extraParams: inheritedParams,
       supersetGroup: null,
       supersetOrder: 0,
       selected: false,
-      trackOneRepMax: false,
+      trackOneRepMax: ex.trackOneRepMax ?? false,
       day: program.currentDay,
       week: program.currentWeek,
     }
@@ -338,6 +361,12 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
       // Resolve target day/week: prefer explicit day-column data, fall back to current view
       const targetDay = overData?.type === 'day-column' ? overData.day : program.currentDay
       const targetWeek = overData?.type === 'day-column' ? overData.week : program.currentWeek
+      const exWithDefaults = ex as typeof ex & { trackOneRepMax?: boolean; defaultExtraParams?: unknown }
+      const inheritedParams = (Array.isArray(exWithDefaults.defaultExtraParams) ? exWithDefaults.defaultExtraParams : [])
+        .map((p, i) => ({
+          ...(p as object),
+          id: `p-${Date.now()}-${i}`,
+        })) as BuilderExercise['extraParams']
       const newEx: BuilderExercise = {
         uid: `uid-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         exerciseId: ex.id,
@@ -349,8 +378,8 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
         harderVariantId: null,
         videoUrl: ex.videoUrl,
         sets: 3, reps: 10, repUnit: 'reps', rest: 60,
-        extraParams: [], supersetGroup: null, supersetOrder: 0, selected: false,
-        trackOneRepMax: false,
+        extraParams: inheritedParams, supersetGroup: null, supersetOrder: 0, selected: false,
+        trackOneRepMax: exWithDefaults.trackOneRepMax ?? false,
         day: targetDay, week: targetWeek,
       }
       setExercises(prev => [...prev, newEx])
