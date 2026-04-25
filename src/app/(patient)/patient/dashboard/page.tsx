@@ -55,14 +55,25 @@ export default function PatientDashboard() {
   const jsDay = new Date().getDay() // 0=Sun
   const todayIndex = jsDay === 0 ? 6 : jsDay - 1 // Mon=0..Sun=6
 
+  // Bepaal of er deze week op een bepaalde dag een sessie is afgerond.
+  // Catch-up sessies vallen automatisch op completedAt (= de werkelijke
+  // trainings-dag), niet op de oorspronkelijk geplande dag.
+  const weekStart = (() => {
+    const d = new Date()
+    d.setDate(d.getDate() - (d.getDay() === 0 ? 6 : d.getDay() - 1))
+    d.setHours(0, 0, 0, 0)
+    return d
+  })()
   const weekDays: Array<'done' | 'today' | 'rest' | 'missed'> = DAY_LABELS.map((_, i) => {
-    if (i === todayIndex) return 'today'
     const done = sessionHistory?.some((s) => {
       const d = new Date(s.completedAt)
+      if (d < weekStart) return false
       const dow = d.getDay() === 0 ? 6 : d.getDay() - 1
       return dow === i
     })
+    // Vandaag-afgerond toont 'done' (groen vinkje), niet meer 'today' (gold).
     if (done) return 'done'
+    if (i === todayIndex) return 'today'
     return 'rest'
   })
 

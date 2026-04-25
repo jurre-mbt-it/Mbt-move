@@ -448,7 +448,7 @@ export const patientRouter = createTRPCRouter({
         orderBy: { completedAt: 'desc' },
         take: input?.limit ?? 20,
         include: {
-          program: { select: { name: true } },
+          program: { select: { id: true, name: true } },
           exerciseLogs: { select: { exerciseId: true } },
         },
       })
@@ -457,6 +457,7 @@ export const patientRouter = createTRPCRouter({
         id: s.id,
         completedAt: s.completedAt?.toISOString() ?? s.scheduledAt.toISOString(),
         scheduledAt: s.scheduledAt.toISOString(),
+        programId: s.program?.id ?? null,
         programName: s.program?.name ?? null,
         durationSeconds: s.duration ?? 0,
         durationMinutes: s.duration ? Math.round(s.duration / 60) : 0,

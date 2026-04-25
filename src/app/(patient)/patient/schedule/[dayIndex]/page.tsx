@@ -4,7 +4,7 @@ import { use, useState } from 'react'
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
 import { ExerciseVideoModal, type ExerciseForModal } from '@/components/exercises/ExerciseVideoModal'
-import { ChevronLeft, Moon, Dumbbell, Play } from 'lucide-react'
+import { ChevronLeft, Moon, Dumbbell, Play, CheckCircle2 } from 'lucide-react'
 import { IconSleep } from '@/components/icons'
 import { P, Kicker, MetaLabel, Tile, CATEGORY_COLORS } from '@/components/dark-ui'
 
@@ -26,8 +26,18 @@ export default function ScheduleDayPage({ params }: Props) {
   const { dayIndex } = use(params)
   const dayNum = parseInt(dayIndex, 10)
   const { data: schedule, isLoading } = trpc.weekSchedules.mySchedule.useQuery(undefined, { staleTime: 60_000 })
+  const { data: sessionHistory } = trpc.patient.getSessionHistory.useQuery({ limit: 30 })
 
   const [modalExercise, setModalExercise] = useState<ExerciseForModal | null>(null)
+
+  // Bepaal of de patient deze week dit programma heeft afgerond — op deze
+  // dag (gewone match) óf op een andere dag (catch-up).
+  const weekStart = (() => {
+    const d = new Date()
+    d.setDate(d.getDate() - (d.getDay() === 0 ? 6 : d.getDay() - 1))
+    d.setHours(0, 0, 0, 0)
+    return d
+  })()
 
   if (isLoading) {
     return (
@@ -44,6 +54,24 @@ export default function ScheduleDayPage({ params }: Props) {
 
   const day = schedule?.days.find(d => d.dayOfWeek === dayNum)
   const dayLabel = DAY_LABELS[dayNum] ?? 'Dag'
+
+  // Geplande programma voor déze dag → match in session-history van deze week.
+  const scheduledProgramId = day?.program?.id ?? null
+  const sessionForThisProgramThisWeek = scheduledProgramId
+    ? sessionHistory?.find(s => {
+        if (s.programId !== scheduledProgramId) return false
+        const completedAt = new Date(s.completedAt)
+        return completedAt >= weekStart
+      })
+    : null
+  const completedDayOfWeek = sessionForThisProgramThisWeek
+    ? (() => {
+        const d = new Date(sessionForThisProgramThisWeek.completedAt)
+        return d.getDay() === 0 ? 6 : d.getDay() - 1
+      })()
+    : null
+  const completedOnThisDay = completedDayOfWeek === dayNum
+  const completedAsCatchUp = completedDayOfWeek !== null && completedDayOfWeek !== dayNum
 
   return (
     <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
@@ -92,9 +120,11 @@ export default function ScheduleDayPage({ params }: Props) {
           </Tile>
         ) : (
           <>
-            <Tile accentBar={P.lime}>
+            <Tile accentBar={completedOnThisDay || completedAsCatchUp ? P.lime : P.lime}>
               <div className="flex items-center gap-2">
-                <Dumbbell className="w-4 h-4" style={{ color: P.lime }} />
+                {completedOnThisDay || completedAsCatchUp
+                  ? <CheckCircle2 className="w-4 h-4" style={{ color: P.lime }} />
+                  : <Dumbbell className="w-4 h-4" style={{ color: P.lime }} />}
                 <h2
                   className="athletic-mono"
                   style={{ color: P.lime, fontSize: 13, fontWeight: 900, letterSpacing: '0.12em' }}
@@ -105,6 +135,22 @@ export default function ScheduleDayPage({ params }: Props) {
               <MetaLabel style={{ marginTop: 4 }}>
                 {day.program.exercises?.length ?? 0} OEFENINGEN
               </MetaLabel>
+              {completedOnThisDay && (
+                <p
+                  className="athletic-mono mt-2 inline-flex items-center gap-1"
+                  style={{ color: P.lime, fontSize: 11, fontWeight: 700, letterSpacing: '0.10em' }}
+                >
+                  ✓ AFGEROND
+                </p>
+              )}
+              {completedAsCatchUp && completedDayOfWeek !== null && (
+                <p
+                  className="athletic-mono mt-2 inline-flex items-center gap-1"
+                  style={{ color: P.gold, fontSize: 11, fontWeight: 700, letterSpacing: '0.10em' }}
+                >
+                  ✓ INGEHAALD OP {(DAY_LABELS[completedDayOfWeek] ?? '?').toUpperCase()}
+                </p>
+              )}
             </Tile>
 
             <div className="space-y-2">
