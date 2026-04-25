@@ -20,18 +20,11 @@ function CallbackHandler() {
     async function handleCallback() {
       const supabase = createClient()
 
-      // Debug: log what params we received
-      const allParams = Object.fromEntries(searchParams.entries())
-      const hashParams = typeof window !== 'undefined' ? window.location.hash : ''
-      console.log('[auth/callback] params:', allParams, 'hash:', hashParams)
-
       // Try PKCE code exchange first
       const code = searchParams.get('code')
       if (code) {
-        console.log('[auth/callback] exchanging code for session')
         const { error } = await supabase.auth.exchangeCodeForSession(code)
         if (error) {
-          console.error('[auth/callback] code exchange error:', error.message)
           setError(error.message)
           return
         }
@@ -41,13 +34,11 @@ function CallbackHandler() {
       const tokenHash = searchParams.get('token_hash')
       const type = searchParams.get('type')
       if (tokenHash && type) {
-        console.log('[auth/callback] verifying OTP:', type)
         const { error } = await supabase.auth.verifyOtp({
           token_hash: tokenHash,
           type: type as 'magiclink' | 'invite' | 'signup' | 'recovery' | 'email',
         })
         if (error) {
-          console.error('[auth/callback] OTP error:', error.message)
           setError(error.message)
           return
         }
@@ -56,13 +47,11 @@ function CallbackHandler() {
       // If no code or token_hash, the Supabase client auto-detects
       // hash fragment tokens (#access_token=...) from the URL
       if (!code && !tokenHash) {
-        console.log('[auth/callback] no code or token_hash, waiting for hash detection...')
         await new Promise(resolve => setTimeout(resolve, 1500))
       }
 
       // Check if we have a session now
       const { data: { user } } = await supabase.auth.getUser()
-      console.log('[auth/callback] user:', user?.id, 'role:', user?.user_metadata?.role)
 
       if (user) {
         // Try to get role from DB (more reliable than user_metadata)

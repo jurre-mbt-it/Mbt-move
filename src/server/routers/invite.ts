@@ -494,8 +494,11 @@ export const inviteRouter = createTRPCRouter({
         },
       })
       if (error) {
-        console.warn('[invite.request] supabase otp error:', error.message)
-        // Opzettelijk generiek terug — delivery-problemen niet als exploitable info
+        // Geen error.message loggen — Supabase OTP-fouten bevatten vaak het
+        // patient-emailadres (PHI). Alleen status/category bewaren.
+        console.warn('[invite.request] supabase otp error', {
+          status: (error as { status?: number }).status ?? null,
+        })
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Kon op dit moment geen code versturen. Probeer het straks opnieuw.',
