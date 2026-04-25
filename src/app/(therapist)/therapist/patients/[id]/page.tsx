@@ -43,16 +43,29 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const { data: programsRaw = [] } = trpc.programs.list.useQuery({ patientId: id })
   const { data: recentSessions = [] } = trpc.patients.recentSessions.useQuery({ patientId: id, limit: 5 })
   const utils = trpc.useUtils()
+  const [inviteFallback, setInviteFallback] = useState<{
+    url: string
+    email: string
+    expiresAt: string | Date
+    error: string | null
+  } | null>(null)
   const resendInvite = trpc.invite.resend.useMutation({
     onSuccess: (res) => {
-      const expires = new Date(res.expiresAt).toLocaleString('nl-NL', {
-        day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-      })
-      toast.success(
-        res.mailDelivered
-          ? `Uitnodiging opnieuw verstuurd naar ${res.email}. Verloopt ${expires}.`
-          : `Nieuwe invite-code aangemaakt — mail kon niet bezorgd worden. Deel de link handmatig.`,
-      )
+      if (res.mailDelivered) {
+        const expires = new Date(res.expiresAt).toLocaleString('nl-NL', {
+          day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+        })
+        toast.success(`Uitnodiging verstuurd naar ${res.email}. Verloopt ${expires}.`)
+        setInviteFallback(null)
+      } else {
+        setInviteFallback({
+          url: res.instructionUrl,
+          email: res.email,
+          expiresAt: res.expiresAt,
+          error: res.mailError,
+        })
+        toast.error('Mail kon niet bezorgd worden — kopieer de link hieronder.')
+      }
     },
     onError: (e) => toast.error(e.message),
   })
@@ -188,6 +201,72 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             </DarkButton>
           )}
         </div>
+
+        {inviteFallback && (
+          <Tile accentBar={P.gold}>
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <MetaLabel style={{ color: P.gold }}>MAIL NIET BEZORGD</MetaLabel>
+                  <p style={{ color: P.ink, fontSize: 13, marginTop: 4, lineHeight: 1.45 }}>
+                    De invite-code voor <strong>{inviteFallback.email}</strong> is wel aangemaakt.
+                    Stuur de link hieronder handmatig (WhatsApp, sms, eigen mail).
+                  </p>
+                  {inviteFallback.error && (
+                    <p
+                      className="athletic-mono"
+                      style={{ color: P.inkMuted, fontSize: 11, marginTop: 6, letterSpacing: '0.04em' }}
+                    >
+                      Reden: {inviteFallback.error}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setInviteFallback(null)}
+                  className="athletic-mono"
+                  style={{ color: P.inkMuted, fontSize: 11, padding: '4px 8px', letterSpacing: '0.1em' }}
+                  aria-label="Sluiten"
+                >
+                  ✕
+                </button>
+              </div>
+              <div
+                className="rounded-md p-2 flex items-center gap-2"
+                style={{ background: P.surfaceLow, border: `1px solid ${P.line}` }}
+              >
+                <code
+                  className="athletic-mono flex-1 truncate"
+                  style={{ fontSize: 11, color: P.ink, letterSpacing: '0.02em' }}
+                >
+                  {inviteFallback.url}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(inviteFallback.url)
+                    toast.success('Link gekopieerd')
+                  }}
+                  className="athletic-tap athletic-mono"
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: 6,
+                    background: P.lime,
+                    color: P.bg,
+                    fontSize: 10,
+                    fontWeight: 900,
+                    letterSpacing: '0.12em',
+                  }}
+                >
+                  COPY
+                </button>
+              </div>
+              <p style={{ color: P.inkMuted, fontSize: 11 }}>
+                Verloopt {new Date(inviteFallback.expiresAt).toLocaleString('nl-NL')}
+              </p>
+            </div>
+          </Tile>
+        )}
 
         {/* Stats row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">

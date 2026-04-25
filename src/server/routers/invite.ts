@@ -309,6 +309,7 @@ export const inviteRouter = createTRPCRouter({
         instructionUrl,
         mailDelivered: mailResult.ok,
         mailProvider: mailResult.provider,
+        mailError: mailResult.ok ? null : mailResult.error ?? 'Onbekende fout',
       }
     }),
 
