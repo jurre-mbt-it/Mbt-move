@@ -190,6 +190,121 @@ export const inviteRouter = createTRPCRouter({
     }),
 
   /**
+   * Verstuur de invite-mail opnieuw voor een patiënt die de invite nog niet
+   * heeft geaccepteerd. Verlengt de TTL en gebruikt de bekende DOB van de
+   * patiënt (geen extra invoer nodig).
+   */
+  resend: mfaTherapistProcedure
+    .input(z.object({ patientId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const rl = await rateLimit('invite.create', ctx.user!.id, RATE_LIMITS.inviteCreate)
+      if (!rl.ok) {
+        await auditLog({
+          event: 'RATE_LIMIT_HIT',
+          userId: ctx.user!.id,
+          actorEmail: ctx.user!.email,
+          resource: 'InviteCode',
+          metadata: { bucket: 'invite.create' },
+          req: ctx.req,
+        })
+        throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
+      }
+
+      const patient = await ctx.prisma.user.findFirst({
+        where: {
+          id: input.patientId,
+          role: { in: ['PATIENT', 'ATHLETE'] },
+          patientTherapists: {
+            some: {
+              therapistId: ctx.user!.id,
+              isActive: true,
+              status: { in: ['APPROVED', 'PENDING'] },
+            },
+          },
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          dateOfBirth: true,
+          practiceId: true,
+        },
+      })
+      if (!patient) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Patiënt niet gevonden of geen toegang.',
+        })
+      }
+      if (!patient.dateOfBirth) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Patiënt heeft geen geboortedatum — vul die eerst in voordat je opnieuw uitnodigt.',
+        })
+      }
+
+      const email = patient.email.toLowerCase().trim()
+      const expiresAt = new Date(Date.now() + CODE_TTL_HOURS * 3600 * 1000)
+
+      await ctx.prisma.inviteCode.updateMany({
+        where: { email, usedAt: null, expiresAt: { gt: new Date() } },
+        data: { expiresAt: new Date(0) },
+      })
+
+      const invite = await ctx.prisma.inviteCode.create({
+        data: {
+          codeHash: `supabase-otp:${crypto.randomBytes(16).toString('hex')}`,
+          email,
+          name: patient.name ?? email,
+          dateOfBirth: patient.dateOfBirth,
+          role: patient.role === 'ATHLETE' ? 'ATHLETE' : 'PATIENT',
+          practiceId: patient.practiceId ?? ctx.user!.practiceId,
+          invitedById: ctx.user!.id,
+          expiresAt,
+        },
+      })
+
+      const instructionUrl = `${
+        process.env.NEXT_PUBLIC_APP_URL ?? 'https://mbt-move.vercel.app'
+      }/login/code?email=${encodeURIComponent(email)}`
+
+      const mail = inviteMail({
+        recipientName: patient.name ?? email,
+        codeUrl: instructionUrl,
+        therapistName: ctx.user!.email.split('@')[0],
+        expiresAt: invite.expiresAt,
+      })
+      mail.to = email
+      const mailResult = await sendMail(mail)
+
+      await auditLog({
+        event: 'INVITE_CREATED',
+        userId: ctx.user!.id,
+        actorEmail: ctx.user!.email,
+        resource: 'InviteCode',
+        resourceId: invite.id,
+        metadata: {
+          email,
+          role: patient.role,
+          mailProvider: mailResult.provider,
+          mailSent: mailResult.ok,
+          resend: true,
+        },
+        req: ctx.req,
+      })
+
+      return {
+        id: invite.id,
+        email,
+        expiresAt: invite.expiresAt,
+        instructionUrl,
+        mailDelivered: mailResult.ok,
+        mailProvider: mailResult.provider,
+      }
+    }),
+
+  /**
    * Therapeut lijst alle invites die hij heeft gestuurd.
    */
   listMine: therapistProcedure.query(async ({ ctx }) => {

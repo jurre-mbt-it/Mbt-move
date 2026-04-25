@@ -3,6 +3,7 @@
 import { use } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { trpc } from '@/lib/trpc/client'
 import {
   DarkButton,
@@ -40,6 +41,19 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const { data: patient, isLoading } = trpc.patients.get.useQuery({ id })
   const { data: programsRaw = [] } = trpc.programs.list.useQuery({ patientId: id })
   const { data: recentSessions = [] } = trpc.patients.recentSessions.useQuery({ patientId: id, limit: 5 })
+  const resendInvite = trpc.invite.resend.useMutation({
+    onSuccess: (res) => {
+      const expires = new Date(res.expiresAt).toLocaleString('nl-NL', {
+        day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+      })
+      toast.success(
+        res.mailDelivered
+          ? `Uitnodiging opnieuw verstuurd naar ${res.email}. Verloopt ${expires}.`
+          : `Nieuwe invite-code aangemaakt — mail kon niet bezorgd worden. Deel de link handmatig.`,
+      )
+    },
+    onError: (e) => toast.error(e.message),
+  })
   const programs = programsRaw as Array<{
     id: string; name: string; status: string; weeks: number;
     daysPerWeek: number; startDate: Date | null; endDate: Date | null; isTemplate: boolean
@@ -115,6 +129,30 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             )}
           </div>
         </div>
+
+        {/* Pending-invite banner */}
+        {patient.accessStatus === 'PENDING' && (
+          <Tile accentBar={P.gold}>
+            <div className="flex items-start gap-3 flex-wrap">
+              <div className="flex-1 min-w-[200px]">
+                <MetaLabel style={{ color: P.gold }}>UITNODIGING OPEN</MetaLabel>
+                <p style={{ color: P.ink, fontSize: 13, marginTop: 4, lineHeight: 1.45 }}>
+                  {patient.name} heeft de uitnodiging nog niet geaccepteerd.
+                  Stuur hem opnieuw met een verse 24-uurs link.
+                </p>
+              </div>
+              <DarkButton
+                variant="primary"
+                size="sm"
+                disabled={resendInvite.isPending}
+                loading={resendInvite.isPending}
+                onClick={() => resendInvite.mutate({ patientId: patient.id })}
+              >
+                Stuur uitnodiging opnieuw
+              </DarkButton>
+            </div>
+          </Tile>
+        )}
 
         {/* Actions */}
         <div className="flex flex-wrap gap-2">
