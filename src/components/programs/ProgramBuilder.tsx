@@ -190,7 +190,22 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
   const updateEx = useCallback((uid: string, patch: Partial<BuilderExercise>) => {
-    setExercises(prev => prev.map(e => e.uid === uid ? { ...e, ...patch } : e))
+    setExercises(prev => {
+      // Wijzigingen aan extraParams syncen we naar alle andere instances van
+      // dezelfde oefening in het programma — anders wijken de parameters
+      // tussen w1/w2/w3 etc. uit elkaar zonder dat de gebruiker dat verwacht.
+      if (patch.extraParams !== undefined) {
+        const target = prev.find(e => e.uid === uid)
+        if (target) {
+          return prev.map(e =>
+            e.exerciseId === target.exerciseId
+              ? { ...e, ...patch }
+              : e
+          )
+        }
+      }
+      return prev.map(e => e.uid === uid ? { ...e, ...patch } : e)
+    })
   }, [])
 
   const removeEx = useCallback((uid: string) => {

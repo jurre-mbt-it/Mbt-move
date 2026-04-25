@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAutosave, loadDraft } from '@/hooks/useAutosave'
 import { VideoInput } from './VideoInput'
 import { MuscleLoadSliders } from './MuscleLoadSliders'
 import { CoachingCues } from './CoachingCues'
@@ -19,7 +20,7 @@ import {
   type LoadType,
   type MovementPattern,
 } from '@/lib/strain-estimation'
-import { Save, X, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
+import { X, ChevronDown, ChevronUp, Sparkles, Check, Loader2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { trpc } from '@/lib/trpc/client'
 import {
@@ -155,14 +156,75 @@ function Toggle({
   )
 }
 
-export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProps) {
+export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
   const router = useRouter()
   const [form, setForm] = useState<ExerciseFormData>({ ...defaultData, ...initialData })
   const [tagDraft, setTagDraft] = useState('')
+  // Houdt het oefening-id bij dat we momenteel bewerken. Bij een nieuwe
+  // oefening wordt dit gevuld zodra autosave het record heeft aangemaakt.
+  const [currentExerciseId, setCurrentExerciseId] = useState<string | undefined>(exerciseId)
 
   const createMutation = trpc.exercises.create.useMutation()
   const updateMutation = trpc.exercises.update.useMutation()
-  const saving = createMutation.isPending || updateMutation.isPending
+
+  // ── Autosave ──────────────────────────────────────────────────────────────
+  const draftKey = useMemo(
+    () => `mbt-exercise-draft-${exerciseId ?? 'new'}`,
+    [exerciseId],
+  )
+
+  // One-shot draft restore on mount.
+  useEffect(() => {
+    const draft = loadDraft<ExerciseFormData>(draftKey)
+    if (!draft) return
+    setForm(prev => ({ ...prev, ...draft }))
+    toast.info('Concept hersteld', { duration: 2000 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const persist = async (val: ExerciseFormData) => {
+    const payload = {
+      name: val.name,
+      description: val.description || undefined,
+      category: val.category as never,
+      bodyRegion: val.bodyRegion as never,
+      difficulty: val.difficulty as never,
+      mediaType: val.mediaType ?? null,
+      videoUrl: val.videoUrl || undefined,
+      thumbnailUrl: undefined,
+      instructions: val.instructions,
+      tips: val.tips,
+      tags: val.tags,
+      isPublic: val.isPublic,
+      muscleLoads: val.muscleLoads as Record<string, number>,
+      easierVariantId: val.easierVariantId ?? null,
+      harderVariantId: val.harderVariantId ?? null,
+      loadType: val.loadType as never,
+      isUnilateral: val.isUnilateral,
+      movementPattern: (val.movementPattern || null) as never,
+    }
+    if (currentExerciseId) {
+      await updateMutation.mutateAsync({ id: currentExerciseId, ...payload })
+    } else {
+      const created = await createMutation.mutateAsync(payload)
+      setCurrentExerciseId(created.id)
+      // Update URL geruisloos zodat refresh op het edit-record landt zonder
+      // re-mount; de form blijft staan met de huidige state.
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, '', `/therapist/exercises/${created.id}/edit`)
+      }
+    }
+  }
+
+  // Naam is verplicht — autosave pas inschakelen als er een naam staat,
+  // anders maakt elke leeg-toetsaanslag een dummy record aan.
+  const autosave = useAutosave({
+    value: form,
+    onSave: persist,
+    draftKey,
+    debounceMs: 1500,
+    enabled: form.name.trim().length > 0,
+  })
 
   const set = <K extends keyof ExerciseFormData>(key: K, val: ExerciseFormData[K]) =>
     setForm(f => ({ ...f, [key]: val }))
@@ -184,48 +246,6 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
     }
   }
 
-  const handleSave = async () => {
-    if (!form.name.trim()) {
-      toast.error('Naam is verplicht')
-      return
-    }
-
-    const payload = {
-      name: form.name,
-      description: form.description || undefined,
-      category: form.category as never,
-      bodyRegion: form.bodyRegion as never,
-      difficulty: form.difficulty as never,
-      mediaType: form.mediaType ?? null,
-      videoUrl: form.videoUrl || undefined,
-      thumbnailUrl: undefined,
-      instructions: form.instructions,
-      tips: form.tips,
-      tags: form.tags,
-      isPublic: form.isPublic,
-      muscleLoads: form.muscleLoads as Record<string, number>,
-      easierVariantId: form.easierVariantId ?? null,
-      harderVariantId: form.harderVariantId ?? null,
-      loadType: form.loadType as never,
-      isUnilateral: form.isUnilateral,
-      movementPattern: (form.movementPattern || null) as never,
-    }
-
-    try {
-      if (mode === 'create') {
-        await createMutation.mutateAsync(payload)
-        toast.success('Oefening aangemaakt')
-      } else {
-        await updateMutation.mutateAsync({ id: exerciseId!, ...payload })
-        toast.success('Oefening opgeslagen')
-      }
-      router.push('/therapist/exercises')
-    } catch (err) {
-      console.error('Save failed:', err)
-      const msg = err instanceof Error ? err.message : 'Opslaan mislukt'
-      toast.error(msg)
-    }
-  }
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -634,7 +654,7 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
 
       {/* Actions — sticky on mobile, inline on desktop */}
       <div
-        className="fixed md:relative bottom-16 md:bottom-auto left-0 md:left-auto right-0 md:right-auto z-10 md:z-auto px-4 py-3 md:px-0 md:py-0 flex gap-3"
+        className="fixed md:relative bottom-16 md:bottom-auto left-0 md:left-auto right-0 md:right-auto z-10 md:z-auto px-4 py-3 md:px-0 md:py-0 flex gap-3 items-center"
         style={{
           background: 'transparent',
         }}
@@ -647,25 +667,43 @@ export function ExerciseForm({ initialData, exerciseId, mode }: ExerciseFormProp
           }}
         />
         <DarkButton
-          onClick={handleSave}
-          disabled={saving}
-          variant="primary"
-          className="flex-1 md:flex-none gap-2 relative"
-        >
-          <Save className="w-4 h-4" />
-          {saving
-            ? 'Opslaan...'
-            : mode === 'create'
-              ? 'Oefening aanmaken'
-              : 'Wijzigingen opslaan'}
-        </DarkButton>
-        <DarkButton
           variant="secondary"
-          onClick={() => router.push('/therapist/exercises')}
+          onClick={async () => {
+            try { await autosave.saveNow() } catch {}
+            router.push('/therapist/exercises')
+          }}
           className="flex-1 md:flex-none relative"
         >
-          Annuleren
+          ← Terug naar bibliotheek
         </DarkButton>
+        <div
+          className="flex items-center gap-1.5 text-xs select-none relative"
+          title={autosave.lastSavedAt ? `Laatst opgeslagen om ${autosave.lastSavedAt.toLocaleTimeString('nl-NL')}` : ''}
+          style={{ color: P.inkMuted }}
+        >
+          {!form.name.trim() && (
+            <span style={{ color: P.danger }}>Naam is verplicht</span>
+          )}
+          {form.name.trim() && autosave.status === 'saving' && (
+            <><Loader2 className="w-3 h-3 animate-spin" /> Opslaan…</>
+          )}
+          {form.name.trim() && autosave.status === 'pending' && (
+            <><Loader2 className="w-3 h-3 animate-spin opacity-50" /> Wijzigingen…</>
+          )}
+          {form.name.trim() && autosave.status === 'saved' && (
+            <><Check className="w-3 h-3" style={{ color: P.lime }} /> Opgeslagen</>
+          )}
+          {form.name.trim() && autosave.status === 'error' && (
+            <button
+              type="button"
+              onClick={() => { void autosave.saveNow() }}
+              className="flex items-center gap-1"
+              style={{ color: P.danger }}
+            >
+              <AlertCircle className="w-3 h-3" /> Opslaan mislukt — opnieuw
+            </button>
+          )}
+        </div>
       </div>
       {/* Spacer so content isn't hidden behind sticky bar on mobile */}
       <div className="h-20 md:hidden" />
