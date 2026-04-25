@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
-import { Dumbbell, Moon, Play, ChevronRight } from 'lucide-react'
+import { Dumbbell, Moon, Play, ChevronRight, CheckCircle2 } from 'lucide-react'
 import { IconLeaf, IconClipboard } from '@/components/icons'
 import { P, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-ui'
 
@@ -23,11 +23,29 @@ type ProgramExercise = {
 
 export default function PatientSchedulePage() {
   const { data: program, isLoading } = trpc.patient.getActiveProgram.useQuery()
+  const { data: sessionHistory } = trpc.patient.getSessionHistory.useQuery({ limit: 30 })
 
   const today = new Date().getDay()
   const todayDayNum = today === 0 ? 7 : today // Mon=1…Sun=7
 
   const [selectedDay, setSelectedDay] = useState(todayDayNum)
+
+  // Welke calendar-dagen deze week hebben een afgeronde sessie?
+  // Catch-up sessies vallen automatisch op completedAt = werkelijke dag.
+  const completedDayNums = (() => {
+    if (!sessionHistory) return new Set<number>()
+    const weekStart = new Date()
+    weekStart.setDate(weekStart.getDate() - (weekStart.getDay() === 0 ? 6 : weekStart.getDay() - 1))
+    weekStart.setHours(0, 0, 0, 0)
+    const set = new Set<number>()
+    for (const s of sessionHistory) {
+      const d = new Date(s.completedAt)
+      if (d < weekStart) continue
+      const dn = d.getDay() === 0 ? 7 : d.getDay()
+      set.add(dn)
+    }
+    return set
+  })()
 
   if (isLoading) {
     return (
@@ -107,6 +125,7 @@ export default function PatientSchedulePage() {
           {Array.from({ length: 7 }).map((_, i) => {
             const dayNum = i + 1
             const hasSession = activeDays.has(dayNum)
+            const isCompleted = completedDayNums.has(dayNum)
             const isSelected = selectedDay === dayNum
             const isTd = dayNum === todayDayNum
             const count = (program.byWeekDay[program.currentWeek]?.[dayNum] as ProgramExercise[] | undefined)?.length ?? 0
@@ -119,9 +138,11 @@ export default function PatientSchedulePage() {
                   background: isSelected ? P.surfaceHi : P.surface,
                   border: isSelected
                     ? `2px solid ${P.lime}`
-                    : isTd
-                      ? `2px solid ${P.gold}`
-                      : `2px solid ${P.line}`,
+                    : isCompleted
+                      ? `2px solid ${P.lime}`
+                      : isTd
+                        ? `2px solid ${P.gold}`
+                        : `2px solid ${P.line}`,
                 }}
               >
                 <span
@@ -130,15 +151,17 @@ export default function PatientSchedulePage() {
                     fontSize: 11,
                     fontWeight: 900,
                     letterSpacing: '0.14em',
-                    color: isSelected ? P.ink : isTd ? P.gold : P.inkMuted,
+                    color: isSelected ? P.ink : isCompleted ? P.lime : isTd ? P.gold : P.inkMuted,
                   }}
                 >
                   {DAY_SHORT[i]}
                 </span>
                 <div className="w-6 h-6 flex items-center justify-center">
-                  {hasSession
-                    ? <Dumbbell className="w-3.5 h-3.5" style={{ color: isSelected ? P.lime : hasSession ? P.ink : P.inkDim }} />
-                    : <Moon className="w-3.5 h-3.5" style={{ color: P.inkDim }} />
+                  {isCompleted
+                    ? <CheckCircle2 className="w-4 h-4" style={{ color: P.lime }} />
+                    : hasSession
+                      ? <Dumbbell className="w-3.5 h-3.5" style={{ color: isSelected ? P.lime : P.ink }} />
+                      : <Moon className="w-3.5 h-3.5" style={{ color: P.inkDim }} />
                   }
                 </div>
                 {hasSession && (
