@@ -210,17 +210,25 @@ export const inviteRouter = createTRPCRouter({
         throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
       }
 
+      // Toegang = directe PatientTherapist-koppeling OF dezelfde praktijk
+      // (consistent met patients.get/list).
+      const me = ctx.user!
       const patient = await ctx.prisma.user.findFirst({
         where: {
           id: input.patientId,
           role: { in: ['PATIENT', 'ATHLETE'] },
-          patientTherapists: {
-            some: {
-              therapistId: ctx.user!.id,
-              isActive: true,
-              status: { in: ['APPROVED', 'PENDING'] },
+          OR: [
+            {
+              patientTherapists: {
+                some: {
+                  therapistId: me.id,
+                  isActive: true,
+                  status: { in: ['APPROVED', 'PENDING'] },
+                },
+              },
             },
-          },
+            ...(me.practiceId ? [{ practiceId: me.practiceId }] : []),
+          ],
         },
         select: {
           id: true,

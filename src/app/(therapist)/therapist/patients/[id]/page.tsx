@@ -1,12 +1,13 @@
 'use client'
 
-import { use } from 'react'
+import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { trpc } from '@/lib/trpc/client'
 import {
   DarkButton,
+  DarkInput,
   DarkTabs as Tabs,
   DarkTabsContent as TabsContent,
   DarkTabsList as TabsList,
@@ -41,6 +42,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const { data: patient, isLoading } = trpc.patients.get.useQuery({ id })
   const { data: programsRaw = [] } = trpc.programs.list.useQuery({ patientId: id })
   const { data: recentSessions = [] } = trpc.patients.recentSessions.useQuery({ patientId: id, limit: 5 })
+  const utils = trpc.useUtils()
   const resendInvite = trpc.invite.resend.useMutation({
     onSuccess: (res) => {
       const expires = new Date(res.expiresAt).toLocaleString('nl-NL', {
@@ -54,6 +56,30 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     },
     onError: (e) => toast.error(e.message),
   })
+  const updatePatient = trpc.patients.update.useMutation({
+    onSuccess: () => {
+      utils.patients.get.invalidate({ id })
+      utils.patients.list.invalidate()
+      setEditing(false)
+      toast.success('Profiel bijgewerkt')
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  const [editing, setEditing] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [editDob, setEditDob] = useState('')
+  const [editNotes, setEditNotes] = useState('')
+
+  useEffect(() => {
+    if (!editing && patient) {
+      setEditName(patient.name ?? '')
+      setEditPhone(patient.phone ?? '')
+      setEditDob(patient.dateOfBirth ? new Date(patient.dateOfBirth).toISOString().slice(0, 10) : '')
+      setEditNotes(patient.notes ?? '')
+    }
+  }, [patient, editing])
   const programs = programsRaw as Array<{
     id: string; name: string; status: string; weeks: number;
     daysPerWeek: number; startDate: Date | null; endDate: Date | null; isTemplate: boolean
@@ -205,55 +231,129 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           <TabsContent value="profiel" className="space-y-4">
             <Tile>
               <div className="space-y-3">
-                <MetaLabel>Contactgegevens</MetaLabel>
-                <div className="space-y-2">
-                  <div
-                    className="athletic-mono flex items-center gap-2"
-                    style={{ color: P.inkMuted, fontSize: 12 }}
-                  >
-                    <span>E-mail</span>
-                    <span style={{ color: P.ink }}>{patient.email}</span>
-                  </div>
-                  {patient.phone && (
-                    <div
-                      className="athletic-mono flex items-center gap-2"
-                      style={{ color: P.inkMuted, fontSize: 12 }}
-                    >
-                      <span>Telefoon</span>
-                      <span style={{ color: P.ink }}>{patient.phone}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <MetaLabel>Contactgegevens</MetaLabel>
+                  {!editing ? (
+                    <DarkButton variant="secondary" size="sm" onClick={() => setEditing(true)}>
+                      Bewerken
+                    </DarkButton>
+                  ) : (
+                    <div className="flex gap-2">
+                      <DarkButton
+                        variant="secondary"
+                        size="sm"
+                        disabled={updatePatient.isPending}
+                        onClick={() => setEditing(false)}
+                      >
+                        Annuleer
+                      </DarkButton>
+                      <DarkButton
+                        variant="primary"
+                        size="sm"
+                        disabled={updatePatient.isPending || !editName.trim()}
+                        loading={updatePatient.isPending}
+                        onClick={() => updatePatient.mutate({
+                          id: patient.id,
+                          name: editName.trim(),
+                          phone: editPhone.trim() || null,
+                          dateOfBirth: editDob || null,
+                          notes: editNotes.trim() || null,
+                        })}
+                      >
+                        Opslaan
+                      </DarkButton>
                     </div>
                   )}
-                  {patient.dateOfBirth && (
-                    <div
-                      className="athletic-mono flex items-center gap-2"
-                      style={{ color: P.inkMuted, fontSize: 12 }}
-                    >
-                      <span>Geboortedatum</span>
-                      <span style={{ color: P.ink }}>
-                        {new Date(patient.dateOfBirth).toLocaleDateString('nl-NL')}
-                      </span>
-                    </div>
-                  )}
-                  <div
-                    className="athletic-mono flex items-center gap-2"
-                    style={{ color: P.inkMuted, fontSize: 12 }}
-                  >
-                    <span>Aangemaakt</span>
-                    <span style={{ color: P.ink }}>
-                      {new Date(patient.createdAt).toLocaleDateString('nl-NL')}
-                    </span>
-                  </div>
                 </div>
+
+                {!editing ? (
+                  <div className="space-y-2">
+                    <ProfileRow label="Naam" value={patient.name} />
+                    <ProfileRow label="E-mail" value={patient.email} />
+                    <ProfileRow label="Telefoon" value={patient.phone ?? '—'} />
+                    <ProfileRow
+                      label="Geboortedatum"
+                      value={patient.dateOfBirth ? new Date(patient.dateOfBirth).toLocaleDateString('nl-NL') : '—'}
+                    />
+                    <ProfileRow
+                      label="Aangemaakt"
+                      value={new Date(patient.createdAt).toLocaleDateString('nl-NL')}
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <MetaLabel>Naam</MetaLabel>
+                      <DarkInput value={editName} onChange={(e) => setEditName(e.target.value)} required />
+                    </div>
+                    <div className="space-y-1.5">
+                      <MetaLabel>E-mail</MetaLabel>
+                      <p
+                        className="athletic-mono"
+                        style={{ color: P.inkMuted, fontSize: 12, padding: '8px 0' }}
+                      >
+                        {patient.email} <span style={{ fontSize: 10 }}>(niet wijzigbaar)</span>
+                      </p>
+                    </div>
+                    <div className="space-y-1.5">
+                      <MetaLabel>Telefoon</MetaLabel>
+                      <DarkInput
+                        type="tel"
+                        placeholder="+31 6 ..."
+                        value={editPhone}
+                        onChange={(e) => setEditPhone(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <MetaLabel>Geboortedatum</MetaLabel>
+                      <DarkInput
+                        type="date"
+                        value={editDob}
+                        onChange={(e) => setEditDob(e.target.value)}
+                        max={new Date().toISOString().slice(0, 10)}
+                      />
+                      <p style={{ color: P.inkMuted, fontSize: 11 }}>
+                        Vereist voor de invite-flow (patiënt logt in met geboortejaar).
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </Tile>
-            {patient.notes && (
-              <Tile>
-                <div className="space-y-2">
-                  <MetaLabel>Notities</MetaLabel>
-                  <p style={{ color: P.ink, fontSize: 13, whiteSpace: 'pre-wrap' }}>{patient.notes}</p>
-                </div>
-              </Tile>
-            )}
+
+            <Tile>
+              <div className="space-y-2">
+                <MetaLabel>Notities</MetaLabel>
+                {!editing ? (
+                  <p
+                    style={{
+                      color: patient.notes ? P.ink : P.inkDim,
+                      fontSize: 13,
+                      whiteSpace: 'pre-wrap',
+                      fontStyle: patient.notes ? 'normal' : 'italic',
+                    }}
+                  >
+                    {patient.notes ?? 'Nog geen notities — klik Bewerken om toe te voegen.'}
+                  </p>
+                ) : (
+                  <textarea
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                    rows={4}
+                    className="w-full rounded-lg p-3 athletic-mono"
+                    style={{
+                      background: P.surfaceLow,
+                      border: `1px solid ${P.line}`,
+                      color: P.ink,
+                      fontSize: 13,
+                      lineHeight: 1.5,
+                      resize: 'vertical',
+                    }}
+                    placeholder="Private notities (alleen jij ziet deze)"
+                  />
+                )}
+              </div>
+            </Tile>
           </TabsContent>
 
           {/* ── TAB: Programma's ──────────────────────────────────── */}
@@ -483,6 +583,15 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           </TabsContent>
         </Tabs>
       </div>
+    </div>
+  )
+}
+
+function ProfileRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="athletic-mono flex items-center gap-2" style={{ color: P.inkMuted, fontSize: 12 }}>
+      <span style={{ minWidth: 110 }}>{label}</span>
+      <span style={{ color: P.ink }}>{value}</span>
     </div>
   )
 }

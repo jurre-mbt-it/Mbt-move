@@ -212,6 +212,57 @@ export const patientsRouter = createTRPCRouter({
       }
     }),
 
+  /**
+   * Bewerk basisgegevens van een patiënt (naam, telefoon, geboortedatum) +
+   * private notities van de behandelend therapeut. Toegankelijk voor de
+   * gekoppelde therapeut of een collega binnen dezelfde praktijk.
+   */
+  update: therapistProcedure
+    .input(z.object({
+      id: z.string(),
+      name: z.string().min(1, 'Naam is verplicht').optional(),
+      phone: z.string().nullable().optional(),
+      // YYYY-MM-DD of null om te wissen
+      dateOfBirth: z.string().refine(
+        (v) => v === '' || !Number.isNaN(Date.parse(v)),
+        'Ongeldige geboortedatum',
+      ).nullable().optional(),
+      notes: z.string().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.id))) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Patiënt niet gevonden of geen toegang.' })
+      }
+
+      const userData: {
+        name?: string
+        phone?: string | null
+        dateOfBirth?: Date | null
+      } = {}
+      if (input.name !== undefined) userData.name = input.name.trim()
+      if (input.phone !== undefined) userData.phone = input.phone?.trim() || null
+      if (input.dateOfBirth !== undefined) {
+        userData.dateOfBirth = input.dateOfBirth ? new Date(input.dateOfBirth) : null
+      }
+
+      if (Object.keys(userData).length > 0) {
+        await ctx.prisma.user.update({
+          where: { id: input.id },
+          data: userData,
+        })
+      }
+
+      if (input.notes !== undefined) {
+        // Notities zijn private per therapeut → alleen eigen relatie updaten.
+        await ctx.prisma.patientTherapist.updateMany({
+          where: { therapistId: ctx.user.id, patientId: input.id, isActive: true },
+          data: { notes: input.notes },
+        })
+      }
+
+      return { ok: true }
+    }),
+
   changeRole: mfaTherapistProcedure
     .input(z.object({
       id: z.string(),
