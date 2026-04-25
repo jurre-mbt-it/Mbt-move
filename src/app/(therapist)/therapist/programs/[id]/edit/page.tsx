@@ -70,6 +70,7 @@ export default function EditProgramPage({ params }: Props) {
     <Suspense>
       <ProgramBuilder
         programId={id}
+        initialStatus={(program as Record<string, unknown>).status as 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED'}
         initialState={{
           name: program.name,
           description: program.description ?? '',

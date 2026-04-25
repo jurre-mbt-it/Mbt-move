@@ -78,12 +78,15 @@ function DragOverlayCard({ name }: { name: string }) {
 }
 
 // ─── Main ProgramBuilder ───────────────────────────────────────────────────────
+type ProgramStatus = 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED'
+
 interface ProgramBuilderProps {
   initialState?: Partial<ProgramState> & { exercises?: BuilderExercise[] }
   programId?: string
+  initialStatus?: ProgramStatus
 }
 
-export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps) {
+export function ProgramBuilder({ initialState, programId, initialStatus }: ProgramBuilderProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   // Na opslaan doorsturen naar een oorspronkelijke pagina (bv week-planner).
@@ -123,6 +126,9 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
   // Houdt het programma-id bij dat we momenteel bewerken. Bij een nieuw
   // programma wordt dit gevuld zodra autosave het record heeft aangemaakt.
   const [currentProgramId, setCurrentProgramId] = useState<string | undefined>(programId)
+  // Live status (CONCEPT/LIVE) zodat de header laat zien of de patient 'm
+  // al kan zien. Nieuwe programma's beginnen als DRAFT.
+  const [currentStatus, setCurrentStatus] = useState<ProgramStatus>(initialStatus ?? 'DRAFT')
 
   const { params: customParams } = useCustomParams()
   const createProgram = trpc.programs.create.useMutation()
@@ -546,6 +552,7 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
         status: 'ACTIVE',
         startDate: new Date().toISOString(),
       })
+      setCurrentStatus('ACTIVE')
       toast.success('Programma gedeployed! Het is nu zichtbaar voor de patiënt.', { duration: 4000 })
       if (returnTo) router.push(returnTo)
     } catch {
@@ -624,6 +631,41 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
             onChange={e => setProgram(p => ({ ...p, name: e.target.value }))}
             className="h-8 text-sm font-semibold border-0 shadow-none focus-visible:ring-0 px-0 min-w-0"
           />
+          {!program.isTemplate && (
+            <span
+              className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full"
+              style={
+                currentStatus === 'ACTIVE'
+                  ? { background: 'rgba(190,242,100,0.12)', color: '#BEF264', border: '1px solid rgba(190,242,100,0.35)' }
+                  : currentStatus === 'COMPLETED' || currentStatus === 'ARCHIVED'
+                  ? { background: 'rgba(123,136,137,0.15)', color: '#7B8889', border: '1px solid rgba(123,136,137,0.30)' }
+                  : { background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.35)' }
+              }
+              title={
+                currentStatus === 'ACTIVE'
+                  ? 'Het programma is gedeployed en zichtbaar voor de patiënt.'
+                  : currentStatus === 'DRAFT'
+                  ? 'Concept — patiënt ziet dit nog niet. Klik DEPLOYEN om actief te maken.'
+                  : currentStatus === 'COMPLETED'
+                  ? 'Programma is afgerond.'
+                  : 'Programma is gearchiveerd.'
+              }
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{
+                  background:
+                    currentStatus === 'ACTIVE' ? '#BEF264'
+                    : currentStatus === 'DRAFT' ? '#f59e0b'
+                    : '#7B8889',
+                }}
+              />
+              {currentStatus === 'ACTIVE' ? 'Live'
+                : currentStatus === 'DRAFT' ? 'Concept'
+                : currentStatus === 'COMPLETED' ? 'Afgerond'
+                : 'Archief'}
+            </span>
+          )}
           <div className="flex-1" />
 
           {/* Week tabs — hidden on mobile */}

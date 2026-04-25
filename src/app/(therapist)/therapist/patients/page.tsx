@@ -51,6 +51,7 @@ function PatientsPageInner() {
   const [inviteResult, setInviteResult] = useState<{
     url: string
     expiresAt: Date
+    patientUserId: string | null
   } | null>(null)
 
   const { data: patients = [], isLoading } = trpc.patients.list.useQuery()
@@ -81,6 +82,7 @@ function PatientsPageInner() {
       setInviteResult({
         url: res.instructionUrl,
         expiresAt: new Date(res.expiresAt),
+        patientUserId: res.patientUserId,
       })
       toast.success('Invite aangemaakt — deel de code-URL met je patiënt.')
     } catch (err: unknown) {
@@ -362,16 +364,32 @@ function PatientsPageInner() {
                     Verloopt op {new Date(inviteResult.expiresAt).toLocaleString('nl-NL')}
                   </p>
                 </div>
-                <DarkButton
-                  variant="secondary"
-                  className="w-full"
-                  onClick={() => {
-                    setInviteOpen(false)
-                    resetInviteForm()
-                  }}
-                >
-                  Sluiten
-                </DarkButton>
+                <div className="flex flex-col gap-2">
+                  {inviteResult.patientUserId && (
+                    <DarkButton
+                      variant="primary"
+                      className="w-full"
+                      onClick={() => {
+                        const pid = inviteResult.patientUserId!
+                        setInviteOpen(false)
+                        resetInviteForm()
+                        router.push(`/therapist/programs/new?patientId=${pid}`)
+                      }}
+                    >
+                      → Maak nu een programma voor deze patiënt
+                    </DarkButton>
+                  )}
+                  <DarkButton
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => {
+                      setInviteOpen(false)
+                      resetInviteForm()
+                    }}
+                  >
+                    Sluiten
+                  </DarkButton>
+                </div>
               </div>
             ) : (
               <form onSubmit={handleInvite} className="space-y-4 mt-2">

@@ -139,6 +139,12 @@ export const inviteRouter = createTRPCRouter({
       // direct PHI lezen via PENDING-toegang. We laten de invite-row staan
       // (zodat de patient via OTP kan accepteren), maar de PatientTherapist
       // wordt pas in `invite.finalize` aangemaakt na patient-redeem.
+      // patientUserId wordt teruggegeven aan de UI zodat je direct na de
+      // invite door kunt klikken naar "maak programma voor deze patiënt".
+      // Alleen gevuld in scenario's waarin we al een Prisma User + actieve
+      // therapist-koppeling hebben (= veilig om programma's voor te maken).
+      let patientUserId: string | null = null
+
       if ((input.role === 'PATIENT' || input.role === 'ATHLETE')) {
         const existingUser = await ctx.prisma.user.findUnique({ where: { email } })
         if (existingUser) {
@@ -155,7 +161,9 @@ export const inviteRouter = createTRPCRouter({
             },
           })
           if (existingLinkSelf) {
-            // Niets doen — bestaande link blijft staan. Geen overwrite.
+            // Bestaande koppeling blijft staan — geen overwrite, maar wel
+            // doorgeven dat we direct programma's voor 'm kunnen maken.
+            patientUserId = existingUser.id
           }
           // (Geen `else { upsert }` meer — dat was het lek.)
         } else {
@@ -180,6 +188,7 @@ export const inviteRouter = createTRPCRouter({
               notes: `Aangemaakt via invite — wacht op acceptatie`,
             },
           })
+          patientUserId = patientUser.id
         }
       }
 
@@ -221,6 +230,7 @@ export const inviteRouter = createTRPCRouter({
         instructionUrl,
         mailDelivered: mailResult.ok,
         mailProvider: mailResult.provider,
+        patientUserId,
       }
     }),
 
