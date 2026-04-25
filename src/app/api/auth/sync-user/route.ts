@@ -1,35 +1,54 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 
+const ALLOWED_SELF_SIGNUP_ROLES = new Set(['THERAPIST', 'ATHLETE'])
+
+/**
+ * Bind een net-aangemaakte Supabase auth-account aan een Prisma user-row.
+ *
+ * Identity (id/email) komt UITSLUITEND uit de geverifieerde Supabase-sessie,
+ * nooit uit de request body — anders kan iedereen op het internet een
+ * willekeurige user-row aanmaken/overschrijven (PRE-LAUNCH security fix).
+ *
+ * Body mag alleen `name` en `role` bevatten:
+ *   - role wordt gevalideerd tegen ALLOWED_SELF_SIGNUP_ROLES (THERAPIST/ATHLETE).
+ *     PATIENT-rows worden uitsluitend via invite.finalize aangemaakt.
+ *     ADMIN kan nooit via deze route.
+ *
+ * Bestaande Prisma rows worden NIET overschreven — alleen create-if-missing.
+ */
 export async function POST(request: Request) {
   try {
-    const { id, email, name, role } = await request.json()
+    const supabase = await createClient()
+    const { data: { user: authUser } } = await supabase.auth.getUser()
 
-    if (!id || !email) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    if (!authUser?.email) {
+      return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
     }
 
-    // Use service role to bypass RLS
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const body = await request.json().catch(() => ({}))
+    const requestedRole = typeof body?.role === 'string' ? body.role : undefined
+    const safeRole = requestedRole && ALLOWED_SELF_SIGNUP_ROLES.has(requestedRole)
+      ? requestedRole
+      : 'THERAPIST'
+    const safeName = typeof body?.name === 'string' && body.name.trim().length > 0
+      ? body.name.trim().slice(0, 200)
+      : authUser.email.split('@')[0]
 
-    const { error } = await supabase
-      .from('users')
-      .upsert({
-        id,
-        email,
-        name: name || email.split('@')[0],
-        role: role || 'THERAPIST',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }, { onConflict: 'id' })
-
-    if (error) {
-      console.error('sync-user error:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    // Bestaande row laten staan — voorkomt role-overwrite via deze route.
+    const existing = await prisma.user.findUnique({ where: { email: authUser.email } })
+    if (existing) {
+      return NextResponse.json({ success: true, existed: true })
     }
+
+    await prisma.user.create({
+      data: {
+        email: authUser.email,
+        name: safeName,
+        role: safeRole as 'THERAPIST' | 'ATHLETE',
+      },
+    })
 
     return NextResponse.json({ success: true })
   } catch (e) {

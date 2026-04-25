@@ -87,9 +87,10 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
   const router = useRouter()
   const searchParams = useSearchParams()
   // Na opslaan doorsturen naar een oorspronkelijke pagina (bv week-planner).
-  // Alleen relatieve paden geaccepteerd om open-redirect te voorkomen.
+  // Alleen single-leading-slash paden — //evil.tld is protocol-relatief en
+  // zou een open redirect zijn.
   const rawReturnTo = searchParams?.get('returnTo') ?? null
-  const returnTo = rawReturnTo && rawReturnTo.startsWith('/') ? rawReturnTo : null
+  const returnTo = rawReturnTo && /^\/[^/\\]/.test(rawReturnTo) ? rawReturnTo : null
 
   const [program, setProgram] = useState<ProgramState>(() => ({
     name: initialState?.name ?? 'Nieuw programma',

@@ -1,5 +1,6 @@
 import { AthleteBottomNav } from '@/components/layout/AthleteBottomNav'
 import { PageTransition } from '@/components/layout/PageTransition'
+import { BetaDisclaimer } from '@/components/system/BetaDisclaimer'
 
 export default function AthleteLayout({
   children,
@@ -13,6 +14,7 @@ export default function AthleteLayout({
     >
       <main className="w-full overflow-x-hidden"><PageTransition>{children}</PageTransition></main>
       <AthleteBottomNav />
+      <BetaDisclaimer />
     </div>
   )
 }

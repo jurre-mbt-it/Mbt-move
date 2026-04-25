@@ -466,8 +466,17 @@ export const patientsRouter = createTRPCRouter({
   delete: mfaTherapistProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      // Alleen actieve relaties (APPROVED of PENDING) mogen via deze knop
+      // gedelete worden. Een ex-therapeut wiens toegang door de patient is
+      // ingetrokken (REVOKED/DECLINED) mag de programma's van die patient
+      // niet meer cascade-deleten.
       const relation = await ctx.prisma.patientTherapist.findFirst({
-        where: { therapistId: ctx.user.id, patientId: input.id },
+        where: {
+          therapistId: ctx.user.id,
+          patientId: input.id,
+          isActive: true,
+          status: { in: ['APPROVED', 'PENDING'] },
+        },
       })
       if (!relation) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Patiënt niet gevonden' })

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Header } from '@/components/layout/Header'
 import { trpc } from '@/lib/trpc/client'
 import { P } from '@/components/dark-ui'
+import { BetaDisclaimer } from '@/components/system/BetaDisclaimer'
 
 export default function AdminLayout({
   children,
@@ -46,6 +47,7 @@ export default function AdminLayout({
       <main className="flex-1 p-6" style={{ background: P.bg }}>
         {children}
       </main>
+      <BetaDisclaimer />
     </div>
   )
 }

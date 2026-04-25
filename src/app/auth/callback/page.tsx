@@ -75,7 +75,11 @@ function CallbackHandler() {
           }
         } catch { /* fallback to metadata role */ }
         const next = searchParams.get('next')
-        router.replace(next || getRoleRedirect(role))
+        // Alleen relatieve paden accepteren (single leading slash, niet
+        // protocol-relatief //evil.tld) om open-redirect via phishing-link
+        // te voorkomen.
+        const safeNext = next && /^\/[^/\\]/.test(next) ? next : null
+        router.replace(safeNext ?? getRoleRedirect(role))
       } else {
         setError('Inloggen mislukt. Geen code of token ontvangen. Controleer de magic link URL.')
       }

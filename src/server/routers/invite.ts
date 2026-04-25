@@ -87,6 +87,20 @@ export const inviteRouter = createTRPCRouter({
       const dob = new Date(input.dateOfBirth)
       const expiresAt = new Date(Date.now() + CODE_TTL_HOURS * 3600 * 1000)
 
+      // SECURITY: weiger invites voor e-mails die al door een THERAPIST/ADMIN
+      // worden gebruikt — anders kan een malafide therapeut hun rol later
+      // platwalsen via finalize.
+      const existingForEmail = await ctx.prisma.user.findUnique({
+        where: { email },
+        select: { role: true },
+      })
+      if (existingForEmail && (existingForEmail.role === 'THERAPIST' || existingForEmail.role === 'ADMIN')) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Dit e-mailadres is al in gebruik door een ander account.',
+        })
+      }
+
       // Voorkom meerdere actieve invites voor dezelfde e-mail
       await ctx.prisma.inviteCode.updateMany({
         where: {
@@ -117,35 +131,56 @@ export const inviteRouter = createTRPCRouter({
       // therapeut al sessies kan loggen vóór de patiënt de invite accepteert.
       // Bij `invite.finalize` wordt de User gekoppeld aan Supabase-auth via
       // email-match en wordt PatientTherapist opgehoogd naar APPROVED.
-      if (input.role === 'PATIENT' || input.role === 'ATHLETE') {
+      //
+      // SECURITY: Als er al een Prisma User bestaat met dit email-adres, dan
+      // mag de invite GEEN nieuwe PatientTherapist relatie aanmaken zonder
+      // bewijs dat de patient daadwerkelijk wil koppelen. Anders kan een
+      // malafide therapeut willekeurige bestaande patiënten "uitnodigen" en
+      // direct PHI lezen via PENDING-toegang. We laten de invite-row staan
+      // (zodat de patient via OTP kan accepteren), maar de PatientTherapist
+      // wordt pas in `invite.finalize` aangemaakt na patient-redeem.
+      if ((input.role === 'PATIENT' || input.role === 'ATHLETE')) {
         const existingUser = await ctx.prisma.user.findUnique({ where: { email } })
-        const patientUser = existingUser ?? await ctx.prisma.user.create({
-          data: {
-            email,
-            name: input.name.trim(),
-            role: input.role,
-            dateOfBirth: dob,
-            practiceId: ctx.user!.practiceId,
-          },
-        })
-        await ctx.prisma.patientTherapist.upsert({
-          where: {
-            therapistId_patientId: {
+        if (existingUser) {
+          // Bestaande user: alleen pre-link aanmaken als deze user al aan
+          // ons (deze therapist) gekoppeld is. Anders moet de patient via
+          // OTP redeem expliciet akkoord geven (PatientTherapist wordt dan
+          // door invite.finalize aangemaakt).
+          const existingLinkSelf = await ctx.prisma.patientTherapist.findUnique({
+            where: {
+              therapistId_patientId: {
+                therapistId: ctx.user!.id,
+                patientId: existingUser.id,
+              },
+            },
+          })
+          if (existingLinkSelf) {
+            // Niets doen — bestaande link blijft staan. Geen overwrite.
+          }
+          // (Geen `else { upsert }` meer — dat was het lek.)
+        } else {
+          // Nieuwe user — geen risico op cross-tenant: maak Prisma User
+          // én pre-link aan zoals voorheen.
+          const patientUser = await ctx.prisma.user.create({
+            data: {
+              email,
+              name: input.name.trim(),
+              role: input.role,
+              dateOfBirth: dob,
+              practiceId: ctx.user!.practiceId,
+            },
+          })
+          await ctx.prisma.patientTherapist.create({
+            data: {
               therapistId: ctx.user!.id,
               patientId: patientUser.id,
+              status: 'PENDING',
+              isActive: true,
+              requestedAt: new Date(),
+              notes: `Aangemaakt via invite — wacht op acceptatie`,
             },
-          },
-          // Bestaande koppeling (bv. APPROVED van vorige redeem) niet overschrijven
-          update: {},
-          create: {
-            therapistId: ctx.user!.id,
-            patientId: patientUser.id,
-            status: 'PENDING',
-            isActive: true,
-            requestedAt: new Date(),
-            notes: `Aangemaakt via invite — wacht op acceptatie`,
-          },
-        })
+          })
+        }
       }
 
       // Stuur een branded invite-mail via Resend (als geconfigureerd). Bevat
@@ -492,23 +527,29 @@ export const inviteRouter = createTRPCRouter({
       return { ok: true, alreadyFinalized: true }
     }
 
-    // Upsert Prisma user (Supabase heeft 'm al gemaakt bij verifyOtp)
-    const user = await ctx.prisma.user.upsert({
-      where: { email },
-      update: {
-        name: invite.name,
-        role: invite.role,
-        practiceId: invite.practiceId,
-        dateOfBirth: invite.dateOfBirth,
-      },
-      create: {
-        email,
-        name: invite.name,
-        role: invite.role,
-        practiceId: invite.practiceId,
-        dateOfBirth: invite.dateOfBirth,
-      },
-    })
+    // SECURITY: Bestaande user-rows NIET overschrijven. Anders kan een
+    // openstaande PATIENT-invite voor een email die later door een andere
+    // user (bv THERAPIST) geclaimed is, hun rol/practice/dob platwalsen
+    // zodra zij toevallig deze flow doorlopen. Alleen create-if-missing.
+    const existingUser = await ctx.prisma.user.findUnique({ where: { email } })
+    let user
+    if (existingUser) {
+      // Voor THERAPIST/ADMIN: weiger silently — invite was niet voor hen.
+      if (existingUser.role === 'THERAPIST' || existingUser.role === 'ADMIN') {
+        return { ok: true, alreadyFinalized: true, skipped: 'role-mismatch' as const }
+      }
+      user = existingUser
+    } else {
+      user = await ctx.prisma.user.create({
+        data: {
+          email,
+          name: invite.name,
+          role: invite.role,
+          practiceId: invite.practiceId,
+          dateOfBirth: invite.dateOfBirth,
+        },
+      })
+    }
 
     await ctx.prisma.inviteCode.update({
       where: { id: invite.id },

@@ -1,5 +1,6 @@
 import { PatientBottomNav } from '@/components/layout/PatientBottomNav'
 import { PageTransition } from '@/components/layout/PageTransition'
+import { BetaDisclaimer } from '@/components/system/BetaDisclaimer'
 
 export default function PatientLayout({
   children,
@@ -13,6 +14,7 @@ export default function PatientLayout({
     >
       <main className="flex-1"><PageTransition>{children}</PageTransition></main>
       <PatientBottomNav />
+      <BetaDisclaimer />
     </div>
   )
 }

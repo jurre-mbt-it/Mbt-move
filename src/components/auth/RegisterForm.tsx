@@ -58,13 +58,12 @@ export function RegisterForm() {
       }
 
       if (data.user) {
-        // Sync user to public.users table
+        // Sync user — id/email worden server-side uit de Supabase sessie gehaald,
+        // alleen name/role komen uit de form (role wordt server-side ge-allowlist).
         await fetch('/api/auth/sync-user', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            id: data.user.id,
-            email: data.user.email,
             name: formData.name,
             role: formData.role,
           }),

@@ -99,10 +99,8 @@ function AccessCodeInner() {
       }
 
       // Stap 2: tRPC finaliseer — markeert InviteCode als used + maakt PatientTherapist relatie
+      // (finalize maakt ook de Prisma user-row aan; aparte sync-user call is overbodig).
       await finalizeMutation.mutateAsync()
-
-      // Stap 3: sync user via bestaande API (maakt Prisma-row als 'ie nog niet bestaat)
-      await fetch('/api/auth/sync-user', { method: 'POST' }).catch(() => {})
 
       router.replace('/patient/dashboard')
     } catch (err) {
