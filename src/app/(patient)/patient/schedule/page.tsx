@@ -30,22 +30,6 @@ export default function PatientSchedulePage() {
 
   const [selectedDay, setSelectedDay] = useState(todayDayNum)
 
-  // Welke calendar-dagen deze week hebben een afgeronde sessie?
-  // Catch-up sessies vallen automatisch op completedAt = werkelijke dag.
-  const completedDayNums = (() => {
-    if (!sessionHistory) return new Set<number>()
-    const weekStart = new Date()
-    weekStart.setDate(weekStart.getDate() - (weekStart.getDay() === 0 ? 6 : weekStart.getDay() - 1))
-    weekStart.setHours(0, 0, 0, 0)
-    const set = new Set<number>()
-    for (const s of sessionHistory) {
-      const d = new Date(s.completedAt)
-      if (d < weekStart) continue
-      const dn = d.getDay() === 0 ? 7 : d.getDay()
-      set.add(dn)
-    }
-    return set
-  })()
 
   if (isLoading) {
     return (
@@ -65,22 +49,80 @@ export default function PatientSchedulePage() {
     )
   }
 
-  // Build map: dayOfWeek → exercises (using day field from program exercises)
-  // The program uses day 1-7 as day-in-program-week, not day-of-calendar-week.
-  // We show the week schedule based on day numbers in the current week.
-  const currentWeekExercises = Object.values(program.byWeekDay[program.currentWeek] ?? {}).flat() as ProgramExercise[]
-
-  // Get which program-days exist in current week
+  // Programma-dagen voor deze week (oorspronkelijke planning)
   const programDaysInWeek = Object.keys(program.byWeekDay[program.currentWeek] ?? {}).map(Number).sort()
 
-  // Map program-day-index → calendar day. Day 1 = Monday, Day 2 = Tuesday, etc.
-  // For simplicity we show exercises by their program day (1–7)
-  const exercisesForSelectedDay = (program.byWeekDay[program.currentWeek]?.[selectedDay] as ProgramExercise[] | undefined) ?? []
+  // ── Schedule-shifting: catch-up sessies "verschuiven" het programma naar de
+  // dag waarop ze daadwerkelijk afgerond zijn. We doen dit greedy:
+  //   1. Sessies van deze week op volgorde van voltooi-tijdstip
+  //   2. Iedere sessie consumeert een planned-day (exacte match eerst, anders
+  //      de vroegste nog-onvervulde planned-day)
+  //   3. Resterende planned-days = 'planned' (toekomst) of 'missed' (verleden)
+  //   4. Lege dagen = 'rest'
+  // Resultaat: de weergave verschuift de programma-blokken naar de werkelijke
+  // trainings-dagen. Patient ziet ✓ op de dag dat 'ie daadwerkelijk getraind
+  // heeft, en de oorspronkelijk geplande dag wordt 'missed' / leeg.
+  type DayStatus = 'done' | 'planned' | 'missed' | 'rest'
+  interface DayInfo {
+    exercises: ProgramExercise[]
+    status: DayStatus
+    originalDay?: number  // bij catch-up: de planned-day waar dit oorspronkelijk voor was
+  }
+  const sessionsThisWeek = (sessionHistory ?? [])
+    .filter(s => {
+      const d = new Date(s.completedAt)
+      const ws = new Date()
+      ws.setDate(ws.getDate() - (ws.getDay() === 0 ? 6 : ws.getDay() - 1))
+      ws.setHours(0, 0, 0, 0)
+      return d >= ws
+    })
+    .map(s => {
+      const d = new Date(s.completedAt)
+      const dn = d.getDay() === 0 ? 7 : d.getDay()
+      return { completedAt: s.completedAt, dayOfWeek: dn }
+    })
+    .sort((a, b) => +new Date(a.completedAt) - +new Date(b.completedAt))
+
+  const usedPlannedDays = new Set<number>()
+  const dayInfo: Record<number, DayInfo> = {}
+
+  for (const session of sessionsThisWeek) {
+    const targetDay = session.dayOfWeek
+    let plannedDay: number | undefined
+    if (programDaysInWeek.includes(targetDay) && !usedPlannedDays.has(targetDay)) {
+      plannedDay = targetDay
+    } else {
+      plannedDay = programDaysInWeek.find(d => !usedPlannedDays.has(d))
+    }
+    if (plannedDay !== undefined) {
+      usedPlannedDays.add(plannedDay)
+      const exs = (program.byWeekDay[program.currentWeek]?.[plannedDay] as ProgramExercise[] | undefined) ?? []
+      dayInfo[targetDay] = {
+        exercises: exs,
+        status: 'done',
+        originalDay: plannedDay !== targetDay ? plannedDay : undefined,
+      }
+    } else {
+      dayInfo[targetDay] = { exercises: [], status: 'done' }
+    }
+  }
+  for (const plannedDay of programDaysInWeek) {
+    if (usedPlannedDays.has(plannedDay)) continue
+    if (dayInfo[plannedDay]) continue
+    const exs = (program.byWeekDay[program.currentWeek]?.[plannedDay] as ProgramExercise[] | undefined) ?? []
+    dayInfo[plannedDay] = {
+      exercises: exs,
+      status: plannedDay < todayDayNum ? 'missed' : 'planned',
+    }
+  }
+  for (let d = 1; d <= 7; d++) {
+    if (!dayInfo[d]) dayInfo[d] = { exercises: [], status: 'rest' }
+  }
+
+  const exercisesForSelectedDay = dayInfo[selectedDay].exercises
+  const selectedDayInfo = dayInfo[selectedDay]
   const hasExercises = exercisesForSelectedDay.length > 0
   const isToday = selectedDay === todayDayNum
-
-  // Which calendar days have exercises (map programDay → calendarDay as same)
-  const activeDays = new Set(programDaysInWeek)
 
   // Group exercises by superset
   const groups: { key: string; exercises: ProgramExercise[] }[] = []
@@ -124,11 +166,14 @@ export default function PatientSchedulePage() {
         <div className="flex gap-2 overflow-x-auto pb-1">
           {Array.from({ length: 7 }).map((_, i) => {
             const dayNum = i + 1
-            const hasSession = activeDays.has(dayNum)
-            const isCompleted = completedDayNums.has(dayNum)
+            const info = dayInfo[dayNum]
+            const isDone = info.status === 'done'
+            const isMissed = info.status === 'missed'
+            const isPlanned = info.status === 'planned'
+            const hasSession = info.exercises.length > 0
             const isSelected = selectedDay === dayNum
             const isTd = dayNum === todayDayNum
-            const count = (program.byWeekDay[program.currentWeek]?.[dayNum] as ProgramExercise[] | undefined)?.length ?? 0
+            const count = info.exercises.length
             return (
               <button
                 key={i}
@@ -138,11 +183,13 @@ export default function PatientSchedulePage() {
                   background: isSelected ? P.surfaceHi : P.surface,
                   border: isSelected
                     ? `2px solid ${P.lime}`
-                    : isCompleted
+                    : isDone
                       ? `2px solid ${P.lime}`
-                      : isTd
-                        ? `2px solid ${P.gold}`
-                        : `2px solid ${P.line}`,
+                      : isMissed
+                        ? `2px solid ${P.danger}`
+                        : isTd
+                          ? `2px solid ${P.gold}`
+                          : `2px solid ${P.line}`,
                 }}
               >
                 <span
@@ -151,16 +198,16 @@ export default function PatientSchedulePage() {
                     fontSize: 11,
                     fontWeight: 900,
                     letterSpacing: '0.14em',
-                    color: isSelected ? P.ink : isCompleted ? P.lime : isTd ? P.gold : P.inkMuted,
+                    color: isSelected ? P.ink : isDone ? P.lime : isMissed ? P.danger : isTd ? P.gold : P.inkMuted,
                   }}
                 >
                   {DAY_SHORT[i]}
                 </span>
                 <div className="w-6 h-6 flex items-center justify-center">
-                  {isCompleted
+                  {isDone
                     ? <CheckCircle2 className="w-4 h-4" style={{ color: P.lime }} />
-                    : hasSession
-                      ? <Dumbbell className="w-3.5 h-3.5" style={{ color: isSelected ? P.lime : P.ink }} />
+                    : isPlanned || isMissed || hasSession
+                      ? <Dumbbell className="w-3.5 h-3.5" style={{ color: isSelected ? P.lime : isMissed ? P.danger : P.ink }} />
                       : <Moon className="w-3.5 h-3.5" style={{ color: P.inkDim }} />
                   }
                 </div>
@@ -170,7 +217,7 @@ export default function PatientSchedulePage() {
                     style={{
                       fontSize: 10,
                       fontWeight: 700,
-                      color: isSelected ? P.lime : P.inkMuted,
+                      color: isSelected ? P.lime : isDone ? P.lime : isMissed ? P.danger : P.inkMuted,
                     }}
                   >
                     {count}
@@ -185,7 +232,11 @@ export default function PatientSchedulePage() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <Kicker>{isToday ? 'VANDAAG' : 'DAG'}</Kicker>
+              <Kicker>
+                {isToday ? 'VANDAAG' : 'DAG'}
+                {selectedDayInfo.status === 'done' && ' · ✓ AFGEROND'}
+                {selectedDayInfo.status === 'missed' && ' · GEMIST'}
+              </Kicker>
               <h2
                 className="athletic-display"
                 style={{
@@ -200,13 +251,21 @@ export default function PatientSchedulePage() {
               >
                 {DAY_NAMES[selectedDay - 1]}
               </h2>
+              {selectedDayInfo.originalDay !== undefined && (
+                <p
+                  className="athletic-mono"
+                  style={{ color: P.gold, fontSize: 11, fontWeight: 700, letterSpacing: '0.10em', marginTop: 4 }}
+                >
+                  ✓ INGEHAALD VAN {(DAY_SHORT[selectedDayInfo.originalDay - 1] ?? '?').toUpperCase()}
+                </p>
+              )}
             </div>
-            {hasExercises && isToday && (
+            {hasExercises && selectedDayInfo.status !== 'done' && isToday && (
               <DarkButton href="/patient/session" size="sm" variant="primary">
                 <Play className="w-3 h-3 fill-current mr-1.5" /> START
               </DarkButton>
             )}
-            {hasExercises && !isToday && (
+            {hasExercises && selectedDayInfo.status !== 'done' && !isToday && (
               <DarkButton
                 href={`/patient/session?week=${program.currentWeek}&day=${selectedDay}`}
                 size="sm"
