@@ -8,25 +8,31 @@ import { trpc } from '@/lib/trpc/client'
 
 export function ConsentPopup() {
   const [open, setOpen] = useState(false)
+  const utils = trpc.useUtils()
 
   const { data, isLoading } = trpc.research.getConsentStatus.useQuery(undefined, {
     retry: false,
   })
 
   const setConsent = trpc.research.setConsent.useMutation({
-    onSuccess: () => setOpen(false),
+    onSuccess: () => {
+      // Cache leeghalen zodat needsNewConsent op de volgende mount klopt.
+      utils.research.getConsentStatus.invalidate()
+      setOpen(false)
+    },
   })
 
-  // Show popup when: no record yet, or consent version changed
+  // Bidirectioneel: openen + sluiten op basis van server-status. Met alleen
+  // setOpen(true) blijft de popup ook open staan nadat een refetch een
+  // geüpdate status terugbrengt.
   useEffect(() => {
-    if (!isLoading && data?.needsNewConsent) {
-      setOpen(true)
-    }
+    if (isLoading) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setOpen(!!data?.needsNewConsent)
   }, [isLoading, data])
 
   function handleDecline() {
     setConsent.mutate({ consentGiven: false })
-    setOpen(false)
   }
 
   function handleAccept() {

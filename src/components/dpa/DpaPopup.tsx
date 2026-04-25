@@ -12,19 +12,28 @@ import { createClient } from '@/lib/supabase/client'
 export function DpaPopup() {
   const [open, setOpen] = useState(false)
   const router = useRouter()
+  const utils = trpc.useUtils()
 
   const { data, isLoading } = trpc.dpa.getStatus.useQuery(undefined, {
     retry: false,
   })
 
   const accept = trpc.dpa.accept.useMutation({
-    onSuccess: () => setOpen(false),
+    onSuccess: () => {
+      // Cache leeghalen — anders ziet de volgende mount nog steeds
+      // needsAcceptance=true en pop het opnieuw open.
+      utils.dpa.getStatus.invalidate()
+      setOpen(false)
+    },
   })
 
+  // Open/sluit op basis van server-status. Belangrijk dat dit BIDIRECTIONEEL
+  // is: alleen `setOpen(true)` zou de popup open laten staan ook nadat de
+  // refetch een geupdatete status (needsAcceptance=false) terugbrengt.
   useEffect(() => {
-    if (!isLoading && data?.needsAcceptance) {
-      setOpen(true)
-    }
+    if (isLoading) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setOpen(!!data?.needsAcceptance)
   }, [isLoading, data])
 
   async function handleLogout() {
