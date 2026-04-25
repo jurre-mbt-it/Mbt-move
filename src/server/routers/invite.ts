@@ -538,11 +538,21 @@ export const inviteRouter = createTRPCRouter({
       if (existingUser.role === 'THERAPIST' || existingUser.role === 'ADMIN') {
         return { ok: true, alreadyFinalized: true, skipped: 'role-mismatch' as const }
       }
+      // Backfill supabaseUserId als de bestaande row nog geen binding had.
+      if (!existingUser.supabaseUserId) {
+        try {
+          await ctx.prisma.user.update({
+            where: { id: existingUser.id },
+            data: { supabaseUserId: ctx.user!.supabaseUserId },
+          })
+        } catch { /* unique constraint — laat staan */ }
+      }
       user = existingUser
     } else {
       user = await ctx.prisma.user.create({
         data: {
           email,
+          supabaseUserId: ctx.user!.supabaseUserId,
           name: invite.name,
           role: invite.role,
           practiceId: invite.practiceId,

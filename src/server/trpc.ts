@@ -13,12 +13,66 @@ export interface Context {
     email: string
     role: string
     practiceId: string | null
+    supabaseUserId: string
   } | null
 }
 
 // In-memory cache voor user lookups (leeft mee met de serverless instantie)
 const userCache = new Map<string, { user: Context['user']; expiresAt: number }>()
 const USER_CACHE_TTL = 60_000 // 60 seconden
+
+/**
+ * Resolve een Supabase auth-user naar een Prisma user-row.
+ *
+ * Lookup-volgorde:
+ *  1. Op `supabaseUserId` (stabiele binding — werkt door email-changes heen).
+ *  2. Fallback: legacy rows zonder supabaseUserId, gematcht op email — maar
+ *     ALLEEN als die row inderdaad nog ongelinkt is. Bij match wordt de
+ *     supabaseUserId direct geback-fild zodat dezelfde user voortaan via
+ *     pad #1 binnenkomt.
+ *
+ * Een row die al een ANDERE supabaseUserId heeft maar wel deze email →
+ * geweigerd. Dat is het account-takeover-scenario (Supabase email-change).
+ */
+async function resolveUser(supabaseUserId: string, email: string) {
+  const byUuid = await prisma.user.findUnique({
+    where: { supabaseUserId },
+    select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true },
+  })
+  if (byUuid) return byUuid
+
+  const byEmail = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true },
+  })
+  if (!byEmail) return null
+  if (byEmail.supabaseUserId && byEmail.supabaseUserId !== supabaseUserId) {
+    // Bestaande row hoort bij een andere Supabase-account — weiger.
+    return null
+  }
+  if (!byEmail.supabaseUserId) {
+    // Defense-in-depth: voor high-value rollen weigeren we email-fallback
+    // backfill. Anders zou een attacker die hun Supabase-email naar een
+    // therapist/admin email weet te wisselen vóór de deploy-SQL gerund is,
+    // die identiteit kunnen claimen. Voor THERAPIST/ADMIN moet supabaseUserId
+    // al via de bulk-backfill (zie supabase-schema.sql) gevuld zijn.
+    if (byEmail.role === 'THERAPIST' || byEmail.role === 'ADMIN') {
+      return null
+    }
+    try {
+      const updated = await prisma.user.update({
+        where: { id: byEmail.id },
+        data: { supabaseUserId },
+        select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true },
+      })
+      return updated
+    } catch {
+      // Race / constraint violation — wacht op volgende request.
+      return null
+    }
+  }
+  return byEmail
+}
 
 export async function createTRPCContext(opts: { req?: NextRequest }): Promise<Context> {
   let user: Context['user'] = null
@@ -47,18 +101,19 @@ export async function createTRPCContext(opts: { req?: NextRequest }): Promise<Co
     }
 
     if (supabaseUser?.id && supabaseUser?.email) {
-      // Check cache eerst
       const cached = userCache.get(supabaseUser.id)
       if (cached && cached.expiresAt > Date.now()) {
         user = cached.user
       } else {
-        // Één DB-query, resultaat wordt gecached
-        const dbUser = await prisma.user.findUnique({
-          where: { email: supabaseUser.email },
-          select: { id: true, email: true, role: true, practiceId: true },
-        })
-        if (dbUser) {
-          user = { id: dbUser.id, email: dbUser.email, role: dbUser.role, practiceId: dbUser.practiceId }
+        const dbUser = await resolveUser(supabaseUser.id, supabaseUser.email)
+        if (dbUser && dbUser.supabaseUserId) {
+          user = {
+            id: dbUser.id,
+            email: dbUser.email,
+            role: dbUser.role,
+            practiceId: dbUser.practiceId,
+            supabaseUserId: dbUser.supabaseUserId,
+          }
           userCache.set(supabaseUser.id, { user, expiresAt: Date.now() + USER_CACHE_TTL })
         }
       }

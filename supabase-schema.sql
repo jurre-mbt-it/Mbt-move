@@ -280,3 +280,19 @@ EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN
   ALTER TABLE "week_schedule_days" ADD CONSTRAINT "week_schedule_days_programId_fkey" FOREIGN KEY ("programId") REFERENCES "programs"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+-- ── Stabiele Supabase-binding op users (security batch 3) ─────────────────────
+-- Email is mutable in Supabase; we hangen de identity nu aan de Supabase-UUID
+-- zodat een email-change-flow geen account-takeover veroorzaakt.
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "supabaseUserId" TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS "users_supabaseUserId_key" ON "users"("supabaseUserId");
+
+-- BELANGRIJK — bulk-backfill voor bestaande gebruikers. Match Prisma-rows
+-- aan Supabase auth-users op email. Zonder deze stap zouden THERAPIST/ADMIN
+-- accounts niet meer kunnen inloggen (de tRPC code weigert email-fallback
+-- voor die rollen om account-takeover te voorkomen).
+UPDATE "users" u
+SET "supabaseUserId" = au.id::text
+FROM auth.users au
+WHERE u.email = au.email
+  AND u."supabaseUserId" IS NULL;

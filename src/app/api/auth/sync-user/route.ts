@@ -37,14 +37,27 @@ export async function POST(request: Request) {
       : authUser.email.split('@')[0]
 
     // Bestaande row laten staan — voorkomt role-overwrite via deze route.
+    // Wel even supabaseUserId backfillen als die nog leeg is en de row van
+    // dezelfde Supabase-user is (matcht email + nog geen andere binding).
     const existing = await prisma.user.findUnique({ where: { email: authUser.email } })
     if (existing) {
+      if (!existing.supabaseUserId) {
+        try {
+          await prisma.user.update({
+            where: { id: existing.id },
+            data: { supabaseUserId: authUser.id },
+          })
+        } catch {
+          // unique constraint — andere row heeft 'm al; negeren.
+        }
+      }
       return NextResponse.json({ success: true, existed: true })
     }
 
     await prisma.user.create({
       data: {
         email: authUser.email,
+        supabaseUserId: authUser.id,
         name: safeName,
         role: safeRole as 'THERAPIST' | 'ATHLETE',
       },

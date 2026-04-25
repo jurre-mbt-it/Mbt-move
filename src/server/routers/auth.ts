@@ -83,8 +83,10 @@ export const authRouter = createTRPCRouter({
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
       )
+      // listFactors verwacht de Supabase auth-UUID (NIET de Prisma cuid).
+      // Voor deze refactor pakken we ctx.user.supabaseUserId.
       const { data, error } = await supabaseAdmin.auth.admin.mfa.listFactors({
-        userId: ctx.user.id,
+        userId: ctx.user.supabaseUserId,
       })
       if (error) {
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })

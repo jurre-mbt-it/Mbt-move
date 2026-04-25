@@ -206,6 +206,12 @@ enum TissueLimitation {
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
+  // Stabiele binding aan de Supabase auth-user. Email is mutable; deze UUID
+  // niet. Lookups in tRPC context gebeuren primair op deze kolom — fallback
+  // op email-match alleen voor legacy rows zonder supabaseUserId, en alleen
+  // als het een 1-op-1 match is (anders geweigerd, voorkomt account-takeover
+  // via Supabase email-change).
+  supabaseUserId String? @unique
   name          String?
   role          UserRole  @default(PATIENT)
   avatarUrl     String?
