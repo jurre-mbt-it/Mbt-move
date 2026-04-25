@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, CalendarDays, Dumbbell, User } from 'lucide-react'
+import { Home, CalendarDays, Dumbbell, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { P } from '@/components/dark-ui'
 
@@ -12,7 +12,7 @@ const NAV_ITEMS = [
   { href: '/patient/dashboard', label: 'HOME', icon: Home },
   { href: '/patient/schedule', label: 'SCHEMA', icon: CalendarDays },
   { href: '/patient/session', label: 'TRAINING', icon: Dumbbell },
-  { href: '/patient/profile', label: 'PROFIEL', icon: User },
+  { href: '/patient/settings', label: 'INSTELLINGEN', icon: Settings },
 ]
 
 export function PatientBottomNav() {
