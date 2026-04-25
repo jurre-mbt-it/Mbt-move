@@ -183,6 +183,15 @@ export default function PatientSchedulePage() {
                 <Play className="w-3 h-3 fill-current mr-1.5" /> START
               </DarkButton>
             )}
+            {hasExercises && !isToday && (
+              <DarkButton
+                href={`/patient/session?week=${program.currentWeek}&day=${selectedDay}`}
+                size="sm"
+                variant="secondary"
+              >
+                <Play className="w-3 h-3 fill-current mr-1.5" /> INHALEN
+              </DarkButton>
+            )}
           </div>
 
           {hasExercises ? (
@@ -218,21 +227,19 @@ export default function PatientSchedulePage() {
                 </div>
               ))}
 
-              {isToday && (
-                <Link
-                  href="/patient/session"
-                  className="athletic-tap flex items-center justify-center gap-2 py-4 rounded-2xl mt-2"
-                  style={{ background: P.lime, color: P.bg }}
+              <Link
+                href={isToday ? '/patient/session' : `/patient/session?week=${program.currentWeek}&day=${selectedDay}`}
+                className="athletic-tap flex items-center justify-center gap-2 py-4 rounded-2xl mt-2"
+                style={{ background: isToday ? P.lime : P.gold, color: P.bg }}
+              >
+                <Play className="w-4 h-4 fill-current" />
+                <span
+                  className="athletic-mono"
+                  style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.1em' }}
                 >
-                  <Play className="w-4 h-4 fill-current" />
-                  <span
-                    className="athletic-mono"
-                    style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.1em' }}
-                  >
-                    START SESSIE — {exercisesForSelectedDay.length} OEFENINGEN
-                  </span>
-                </Link>
-              )}
+                  {isToday ? 'START SESSIE' : 'INHALEN'} — {exercisesForSelectedDay.length} OEFENINGEN
+                </span>
+              </Link>
             </div>
           ) : (
             <Tile accentBar={P.lime}>

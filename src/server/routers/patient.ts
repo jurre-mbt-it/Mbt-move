@@ -141,7 +141,17 @@ export const patientRouter = createTRPCRouter({
   // ── Today's exercises (for session page) ─────────────────────────────────
 
   getTodayExercises: protectedProcedure
-    .input(z.object({ patientId: z.string().optional() }).optional())
+    .input(
+      z
+        .object({
+          patientId: z.string().optional(),
+          // Catch-up: laat patient een gemiste dag inhalen door specifiek
+          // week/day op te vragen i.p.v. computeCurrentWeekDay.
+          week: z.number().int().min(1).optional(),
+          day: z.number().int().min(1).max(7).optional(),
+        })
+        .optional(),
+    )
     .query(async ({ ctx, input }) => {
     // Default = eigen user. Therapist kan patientId meegeven om door
     // patient's oogpunt te kijken (bv. live-behandeling flow).
@@ -185,11 +195,17 @@ export const patientRouter = createTRPCRouter({
 
     const allExercises = program.exercises.map(mapProgramExercise)
 
-    const { week, day } = computeCurrentWeekDay(
+    const computed = computeCurrentWeekDay(
       program.startDate,
       program.weeks,
       [...new Set(allExercises.map(e => e.day))]
     )
+
+    // Catch-up override: als client expliciet week+day meegeeft (gemiste dag inhalen)
+    // gebruiken we die i.p.v. de berekende huidige dag.
+    const week = input?.week ?? computed.week
+    const day = input?.day ?? computed.day
+    const isCatchUp = input?.week !== undefined || input?.day !== undefined
 
     const todayExercises = allExercises.filter(e => e.week === week && e.day === day)
 
@@ -200,6 +216,7 @@ export const patientRouter = createTRPCRouter({
         currentWeek: week,
         currentDay: day,
         weeks: program.weeks,
+        isCatchUp,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         tendinopathyMode: (program as any).tendinopathyMode ?? false,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

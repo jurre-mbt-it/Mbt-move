@@ -17,10 +17,10 @@ import {
 } from '@/components/dark-ui'
 
 const EFFECTIVE_DATE = '1 april 2025'
-const CONTROLLER = 'Movement Based Therapy B.V.'
-const CONTROLLER_ADDRESS = 'Herengracht 182, 1016 BR Amsterdam'
+const CONTROLLER = 'Movement Based Therapy'
+const CONTROLLER_ADDRESS = 'Jacob Bontiusplaats 40, 1018LL Amsterdam, Nederland'
 const CONTROLLER_KVK = '12345678'
-const CONTROLLER_EMAIL = 'privacy@mbt-move.nl'
+const CONTROLLER_EMAIL = 'info@movementbasedtherapy.nl'
 const AP_URL = 'https://www.autoriteitpersoonsgegevens.nl'
 
 export default function DpaPage() {

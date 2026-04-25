@@ -46,9 +46,8 @@ function PatientsPageInner() {
   const [inviteName, setInviteName] = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteDob, setInviteDob] = useState('') // YYYY-MM-DD
-  const [inviteRole, setInviteRole] = useState<'PATIENT' | 'THERAPIST' | 'ATHLETE'>('PATIENT')
+  const [inviteRole, setInviteRole] = useState<'PATIENT' | 'ATHLETE'>('PATIENT')
   const [inviteLoading, setInviteLoading] = useState(false)
-  const [inviteExists, setInviteExists] = useState(false)
   const [inviteResult, setInviteResult] = useState<{
     url: string
     expiresAt: Date
@@ -62,52 +61,28 @@ function PatientsPageInner() {
     setInviteEmail('')
     setInviteDob('')
     setInviteRole('PATIENT')
-    setInviteExists(false)
     setInviteResult(null)
   }
 
-  async function handleInvite(e: React.FormEvent, resend = false) {
+  async function handleInvite(e: React.FormEvent) {
     e.preventDefault()
+    if (!inviteDob) {
+      toast.error('Geboortedatum is verplicht voor een toegangscode-invite.')
+      return
+    }
     setInviteLoading(true)
-    setInviteExists(false)
     try {
-      // PATIENT + ATHLETE → nieuwe Physitrack-achtige code-flow (geboortedatum vereist)
-      if (inviteRole === 'PATIENT' || inviteRole === 'ATHLETE') {
-        if (!inviteDob) {
-          toast.error('Geboortedatum is verplicht voor een toegangscode-invite.')
-          return
-        }
-        const res = await createInvite.mutateAsync({
-          email: inviteEmail,
-          name: inviteName,
-          dateOfBirth: inviteDob,
-          role: inviteRole,
-        })
-        setInviteResult({
-          url: res.instructionUrl,
-          expiresAt: new Date(res.expiresAt),
-        })
-        toast.success('Invite aangemaakt — deel de code-URL met je patiënt.')
-        return
-      }
-
-      // THERAPIST → oude magic-link flow (hoeft geen DOB)
-      const res = await fetch('/api/auth/invite-patient', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: inviteEmail, name: inviteName, role: inviteRole, resend }),
+      const res = await createInvite.mutateAsync({
+        email: inviteEmail,
+        name: inviteName,
+        dateOfBirth: inviteDob,
+        role: inviteRole,
       })
-      const data = await res.json()
-      if (res.status === 409 && !resend) {
-        setInviteExists(true)
-        return
-      }
-      if (!res.ok) throw new Error(data.error)
-      toast.success(resend
-        ? `Nieuwe uitnodiging verstuurd naar ${inviteEmail}`
-        : `Uitnodiging verstuurd naar ${inviteEmail}`)
-      setInviteOpen(false)
-      resetInviteForm()
+      setInviteResult({
+        url: res.instructionUrl,
+        expiresAt: new Date(res.expiresAt),
+      })
+      toast.success('Invite aangemaakt — deel de code-URL met je patiënt.')
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Er ging iets mis')
     } finally {
@@ -334,11 +309,9 @@ function PatientsPageInner() {
             }}
           >
             <DialogHeader>
-              <DialogTitle style={{ color: P.ink }}>Gebruiker uitnodigen</DialogTitle>
+              <DialogTitle style={{ color: P.ink }}>Patiënt uitnodigen</DialogTitle>
               <DialogDescription style={{ color: P.inkMuted }}>
-                {inviteRole === 'PATIENT' || inviteRole === 'ATHLETE'
-                  ? 'Patiënt logt in met e-mail + geboortejaar + 6-cijfer code.'
-                  : 'Therapeut ontvangt een e-mail met een magic-link om in te loggen.'}
+                Patiënt logt in met e-mail + geboortejaar + 6-cijfer code.
               </DialogDescription>
             </DialogHeader>
 
@@ -408,7 +381,7 @@ function PatientsPageInner() {
                     id="invite-name"
                     placeholder="Jan de Vries"
                     value={inviteName}
-                    onChange={e => { setInviteName(e.target.value); setInviteExists(false) }}
+                    onChange={e => setInviteName(e.target.value)}
                     required
                   />
                 </div>
@@ -419,33 +392,30 @@ function PatientsPageInner() {
                     type="email"
                     placeholder="jan@example.com"
                     value={inviteEmail}
-                    onChange={e => { setInviteEmail(e.target.value); setInviteExists(false) }}
+                    onChange={e => setInviteEmail(e.target.value)}
                     required
                   />
                 </div>
-                {(inviteRole === 'PATIENT' || inviteRole === 'ATHLETE') && (
-                  <div className="space-y-1.5">
-                    <MetaLabel>Geboortedatum</MetaLabel>
-                    <DarkInput
-                      id="invite-dob"
-                      type="date"
-                      value={inviteDob}
-                      onChange={e => setInviteDob(e.target.value)}
-                      max={new Date().toISOString().slice(0, 10)}
-                      required
-                    />
-                    <p style={{ color: P.inkMuted, fontSize: 11, marginTop: 2 }}>
-                      Bij inloggen controleren we het geboortejaar — alleen de echte patiënt weet dit.
-                    </p>
-                  </div>
-                )}
+                <div className="space-y-1.5">
+                  <MetaLabel>Geboortedatum</MetaLabel>
+                  <DarkInput
+                    id="invite-dob"
+                    type="date"
+                    value={inviteDob}
+                    onChange={e => setInviteDob(e.target.value)}
+                    max={new Date().toISOString().slice(0, 10)}
+                    required
+                  />
+                  <p style={{ color: P.inkMuted, fontSize: 11, marginTop: 2 }}>
+                    Bij inloggen controleren we het geboortejaar — alleen de echte patiënt weet dit.
+                  </p>
+                </div>
                 <div className="space-y-1.5">
                   <MetaLabel>Rol</MetaLabel>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     {([
                       { value: 'PATIENT', label: 'Patiënt', color: P.lime },
                       { value: 'ATHLETE', label: 'Atleet', color: P.gold },
-                      { value: 'THERAPIST', label: 'Therapeut', color: P.ice },
                     ] as const).map(r => (
                       <button
                         key={r.value}
@@ -463,40 +433,14 @@ function PatientsPageInner() {
                   </div>
                 </div>
 
-                {inviteExists && (
-                  <div
-                    className="rounded-lg p-3 space-y-2"
-                    style={{ border: `1px solid ${P.gold}`, background: 'rgba(244,194,97,0.08)' }}
-                  >
-                    <p style={{ color: P.gold, fontSize: 13 }}>
-                      Deze gebruiker is al uitgenodigd.
-                    </p>
-                    <DarkButton
-                      variant="secondary"
-                      size="sm"
-                      className="w-full"
-                      disabled={inviteLoading}
-                      onClick={() => handleInvite({ preventDefault: () => {} } as React.FormEvent, true)}
-                    >
-                      {inviteLoading ? 'Versturen...' : 'Uitnodiging opnieuw versturen'}
-                    </DarkButton>
-                  </div>
-                )}
-
-                {!inviteExists && (
-                  <DarkButton
-                    type="submit"
-                    variant="primary"
-                    className="w-full"
-                    disabled={inviteLoading}
-                  >
-                    {inviteLoading
-                      ? 'Bezig...'
-                      : inviteRole === 'PATIENT' || inviteRole === 'ATHLETE'
-                        ? 'Code-invite aanmaken'
-                        : 'Uitnodiging versturen'}
-                  </DarkButton>
-                )}
+                <DarkButton
+                  type="submit"
+                  variant="primary"
+                  className="w-full"
+                  disabled={inviteLoading}
+                >
+                  {inviteLoading ? 'Bezig...' : 'Code-invite aanmaken'}
+                </DarkButton>
               </form>
             )}
           </DialogContent>

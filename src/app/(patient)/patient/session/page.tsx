@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { cn } from '@/lib/utils'
 import { trpc } from '@/lib/trpc/client'
@@ -617,9 +617,26 @@ function SessionSummary({
 // ─── Main Session Page ────────────────────────────────────────────────────────
 
 export default function SessionPage() {
+  return (
+    <Suspense fallback={null}>
+      <SessionPageInner />
+    </Suspense>
+  )
+}
+
+function SessionPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const utils = trpc.useUtils()
-  const { data: sessionData, isLoading } = trpc.patient.getTodayExercises.useQuery()
+
+  // Catch-up flow: ?week=N&day=N → laad een specifieke (gemiste) dag i.p.v. vandaag
+  const catchUpWeek = Number(searchParams.get('week')) || undefined
+  const catchUpDay = Number(searchParams.get('day')) || undefined
+  const isCatchUp = catchUpWeek !== undefined && catchUpDay !== undefined
+
+  const { data: sessionData, isLoading } = trpc.patient.getTodayExercises.useQuery(
+    isCatchUp ? { week: catchUpWeek, day: catchUpDay } : undefined,
+  )
   const logSession = trpc.patient.logSession.useMutation()
 
   const exercises: SessionExercise[] = sessionData?.exercises ?? []
@@ -793,18 +810,20 @@ export default function SessionPage() {
       exertionLevel,
       exercises: exercises.map(e => {
         const weights = setWeights[e.uid] ?? []
-        const lastWeight = weights.filter(w => w > 0).slice(-1)[0] ?? null
+        const lastSetWeight = weights.filter(w => w > 0).slice(-1)[0] ?? null
+        const feedbackWeight = feedback[e.uid]?.weight ?? null
+        const finalWeight = lastSetWeight ?? (feedbackWeight && feedbackWeight > 0 ? feedbackWeight : null)
         const reps = extraReps[e.uid] ?? e.reps
         const programTrack1rm = sessionData?.program?.trackOneRepMax ?? false
-        const estimated1rm = (programTrack1rm && lastWeight && lastWeight > 0)
-          ? calcEpley(lastWeight, reps)
+        const estimated1rm = (programTrack1rm && finalWeight && finalWeight > 0)
+          ? calcEpley(finalWeight, reps)
           : null
         return {
           exerciseId: e.exerciseId,
           setsCompleted: setsCompleted[e.uid] ?? 0,
           repsCompleted: reps,
           painLevel: tendinopathyMode ? (feedback[e.uid]?.painDuring ?? null) : (feedback[e.uid]?.pain ?? null),
-          weight: lastWeight,
+          weight: finalWeight,
           estimatedOneRepMax: estimated1rm,
           painDuring: tendinopathyMode ? (feedback[e.uid]?.painDuring ?? null) : null,
         }
@@ -1015,7 +1034,7 @@ export default function SessionPage() {
                       <span>Set {setNum}</span>
                       <span>{isSetDone ? `✓ ${w > 0 ? w + ' kg' : 'Klaar'}` : sets === setNum - 1 ? 'Tik om te voltooien →' : '—'}</span>
                     </button>
-                    {isSetDone && (
+                    {(isSetDone || sets === setNum - 1) && (
                       <div className="flex items-center gap-2 px-2 py-1">
                         <span style={{ color: P.inkMuted, fontSize: 11 }} className="flex-1">Gewicht set {setNum}</span>
                         <button
@@ -1283,9 +1302,9 @@ export default function SessionPage() {
           <div className="text-center">
             <span
               className="athletic-mono"
-              style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.14em', fontWeight: 700 }}
+              style={{ color: isCatchUp ? P.gold : P.inkMuted, fontSize: 10, letterSpacing: '0.14em', fontWeight: 700 }}
             >
-              {sessionData.program.name.toUpperCase()} · WEEK {sessionData.program.currentWeek}
+              {isCatchUp ? 'INHALEN · ' : ''}{sessionData.program.name.toUpperCase()} · WEEK {sessionData.program.currentWeek} · DAG {sessionData.program.currentDay}
             </span>
             <p
               className="athletic-mono"
