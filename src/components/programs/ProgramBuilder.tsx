@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Label } from '@/components/ui/label'
 import { useCustomParams } from '@/hooks/useCustomParams'
+import { useAutosave, loadDraft } from '@/hooks/useAutosave'
 import {
   DndContext, DragOverlay, closestCenter, PointerSensor,
   useSensor, useSensors, type DragEndEvent, type DragOverEvent,
@@ -33,7 +34,7 @@ import { trpc } from '@/lib/trpc/client'
 import { cn } from '@/lib/utils'
 
 import {
-  Save, Eye, Copy, Plus, Trash2, Rocket,
+  Eye, Copy, Plus, Trash2, Rocket, Check, AlertCircle, Loader2,
   ChevronLeft, Layers, Search, CheckCircle2, X, BarChart2, Info,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -117,6 +118,10 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
   const [mobileSelected, setMobileSelected] = useState<Set<string>>(new Set())
   const [mobileQuery, setMobileQuery] = useState('')
   const [mobileCategory, setMobileCategory] = useState<string | null>(null)
+
+  // Houdt het programma-id bij dat we momenteel bewerken. Bij een nieuw
+  // programma wordt dit gevuld zodra autosave het record heeft aangemaakt.
+  const [currentProgramId, setCurrentProgramId] = useState<string | undefined>(programId)
 
   const { params: customParams } = useCustomParams()
   const createProgram = trpc.programs.create.useMutation()
@@ -398,9 +403,58 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
     }
   }
 
-  // ── Save ─────────────────────────────────────────────────────────────────────
-  const handleSave = async () => {
-    const exercisePayload = exercises.map((ex, i) => ({
+  // ── Autosave ─────────────────────────────────────────────────────────────────
+  const draftKey = useMemo(() => `mbt-program-draft-${programId ?? 'new'}`, [programId])
+
+  // Restore localStorage draft once on mount (only for the matching draftKey).
+  // Drafts represent the user's most recent unsaved edits, so they take
+  // precedence over the server snapshot in initialState.
+  useEffect(() => {
+    const draft = loadDraft<{
+      program: Partial<ProgramState>
+      exercises: BuilderExercise[]
+    }>(draftKey)
+    if (!draft) return
+    setProgram(p => ({ ...p, ...draft.program }))
+    setExercises(draft.exercises ?? [])
+    toast.info('Concept hersteld', { duration: 2000 })
+    // We intentionally only run this once per mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Only the fields the server cares about — used as the autosave value.
+  type AutosaveValue = {
+    program: {
+      name: string
+      description: string | null | undefined
+      patientId: string | null | undefined
+      weeks: number
+      daysPerWeek: number
+      isTemplate: boolean
+      tendinopathyMode: boolean
+      trackOneRepMax: boolean
+    }
+    exercises: BuilderExercise[]
+  }
+  const formValue: AutosaveValue = useMemo(() => ({
+    program: {
+      name: program.name,
+      description: program.description,
+      patientId: program.patientId,
+      weeks: program.weeks,
+      daysPerWeek: program.daysPerWeek,
+      isTemplate: program.isTemplate,
+      tendinopathyMode: program.tendinopathyMode,
+      trackOneRepMax: program.trackOneRepMax,
+    },
+    exercises,
+  }), [program, exercises])
+
+  // No useCallback: tRPC mutation refs in the dep array trigger
+  // "excessively deep type instantiation". The autosave hook stores the
+  // latest onSave via a ref, so a fresh function each render is fine.
+  const persist = async (val: AutosaveValue) => {
+    const exercisePayload = val.exercises.map((ex, i) => ({
       exerciseId: ex.exerciseId,
       week: ex.week,
       day: ex.day,
@@ -413,67 +467,71 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
       supersetOrder: ex.supersetOrder,
       notes: null,
     }))
-
-    try {
-      // Bibliotheek-save mag geen patientId houden, anders staat een template
-      // gekoppeld aan een patiënt in de lijst.
-      const patientIdForSave = program.isTemplate ? null : program.patientId || undefined
-      if (programId) {
-        await saveProgram.mutateAsync({
-          id: programId,
-          name: program.name,
-          description: program.description ?? undefined,
-          weeks: program.weeks,
-          daysPerWeek: program.daysPerWeek,
-          isTemplate: program.isTemplate,
-          patientId: patientIdForSave,
-          exercises: exercisePayload,
-        })
-      } else {
-        const created = await createProgram.mutateAsync({
-          name: program.name,
-          description: program.description ?? undefined,
-          weeks: program.weeks,
-          daysPerWeek: program.daysPerWeek,
-          isTemplate: program.isTemplate,
-          patientId: patientIdForSave ?? undefined,
-        })
-        // Save exercises to the newly created program
-        if (exercises.length > 0) {
-          await saveProgram.mutateAsync({
-            id: created.id,
-            exercises: exercisePayload,
-          })
-        }
-        router.push(`/therapist/programs/${created.id}/edit`)
-        toast.success('Programma aangemaakt')
-        return
+    // Bibliotheek-save mag geen patientId houden, anders staat een template
+    // gekoppeld aan een patiënt in de lijst.
+    const patientIdForSave = val.program.isTemplate ? null : val.program.patientId || undefined
+    if (currentProgramId) {
+      await saveProgram.mutateAsync({
+        id: currentProgramId,
+        name: val.program.name,
+        description: val.program.description ?? undefined,
+        weeks: val.program.weeks,
+        daysPerWeek: val.program.daysPerWeek,
+        isTemplate: val.program.isTemplate,
+        patientId: patientIdForSave,
+        exercises: exercisePayload,
+      })
+    } else {
+      const created = await createProgram.mutateAsync({
+        name: val.program.name,
+        description: val.program.description ?? undefined,
+        weeks: val.program.weeks,
+        daysPerWeek: val.program.daysPerWeek,
+        isTemplate: val.program.isTemplate,
+        patientId: patientIdForSave ?? undefined,
+      })
+      if (val.exercises.length > 0) {
+        await saveProgram.mutateAsync({ id: created.id, exercises: exercisePayload })
       }
-      toast.success('Programma opgeslagen')
-      if (returnTo) router.push(returnTo)
-    } catch {
-      toast.error('Opslaan mislukt')
+      setCurrentProgramId(created.id)
+      // Update URL silently zodat refresh/back op het edit-record landt,
+      // zonder een echte navigatie en re-mount te triggeren.
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, '', `/therapist/programs/${created.id}/edit`)
+      }
     }
   }
+
+  const autosave = useAutosave({
+    value: formValue,
+    onSave: persist,
+    draftKey,
+    debounceMs: 1500,
+  })
 
   const handleDeploy = async () => {
     if (exercises.length === 0) {
       toast.error('Voeg eerst oefeningen toe voordat je deployt')
       return
     }
-    // Save first, then set status to ACTIVE
-    await handleSave()
     try {
-      if (programId) {
-        await saveProgram.mutateAsync({
-          id: programId,
-          status: 'ACTIVE',
-          startDate: new Date().toISOString(),
-        })
-        toast.success('Programma gedeployed! Het is nu zichtbaar voor de patiënt.', { duration: 4000 })
-      } else {
-        toast.error('Sla het programma eerst op')
-      }
+      await autosave.saveNow()
+    } catch {
+      toast.error('Opslaan mislukt — kon niet deployen')
+      return
+    }
+    if (!currentProgramId) {
+      toast.error('Sla het programma eerst op')
+      return
+    }
+    try {
+      await saveProgram.mutateAsync({
+        id: currentProgramId,
+        status: 'ACTIVE',
+        startDate: new Date().toISOString(),
+      })
+      toast.success('Programma gedeployed! Het is nu zichtbaar voor de patiënt.', { duration: 4000 })
+      if (returnTo) router.push(returnTo)
     } catch {
       toast.error('Deployen mislukt')
     }
@@ -490,10 +548,10 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
     }))
     setTemplateSaving(true)
     try {
-      if (programId) {
+      if (currentProgramId) {
         // If this already is a program, duplicate it as template
         await duplicateProgram.mutateAsync({
-          id: programId,
+          id: currentProgramId,
           name: templateCategory ? `[${templateCategory}] ${name}` : name,
           isTemplate: true,
           patientId: null,
@@ -588,16 +646,29 @@ export function ProgramBuilder({ initialState, programId }: ProgramBuilderProps)
             </Button>
           </div>
 
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5 h-7 text-xs shrink-0"
-            onClick={handleSave}
-            disabled={saving}
+          <div
+            className="flex items-center gap-1.5 h-7 px-2 text-xs shrink-0 select-none"
+            title={autosave.lastSavedAt ? `Laatst opgeslagen om ${autosave.lastSavedAt.toLocaleTimeString('nl-NL')}` : ''}
           >
-            <Save className="w-3.5 h-3.5" />
-            {saving ? '...' : 'Opslaan'}
-          </Button>
+            {autosave.status === 'saving' && (
+              <><Loader2 className="w-3 h-3 animate-spin text-muted-foreground" /><span className="text-muted-foreground">Opslaan…</span></>
+            )}
+            {autosave.status === 'pending' && (
+              <><Loader2 className="w-3 h-3 animate-spin opacity-50 text-muted-foreground" /><span className="text-muted-foreground">Wijzigingen…</span></>
+            )}
+            {autosave.status === 'saved' && (
+              <><Check className="w-3 h-3" style={{ color: '#BEF264' }} /><span className="text-muted-foreground">Opgeslagen</span></>
+            )}
+            {autosave.status === 'error' && (
+              <button
+                type="button"
+                onClick={() => { void autosave.saveNow() }}
+                className="flex items-center gap-1 text-red-400 hover:text-red-300"
+              >
+                <AlertCircle className="w-3 h-3" /> Opslaan mislukt — opnieuw
+              </button>
+            )}
+          </div>
           <Button
             size="sm"
             className="gap-1.5 h-7 text-xs shrink-0"
