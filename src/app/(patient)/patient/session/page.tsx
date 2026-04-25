@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { cn } from '@/lib/utils'
@@ -8,9 +8,10 @@ import { trpc } from '@/lib/trpc/client'
 import { SUPERSET_COLORS } from '@/lib/program-constants'
 import {
   ChevronLeft, Clock, ChevronDown, ChevronUp, Lightbulb,
-  TrendingUp, TrendingDown, CheckCircle2, SkipForward, Minus, Plus, Trophy, Bell,
+  TrendingUp, TrendingDown, CheckCircle2, SkipForward, Minus, Plus, Trophy, Bell, RotateCcw,
 } from 'lucide-react'
 import { P, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-ui'
+import { useDraftBackup, loadDraft, clearStoredDraft } from '@/hooks/useAutosave'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ReactPlayer = dynamic(() => import('react-player') as any, { ssr: false }) as any
@@ -300,59 +301,9 @@ function FeedbackModal({
           </div>
         )}
 
-        {/* Optional weight / RPE */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <MetaLabel style={{ marginBottom: 6 }}>GEWICHT (KG)</MetaLabel>
-            <div
-              className="flex items-center gap-2 justify-between rounded-xl px-3"
-              style={{ height: 44, background: P.surfaceHi, border: `1px solid ${P.lineStrong}` }}
-            >
-              <button
-                className="athletic-tap p-1"
-                style={{ color: P.ink }}
-                onClick={() => onChange({ weight: Math.max(0, (feedback.weight ?? 0) - 2.5) })}
-              >
-                <Minus className="w-3.5 h-3.5" />
-              </button>
-              <span className="athletic-mono" style={{ color: P.ink, fontSize: 14, fontWeight: 800 }}>
-                {feedback.weight ?? 0}
-              </span>
-              <button
-                className="athletic-tap p-1"
-                style={{ color: P.ink }}
-                onClick={() => onChange({ weight: (feedback.weight ?? 0) + 2.5 })}
-              >
-                <Plus className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-          <div>
-            <MetaLabel style={{ marginBottom: 6 }}>RPE (/10)</MetaLabel>
-            <div
-              className="flex items-center gap-2 justify-between rounded-xl px-3"
-              style={{ height: 44, background: P.surfaceHi, border: `1px solid ${P.lineStrong}` }}
-            >
-              <button
-                className="athletic-tap p-1"
-                style={{ color: P.ink }}
-                onClick={() => onChange({ rpe: Math.max(1, (feedback.rpe ?? 5) - 1) })}
-              >
-                <Minus className="w-3.5 h-3.5" />
-              </button>
-              <span className="athletic-mono" style={{ color: P.ink, fontSize: 14, fontWeight: 800 }}>
-                {feedback.rpe ?? 5}
-              </span>
-              <button
-                className="athletic-tap p-1"
-                style={{ color: P.ink }}
-                onClick={() => onChange({ rpe: Math.min(10, (feedback.rpe ?? 5) + 1) })}
-              >
-                <Plus className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        </div>
+        {/* Gewicht-per-set wordt al ingevoerd in de set-rijen hierboven —
+            niet hier nog een keer vragen. RPE komt aan het einde van de
+            sessie (1× voor de hele workout) ipv per oefening. */}
 
         <DarkButton onClick={onSave} size="lg">
           OPSLAAN
@@ -378,12 +329,13 @@ function SessionSummary({
   feedback: Record<string, FeedbackEntry>
   setWeights: Record<string, number[]>
   elapsed: number
-  onFinish: (sessionSmiley: number | null, durationSeconds: number) => void
+  onFinish: (sessionSmiley: number | null, sessionRpe: number | null, durationSeconds: number) => void
   isSaving: boolean
   tendinopathyMode?: boolean
   sessionOneRmPRs?: Record<string, number>
 }) {
   const [sessionSmiley, setSessionSmiley] = useState<number | null>(null)
+  const [sessionRpe, setSessionRpe] = useState<number | null>(null)
   const [durationMinutes, setDurationMinutes] = useState(() => Math.max(1, Math.round(elapsed / 60)))
 
   const now = new Date()
@@ -601,9 +553,44 @@ function SessionSummary({
           </div>
         </Tile>
 
+        {/* Session-RPE — gevraagde 1× per workout, gaat in de workload-
+            berekening (sRPE = RPE × duur). Verplicht. */}
+        <Tile>
+          <p style={{ color: P.ink, fontSize: 14, fontWeight: 800 }}>Hoe zwaar was de sessie?</p>
+          <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
+            RPE 1 (heel licht) — 10 (maximaal). Gebruikt voor je workload.
+          </MetaLabel>
+          <div className="grid grid-cols-10 gap-1 mt-3">
+            {Array.from({ length: 10 }, (_, i) => i + 1).map(val => {
+              const selected = sessionRpe === val
+              const color = val <= 3 ? P.lime : val <= 6 ? P.gold : P.danger
+              return (
+                <button
+                  key={val}
+                  onClick={() => setSessionRpe(selected ? null : val)}
+                  className="athletic-tap rounded-lg athletic-mono transition-all"
+                  style={{
+                    height: 40,
+                    background: selected ? color : P.surfaceHi,
+                    color: selected ? P.bg : P.inkMuted,
+                    border: selected ? `2px solid ${color}` : `1px solid ${P.line}`,
+                    fontSize: 12,
+                    fontWeight: 900,
+                  }}
+                >
+                  {val}
+                </button>
+              )
+            })}
+          </div>
+          {sessionRpe === null && (
+            <p style={{ color: P.inkMuted, fontSize: 11, marginTop: 6 }}>Verplicht voor workload-tracking.</p>
+          )}
+        </Tile>
+
         <DarkButton
-          onClick={() => onFinish(sessionSmiley, durationMinutes * 60)}
-          disabled={isSaving}
+          onClick={() => onFinish(sessionSmiley, sessionRpe, durationMinutes * 60)}
+          disabled={isSaving || sessionRpe === null}
           loading={isSaving}
           size="lg"
         >
@@ -667,6 +654,81 @@ function SessionPageInner() {
 
   const doneRef = useRef(done)
   useEffect(() => { doneRef.current = done }, [done])
+
+  // ── Resume / draft-backup ───────────────────────────────────────────────────
+  type SessionDraft = {
+    setsCompleted: Record<string, number>
+    done: string[]
+    feedback: Record<string, FeedbackEntry>
+    setWeights: Record<string, number[]>
+    extraReps: Record<string, number>
+    sessionOneRm: Record<string, number>
+    sessionPRs: Record<string, number>
+    expanded: string | null
+    phase: 'session' | 'summary'
+  }
+
+  const draftKey = useMemo(() => {
+    const pid = sessionData?.program?.id ?? 'no-program'
+    const week = isCatchUp ? catchUpWeek : (sessionData?.program?.currentWeek ?? 1)
+    const day = isCatchUp ? catchUpDay : (sessionData?.program?.currentDay ?? 1)
+    return `mbt-session-draft-${pid}-${week}-${day}`
+  }, [sessionData?.program?.id, sessionData?.program?.currentWeek, sessionData?.program?.currentDay, isCatchUp, catchUpWeek, catchUpDay])
+
+  const [resumeChecked, setResumeChecked] = useState(false)
+  const [showResumeBanner, setShowResumeBanner] = useState(false)
+
+  // Detecteer een bestaand concept zodra we de sessie-data hebben.
+  useEffect(() => {
+    if (resumeChecked) return
+    if (!sessionData?.program?.id) return
+    const draft = loadDraft<SessionDraft>(draftKey)
+    if (draft && (draft.done?.length || Object.keys(draft.setsCompleted ?? {}).length)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setShowResumeBanner(true)
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setResumeChecked(true)
+  }, [draftKey, resumeChecked, sessionData?.program?.id])
+
+  function handleResume() {
+    const draft = loadDraft<SessionDraft>(draftKey)
+    if (draft) {
+      setSetsCompleted(draft.setsCompleted ?? {})
+      setDone(new Set(draft.done ?? []))
+      setFeedback(draft.feedback ?? {})
+      setSetWeights(draft.setWeights ?? {})
+      setExtraReps(draft.extraReps ?? {})
+      setSessionOneRm(draft.sessionOneRm ?? {})
+      setSessionPRs(draft.sessionPRs ?? {})
+      if (draft.expanded) setExpanded(draft.expanded)
+      if (draft.phase === 'summary') setPhase('summary')
+    }
+    setShowResumeBanner(false)
+  }
+
+  function handleResetDraft() {
+    clearStoredDraft(draftKey)
+    setShowResumeBanner(false)
+  }
+
+  // Sla de hele sessie-staat continu op (alleen na resume-keuze, en alleen
+  // zolang de sessie loopt — niet meer wanneer 'm gefinaliseerd is op de server).
+  useDraftBackup<SessionDraft>({
+    key: draftKey,
+    value: {
+      setsCompleted,
+      done: [...done],
+      feedback,
+      setWeights,
+      extraReps,
+      sessionOneRm,
+      sessionPRs,
+      expanded,
+      phase,
+    },
+    enabled: !showResumeBanner && !!sessionData?.program?.id,
+  })
 
   // Set initial expanded after exercises load
   useEffect(() => {
@@ -792,11 +854,13 @@ function SessionPageInner() {
     setFeedback(prev => ({ ...prev, [uid]: { ...prev[uid], ...partial } }))
   }, [])
 
-  const handleFinish = useCallback(async (sessionSmiley: number | null, durationSeconds: number) => {
+  const handleFinish = useCallback(async (sessionSmiley: number | null, sessionRpe: number | null, durationSeconds: number) => {
     const tendinopathyMode = sessionData?.program?.tendinopathyMode ?? false
     const pains = Object.values(feedback).filter(f => f.pain !== null).map(f => f.pain!)
     const avgPain = pains.length > 0 ? Math.round(pains.reduce((a, b) => a + b, 0) / pains.length) : null
-    const exertionLevel = sessionSmiley !== null ? Math.max(1, 11 - sessionSmiley * 2) : null
+    // Expliciete RPE direct gebruiken voor exertionLevel (workload sRPE = RPE × duur).
+    // Smiley blijft losse "hoe voelt je lichaam"-indicator, maar telt niet mee in workload.
+    const exertionLevel = sessionRpe
 
     const completedAt = new Date()
     const scheduledAt = new Date(completedAt.getTime() - durationSeconds * 1000)
@@ -839,8 +903,11 @@ function SessionPageInner() {
       utils.patient.getActiveProgram.invalidate(),
     ])
 
+    // Sessie is succesvol gelogd → concept opruimen.
+    clearStoredDraft(draftKey)
+
     router.push('/patient/dashboard')
-  }, [sessionData, feedback, elapsed, exercises, setsCompleted, extraReps, logSession, router, utils])
+  }, [sessionData, feedback, elapsed, exercises, setsCompleted, extraReps, logSession, router, utils, draftKey])
 
   if (isLoading) {
     return (
@@ -859,6 +926,41 @@ function SessionPageInner() {
         <DarkButton variant="secondary" onClick={() => router.push('/patient/dashboard')}>
           Terug naar dashboard
         </DarkButton>
+      </div>
+    )
+  }
+
+  if (showResumeBanner) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: P.bg, color: P.ink }}>
+        <div
+          className="w-full max-w-sm rounded-2xl p-6 space-y-4"
+          style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+        >
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ background: P.surfaceHi, border: `1px solid ${P.lime}` }}
+          >
+            <RotateCcw className="w-5 h-5" style={{ color: P.lime }} />
+          </div>
+          <div>
+            <Kicker>Open sessie</Kicker>
+            <h2 className="text-lg font-bold mt-1" style={{ color: P.ink }}>
+              Verder waar je was?
+            </h2>
+            <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 4 }}>
+              Je hebt deze sessie eerder gestart maar nog niet afgerond. Wil je daar verder gaan?
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <DarkButton onClick={handleResume} size="lg">
+              Verder waar je was
+            </DarkButton>
+            <DarkButton variant="secondary" onClick={handleResetDraft}>
+              Opnieuw beginnen
+            </DarkButton>
+          </div>
+        </div>
       </div>
     )
   }
