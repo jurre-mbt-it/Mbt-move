@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation'
 import { ActionTile, DarkButton, Kicker, MetaLabel, P } from '@/components/dark-ui'
 import { createClient } from '@/lib/supabase/client'
 import { trpc } from '@/lib/trpc/client'
+import { PrefToggleTile } from '@/components/settings/PrefToggleTile'
+import { PREF_REST_TIMER_ENABLED } from '@/hooks/useLocalPref'
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -44,6 +46,14 @@ export default function SettingsPage() {
           Beheer je account en voorkeuren
         </MetaLabel>
       </div>
+
+      <Kicker>Voorkeuren</Kicker>
+      <PrefToggleTile
+        prefKey={PREF_REST_TIMER_ENABLED}
+        defaultValue={true}
+        label="Rust-timer tussen sets"
+        sub="Toon 60-seconden countdown na elke set"
+      />
 
       <div className="flex flex-col gap-2">
         <ActionTile

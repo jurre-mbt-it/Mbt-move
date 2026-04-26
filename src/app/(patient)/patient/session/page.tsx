@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { P, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-ui'
 import { useDraftBackup, loadDraft, clearStoredDraft } from '@/hooks/useAutosave'
+import { useBoolPref, PREF_REST_TIMER_ENABLED } from '@/hooks/useLocalPref'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ReactPlayer = dynamic(() => import('react-player') as any, { ssr: false }) as any
@@ -628,6 +629,7 @@ function SessionPageInner() {
 
   const exercises: SessionExercise[] = sessionData?.exercises ?? []
 
+  const [restTimerEnabled] = useBoolPref(PREF_REST_TIMER_ENABLED, true)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [setsCompleted, setSetsCompleted] = useState<Record<string, number>>({})
   const [done, setDone] = useState<Set<string>>(new Set())
@@ -744,6 +746,14 @@ function SessionPageInner() {
     return () => clearInterval(t)
   }, [])
 
+  // Cancel an in-flight rest timer if the user disables the preference mid-session.
+  useEffect(() => {
+    if (!restTimerEnabled && showRestTimer) {
+      clearInterval(restTimerRef.current!)
+      setShowRestTimer(false)
+    }
+  }, [restTimerEnabled, showRestTimer])
+
   // Rest timer countdown
   useEffect(() => {
     if (!showRestTimer) return
@@ -805,12 +815,12 @@ function SessionPageInner() {
   const markSetDone = useCallback((uid: string, restSec: number, totalSets: number) => {
     setSetsCompleted(prev => {
       const next = (prev[uid] ?? 0) + 1
-      if (next < totalSets) {
+      if (next < totalSets && restTimerEnabled) {
         startRestTimer(restSec)
       }
       return { ...prev, [uid]: next }
     })
-  }, [startRestTimer])
+  }, [startRestTimer, restTimerEnabled])
 
   const markExerciseDone = useCallback((uid: string) => {
     setFeedback(prev => ({

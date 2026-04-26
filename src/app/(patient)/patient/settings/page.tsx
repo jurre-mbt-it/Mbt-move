@@ -8,6 +8,8 @@ import {
   Kicker,
   P,
 } from '@/components/dark-ui'
+import { PrefToggleTile } from '@/components/settings/PrefToggleTile'
+import { PREF_REST_TIMER_ENABLED } from '@/hooks/useLocalPref'
 
 export default function PatientSettingsPage() {
   // Pending therapist-verzoeken laten we direct zien als accent op de access-tile
@@ -32,7 +34,16 @@ export default function PatientSettingsPage() {
           />
         )}
 
-        <Kicker>Privacy &amp; profiel</Kicker>
+        <Kicker>Voorkeuren</Kicker>
+
+        <PrefToggleTile
+          prefKey={PREF_REST_TIMER_ENABLED}
+          defaultValue={true}
+          label="Rust-timer tussen sets"
+          sub="Toon 60-seconden countdown na elke set"
+        />
+
+        <Kicker style={{ marginTop: 12 }}>Privacy &amp; profiel</Kicker>
 
         <ActionTile
           href="/patient/settings/access"
