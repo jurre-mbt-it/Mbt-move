@@ -31,9 +31,10 @@ function ExercisePicker({
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
 
-  const { data: allExercises = [], isLoading } = trpc.exercises.list.useQuery(undefined, {
+  const { data, isLoading } = trpc.exercises.list.useQuery(undefined, {
     staleTime: 60_000,
   })
+  const allExercises = (data ?? []) as Array<{ id: string; name: string; difficulty: string }>
 
   const exercises = allExercises.filter(
     e => e.id !== excludeId && e.name.toLowerCase().includes(query.toLowerCase()),

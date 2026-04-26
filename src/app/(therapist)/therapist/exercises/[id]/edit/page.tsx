@@ -30,6 +30,7 @@ export default function EditExercisePage({ params }: Props) {
 
   if (!exercise) return notFound()
 
+  const ex = exercise as unknown as Record<string, unknown>
   const initialData = {
     name: exercise.name,
     description: exercise.description ?? '',
@@ -45,9 +46,9 @@ export default function EditExercisePage({ params }: Props) {
     muscleLoads: exercise.muscleLoads as Record<string, number>,
     easierVariantId: exercise.easierVariantId ?? null,
     harderVariantId: exercise.harderVariantId ?? null,
-    loadType: (exercise as Record<string, unknown>).loadType as string ?? 'BODYWEIGHT',
-    isUnilateral: (exercise as Record<string, unknown>).isUnilateral as boolean ?? false,
-    movementPattern: (exercise as Record<string, unknown>).movementPattern as string ?? null,
+    loadType: (ex.loadType as string) ?? 'BODYWEIGHT',
+    isUnilateral: (ex.isUnilateral as boolean) ?? false,
+    movementPattern: (ex.movementPattern as string) ?? null,
   }
 
   return (
