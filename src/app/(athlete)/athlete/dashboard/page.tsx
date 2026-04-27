@@ -283,6 +283,12 @@ export default function AthleteDashboard() {
             href="/athlete/history"
             bar={P.purple}
           />
+          <ActionTile
+            label="QUICK WORKOUT"
+            sub="Vrije sessie starten"
+            href="/athlete/session?mode=quick"
+            bar={P.gold}
+          />
         </div>
 
         {/* ── Recovery + Workload panels ────────────────── */}
