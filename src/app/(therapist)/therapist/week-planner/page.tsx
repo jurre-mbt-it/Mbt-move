@@ -135,14 +135,18 @@ function WeekPlannerContent() {
     { patientId: selectedPatientId, isTemplate: false },
     { enabled: !!selectedPatientId, staleTime: 30_000 },
   )
-  const allSchedulesRaw = (schedulesQuery.data as (Schedule & { startDate?: string | Date | null })[] | undefined) ?? []
-  const allSchedules: Schedule[] = useMemo(() => allSchedulesRaw, [allSchedulesRaw])
+  const allSchedules: (Schedule & { startDate?: string | Date | null })[] = useMemo(
+    () => (schedulesQuery.data as (Schedule & { startDate?: string | Date | null })[] | undefined) ?? [],
+    [schedulesQuery.data],
+  )
   const availableWeeks: number[] = useMemo(
     () => [...new Set(allSchedules.map(s => s.weekNumber ?? 1))].sort((a, b) => a - b),
     [allSchedules],
   )
-  const schedule: Schedule | null =
-    allSchedules.find(s => (s.weekNumber ?? 1) === selectedWeek) ?? null
+  const schedule: Schedule | null = useMemo(
+    () => allSchedules.find(s => (s.weekNumber ?? 1) === selectedWeek) ?? null,
+    [allSchedules, selectedWeek],
+  )
 
   // Programma's van deze patient — onafhankelijk van of ze al in een
   // WeekSchedule zijn ingepland. Zo ziet de therapeut meteen of er iets is.
@@ -235,34 +239,50 @@ function WeekPlannerContent() {
   )
   const firstActivityDate = (firstActivityQuery.data as { date: string | Date | null } | undefined)?.date ?? null
 
-  // Anchor-datum voor week 1 = maandag van de week waarin de patiënt
-  // z'n eerste activiteit had. Volgorde van fallbacks:
+  // Stabiele anchor-tijdstempel als ms-waarde. Volgorde van bronnen:
   // 1. Vroegste van: WeekSchedule.startDate / activeProgram.startDate /
   //    eerste SessionLog scheduledAt
-  // 2. Vandaag (laatste redmiddel — week 1 = deze week)
-  const anchorDate: Date = useMemo(() => {
-    const dates: Date[] = []
+  // 2. Fallback: today minus 4 weken (zodat user altijd ~4 weken terug
+  //    kan navigeren ook bij nieuwe patiënten zonder historie)
+  const anchorTime: number = useMemo(() => {
+    const times: number[] = []
     for (const s of allSchedules) {
-      const sd = (s as Schedule & { startDate?: string | Date | null }).startDate
-      if (sd) dates.push(new Date(sd))
+      if (s.startDate) {
+        const t = new Date(s.startDate).getTime()
+        if (!Number.isNaN(t)) times.push(t)
+      }
     }
     for (const p of activePrograms) {
-      if (p.startDate) dates.push(new Date(p.startDate))
+      if (p.startDate) {
+        const t = new Date(p.startDate).getTime()
+        if (!Number.isNaN(t)) times.push(t)
+      }
     }
-    if (firstActivityDate) dates.push(new Date(firstActivityDate))
-    if (dates.length === 0) return new Date()
-    return new Date(Math.min(...dates.map(d => d.getTime())))
+    if (firstActivityDate) {
+      const t = new Date(firstActivityDate).getTime()
+      if (!Number.isNaN(t)) times.push(t)
+    }
+    if (times.length === 0) {
+      // Geen historie → ankr 4 weken terug zodat tabs 1..5 zichtbaar zijn
+      const fallback = new Date()
+      fallback.setDate(fallback.getDate() - 28)
+      return fallback.getTime()
+    }
+    return Math.min(...times)
   }, [allSchedules, activePrograms, firstActivityDate])
 
-  const week1Monday = mondayOf(anchorDate)
-  const todayMonday = mondayOf(new Date())
-  const currentWeekNumber = Math.floor(
-    (todayMonday.getTime() - week1Monday.getTime()) / (7 * 24 * 60 * 60 * 1000),
-  ) + 1
+  // ms-waarde van today's Monday — herrekent niet per render want anchorTime
+  // is al stable, en today verandert niet binnen één sessie.
+  const week1MondayTime = useMemo(() => mondayOf(new Date(anchorTime)).getTime(), [anchorTime])
+  const todayMondayTime = useMemo(() => mondayOf(new Date()).getTime(), [])
+  const currentWeekNumber = Math.max(
+    1,
+    Math.floor((todayMondayTime - week1MondayTime) / (7 * 24 * 60 * 60 * 1000)) + 1,
+  )
 
   const weekRange = (n: number): { from: Date; to: Date } => {
-    const from = addDays(week1Monday, (n - 1) * 7)
-    const to = addDays(from, 6)
+    const from = new Date(week1MondayTime + (n - 1) * 7 * 24 * 60 * 60 * 1000)
+    const to = new Date(from.getTime() + 6 * 24 * 60 * 60 * 1000)
     return { from, to }
   }
 
@@ -280,12 +300,18 @@ function WeekPlannerContent() {
   // Sessies binnen de getoonde week — voor 'eigen workouts' chips +
   // ✓ markers op afgeronde planned sessies. Filter strikt op datum-range
   // van geselecteerde week (Ma..Zo), zodat tabs daadwerkelijk verschillen.
-  const selectedRange = weekRange(selectedWeek)
+  const rangeIso = useMemo(() => {
+    const r = weekRange(selectedWeek)
+    return { from: r.from.toISOString(), to: r.to.toISOString() }
+    // weekRange depends on week1MondayTime
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedWeek, week1MondayTime])
+
   const sessionsInRangeQuery = trpc.weekSchedules.sessionsInRange.useQuery(
     {
       patientId: selectedPatientId,
-      from: selectedRange.from.toISOString(),
-      to: selectedRange.to.toISOString(),
+      from: rangeIso.from,
+      to: rangeIso.to,
     },
     { enabled: !!selectedPatientId, staleTime: 30_000 },
   )
@@ -451,14 +477,17 @@ function WeekNavigator({
   const [copyOpen, setCopyOpen] = useState(false)
   const [copyTargets, setCopyTargets] = useState<Set<number>>(new Set())
 
-  // Tabs: alle bestaande weken + huidige selectie + alle weken tot 'vandaag'.
-  // Zo zie je per default de geschiedenis (verleden weken) ook als die nog
-  // geen WeekSchedule-record hebben.
+  // Tabs: alle bestaande weken + huidige selectie + laatste ~12 weken
+  // tot 'vandaag'. Zo zie je per default de geschiedenis (verleden weken)
+  // ook als die nog geen WeekSchedule-record hebben, zonder dat we
+  // bij een lang-lopende patiënt 50+ knoppen renderen.
+  const MAX_PAST_TABS = 12
   const visibleWeeks = useMemo(() => {
     const set = new Set(availableWeeks)
     set.add(selectedWeek)
     if (currentWeekNumber > 0) {
-      for (let i = 1; i <= currentWeekNumber; i++) set.add(i)
+      const start = Math.max(1, currentWeekNumber - MAX_PAST_TABS + 1)
+      for (let i = start; i <= currentWeekNumber; i++) set.add(i)
     }
     return [...set].sort((a, b) => a - b)
   }, [availableWeeks, selectedWeek, currentWeekNumber])
