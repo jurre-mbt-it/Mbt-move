@@ -360,22 +360,21 @@ export const weekSchedulesRouter = createTRPCRouter({
   sessionsInRange: therapistProcedure
     .input(z.object({
       patientId: z.string(),
-      from: z.string(), // ISO date
-      to: z.string(),   // ISO date (inclusief — sessies tot einde van die dag tellen mee)
+      from: z.string(), // ISO timestamp — start van de week (Ma 00:00 local)
+      to: z.string(),   // ISO timestamp — exclusive einde (volgende Ma 00:00 local)
     }))
     .query(async ({ ctx, input }) => {
       await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
       const fromDate = new Date(input.from)
       const toDate = new Date(input.to)
-      // Eind-van-dag voor `to` zodat een sessie op de laatste dag (zo) ook
-      // valt binnen de range, ongeacht het tijdstip.
-      const toEnd = new Date(toDate)
-      toEnd.setHours(23, 59, 59, 999)
 
       const sessions = await ctx.prisma.sessionLog.findMany({
         where: {
           patientId: input.patientId,
-          scheduledAt: { gte: fromDate, lte: toEnd },
+          // lt (exclusive) op `to` — frontend stuurt volgende Ma 00:00,
+          // dus alle Zo-sessies (ook 23:59) zitten erin. Geen server-side
+          // setHours die alsnog TZ-fouten introduceert.
+          scheduledAt: { gte: fromDate, lt: toDate },
         },
         select: {
           id: true,

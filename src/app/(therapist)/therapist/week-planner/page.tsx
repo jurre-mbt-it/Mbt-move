@@ -280,6 +280,9 @@ function WeekPlannerContent() {
     Math.floor((todayMondayTime - week1MondayTime) / (7 * 24 * 60 * 60 * 1000)) + 1,
   )
 
+  // `from` = Ma 00:00 local · `to` = Zo (display, +6d). Voor de query
+  // gebruiken we exclusive next-Ma boundary in `rangeIso` zodat ook
+  // Zo-sessies (ook 23:59) erin zitten zonder TZ-bug op de server.
   const weekRange = (n: number): { from: Date; to: Date } => {
     const from = new Date(week1MondayTime + (n - 1) * 7 * 24 * 60 * 60 * 1000)
     const to = new Date(from.getTime() + 6 * 24 * 60 * 60 * 1000)
@@ -301,10 +304,14 @@ function WeekPlannerContent() {
   // ✓ markers op afgeronde planned sessies. Filter strikt op datum-range
   // van geselecteerde week (Ma..Zo), zodat tabs daadwerkelijk verschillen.
   const rangeIso = useMemo(() => {
-    const r = weekRange(selectedWeek)
-    return { from: r.from.toISOString(), to: r.to.toISOString() }
-    // weekRange depends on week1MondayTime
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const fromMs = week1MondayTime + (selectedWeek - 1) * 7 * 24 * 60 * 60 * 1000
+    // Exclusive: volgende Ma 00:00 local. Server gebruikt `lt` zodat
+    // Zo-sessies (incl. 23:59) gewoon meedoen.
+    const toExclusiveMs = fromMs + 7 * 24 * 60 * 60 * 1000
+    return {
+      from: new Date(fromMs).toISOString(),
+      to: new Date(toExclusiveMs).toISOString(),
+    }
   }, [selectedWeek, week1MondayTime])
 
   const sessionsInRangeQuery = trpc.weekSchedules.sessionsInRange.useQuery(
