@@ -41,6 +41,7 @@ type EditProgram = {
   isTemplate: boolean
   patientId: string | null
   status: 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED'
+  updatedAt: string | Date
   exercises: EditExercise[]
 }
 
@@ -101,9 +102,16 @@ export default function EditProgramPage({ params }: Props) {
     week: pe.week,
   }))
 
+  // Key op updatedAt zodat de builder remount wanneer onderliggende data
+  // verandert (bv. via programs.changeDay vanuit week-planner).
+  const builderKey = typeof program.updatedAt === 'string'
+    ? program.updatedAt
+    : new Date(program.updatedAt).toISOString()
+
   return (
     <Suspense>
       <ProgramBuilder
+        key={builderKey}
         programId={id}
         initialStatus={program.status}
         initialState={{

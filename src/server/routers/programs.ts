@@ -333,6 +333,15 @@ export const programsRouter = createTRPCRouter({
         data: { day: input.toDay },
       })
 
+      // Bump Program.updatedAt zodat consumers (program builder o.a.) kunnen
+      // zien dat de data ververst is en hun lokale state moeten remounten.
+      if (result.count > 0) {
+        await ctx.prisma.program.update({
+          where: { id: input.programId },
+          data: { updatedAt: new Date() },
+        })
+      }
+
       return { updated: result.count }
     }),
 })
