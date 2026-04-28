@@ -6,6 +6,12 @@ import { createTRPCRouter, therapistProcedure, mfaTherapistProcedure } from '@/s
 
 const createId = () => crypto.randomUUID()
 
+// Onboarding-placeholder die bij invite.create wordt gezet en bij invite.finalize
+// gewist hoort te worden. Self-heal in patients.list pikt rijen op die door een
+// eerdere bug nog steeds met deze tekst rondlopen terwijl de patient al
+// geaccepteerd heeft.
+const PENDING_INVITE_NOTE = 'Aangemaakt via invite — wacht op acceptatie'
+
 /**
  * Toegang tot een patient = directe PatientTherapist-koppeling, OF dezelfde
  * praktijk als de patient. ADMIN krijgt altijd toegang.
@@ -43,6 +49,19 @@ export const patientsRouter = createTRPCRouter({
     // Dat laatste laat collega-therapeuten binnen één praktijk elkaars
     // patiënten zien zonder aparte invite.
     const me = ctx.user
+
+    // Self-heal stale onboarding-notes voor reeds geaccepteerde patiënten
+    // van deze therapeut. Eén UPDATE per dashboard-load; raakt alleen rijen
+    // die nog letterlijk de placeholder bevatten.
+    await ctx.prisma.patientTherapist.updateMany({
+      where: {
+        therapistId: me.id,
+        status: 'APPROVED',
+        notes: PENDING_INVITE_NOTE,
+      },
+      data: { notes: null },
+    })
+
     const patients = await ctx.prisma.user.findMany({
       where: {
         role: { in: ['PATIENT', 'ATHLETE'] },

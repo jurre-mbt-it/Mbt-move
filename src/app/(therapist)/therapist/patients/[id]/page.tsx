@@ -42,7 +42,8 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const router = useRouter()
   const { data: patient, isLoading } = trpc.patients.get.useQuery({ id })
   const { data: programsRaw = [] } = trpc.programs.list.useQuery({ patientId: id })
-  const { data: recentSessions = [] } = trpc.patients.recentSessions.useQuery({ patientId: id, limit: 5 })
+  const [historyLimit, setHistoryLimit] = useState(5)
+  const { data: recentSessions = [] } = trpc.patients.recentSessions.useQuery({ patientId: id, limit: historyLimit })
   const utils = trpc.useUtils()
   const [inviteFallback, setInviteFallback] = useState<{
     url: string
@@ -543,7 +544,8 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                 </div>
               </Tile>
             ) : (
-              recentSessions.map((session) => (
+              <>
+              {recentSessions.map((session) => (
                 <Tile key={session.id} accentBar={session.painLevel != null && session.painLevel >= 6 ? P.danger : P.lime}>
                   <div className="space-y-2">
                     <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -629,7 +631,18 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                     )}
                   </div>
                 </Tile>
-              ))
+              ))}
+              {recentSessions.length === historyLimit && historyLimit < 50 && (
+                <div className="flex justify-center pt-2">
+                  <DarkButton
+                    variant="secondary"
+                    onClick={() => setHistoryLimit((n) => Math.min(n + 10, 50))}
+                  >
+                    Meer laden
+                  </DarkButton>
+                </div>
+              )}
+              </>
             )}
           </TabsContent>
 

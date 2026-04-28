@@ -42,6 +42,7 @@ import { inviteMail, sendMail } from '@/server/mail'
 
 const CODE_TTL_HOURS = 24
 const MAX_REDEEM_ATTEMPTS = 5
+const PENDING_INVITE_NOTE = 'Aangemaakt via invite — wacht op acceptatie'
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -185,7 +186,7 @@ export const inviteRouter = createTRPCRouter({
               status: 'PENDING',
               isActive: true,
               requestedAt: new Date(),
-              notes: `Aangemaakt via invite — wacht op acceptatie`,
+              notes: PENDING_INVITE_NOTE,
             },
           })
           patientUserId = patientUser.id
@@ -526,6 +527,20 @@ export const inviteRouter = createTRPCRouter({
   finalize: protectedProcedure.mutation(async ({ ctx }) => {
     const email = ctx.user!.email.toLowerCase()
 
+    // Self-heal: voor patiënten die al eerder finalize hebben doorlopen toen
+    // de "wacht op acceptatie"-note nog niet werd gewist. Draaien we ongeacht
+    // of er nog een actieve invite is — kost één UPDATE en voorkomt dat
+    // therapeuten nog stale onboarding-notes zien voor reeds geaccepteerde
+    // patiënten.
+    await ctx.prisma.patientTherapist.updateMany({
+      where: {
+        patient: { email },
+        status: 'APPROVED',
+        notes: PENDING_INVITE_NOTE,
+      },
+      data: { notes: null },
+    })
+
     const invite = await ctx.prisma.inviteCode.findFirst({
       where: {
         email,
@@ -580,20 +595,36 @@ export const inviteRouter = createTRPCRouter({
     })
 
     if (invite.role === 'PATIENT' || invite.role === 'ATHLETE') {
-      await ctx.prisma.patientTherapist.upsert({
+      const existingLink = await ctx.prisma.patientTherapist.findUnique({
         where: {
           therapistId_patientId: {
             therapistId: invite.invitedById,
             patientId: user.id,
           },
         },
-        update: { isActive: true, status: 'APPROVED' },
-        create: {
-          therapistId: invite.invitedById,
-          patientId: user.id,
-          status: 'APPROVED',
-        },
+        select: { id: true, notes: true },
       })
+      if (existingLink) {
+        await ctx.prisma.patientTherapist.update({
+          where: { id: existingLink.id },
+          data: {
+            isActive: true,
+            status: 'APPROVED',
+            // Wis de placeholder-note alleen als die nog ongewijzigd is —
+            // anders blijft een handmatig toegevoegde note van de therapeut
+            // staan.
+            ...(existingLink.notes === PENDING_INVITE_NOTE ? { notes: null } : {}),
+          },
+        })
+      } else {
+        await ctx.prisma.patientTherapist.create({
+          data: {
+            therapistId: invite.invitedById,
+            patientId: user.id,
+            status: 'APPROVED',
+          },
+        })
+      }
     }
 
     await auditLog({
