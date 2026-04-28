@@ -107,6 +107,17 @@ function WeekPlannerContent() {
 
   const activePrograms = patientPrograms.filter(p => p.status === 'ACTIVE' || p.status === 'DRAFT')
 
+  // Map: weekday-index (0=Ma..6=Zo) → programs die op die dag draaien
+  // (afgeleid uit ProgramExercise.day, 1-indexed → 0-indexed).
+  const programsByWeekday: Record<number, ProgramListItem[]> = {}
+  for (const p of activePrograms) {
+    for (const day of p.daysScheduled ?? []) {
+      const dow = day - 1
+      if (!programsByWeekday[dow]) programsByWeekday[dow] = []
+      programsByWeekday[dow].push(p)
+    }
+  }
+
   const selectedPatient = patients.find(p => p.id === selectedPatientId) ?? null
 
   return (
@@ -182,6 +193,7 @@ function WeekPlannerContent() {
                 key={i}
                 dayOfWeek={i}
                 program={programByDay[i] ?? null}
+                programDayMatches={programsByWeekday[i] ?? []}
                 patientId={selectedPatientId}
                 onClear={() => clearDay(i)}
                 onAssign={programId => assignProgram(i, programId)}
@@ -194,20 +206,93 @@ function WeekPlannerContent() {
   )
 }
 
-function ActiveProgramRow({ program }: { program: ProgramListItem }) {
+function MoveDayDialog({
+  open,
+  onOpenChange,
+  programId,
+  programName,
+  fromDay,
+  occupiedDays,
+  week,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  programId: string
+  programName?: string
+  fromDay: number | null
+  occupiedDays: number[]
+  week?: number
+}) {
   const utils = trpc.useUtils()
-  const [moveDialog, setMoveDialog] = useState<{ fromDay: number } | null>(null)
   const changeDay = trpc.programs.changeDay.useMutation({
     onSuccess: async () => {
       await Promise.all([
         utils.programs.list.invalidate(),
+        utils.programs.get.invalidate({ id: programId }),
         utils.weekSchedules.list.invalidate(),
       ])
       toast.success('Dag verplaatst')
+      onOpenChange(false)
     },
     onError: () => toast.error('Verplaatsen mislukt'),
   })
 
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="max-w-sm"
+        style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
+      >
+        <DialogHeader>
+          <DialogTitle style={{ color: P.ink }}>
+            {fromDay !== null
+              ? `${programName ? `${programName} · ` : ''}Verplaats ${DAY_LABELS[fromDay - 1]} naar…`
+              : ''}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-7 gap-1.5 pt-2">
+          {DAY_LABELS.map((label, i) => {
+            const targetDay = i + 1
+            const isCurrent = fromDay === targetDay
+            const isOccupied = occupiedDays.includes(targetDay) && !isCurrent
+            const disabled = isCurrent || isOccupied || changeDay.isPending
+            return (
+              <button
+                key={label}
+                type="button"
+                disabled={disabled}
+                onClick={() => {
+                  if (fromDay === null) return
+                  changeDay.mutate({ programId, fromDay, toDay: targetDay, week })
+                }}
+                className="athletic-tap athletic-mono py-2 rounded-md"
+                style={{
+                  background: P.surfaceHi,
+                  color: disabled ? P.inkDim : P.ink,
+                  border: `1px solid ${P.lineStrong}`,
+                  fontSize: 11,
+                  fontWeight: 800,
+                  letterSpacing: '0.05em',
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  opacity: isCurrent ? 0.4 : isOccupied ? 0.5 : 1,
+                }}
+                title={isOccupied ? 'Al bezet binnen het programma' : ''}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+        <p className="athletic-mono pt-1" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.04em' }}>
+          Verandert alle oefeningen op die dag binnen het programma{week !== undefined ? ` (week ${week})` : ''}.
+        </p>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function ActiveProgramRow({ program }: { program: ProgramListItem }) {
+  const [moveFromDay, setMoveFromDay] = useState<number | null>(null)
   const days = program.daysScheduled ?? []
   const planned = days.length > 0
 
@@ -231,14 +316,13 @@ function ActiveProgramRow({ program }: { program: ProgramListItem }) {
             {program.weeks} wk · {program.daysPerWeek}×/wk · {program._count?.exercises ?? 0} oef.
           </span>
         </div>
-        {/* Day chips met verplaats-knop per chip */}
         <div className="flex items-center gap-1.5 flex-wrap mt-2">
           {planned ? (
             days.map(d => (
               <button
                 key={d}
                 type="button"
-                onClick={() => setMoveDialog({ fromDay: d })}
+                onClick={() => setMoveFromDay(d)}
                 className="athletic-tap athletic-mono px-2 py-1 rounded-md flex items-center gap-1"
                 style={{
                   background: 'rgba(190,242,100,0.12)',
@@ -273,57 +357,14 @@ function ActiveProgramRow({ program }: { program: ProgramListItem }) {
         Open
       </DarkButton>
 
-      {/* Move-day dialog */}
-      <Dialog open={!!moveDialog} onOpenChange={open => { if (!open) setMoveDialog(null) }}>
-        <DialogContent
-          className="max-w-sm"
-          style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
-        >
-          <DialogHeader>
-            <DialogTitle style={{ color: P.ink }}>
-              Verplaats {moveDialog ? DAY_LABELS[moveDialog.fromDay - 1] : ''} naar…
-            </DialogTitle>
-          </DialogHeader>
-          <div className="grid grid-cols-7 gap-1.5 pt-2">
-            {DAY_LABELS.map((label, i) => {
-              const targetDay = i + 1
-              const isCurrent = moveDialog?.fromDay === targetDay
-              const isOccupied = days.includes(targetDay) && !isCurrent
-              return (
-                <button
-                  key={label}
-                  type="button"
-                  disabled={isCurrent || isOccupied || changeDay.isPending}
-                  onClick={() => {
-                    if (!moveDialog) return
-                    changeDay.mutate(
-                      { programId: program.id, fromDay: moveDialog.fromDay, toDay: targetDay },
-                      { onSuccess: () => setMoveDialog(null) },
-                    )
-                  }}
-                  className="athletic-tap athletic-mono py-2 rounded-md"
-                  style={{
-                    background: isCurrent ? P.surfaceLow : isOccupied ? P.surfaceLow : P.surfaceHi,
-                    color: isCurrent ? P.inkDim : isOccupied ? P.inkDim : P.ink,
-                    border: `1px solid ${isCurrent ? P.line : P.lineStrong}`,
-                    fontSize: 11,
-                    fontWeight: 800,
-                    letterSpacing: '0.05em',
-                    cursor: isCurrent || isOccupied ? 'not-allowed' : 'pointer',
-                    opacity: isCurrent ? 0.4 : isOccupied ? 0.5 : 1,
-                  }}
-                  title={isOccupied ? 'Al bezet door deze programma-dag' : ''}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-          <p className="athletic-mono pt-1" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.04em' }}>
-            Verandert alle oefeningen op die dag binnen het programma.
-          </p>
-        </DialogContent>
-      </Dialog>
+      <MoveDayDialog
+        open={moveFromDay !== null}
+        onOpenChange={open => { if (!open) setMoveFromDay(null) }}
+        programId={program.id}
+        programName={program.name}
+        fromDay={moveFromDay}
+        occupiedDays={days}
+      />
     </div>
   )
 }
@@ -331,18 +372,27 @@ function ActiveProgramRow({ program }: { program: ProgramListItem }) {
 function DayCell({
   dayOfWeek,
   program,
+  programDayMatches,
   patientId,
   onClear,
   onAssign,
 }: {
   dayOfWeek: number
   program: DayProgram
+  programDayMatches: ProgramListItem[]
   patientId: string
   onClear: () => void
   onAssign: (programId: string) => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [moveTarget, setMoveTarget] = useState<ProgramListItem | null>(null)
+
+  // WeekSchedule program telt mee mits 't niet al via Program.day getoond wordt
+  const programDayIds = new Set(programDayMatches.map(p => p.id))
+  const showWeekScheduleOverlay = program && !programDayIds.has(program.id)
+
+  const hasContent = programDayMatches.length > 0 || !!showWeekScheduleOverlay
 
   return (
     <Tile>
@@ -360,31 +410,70 @@ function DayCell({
           {DAY_LABELS[dayOfWeek]}
         </div>
 
-        {program ? (
+        {hasContent ? (
           <div className="flex flex-col gap-1.5 flex-1">
-            <div
-              className="rounded-md px-2 py-1.5"
-              style={{
-                background: 'rgba(190,242,100,0.12)',
-                border: `1px solid ${P.lime}`,
-                color: P.lime,
-              }}
-            >
-              <span
-                className="athletic-mono"
-                style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', lineHeight: 1.3 }}
+            {/* Programma's afgeleid uit Program.day — klikbaar om te verplaatsen */}
+            {programDayMatches.map(p => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setMoveTarget(p)}
+                className="athletic-tap rounded-md px-2 py-1.5 text-left"
+                style={{
+                  background: 'rgba(190,242,100,0.12)',
+                  border: `1px solid ${P.lime}`,
+                  color: P.lime,
+                }}
+                title="Klik om te verplaatsen"
               >
-                {program.name}
-              </span>
-            </div>
+                <span
+                  className="athletic-mono"
+                  style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', lineHeight: 1.3 }}
+                >
+                  {p.name}
+                </span>
+              </button>
+            ))}
+
+            {/* WeekSchedule overlay — een handmatig toegewezen programma (× om weg te halen) */}
+            {showWeekScheduleOverlay && program && (
+              <div className="flex items-center gap-1.5">
+                <div
+                  className="flex-1 rounded-md px-2 py-1.5"
+                  style={{
+                    background: P.surfaceHi,
+                    border: `1px dashed ${P.line}`,
+                    color: P.ink,
+                  }}
+                  title="Handmatig toegewezen via +"
+                >
+                  <span
+                    className="athletic-mono"
+                    style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', lineHeight: 1.3 }}
+                  >
+                    {program.name}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={onClear}
+                  className="athletic-tap shrink-0 w-7 h-7 rounded-md flex items-center justify-center"
+                  style={{ background: P.surfaceHi, color: P.danger, fontSize: 12 }}
+                  title="Verwijder van deze dag"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
             <button
               type="button"
-              onClick={onClear}
+              onClick={() => setMenuOpen(true)}
               className="athletic-tap self-end w-7 h-7 rounded-md flex items-center justify-center"
-              style={{ background: P.surfaceHi, color: P.danger, fontSize: 12 }}
-              title="Verwijder van deze dag"
+              style={{ background: P.surfaceHi, color: P.inkMuted }}
+              title="Voeg extra programma toe"
             >
-              <X className="w-3.5 h-3.5" />
+              <Plus className="w-3.5 h-3.5" />
             </button>
           </div>
         ) : (
@@ -404,6 +493,16 @@ function DayCell({
           </button>
         )}
       </div>
+
+      {/* Move-day dialog voor klikken op Program.day chip */}
+      <MoveDayDialog
+        open={!!moveTarget}
+        onOpenChange={open => { if (!open) setMoveTarget(null) }}
+        programId={moveTarget?.id ?? ''}
+        programName={moveTarget?.name}
+        fromDay={moveTarget ? dayOfWeek + 1 : null}
+        occupiedDays={moveTarget?.daysScheduled ?? []}
+      />
 
       {/* Add menu (kies type) */}
       <Dialog open={menuOpen} onOpenChange={setMenuOpen}>
