@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -189,6 +189,14 @@ function PainCheckCard() {
 // ── Hoofdpagina ───────────────────────────────────────────────────────────────
 
 export default function WalkRunWizardPage() {
+  return (
+    <Suspense>
+      <WalkRunWizardContent />
+    </Suspense>
+  )
+}
+
+function WalkRunWizardContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const prePatientId = searchParams.get('patientId') ?? ''

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { Suspense, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
@@ -38,6 +38,14 @@ type ProgramListItem = {
 }
 
 export default function WeekPlannerPage() {
+  return (
+    <Suspense>
+      <WeekPlannerContent />
+    </Suspense>
+  )
+}
+
+function WeekPlannerContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const utils = trpc.useUtils()
