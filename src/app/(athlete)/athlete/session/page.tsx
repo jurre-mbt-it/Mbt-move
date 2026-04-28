@@ -58,7 +58,9 @@ export default function AthleteSessionPage() {
   const router = useRouter()
   const utils = trpc.useUtils()
   const { data: sessionData, isLoading } = trpc.patient.getTodayExercises.useQuery()
-  const { data: dbExercises = [] } = trpc.exercises.list.useQuery(undefined, { staleTime: 60_000 })
+  // Cast naar lokaal shallow type; tRPC inference is te diep voor TS (TS2589).
+  const dbExercisesQuery = trpc.exercises.list.useQuery(undefined, { staleTime: 60_000 })
+  const dbExercises: DbExercise[] = (dbExercisesQuery.data as DbExercise[] | undefined) ?? []
   const logSession = trpc.patient.logSession.useMutation()
 
   // Quick mode detection
