@@ -11,9 +11,44 @@ interface Props {
   params: Promise<{ id: string }>
 }
 
+// Cast naar shallow type; tRPC inference is te diep voor TS (TS2589).
+type EditExercise = {
+  id: string
+  exerciseId: string
+  sets: number
+  reps: number
+  repUnit: string | null
+  restTime: number
+  supersetGroup: string | null
+  supersetOrder: number
+  day: number
+  week: number
+  exercise: {
+    name: string
+    category: string
+    difficulty: string
+    easierVariantId: string | null
+    harderVariantId: string | null
+    videoUrl: string | null
+    muscleLoads: { muscle: string; load: number }[]
+  }
+}
+type EditProgram = {
+  name: string
+  description: string | null
+  weeks: number
+  daysPerWeek: number
+  isTemplate: boolean
+  patientId: string | null
+  status: 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED'
+  exercises: EditExercise[]
+}
+
 export default function EditProgramPage({ params }: Props) {
   const { id } = use(params)
-  const { data: program, isLoading } = trpc.programs.get.useQuery({ id })
+  const programQuery = trpc.programs.get.useQuery({ id })
+  const program = programQuery.data as EditProgram | undefined
+  const isLoading = programQuery.isLoading
 
   if (isLoading) {
     return (
@@ -70,7 +105,7 @@ export default function EditProgramPage({ params }: Props) {
     <Suspense>
       <ProgramBuilder
         programId={id}
-        initialStatus={(program as Record<string, unknown>).status as 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED'}
+        initialStatus={program.status}
         initialState={{
           name: program.name,
           description: program.description ?? '',

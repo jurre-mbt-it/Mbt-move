@@ -29,10 +29,14 @@ export default function CollectionsPage() {
   const [formColor, setFormColor] = useState<string>(COLLECTION_COLORS[0])
   const [activeCollection, setActiveCollection] = useState<string | null>(null)
 
-  const { data: collectionExercises = [], isLoading: exercisesLoading } = trpc.exercises.getCollectionExercises.useQuery(
+  // Cast naar shallow type; tRPC inference is te diep voor TS (TS2589).
+  type CollectionExercise = { id: string; name: string; description: string | null }
+  const collectionExercisesQuery = trpc.exercises.getCollectionExercises.useQuery(
     { collectionId: activeCollection! },
     { enabled: !!activeCollection },
   )
+  const collectionExercises: CollectionExercise[] = (collectionExercisesQuery.data as CollectionExercise[] | undefined) ?? []
+  const exercisesLoading = collectionExercisesQuery.isLoading
 
   const createMutation = trpc.exercises.createCollection.useMutation({
     onSuccess: () => {
