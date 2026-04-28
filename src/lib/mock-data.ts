@@ -58,15 +58,6 @@ export type MockSessionLog = {
   notes?: string
 }
 
-export type MockMessage = {
-  id: string
-  patientId: string
-  from: 'therapist' | 'patient'
-  content: string
-  date: string           // ISO date
-  read: boolean
-}
-
 // ─── Patiënten ───────────────────────────────────────────────────────────────
 
 export const PATIENTS: PatientProfile[] = [
@@ -317,31 +308,6 @@ export const SESSION_LOGS: MockSessionLog[] = [
   { id: 's6-2', patientId: 'pat6', date: '2026-04-03', week: 1, day: 1, rpe: 3, pain: 6, done: 3, total: 3, duration: 20, notes: 'Eerste sessie na blessure, voorzichtig gestart' },
 ]
 
-// ─── Berichten per patiënt ────────────────────────────────────────────────────
-
-export const MESSAGES: MockMessage[] = [
-  // Jan de Vries (pat1)
-  { id: 'm1-1', patientId: 'pat1', from: 'therapist', content: 'Hoi Jan, goed gedaan vandaag! De knie-extensie zag er al een stuk soepeler uit. Morgen even rustig aanhouden.', date: '2026-04-05T17:30:00', read: true },
-  { id: 'm1-2', patientId: 'pat1', from: 'patient', content: 'Bedankt! Had wat ongemak bij de terminal extensie maar verder ging het goed. Zie u dinsdag!', date: '2026-04-05T19:15:00', read: true },
-  { id: 'm1-3', patientId: 'pat1', from: 'therapist', content: 'Perfect. Als het ongemak > 4/10 wordt, stop dan en neem contact op.', date: '2026-04-05T19:45:00', read: true },
-  { id: 'm1-4', patientId: 'pat1', from: 'patient', content: 'Begrepen. Ik ga ook even stretchen vannacht zoals u zei.', date: '2026-04-05T20:00:00', read: false },
-
-  // Maria Jansen (pat2)
-  { id: 'm2-1', patientId: 'pat2', from: 'therapist', content: 'Maria, ik heb de overhead progressie nog even uitgesteld. Eerst de scapulaire stabilisatie verder opbouwen deze week.', date: '2026-04-01T09:00:00', read: true },
-  { id: 'm2-2', patientId: 'pat2', from: 'patient', content: 'Oké, duidelijk. Ik merkte ook dat mijn schouder sneller vermoeid raakte gisteren.', date: '2026-04-01T10:30:00', read: true },
-  { id: 'm2-3', patientId: 'pat2', from: 'therapist', content: 'Dat klopt bij je fase. Nog 1 week geduld dan gaan we opbouwen. 💪', date: '2026-04-01T11:00:00', read: true },
-
-  // Sophie Dekker (pat4)
-  { id: 'm4-1', patientId: 'pat4', from: 'therapist', content: 'Sophie, gefeliciteerd met het afrondenvan het programma! De vooruitgang was indrukwekkend. Klaar voor fase 2?', date: '2026-03-15T10:00:00', read: true },
-  { id: 'm4-2', patientId: 'pat4', from: 'patient', content: 'Ja!! Zo blij. Wanneer kan ik beginnen met springen?', date: '2026-03-15T11:30:00', read: true },
-  { id: 'm4-3', patientId: 'pat4', from: 'therapist', content: 'Over 2 weken starten we met plyometrie. Eerst nog een week actief rust. Ik stuur volgende week het nieuwe programma.', date: '2026-03-15T12:00:00', read: true },
-
-  // Lars Pietersen (pat6)
-  { id: 'm6-1', patientId: 'pat6', from: 'patient', content: 'Hallo, mijn enkel is vandaag erg gezwollen wakker geworden. Is dat normaal?', date: '2026-04-04T08:15:00', read: true },
-  { id: 'm6-2', patientId: 'pat6', from: 'therapist', content: 'Dat is normaal in week 1. Houd het hoog, ijs 20 min, 3x per dag. Als er roodheid bij komt of koorts, bel me direct.', date: '2026-04-04T09:00:00', read: true },
-  { id: 'm6-3', patientId: 'pat6', from: 'patient', content: 'Oke goed. Geen roodheid. Gaat al wat beter nu. Bedankt!', date: '2026-04-04T14:00:00', read: true },
-]
-
 // ─── Cardio log mock data ─────────────────────────────────────────────────────
 
 export type MockCardioLog = {
@@ -467,12 +433,6 @@ export function getSessionsByPatient(patientId: string): MockSessionLog[] {
   return SESSION_LOGS
     .filter(s => s.patientId === patientId)
     .sort((a, b) => b.date.localeCompare(a.date))
-}
-
-export function getMessagesByPatient(patientId: string): MockMessage[] {
-  return MESSAGES
-    .filter(m => m.patientId === patientId)
-    .sort((a, b) => a.date.localeCompare(b.date))
 }
 
 export function generateAccessCode(): string {
