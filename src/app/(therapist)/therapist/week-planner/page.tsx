@@ -710,6 +710,176 @@ function WeekNavigator({
   )
 }
 
+type SessionDetail = {
+  id: string
+  scheduledAt: string | Date
+  completedAt: string | Date | null
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED'
+  duration: number | null
+  painLevel: number | null
+  exertionLevel: number | null
+  notes: string | null
+  program: { id: string; name: string } | null
+  exerciseLogs: Array<{
+    id: string
+    setsCompleted: number | null
+    repsCompleted: number | null
+    duration: number | null
+    weight: number | null
+    painLevel: number | null
+    painDuring: number | null
+    notes: string | null
+    exercise: { name: string; category: string }
+  }>
+}
+
+function SessionDetailsDialog({
+  sessionId,
+  onOpenChange,
+}: {
+  sessionId: string | null
+  onOpenChange: (open: boolean) => void
+}) {
+  const open = !!sessionId
+  const detailsQuery = trpc.weekSchedules.sessionDetails.useQuery(
+    { sessionId: sessionId ?? '' },
+    { enabled: open, staleTime: 60_000 },
+  )
+  const data = detailsQuery.data as SessionDetail | undefined
+
+  const formatDateTime = (d: string | Date) => {
+    const date = new Date(d)
+    return date.toLocaleString('nl-NL', {
+      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+    })
+  }
+  const durationLabel = (sec: number | null) => {
+    if (!sec) return null
+    const m = Math.round(sec / 60)
+    return m >= 60 ? `${Math.floor(m / 60)}u ${m % 60}m` : `${m} min`
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="max-w-md"
+        style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
+      >
+        <DialogHeader>
+          <DialogTitle style={{ color: P.ink }}>
+            {data?.program?.name ?? 'Eigen workout'}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 pt-2">
+          {detailsQuery.isLoading ? (
+            <p className="athletic-mono" style={{ color: P.inkDim, fontSize: 11 }}>Laden...</p>
+          ) : !data ? (
+            <p className="athletic-mono" style={{ color: P.inkDim, fontSize: 11 }}>Sessie niet gevonden</p>
+          ) : (
+            <>
+              {/* Meta-info */}
+              <div
+                className="athletic-mono flex flex-wrap items-center gap-x-3 gap-y-1"
+                style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.04em' }}
+              >
+                <span>{formatDateTime(data.scheduledAt)}</span>
+                {durationLabel(data.duration) && <span>· {durationLabel(data.duration)}</span>}
+                <span
+                  style={{
+                    background: data.status === 'COMPLETED' ? 'rgba(190,242,100,0.14)' : P.surfaceHi,
+                    color: data.status === 'COMPLETED' ? P.lime : P.inkMuted,
+                    padding: '1px 8px',
+                    borderRadius: 999,
+                    fontSize: 9,
+                    letterSpacing: '0.1em',
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {data.status === 'COMPLETED' ? 'Afgerond' : data.status}
+                </span>
+              </div>
+
+              {/* Subjective scores */}
+              {(data.painLevel != null || data.exertionLevel != null) && (
+                <div
+                  className="athletic-mono flex gap-3"
+                  style={{ color: P.ink, fontSize: 11, letterSpacing: '0.04em' }}
+                >
+                  {data.painLevel != null && (
+                    <span>Pijn: <strong style={{ color: data.painLevel >= 5 ? P.danger : P.lime }}>{data.painLevel}/10</strong></span>
+                  )}
+                  {data.exertionLevel != null && (
+                    <span>RPE: <strong>{data.exertionLevel}/10</strong></span>
+                  )}
+                </div>
+              )}
+
+              {/* Notes */}
+              {data.notes && (
+                <p
+                  className="athletic-mono italic px-3 py-2 rounded-md"
+                  style={{ color: P.inkMuted, fontSize: 11, background: P.surfaceHi, letterSpacing: '0.03em' }}
+                >
+                  "{data.notes}"
+                </p>
+              )}
+
+              {/* Exercise logs */}
+              {data.exerciseLogs.length > 0 ? (
+                <div className="space-y-1.5 max-h-[280px] overflow-y-auto">
+                  <Kicker>Oefeningen ({data.exerciseLogs.length})</Kicker>
+                  {data.exerciseLogs.map(ex => (
+                    <div
+                      key={ex.id}
+                      className="rounded-md px-3 py-2"
+                      style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}` }}
+                    >
+                      <div
+                        className="flex items-center justify-between gap-2"
+                        style={{ color: P.ink, fontSize: 12, fontWeight: 700 }}
+                      >
+                        <span className="truncate">{ex.exercise.name}</span>
+                        <span
+                          className="athletic-mono shrink-0"
+                          style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.04em' }}
+                        >
+                          {ex.setsCompleted ?? 0}×{ex.repsCompleted ?? 0}
+                          {ex.weight ? ` · ${ex.weight}kg` : ''}
+                        </span>
+                      </div>
+                      {(ex.painDuring != null || ex.painLevel != null || ex.notes) && (
+                        <div
+                          className="athletic-mono flex gap-3 mt-1"
+                          style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.04em' }}
+                        >
+                          {ex.painDuring != null && <span>pijn: {ex.painDuring}/10</span>}
+                          {ex.painLevel != null && ex.painDuring == null && <span>pijn: {ex.painLevel}/10</span>}
+                          {ex.notes && <span className="italic truncate">"{ex.notes}"</span>}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="athletic-mono" style={{ color: P.inkDim, fontSize: 11 }}>
+                  Geen oefeningen gelogd voor deze sessie.
+                </p>
+              )}
+
+              <div className="flex justify-end pt-1">
+                <DarkButton variant="secondary" size="sm" onClick={() => onOpenChange(false)}>
+                  Sluiten
+                </DarkButton>
+              </div>
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function MoveDayDialog({
   open,
   onOpenChange,
@@ -916,6 +1086,7 @@ function DayCell({
   const [menuOpen, setMenuOpen] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [moveTarget, setMoveTarget] = useState<ProgramListItem | null>(null)
+  const [detailsSessionId, setDetailsSessionId] = useState<string | null>(null)
 
   // WeekSchedule program telt mee mits 't niet al via Program.day getoond wordt
   const programDayIds = new Set(programDayMatches.map(p => p.id))
@@ -1022,7 +1193,8 @@ function DayCell({
             })()}
 
             {/* Sessie-chips — eigen workouts (programId=null) +
-                 sessies van programma's die niet (meer) actief zijn. */}
+                 sessies van programma's die niet (meer) actief zijn.
+                 Klikbaar om details popup te openen. */}
             {sessionChips.map(s => {
               const date = new Date(s.scheduledAt)
               const dateLabel = date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
@@ -1032,15 +1204,17 @@ function DayCell({
                 : (s.programName ?? 'Sessie')
               const titlePrefix = s.programId === null ? 'Eigen workout' : `Sessie · ${s.programName ?? 'onbekend programma'}`
               return (
-                <div
+                <button
                   key={s.id}
-                  className="rounded-md px-2 py-1.5 flex items-start justify-between gap-1.5"
+                  type="button"
+                  onClick={() => setDetailsSessionId(s.id)}
+                  className="athletic-tap rounded-md px-2 py-1.5 flex items-start justify-between gap-1.5 text-left w-full"
                   style={{
                     background: EXTRA_SESSION_STYLE.bg,
                     border: `1px solid ${EXTRA_SESSION_STYLE.border}`,
                     color: EXTRA_SESSION_STYLE.text,
                   }}
-                  title={`${titlePrefix} · ${dateLabel}${isCompleted ? ' (afgerond)' : ''}`}
+                  title={`${titlePrefix} · ${dateLabel}${isCompleted ? ' (afgerond)' : ''} — klik voor details`}
                 >
                   <div className="flex-1 min-w-0">
                     <span
@@ -1065,7 +1239,7 @@ function DayCell({
                       ✓
                     </span>
                   )}
-                </div>
+                </button>
               )
             })}
 
@@ -1105,6 +1279,12 @@ function DayCell({
         programName={moveTarget?.name}
         fromDay={moveTarget ? dayOfWeek + 1 : null}
         occupiedDays={moveTarget?.daysScheduled ?? []}
+      />
+
+      {/* Session-details dialog voor klikken op een sessie-chip */}
+      <SessionDetailsDialog
+        sessionId={detailsSessionId}
+        onOpenChange={open => { if (!open) setDetailsSessionId(null) }}
       />
 
       {/* Add menu (kies type) */}

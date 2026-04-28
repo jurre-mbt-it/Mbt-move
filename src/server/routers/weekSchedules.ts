@@ -334,6 +334,57 @@ export const weekSchedulesRouter = createTRPCRouter({
     }),
 
   /**
+   * Volledige details van één SessionLog — voor de detail-popup in
+   * de week-planner. Inclusief exerciseLogs + namen van de oefeningen.
+   */
+  sessionDetails: therapistProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const session = await ctx.prisma.sessionLog.findUnique({
+        where: { id: input.sessionId },
+        include: {
+          program: { select: { id: true, name: true } },
+          exerciseLogs: {
+            select: {
+              id: true,
+              exerciseId: true,
+              setsCompleted: true,
+              repsCompleted: true,
+              duration: true,
+              weight: true,
+              painLevel: true,
+              painDuring: true,
+              notes: true,
+            },
+          },
+        },
+      })
+      if (!session) throw new TRPCError({ code: 'NOT_FOUND' })
+      // Authz: sessie moet bij een patient horen waar deze therapeut
+      // toegang toe heeft.
+      await assertPatientLink(ctx.prisma, ctx.user, session.patientId)
+
+      // ExerciseLog heeft geen Prisma-relatie naar Exercise — fetch in
+      // één extra query en merge in.
+      const exerciseIds = [...new Set(session.exerciseLogs.map(l => l.exerciseId))]
+      const exercises = exerciseIds.length
+        ? await ctx.prisma.exercise.findMany({
+            where: { id: { in: exerciseIds } },
+            select: { id: true, name: true, category: true },
+          })
+        : []
+      const byId = new Map(exercises.map(e => [e.id, e]))
+
+      return {
+        ...session,
+        exerciseLogs: session.exerciseLogs.map(log => ({
+          ...log,
+          exercise: byId.get(log.exerciseId) ?? { name: 'Onbekende oefening', category: 'STRENGTH' },
+        })),
+      }
+    }),
+
+  /**
    * Geeft de vroegste activiteit (SessionLog) van een patient terug.
    * Gebruikt om de anchor-datum voor week 1 te kiezen — zonder dit zou
    * de week-planner alleen 'deze week' tonen voor patienten zonder
