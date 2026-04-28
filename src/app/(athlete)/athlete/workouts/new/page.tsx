@@ -883,13 +883,16 @@ function ExercisePickerView({
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
 
-  const { data: allExercises = [], isLoading } = trpc.exercises.list.useQuery(
+  // Cast naar lokaal shallow type; tRPC inference is te diep voor TS (TS2589).
+  const exercisesQuery = trpc.exercises.list.useQuery(
     {
       query: search || undefined,
       category: categoryFilter || undefined,
     },
     { staleTime: 30_000 }
   )
+  const allExercises: RealExercise[] = (exercisesQuery.data as RealExercise[] | undefined) ?? []
+  const isLoading = exercisesQuery.isLoading
 
   const addedIds = new Set(exercises.map(e => e.exerciseId))
 

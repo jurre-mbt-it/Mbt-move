@@ -61,7 +61,9 @@ export default function ExercisesPage() {
 
   const collectionExerciseIds = useMemo(() => {
     if (!collectionExercises) return null
-    return new Set(collectionExercises.map(e => e.id))
+    // Cast naar shallow type; tRPC inference is te diep voor TS (TS2589).
+    const ids = (collectionExercises as { id: string }[]).map(e => e.id)
+    return new Set(ids)
   }, [collectionExercises])
 
   const filtered = useMemo(() => {
