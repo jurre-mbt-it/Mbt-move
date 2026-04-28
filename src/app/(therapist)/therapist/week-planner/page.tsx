@@ -34,12 +34,38 @@ type ProgramListItem = {
   status: 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED'
   weeks: number
   daysPerWeek: number
+  startDate?: string | Date | null
   patient?: { id: string; name: string | null } | null
   _count?: { exercises: number }
   // Unieke `day`-waarden uit Program.exercises (1=Ma..7=Zo).
   daysScheduled?: number[]
   // Dominante categorie afgeleid uit exercises (STRENGTH/CARDIO/...).
   dominantCategory?: string | null
+}
+
+// Maandag van de kalenderweek waarin `d` valt (Ma=start, Zo=eind).
+function mondayOf(d: Date): Date {
+  const result = new Date(d)
+  result.setHours(0, 0, 0, 0)
+  const day = result.getDay() // 0=Sun..6=Sat
+  const offset = (day + 6) % 7 // 0 als 't al Ma is, anders aantal dagen terug
+  result.setDate(result.getDate() - offset)
+  return result
+}
+
+function addDays(d: Date, n: number): Date {
+  const r = new Date(d)
+  r.setDate(r.getDate() + n)
+  return r
+}
+
+function formatRange(from: Date, to: Date): string {
+  const sameMonth = from.getMonth() === to.getMonth()
+  const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }
+  if (sameMonth) {
+    return `${from.getDate()}-${to.toLocaleDateString('nl-NL', opts)}`
+  }
+  return `${from.toLocaleDateString('nl-NL', opts)}–${to.toLocaleDateString('nl-NL', opts)}`
 }
 type ExtraSession = {
   id: string
@@ -99,10 +125,8 @@ function WeekPlannerContent() {
     { patientId: selectedPatientId, isTemplate: false },
     { enabled: !!selectedPatientId, staleTime: 30_000 },
   )
-  const allSchedules: Schedule[] = useMemo(
-    () => ((schedulesQuery.data as Schedule[] | undefined) ?? []),
-    [schedulesQuery.data],
-  )
+  const allSchedulesRaw = (schedulesQuery.data as (Schedule & { startDate?: string | Date | null })[] | undefined) ?? []
+  const allSchedules: Schedule[] = useMemo(() => allSchedulesRaw, [allSchedulesRaw])
   const availableWeeks: number[] = useMemo(
     () => [...new Set(allSchedules.map(s => s.weekNumber ?? 1))].sort((a, b) => a - b),
     [allSchedules],
@@ -207,6 +231,37 @@ function WeekPlannerContent() {
 
   const activePrograms = patientPrograms.filter(p => p.status === 'ACTIVE' || p.status === 'DRAFT')
 
+  // Anchor-datum voor week 1 = maandag van de week waarin de patiënt z'n
+  // behandeling startte. Volgorde van fallbacks:
+  // 1. Vroegste WeekSchedule.startDate van deze patient
+  // 2. Vroegste actieve program.startDate
+  // 3. Vandaag (laatste redmiddel — week 1 = deze week)
+  const anchorDate: Date = useMemo(() => {
+    const dates: Date[] = []
+    for (const s of allSchedules) {
+      // Schedule kan startDate hebben (Prisma-veld); we casten als string|Date
+      const sd = (s as Schedule & { startDate?: string | Date | null }).startDate
+      if (sd) dates.push(new Date(sd))
+    }
+    for (const p of activePrograms) {
+      if (p.startDate) dates.push(new Date(p.startDate))
+    }
+    if (dates.length === 0) return new Date()
+    return new Date(Math.min(...dates.map(d => d.getTime())))
+  }, [allSchedules, activePrograms])
+
+  const week1Monday = mondayOf(anchorDate)
+  const todayMonday = mondayOf(new Date())
+  const currentWeekNumber = Math.floor(
+    (todayMonday.getTime() - week1Monday.getTime()) / (7 * 24 * 60 * 60 * 1000),
+  ) + 1
+
+  const weekRange = (n: number): { from: Date; to: Date } => {
+    const from = addDays(week1Monday, (n - 1) * 7)
+    const to = addDays(from, 6)
+    return { from, to }
+  }
+
   // Map: weekday-index (0=Ma..6=Zo) → programs die op die dag draaien
   // (afgeleid uit ProgramExercise.day, 1-indexed → 0-indexed).
   const programsByWeekday: Record<number, ProgramListItem[]> = {}
@@ -276,6 +331,8 @@ function WeekPlannerContent() {
           <WeekNavigator
             availableWeeks={availableWeeks}
             selectedWeek={selectedWeek}
+            currentWeekNumber={currentWeekNumber}
+            weekRange={weekRange}
             onSelect={setSelectedWeek}
             onAddWeek={handleAddWeek}
             onCopyWeek={(targets) => copyWeekMutation.mutate({
@@ -327,6 +384,8 @@ function WeekPlannerContent() {
 function WeekNavigator({
   availableWeeks,
   selectedWeek,
+  currentWeekNumber,
+  weekRange,
   onSelect,
   onAddWeek,
   onCopyWeek,
@@ -335,6 +394,8 @@ function WeekNavigator({
 }: {
   availableWeeks: number[]
   selectedWeek: number
+  currentWeekNumber: number
+  weekRange: (n: number) => { from: Date; to: Date }
   onSelect: (week: number) => void
   onAddWeek: () => void
   onCopyWeek: (targets: number[]) => void
@@ -344,12 +405,17 @@ function WeekNavigator({
   const [copyOpen, setCopyOpen] = useState(false)
   const [copyTargets, setCopyTargets] = useState<Set<number>>(new Set())
 
-  // Tabs: alle bestaande weken + huidige als 'ie nog niet bestaat
+  // Tabs: alle bestaande weken + huidige selectie + alle weken tot 'vandaag'.
+  // Zo zie je per default de geschiedenis (verleden weken) ook als die nog
+  // geen WeekSchedule-record hebben.
   const visibleWeeks = useMemo(() => {
     const set = new Set(availableWeeks)
     set.add(selectedWeek)
+    if (currentWeekNumber > 0) {
+      for (let i = 1; i <= currentWeekNumber; i++) set.add(i)
+    }
     return [...set].sort((a, b) => a - b)
-  }, [availableWeeks, selectedWeek])
+  }, [availableWeeks, selectedWeek, currentWeekNumber])
 
   const openCopy = () => {
     // Default: stel volgende week voor als target
@@ -384,35 +450,62 @@ function WeekNavigator({
 
   return (
     <Tile>
-      <div className="flex items-center gap-2 flex-wrap">
-        <MetaLabel>Week</MetaLabel>
-        <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="flex items-start gap-2 flex-wrap">
+        <MetaLabel style={{ marginTop: 6 }}>Week</MetaLabel>
+        <div className="flex items-start gap-1.5 flex-wrap">
           {visibleWeeks.map(n => {
             const isActive = n === selectedWeek
+            const isCurrent = n === currentWeekNumber
+            const isPast = n < currentWeekNumber
+            const range = weekRange(n)
+            const dateLabel = formatRange(range.from, range.to)
             return (
               <button
                 key={n}
                 type="button"
                 onClick={() => onSelect(n)}
-                className="athletic-tap athletic-mono px-3 py-1.5 rounded-md"
+                className="athletic-tap athletic-mono px-3 py-1.5 rounded-md flex flex-col items-start gap-0.5"
                 style={{
                   background: isActive ? P.lime : P.surfaceHi,
-                  color: isActive ? P.bg : P.ink,
-                  border: `1px solid ${isActive ? P.lime : P.lineStrong}`,
+                  color: isActive ? P.bg : isPast ? P.inkMuted : P.ink,
+                  border: `1px solid ${
+                    isActive ? P.lime : isCurrent ? P.gold : P.lineStrong
+                  }`,
                   fontSize: 11,
                   fontWeight: 800,
                   letterSpacing: '0.06em',
                   textTransform: 'uppercase',
+                  opacity: isPast && !isActive ? 0.85 : 1,
                 }}
               >
-                Week {n}
+                <span className="flex items-center gap-1.5">
+                  Week {n}
+                  {isCurrent && (
+                    <span
+                      style={{
+                        background: isActive ? 'rgba(0,0,0,0.18)' : 'rgba(244,194,97,0.25)',
+                        color: isActive ? P.bg : P.gold,
+                        fontSize: 8,
+                        letterSpacing: '0.1em',
+                        padding: '1px 5px',
+                        borderRadius: 999,
+                        fontWeight: 900,
+                      }}
+                    >
+                      VANDAAG
+                    </span>
+                  )}
+                </span>
+                <span style={{ fontSize: 9, opacity: 0.7, letterSpacing: '0.04em', textTransform: 'none', fontWeight: 600 }}>
+                  {dateLabel}
+                </span>
               </button>
             )
           })}
           <button
             type="button"
             onClick={onAddWeek}
-            className="athletic-tap athletic-mono px-3 py-1.5 rounded-md flex items-center gap-1"
+            className="athletic-tap athletic-mono px-3 py-1.5 rounded-md flex items-center gap-1 self-start"
             style={{
               background: P.surfaceLow,
               color: P.inkMuted,
@@ -421,6 +514,7 @@ function WeekNavigator({
               fontWeight: 800,
               letterSpacing: '0.06em',
               textTransform: 'uppercase',
+              minHeight: 42,
             }}
             title="Volgende week toevoegen"
           >
@@ -428,7 +522,16 @@ function WeekNavigator({
             Week
           </button>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2 self-start">
+          {selectedWeek !== currentWeekNumber && currentWeekNumber > 0 && (
+            <DarkButton
+              variant="secondary"
+              size="sm"
+              onClick={() => onSelect(currentWeekNumber)}
+            >
+              ↳ Vandaag
+            </DarkButton>
+          )}
           <DarkButton
             variant="secondary"
             size="sm"
