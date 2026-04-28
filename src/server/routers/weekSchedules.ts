@@ -334,6 +334,55 @@ export const weekSchedulesRouter = createTRPCRouter({
     }),
 
   /**
+   * Recent gelogde quick-workouts van een patient (SessionLog met
+   * programId IS NULL). Voor de week-planner-overview zodat ad-hoc
+   * trainingen ook zichtbaar zijn naast de geplande programma's.
+   */
+  recentExtraSessions: therapistProcedure
+    .input(z.object({
+      patientId: z.string(),
+      days: z.number().int().min(1).max(120).default(30),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
+      const since = new Date(Date.now() - input.days * 24 * 60 * 60 * 1000)
+      const sessions = await ctx.prisma.sessionLog.findMany({
+        where: {
+          patientId: input.patientId,
+          programId: null,
+          scheduledAt: { gte: since },
+        },
+        select: {
+          id: true,
+          scheduledAt: true,
+          completedAt: true,
+          status: true,
+          duration: true,
+          exerciseLogs: {
+            select: { exerciseId: true },
+            take: 1,
+          },
+        },
+        orderBy: { scheduledAt: 'desc' },
+      })
+      // Map naar weekday-index (0=Ma..6=Zo) zodat de UI direct kan groeperen
+      return sessions.map(s => {
+        const d = new Date(s.scheduledAt)
+        // JS getDay: 0=Sun..6=Sat — converteer naar 0=Mon..6=Sun
+        const weekdayIndex = (d.getDay() + 6) % 7
+        return {
+          id: s.id,
+          scheduledAt: s.scheduledAt,
+          completedAt: s.completedAt,
+          status: s.status,
+          duration: s.duration,
+          weekdayIndex,
+          hasExercises: s.exerciseLogs.length > 0,
+        }
+      })
+    }),
+
+  /**
    * Verwijder één weekNumber voor een patient.
    */
   deleteWeek: therapistProcedure

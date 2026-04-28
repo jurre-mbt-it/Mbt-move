@@ -38,6 +38,39 @@ type ProgramListItem = {
   _count?: { exercises: number }
   // Unieke `day`-waarden uit Program.exercises (1=Ma..7=Zo).
   daysScheduled?: number[]
+  // Dominante categorie afgeleid uit exercises (STRENGTH/CARDIO/...).
+  dominantCategory?: string | null
+}
+type ExtraSession = {
+  id: string
+  scheduledAt: string | Date
+  completedAt: string | Date | null
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED'
+  duration: number | null
+  weekdayIndex: number
+  hasExercises: boolean
+}
+
+// Per-categorie kleurset voor chips. Tint = transparante achtergrond,
+// border = volle kleur. Fallback op P.lime (Strength) als categorie onbekend.
+type ChipStyle = { bg: string; border: string; text: string }
+const CATEGORY_STYLES: Record<string, ChipStyle> = {
+  STRENGTH:    { bg: 'rgba(190,242,100,0.12)', border: P.lime,   text: P.lime   },
+  MOBILITY:    { bg: 'rgba(125,211,252,0.12)', border: P.ice,    text: P.ice    },
+  PLYOMETRICS: { bg: 'rgba(244,194,97,0.12)',  border: P.gold,   text: P.gold   },
+  PLYO:        { bg: 'rgba(244,194,97,0.12)',  border: P.gold,   text: P.gold   },
+  CARDIO:      { bg: 'rgba(248,113,113,0.12)', border: P.danger, text: P.danger },
+  STABILITY:   { bg: 'rgba(167,139,250,0.12)', border: P.purple, text: P.purple },
+  MIXED:       { bg: 'rgba(190,242,100,0.12)', border: P.lime,   text: P.lime   },
+}
+const EXTRA_SESSION_STYLE: ChipStyle = {
+  bg: 'rgba(244,194,97,0.10)',
+  border: P.gold,
+  text: P.gold,
+}
+function chipStyle(category?: string | null): ChipStyle {
+  if (!category) return CATEGORY_STYLES.STRENGTH
+  return CATEGORY_STYLES[category] ?? CATEGORY_STYLES.STRENGTH
 }
 
 export default function WeekPlannerPage() {
@@ -87,6 +120,21 @@ function WeekPlannerContent() {
     () => ((patientProgramsQuery.data as ProgramListItem[] | undefined) ?? []).filter(p => !p.isTemplate),
     [patientProgramsQuery.data],
   )
+
+  // Quick-workouts (SessionLog zonder programId) afgelopen 30 dagen
+  const extraSessionsQuery = trpc.weekSchedules.recentExtraSessions.useQuery(
+    { patientId: selectedPatientId, days: 30 },
+    { enabled: !!selectedPatientId, staleTime: 30_000 },
+  )
+  const extraSessions: ExtraSession[] = useMemo(
+    () => (extraSessionsQuery.data as ExtraSession[] | undefined) ?? [],
+    [extraSessionsQuery.data],
+  )
+  const extraByWeekday: Record<number, ExtraSession[]> = {}
+  for (const s of extraSessions) {
+    if (!extraByWeekday[s.weekdayIndex]) extraByWeekday[s.weekdayIndex] = []
+    extraByWeekday[s.weekdayIndex].push(s)
+  }
 
   const setDayProgramMutation = trpc.weekSchedules.setDayProgram.useMutation({
     onSuccess: async () => {
@@ -263,6 +311,7 @@ function WeekPlannerContent() {
                 dayOfWeek={i}
                 program={programByDay[i] ?? null}
                 programDayMatches={programsByWeekday[i] ?? []}
+                extraSessions={extraByWeekday[i] ?? []}
                 patientId={selectedPatientId}
                 onClear={() => clearDay(i)}
                 onAssign={programId => assignProgram(i, programId)}
@@ -551,6 +600,7 @@ function ActiveProgramRow({ program }: { program: ProgramListItem }) {
   const [moveFromDay, setMoveFromDay] = useState<number | null>(null)
   const days = program.daysScheduled ?? []
   const planned = days.length > 0
+  const style = chipStyle(program.dominantCategory)
 
   return (
     <div
@@ -558,11 +608,31 @@ function ActiveProgramRow({ program }: { program: ProgramListItem }) {
       style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}` }}
     >
       <div className="flex-1 min-w-0">
-        <div
-          className="truncate"
-          style={{ color: P.ink, fontSize: 13, fontWeight: 800, letterSpacing: '0.04em' }}
-        >
-          {program.name}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span
+            className="truncate"
+            style={{ color: P.ink, fontSize: 13, fontWeight: 800, letterSpacing: '0.04em' }}
+          >
+            {program.name}
+          </span>
+          {program.dominantCategory && (
+            <span
+              className="athletic-mono"
+              style={{
+                background: style.bg,
+                color: style.text,
+                border: `1px solid ${style.border}`,
+                fontSize: 9,
+                letterSpacing: '0.1em',
+                padding: '1px 6px',
+                borderRadius: 999,
+                fontWeight: 800,
+                textTransform: 'uppercase',
+              }}
+            >
+              {program.dominantCategory}
+            </span>
+          )}
         </div>
         <div
           className="athletic-mono flex items-center gap-2 flex-wrap"
@@ -581,9 +651,9 @@ function ActiveProgramRow({ program }: { program: ProgramListItem }) {
                 onClick={() => setMoveFromDay(d)}
                 className="athletic-tap athletic-mono px-2 py-1 rounded-md flex items-center gap-1"
                 style={{
-                  background: 'rgba(190,242,100,0.12)',
-                  color: P.lime,
-                  border: `1px solid ${P.lime}`,
+                  background: style.bg,
+                  color: style.text,
+                  border: `1px solid ${style.border}`,
                   fontSize: 10,
                   fontWeight: 800,
                   letterSpacing: '0.08em',
@@ -629,6 +699,7 @@ function DayCell({
   dayOfWeek,
   program,
   programDayMatches,
+  extraSessions,
   patientId,
   onClear,
   onAssign,
@@ -636,6 +707,7 @@ function DayCell({
   dayOfWeek: number
   program: DayProgram
   programDayMatches: ProgramListItem[]
+  extraSessions: ExtraSession[]
   patientId: string
   onClear: () => void
   onAssign: (programId: string) => void
@@ -648,7 +720,8 @@ function DayCell({
   const programDayIds = new Set(programDayMatches.map(p => p.id))
   const showWeekScheduleOverlay = program && !programDayIds.has(program.id)
 
-  const hasContent = programDayMatches.length > 0 || !!showWeekScheduleOverlay
+  const hasContent =
+    programDayMatches.length > 0 || !!showWeekScheduleOverlay || extraSessions.length > 0
 
   return (
     <Tile>
@@ -669,27 +742,30 @@ function DayCell({
         {hasContent ? (
           <div className="flex flex-col gap-1.5 flex-1">
             {/* Programma's afgeleid uit Program.day — klikbaar om te verplaatsen */}
-            {programDayMatches.map(p => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => setMoveTarget(p)}
-                className="athletic-tap rounded-md px-2 py-1.5 text-left"
-                style={{
-                  background: 'rgba(190,242,100,0.12)',
-                  border: `1px solid ${P.lime}`,
-                  color: P.lime,
-                }}
-                title="Klik om te verplaatsen"
-              >
-                <span
-                  className="athletic-mono"
-                  style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', lineHeight: 1.3 }}
+            {programDayMatches.map(p => {
+              const style = chipStyle(p.dominantCategory)
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setMoveTarget(p)}
+                  className="athletic-tap rounded-md px-2 py-1.5 text-left"
+                  style={{
+                    background: style.bg,
+                    border: `1px solid ${style.border}`,
+                    color: style.text,
+                  }}
+                  title={`${p.name}${p.dominantCategory ? ` · ${p.dominantCategory}` : ''} — klik om te verplaatsen`}
                 >
-                  {p.name}
-                </span>
-              </button>
-            ))}
+                  <span
+                    className="athletic-mono"
+                    style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', lineHeight: 1.3 }}
+                  >
+                    {p.name}
+                  </span>
+                </button>
+              )
+            })}
 
             {/* WeekSchedule overlay — een handmatig toegewezen programma (× om weg te halen) */}
             {showWeekScheduleOverlay && program && (
@@ -721,6 +797,38 @@ function DayCell({
                 </button>
               </div>
             )}
+
+            {/* Quick-workouts — door de atleet zelf gelogd, geen programma */}
+            {extraSessions.map(s => {
+              const date = new Date(s.scheduledAt)
+              const dateLabel = date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+              const isCompleted = s.status === 'COMPLETED' || !!s.completedAt
+              return (
+                <div
+                  key={s.id}
+                  className="rounded-md px-2 py-1.5"
+                  style={{
+                    background: EXTRA_SESSION_STYLE.bg,
+                    border: `1px solid ${EXTRA_SESSION_STYLE.border}`,
+                    color: EXTRA_SESSION_STYLE.text,
+                  }}
+                  title={`Eigen workout · ${dateLabel}${isCompleted ? ' (afgerond)' : ''}`}
+                >
+                  <span
+                    className="athletic-mono"
+                    style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.04em', lineHeight: 1.3, display: 'block' }}
+                  >
+                    Eigen workout
+                  </span>
+                  <span
+                    className="athletic-mono"
+                    style={{ fontSize: 9, opacity: 0.75, letterSpacing: '0.05em' }}
+                  >
+                    {dateLabel}{s.duration ? ` · ${Math.round(s.duration / 60)}m` : ''}
+                  </span>
+                </div>
+              )
+            })}
 
             <button
               type="button"
