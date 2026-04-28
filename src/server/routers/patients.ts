@@ -62,6 +62,14 @@ export const patientsRouter = createTRPCRouter({
       data: { notes: null },
     })
 
+    // Therapietrouw-window: laatste 14 dagen. Lage compliance = ≥ 3 geplande
+    // sessies en < 60% afgerond. Threshold is bewust conservatief zodat
+    // nieuwe patiënten met 1-2 sessies niet meteen 'low' zijn.
+    const COMPLIANCE_WINDOW_DAYS = 14
+    const COMPLIANCE_MIN_SCHEDULED = 3
+    const COMPLIANCE_THRESHOLD = 0.6
+    const since = new Date(Date.now() - COMPLIANCE_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+
     const patients = await ctx.prisma.user.findMany({
       where: {
         role: { in: ['PATIENT', 'ATHLETE'] },
@@ -107,6 +115,10 @@ export const patientsRouter = createTRPCRouter({
           take: 1,
           select: { status: true, notes: true },
         },
+        sessionLogs: {
+          where: { scheduledAt: { gte: since } },
+          select: { completedAt: true },
+        },
       },
       orderBy: { createdAt: 'desc' },
     })
@@ -120,6 +132,14 @@ export const patientsRouter = createTRPCRouter({
         .join('')
         .toUpperCase()
         .slice(0, 2)
+
+      const scheduled = p.sessionLogs.length
+      const completed = p.sessionLogs.filter(s => s.completedAt !== null).length
+      const compliancePercent = scheduled > 0 ? completed / scheduled : null
+      const complianceLow =
+        scheduled >= COMPLIANCE_MIN_SCHEDULED &&
+        compliancePercent !== null &&
+        compliancePercent < COMPLIANCE_THRESHOLD
 
       return {
         accessStatus: myRel?.status ?? 'APPROVED',
@@ -137,6 +157,11 @@ export const patientsRouter = createTRPCRouter({
         weeksTotal: program?.weeks ?? 0,
         startDate: program?.startDate,
         endDate: program?.endDate,
+        // Therapietrouw afgelopen 14 dagen
+        compliancePercent,
+        complianceLow,
+        complianceScheduled: scheduled,
+        complianceCompleted: completed,
       }
     })
   }),

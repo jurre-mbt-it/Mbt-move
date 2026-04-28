@@ -96,12 +96,12 @@ function PatientsPageInner() {
   }
 
   const activeCount = patients.filter(p => p.programStatus === 'ACTIVE').length
-  const lowComplianceCount = 0 // TODO: add compliance tracking
+  const lowComplianceCount = patients.filter(p => p.complianceLow).length
 
   const filtered = patients
     .filter(p => {
       if (quickFilter === 'active') return p.programStatus === 'ACTIVE'
-      if (quickFilter === 'low-compliance') return false // TODO
+      if (quickFilter === 'low-compliance') return p.complianceLow
       return true
     })
     .filter(p =>
@@ -237,6 +237,24 @@ function PatientsPageInner() {
                             }}
                           >
                             Uitnodiging open
+                          </span>
+                        )}
+                        {patient.complianceLow && (
+                          <span
+                            className="athletic-mono"
+                            title={`${patient.complianceCompleted} van ${patient.complianceScheduled} sessies afgerond afgelopen 14 dagen`}
+                            style={{
+                              background: 'rgba(248,113,113,0.14)',
+                              color: P.danger,
+                              fontSize: 10,
+                              letterSpacing: '0.1em',
+                              padding: '2px 8px',
+                              borderRadius: 999,
+                              fontWeight: 800,
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            Lage trouw {Math.round((patient.compliancePercent ?? 0) * 100)}%
                           </span>
                         )}
                       </div>
