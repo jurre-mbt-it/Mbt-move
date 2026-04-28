@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
 import { IconRunning, IconCardio } from '@/components/icons'
@@ -41,7 +42,10 @@ type Program = {
 export default function ProgramsPage() {
   const router = useRouter()
   const utils = trpc.useUtils()
-  const { data: rawData, isLoading } = trpc.programs.list.useQuery(undefined, { staleTime: 30_000 })
+  const { data: rawData, isLoading } = trpc.programs.list.useQuery(
+    { isTemplate: false },
+    { staleTime: 30_000 },
+  )
   const duplicateMutation = trpc.programs.duplicate.useMutation()
   const deleteMutation = trpc.programs.delete.useMutation()
 
@@ -51,9 +55,7 @@ export default function ProgramsPage() {
 
   // Cast tRPC-inferred list to local Program[] — the inferred type is too deep
   // (bevat Prisma-relations) en laat TS struikelen in de build.
-  const data: Program[] = (rawData ?? []) as Program[]
-  const templates = data.filter(p => p.isTemplate)
-  const programs  = data.filter(p => !p.isTemplate)
+  const programs: Program[] = (rawData ?? []) as Program[]
 
   const handleDuplicate = async () => {
     if (!duplicateTarget) return
@@ -133,24 +135,6 @@ export default function ProgramsPage() {
             </DarkButton>
           </div>
         </div>
-
-        {/* Templates */}
-        {templates.length > 0 && (
-          <section className="space-y-3">
-            <Kicker>Bibliotheek · Templates ({templates.length})</Kicker>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {templates.map(p => (
-                <ProgramCard
-                  key={p.id}
-                  program={p}
-                  isTemplate
-                  onDuplicate={() => { setDuplicateTarget(p); setDuplicateName(`${p.name} (kopie)`); setDuplicateAsTemplate(false) }}
-                  onDelete={() => handleDelete(p.id, p.name)}
-                />
-              ))}
-            </div>
-          </section>
-        )}
 
         {/* Programs */}
         <section className="space-y-3">
@@ -241,44 +225,36 @@ function ProgramCard({
   onDelete: () => void
 }) {
   const status = STATUS_COLORS[program.status] ?? STATUS_COLORS.DRAFT
+  const [expanded, setExpanded] = useState(false)
 
   return (
     <Tile accentBar={status.accent}>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3
-              style={{
-                color: P.ink,
-                fontSize: 14,
-                fontWeight: 800,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-              }}
-            >
-              {program.name}
-            </h3>
-            <span
-              className="athletic-mono"
-              style={{
-                background: status.bg,
-                color: status.text,
-                fontSize: 10,
-                letterSpacing: '0.1em',
-                padding: '2px 8px',
-                borderRadius: 999,
-                fontWeight: 800,
-                textTransform: 'uppercase',
-              }}
-            >
-              {status.label}
-            </span>
-            {isTemplate && (
+        <button
+          type="button"
+          onClick={() => setExpanded(v => !v)}
+          aria-expanded={expanded}
+          className="athletic-tap flex-1 min-w-0 text-left flex items-start gap-2"
+          style={{ background: 'transparent' }}
+        >
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3
+                style={{
+                  color: P.ink,
+                  fontSize: 14,
+                  fontWeight: 800,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {program.name}
+              </h3>
               <span
                 className="athletic-mono"
                 style={{
-                  background: P.surfaceHi,
-                  color: P.inkMuted,
+                  background: status.bg,
+                  color: status.text,
                   fontSize: 10,
                   letterSpacing: '0.1em',
                   padding: '2px 8px',
@@ -287,27 +263,47 @@ function ProgramCard({
                   textTransform: 'uppercase',
                 }}
               >
-                Template
+                {status.label}
               </span>
+              {isTemplate && (
+                <span
+                  className="athletic-mono"
+                  style={{
+                    background: P.surfaceHi,
+                    color: P.inkMuted,
+                    fontSize: 10,
+                    letterSpacing: '0.1em',
+                    padding: '2px 8px',
+                    borderRadius: 999,
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Template
+                </span>
+              )}
+            </div>
+            {program.description && (
+              <p
+                className="athletic-mono truncate"
+                style={{ color: P.inkMuted, fontSize: 11, marginTop: 3, letterSpacing: '0.03em' }}
+              >
+                {program.description}
+              </p>
             )}
-          </div>
-          {program.description && (
-            <p
-              className="athletic-mono truncate"
-              style={{ color: P.inkMuted, fontSize: 11, marginTop: 3, letterSpacing: '0.03em' }}
+            <div
+              className="athletic-mono flex items-center gap-3 mt-2 flex-wrap"
+              style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.05em' }}
             >
-              {program.description}
-            </p>
-          )}
-          <div
-            className="athletic-mono flex items-center gap-3 mt-2 flex-wrap"
-            style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.05em' }}
-          >
-            {program.patient?.name && <span>· {program.patient.name}</span>}
-            <span>{program.weeks} wk · {program.daysPerWeek}×/wk</span>
-            <span>{program._count?.exercises ?? 0} oefeningen</span>
+              {program.patient?.name && <span>· {program.patient.name}</span>}
+              <span>{program.weeks} wk · {program.daysPerWeek}×/wk</span>
+              <span>{program._count?.exercises ?? 0} oefeningen</span>
+            </div>
           </div>
-        </div>
+          <span className="shrink-0 mt-0.5" style={{ color: P.inkMuted }}>
+            {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </span>
+        </button>
         <div className="flex gap-1 shrink-0">
           <button
             type="button"
@@ -336,6 +332,98 @@ function ProgramCard({
           </button>
         </div>
       </div>
+      {expanded && (
+        <div
+          className="mt-3 pt-3 border-t"
+          style={{ borderColor: P.lineStrong }}
+        >
+          <ProgramExercisePreview programId={program.id} />
+        </div>
+      )}
     </Tile>
+  )
+}
+
+type PreviewExercise = {
+  id: string
+  week: number
+  day: number
+  sets: number
+  reps: number
+  repUnit: string | null
+  exercise: { name: string }
+}
+
+function ProgramExercisePreview({ programId }: { programId: string }) {
+  const { data: rawData, isLoading } = trpc.programs.get.useQuery(
+    { id: programId },
+    { staleTime: 60_000 },
+  )
+  // Cast naar lokaal shallow type; tRPC inference is te diep voor TS (TS2589).
+  const data = rawData as { exercises: PreviewExercise[] } | undefined
+
+  if (isLoading) {
+    return (
+      <p className="athletic-mono" style={{ color: P.inkDim, fontSize: 11, letterSpacing: '0.05em' }}>
+        Laden...
+      </p>
+    )
+  }
+  if (!data || data.exercises.length === 0) {
+    return (
+      <p className="athletic-mono" style={{ color: P.inkDim, fontSize: 11, letterSpacing: '0.05em' }}>
+        Geen oefeningen
+      </p>
+    )
+  }
+
+  const grouped = new Map<string, PreviewExercise[]>()
+  for (const ex of data.exercises) {
+    const key = `${ex.week}-${ex.day}`
+    const list = grouped.get(key) ?? []
+    list.push(ex)
+    grouped.set(key, list)
+  }
+
+  return (
+    <div className="space-y-2.5">
+      {[...grouped.entries()].map(([key, list]) => {
+        const [week, day] = key.split('-')
+        return (
+          <div key={key}>
+            <div
+              className="athletic-mono"
+              style={{
+                color: P.inkDim,
+                fontSize: 10,
+                letterSpacing: '0.1em',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                marginBottom: 4,
+              }}
+            >
+              Week {week} · Dag {day}
+            </div>
+            <ul className="space-y-1">
+              {list.map(ex => (
+                <li
+                  key={ex.id}
+                  className="flex items-center justify-between gap-3"
+                  style={{ color: P.ink, fontSize: 12 }}
+                >
+                  <span className="truncate">{ex.exercise.name}</span>
+                  <span
+                    className="athletic-mono shrink-0"
+                    style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.05em' }}
+                  >
+                    {ex.sets}×{ex.reps}{ex.repUnit && ex.repUnit !== 'reps' ? ` ${ex.repUnit}` : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      })}
+    </div>
   )
 }

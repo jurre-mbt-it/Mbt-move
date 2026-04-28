@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
 import {
@@ -98,9 +99,9 @@ export default function ProgramLibraryPage() {
       <div className="max-w-5xl mx-auto px-4 pt-10 pb-8 space-y-6">
         <div className="flex flex-col gap-1">
           <Kicker>Bibliotheek</Kicker>
-          <Display size="md">TEMPLATES</Display>
+          <Display size="md">SCHEMA&apos;S</Display>
           <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
-            {data.length} templates beschikbaar
+            {data.length} schema&apos;s beschikbaar
           </MetaLabel>
         </div>
 
@@ -134,11 +135,11 @@ export default function ProgramLibraryPage() {
           <Tile>
             <div className="py-12 flex flex-col items-center gap-2 text-center">
               <p style={{ color: P.inkMuted, fontSize: 13 }}>
-                {data.length === 0 ? 'Nog geen templates in de bibliotheek' : 'Geen resultaten voor deze zoekopdracht'}
+                {data.length === 0 ? "Nog geen schema's in de bibliotheek" : 'Geen resultaten voor deze zoekopdracht'}
               </p>
               {data.length === 0 && (
                 <p style={{ color: P.inkDim, fontSize: 11 }}>
-                  Sla een programma op als template via de builder
+                  Sla een programma op als schema via de builder
                 </p>
               )}
             </div>
@@ -218,56 +219,68 @@ function LibraryCard({ program, onCopy }: { program: Program; onCopy: () => void
   const categoryMatch = program.name.match(/^\[([^\]]+)\]/)
   const category = categoryMatch?.[1]
   const displayName = categoryMatch ? program.name.slice(categoryMatch[0].length).trim() : program.name
+  const [expanded, setExpanded] = useState(false)
 
   return (
     <Tile accentBar={P.lime}>
       <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          {category && (
-            <span
-              className="athletic-mono inline-block mb-2"
+        <button
+          type="button"
+          onClick={() => setExpanded(v => !v)}
+          aria-expanded={expanded}
+          className="athletic-tap flex-1 min-w-0 text-left flex items-start gap-2"
+          style={{ background: 'transparent' }}
+        >
+          <div className="flex-1 min-w-0">
+            {category && (
+              <span
+                className="athletic-mono inline-block mb-2"
+                style={{
+                  background: 'rgba(190,242,100,0.14)',
+                  color: P.lime,
+                  fontSize: 10,
+                  letterSpacing: '0.12em',
+                  padding: '2px 8px',
+                  borderRadius: 999,
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                }}
+              >
+                {category}
+              </span>
+            )}
+            <h3
               style={{
-                background: 'rgba(190,242,100,0.14)',
-                color: P.lime,
-                fontSize: 10,
-                letterSpacing: '0.12em',
-                padding: '2px 8px',
-                borderRadius: 999,
+                color: P.ink,
+                fontSize: 14,
                 fontWeight: 800,
+                letterSpacing: '0.06em',
                 textTransform: 'uppercase',
+                lineHeight: 1.3,
               }}
             >
-              {category}
-            </span>
-          )}
-          <h3
-            style={{
-              color: P.ink,
-              fontSize: 14,
-              fontWeight: 800,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              lineHeight: 1.3,
-            }}
-          >
-            {displayName}
-          </h3>
-          {program.description && (
-            <p
-              className="athletic-mono line-clamp-2"
-              style={{ color: P.inkMuted, fontSize: 11, marginTop: 4, letterSpacing: '0.03em' }}
+              {displayName}
+            </h3>
+            {program.description && (
+              <p
+                className="athletic-mono line-clamp-2"
+                style={{ color: P.inkMuted, fontSize: 11, marginTop: 4, letterSpacing: '0.03em' }}
+              >
+                {program.description}
+              </p>
+            )}
+            <div
+              className="athletic-mono flex items-center gap-3 mt-2 flex-wrap"
+              style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.05em' }}
             >
-              {program.description}
-            </p>
-          )}
-          <div
-            className="athletic-mono flex items-center gap-3 mt-2 flex-wrap"
-            style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.05em' }}
-          >
-            <span>{program.weeks} wk · {program.daysPerWeek}×/wk</span>
-            <span>{program._count?.exercises ?? 0} oefeningen</span>
+              <span>{program.weeks} wk · {program.daysPerWeek}×/wk</span>
+              <span>{program._count?.exercises ?? 0} oefeningen</span>
+            </div>
           </div>
-        </div>
+          <span className="shrink-0 mt-0.5" style={{ color: P.inkMuted }}>
+            {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </span>
+        </button>
         <div className="flex flex-col gap-1 shrink-0">
           <button
             type="button"
@@ -287,6 +300,98 @@ function LibraryCard({ program, onCopy }: { program: Program; onCopy: () => void
           </DarkButton>
         </div>
       </div>
+      {expanded && (
+        <div
+          className="mt-3 pt-3 border-t"
+          style={{ borderColor: P.lineStrong }}
+        >
+          <SchemaExercisePreview programId={program.id} />
+        </div>
+      )}
     </Tile>
+  )
+}
+
+type PreviewExercise = {
+  id: string
+  week: number
+  day: number
+  sets: number
+  reps: number
+  repUnit: string | null
+  exercise: { name: string }
+}
+
+function SchemaExercisePreview({ programId }: { programId: string }) {
+  const { data: rawData, isLoading } = trpc.programs.get.useQuery(
+    { id: programId },
+    { staleTime: 60_000 },
+  )
+  // Cast naar lokaal shallow type; tRPC inference is te diep voor TS (TS2589).
+  const data = rawData as { exercises: PreviewExercise[] } | undefined
+
+  if (isLoading) {
+    return (
+      <p className="athletic-mono" style={{ color: P.inkDim, fontSize: 11, letterSpacing: '0.05em' }}>
+        Laden...
+      </p>
+    )
+  }
+  if (!data || data.exercises.length === 0) {
+    return (
+      <p className="athletic-mono" style={{ color: P.inkDim, fontSize: 11, letterSpacing: '0.05em' }}>
+        Geen oefeningen
+      </p>
+    )
+  }
+
+  const grouped = new Map<string, PreviewExercise[]>()
+  for (const ex of data.exercises) {
+    const key = `${ex.week}-${ex.day}`
+    const list = grouped.get(key) ?? []
+    list.push(ex)
+    grouped.set(key, list)
+  }
+
+  return (
+    <div className="space-y-2.5">
+      {[...grouped.entries()].map(([key, list]) => {
+        const [week, day] = key.split('-')
+        return (
+          <div key={key}>
+            <div
+              className="athletic-mono"
+              style={{
+                color: P.inkDim,
+                fontSize: 10,
+                letterSpacing: '0.1em',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                marginBottom: 4,
+              }}
+            >
+              Week {week} · Dag {day}
+            </div>
+            <ul className="space-y-1">
+              {list.map(ex => (
+                <li
+                  key={ex.id}
+                  className="flex items-center justify-between gap-3"
+                  style={{ color: P.ink, fontSize: 12 }}
+                >
+                  <span className="truncate">{ex.exercise.name}</span>
+                  <span
+                    className="athletic-mono shrink-0"
+                    style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.05em' }}
+                  >
+                    {ex.sets}×{ex.reps}{ex.repUnit && ex.repUnit !== 'reps' ? ` ${ex.repUnit}` : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      })}
+    </div>
   )
 }

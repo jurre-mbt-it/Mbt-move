@@ -28,7 +28,7 @@ const navItems = [
   { href: '/therapist/programs', label: "Programma's", icon: ClipboardList },
   { href: '/therapist/week-planner', label: 'Weekschema', icon: CalendarDays },
   { href: '/therapist/exercises', label: 'Oefeningen', icon: Dumbbell },
-  { href: '/therapist/programs/library', label: 'Bibliotheek', icon: Library },
+  { href: '/therapist/programs/library', label: "Schema's", icon: Library },
   { href: '/therapist/messages', label: 'Berichten', icon: MessageSquare },
 ]
 
