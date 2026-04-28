@@ -26,7 +26,7 @@ const DAY_LABELS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 type Patient = { id: string; name: string }
 type DayProgram = { id: string; name: string } | null
 type ScheduleDay = { id: string; dayOfWeek: number; program?: DayProgram }
-type Schedule = { id: string; days: ScheduleDay[] }
+type Schedule = { id: string; weekNumber: number; days: ScheduleDay[] }
 type ProgramListItem = {
   id: string
   name: string
@@ -53,6 +53,7 @@ function WeekPlannerContent() {
   const searchParams = useSearchParams()
   const utils = trpc.useUtils()
   const selectedPatientId = searchParams.get('patientId') ?? ''
+  const selectedWeek = Math.max(1, Number(searchParams.get('week') ?? '1') || 1)
 
   // Cast naar shallow types; tRPC inference is te diep voor TS (TS2589).
   const patientsQuery = trpc.patients.list.useQuery()
@@ -65,7 +66,16 @@ function WeekPlannerContent() {
     { patientId: selectedPatientId, isTemplate: false },
     { enabled: !!selectedPatientId, staleTime: 30_000 },
   )
-  const schedule: Schedule | null = ((schedulesQuery.data as Schedule[] | undefined) ?? [])[0] ?? null
+  const allSchedules: Schedule[] = useMemo(
+    () => ((schedulesQuery.data as Schedule[] | undefined) ?? []),
+    [schedulesQuery.data],
+  )
+  const availableWeeks: number[] = useMemo(
+    () => [...new Set(allSchedules.map(s => s.weekNumber ?? 1))].sort((a, b) => a - b),
+    [allSchedules],
+  )
+  const schedule: Schedule | null =
+    allSchedules.find(s => (s.weekNumber ?? 1) === selectedWeek) ?? null
 
   // Programma's van deze patient — onafhankelijk van of ze al in een
   // WeekSchedule zijn ingepland. Zo ziet de therapeut meteen of er iets is.
@@ -85,21 +95,63 @@ function WeekPlannerContent() {
     onError: () => toast.error('Bijwerken mislukt'),
   })
 
-  const setSelectedPatient = (patientId: string) => {
-    const params = new URLSearchParams(searchParams.toString())
+  const copyWeekMutation = trpc.weekSchedules.copyWeek.useMutation({
+    onSuccess: async ({ copied }) => {
+      await utils.weekSchedules.list.invalidate()
+      toast.success(`Week gekopieerd naar ${copied} ${copied === 1 ? 'week' : 'weken'}`)
+    },
+    onError: () => toast.error('Kopiëren mislukt'),
+  })
+
+  const deleteWeekMutation = trpc.weekSchedules.deleteWeek.useMutation({
+    onSuccess: async () => {
+      await utils.weekSchedules.list.invalidate()
+      toast.success('Week verwijderd')
+    },
+    onError: () => toast.error('Verwijderen mislukt'),
+  })
+
+  const updateUrl = (patientId: string, week: number) => {
+    const params = new URLSearchParams()
     if (patientId) params.set('patientId', patientId)
-    else params.delete('patientId')
+    if (week > 1) params.set('week', String(week))
     router.replace(`/therapist/week-planner${params.toString() ? `?${params.toString()}` : ''}`)
   }
 
+  const setSelectedPatient = (patientId: string) => updateUrl(patientId, 1)
+  const setSelectedWeek = (week: number) => updateUrl(selectedPatientId, Math.max(1, week))
+
   const clearDay = (dayOfWeek: number) => {
     if (!selectedPatientId) return
-    setDayProgramMutation.mutate({ patientId: selectedPatientId, dayOfWeek, programId: null })
+    setDayProgramMutation.mutate({
+      patientId: selectedPatientId,
+      dayOfWeek,
+      programId: null,
+      weekNumber: selectedWeek,
+    })
   }
 
   const assignProgram = (dayOfWeek: number, programId: string) => {
     if (!selectedPatientId) return
-    setDayProgramMutation.mutate({ patientId: selectedPatientId, dayOfWeek, programId })
+    setDayProgramMutation.mutate({
+      patientId: selectedPatientId,
+      dayOfWeek,
+      programId,
+      weekNumber: selectedWeek,
+    })
+  }
+
+  const handleAddWeek = () => {
+    const next = (availableWeeks[availableWeeks.length - 1] ?? 0) + 1
+    setSelectedWeek(next || 1)
+  }
+
+  const handleDeleteWeek = () => {
+    if (!selectedPatientId || !schedule) return
+    if (!confirm(`Week ${selectedWeek} verwijderen?`)) return
+    deleteWeekMutation.mutate({ patientId: selectedPatientId, weekNumber: selectedWeek })
+    // Na verwijderen terug naar week 1
+    setSelectedWeek(1)
   }
 
   const programByDay: Record<number, DayProgram> = {}
@@ -171,6 +223,23 @@ function WeekPlannerContent() {
           </Tile>
         )}
 
+        {/* Week navigator */}
+        {selectedPatientId && (
+          <WeekNavigator
+            availableWeeks={availableWeeks}
+            selectedWeek={selectedWeek}
+            onSelect={setSelectedWeek}
+            onAddWeek={handleAddWeek}
+            onCopyWeek={(targets) => copyWeekMutation.mutate({
+              patientId: selectedPatientId,
+              fromWeekNumber: selectedWeek,
+              toWeekNumbers: targets,
+            })}
+            onDeleteWeek={schedule ? handleDeleteWeek : undefined}
+            isCopying={copyWeekMutation.isPending}
+          />
+        )}
+
         {/* Week grid */}
         {!selectedPatientId ? (
           <Tile>
@@ -203,6 +272,193 @@ function WeekPlannerContent() {
         )}
       </div>
     </div>
+  )
+}
+
+function WeekNavigator({
+  availableWeeks,
+  selectedWeek,
+  onSelect,
+  onAddWeek,
+  onCopyWeek,
+  onDeleteWeek,
+  isCopying,
+}: {
+  availableWeeks: number[]
+  selectedWeek: number
+  onSelect: (week: number) => void
+  onAddWeek: () => void
+  onCopyWeek: (targets: number[]) => void
+  onDeleteWeek?: () => void
+  isCopying: boolean
+}) {
+  const [copyOpen, setCopyOpen] = useState(false)
+  const [copyTargets, setCopyTargets] = useState<Set<number>>(new Set())
+
+  // Tabs: alle bestaande weken + huidige als 'ie nog niet bestaat
+  const visibleWeeks = useMemo(() => {
+    const set = new Set(availableWeeks)
+    set.add(selectedWeek)
+    return [...set].sort((a, b) => a - b)
+  }, [availableWeeks, selectedWeek])
+
+  const openCopy = () => {
+    // Default: stel volgende week voor als target
+    const nextWeek = (Math.max(0, ...availableWeeks)) + 1
+    setCopyTargets(new Set([nextWeek]))
+    setCopyOpen(true)
+  }
+
+  const toggleTarget = (n: number) => {
+    setCopyTargets(prev => {
+      const next = new Set(prev)
+      if (next.has(n)) next.delete(n)
+      else next.add(n)
+      return next
+    })
+  }
+
+  const submitCopy = () => {
+    const targets = [...copyTargets].filter(n => n !== selectedWeek)
+    if (targets.length === 0) return
+    onCopyWeek(targets)
+    setCopyOpen(false)
+  }
+
+  // Voor copy-dialog: aanbiedbare doel-weken (niet de bron-week)
+  const candidateTargets = useMemo(() => {
+    const max = Math.max(0, ...availableWeeks, selectedWeek)
+    const list: number[] = []
+    for (let i = 1; i <= max + 4; i++) if (i !== selectedWeek) list.push(i)
+    return list
+  }, [availableWeeks, selectedWeek])
+
+  return (
+    <Tile>
+      <div className="flex items-center gap-2 flex-wrap">
+        <MetaLabel>Week</MetaLabel>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {visibleWeeks.map(n => {
+            const isActive = n === selectedWeek
+            return (
+              <button
+                key={n}
+                type="button"
+                onClick={() => onSelect(n)}
+                className="athletic-tap athletic-mono px-3 py-1.5 rounded-md"
+                style={{
+                  background: isActive ? P.lime : P.surfaceHi,
+                  color: isActive ? P.bg : P.ink,
+                  border: `1px solid ${isActive ? P.lime : P.lineStrong}`,
+                  fontSize: 11,
+                  fontWeight: 800,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                Week {n}
+              </button>
+            )
+          })}
+          <button
+            type="button"
+            onClick={onAddWeek}
+            className="athletic-tap athletic-mono px-3 py-1.5 rounded-md flex items-center gap-1"
+            style={{
+              background: P.surfaceLow,
+              color: P.inkMuted,
+              border: `1px dashed ${P.line}`,
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+            }}
+            title="Volgende week toevoegen"
+          >
+            <Plus className="w-3 h-3" />
+            Week
+          </button>
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <DarkButton
+            variant="secondary"
+            size="sm"
+            onClick={openCopy}
+            disabled={!availableWeeks.includes(selectedWeek) || isCopying}
+          >
+            Kopieer week
+          </DarkButton>
+          {onDeleteWeek && (
+            <button
+              type="button"
+              onClick={onDeleteWeek}
+              className="athletic-tap w-8 h-8 rounded-md flex items-center justify-center"
+              style={{ background: P.surfaceHi, color: P.danger }}
+              title={`Week ${selectedWeek} verwijderen`}
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Copy week dialog */}
+      <Dialog open={copyOpen} onOpenChange={setCopyOpen}>
+        <DialogContent
+          className="max-w-sm"
+          style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
+        >
+          <DialogHeader>
+            <DialogTitle style={{ color: P.ink }}>
+              Kopieer week {selectedWeek} naar…
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.04em' }}>
+              Bestaande weken worden overschreven.
+            </p>
+            <div className="grid grid-cols-4 gap-1.5">
+              {candidateTargets.map(n => {
+                const checked = copyTargets.has(n)
+                const exists = availableWeeks.includes(n)
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => toggleTarget(n)}
+                    className="athletic-tap athletic-mono py-2 rounded-md"
+                    style={{
+                      background: checked ? P.lime : P.surfaceHi,
+                      color: checked ? P.bg : P.ink,
+                      border: `1px solid ${checked ? P.lime : P.lineStrong}`,
+                      fontSize: 11,
+                      fontWeight: 800,
+                      letterSpacing: '0.05em',
+                    }}
+                    title={exists ? 'Bestaat al — wordt overschreven' : 'Nieuw'}
+                  >
+                    Week {n}{exists ? ' ⚠' : ''}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <DarkButton variant="secondary" size="sm" onClick={() => setCopyOpen(false)}>
+                Annuleren
+              </DarkButton>
+              <DarkButton
+                variant="primary"
+                size="sm"
+                onClick={submitCopy}
+                disabled={isCopying || copyTargets.size === 0}
+              >
+                Kopieer{copyTargets.size > 0 ? ` (${copyTargets.size})` : ''}
+              </DarkButton>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Tile>
   )
 }
 

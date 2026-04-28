@@ -296,3 +296,10 @@ SET "supabaseUserId" = au.id::text
 FROM auth.users au
 WHERE u.email = au.email
   AND u."supabaseUserId" IS NULL;
+
+-- ── Multi-week behandelplannen (milestone 2 week-planner) ───────────────────
+-- Een patient kan nu meerdere WeekSchedule-records hebben, één per
+-- weekNumber (1, 2, 3, …). Bestaande records houden hun default 1.
+ALTER TABLE "week_schedules" ADD COLUMN IF NOT EXISTS "weekNumber" INTEGER NOT NULL DEFAULT 1;
+CREATE INDEX IF NOT EXISTS "week_schedules_patientId_weekNumber_idx"
+  ON "week_schedules"("patientId", "weekNumber");

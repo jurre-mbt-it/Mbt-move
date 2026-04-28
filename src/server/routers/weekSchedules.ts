@@ -176,6 +176,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       patientId: z.string(),
       dayOfWeek: z.number().int().min(0).max(6),
       programId: z.string().nullable(),
+      weekNumber: z.number().int().min(1).default(1),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
@@ -193,7 +194,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       }
 
       const existing = await ctx.prisma.weekSchedule.findFirst({
-        where: { creatorId: ctx.user.id, patientId: input.patientId },
+        where: { creatorId: ctx.user.id, patientId: input.patientId, weekNumber: input.weekNumber },
         include: { days: true },
       })
 
@@ -206,12 +207,13 @@ export const weekSchedulesRouter = createTRPCRouter({
         return ctx.prisma.weekSchedule.create({
           data: {
             id: createId(),
-            name: `Weekplan · ${label}`,
+            name: `Weekplan · ${label} · week ${input.weekNumber}`,
             creatorId: ctx.user.id,
             practiceId: ctx.user.practiceId ?? null,
             patientId: input.patientId,
             startDate: new Date(),
             isTemplate: false,
+            weekNumber: input.weekNumber,
             days: {
               create: Array.from({ length: 7 }, (_, dow) => ({
                 id: createId(),
@@ -245,6 +247,112 @@ export const weekSchedulesRouter = createTRPCRouter({
         where: { id: existing.id },
         include: { days: { include: { program: { select: { id: true, name: true } } }, orderBy: { dayOfWeek: 'asc' } } },
       })
+    }),
+
+  /**
+   * Kopieer alle days van bron-week naar één of meerdere doel-weken voor
+   * dezelfde patient. Maakt nieuwe WeekSchedule-records aan, of overschrijft
+   * bestaande ones met dezelfde weekNumber.
+   */
+  copyWeek: therapistProcedure
+    .input(z.object({
+      patientId: z.string(),
+      fromWeekNumber: z.number().int().min(1),
+      toWeekNumbers: z.array(z.number().int().min(1)).min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
+
+      const source = await ctx.prisma.weekSchedule.findFirst({
+        where: {
+          creatorId: ctx.user.id,
+          patientId: input.patientId,
+          weekNumber: input.fromWeekNumber,
+        },
+        include: { days: true },
+      })
+      if (!source) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: `Week ${input.fromWeekNumber} bestaat niet voor deze patient`,
+        })
+      }
+
+      const patient = await ctx.prisma.user.findUnique({
+        where: { id: input.patientId },
+        select: { name: true, email: true },
+      })
+      const label = patient?.name ?? patient?.email ?? 'Patient'
+
+      const targets = input.toWeekNumbers.filter(n => n !== input.fromWeekNumber)
+      let created = 0
+
+      for (const wn of targets) {
+        const existing = await ctx.prisma.weekSchedule.findFirst({
+          where: { creatorId: ctx.user.id, patientId: input.patientId, weekNumber: wn },
+        })
+        if (existing) {
+          // Overschrijf: clear days, herinsert
+          await ctx.prisma.weekScheduleDay.deleteMany({ where: { weekScheduleId: existing.id } })
+          await ctx.prisma.weekSchedule.update({
+            where: { id: existing.id },
+            data: {
+              days: {
+                create: source.days.map(d => ({
+                  id: createId(),
+                  dayOfWeek: d.dayOfWeek,
+                  programId: d.programId,
+                })),
+              },
+            },
+          })
+        } else {
+          await ctx.prisma.weekSchedule.create({
+            data: {
+              id: createId(),
+              name: `Weekplan · ${label} · week ${wn}`,
+              creatorId: ctx.user.id,
+              practiceId: ctx.user.practiceId ?? null,
+              patientId: input.patientId,
+              startDate: source.startDate ?? new Date(),
+              isTemplate: false,
+              weekNumber: wn,
+              days: {
+                create: source.days.map(d => ({
+                  id: createId(),
+                  dayOfWeek: d.dayOfWeek,
+                  programId: d.programId,
+                })),
+              },
+            },
+          })
+        }
+        created++
+      }
+
+      return { copied: created }
+    }),
+
+  /**
+   * Verwijder één weekNumber voor een patient.
+   */
+  deleteWeek: therapistProcedure
+    .input(z.object({
+      patientId: z.string(),
+      weekNumber: z.number().int().min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
+      const existing = await ctx.prisma.weekSchedule.findFirst({
+        where: {
+          creatorId: ctx.user.id,
+          patientId: input.patientId,
+          weekNumber: input.weekNumber,
+        },
+      })
+      if (!existing) return { deleted: false }
+      await ctx.prisma.weekSchedule.delete({ where: { id: existing.id } })
+      return { deleted: true }
     }),
 
   // Patient: get their assigned week schedule

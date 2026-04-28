@@ -592,6 +592,9 @@ model WeekSchedule {
   startDate   DateTime?
   endDate     DateTime?
   isTemplate  Boolean           @default(false)
+  // weekNumber = 1, 2, 3, ... voor multi-week behandelplannen per patient.
+  // Bestaande records behouden 1 (default). Templates negeren dit veld.
+  weekNumber  Int               @default(1)
   days        WeekScheduleDay[]
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
