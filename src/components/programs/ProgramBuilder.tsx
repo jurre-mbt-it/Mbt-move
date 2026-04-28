@@ -670,7 +670,15 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
   }
 
   // ── Week/day navigation ───────────────────────────────────────────────────────
-  const days = Array.from({ length: program.daysPerWeek }, (_, i) => i + 1)
+  // Toon zowel de "default" days (1..daysPerWeek) als de days die feitelijk
+  // bezet zijn door exercises. Dat is nodig omdat ProgramExercise.day nu via
+  // changeDay vanuit de week-planner naar elk weekday (1=Ma..7=Zo) verplaatst
+  // kan worden — anders rendert de builder alleen 1..daysPerWeek en zie je
+  // verplaatste exercises niet.
+  const dayUnion = new Set<number>()
+  for (let i = 1; i <= program.daysPerWeek; i++) dayUnion.add(i)
+  for (const ex of exercises) if (ex.day >= 1 && ex.day <= 7) dayUnion.add(ex.day)
+  const days = [...dayUnion].sort((a, b) => a - b)
   const weeks = Array.from({ length: program.weeks }, (_, i) => i + 1)
 
   const exerciseCountForDay = (day: number, week: number) =>
