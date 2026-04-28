@@ -31,6 +31,7 @@ type ProgramListItem = {
   id: string
   name: string
   isTemplate: boolean
+  status: 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED'
   weeks: number
   daysPerWeek: number
   patient?: { id: string; name: string | null } | null
@@ -64,6 +65,17 @@ function WeekPlannerContent() {
   )
   const schedule: Schedule | null = ((schedulesQuery.data as Schedule[] | undefined) ?? [])[0] ?? null
 
+  // Programma's van deze patient — onafhankelijk van of ze al in een
+  // WeekSchedule zijn ingepland. Zo ziet de therapeut meteen of er iets is.
+  const patientProgramsQuery = trpc.programs.list.useQuery(
+    { patientId: selectedPatientId },
+    { enabled: !!selectedPatientId, staleTime: 30_000 },
+  )
+  const patientPrograms: ProgramListItem[] = useMemo(
+    () => ((patientProgramsQuery.data as ProgramListItem[] | undefined) ?? []).filter(p => !p.isTemplate),
+    [patientProgramsQuery.data],
+  )
+
   const setDayProgramMutation = trpc.weekSchedules.setDayProgram.useMutation({
     onSuccess: async () => {
       await utils.weekSchedules.list.invalidate()
@@ -89,7 +101,19 @@ function WeekPlannerContent() {
   }
 
   const programByDay: Record<number, DayProgram> = {}
-  if (schedule) for (const d of schedule.days) programByDay[d.dayOfWeek] = d.program ?? null
+  const daysByProgramId = new Map<string, number[]>()
+  if (schedule) {
+    for (const d of schedule.days) {
+      programByDay[d.dayOfWeek] = d.program ?? null
+      if (d.program) {
+        const list = daysByProgramId.get(d.program.id) ?? []
+        list.push(d.dayOfWeek)
+        daysByProgramId.set(d.program.id, list)
+      }
+    }
+  }
+
+  const activePrograms = patientPrograms.filter(p => p.status === 'ACTIVE' || p.status === 'DRAFT')
 
   const selectedPatient = patients.find(p => p.id === selectedPatientId) ?? null
 
@@ -129,6 +153,59 @@ function WeekPlannerContent() {
             )}
           </div>
         </Tile>
+
+        {/* Lopende programma's voor deze patient — los van WeekSchedule */}
+        {selectedPatientId && activePrograms.length > 0 && (
+          <Tile>
+            <div className="flex flex-col gap-2">
+              <Kicker>Lopende programma&apos;s ({activePrograms.length})</Kicker>
+              <div className="flex flex-col gap-2">
+                {activePrograms.map(p => {
+                  const days = daysByProgramId.get(p.id) ?? []
+                  const planned = days.length > 0
+                  return (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg flex-wrap"
+                      style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}` }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div
+                          className="truncate"
+                          style={{ color: P.ink, fontSize: 13, fontWeight: 800, letterSpacing: '0.04em' }}
+                        >
+                          {p.name}
+                        </div>
+                        <div
+                          className="athletic-mono flex items-center gap-2 flex-wrap"
+                          style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.05em', marginTop: 2 }}
+                        >
+                          <span>
+                            {p.weeks} wk · {p.daysPerWeek}×/wk · {p._count?.exercises ?? 0} oef.
+                          </span>
+                          {planned ? (
+                            <span style={{ color: P.lime }}>
+                              · ingepland op {days.sort().map(d => DAY_LABELS[d]).join(', ')}
+                            </span>
+                          ) : (
+                            <span style={{ color: P.gold }}>· nog niet ingepland</span>
+                          )}
+                        </div>
+                      </div>
+                      <DarkButton
+                        variant="secondary"
+                        size="sm"
+                        href={`/therapist/programs/${p.id}/edit`}
+                      >
+                        Open
+                      </DarkButton>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </Tile>
+        )}
 
         {/* Week grid */}
         {!selectedPatientId ? (
