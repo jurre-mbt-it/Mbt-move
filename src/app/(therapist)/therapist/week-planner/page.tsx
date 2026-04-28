@@ -226,24 +226,33 @@ function WeekPlannerContent() {
 
   const activePrograms = patientPrograms.filter(p => p.status === 'ACTIVE' || p.status === 'DRAFT')
 
-  // Anchor-datum voor week 1 = maandag van de week waarin de patiënt z'n
-  // behandeling startte. Volgorde van fallbacks:
-  // 1. Vroegste WeekSchedule.startDate van deze patient
-  // 2. Vroegste actieve program.startDate
-  // 3. Vandaag (laatste redmiddel — week 1 = deze week)
+  // Vroegste gelogde sessie — als anchor-fallback wanneer er geen Program
+  // of WeekSchedule met startDate is. Zorgt dat patienten die alleen
+  // eigen workouts loggen ook 'verleden' weken in de tabs zien.
+  const firstActivityQuery = trpc.weekSchedules.firstActivityDate.useQuery(
+    { patientId: selectedPatientId },
+    { enabled: !!selectedPatientId, staleTime: 60_000 },
+  )
+  const firstActivityDate = (firstActivityQuery.data as { date: string | Date | null } | undefined)?.date ?? null
+
+  // Anchor-datum voor week 1 = maandag van de week waarin de patiënt
+  // z'n eerste activiteit had. Volgorde van fallbacks:
+  // 1. Vroegste van: WeekSchedule.startDate / activeProgram.startDate /
+  //    eerste SessionLog scheduledAt
+  // 2. Vandaag (laatste redmiddel — week 1 = deze week)
   const anchorDate: Date = useMemo(() => {
     const dates: Date[] = []
     for (const s of allSchedules) {
-      // Schedule kan startDate hebben (Prisma-veld); we casten als string|Date
       const sd = (s as Schedule & { startDate?: string | Date | null }).startDate
       if (sd) dates.push(new Date(sd))
     }
     for (const p of activePrograms) {
       if (p.startDate) dates.push(new Date(p.startDate))
     }
+    if (firstActivityDate) dates.push(new Date(firstActivityDate))
     if (dates.length === 0) return new Date()
     return new Date(Math.min(...dates.map(d => d.getTime())))
-  }, [allSchedules, activePrograms])
+  }, [allSchedules, activePrograms, firstActivityDate])
 
   const week1Monday = mondayOf(anchorDate)
   const todayMonday = mondayOf(new Date())

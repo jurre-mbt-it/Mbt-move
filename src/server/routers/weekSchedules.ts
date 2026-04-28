@@ -334,6 +334,24 @@ export const weekSchedulesRouter = createTRPCRouter({
     }),
 
   /**
+   * Geeft de vroegste activiteit (SessionLog) van een patient terug.
+   * Gebruikt om de anchor-datum voor week 1 te kiezen — zonder dit zou
+   * de week-planner alleen 'deze week' tonen voor patienten zonder
+   * Program of WeekSchedule.
+   */
+  firstActivityDate: therapistProcedure
+    .input(z.object({ patientId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
+      const session = await ctx.prisma.sessionLog.findFirst({
+        where: { patientId: input.patientId },
+        orderBy: { scheduledAt: 'asc' },
+        select: { scheduledAt: true },
+      })
+      return { date: session?.scheduledAt ?? null }
+    }),
+
+  /**
    * Alle SessionLogs binnen een datum-range (Ma..Zo van een specifieke
    * behandel-week). Voor de week-planner zodat we per dag kunnen tonen
    * wat gepland was, wat afgerond is, en welke eigen workouts erbij
