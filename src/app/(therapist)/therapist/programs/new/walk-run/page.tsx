@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { WALK_RUN_TEMPLATES, WalkRunTemplate, WalkRunWeek } from '@/lib/cardio-constants'
@@ -190,9 +190,11 @@ function PainCheckCard() {
 
 export default function WalkRunWizardPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const prePatientId = searchParams.get('patientId') ?? ''
   const { data: patientsData = [] } = trpc.patients.list.useQuery()
   const [step, setStep] = useState<WizardStep>(1)
-  const [state, setState] = useState<WizardState>(DEFAULT)
+  const [state, setState] = useState<WizardState>({ ...DEFAULT, patientId: prePatientId })
   const [saving, setSaving] = useState(false)
 
   const set = <K extends keyof WizardState>(key: K, val: WizardState[K]) =>

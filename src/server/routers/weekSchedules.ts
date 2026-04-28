@@ -166,6 +166,87 @@ export const weekSchedulesRouter = createTRPCRouter({
       return ctx.prisma.weekSchedule.delete({ where: { id: input.id } })
     }),
 
+  /**
+   * Granulaire set/unset van een programma op één weekdag voor een patient.
+   * Maakt het week-schedule automatisch aan als 't nog niet bestaat.
+   * Geeft `programId: null` mee om de dag leeg te maken.
+   */
+  setDayProgram: therapistProcedure
+    .input(z.object({
+      patientId: z.string(),
+      dayOfWeek: z.number().int().min(0).max(6),
+      programId: z.string().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
+
+      if (input.programId) {
+        const program = await ctx.prisma.program.findUnique({ where: { id: input.programId } })
+        if (!program) throw new TRPCError({ code: 'NOT_FOUND', message: 'Programma niet gevonden' })
+        const isAdmin = ctx.user.role === 'ADMIN'
+        const isOwner = program.creatorId === ctx.user.id
+        const samePractice =
+          !!ctx.user.practiceId && !!program.practiceId && program.practiceId === ctx.user.practiceId
+        if (!isAdmin && !isOwner && !samePractice) {
+          throw new TRPCError({ code: 'FORBIDDEN' })
+        }
+      }
+
+      const existing = await ctx.prisma.weekSchedule.findFirst({
+        where: { creatorId: ctx.user.id, patientId: input.patientId },
+        include: { days: true },
+      })
+
+      if (!existing) {
+        const patient = await ctx.prisma.user.findUnique({
+          where: { id: input.patientId },
+          select: { name: true, email: true },
+        })
+        const label = patient?.name ?? patient?.email ?? 'Patient'
+        return ctx.prisma.weekSchedule.create({
+          data: {
+            id: createId(),
+            name: `Weekplan · ${label}`,
+            creatorId: ctx.user.id,
+            practiceId: ctx.user.practiceId ?? null,
+            patientId: input.patientId,
+            startDate: new Date(),
+            isTemplate: false,
+            days: {
+              create: Array.from({ length: 7 }, (_, dow) => ({
+                id: createId(),
+                dayOfWeek: dow,
+                ...(dow === input.dayOfWeek && input.programId ? { programId: input.programId } : {}),
+              })),
+            },
+          },
+          include: { days: { include: { program: { select: { id: true, name: true } } }, orderBy: { dayOfWeek: 'asc' } } },
+        })
+      }
+
+      const day = existing.days.find(d => d.dayOfWeek === input.dayOfWeek)
+      if (day) {
+        await ctx.prisma.weekScheduleDay.update({
+          where: { id: day.id },
+          data: { programId: input.programId },
+        })
+      } else {
+        await ctx.prisma.weekScheduleDay.create({
+          data: {
+            id: createId(),
+            weekScheduleId: existing.id,
+            dayOfWeek: input.dayOfWeek,
+            programId: input.programId,
+          },
+        })
+      }
+
+      return ctx.prisma.weekSchedule.findUnique({
+        where: { id: existing.id },
+        include: { days: { include: { program: { select: { id: true, name: true } } }, orderBy: { dayOfWeek: 'asc' } } },
+      })
+    }),
+
   // Patient: get their assigned week schedule
   mySchedule: protectedProcedure
     .query(async ({ ctx }) => {
