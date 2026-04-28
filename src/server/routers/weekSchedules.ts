@@ -334,6 +334,60 @@ export const weekSchedulesRouter = createTRPCRouter({
     }),
 
   /**
+   * Alle SessionLogs binnen een datum-range (Ma..Zo van een specifieke
+   * behandel-week). Voor de week-planner zodat we per dag kunnen tonen
+   * wat gepland was, wat afgerond is, en welke eigen workouts erbij
+   * gedaan zijn.
+   */
+  sessionsInRange: therapistProcedure
+    .input(z.object({
+      patientId: z.string(),
+      from: z.string(), // ISO date
+      to: z.string(),   // ISO date (inclusief — sessies tot einde van die dag tellen mee)
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
+      const fromDate = new Date(input.from)
+      const toDate = new Date(input.to)
+      // Eind-van-dag voor `to` zodat een sessie op de laatste dag (zo) ook
+      // valt binnen de range, ongeacht het tijdstip.
+      const toEnd = new Date(toDate)
+      toEnd.setHours(23, 59, 59, 999)
+
+      const sessions = await ctx.prisma.sessionLog.findMany({
+        where: {
+          patientId: input.patientId,
+          scheduledAt: { gte: fromDate, lte: toEnd },
+        },
+        select: {
+          id: true,
+          scheduledAt: true,
+          completedAt: true,
+          status: true,
+          duration: true,
+          programId: true,
+          program: { select: { id: true, name: true } },
+        },
+        orderBy: { scheduledAt: 'asc' },
+      })
+
+      return sessions.map(s => {
+        const d = new Date(s.scheduledAt)
+        const weekdayIndex = (d.getDay() + 6) % 7 // 0=Ma..6=Zo
+        return {
+          id: s.id,
+          scheduledAt: s.scheduledAt,
+          completedAt: s.completedAt,
+          status: s.status,
+          duration: s.duration,
+          programId: s.programId,
+          programName: s.program?.name ?? null,
+          weekdayIndex,
+        }
+      })
+    }),
+
+  /**
    * Recent gelogde quick-workouts van een patient (SessionLog met
    * programId IS NULL). Voor de week-planner-overview zodat ad-hoc
    * trainingen ook zichtbaar zijn naast de geplande programma's.

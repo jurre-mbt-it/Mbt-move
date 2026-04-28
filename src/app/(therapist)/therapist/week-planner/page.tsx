@@ -76,6 +76,16 @@ type ExtraSession = {
   weekdayIndex: number
   hasExercises: boolean
 }
+type RangeSession = {
+  id: string
+  scheduledAt: string | Date
+  completedAt: string | Date | null
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED'
+  duration: number | null
+  programId: string | null
+  programName: string | null
+  weekdayIndex: number
+}
 
 // Per-categorie kleurset voor chips. Tint = transparante achtergrond,
 // border = volle kleur. Fallback op P.lime (Strength) als categorie onbekend.
@@ -144,21 +154,6 @@ function WeekPlannerContent() {
     () => ((patientProgramsQuery.data as ProgramListItem[] | undefined) ?? []).filter(p => !p.isTemplate),
     [patientProgramsQuery.data],
   )
-
-  // Quick-workouts (SessionLog zonder programId) afgelopen 30 dagen
-  const extraSessionsQuery = trpc.weekSchedules.recentExtraSessions.useQuery(
-    { patientId: selectedPatientId, days: 30 },
-    { enabled: !!selectedPatientId, staleTime: 30_000 },
-  )
-  const extraSessions: ExtraSession[] = useMemo(
-    () => (extraSessionsQuery.data as ExtraSession[] | undefined) ?? [],
-    [extraSessionsQuery.data],
-  )
-  const extraByWeekday: Record<number, ExtraSession[]> = {}
-  for (const s of extraSessions) {
-    if (!extraByWeekday[s.weekdayIndex]) extraByWeekday[s.weekdayIndex] = []
-    extraByWeekday[s.weekdayIndex].push(s)
-  }
 
   const setDayProgramMutation = trpc.weekSchedules.setDayProgram.useMutation({
     onSuccess: async () => {
@@ -273,6 +268,47 @@ function WeekPlannerContent() {
     }
   }
 
+  // Sessies binnen de getoonde week — voor 'eigen workouts' chips +
+  // ✓ markers op afgeronde planned sessies. Filter strikt op datum-range
+  // van geselecteerde week (Ma..Zo), zodat tabs daadwerkelijk verschillen.
+  const selectedRange = weekRange(selectedWeek)
+  const sessionsInRangeQuery = trpc.weekSchedules.sessionsInRange.useQuery(
+    {
+      patientId: selectedPatientId,
+      from: selectedRange.from.toISOString(),
+      to: selectedRange.to.toISOString(),
+    },
+    { enabled: !!selectedPatientId, staleTime: 30_000 },
+  )
+  const rangeSessions: RangeSession[] = useMemo(
+    () => (sessionsInRangeQuery.data as RangeSession[] | undefined) ?? [],
+    [sessionsInRangeQuery.data],
+  )
+
+  // Per weekdag: lijst van eigen workouts (programId=null) — voor gold chips
+  const extraByWeekday: Record<number, ExtraSession[]> = {}
+  // Per weekdag: set van programIds die afgerond zijn — voor ✓ markers
+  const completedProgramByDay: Record<number, Set<string>> = {}
+  for (const s of rangeSessions) {
+    if (s.programId === null) {
+      const list = extraByWeekday[s.weekdayIndex] ?? []
+      list.push({
+        id: s.id,
+        scheduledAt: s.scheduledAt,
+        completedAt: s.completedAt,
+        status: s.status,
+        duration: s.duration,
+        weekdayIndex: s.weekdayIndex,
+        hasExercises: false,
+      })
+      extraByWeekday[s.weekdayIndex] = list
+    } else if (s.completedAt) {
+      const set = completedProgramByDay[s.weekdayIndex] ?? new Set<string>()
+      set.add(s.programId)
+      completedProgramByDay[s.weekdayIndex] = set
+    }
+  }
+
   const selectedPatient = patients.find(p => p.id === selectedPatientId) ?? null
 
   return (
@@ -369,6 +405,7 @@ function WeekPlannerContent() {
                 program={programByDay[i] ?? null}
                 programDayMatches={programsByWeekday[i] ?? []}
                 extraSessions={extraByWeekday[i] ?? []}
+                completedProgramIds={completedProgramByDay[i] ?? new Set()}
                 patientId={selectedPatientId}
                 onClear={() => clearDay(i)}
                 onAssign={programId => assignProgram(i, programId)}
@@ -803,6 +840,7 @@ function DayCell({
   program,
   programDayMatches,
   extraSessions,
+  completedProgramIds,
   patientId,
   onClear,
   onAssign,
@@ -811,6 +849,7 @@ function DayCell({
   program: DayProgram
   programDayMatches: ProgramListItem[]
   extraSessions: ExtraSession[]
+  completedProgramIds: Set<string>
   patientId: string
   onClear: () => void
   onAssign: (programId: string) => void
@@ -847,59 +886,81 @@ function DayCell({
             {/* Programma's afgeleid uit Program.day — klikbaar om te verplaatsen */}
             {programDayMatches.map(p => {
               const style = chipStyle(p.dominantCategory)
+              const isDone = completedProgramIds.has(p.id)
               return (
                 <button
                   key={p.id}
                   type="button"
                   onClick={() => setMoveTarget(p)}
-                  className="athletic-tap rounded-md px-2 py-1.5 text-left"
+                  className="athletic-tap rounded-md px-2 py-1.5 text-left flex items-center justify-between gap-1.5"
                   style={{
                     background: style.bg,
                     border: `1px solid ${style.border}`,
                     color: style.text,
                   }}
-                  title={`${p.name}${p.dominantCategory ? ` · ${p.dominantCategory}` : ''} — klik om te verplaatsen`}
+                  title={`${p.name}${p.dominantCategory ? ` · ${p.dominantCategory}` : ''}${isDone ? ' · afgerond' : ''} — klik om te verplaatsen`}
                 >
                   <span
-                    className="athletic-mono"
+                    className="athletic-mono truncate"
                     style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', lineHeight: 1.3 }}
                   >
                     {p.name}
                   </span>
+                  {isDone && (
+                    <span
+                      className="shrink-0"
+                      style={{ fontSize: 11, fontWeight: 900, lineHeight: 1 }}
+                      aria-label="Afgerond"
+                    >
+                      ✓
+                    </span>
+                  )}
                 </button>
               )
             })}
 
             {/* WeekSchedule overlay — een handmatig toegewezen programma (× om weg te halen) */}
-            {showWeekScheduleOverlay && program && (
-              <div className="flex items-center gap-1.5">
-                <div
-                  className="flex-1 rounded-md px-2 py-1.5"
-                  style={{
-                    background: P.surfaceHi,
-                    border: `1px dashed ${P.line}`,
-                    color: P.ink,
-                  }}
-                  title="Handmatig toegewezen via +"
-                >
-                  <span
-                    className="athletic-mono"
-                    style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', lineHeight: 1.3 }}
+            {showWeekScheduleOverlay && program && (() => {
+              const isDone = completedProgramIds.has(program.id)
+              return (
+                <div className="flex items-center gap-1.5">
+                  <div
+                    className="flex-1 rounded-md px-2 py-1.5 flex items-center justify-between gap-1.5"
+                    style={{
+                      background: P.surfaceHi,
+                      border: `1px dashed ${P.line}`,
+                      color: P.ink,
+                    }}
+                    title={`Handmatig toegewezen via +${isDone ? ' · afgerond' : ''}`}
                   >
-                    {program.name}
-                  </span>
+                    <span
+                      className="athletic-mono truncate"
+                      style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', lineHeight: 1.3 }}
+                    >
+                      {program.name}
+                    </span>
+                    {isDone && (
+                      <span
+                        className="shrink-0"
+                        style={{ color: P.lime, fontSize: 11, fontWeight: 900, lineHeight: 1 }}
+                        aria-label="Afgerond"
+                      >
+                        ✓
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onClear}
+                    className="athletic-tap shrink-0 w-7 h-7 rounded-md flex items-center justify-center"
+                    style={{ background: P.surfaceHi, color: P.danger, fontSize: 12 }}
+                    title="Verwijder van deze dag"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={onClear}
-                  className="athletic-tap shrink-0 w-7 h-7 rounded-md flex items-center justify-center"
-                  style={{ background: P.surfaceHi, color: P.danger, fontSize: 12 }}
-                  title="Verwijder van deze dag"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
+              )
+            })()}
 
             {/* Quick-workouts — door de atleet zelf gelogd, geen programma */}
             {extraSessions.map(s => {
@@ -909,7 +970,7 @@ function DayCell({
               return (
                 <div
                   key={s.id}
-                  className="rounded-md px-2 py-1.5"
+                  className="rounded-md px-2 py-1.5 flex items-start justify-between gap-1.5"
                   style={{
                     background: EXTRA_SESSION_STYLE.bg,
                     border: `1px solid ${EXTRA_SESSION_STYLE.border}`,
@@ -917,18 +978,29 @@ function DayCell({
                   }}
                   title={`Eigen workout · ${dateLabel}${isCompleted ? ' (afgerond)' : ''}`}
                 >
-                  <span
-                    className="athletic-mono"
-                    style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.04em', lineHeight: 1.3, display: 'block' }}
-                  >
-                    Eigen workout
-                  </span>
-                  <span
-                    className="athletic-mono"
-                    style={{ fontSize: 9, opacity: 0.75, letterSpacing: '0.05em' }}
-                  >
-                    {dateLabel}{s.duration ? ` · ${Math.round(s.duration / 60)}m` : ''}
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <span
+                      className="athletic-mono"
+                      style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.04em', lineHeight: 1.3, display: 'block' }}
+                    >
+                      Eigen workout
+                    </span>
+                    <span
+                      className="athletic-mono"
+                      style={{ fontSize: 9, opacity: 0.75, letterSpacing: '0.05em' }}
+                    >
+                      {dateLabel}{s.duration ? ` · ${Math.round(s.duration / 60)}m` : ''}
+                    </span>
+                  </div>
+                  {isCompleted && (
+                    <span
+                      className="shrink-0"
+                      style={{ fontSize: 11, fontWeight: 900, lineHeight: 1 }}
+                      aria-label="Afgerond"
+                    >
+                      ✓
+                    </span>
+                  )}
                 </div>
               )
             })}
