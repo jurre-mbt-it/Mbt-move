@@ -549,24 +549,21 @@ function AddExerciseRow({ onAdd }: { onAdd: (ex: { id: string; name: string }) =
     { enabled: open, staleTime: 60_000 },
   )
 
-  // Normale zoekresultaten (als geen collectie geselecteerd is)
-  const { data: searchResults = [] } = trpc.exercises.list.useQuery(
+  // Cast naar shallow types; tRPC inference is te diep voor TS (TS2589).
+  type ExerciseRow = { id: string; name: string; category: string }
+  const searchResultsQuery = trpc.exercises.list.useQuery(
     { query: query || undefined },
     { enabled: open && !collectionId, staleTime: 30_000 },
   )
+  const searchResults = (searchResultsQuery.data as ExerciseRow[] | undefined) ?? []
 
-  // Oefeningen in geselecteerde collectie
-  const { data: collectionExercises = [] } =
-    trpc.exercises.getCollectionExercises.useQuery(
-      { collectionId: collectionId ?? '' },
-      { enabled: open && !!collectionId, staleTime: 30_000 },
-    )
+  const collectionExercisesQuery = trpc.exercises.getCollectionExercises.useQuery(
+    { collectionId: collectionId ?? '' },
+    { enabled: open && !!collectionId, staleTime: 30_000 },
+  )
+  const collectionExercises = (collectionExercisesQuery.data as ExerciseRow[] | undefined) ?? []
 
-  const exercises = (collectionId ? collectionExercises : searchResults) as Array<{
-    id: string
-    name: string
-    category: string
-  }>
+  const exercises: ExerciseRow[] = collectionId ? collectionExercises : searchResults
 
   const filtered = collectionId && query.trim()
     ? exercises.filter((ex) => ex.name.toLowerCase().includes(query.toLowerCase()))
