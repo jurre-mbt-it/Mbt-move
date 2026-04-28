@@ -36,6 +36,8 @@ type ProgramListItem = {
   daysPerWeek: number
   patient?: { id: string; name: string | null } | null
   _count?: { exercises: number }
+  // Unieke `day`-waarden uit Program.exercises (1=Ma..7=Zo).
+  daysScheduled?: number[]
 }
 
 export default function WeekPlannerPage() {
@@ -101,17 +103,7 @@ function WeekPlannerContent() {
   }
 
   const programByDay: Record<number, DayProgram> = {}
-  const daysByProgramId = new Map<string, number[]>()
-  if (schedule) {
-    for (const d of schedule.days) {
-      programByDay[d.dayOfWeek] = d.program ?? null
-      if (d.program) {
-        const list = daysByProgramId.get(d.program.id) ?? []
-        list.push(d.dayOfWeek)
-        daysByProgramId.set(d.program.id, list)
-      }
-    }
-  }
+  if (schedule) for (const d of schedule.days) programByDay[d.dayOfWeek] = d.program ?? null
 
   const activePrograms = patientPrograms.filter(p => p.status === 'ACTIVE' || p.status === 'DRAFT')
 
@@ -160,48 +152,9 @@ function WeekPlannerContent() {
             <div className="flex flex-col gap-2">
               <Kicker>Lopende programma&apos;s ({activePrograms.length})</Kicker>
               <div className="flex flex-col gap-2">
-                {activePrograms.map(p => {
-                  const days = daysByProgramId.get(p.id) ?? []
-                  const planned = days.length > 0
-                  return (
-                    <div
-                      key={p.id}
-                      className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg flex-wrap"
-                      style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}` }}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div
-                          className="truncate"
-                          style={{ color: P.ink, fontSize: 13, fontWeight: 800, letterSpacing: '0.04em' }}
-                        >
-                          {p.name}
-                        </div>
-                        <div
-                          className="athletic-mono flex items-center gap-2 flex-wrap"
-                          style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.05em', marginTop: 2 }}
-                        >
-                          <span>
-                            {p.weeks} wk · {p.daysPerWeek}×/wk · {p._count?.exercises ?? 0} oef.
-                          </span>
-                          {planned ? (
-                            <span style={{ color: P.lime }}>
-                              · ingepland op {days.sort().map(d => DAY_LABELS[d]).join(', ')}
-                            </span>
-                          ) : (
-                            <span style={{ color: P.gold }}>· nog niet ingepland</span>
-                          )}
-                        </div>
-                      </div>
-                      <DarkButton
-                        variant="secondary"
-                        size="sm"
-                        href={`/therapist/programs/${p.id}/edit`}
-                      >
-                        Open
-                      </DarkButton>
-                    </div>
-                  )
-                })}
+                {activePrograms.map(p => (
+                  <ActiveProgramRow key={p.id} program={p} />
+                ))}
               </div>
             </div>
           </Tile>
@@ -237,6 +190,140 @@ function WeekPlannerContent() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function ActiveProgramRow({ program }: { program: ProgramListItem }) {
+  const utils = trpc.useUtils()
+  const [moveDialog, setMoveDialog] = useState<{ fromDay: number } | null>(null)
+  const changeDay = trpc.programs.changeDay.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.programs.list.invalidate(),
+        utils.weekSchedules.list.invalidate(),
+      ])
+      toast.success('Dag verplaatst')
+    },
+    onError: () => toast.error('Verplaatsen mislukt'),
+  })
+
+  const days = program.daysScheduled ?? []
+  const planned = days.length > 0
+
+  return (
+    <div
+      className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg flex-wrap"
+      style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}` }}
+    >
+      <div className="flex-1 min-w-0">
+        <div
+          className="truncate"
+          style={{ color: P.ink, fontSize: 13, fontWeight: 800, letterSpacing: '0.04em' }}
+        >
+          {program.name}
+        </div>
+        <div
+          className="athletic-mono flex items-center gap-2 flex-wrap"
+          style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.05em', marginTop: 4 }}
+        >
+          <span>
+            {program.weeks} wk · {program.daysPerWeek}×/wk · {program._count?.exercises ?? 0} oef.
+          </span>
+        </div>
+        {/* Day chips met verplaats-knop per chip */}
+        <div className="flex items-center gap-1.5 flex-wrap mt-2">
+          {planned ? (
+            days.map(d => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setMoveDialog({ fromDay: d })}
+                className="athletic-tap athletic-mono px-2 py-1 rounded-md flex items-center gap-1"
+                style={{
+                  background: 'rgba(190,242,100,0.12)',
+                  color: P.lime,
+                  border: `1px solid ${P.lime}`,
+                  fontSize: 10,
+                  fontWeight: 800,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                }}
+                title="Klik om te verplaatsen"
+              >
+                {DAY_LABELS[d - 1]}
+                <span style={{ fontSize: 9, opacity: 0.7 }}>↔</span>
+              </button>
+            ))
+          ) : (
+            <span
+              className="athletic-mono"
+              style={{ color: P.gold, fontSize: 10, letterSpacing: '0.05em' }}
+            >
+              Geen dagen ingepland in dit programma
+            </span>
+          )}
+        </div>
+      </div>
+      <DarkButton
+        variant="secondary"
+        size="sm"
+        href={`/therapist/programs/${program.id}/edit`}
+      >
+        Open
+      </DarkButton>
+
+      {/* Move-day dialog */}
+      <Dialog open={!!moveDialog} onOpenChange={open => { if (!open) setMoveDialog(null) }}>
+        <DialogContent
+          className="max-w-sm"
+          style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
+        >
+          <DialogHeader>
+            <DialogTitle style={{ color: P.ink }}>
+              Verplaats {moveDialog ? DAY_LABELS[moveDialog.fromDay - 1] : ''} naar…
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-7 gap-1.5 pt-2">
+            {DAY_LABELS.map((label, i) => {
+              const targetDay = i + 1
+              const isCurrent = moveDialog?.fromDay === targetDay
+              const isOccupied = days.includes(targetDay) && !isCurrent
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  disabled={isCurrent || isOccupied || changeDay.isPending}
+                  onClick={() => {
+                    if (!moveDialog) return
+                    changeDay.mutate(
+                      { programId: program.id, fromDay: moveDialog.fromDay, toDay: targetDay },
+                      { onSuccess: () => setMoveDialog(null) },
+                    )
+                  }}
+                  className="athletic-tap athletic-mono py-2 rounded-md"
+                  style={{
+                    background: isCurrent ? P.surfaceLow : isOccupied ? P.surfaceLow : P.surfaceHi,
+                    color: isCurrent ? P.inkDim : isOccupied ? P.inkDim : P.ink,
+                    border: `1px solid ${isCurrent ? P.line : P.lineStrong}`,
+                    fontSize: 11,
+                    fontWeight: 800,
+                    letterSpacing: '0.05em',
+                    cursor: isCurrent || isOccupied ? 'not-allowed' : 'pointer',
+                    opacity: isCurrent ? 0.4 : isOccupied ? 0.5 : 1,
+                  }}
+                  title={isOccupied ? 'Al bezet door deze programma-dag' : ''}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+          <p className="athletic-mono pt-1" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.04em' }}>
+            Verandert alle oefeningen op die dag binnen het programma.
+          </p>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

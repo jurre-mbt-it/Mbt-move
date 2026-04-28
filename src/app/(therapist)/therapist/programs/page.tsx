@@ -20,6 +20,8 @@ import {
   Tile,
 } from '@/components/dark-ui'
 
+const DAY_LABELS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
+
 const STATUS_COLORS: Record<string, { bg: string; text: string; label: string; accent: string }> = {
   ACTIVE:    { bg: 'rgba(190,242,100,0.14)', text: P.lime,     label: 'Actief',       accent: P.lime },
   DRAFT:     { bg: 'rgba(244,194,97,0.14)',  text: P.gold,     label: 'Concept',      accent: P.gold },
@@ -355,12 +357,26 @@ type PreviewExercise = {
 }
 
 function ProgramExercisePreview({ programId }: { programId: string }) {
+  const utils = trpc.useUtils()
   const { data: rawData, isLoading } = trpc.programs.get.useQuery(
     { id: programId },
     { staleTime: 60_000 },
   )
   // Cast naar lokaal shallow type; tRPC inference is te diep voor TS (TS2589).
   const data = rawData as { exercises: PreviewExercise[] } | undefined
+
+  const [moveDialog, setMoveDialog] = useState<{ week: number; fromDay: number } | null>(null)
+  const changeDay = trpc.programs.changeDay.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.programs.list.invalidate(),
+        utils.programs.get.invalidate({ id: programId }),
+      ])
+      toast.success('Dag verplaatst')
+      setMoveDialog(null)
+    },
+    onError: () => toast.error('Verplaatsen mislukt'),
+  })
 
   if (isLoading) {
     return (
@@ -385,45 +401,135 @@ function ProgramExercisePreview({ programId }: { programId: string }) {
     grouped.set(key, list)
   }
 
+  // Bezette dagen per week — voor de move-dialog ("disabled" als al ingepland)
+  const occupiedByWeek = new Map<number, Set<number>>()
+  for (const ex of data.exercises) {
+    const set = occupiedByWeek.get(ex.week) ?? new Set<number>()
+    set.add(ex.day)
+    occupiedByWeek.set(ex.week, set)
+  }
+
   return (
-    <div className="space-y-2.5">
-      {[...grouped.entries()].map(([key, list]) => {
-        const [week, day] = key.split('-')
-        return (
-          <div key={key}>
-            <div
-              className="athletic-mono"
-              style={{
-                color: P.inkDim,
-                fontSize: 10,
-                letterSpacing: '0.1em',
-                fontWeight: 800,
-                textTransform: 'uppercase',
-                marginBottom: 4,
-              }}
-            >
-              Week {week} · Dag {day}
-            </div>
-            <ul className="space-y-1">
-              {list.map(ex => (
-                <li
-                  key={ex.id}
-                  className="flex items-center justify-between gap-3"
-                  style={{ color: P.ink, fontSize: 12 }}
+    <>
+      <div className="space-y-2.5">
+        {[...grouped.entries()].map(([key, list]) => {
+          const [weekStr, dayStr] = key.split('-')
+          const week = Number(weekStr)
+          const day = Number(dayStr)
+          const dayLabel = DAY_LABELS[day - 1] ?? `Dag ${day}`
+          return (
+            <div key={key}>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <div
+                  className="athletic-mono"
+                  style={{
+                    color: P.inkDim,
+                    fontSize: 10,
+                    letterSpacing: '0.1em',
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                  }}
                 >
-                  <span className="truncate">{ex.exercise.name}</span>
-                  <span
-                    className="athletic-mono shrink-0"
-                    style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.05em' }}
+                  Week {week} · {dayLabel}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMoveDialog({ week, fromDay: day })}
+                  className="athletic-tap athletic-mono px-2 py-0.5 rounded-md"
+                  style={{
+                    background: P.surfaceHi,
+                    color: P.inkMuted,
+                    border: `1px solid ${P.lineStrong}`,
+                    fontSize: 9,
+                    fontWeight: 800,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                  }}
+                  title="Verplaats deze dag"
+                >
+                  Verplaats ↔
+                </button>
+              </div>
+              <ul className="space-y-1">
+                {list.map(ex => (
+                  <li
+                    key={ex.id}
+                    className="flex items-center justify-between gap-3"
+                    style={{ color: P.ink, fontSize: 12 }}
                   >
-                    {ex.sets}×{ex.reps}{ex.repUnit && ex.repUnit !== 'reps' ? ` ${ex.repUnit}` : ''}
-                  </span>
-                </li>
-              ))}
-            </ul>
+                    <span className="truncate">{ex.exercise.name}</span>
+                    <span
+                      className="athletic-mono shrink-0"
+                      style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.05em' }}
+                    >
+                      {ex.sets}×{ex.reps}{ex.repUnit && ex.repUnit !== 'reps' ? ` ${ex.repUnit}` : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Move-day dialog */}
+      <Dialog open={!!moveDialog} onOpenChange={open => { if (!open) setMoveDialog(null) }}>
+        <DialogContent
+          className="max-w-sm"
+          style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
+        >
+          <DialogHeader>
+            <DialogTitle style={{ color: P.ink }}>
+              {moveDialog
+                ? `Week ${moveDialog.week} · ${DAY_LABELS[moveDialog.fromDay - 1]} verplaatsen naar…`
+                : ''}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-7 gap-1.5 pt-2">
+            {DAY_LABELS.map((label, i) => {
+              const targetDay = i + 1
+              const isCurrent = moveDialog?.fromDay === targetDay
+              const occupied = moveDialog
+                ? (occupiedByWeek.get(moveDialog.week)?.has(targetDay) ?? false)
+                : false
+              const disabled = isCurrent || (occupied && !isCurrent) || changeDay.isPending
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => {
+                    if (!moveDialog) return
+                    changeDay.mutate({
+                      programId,
+                      fromDay: moveDialog.fromDay,
+                      toDay: targetDay,
+                      week: moveDialog.week,
+                    })
+                  }}
+                  className="athletic-tap athletic-mono py-2 rounded-md"
+                  style={{
+                    background: P.surfaceHi,
+                    color: disabled ? P.inkDim : P.ink,
+                    border: `1px solid ${P.lineStrong}`,
+                    fontSize: 11,
+                    fontWeight: 800,
+                    letterSpacing: '0.05em',
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    opacity: disabled ? 0.45 : 1,
+                  }}
+                  title={occupied && !isCurrent ? 'Al bezet in deze week' : ''}
+                >
+                  {label}
+                </button>
+              )
+            })}
           </div>
-        )
-      })}
-    </div>
+          <p className="athletic-mono pt-1" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.04em' }}>
+            Verandert alle oefeningen op deze dag binnen week {moveDialog?.week}.
+          </p>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

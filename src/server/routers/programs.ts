@@ -67,7 +67,7 @@ export const programsRouter = createTRPCRouter({
           patient: { select: { id: true, name: true, email: true } },
           _count: { select: { exercises: true } },
           exercises: {
-            select: { exercise: { select: { category: true } } },
+            select: { day: true, exercise: { select: { category: true } } },
           },
         },
         orderBy: { updatedAt: 'desc' },
@@ -77,18 +77,24 @@ export const programsRouter = createTRPCRouter({
       // op Kracht/Cardio/Mobiliteit/Plyometrie/Stabiliteit zonder een extra
       // ronde naar de DB. CARDIO-programma's hebben vaak geen exercises en
       // vallen terug op program.type.
+      // Ook: daysScheduled = unieke `day`-waarden uit exercises (1=Ma..7=Zo
+      // conform DAY_LABELS in program builder). Zo kan de week-planner laten
+      // zien op welke weekdagen een programma staat zonder een extra query.
       return programs.map(({ exercises, ...rest }) => {
         const counts: Record<string, number> = {}
+        const daysSet = new Set<number>()
         for (const pe of exercises) {
           const cat = pe.exercise?.category
           if (cat) counts[cat] = (counts[cat] ?? 0) + 1
+          if (pe.day) daysSet.add(pe.day)
         }
         let dominantCategory: string | null = null
         for (const [cat, n] of Object.entries(counts)) {
           if (!dominantCategory || n > counts[dominantCategory]) dominantCategory = cat
         }
         if (!dominantCategory && rest.type) dominantCategory = rest.type
-        return { ...rest, dominantCategory }
+        const daysScheduled = [...daysSet].sort((a, b) => a - b)
+        return { ...rest, dominantCategory, daysScheduled }
       })
     }),
 
@@ -291,5 +297,42 @@ export const programsRouter = createTRPCRouter({
       }
       await ctx.prisma.program.delete({ where: { id: input.id } })
       return { success: true }
+    }),
+
+  /**
+   * Verplaats alle exercises met `day=fromDay` naar `day=toDay`. Optioneel
+   * binnen één specifieke `week`. Handig voor "verplaats Di → Do" zonder
+   * de hele program builder te openen.
+   */
+  changeDay: creatorProcedure
+    .input(z.object({
+      programId: z.string(),
+      fromDay: z.number().int().min(1).max(7),
+      toDay: z.number().int().min(1).max(7),
+      week: z.number().int().min(1).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.fromDay === input.toDay) return { updated: 0 }
+
+      const program = await ctx.prisma.program.findUnique({ where: { id: input.programId } })
+      if (!program) throw new TRPCError({ code: 'NOT_FOUND' })
+      const isAdmin = ctx.user!.role === 'ADMIN'
+      const isOwner = program.creatorId === ctx.user!.id
+      const samePractice =
+        !!ctx.user!.practiceId && !!program.practiceId && program.practiceId === ctx.user!.practiceId
+      if (!isAdmin && !isOwner && !samePractice) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+
+      const result = await ctx.prisma.programExercise.updateMany({
+        where: {
+          programId: input.programId,
+          day: input.fromDay,
+          ...(input.week !== undefined ? { week: input.week } : {}),
+        },
+        data: { day: input.toDay },
+      })
+
+      return { updated: result.count }
     }),
 })
