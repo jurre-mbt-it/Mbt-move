@@ -327,27 +327,41 @@ function WeekPlannerContent() {
     [sessionsInRangeQuery.data],
   )
 
-  // Per weekdag: lijst van eigen workouts (programId=null) — voor gold chips
-  const extraByWeekday: Record<number, ExtraSession[]> = {}
+  // Welke programIds matchen al met een actief programma op die weekdag?
+  // (Voor dedup: een sessie die matcht met een Program.day chip krijgt
+  //  alleen een ✓ marker; sessies die NIET matchen krijgen een eigen chip.)
+  const activeIdsByWeekday: Record<number, Set<string>> = {}
+  for (const dow in programsByWeekday) {
+    activeIdsByWeekday[dow] = new Set(programsByWeekday[dow].map(p => p.id))
+  }
+
+  // Per weekdag: chips voor extra/onbekende sessies (eigen workouts +
+  // sessies van inactieve/niet-passende programma's). Alle sessies in
+  // de range moeten ergens zichtbaar zijn — dus als een sessie niet
+  // matcht met een Program.day chip, krijgt 'ie z'n eigen chip.
+  const sessionChipsByDay: Record<number, RangeSession[]> = {}
   // Per weekdag: set van programIds die afgerond zijn — voor ✓ markers
+  // op de Program.day chips die wél matchen.
   const completedProgramByDay: Record<number, Set<string>> = {}
+
   for (const s of rangeSessions) {
-    if (s.programId === null) {
-      const list = extraByWeekday[s.weekdayIndex] ?? []
-      list.push({
-        id: s.id,
-        scheduledAt: s.scheduledAt,
-        completedAt: s.completedAt,
-        status: s.status,
-        duration: s.duration,
-        weekdayIndex: s.weekdayIndex,
-        hasExercises: false,
-      })
-      extraByWeekday[s.weekdayIndex] = list
-    } else if (s.completedAt) {
-      const set = completedProgramByDay[s.weekdayIndex] ?? new Set<string>()
+    const dow = s.weekdayIndex
+    if (s.programId !== null && s.completedAt) {
+      const set = completedProgramByDay[dow] ?? new Set<string>()
       set.add(s.programId)
-      completedProgramByDay[s.weekdayIndex] = set
+      completedProgramByDay[dow] = set
+    }
+    // Sessie krijgt een eigen chip wanneer:
+    //   1. programId === null (eigen workout), OF
+    //   2. programId NIET matcht met een Program.day op deze weekdag
+    //      (dus het programma is niet actief OF heeft geen exercise op
+    //      die dag → de sessie zou anders onzichtbaar zijn)
+    const matchesActive =
+      s.programId !== null && (activeIdsByWeekday[dow]?.has(s.programId) ?? false)
+    if (!matchesActive) {
+      const list = sessionChipsByDay[dow] ?? []
+      list.push(s)
+      sessionChipsByDay[dow] = list
     }
   }
 
@@ -446,7 +460,7 @@ function WeekPlannerContent() {
                 dayOfWeek={i}
                 program={programByDay[i] ?? null}
                 programDayMatches={programsByWeekday[i] ?? []}
-                extraSessions={extraByWeekday[i] ?? []}
+                sessionChips={sessionChipsByDay[i] ?? []}
                 completedProgramIds={completedProgramByDay[i] ?? new Set()}
                 patientId={selectedPatientId}
                 onClear={() => clearDay(i)}
@@ -884,7 +898,7 @@ function DayCell({
   dayOfWeek,
   program,
   programDayMatches,
-  extraSessions,
+  sessionChips,
   completedProgramIds,
   patientId,
   onClear,
@@ -893,7 +907,7 @@ function DayCell({
   dayOfWeek: number
   program: DayProgram
   programDayMatches: ProgramListItem[]
-  extraSessions: ExtraSession[]
+  sessionChips: RangeSession[]
   completedProgramIds: Set<string>
   patientId: string
   onClear: () => void
@@ -908,7 +922,7 @@ function DayCell({
   const showWeekScheduleOverlay = program && !programDayIds.has(program.id)
 
   const hasContent =
-    programDayMatches.length > 0 || !!showWeekScheduleOverlay || extraSessions.length > 0
+    programDayMatches.length > 0 || !!showWeekScheduleOverlay || sessionChips.length > 0
 
   return (
     <Tile>
@@ -1007,11 +1021,16 @@ function DayCell({
               )
             })()}
 
-            {/* Quick-workouts — door de atleet zelf gelogd, geen programma */}
-            {extraSessions.map(s => {
+            {/* Sessie-chips — eigen workouts (programId=null) +
+                 sessies van programma's die niet (meer) actief zijn. */}
+            {sessionChips.map(s => {
               const date = new Date(s.scheduledAt)
               const dateLabel = date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
               const isCompleted = s.status === 'COMPLETED' || !!s.completedAt
+              const label = s.programId === null
+                ? 'Eigen workout'
+                : (s.programName ?? 'Sessie')
+              const titlePrefix = s.programId === null ? 'Eigen workout' : `Sessie · ${s.programName ?? 'onbekend programma'}`
               return (
                 <div
                   key={s.id}
@@ -1021,14 +1040,14 @@ function DayCell({
                     border: `1px solid ${EXTRA_SESSION_STYLE.border}`,
                     color: EXTRA_SESSION_STYLE.text,
                   }}
-                  title={`Eigen workout · ${dateLabel}${isCompleted ? ' (afgerond)' : ''}`}
+                  title={`${titlePrefix} · ${dateLabel}${isCompleted ? ' (afgerond)' : ''}`}
                 >
                   <div className="flex-1 min-w-0">
                     <span
-                      className="athletic-mono"
+                      className="athletic-mono truncate"
                       style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.04em', lineHeight: 1.3, display: 'block' }}
                     >
-                      Eigen workout
+                      {label}
                     </span>
                     <span
                       className="athletic-mono"
