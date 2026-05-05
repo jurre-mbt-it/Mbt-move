@@ -9,7 +9,7 @@
  * No web-push / APNs in v1.
  */
 import type { Insight, PrismaClient } from '@prisma/client'
-import { sendMail } from '@/server/mail'
+import { sendMail, escapeHtml } from '@/server/mail'
 
 const BRAND = {
   bg: '#0A0E0F',
@@ -38,6 +38,10 @@ function renderCriticalEmail(insight: Insight, patientName: string): {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://mbt-gym.nl'
   const dashboardUrl = `${appUrl}/therapist/signals`
 
+  const safeTitle = escapeHtml(insight.title)
+  const safeSuggestion = escapeHtml(insight.suggestion)
+  const safePatientName = escapeHtml(patientName)
+
   const html = `<!DOCTYPE html>
 <html lang="nl">
   <body style="margin:0;padding:0;background:${BRAND.bg};color:${BRAND.ink};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
@@ -46,13 +50,13 @@ function renderCriticalEmail(insight: Insight, patientName: string): {
         Kritiek klinisch signaal
       </div>
       <h1 style="margin:0 0 12px 0;font-size:22px;font-weight:900;letter-spacing:-0.01em;">
-        ${insight.title}
+        ${safeTitle}
       </h1>
       <p style="color:${BRAND.inkMuted};font-size:14px;line-height:1.55;margin:0 0 20px 0;">
-        ${insight.suggestion}
+        ${safeSuggestion}
       </p>
       <p style="color:${BRAND.inkMuted};font-size:12px;margin:0 0 20px 0;">
-        Patiënt: <strong style="color:${BRAND.ink};">${patientName}</strong>
+        Patiënt: <strong style="color:${BRAND.ink};">${safePatientName}</strong>
       </p>
       <a href="${dashboardUrl}" style="display:inline-block;background:${BRAND.lime};color:${BRAND.bg};padding:12px 20px;border-radius:8px;font-weight:900;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;text-decoration:none;">
         Bekijk in dashboard →
