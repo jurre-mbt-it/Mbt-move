@@ -28,6 +28,7 @@ const navItems = [
   { href: '/therapist/week-planner', label: 'Weekschema', icon: CalendarDays },
   { href: '/therapist/exercises', label: 'Oefeningen', icon: Dumbbell },
   { href: '/therapist/programs/library', label: "Schema's", icon: Library },
+  { href: '/therapist/dpa', label: 'DPA-status', icon: Shield },
 ]
 
 export function TherapistSidebar() {

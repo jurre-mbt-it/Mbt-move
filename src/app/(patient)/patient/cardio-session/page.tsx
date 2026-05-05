@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
@@ -11,33 +12,6 @@ import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, HR_ZONES, HRZone } from '@/lib/car
 import { CARDIO_ICON_MAP, IconRunning, IconWalking, IconWarning, IconFinishFlag, IconCheck } from '@/components/icons'
 import { P, Kicker, MetaLabel, Tile, DarkButton, DarkInput, CATEGORY_COLORS } from '@/components/dark-ui'
 import { trpc } from '@/lib/trpc/client'
-
-// ── Mock sessie data ──────────────────────────────────────────────────────────
-
-const MOCK_SESSION = {
-  id: 'cs-mock-1',
-  programName: 'Walk-Run Terugkeer Protocol — Knie',
-  activity: 'RUNNING' as const,
-  protocol: 'WALK_RUN' as const,
-  week: 3,
-  session: 2,
-  targetDurationMin: 18,
-  targetZone: 2 as HRZone,
-  intervals: [
-    { label: 'Wandelen', type: 'WALK', durationSec: 120 },
-    { label: 'Lopen',    type: 'RUN',  durationSec: 60 },
-    { label: 'Wandelen', type: 'WALK', durationSec: 120 },
-    { label: 'Lopen',    type: 'RUN',  durationSec: 60 },
-    { label: 'Wandelen', type: 'WALK', durationSec: 120 },
-    { label: 'Lopen',    type: 'RUN',  durationSec: 60 },
-    { label: 'Wandelen', type: 'WALK', durationSec: 120 },
-    { label: 'Lopen',    type: 'RUN',  durationSec: 60 },
-    { label: 'Wandelen', type: 'WALK', durationSec: 120 },
-    { label: 'Lopen',    type: 'RUN',  durationSec: 60 },
-    { label: 'Wandelen', type: 'WALK', durationSec: 120 },
-    { label: 'Lopen',    type: 'RUN',  durationSec: 60 },
-  ],
-}
 
 type SessionPhase = 'IDLE' | 'ACTIVE' | 'PAUSED' | 'DONE'
 
@@ -270,29 +244,33 @@ export default function CardioSessionPage() {
   const router = useRouter()
   const utils = trpc.useUtils()
   const logCardio = trpc.patient.logCardioSession.useMutation()
-  // TODO: vervang door echte sessie via active cardio program zodra cardio-programma's
-  // gepersisteerd worden (zie programs/new/cardio).
-  const session = MOCK_SESSION
+  const { data: session, isLoading: sessionLoading } =
+    trpc.patient.getActiveCardioProgram.useQuery()
 
   const [phase, setPhase] = useState<SessionPhase>('IDLE')
   const [elapsedSec, setElapsedSec] = useState(0)
   const [currentIntervalIdx, setCurrentIntervalIdx] = useState(0)
-  const [intervalRemaining, setIntervalRemaining] = useState(
-    session.intervals.length > 0 ? session.intervals[0].durationSec : 0
-  )
+  const [intervalRemaining, setIntervalRemaining] = useState(0)
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [showFeedback, setShowFeedback] = useState(false)
+
+  // Sync interval remaining wanneer de sessie binnenkomt vanaf de server.
+  useEffect(() => {
+    if (session && session.intervals.length > 0 && phase === 'IDLE') {
+      setIntervalRemaining(session.intervals[0].durationSec)
+    }
+  }, [session, phase])
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const { playBeep } = useAudioCues(soundEnabled)
 
-  const currentInterval = session.intervals[currentIntervalIdx]
-  const isIntervalMode = session.intervals.length > 0
-  const hasIntervals = session.intervals.length > 0
+  const currentInterval = session?.intervals[currentIntervalIdx]
+  const isIntervalMode = (session?.intervals.length ?? 0) > 0
+  const hasIntervals = (session?.intervals.length ?? 0) > 0
 
   // ── Timer tick ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (phase !== 'ACTIVE') {
+    if (phase !== 'ACTIVE' || !session) {
       if (intervalRef.current) clearInterval(intervalRef.current)
       return
     }
@@ -328,14 +306,14 @@ export default function CardioSessionPage() {
     }, 1000)
 
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [phase, isIntervalMode, currentIntervalIdx, playBeep, session.intervals])
+  }, [phase, isIntervalMode, currentIntervalIdx, playBeep, session])
 
   // Sync interval remaining wanneer idx verandert
   useEffect(() => {
-    if (session.intervals[currentIntervalIdx]) {
+    if (session?.intervals[currentIntervalIdx]) {
       setIntervalRemaining(session.intervals[currentIntervalIdx].durationSec)
     }
-  }, [currentIntervalIdx, session.intervals])
+  }, [currentIntervalIdx, session])
 
   const handleStart = () => {
     setPhase('ACTIVE')
@@ -350,6 +328,62 @@ export default function CardioSessionPage() {
     setPhase('DONE')
     setShowFeedback(true)
     if (intervalRef.current) clearInterval(intervalRef.current)
+  }
+
+  // ── Empty / loading states ──────────────────────────────────────────────
+  if (sessionLoading) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: P.bg, color: P.inkMuted, fontSize: 13 }}
+      >
+        Laden…
+      </div>
+    )
+  }
+
+  if (!session) {
+    return (
+      <div
+        className="min-h-screen flex flex-col items-center justify-center px-6 text-center gap-4"
+        style={{ background: P.bg, color: P.ink }}
+      >
+        <Kicker>GEEN CARDIO PROGRAMMA</Kicker>
+        <h2
+          className="athletic-display"
+          style={{
+            color: P.ink,
+            fontSize: 28,
+            lineHeight: '32px',
+            letterSpacing: '-0.03em',
+            fontWeight: 900,
+            textTransform: 'uppercase',
+          }}
+        >
+          NOG GEEN CARDIO TOEGEWEZEN
+        </h2>
+        <p style={{ color: P.inkMuted, fontSize: 13, maxWidth: '20rem', lineHeight: 1.5 }}>
+          Je therapeut moet eerst een cardio- of walk-run programma voor je
+          activeren. Vraag dit even bij je volgende afspraak.
+        </p>
+        <div className="w-full max-w-xs mt-2">
+          <Link
+            href="/patient/dashboard"
+            className="athletic-tap athletic-mono rounded-xl px-4 py-3 flex items-center justify-center"
+            style={{
+              background: P.lime,
+              color: P.bg,
+              fontSize: 12,
+              fontWeight: 900,
+              letterSpacing: '0.12em',
+              textDecoration: 'none',
+            }}
+          >
+            ← TERUG NAAR HOME
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   const handleSkipInterval = () => {

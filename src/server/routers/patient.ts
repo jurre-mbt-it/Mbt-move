@@ -356,6 +356,114 @@ export const patientRouter = createTRPCRouter({
       return log
     }),
 
+  // ── Active cardio program → genormaliseerde sessie ──────────────────────
+
+  /**
+   * Vindt het actieve CARDIO-programma van de ingelogde patiënt en converteert
+   * het naar de shape die de cardio-session pagina verwacht.
+   *
+   * cardioParams JSONB komt uit twee wizards (zie programs/new/cardio en
+   * programs/new/walk-run) en heeft daarom verschillende velden — dit is de
+   * brug die de UI uniform houdt.
+   */
+  getActiveCardioProgram: protectedProcedure.query(async ({ ctx }) => {
+    const program = await ctx.prisma.program.findFirst({
+      where: { patientId: ctx.user.id, status: 'ACTIVE', type: 'CARDIO' },
+      orderBy: { updatedAt: 'desc' },
+    })
+    if (!program) return null
+
+    const params = (program.cardioParams ?? {}) as Record<string, unknown>
+
+    // Bepaal current week (1-based) op basis van elapsed days sinds startDate.
+    const start = program.startDate ?? program.createdAt
+    const daysSince = Math.max(
+      0,
+      Math.floor((Date.now() - start.getTime()) / 86_400_000),
+    )
+    const weekIdx = Math.min(Math.floor(daysSince / 7), program.weeks - 1)
+    const week = weekIdx + 1
+
+    // Walk-Run subtype: weken bevatten run/walk minutes en aantal rondes.
+    if (params.subType === 'WALK_RUN' && Array.isArray(params.weeks)) {
+      const weeks = params.weeks as Array<{
+        runMin?: number
+        walkMin?: number
+        rounds?: number
+        sessionsPerWeek?: number
+      }>
+      const w = weeks[weekIdx] ?? weeks[weeks.length - 1] ?? { runMin: 1, walkMin: 2, rounds: 6 }
+      const rounds = Math.max(1, w.rounds ?? 6)
+      const intervals: Array<{ label: string; type: 'WALK' | 'RUN'; durationSec: number }> = []
+      for (let i = 0; i < rounds; i++) {
+        intervals.push({ label: 'Wandelen', type: 'WALK', durationSec: (w.walkMin ?? 2) * 60 })
+        intervals.push({ label: 'Lopen', type: 'RUN', durationSec: (w.runMin ?? 1) * 60 })
+      }
+      return {
+        id: program.id,
+        programName: program.name,
+        activity: 'RUNNING' as const,
+        protocol: 'WALK_RUN' as const,
+        week,
+        session: 1,
+        targetDurationMin: Math.round(intervals.reduce((s, i) => s + i.durationSec, 0) / 60),
+        targetZone: 2 as const,
+        intervals,
+      }
+    }
+
+    // Pure cardio: optioneel intervals[] met workDuration/restDuration/repetitions.
+    const rawIntervals = Array.isArray(params.intervals)
+      ? (params.intervals as Array<{
+          workDuration?: number
+          restDuration?: number
+          repetitions?: number
+          label?: string
+        }>)
+      : []
+    const flatIntervals: Array<{ label: string; type: 'WALK' | 'RUN'; durationSec: number }> = []
+    for (const block of rawIntervals) {
+      const reps = Math.max(1, block.repetitions ?? 1)
+      for (let i = 0; i < reps; i++) {
+        flatIntervals.push({
+          label: block.label ?? 'Werk',
+          type: 'RUN',
+          durationSec: block.workDuration ?? 60,
+        })
+        if ((block.restDuration ?? 0) > 0) {
+          flatIntervals.push({
+            label: 'Rust',
+            type: 'WALK',
+            durationSec: block.restDuration ?? 30,
+          })
+        }
+      }
+    }
+
+    const targetZoneRaw = params.targetZone
+    const targetZone =
+      typeof targetZoneRaw === 'number' && targetZoneRaw >= 1 && targetZoneRaw <= 5
+        ? (targetZoneRaw as 1 | 2 | 3 | 4 | 5)
+        : (2 as const)
+
+    return {
+      id: program.id,
+      programName: program.name,
+      activity: ((params.activity as string) ?? 'RUNNING') as
+        | 'RUNNING' | 'CYCLING' | 'ROWING' | 'SWIMMING' | 'CROSSTRAINER'
+        | 'WALKING' | 'SKIERG' | 'ASSAULT_BIKE' | 'WATTBIKE' | 'STAIRCLIMBER' | 'OTHER',
+      protocol: ((params.protocol as string) ?? 'STEADY_STATE') as
+        | 'STEADY_STATE' | 'INTERVALS' | 'TEMPO' | 'FARTLEK'
+        | 'ZONE_TRAINING' | 'THRESHOLD' | 'LONG_SLOW_DISTANCE' | 'WALK_RUN',
+      week,
+      session: 1,
+      targetDurationMin:
+        typeof params.targetDurationMin === 'number' ? params.targetDurationMin : 30,
+      targetZone,
+      intervals: flatIntervals,
+    }
+  }),
+
   // ── Log a stand-alone pain report ────────────────────────────────────────
 
   reportPain: protectedProcedure
