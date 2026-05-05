@@ -542,6 +542,20 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
     debounceMs: 1500,
   })
 
+  // Eén toast per error → succes-transitie zodat opslaan-fouten zichtbaar zijn
+  // ook als de gebruiker niet op de inline-status let.
+  const errorToastShownRef = useState<{ shown: boolean }>({ shown: false })[0]
+  useEffect(() => {
+    if (autosave.status === 'error' && !errorToastShownRef.shown) {
+      errorToastShownRef.shown = true
+      const msg =
+        autosave.error instanceof Error ? autosave.error.message : 'Opslaan mislukt'
+      toast.error(`Programma niet opgeslagen: ${msg}`)
+    } else if (autosave.status === 'saved' && errorToastShownRef.shown) {
+      errorToastShownRef.shown = false
+    }
+  }, [autosave.status, autosave.error, errorToastShownRef])
+
   const handleDeploy = async () => {
     if (exercises.length === 0) {
       toast.error('Voeg eerst oefeningen toe voordat je deployt')

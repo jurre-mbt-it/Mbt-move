@@ -147,14 +147,19 @@ export const programsRouter = createTRPCRouter({
       daysPerWeek: z.number().int().min(1).default(3),
       isTemplate: z.boolean().default(false),
       type: z.enum(['STRENGTH', 'MOBILITY', 'PLYOMETRICS', 'CARDIO', 'STABILITY', 'MIXED']).optional(),
+      // Vrije JSON-blob voor cardio/walk-run protocollen. Geen strikte schema
+      // omdat de wizards verschillende velden vastleggen (zone-training,
+      // intervallen, walk-run weken, etc.). UI blijft de bron van waarheid.
+      cardioParams: z.unknown().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const { patientId, ...rest } = input
+      const { patientId, cardioParams, ...rest } = input
       await assertCanAssignPatient(ctx.prisma, ctx.user!, patientId)
       return ctx.prisma.program.create({
         data: {
           id: createId(),
           ...rest,
+          cardioParams: (cardioParams ?? null) as never,
           patientId: patientId ?? null,
           creatorId: ctx.user!.id,
           practiceId: ctx.user!.practiceId ?? null,

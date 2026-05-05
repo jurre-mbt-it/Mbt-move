@@ -70,7 +70,24 @@ export default function AthleteDashboard() {
 
   const todayExercises = sessionData?.exercises ?? []
   const lastSession = sessionHistory?.[0] ?? null
-  const streak = 5
+
+  // Streak = aaneengesloten dagen-tot-vandaag met minimaal één voltooide sessie.
+  // Mist één dag → reset. Geen geforceerde minimum-grens.
+  const streak = (() => {
+    const days = new Set(
+      (sessionHistory ?? []).map((s) =>
+        new Date(s.completedAt).toDateString(),
+      ),
+    )
+    let count = 0
+    const cursor = new Date()
+    cursor.setHours(0, 0, 0, 0)
+    while (days.has(cursor.toDateString())) {
+      count++
+      cursor.setDate(cursor.getDate() - 1)
+    }
+    return count
+  })()
   const completedToday =
     sessionHistory?.some(
       (s) =>

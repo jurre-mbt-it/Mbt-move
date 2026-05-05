@@ -231,6 +231,16 @@ export default function PatientDashboard() {
           bar={todayWellness ? P.lime : P.ice}
         />
 
+        {/* Active program detail */}
+        {activeProgram?.id && (
+          <ActionTile
+            href={`/patient/program/${activeProgram.id}`}
+            label="Mijn programma"
+            sub={`${activeProgram.name ?? ''} · alle weken bekijken`}
+            bar={P.purple}
+          />
+        )}
+
         {/* Cardio + pain quick actions */}
         <ActionTile
           href="/patient/cardio-session"

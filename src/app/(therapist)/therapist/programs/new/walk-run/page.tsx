@@ -203,7 +203,9 @@ function WalkRunWizardContent() {
   const { data: patientsData = [] } = trpc.patients.list.useQuery()
   const [step, setStep] = useState<WizardStep>(1)
   const [state, setState] = useState<WizardState>({ ...DEFAULT, patientId: prePatientId })
-  const [saving, setSaving] = useState(false)
+  const utils = trpc.useUtils()
+  const createProgram = trpc.programs.create.useMutation()
+  const saving = createProgram.isPending
 
   const set = <K extends keyof WizardState>(key: K, val: WizardState[K]) =>
     setState(s => ({ ...s, [key]: val }))
@@ -231,11 +233,31 @@ function WalkRunWizardContent() {
       toast.error('Selecteer een patiënt')
       return
     }
-    setSaving(true)
-    await new Promise(r => setTimeout(r, 900))
-    setSaving(false)
-    toast.success('Walk-Run protocol aangemaakt!')
-    router.push('/therapist/programs')
+    const tpl = WALK_RUN_TEMPLATES.find(t => t.id === state.templateId)
+    const programName = `Walk-Run · ${tpl?.name ?? 'Generiek'} · ${state.targetDistanceKm}km`
+    try {
+      const created = await createProgram.mutateAsync({
+        name: programName,
+        description: state.notes.trim() || undefined,
+        patientId: state.patientId,
+        weeks: weeks.length,
+        daysPerWeek: Math.max(1, weeks[0]?.sessionsPerWeek ?? 3),
+        type: 'CARDIO',
+        cardioParams: {
+          subType: 'WALK_RUN',
+          templateId: state.templateId,
+          currentFitness: state.currentFitness,
+          targetDistanceKm: state.targetDistanceKm,
+          startWeek: state.startWeek,
+          weeks,
+        },
+      })
+      await utils.programs.list.invalidate()
+      toast.success('Walk-Run protocol aangemaakt!')
+      router.push(`/therapist/programs/${created.id}/edit`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Opslaan mislukt')
+    }
   }
 
   const stepLabel =

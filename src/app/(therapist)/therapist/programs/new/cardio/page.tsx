@@ -153,7 +153,9 @@ function CardioProgramBuilderContent() {
   const { data: patientsData = [] } = trpc.patients.list.useQuery()
   const [form, setForm] = useState<CardioFormState>({ ...DEFAULT_STATE, patientId: prePatientId })
   const [step, setStep] = useState<1 | 2 | 3>(1)
-  const [saving, setSaving] = useState(false)
+  const utils = trpc.useUtils()
+  const createProgram = trpc.programs.create.useMutation()
+  const saving = createProgram.isPending
 
   const set = <K extends keyof CardioFormState>(key: K, val: CardioFormState[K]) =>
     setForm(f => ({ ...f, [key]: val }))
@@ -182,11 +184,32 @@ function CardioProgramBuilderContent() {
       toast.error('Geef het programma een naam')
       return
     }
-    setSaving(true)
-    await new Promise(r => setTimeout(r, 800))
-    setSaving(false)
-    toast.success('Cardio programma opgeslagen!')
-    router.push('/therapist/programs')
+    try {
+      const created = await createProgram.mutateAsync({
+        name: form.name.trim(),
+        description: form.description.trim() || undefined,
+        patientId: form.patientId || null,
+        weeks: form.weeks,
+        daysPerWeek: form.sessionsPerWeek,
+        type: 'CARDIO',
+        cardioParams: {
+          activity: form.activity,
+          protocol: form.protocol,
+          targetDurationMin: form.targetDurationMin,
+          targetDistanceKm: form.targetDistanceKm
+            ? Number(form.targetDistanceKm)
+            : null,
+          targetZone: form.targetZone,
+          targetRpe: form.targetRpe,
+          intervals: form.intervals,
+        },
+      })
+      await utils.programs.list.invalidate()
+      toast.success('Cardio programma opgeslagen!')
+      router.push(`/therapist/programs/${created.id}/edit`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Opslaan mislukt')
+    }
   }
 
   return (

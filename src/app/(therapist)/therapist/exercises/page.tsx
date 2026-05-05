@@ -226,9 +226,19 @@ export default function ExercisesPage() {
               Klik op een kaart voor de video
             </p>
           </div>
-          <DarkButton href="/therapist/exercises/new" size="sm">
-            + <span className="hidden sm:inline ml-1">Nieuwe oefening</span>
-          </DarkButton>
+          <div className="flex items-center gap-2">
+            <DarkButton
+              href="/therapist/exercises/collections"
+              size="sm"
+              variant="secondary"
+            >
+              <span className="hidden sm:inline">Collecties</span>
+              <span className="sm:hidden">📁</span>
+            </DarkButton>
+            <DarkButton href="/therapist/exercises/new" size="sm">
+              + <span className="hidden sm:inline ml-1">Nieuwe oefening</span>
+            </DarkButton>
+          </div>
         </div>
 
         {/* Search + view toggle */}

@@ -166,8 +166,17 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
   // oefening wordt dit gevuld zodra autosave het record heeft aangemaakt.
   const [currentExerciseId, setCurrentExerciseId] = useState<string | undefined>(exerciseId)
 
-  const createMutation = trpc.exercises.create.useMutation()
-  const updateMutation = trpc.exercises.update.useMutation()
+  const utils = trpc.useUtils()
+  const createMutation = trpc.exercises.create.useMutation({
+    onSuccess: () => {
+      void utils.exercises.list.invalidate()
+    },
+  })
+  const updateMutation = trpc.exercises.update.useMutation({
+    onSuccess: () => {
+      void utils.exercises.list.invalidate()
+    },
+  })
 
   // ── Autosave ──────────────────────────────────────────────────────────────
   const draftKey = useMemo(
@@ -230,6 +239,20 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
     debounceMs: 1500,
     enabled: form.name.trim().length > 0,
   })
+
+  // Eén toast per error → succes-transitie zodat de gebruiker niet alleen op
+  // de inline-indicator hoeft te letten als opslaan faalt.
+  const lastErrorToastRef = useState<{ shown: boolean }>({ shown: false })[0]
+  useEffect(() => {
+    if (autosave.status === 'error' && !lastErrorToastRef.shown) {
+      lastErrorToastRef.shown = true
+      const msg =
+        autosave.error instanceof Error ? autosave.error.message : 'Opslaan mislukt'
+      toast.error(`Oefening niet opgeslagen: ${msg}`)
+    } else if (autosave.status === 'saved' && lastErrorToastRef.shown) {
+      lastErrorToastRef.shown = false
+    }
+  }, [autosave.status, autosave.error, lastErrorToastRef])
 
   const set = <K extends keyof ExerciseFormData>(key: K, val: ExerciseFormData[K]) =>
     setForm(f => ({ ...f, [key]: val }))
