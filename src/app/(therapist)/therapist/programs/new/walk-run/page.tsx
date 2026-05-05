@@ -21,7 +21,7 @@ import {
 
 // ── Wizard stappen ────────────────────────────────────────────────────────────
 
-type WizardStep = 1 | 2 | 3 | 4
+type WizardStep = 1 | 2
 
 interface WizardState {
   patientId: string
@@ -261,9 +261,7 @@ function WalkRunWizardContent() {
   }
 
   const stepLabel =
-    step === 1 ? 'Patiënt & Blessure' :
-    step === 2 ? 'Fitnessniveau & Doel' :
-    step === 3 ? 'Schema aanpassen' : 'Bevestigen'
+    step === 1 ? 'Patiënt, Blessure & Doel' : 'Schema & Bevestigen'
 
   return (
     <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
@@ -286,7 +284,7 @@ function WalkRunWizardContent() {
             <Display size="sm">{stepLabel.toUpperCase()}</Display>
           </div>
           <div className="flex gap-1 shrink-0">
-            {([1, 2, 3, 4] as const).map(s => (
+            {([1, 2] as const).map(s => (
               <div
                 key={s}
                 className="w-8 h-1 rounded-full"
@@ -378,20 +376,6 @@ function WalkRunWizardContent() {
               </div>
             </Tile>
 
-            <DarkButton
-              variant="primary"
-              className="w-full"
-              disabled={!state.patientId}
-              onClick={() => setStep(2)}
-            >
-              Volgende →
-            </DarkButton>
-          </div>
-        )}
-
-        {/* Stap 2: Fitnessniveau & doel */}
-        {step === 2 && (
-          <div className="space-y-4">
             <Tile>
               <div className="space-y-3">
                 <MetaLabel>Huidig fitnessniveau</MetaLabel>
@@ -488,19 +472,19 @@ function WalkRunWizardContent() {
               </div>
             </Tile>
 
-            <div className="flex gap-3">
-              <DarkButton variant="secondary" className="flex-1" onClick={() => setStep(1)}>
-                Terug
-              </DarkButton>
-              <DarkButton variant="primary" className="flex-1" onClick={() => setStep(3)}>
-                Volgende →
-              </DarkButton>
-            </div>
+            <DarkButton
+              variant="primary"
+              className="w-full"
+              disabled={!state.patientId}
+              onClick={() => setStep(2)}
+            >
+              Volgende → Schema & Bevestigen
+            </DarkButton>
           </div>
         )}
 
-        {/* Stap 3: Schema aanpassen */}
-        {step === 3 && (
+        {/* Stap 2: Schema aanpassen + Bevestigen */}
+        {step === 2 && (
           <div className="space-y-4">
             <Tile>
               <div className="space-y-4">
@@ -550,20 +534,7 @@ function WalkRunWizardContent() {
               />
             </div>
 
-            <div className="flex gap-3">
-              <DarkButton variant="secondary" className="flex-1" onClick={() => setStep(2)}>
-                Terug
-              </DarkButton>
-              <DarkButton variant="primary" className="flex-1" onClick={() => setStep(4)}>
-                Bekijk samenvatting →
-              </DarkButton>
-            </div>
-          </div>
-        )}
-
-        {/* Stap 4: Samenvatting & bevestiging */}
-        {step === 4 && (
-          <div className="space-y-4">
+            {/* Samenvatting & bevestiging valt direct onder het schema */}
             <Tile accentBar={P.lime}>
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
@@ -683,7 +654,7 @@ function WalkRunWizardContent() {
             <PainCheckCard />
 
             <div className="flex gap-3">
-              <DarkButton variant="secondary" className="flex-1" onClick={() => setStep(3)}>
+              <DarkButton variant="secondary" className="flex-1" onClick={() => setStep(1)}>
                 Terug
               </DarkButton>
               <DarkButton

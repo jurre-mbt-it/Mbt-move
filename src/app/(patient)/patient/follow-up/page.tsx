@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { trpc } from '@/lib/trpc/client'
 import {
   DarkButton,
   DarkHeader,
@@ -26,9 +27,8 @@ function silbernagelLabel(pain: number): string {
   return 'STOP'
 }
 
-// ─── Mock pending follow-up checks ────────────────────────────────────────────
 type FollowUpItem = {
-  id: string
+  id: string // exerciseLogId
   exerciseName: string
   sessionDate: string
   hoursAgo: number
@@ -36,27 +36,6 @@ type FollowUpItem = {
   painAfter24h: number | null
   morningStiffness: number | null
 }
-
-const MOCK_PENDING: FollowUpItem[] = [
-  {
-    id: 'fu-1',
-    exerciseName: 'Bulgarian Split Squat',
-    sessionDate: '2026-04-09',
-    hoursAgo: 18,
-    painDuringSession: 3,
-    painAfter24h: null,
-    morningStiffness: null,
-  },
-  {
-    id: 'fu-2',
-    exerciseName: 'Single Leg Deadlift',
-    sessionDate: '2026-04-09',
-    hoursAgo: 18,
-    painDuringSession: 4,
-    painAfter24h: null,
-    morningStiffness: null,
-  },
-]
 
 // ─── NRS Picker ───────────────────────────────────────────────────────────────
 function NrsPicker({
@@ -107,16 +86,22 @@ function FollowUpCard({
   onSave,
 }: {
   item: FollowUpItem
-  onSave: (id: string, painAfter24h: number | null, morningStiffness: number | null) => void
+  onSave: (id: string, painAfter24h: number | null, morningStiffness: number | null) => Promise<void>
 }) {
   const [pain24h, setPain24h] = useState<number | null>(item.painAfter24h)
   const [stiffness, setStiffness] = useState<number | null>(item.morningStiffness)
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
 
-  const handleSave = () => {
-    onSave(item.id, pain24h, stiffness)
-    setSaved(true)
-    toast.success(`${item.exerciseName} follow-up opgeslagen`)
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await onSave(item.id, pain24h, stiffness)
+      setSaved(true)
+      toast.success(`${item.exerciseName} follow-up opgeslagen`)
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (saved) {
@@ -259,9 +244,9 @@ function FollowUpCard({
 
         <DarkButton
           onClick={handleSave}
-          disabled={pain24h === null && stiffness === null}
+          disabled={saving || pain24h === null}
         >
-          OPSLAAN
+          {saving ? 'OPSLAAN…' : 'OPSLAAN'}
         </DarkButton>
       </div>
     </Tile>
@@ -270,20 +255,53 @@ function FollowUpCard({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function FollowUpPage() {
-  const [items, setItems] = useState<FollowUpItem[]>(MOCK_PENDING)
+  const utils = trpc.useUtils()
+  const { data: pending = [], isLoading } =
+    trpc.patient.getPendingPainFollowUps.useQuery()
+  const submit = trpc.patient.submitPainFollowUp.useMutation()
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
 
-  const handleSave = (
+  // Flatten sessies → één FollowUpItem per exerciseLog.
+  const items = useMemo<FollowUpItem[]>(() => {
+    const now = Date.now()
+    return pending.flatMap((s) => {
+      const completedAt = s.completedAt ? new Date(s.completedAt) : new Date()
+      const hoursAgo = Math.max(
+        0,
+        Math.floor((now - completedAt.getTime()) / 3_600_000),
+      )
+      return s.exerciseLogs.map((el) => ({
+        id: el.id,
+        exerciseName: el.exerciseName,
+        sessionDate: completedAt.toISOString(),
+        hoursAgo,
+        painDuringSession: el.painDuring ?? 0,
+        painAfter24h: null,
+        morningStiffness: null,
+      }))
+    })
+  }, [pending])
+
+  const handleSave = async (
     id: string,
     painAfter24h: number | null,
     morningStiffness: number | null,
   ) => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, painAfter24h, morningStiffness } : item,
-      ),
-    )
-    setSavedIds((prev) => new Set(prev).add(id))
+    if (painAfter24h === null) {
+      toast.error('Pijnscore is verplicht')
+      return
+    }
+    try {
+      await submit.mutateAsync({
+        exerciseLogId: id,
+        painAfter24h,
+        morningStiffness: morningStiffness ?? undefined,
+      })
+      setSavedIds((prev) => new Set(prev).add(id))
+      await utils.patient.getPendingPainFollowUps.invalidate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Opslaan mislukt')
+    }
   }
 
   const allDone = items.length > 0 && items.every((item) => savedIds.has(item.id))
@@ -315,7 +333,19 @@ export default function FollowUpPage() {
         </Tile>
 
         {/* Pending items */}
-        {items.length === 0 ? (
+        {isLoading ? (
+          <Tile>
+            <div className="flex flex-col gap-2 py-4">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-12 rounded-xl animate-pulse"
+                  style={{ background: P.surfaceHi }}
+                />
+              ))}
+            </div>
+          </Tile>
+        ) : items.length === 0 ? (
           <Tile>
             <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
               <span className="athletic-mono" style={{ color: P.lime, fontSize: 32, fontWeight: 900 }}>

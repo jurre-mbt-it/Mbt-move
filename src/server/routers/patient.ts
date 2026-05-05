@@ -562,6 +562,160 @@ export const patientRouter = createTRPCRouter({
       return byExercise
     }),
 
+  // ── Personal bests: hoogste estimated 1RM per oefening ──────────────────
+
+  /**
+   * Hoogste ooit gelogde `estimatedOneRepMax` per oefening voor deze patiënt.
+   * Gebruikt op de session-pagina om een PR te detecteren tijdens loggen.
+   */
+  getPersonalBests: protectedProcedure.query(async ({ ctx }) => {
+    const grouped = await ctx.prisma.exerciseLog.groupBy({
+      by: ['exerciseId'],
+      where: {
+        session: { patientId: ctx.user.id, status: 'COMPLETED' },
+        estimatedOneRepMax: { not: null, gt: 0 },
+      },
+      _max: { estimatedOneRepMax: true },
+    })
+    const out: Record<string, number> = {}
+    for (const row of grouped) {
+      if (row._max.estimatedOneRepMax != null) {
+        out[row.exerciseId] = row._max.estimatedOneRepMax
+      }
+    }
+    return out
+  }),
+
+  // ── 1RM progressie per oefening (voor progress page chart) ──────────────
+
+  /**
+   * Tijd-reeks van geschatte 1RM per oefening, gesorteerd oud → nieuw.
+   * Limiet: top-N oefeningen op basis van aantal datapoints, met max
+   * datapoints per oefening om payload klein te houden.
+   */
+  getOneRmProgression: protectedProcedure
+    .input(
+      z
+        .object({
+          maxExercises: z.number().int().min(1).max(20).default(4),
+          maxPointsPerExercise: z.number().int().min(2).max(50).default(15),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      const limit = input?.maxExercises ?? 4
+      const pointsCap = input?.maxPointsPerExercise ?? 15
+
+      const logs = await ctx.prisma.exerciseLog.findMany({
+        where: {
+          session: { patientId: ctx.user.id, status: 'COMPLETED' },
+          estimatedOneRepMax: { not: null, gt: 0 },
+        },
+        orderBy: { session: { completedAt: 'asc' } },
+        select: {
+          exerciseId: true,
+          estimatedOneRepMax: true,
+          session: { select: { completedAt: true } },
+        },
+        take: 2000,
+      })
+
+      // Group by exerciseId.
+      const grouped = new Map<string, Array<{ value: number; date: string }>>()
+      for (const log of logs) {
+        const date = (log.session.completedAt ?? new Date()).toISOString()
+        if (!grouped.has(log.exerciseId)) grouped.set(log.exerciseId, [])
+        grouped.get(log.exerciseId)!.push({
+          value: log.estimatedOneRepMax!,
+          date,
+        })
+      }
+
+      // Top N op aantal datapoints (meest geserveerde oefeningen voorop).
+      const top = Array.from(grouped.entries())
+        .sort((a, b) => b[1].length - a[1].length)
+        .slice(0, limit)
+
+      const exerciseIds = top.map(([id]) => id)
+      const exercises = exerciseIds.length
+        ? await ctx.prisma.exercise.findMany({
+            where: { id: { in: exerciseIds } },
+            select: { id: true, name: true },
+          })
+        : []
+      const nameMap = new Map(exercises.map(e => [e.id, e.name]))
+
+      return top.map(([exerciseId, points]) => {
+        // Subsample naar pointsCap (gelijkmatig verspreid, behoud eerste/laatste).
+        const trimmed =
+          points.length <= pointsCap
+            ? points
+            : points.filter((_, i, arr) => {
+                if (i === 0 || i === arr.length - 1) return true
+                const step = (arr.length - 2) / (pointsCap - 2)
+                return Math.round((i - 1) / step) * step + 1 === i
+              })
+        return {
+          exerciseId,
+          name: nameMap.get(exerciseId) ?? 'Oefening',
+          data: trimmed.map((p, i) => ({
+            session: i + 1,
+            date: p.date,
+            value: Math.round(p.value * 10) / 10,
+          })),
+        }
+      })
+    }),
+
+  // ── Tendinopathie-trend (3-lijn chart op progress page) ─────────────────
+
+  /**
+   * Tijdreeks van pijnDuring / painAfter24h / morningStiffness uit
+   * exerciseLogs in tendinopathy-mode programs. Eén punt per sessie:
+   * gemiddelden over de exercise-logs van die sessie.
+   */
+  getTendinopathyTrend: protectedProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(50).default(10) }).optional())
+    .query(async ({ ctx, input }) => {
+      const sessions = await ctx.prisma.sessionLog.findMany({
+        where: {
+          patientId: ctx.user.id,
+          status: 'COMPLETED',
+          program: { tendinopathyMode: true },
+        },
+        orderBy: { completedAt: 'asc' },
+        take: input?.limit ?? 10,
+        select: {
+          id: true,
+          completedAt: true,
+          exerciseLogs: {
+            select: {
+              painDuring: true,
+              painAfter24h: true,
+              morningStiffness: true,
+            },
+          },
+        },
+      })
+
+      const avg = (vals: Array<number | null>): number | null => {
+        const nums = vals.filter((v): v is number => v != null)
+        if (nums.length === 0) return null
+        return Math.round((nums.reduce((s, v) => s + v, 0) / nums.length) * 10) / 10
+      }
+
+      return sessions
+        .map((s, i) => ({
+          session: i + 1,
+          date: (s.completedAt ?? new Date()).toISOString(),
+          painDuring: avg(s.exerciseLogs.map(el => el.painDuring)),
+          painAfter24h: avg(s.exerciseLogs.map(el => el.painAfter24h)),
+          morningStiffness: avg(s.exerciseLogs.map(el => el.morningStiffness)),
+        }))
+        // Filter sessies zonder enige tendinopathy-data weg.
+        .filter(p => p.painDuring != null || p.painAfter24h != null || p.morningStiffness != null)
+    }),
+
   // ── Tendinopathy pain follow-up (24u na sessie) ───────────────────────────
 
   getPendingPainFollowUps: protectedProcedure.query(async ({ ctx }) => {

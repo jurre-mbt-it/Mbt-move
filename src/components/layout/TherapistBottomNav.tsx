@@ -2,11 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, AlertCircle, ClipboardList, Dumbbell, Settings } from 'lucide-react'
+import { LayoutDashboard, Users, AlertCircle, ClipboardList, Dumbbell, Settings, Shield } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { trpc } from '@/lib/trpc/client'
 import { P } from '@/components/dark-ui'
 
-const navItems = [
+const baseNavItems = [
   { href: '/therapist/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/therapist/patients', label: 'Patiënten', icon: Users },
   { href: '/therapist/signals', label: 'Signalen', icon: AlertCircle },
@@ -17,6 +18,10 @@ const navItems = [
 
 export function TherapistBottomNav() {
   const pathname = usePathname()
+  const { data: me } = trpc.auth.getMe.useQuery()
+  const navItems = me?.role === 'ADMIN'
+    ? [...baseNavItems, { href: '/admin/dashboard', label: 'Admin', icon: Shield }]
+    : baseNavItems
 
   return (
     <nav

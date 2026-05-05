@@ -12,55 +12,30 @@ import {
   Tile,
 } from '@/components/dark-ui'
 
-// ─── Mock 1RM progression data ────────────────────────────────────────────────
-const MOCK_1RM_DATA = [
-  {
-    exerciseId: '1',
-    name: 'Bulgarian Split Squat',
-    data: [
-      { session: 1, date: '2026-01-10', value: 75 },
-      { session: 2, date: '2026-01-17', value: 78 },
-      { session: 3, date: '2026-01-24', value: 80 },
-      { session: 4, date: '2026-01-31', value: 83 },
-      { session: 5, date: '2026-02-07', value: 88 },
-      { session: 6, date: '2026-02-14', value: 88 },
-      { session: 7, date: '2026-02-21', value: 92 },
-    ],
-  },
-  {
-    exerciseId: '4',
-    name: 'Single Leg Deadlift',
-    data: [
-      { session: 1, date: '2026-01-10', value: 50 },
-      { session: 2, date: '2026-01-17', value: 53 },
-      { session: 3, date: '2026-01-24', value: 55 },
-      { session: 4, date: '2026-01-31', value: 55 },
-      { session: 5, date: '2026-02-07', value: 58 },
-      { session: 6, date: '2026-02-14', value: 60 },
-      { session: 7, date: '2026-02-21', value: 65 },
-    ],
-  },
-]
-
-// ─── Mock tendinopathy pain data ───────────────────────────────────────────────
-const MOCK_TENDINOPATHY_DATA = [
-  { session: 1, date: '2026-01-10', painDuring: 3, painAfter24h: 4, morningStiffness: 3 },
-  { session: 2, date: '2026-01-17', painDuring: 4, painAfter24h: 4, morningStiffness: 3 },
-  { session: 3, date: '2026-01-24', painDuring: 3, painAfter24h: 3, morningStiffness: 2 },
-  { session: 4, date: '2026-01-31', painDuring: 3, painAfter24h: 2, morningStiffness: 2 },
-  { session: 5, date: '2026-02-07', painDuring: 2, painAfter24h: 2, morningStiffness: 1 },
-  { session: 6, date: '2026-02-14', painDuring: 2, painAfter24h: 1, morningStiffness: 1 },
-  { session: 7, date: '2026-02-21', painDuring: 2, painAfter24h: 1, morningStiffness: 1 },
-]
-
 const DAY_SHORT = ['MA', 'DI', 'WO', 'DO', 'VR', 'ZA', 'ZO']
 
 export default function ProgressPage() {
   const { data: sessions } = trpc.patient.getSessionHistory.useQuery({ limit: 50 })
   const { data: program } = trpc.patient.getActiveProgram.useQuery()
+  const { data: oneRmData = [] } = trpc.patient.getOneRmProgression.useQuery()
+  const { data: tendinopathyData = [] } = trpc.patient.getTendinopathyTrend.useQuery()
 
   const history = sessions ?? []
-  const streak = 5 // TODO: compute from consecutive days
+
+  // Streak = aaneengesloten dagen-tot-vandaag met ten minste één voltooide sessie.
+  const streak = (() => {
+    const days = new Set(
+      history.map(s => new Date(s.completedAt).toDateString()),
+    )
+    let count = 0
+    const cursor = new Date()
+    cursor.setHours(0, 0, 0, 0)
+    while (days.has(cursor.toDateString())) {
+      count++
+      cursor.setDate(cursor.getDate() - 1)
+    }
+    return count
+  })()
 
   const avgPain =
     history.filter((s) => s.painLevel !== null).length > 0
@@ -330,12 +305,13 @@ export default function ProgressPage() {
         </Tile>
 
         {/* ── 1RM Progressie ─────────────────────────────────────────────── */}
+        {oneRmData.length > 0 && (
         <Tile>
           <div className="flex items-center gap-2 mb-3">
             <MetaLabel>1RM Progressie</MetaLabel>
           </div>
           <div className="flex flex-col gap-4">
-            {MOCK_1RM_DATA.map((ex) => {
+            {oneRmData.map((ex) => {
               const first = ex.data[0]?.value ?? 0
               const last = ex.data[ex.data.length - 1]?.value ?? 0
               const pctChange = first > 0 ? Math.round(((last - first) / first) * 100) : 0
@@ -427,8 +403,10 @@ export default function ProgressPage() {
             })}
           </div>
         </Tile>
+        )}
 
         {/* ── Tendinopathie monitor ──────────────────────────────────────── */}
+        {tendinopathyData.length > 0 && (
         <Tile>
           <div className="flex items-center gap-2 mb-1">
             <MetaLabel>Tendinopathie monitor</MetaLabel>
@@ -439,9 +417,9 @@ export default function ProgressPage() {
 
           {/* Silbernagel status */}
           {(() => {
-            const last3 = MOCK_TENDINOPATHY_DATA.slice(-3).map((d) => d.painDuring)
+            const last3 = tendinopathyData.slice(-3).map((d) => d.painDuring ?? 0)
             const latestPain =
-              MOCK_TENDINOPATHY_DATA[MOCK_TENDINOPATHY_DATA.length - 1]?.painDuring ?? 0
+              tendinopathyData[tendinopathyData.length - 1]?.painDuring ?? 0
             const rising = last3.length === 3 && last3[2] > last3[0] + 1
             let status: 'green' | 'yellow' | 'red' = 'green'
             if (latestPain > 7 || rising) status = 'red'
@@ -480,7 +458,7 @@ export default function ProgressPage() {
 
           {/* Multi-line mini chart */}
           {(() => {
-            const data = MOCK_TENDINOPATHY_DATA
+            const data = tendinopathyData
             const n = data.length
             return (
               <div className="flex flex-col gap-2">
@@ -493,7 +471,7 @@ export default function ProgressPage() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     points={data
-                      .map((d, i) => `${i * 30 + 5},${45 - (d.painDuring / 10) * 40}`)
+                      .map((d, i) => `${i * 30 + 5},${45 - ((d.painDuring ?? 0) / 10) * 40}`)
                       .join(' ')}
                   />
                   {/* painAfter24h — ice */}
@@ -572,6 +550,7 @@ export default function ProgressPage() {
             )
           })()}
         </Tile>
+        )}
 
         {/* Pain report CTA */}
         <Tile href="/patient/pain" accentBar={P.danger}>

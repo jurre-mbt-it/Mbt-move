@@ -152,7 +152,7 @@ function CardioProgramBuilderContent() {
 
   const { data: patientsData = [] } = trpc.patients.list.useQuery()
   const [form, setForm] = useState<CardioFormState>({ ...DEFAULT_STATE, patientId: prePatientId })
-  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [step, setStep] = useState<1 | 2>(1)
   const utils = trpc.useUtils()
   const createProgram = trpc.programs.create.useMutation()
   const saving = createProgram.isPending
@@ -225,11 +225,11 @@ function CardioProgramBuilderContent() {
             ← TERUG
           </Link>
           <div className="flex-1 flex flex-col gap-1">
-            <Kicker>Cardio · Stap {step} van 3</Kicker>
+            <Kicker>Cardio · Stap {step} van 2</Kicker>
             <Display size="sm">NIEUW PROGRAMMA</Display>
           </div>
           <div className="flex gap-1">
-            {([1, 2, 3] as const).map(s => (
+            {([1, 2] as const).map(s => (
               <div
                 key={s}
                 className="w-8 h-1 rounded-full"
@@ -349,15 +349,6 @@ function CardioProgramBuilderContent() {
               </div>
             </Tile>
 
-            <DarkButton variant="primary" className="w-full" onClick={() => setStep(2)}>
-              Volgende →
-            </DarkButton>
-          </div>
-        )}
-
-        {/* Stap 2: Activiteit & Protocol */}
-        {step === 2 && (
-          <div className="space-y-4">
             {/* Activiteit */}
             <Tile>
               <div className="space-y-3">
@@ -420,19 +411,14 @@ function CardioProgramBuilderContent() {
               </div>
             </Tile>
 
-            <div className="flex gap-3">
-              <DarkButton variant="secondary" className="flex-1" onClick={() => setStep(1)}>
-                Terug
-              </DarkButton>
-              <DarkButton variant="primary" className="flex-1" onClick={() => setStep(3)}>
-                Volgende →
-              </DarkButton>
-            </div>
+            <DarkButton variant="primary" className="w-full" onClick={() => setStep(2)}>
+              Volgende → Doelen & Intervallen
+            </DarkButton>
           </div>
         )}
 
-        {/* Stap 3: Doelen & Intervallen */}
-        {step === 3 && (
+        {/* Stap 2: Doelen & Intervallen */}
+        {step === 2 && (
           <div className="space-y-4">
             <Tile>
               <div className="space-y-4">
@@ -585,7 +571,7 @@ function CardioProgramBuilderContent() {
             </Tile>
 
             <div className="flex gap-3">
-              <DarkButton variant="secondary" className="flex-1" onClick={() => setStep(2)}>
+              <DarkButton variant="secondary" className="flex-1" onClick={() => setStep(1)}>
                 Terug
               </DarkButton>
               <DarkButton

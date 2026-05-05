@@ -648,8 +648,10 @@ function SessionPageInner() {
   // 1RM tracking: estimated 1RM per exercise (current session best) and PR tracker
   const [sessionOneRm, setSessionOneRm] = useState<Record<string, number>>({})  // uid -> best estimated 1RM this session
   const [sessionPRs, setSessionPRs] = useState<Record<string, number>>({})      // uid -> new PR value (if PR set)
-  // Mock previous best 1RM per exerciseId (would come from DB in production)
-  const MOCK_PREV_1RM: Record<string, number> = { '1': 88, '2': 0, '4': 65, '5': 0 }
+  // Hoogste ooit gelogde 1RM per exerciseId — echte data uit de DB.
+  const { data: prevOneRm = {} } = trpc.patient.getPersonalBests.useQuery(undefined, {
+    staleTime: 60_000,
+  })
 
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const feedbackTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -802,8 +804,8 @@ function SessionPageInner() {
     setSessionOneRm(prev => {
       const current = prev[uid] ?? 0
       if (estimated <= current) return prev
-      // Check against mock previous best
-      const prevBest = MOCK_PREV_1RM[exerciseId] ?? 0
+      // Vergelijk met all-time best uit de DB.
+      const prevBest = prevOneRm[exerciseId] ?? 0
       if (estimated > prevBest) {
         setSessionPRs(p => ({ ...p, [uid]: estimated }))
       }
@@ -1196,7 +1198,7 @@ function SessionPageInner() {
               const bestWeight = Math.max(...weights.filter(w => w > 0), 0)
               const reps = extraReps[e.uid] ?? e.reps
               const est1rm = bestWeight > 0 ? calcEpley(bestWeight, reps) : null
-              const prevBest = MOCK_PREV_1RM[e.exerciseId] ?? 0
+              const prevBest = prevOneRm[e.exerciseId] ?? 0
               const isPR = est1rm !== null && est1rm > prevBest && prevBest > 0
               return est1rm ? (
                 <div
