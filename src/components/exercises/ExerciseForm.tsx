@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useAutosave, loadDraft } from '@/hooks/useAutosave'
 import { VideoInput } from './VideoInput'
 import { MuscleLoadSliders } from './MuscleLoadSliders'
@@ -158,6 +158,8 @@ function Toggle({
 
 export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const roleBase = pathname?.startsWith('/athlete') ? '/athlete' : '/therapist'
   const [form, setForm] = useState<ExerciseFormData>({ ...defaultData, ...initialData })
   const [tagDraft, setTagDraft] = useState('')
   // Houdt het oefening-id bij dat we momenteel bewerken. Bij een nieuwe
@@ -211,7 +213,11 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
       // Navigeer naar de edit-pagina zodat de URL klopt en refresh blijft werken.
       // (history.replaceState triggert een PageTransition-remount waardoor de
       // form-state weg is.)
-      router.replace(`/therapist/exercises/${created.id}/edit`)
+      const dest =
+        roleBase === '/therapist'
+          ? `/therapist/exercises/${created.id}/edit`
+          : `/athlete/exercises/${created.id}`
+      router.replace(dest)
     }
   }
 
@@ -669,7 +675,7 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
           variant="secondary"
           onClick={async () => {
             try { await autosave.saveNow() } catch {}
-            router.push('/therapist/exercises')
+            router.push(`${roleBase}/exercises`)
           }}
           className="flex-1 md:flex-none relative"
         >

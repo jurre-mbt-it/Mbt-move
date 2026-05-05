@@ -63,6 +63,7 @@ export const gdprRouter = createTRPCRouter({
       sessionLogs,
       cardioLogs,
       wellnessChecks,
+      painEntries,
       messages,
       notifications,
       weekSchedules,
@@ -103,6 +104,7 @@ export const gdprRouter = createTRPCRouter({
       }),
       ctx.prisma.cardioLog.findMany({ where: { patientId: userId } }),
       ctx.prisma.wellnessCheck.findMany({ where: { userId } }),
+      ctx.prisma.painEntry.findMany({ where: { userId } }),
       ctx.prisma.message.findMany({
         where: { OR: [{ senderId: userId }, { recipientId: userId }] },
       }),
@@ -136,6 +138,7 @@ export const gdprRouter = createTRPCRouter({
       sessionLogs,
       cardioLogs,
       wellnessChecks,
+      painEntries,
       messages,
       notifications,
       weekSchedules,

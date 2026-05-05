@@ -294,6 +294,106 @@ export const patientRouter = createTRPCRouter({
       return sessionLog
     }),
 
+  // ── Log a completed cardio session ───────────────────────────────────────
+
+  logCardioSession: protectedProcedure
+    .input(
+      z.object({
+        programId: z.string().nullable().optional(),
+        activity: z.enum([
+          'RUNNING', 'CYCLING', 'ROWING', 'SWIMMING', 'CROSSTRAINER',
+          'WALKING', 'SKIERG', 'ASSAULT_BIKE', 'WATTBIKE', 'STAIRCLIMBER', 'OTHER',
+        ]),
+        protocol: z.enum([
+          'STEADY_STATE', 'INTERVALS', 'TEMPO', 'FARTLEK',
+          'ZONE_TRAINING', 'THRESHOLD', 'LONG_SLOW_DISTANCE', 'WALK_RUN',
+        ]),
+        durationSec: z.number().int().min(0),
+        distanceM: z.number().int().min(0).nullable().optional(),
+        avgHeartRate: z.number().int().min(40).max(220).nullable().optional(),
+        maxHeartRate: z.number().int().min(40).max(220).nullable().optional(),
+        zone: z.number().int().min(1).max(5).nullable().optional(),
+        rpe: z.number().int().min(1).max(10).nullable().optional(),
+        painLevel: z.number().int().min(0).max(10).nullable().optional(),
+        notes: z.string().max(1000).nullable().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const rl = await rateLimit('patient.logCardioSession', ctx.user.id, RATE_LIMITS.sessionLog)
+      if (!rl.ok) {
+        throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
+      }
+      const log = await ctx.prisma.cardioLog.create({
+        data: {
+          patientId: ctx.user.id,
+          programId: input.programId ?? null,
+          activity: input.activity,
+          protocol: input.protocol,
+          durationSec: input.durationSec,
+          distanceM: input.distanceM ?? null,
+          avgHeartRate: input.avgHeartRate ?? null,
+          maxHeartRate: input.maxHeartRate ?? null,
+          zone: input.zone ?? null,
+          rpe: input.rpe ?? null,
+          painLevel: input.painLevel ?? null,
+          notes: input.notes ?? null,
+        },
+        select: { id: true },
+      })
+      await auditLog({
+        event: 'CARDIO_SESSION_LOGGED',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        resource: 'CardioLog',
+        resourceId: log.id,
+        metadata: {
+          activity: input.activity,
+          protocol: input.protocol,
+          durationSec: input.durationSec,
+        },
+        req: ctx.req,
+      })
+      return log
+    }),
+
+  // ── Log a stand-alone pain report ────────────────────────────────────────
+
+  reportPain: protectedProcedure
+    .input(
+      z.object({
+        nrs: z.number().int().min(0).max(10),
+        location: z.string().min(1).max(80),
+        context: z.enum(['rest', 'movement', 'exercise', 'after', 'always']),
+        notes: z.string().max(1000).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const rl = await rateLimit('patient.reportPain', ctx.user.id, RATE_LIMITS.sessionLog)
+      if (!rl.ok) {
+        throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
+      }
+      const entry = await ctx.prisma.painEntry.create({
+        data: {
+          userId: ctx.user.id,
+          nrs: input.nrs,
+          location: input.location,
+          context: input.context,
+          notes: input.notes ?? null,
+        },
+        select: { id: true },
+      })
+      await auditLog({
+        event: 'PAIN_REPORTED',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        resource: 'PainEntry',
+        resourceId: entry.id,
+        metadata: { nrs: input.nrs, context: input.context },
+        req: ctx.req,
+      })
+      return entry
+    }),
+
   // ── Last weights per exercise ─────────────────────────────────────────────
 
   /**

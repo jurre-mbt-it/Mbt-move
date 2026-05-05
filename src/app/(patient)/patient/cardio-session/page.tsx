@@ -10,6 +10,7 @@ import {
 import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, HR_ZONES, HRZone } from '@/lib/cardio-constants'
 import { CARDIO_ICON_MAP, IconRunning, IconWalking, IconWarning, IconFinishFlag, IconCheck } from '@/components/icons'
 import { P, Kicker, MetaLabel, Tile, DarkButton, DarkInput, CATEGORY_COLORS } from '@/components/dark-ui'
+import { trpc } from '@/lib/trpc/client'
 
 // ── Mock sessie data ──────────────────────────────────────────────────────────
 
@@ -267,6 +268,10 @@ function FeedbackModal({
 
 export default function CardioSessionPage() {
   const router = useRouter()
+  const utils = trpc.useUtils()
+  const logCardio = trpc.patient.logCardioSession.useMutation()
+  // TODO: vervang door echte sessie via active cardio program zodra cardio-programma's
+  // gepersisteerd worden (zie programs/new/cardio).
   const session = MOCK_SESSION
 
   const [phase, setPhase] = useState<SessionPhase>('IDLE')
@@ -358,14 +363,32 @@ export default function CardioSessionPage() {
     }
   }
 
-  const handleFeedbackSubmit = (data: { rpe: number; painLevel: number; hrAvg: number | null; distance: number | null }) => {
-    console.log('Cardio log:', { ...data, duration: elapsedSec })
-    if (data.painLevel >= 5) {
-      toast.error('Pijn gemeld aan therapeut. Volgende sessie wordt herhaald.')
-    } else {
-      toast.success('Cardio sessie opgeslagen! Goed gedaan!')
+  const handleFeedbackSubmit = async (data: { rpe: number; painLevel: number; hrAvg: number | null; distance: number | null }) => {
+    try {
+      await logCardio.mutateAsync({
+        activity: session.activity,
+        protocol: session.protocol,
+        durationSec: elapsedSec,
+        distanceM: data.distance != null ? Math.round(data.distance * 1000) : null,
+        avgHeartRate: data.hrAvg,
+        zone: session.targetZone,
+        rpe: data.rpe,
+        painLevel: data.painLevel,
+      })
+      await Promise.all([
+        utils.patient.getSessionHistory.invalidate(),
+        utils.patient.getRecoverySessions.invalidate(),
+      ])
+      if (data.painLevel >= 5) {
+        toast.error('Pijn gemeld aan therapeut. Volgende sessie wordt herhaald.')
+      } else {
+        toast.success('Cardio sessie opgeslagen! Goed gedaan!')
+      }
+      router.push('/patient/dashboard')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Opslaan mislukt'
+      toast.error(msg)
     }
-    router.push('/patient/schedule')
   }
 
   const activityInfo = CARDIO_ACTIVITIES[session.activity]

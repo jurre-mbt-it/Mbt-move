@@ -233,4 +233,16 @@ export const adminRouter = createTRPCRouter({
 
       return { ok: true, user }
     }),
+
+  // ── Dashboard stats ───────────────────────────────────────────────────
+
+  getStats: adminProcedure.query(async ({ ctx }) => {
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const [totalUsers, mfaEnabled, sessionsThisWeek] = await Promise.all([
+      ctx.prisma.user.count(),
+      ctx.prisma.user.count({ where: { mfaEnabled: true } }),
+      ctx.prisma.sessionLog.count({ where: { completedAt: { gte: since } } }),
+    ])
+    return { totalUsers, mfaEnabled, sessionsThisWeek }
+  }),
 })

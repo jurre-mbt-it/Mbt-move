@@ -269,6 +269,7 @@ model User {
   researchConsent        ResearchConsent?
   favoriteExercises      FavoriteExercise[]
   wellnessChecks         WellnessCheck[]
+  painEntries            PainEntry[]
   invitesSent            InviteCode[]           @relation("InviteSender")
   auditLogs              AuditLog[]
   mfaBackupCodes         MfaBackupCode[]
@@ -326,6 +327,21 @@ model WellnessCheck {
   @@unique([userId, date])
   @@index([userId, date])
   @@map("wellness_checks")
+}
+
+model PainEntry {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  nrs       Int      // 0-10 NRS pain scale
+  location  String   // e.g. "Knie links"
+  context   String   // 'rest' | 'movement' | 'exercise' | 'after' | 'always'
+  notes     String?
+  reportedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([userId, reportedAt])
+  @@map("pain_entries")
 }
 
 enum PatientAccessStatus {

@@ -3,8 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, CheckCircle2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { PAIN_CONTEXT_ICON_MAP } from '@/components/icons'
 import { P, Kicker, MetaLabel, Tile, DarkButton, DarkTextarea } from '@/components/dark-ui'
+import { trpc } from '@/lib/trpc/client'
+
+type PainContext = 'rest' | 'movement' | 'exercise' | 'after' | 'always'
 
 const LOCATIONS = [
   'Knie links', 'Knie rechts',
@@ -36,17 +40,28 @@ const NRS_LABELS: Record<number, string> = { 0: 'Geen pijn', 3: 'Mild', 5: 'Mati
 
 export default function PainReportPage() {
   const router = useRouter()
+  const reportPain = trpc.patient.reportPain.useMutation()
   const [nrs, setNrs] = useState<number | null>(null)
   const [location, setLocation] = useState<string | null>(null)
-  const [context, setContext] = useState<string | null>(null)
+  const [context, setContext] = useState<PainContext | null>(null)
   const [notes, setNotes] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
-  const canSubmit = nrs !== null && location !== null && context !== null
+  const canSubmit = nrs !== null && location !== null && context !== null && !reportPain.isPending
 
-  const handleSubmit = () => {
-    if (!canSubmit) return
-    setSubmitted(true)
+  const handleSubmit = async () => {
+    if (nrs === null || !location || !context) return
+    try {
+      await reportPain.mutateAsync({
+        nrs,
+        location,
+        context,
+        notes: notes.trim() || undefined,
+      })
+      setSubmitted(true)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Opslaan mislukt')
+    }
   }
 
   if (submitted) {
@@ -210,7 +225,7 @@ export default function PainReportPage() {
               return (
                 <button
                   key={c.value}
-                  onClick={() => setContext(selected ? null : c.value)}
+                  onClick={() => setContext(selected ? null : (c.value as PainContext))}
                   className="athletic-tap flex items-center gap-2 px-3 py-3 rounded-2xl transition-all text-left"
                   style={{
                     background: selected ? 'rgba(190,242,100,0.10)' : P.surfaceLow,
@@ -245,7 +260,7 @@ export default function PainReportPage() {
           size="lg"
           variant={canSubmit ? 'primary' : 'secondary'}
         >
-          RAPPORTEER PIJN
+          {reportPain.isPending ? 'OPSLAAN…' : 'RAPPORTEER PIJN'}
         </DarkButton>
       </div>
     </div>

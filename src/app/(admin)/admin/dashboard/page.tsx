@@ -1,15 +1,7 @@
-import { ActionTile, Kicker, MetaLabel, MetricTile, P, Tile } from '@/components/dark-ui'
+'use client'
 
-export const metadata = {
-  title: 'Admin Dashboard – MBT Gym',
-}
-
-const stats = [
-  { label: 'Total Users', value: '—', tint: P.lime },
-  { label: 'Active Sessions', value: '—', tint: P.ice },
-  { label: 'MFA Enabled', value: '—', tint: P.gold },
-  { label: 'System Status', value: 'OK', tint: P.lime },
-]
+import { ActionTile, Kicker, MetaLabel, MetricTile, P } from '@/components/dark-ui'
+import { trpc } from '@/lib/trpc/client'
 
 const quickLinks = [
   { href: '/admin/users', label: 'Users & rollen', description: 'Wijs rollen toe + koppel aan praktijk', bar: P.lime },
@@ -22,6 +14,18 @@ const quickLinks = [
 ]
 
 export default function AdminDashboard() {
+  const stats = trpc.admin.getStats.useQuery()
+
+  const display = (n: number | undefined) =>
+    stats.isLoading ? '…' : n != null ? n.toLocaleString('nl-NL') : '—'
+
+  const tiles = [
+    { label: 'Total Users', value: display(stats.data?.totalUsers), tint: P.lime },
+    { label: 'Sessions (7d)', value: display(stats.data?.sessionsThisWeek), tint: P.ice },
+    { label: 'MFA Enabled', value: display(stats.data?.mfaEnabled), tint: P.gold },
+    { label: 'System Status', value: 'OK', tint: P.lime },
+  ]
+
   return (
     <div className="max-w-5xl w-full flex flex-col gap-6">
       <div className="flex flex-col gap-1">
@@ -38,7 +42,7 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {stats.map((stat) => (
+        {tiles.map((stat) => (
           <MetricTile key={stat.label} label={stat.label} value={stat.value} tint={stat.tint} />
         ))}
       </div>
@@ -49,16 +53,6 @@ export default function AdminDashboard() {
           <ActionTile key={href} href={href} label={label} sub={description} bar={bar} />
         ))}
       </div>
-
-      <Tile>
-        <MetaLabel>User Management</MetaLabel>
-        <div
-          className="flex items-center justify-center h-32"
-          style={{ color: P.inkMuted, fontSize: 13 }}
-        >
-          Connect Supabase to manage users here.
-        </div>
-      </Tile>
     </div>
   )
 }
