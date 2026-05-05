@@ -718,6 +718,17 @@ export const patientRouter = createTRPCRouter({
 
   // ── Tendinopathy pain follow-up (24u na sessie) ───────────────────────────
 
+  hasTendinopathyProgram: protectedProcedure.query(async ({ ctx }) => {
+    const count = await ctx.prisma.program.count({
+      where: {
+        patientId: ctx.user!.id,
+        status: 'ACTIVE',
+        tendinopathyMode: true,
+      },
+    })
+    return count > 0
+  }),
+
   getPendingPainFollowUps: protectedProcedure.query(async ({ ctx }) => {
     // Sessies tussen 16u en 48u geleden waar tendinopathy mode aan stond,
     // met exercise-logs die painDuring hebben maar geen painAfter24h.

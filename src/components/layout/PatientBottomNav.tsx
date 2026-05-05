@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { P } from '@/components/dark-ui'
+import { trpc } from '@/lib/trpc/client'
 
 // 5 tabs: HOME / SCHEMA / + (quick-log sheet) / TRAINING / INSTELLINGEN
 const NAV_ITEMS = [
@@ -25,22 +26,28 @@ const NAV_ITEMS = [
   { href: '/patient/settings', label: 'INSTELLINGEN', icon: Settings },
 ]
 
-const QUICK_ACTIONS: Array<{
+type QuickAction = {
   href: string
   label: string
   sub: string
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>
   color: string
-}> = [
+  /** Only show if the patient has at least one ACTIVE program with tendinopathyMode on. */
+  tendinopathyOnly?: boolean
+}
+
+const QUICK_ACTIONS: QuickAction[] = [
   { href: '/patient/wellness', label: 'Wellness check', sub: 'Slaap, energie, stemming', icon: Activity, color: P.ice },
   { href: '/patient/pain', label: 'Pijn rapporteren', sub: 'Los van een sessie', icon: Heart, color: P.danger },
   { href: '/patient/cardio-session', label: 'Cardio sessie', sub: 'Walk-run, zone 2', icon: Dumbbell, color: P.lime },
-  { href: '/patient/follow-up', label: '24u follow-up', sub: 'Pijn na sessie checken', icon: Clock, color: P.gold },
+  { href: '/patient/follow-up', label: '24u follow-up', sub: 'Pijn na sessie checken', icon: Clock, color: P.gold, tendinopathyOnly: true },
 ]
 
 export function PatientBottomNav() {
   const pathname = usePathname()
   const [sheetOpen, setSheetOpen] = useState(false)
+  const { data: hasTendinopathy = false } = trpc.patient.hasTendinopathyProgram.useQuery()
+  const quickActions = QUICK_ACTIONS.filter(a => !a.tendinopathyOnly || hasTendinopathy)
 
   // Render exact 5 cells: 2 left tabs, FAB+, 2 right tabs.
   return (
@@ -82,7 +89,7 @@ export function PatientBottomNav() {
               </button>
             </div>
             <div className="flex flex-col gap-2">
-              {QUICK_ACTIONS.map(({ href, label, sub, icon: Icon, color }) => (
+              {quickActions.map(({ href, label, sub, icon: Icon, color }) => (
                 <Link
                   key={href}
                   href={href}
