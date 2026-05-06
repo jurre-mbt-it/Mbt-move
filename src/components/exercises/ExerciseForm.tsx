@@ -167,6 +167,9 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
   const [currentExerciseId, setCurrentExerciseId] = useState<string | undefined>(exerciseId)
 
   const utils = trpc.useUtils()
+  const { data: me } = trpc.auth.getMe.useQuery()
+  const isAdmin = me?.role === 'ADMIN'
+  const practiceName = me?.practiceName ?? null
   const createMutation = trpc.exercises.create.useMutation({
     onSuccess: () => {
       void utils.exercises.list.invalidate()
@@ -459,37 +462,89 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
             )}
           </div>
 
-          <div
-            className="flex items-center justify-between rounded-xl"
-            style={{
-              background: P.surface,
-              border: `1px solid ${P.line}`,
-              padding: '12px 14px',
-            }}
-          >
-            <div>
-              <p
-                style={{
-                  color: P.ink,
-                  fontSize: 13,
-                  fontWeight: 800,
-                  letterSpacing: '0.01em',
-                }}
-              >
-                PUBLIEK BESCHIKBAAR
-              </p>
-              <p
-                style={{
-                  color: P.inkMuted,
-                  fontSize: 12,
-                  marginTop: 2,
-                }}
-              >
-                Zichtbaar voor alle therapeuten in de praktijk
-              </p>
+          {/* Zichtbaarheid wordt server-side bepaald op basis van rol/praktijk:
+              - ADMIN  → globaal
+              - Therapeut met praktijk → alleen die praktijk
+              - Therapeut zonder praktijk → alleen jezelf
+              Admin heeft de toggle nog wel (om handmatig naar non-public te
+              zetten als dat ooit nodig is). Voor andere rollen tonen we
+              alleen een info-pill — geen toggle. */}
+          {isAdmin ? (
+            <div
+              className="flex items-center justify-between rounded-xl"
+              style={{
+                background: P.surface,
+                border: `1px solid ${P.line}`,
+                padding: '12px 14px',
+              }}
+            >
+              <div>
+                <p
+                  style={{
+                    color: P.ink,
+                    fontSize: 13,
+                    fontWeight: 800,
+                    letterSpacing: '0.01em',
+                  }}
+                >
+                  GLOBAAL VOOR IEDEREEN
+                </p>
+                <p
+                  style={{
+                    color: P.inkMuted,
+                    fontSize: 12,
+                    marginTop: 2,
+                  }}
+                >
+                  Admin-oefeningen zijn standaard zichtbaar voor álle therapeuten en praktijken op het platform.
+                </p>
+              </div>
+              <Toggle checked={form.isPublic} onChange={v => set('isPublic', v)} />
             </div>
-            <Toggle checked={form.isPublic} onChange={v => set('isPublic', v)} />
-          </div>
+          ) : (
+            <div
+              className="flex items-start gap-3 rounded-xl"
+              style={{
+                background: P.surface,
+                border: `1px solid ${P.line}`,
+                padding: '12px 14px',
+              }}
+            >
+              <span
+                className="shrink-0 rounded-full"
+                style={{
+                  background: practiceName ? P.lime : P.inkMuted,
+                  width: 8,
+                  height: 8,
+                  marginTop: 5,
+                }}
+              />
+              <div className="min-w-0 flex-1">
+                <p
+                  style={{
+                    color: P.ink,
+                    fontSize: 13,
+                    fontWeight: 800,
+                    letterSpacing: '0.01em',
+                  }}
+                >
+                  ZICHTBAARHEID
+                </p>
+                <p
+                  style={{
+                    color: P.inkMuted,
+                    fontSize: 12,
+                    marginTop: 2,
+                    lineHeight: '17px',
+                  }}
+                >
+                  {practiceName
+                    ? <>Deze oefening komt in de bibliotheek van praktijk <strong style={{ color: P.ink }}>{practiceName}</strong> — zichtbaar voor alle therapeuten binnen deze praktijk. Globale (admin-)oefeningen blijven daarnaast voor iedereen zichtbaar.</>
+                    : 'Deze oefening is alleen voor jou zichtbaar — je bent niet aan een praktijk gekoppeld.'}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </Section>
 

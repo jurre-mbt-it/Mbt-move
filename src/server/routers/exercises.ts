@@ -158,14 +158,28 @@ export const exercisesRouter = createTRPCRouter({
   create: creatorProcedure
     .input(ExerciseInput)
     .mutation(async ({ ctx, input }) => {
-      // Duplicate prevention: check for exercises with same name (case-insensitive)
+      // Visibility-regel — server-side enforced, client kan niet self-promoten:
+      //   - ADMIN  → globaal  (isPublic = true,  practiceId = null)
+      //   - THERAPIST/ATHLETE met praktijk → praktijk-scoped (isPublic = false, practiceId = mijn praktijk)
+      //   - THERAPIST/ATHLETE zonder praktijk → persoonlijk (isPublic = false, practiceId = null)
+      const isAdmin = ctx.user!.role === 'ADMIN'
+      const enforcedIsPublic = isAdmin
+      const enforcedPracticeId = isAdmin ? null : ctx.user!.practiceId ?? null
+
+      // Duplicate prevention: check op naam binnen alle oefeningen die deze
+      // user al kan zien (eigen + globaal + praktijk-scoped). Dit voorkomt
+      // dubbele entries in de praktijk-bibliotheek.
+      const dupVisibility: Array<Record<string, unknown>> = [
+        { createdById: ctx.user!.id },
+        { isPublic: true },
+      ]
+      if (ctx.user!.practiceId) {
+        dupVisibility.push({ practiceId: ctx.user!.practiceId })
+      }
       const existing = await ctx.prisma.exercise.findFirst({
         where: {
           name: { equals: input.name, mode: 'insensitive' },
-          OR: [
-            { createdById: ctx.user!.id },
-            { isPublic: true },
-          ],
+          OR: dupVisibility,
         },
         select: { id: true, name: true },
       })
@@ -183,8 +197,8 @@ export const exercisesRouter = createTRPCRouter({
           ...data,
           id,
           createdById: ctx.user!.id,
-          // Scope naar eigen praktijk tenzij admin expliciet public maakt.
-          practiceId: data.isPublic ? null : ctx.user!.practiceId ?? null,
+          isPublic: enforcedIsPublic,
+          practiceId: enforcedPracticeId,
           muscleLoads: {
             create: Object.entries(muscleLoads).map(([muscle, load]) => ({
               id: createId(),
@@ -207,8 +221,8 @@ export const exercisesRouter = createTRPCRouter({
       const { id, muscleLoads, ...data } = input
       const existing = await ctx.prisma.exercise.findUnique({ where: { id } })
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
-      const canEdit = existing.createdById === ctx.user!.id
-        || ctx.user!.role === 'ADMIN'
+      const isAdmin = ctx.user!.role === 'ADMIN'
+      const canEdit = existing.createdById === ctx.user!.id || isAdmin
       if (!canEdit) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
@@ -216,10 +230,19 @@ export const exercisesRouter = createTRPCRouter({
       // Replace all muscle loads
       await ctx.prisma.muscleLoad.deleteMany({ where: { exerciseId: id } })
 
+      // Voorkom dat een non-admin zichzelf promoot naar globaal of de
+      // praktijk-scope wijzigt — daar gaat alleen ADMIN over.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { isPublic: _ignoredIsPublic, ...rest } = data
+      const updateData: Record<string, unknown> = { ...rest }
+      if (isAdmin) {
+        updateData.isPublic = data.isPublic
+      }
+
       const exercise = await ctx.prisma.exercise.update({
         where: { id },
         data: {
-          ...data,
+          ...updateData,
           muscleLoads: {
             create: Object.entries(muscleLoads).map(([muscle, load]) => ({
               id: createId(),

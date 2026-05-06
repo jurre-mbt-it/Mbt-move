@@ -55,6 +55,8 @@ export const authRouter = createTRPCRouter({
         injuryVisibleToTherapist: true,
         mfaEnabled: true,
         createdAt: true,
+        practiceId: true,
+        practice: { select: { id: true, name: true } },
       },
     })
 
@@ -64,8 +66,10 @@ export const authRouter = createTRPCRouter({
 
     // MFA-enforcement voor kritieke rollen.
     const mfaRequired = roleRequiresMfa(user.role)
+    const { practice, ...rest } = user
     return {
-      ...user,
+      ...rest,
+      practiceName: practice?.name ?? null,
       mfaRequired,
       mfaEnforcementPending: mfaRequired && !user.mfaEnabled,
     }
