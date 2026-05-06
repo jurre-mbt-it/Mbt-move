@@ -60,6 +60,7 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
   return (
     <Dialog open={open} onOpenChange={open => { if (!open) onClose() }}>
       <DialogContent
+        hideCloseButton
         className="max-w-md mx-auto p-0 overflow-hidden gap-0"
         style={{ borderRadius: '20px', maxHeight: '90vh', overflowY: 'auto' }}
       >

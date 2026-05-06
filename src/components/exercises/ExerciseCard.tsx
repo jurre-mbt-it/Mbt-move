@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Play, Edit, MoreHorizontal, PlayCircle } from 'lucide-react'
+import { Play, Edit, MoreHorizontal, PlayCircle, Heart } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,10 +26,13 @@ interface ExerciseCardProps {
     thumbnailUrl?: string | null
     description?: string | null
     tags?: string[]
+    isFavorite?: boolean
   }
   onAddToCollection?: (id: string) => void
   /** When provided, clicking the card calls this instead of navigating to edit */
   onPreview?: () => void
+  /** When provided, toont een hartje rechts-boven op de thumbnail. */
+  onToggleFavorite?: (id: string, currentlyFavorite: boolean) => void
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -42,7 +45,12 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 const DIFFICULTY_DOTS = { BEGINNER: 1, INTERMEDIATE: 2, ADVANCED: 3 }
 
-export function ExerciseCard({ exercise, onAddToCollection, onPreview }: ExerciseCardProps) {
+export function ExerciseCard({
+  exercise,
+  onAddToCollection,
+  onPreview,
+  onToggleFavorite,
+}: ExerciseCardProps) {
   const category = EXERCISE_CATEGORIES.find(c => c.value === exercise.category)
   const difficulty = DIFFICULTIES.find(d => d.value === exercise.difficulty)
   const color = CATEGORY_COLORS[exercise.category] ?? '#BEF264'
@@ -107,13 +115,36 @@ export function ExerciseCard({ exercise, onAddToCollection, onPreview }: Exercis
           </span>
         </div>
 
-        {/* Difficulty dots */}
-        <div className="absolute top-2 right-2 flex gap-0.5">
+        {/* Favorite heart — top-right */}
+        {onToggleFavorite && (
+          <button
+            type="button"
+            aria-label={exercise.isFavorite ? 'Verwijder uit favorieten' : 'Voeg toe aan favorieten'}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              onToggleFavorite(exercise.id, exercise.isFavorite ?? false)
+            }}
+            className="absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center bg-black/40 hover:bg-black/60 transition-colors"
+          >
+            <Heart
+              className="w-4 h-4 transition-all"
+              style={{
+                color: exercise.isFavorite ? '#f87171' : '#ffffff',
+                fill: exercise.isFavorite ? '#f87171' : 'transparent',
+                strokeWidth: exercise.isFavorite ? 2 : 1.8,
+              }}
+            />
+          </button>
+        )}
+
+        {/* Difficulty dots — bottom-right zodat het hartje top-right kan staan */}
+        <div className="absolute bottom-2 right-2 flex gap-0.5 px-1.5 py-1 rounded-full bg-black/30">
           {[1, 2, 3].map(n => (
             <span
               key={n}
-              className="w-2 h-2 rounded-full"
-              style={{ background: n <= dots ? color : `${color}40` }}
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ background: n <= dots ? color : `${color}50` }}
             />
           ))}
         </div>

@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
+import { Heart } from 'lucide-react'
 import { ExerciseCard } from '@/components/exercises/ExerciseCard'
 import { ExerciseVideoModal, type ExerciseForModal } from '@/components/exercises/ExerciseVideoModal'
 import {
@@ -33,6 +34,7 @@ type ExerciseItem = {
   description?: string | null
   tags?: string[]
   muscleLoads?: Record<string, number>
+  isFavorite?: boolean
 }
 
 export default function ExercisesPage() {
@@ -42,11 +44,19 @@ export default function ExercisesPage() {
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null)
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null)
   const [activeCollection, setActiveCollection] = useState<string | null>(null)
+  const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [showFilters, setShowFilters] = useState(true)
   const [modalExercise, setModalExercise] = useState<ExerciseForModal | null>(null)
 
+  const utils = trpc.useUtils()
   const { data: exercises = [], isLoading } = trpc.exercises.list.useQuery(undefined, {
     staleTime: 30_000,
+  })
+
+  const toggleFavorite = trpc.exercises.toggleFavorite.useMutation({
+    onSuccess: () => {
+      void utils.exercises.list.invalidate()
+    },
   })
 
   const { data: collections = [] } = trpc.exercises.listCollections.useQuery(undefined, {
@@ -75,10 +85,13 @@ export default function ExercisesPage() {
       if (selectedDifficulty && ex.difficulty !== selectedDifficulty) return false
       // Filter by collection
       if (activeCollection && collectionExerciseIds && !collectionExerciseIds.has(ex.id)) return false
+      // Filter op favorieten
+      if (favoritesOnly && !ex.isFavorite) return false
       return true
     })
-  }, [exercises, query, selectedCategory, selectedRegion, selectedDifficulty, activeCollection, collectionExerciseIds])
+  }, [exercises, query, selectedCategory, selectedRegion, selectedDifficulty, activeCollection, collectionExerciseIds, favoritesOnly])
 
+  const favoritesCount = (exercises as ExerciseItem[]).filter((ex) => ex.isFavorite).length
   const activeFilterCount = [selectedCategory, selectedRegion, selectedDifficulty].filter(Boolean).length
 
   const clearFilters = () => {
@@ -260,6 +273,31 @@ export default function ExercisesPage() {
             )}
           </div>
 
+          <button
+            type="button"
+            onClick={() => setFavoritesOnly((v) => !v)}
+            aria-pressed={favoritesOnly}
+            aria-label={favoritesOnly ? 'Toon alle oefeningen' : 'Toon alleen favorieten'}
+            className="athletic-tap inline-flex items-center gap-1.5 px-3 py-2 rounded-xl transition-colors"
+            style={{
+              background: favoritesOnly ? 'rgba(248,113,113,0.12)' : 'transparent',
+              border: `1px solid ${favoritesOnly ? '#f87171' : P.lineStrong}`,
+              color: favoritesOnly ? '#f87171' : P.inkMuted,
+              fontSize: 12,
+              fontWeight: 800,
+              letterSpacing: '0.04em',
+            }}
+          >
+            <Heart
+              className="w-3.5 h-3.5"
+              style={{
+                fill: favoritesOnly ? '#f87171' : 'transparent',
+                strokeWidth: 2,
+              }}
+            />
+            {favoritesOnly ? 'Favorieten' : `Favorieten${favoritesCount > 0 ? ` · ${favoritesCount}` : ''}`}
+          </button>
+
           <DarkButton
             variant="secondary"
             size="sm"
@@ -424,6 +462,7 @@ export default function ExercisesPage() {
                 key={ex.id}
                 exercise={ex}
                 onPreview={() => openPreview(ex)}
+                onToggleFavorite={(id) => toggleFavorite.mutate({ exerciseId: id })}
               />
             ))}
           </div>
@@ -461,6 +500,27 @@ export default function ExercisesPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleFavorite.mutate({ exerciseId: ex.id })
+                      }}
+                      aria-label={ex.isFavorite ? 'Verwijder uit favorieten' : 'Voeg toe aan favorieten'}
+                      className="athletic-tap w-7 h-7 rounded-full flex items-center justify-center"
+                      style={{
+                        background: ex.isFavorite ? 'rgba(248,113,113,0.12)' : P.surfaceHi,
+                      }}
+                    >
+                      <Heart
+                        className="w-3.5 h-3.5"
+                        style={{
+                          color: ex.isFavorite ? '#f87171' : P.inkMuted,
+                          fill: ex.isFavorite ? '#f87171' : 'transparent',
+                          strokeWidth: 2,
+                        }}
+                      />
+                    </button>
                     <span
                       className="athletic-mono px-2 py-0.5 rounded-full"
                       style={{
