@@ -7,6 +7,7 @@ const quickLinks = [
   { href: '/admin/users', label: 'Users & rollen', description: 'Wijs rollen toe + koppel aan praktijk', bar: P.lime },
   { href: '/admin/practices', label: 'Praktijken', description: 'Multi-tenant groepen beheren', bar: P.ice },
   { href: '/admin/rehab-protocols', label: 'Revalidatie-protocollen', description: 'Protocol-catalog + criteria bewerken', bar: P.purple },
+  { href: '/admin/cohort', label: 'Cohort analytics', description: 'Platform-aggregaten over alle gebruikers (opt-out gerespecteerd)', bar: P.lime },
   { href: '/therapist/patients', label: 'Patiënten', description: 'Beheer patiënten en hun programma\'s', bar: P.purple },
   { href: '/therapist/exercises', label: 'Oefeningen', description: 'Oefeningenbibliotheek beheren', bar: P.gold },
   { href: '/therapist/programs', label: "Programma's", description: "Revalidatieprogramma's beheren", bar: P.ice },

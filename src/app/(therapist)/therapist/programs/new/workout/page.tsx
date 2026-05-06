@@ -60,7 +60,270 @@ function zoneColor(zone: HRZone): string {
   return CATEGORY_COLORS[`Z${zone}` as 'Z1' | 'Z2' | 'Z3' | 'Z4' | 'Z5']
 }
 
-// ── Interval editor ───────────────────────────────────────────────────────────
+// ── Visual interval editor ────────────────────────────────────────────────────
+// TrainingPeaks-style: horizontale tijdlijn waar elk blok een interval is,
+// breedte proportioneel aan duur. Klik om te bewerken, ✕ om te verwijderen.
+
+const fmtDuration = (sec: number): string => {
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  if (m === 0) return `${s}s`
+  if (s === 0) return `${m}m`
+  return `${m}m ${s}s`
+}
+
+function WorkoutTimeline({ intervals }: { intervals: CardioInterval[] }) {
+  // Bereken totale tijd over alle blokken (×repetitions).
+  const total = intervals.reduce(
+    (sum, iv) =>
+      sum + iv.repetitions * (iv.workDuration + iv.restDuration),
+    0,
+  )
+  if (total === 0) {
+    return (
+      <div
+        className="athletic-mono w-full rounded-lg flex items-center justify-center"
+        style={{
+          background: P.surfaceHi,
+          height: 56,
+          color: P.inkDim,
+          fontSize: 11,
+          letterSpacing: '0.12em',
+        }}
+      >
+        TIJDLIJN VERSCHIJNT ZODRA JE EEN BLOK TOEVOEGT
+      </div>
+    )
+  }
+
+  // Bouw flat-segments: voor elk blok rep × (work + rest).
+  type Seg = { kind: 'work' | 'rest'; sec: number; label: string; group: number }
+  const segments: Seg[] = []
+  intervals.forEach((iv, idx) => {
+    const reps = Math.max(1, iv.repetitions)
+    for (let r = 0; r < reps; r++) {
+      segments.push({
+        kind: 'work',
+        sec: iv.workDuration,
+        label: iv.label ?? `Blok ${idx + 1}`,
+        group: idx,
+      })
+      if (iv.restDuration > 0) {
+        segments.push({ kind: 'rest', sec: iv.restDuration, label: 'Rust', group: idx })
+      }
+    }
+  })
+
+  return (
+    <div className="space-y-1.5">
+      <div
+        className="w-full overflow-hidden rounded-lg flex"
+        style={{ height: 56, background: P.surfaceLow, border: `1px solid ${P.line}` }}
+      >
+        {segments.map((seg, i) => {
+          const widthPct = (seg.sec / total) * 100
+          const bg =
+            seg.kind === 'work'
+              ? `linear-gradient(180deg, ${P.lime} 0%, ${P.lime}cc 100%)`
+              : P.surfaceHi
+          return (
+            <div
+              key={i}
+              className="flex items-center justify-center overflow-hidden"
+              style={{
+                width: `${widthPct}%`,
+                background: bg,
+                borderRight:
+                  i < segments.length - 1 ? `1px solid ${P.bg}` : 'none',
+                color: seg.kind === 'work' ? P.bg : P.inkMuted,
+                fontSize: 9,
+                fontWeight: 900,
+                letterSpacing: '0.04em',
+              }}
+              title={`${seg.label} · ${fmtDuration(seg.sec)}`}
+            >
+              {widthPct > 5 && (
+                <span className="athletic-mono truncate px-1">
+                  {seg.kind === 'work' ? fmtDuration(seg.sec) : ''}
+                </span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <div className="flex items-center justify-between">
+        <span
+          className="athletic-mono"
+          style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.12em' }}
+        >
+          0:00
+        </span>
+        <span
+          className="athletic-mono"
+          style={{ color: P.lime, fontSize: 11, letterSpacing: '0.08em', fontWeight: 900 }}
+        >
+          TOTAAL · {fmtDuration(total)}
+        </span>
+        <span
+          className="athletic-mono"
+          style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.12em' }}
+        >
+          {fmtDuration(total)}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function IntervalBlock({
+  iv,
+  index,
+  expanded,
+  onToggle,
+  onUpdate,
+  onRemove,
+}: {
+  iv: CardioInterval
+  index: number
+  expanded: boolean
+  onToggle: () => void
+  onUpdate: (key: keyof CardioInterval, val: string | number) => void
+  onRemove: () => void
+}) {
+  const blockTotal = iv.repetitions * (iv.workDuration + iv.restDuration)
+  const workPct =
+    iv.workDuration + iv.restDuration > 0
+      ? (iv.workDuration / (iv.workDuration + iv.restDuration)) * 100
+      : 100
+
+  return (
+    <div
+      className="rounded-xl overflow-hidden transition-all"
+      style={{
+        background: P.surface,
+        border: `1px solid ${expanded ? P.lime : P.line}`,
+      }}
+    >
+      {/* Header — altijd zichtbaar */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="athletic-tap w-full flex items-center gap-3 p-3 text-left"
+      >
+        <span
+          className="athletic-mono inline-flex items-center justify-center rounded-lg shrink-0"
+          style={{
+            background: P.lime,
+            color: P.bg,
+            width: 32,
+            height: 32,
+            fontSize: 12,
+            fontWeight: 900,
+          }}
+        >
+          {index + 1}
+        </span>
+        <div className="flex-1 min-w-0">
+          <p
+            className="truncate"
+            style={{ color: P.ink, fontSize: 13, fontWeight: 700 }}
+          >
+            {iv.label || `Blok ${index + 1}`}
+          </p>
+          <p
+            className="athletic-mono"
+            style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.06em' }}
+          >
+            {iv.repetitions}× ({fmtDuration(iv.workDuration)} werk +{' '}
+            {fmtDuration(iv.restDuration)} rust) · {fmtDuration(blockTotal)} totaal
+          </p>
+        </div>
+        <span
+          className="athletic-mono shrink-0"
+          style={{
+            color: P.inkMuted,
+            fontSize: 10,
+            letterSpacing: '0.12em',
+            transform: expanded ? 'rotate(180deg)' : 'rotate(0)',
+            transition: 'transform 0.15s',
+          }}
+        >
+          ▾
+        </span>
+      </button>
+
+      {/* Mini-tijdlijn van één rep */}
+      <div
+        className="mx-3 mb-3 flex overflow-hidden rounded"
+        style={{ height: 6, background: P.surfaceLow }}
+      >
+        <div style={{ width: `${workPct}%`, background: P.lime }} />
+        <div style={{ width: `${100 - workPct}%`, background: P.surfaceHi }} />
+      </div>
+
+      {/* Edit panel — uitklappen */}
+      {expanded && (
+        <div
+          className="px-3 pb-3 space-y-3"
+          style={{ borderTop: `1px solid ${P.line}` }}
+        >
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <div className="space-y-1">
+              <MetaLabel>Werk (sec)</MetaLabel>
+              <DarkInput
+                type="number"
+                min={10}
+                value={iv.workDuration}
+                onChange={(e) => onUpdate('workDuration', +e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <MetaLabel>Rust (sec)</MetaLabel>
+              <DarkInput
+                type="number"
+                min={0}
+                value={iv.restDuration}
+                onChange={(e) => onUpdate('restDuration', +e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <MetaLabel>Herhalingen</MetaLabel>
+              <DarkInput
+                type="number"
+                min={1}
+                max={50}
+                value={iv.repetitions}
+                onChange={(e) => onUpdate('repetitions', +e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <MetaLabel>Label</MetaLabel>
+              <DarkInput
+                value={iv.label ?? ''}
+                placeholder="Bijv. Sprint"
+                onChange={(e) => onUpdate('label', e.target.value)}
+              />
+            </div>
+          </div>
+          <button
+            onClick={onRemove}
+            className="athletic-tap w-full text-center py-2 rounded-lg athletic-mono"
+            style={{
+              color: P.danger,
+              background: 'rgba(248,113,113,0.06)',
+              border: `1px solid ${P.danger}33`,
+              fontSize: 11,
+              letterSpacing: '0.12em',
+              fontWeight: 800,
+            }}
+          >
+            ✕  BLOK VERWIJDEREN
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function IntervalEditor({
   intervals,
@@ -69,75 +332,48 @@ function IntervalEditor({
   intervals: CardioInterval[]
   onChange: (v: CardioInterval[]) => void
 }) {
-  const addInterval = () =>
-    onChange([...intervals, { workDuration: 120, restDuration: 60, repetitions: 4, label: 'Blok' }])
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null)
+
+  const addInterval = () => {
+    onChange([
+      ...intervals,
+      { workDuration: 120, restDuration: 60, repetitions: 4, label: 'Blok' },
+    ])
+    setExpandedIdx(intervals.length) // open het nieuwe blok direct
+  }
 
   const update = (i: number, key: keyof CardioInterval, val: string | number) => {
-    const next = intervals.map((iv, idx) => idx === i ? { ...iv, [key]: val } : iv)
+    const next = intervals.map((iv, idx) =>
+      idx === i ? { ...iv, [key]: val } : iv,
+    )
     onChange(next)
   }
 
-  const remove = (i: number) => onChange(intervals.filter((_, idx) => idx !== i))
+  const remove = (i: number) => {
+    onChange(intervals.filter((_, idx) => idx !== i))
+    if (expandedIdx === i) setExpandedIdx(null)
+  }
 
   return (
-    <div className="space-y-3">
-      {intervals.map((iv, i) => (
-        <div
-          key={i}
-          className="rounded-xl p-3 space-y-3"
-          style={{ background: P.surfaceHi, border: `1px solid ${P.line}` }}
-        >
-          <div className="flex items-center justify-between">
-            <MetaLabel>Interval {i + 1}</MetaLabel>
-            <button
-              onClick={() => remove(i)}
-              className="athletic-tap"
-              style={{ color: P.danger, fontSize: 14 }}
-              aria-label="Verwijderen"
-            >
-              ✕
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <div className="space-y-1">
-              <MetaLabel>Werk (sec)</MetaLabel>
-              <DarkInput
-                type="number" min={10} value={iv.workDuration}
-                onChange={e => update(i, 'workDuration', +e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <MetaLabel>Rust (sec)</MetaLabel>
-              <DarkInput
-                type="number" min={0} value={iv.restDuration}
-                onChange={e => update(i, 'restDuration', +e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <MetaLabel>Herhalingen</MetaLabel>
-              <DarkInput
-                type="number" min={1} value={iv.repetitions}
-                onChange={e => update(i, 'repetitions', +e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <MetaLabel>Label</MetaLabel>
-              <DarkInput
-                value={iv.label ?? ''} placeholder="Bijv. Sprint"
-                onChange={e => update(i, 'label', e.target.value)}
-              />
-            </div>
-          </div>
-          <p
-            className="athletic-mono"
-            style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.05em' }}
-          >
-            Totaal: {Math.round(iv.repetitions * (iv.workDuration + iv.restDuration) / 60)} min
-          </p>
-        </div>
-      ))}
+    <div className="space-y-4">
+      <WorkoutTimeline intervals={intervals} />
+
+      <div className="space-y-2">
+        {intervals.map((iv, i) => (
+          <IntervalBlock
+            key={i}
+            iv={iv}
+            index={i}
+            expanded={expandedIdx === i}
+            onToggle={() => setExpandedIdx(expandedIdx === i ? null : i)}
+            onUpdate={(k, v) => update(i, k, v)}
+            onRemove={() => remove(i)}
+          />
+        ))}
+      </div>
+
       <DarkButton variant="secondary" size="sm" onClick={addInterval} className="w-full">
-        + Interval toevoegen
+        + Blok toevoegen
       </DarkButton>
     </div>
   )
@@ -145,7 +381,7 @@ function IntervalEditor({
 
 // ── Hoofdpagina ───────────────────────────────────────────────────────────────
 
-function CardioProgramBuilderContent() {
+function WorkoutBuilderContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const prePatientId = searchParams.get('patientId') ?? ''
@@ -205,7 +441,7 @@ function CardioProgramBuilderContent() {
         },
       })
       await utils.programs.list.invalidate()
-      toast.success('Cardio programma opgeslagen!')
+      toast.success('Workout opgeslagen!')
       router.push(`/therapist/programs/${created.id}/edit`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Opslaan mislukt')
@@ -225,8 +461,8 @@ function CardioProgramBuilderContent() {
             ← TERUG
           </Link>
           <div className="flex-1 flex flex-col gap-1">
-            <Kicker>Cardio · Stap {step} van 2</Kicker>
-            <Display size="sm">NIEUW PROGRAMMA</Display>
+            <Kicker>Workout Builder · Stap {step} van 2</Kicker>
+            <Display size="sm">NIEUWE WORKOUT</Display>
           </div>
           <div className="flex gap-1">
             {([1, 2] as const).map(s => (
@@ -590,10 +826,10 @@ function CardioProgramBuilderContent() {
   )
 }
 
-export default function CardioProgramBuilderPage() {
+export default function WorkoutBuilderPage() {
   return (
     <Suspense>
-      <CardioProgramBuilderContent />
+      <WorkoutBuilderContent />
     </Suspense>
   )
 }

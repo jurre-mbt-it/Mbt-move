@@ -243,6 +243,13 @@ model User {
   // Mobility Assessment (Ready State methodology) — admin schakelt per therapeut in.
   canUseAssessment  Boolean   @default(false)
 
+  // Cohort analytics opt-out — patient/athlete kan zichzelf uitsluiten van
+  // platform-aggregaten (gemiddelden / trends voor therapeut + admin).
+  // Default = meedoen (geen impact als 'ie nooit aangezet wordt). Onafhankelijk
+  // van research consent: dat gaat over geanonimiseerd onderzoeksdata-export,
+  // dit gaat over interne aggregaten binnen de practice.
+  cohortAnalyticsOptOut Boolean @default(false)
+
   // AVG art. 17 — right to be forgotten
   deletedAt             DateTime?  // soft-delete tombstone (records stay during 30-day grace)
   deletionRequestedAt   DateTime?  // when patient requested deletion

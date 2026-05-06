@@ -89,6 +89,7 @@ export const gdprRouter = createTRPCRouter({
           dpaAcceptedAt: true,
           mfaEnabled: true,
           practiceId: true,
+          cohortAnalyticsOptOut: true,
           createdAt: true,
           updatedAt: true,
         },

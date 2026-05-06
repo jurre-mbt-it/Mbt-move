@@ -126,10 +126,10 @@ export default function ProgramsPage() {
             <DarkButton
               variant="secondary"
               size="sm"
-              href="/therapist/programs/new/cardio"
+              href="/therapist/programs/new/workout"
             >
               <span className="inline-flex items-center gap-1.5">
-                <IconCardio size={14} /> Nieuw Cardio
+                <IconCardio size={14} /> Workout Builder
               </span>
             </DarkButton>
             <DarkButton variant="primary" size="sm" href="/therapist/programs/new">

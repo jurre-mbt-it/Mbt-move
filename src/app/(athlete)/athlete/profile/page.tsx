@@ -1,7 +1,10 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import { trpc } from '@/lib/trpc/client'
+import { Switch } from '@/components/ui/switch'
 import {
   P,
   Kicker,
@@ -13,6 +16,20 @@ import {
 export default function AthleteProfilePage() {
   const router = useRouter()
   const supabase = createClient()
+  const utils = trpc.useUtils()
+
+  const { data: cohortStatus } = trpc.cohort.getMyOptOut.useQuery()
+  const setCohort = trpc.cohort.setMyOptOut.useMutation({
+    onSuccess: ({ optOut }) => {
+      utils.cohort.getMyOptOut.invalidate()
+      toast.success(
+        optOut
+          ? 'Je doet niet meer mee aan platform-aggregaten.'
+          : 'Je telt weer mee in platform-aggregaten.',
+      )
+    },
+    onError: () => toast.error('Er is iets misgegaan. Probeer opnieuw.'),
+  })
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -112,6 +129,67 @@ export default function AthleteProfilePage() {
                 ZELFSTANDIG TRAINEN
               </span>
             </div>
+          </div>
+        </Tile>
+
+        {/* Cohort analytics opt-out */}
+        <Tile accentBar={cohortStatus?.optOut ? P.danger : P.lime}>
+          <div className="flex items-start gap-4">
+            <div className="flex-1 min-w-0">
+              <p
+                className="athletic-mono"
+                style={{
+                  color: P.ink,
+                  fontSize: 13,
+                  fontWeight: 900,
+                  letterSpacing: '0.08em',
+                }}
+              >
+                MEEDOEN AAN AGGREGATEN
+              </p>
+              <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 4, lineHeight: '17px' }}>
+                Movement Based Therapy gebruikt geanonimiseerde gemiddelden
+                (pijn, sessies, oefeningen) om het platform te verbeteren. Je
+                kunt jezelf op elk moment uitsluiten — je individuele data
+                blijft natuurlijk wel van jou.
+              </p>
+              <div className="mt-3">
+                {cohortStatus?.optOut ? (
+                  <span
+                    className="athletic-mono px-2 py-1 rounded-full"
+                    style={{
+                      backgroundColor: P.surfaceHi,
+                      color: P.danger,
+                      fontSize: 10,
+                      fontWeight: 900,
+                      letterSpacing: '0.08em',
+                      border: `1px solid ${P.danger}`,
+                    }}
+                  >
+                    UITGESLOTEN
+                  </span>
+                ) : (
+                  <span
+                    className="athletic-mono px-2 py-1 rounded-full"
+                    style={{
+                      backgroundColor: P.surfaceHi,
+                      color: P.lime,
+                      fontSize: 10,
+                      fontWeight: 900,
+                      letterSpacing: '0.08em',
+                      border: `1px solid ${P.lime}`,
+                    }}
+                  >
+                    DOET MEE
+                  </span>
+                )}
+              </div>
+            </div>
+            <Switch
+              checked={!(cohortStatus?.optOut ?? false)}
+              onCheckedChange={(checked) => setCohort.mutate({ optOut: !checked })}
+              disabled={setCohort.isPending}
+            />
           </div>
         </Tile>
 

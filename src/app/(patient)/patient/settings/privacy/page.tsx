@@ -28,6 +28,7 @@ export default function PrivacySettingsPage() {
 
   const utils = trpc.useUtils()
   const { data, isLoading } = trpc.research.getConsentStatus.useQuery()
+  const { data: cohortStatus } = trpc.cohort.getMyOptOut.useQuery()
 
   const setConsent = trpc.research.setConsent.useMutation({
     onSuccess: (result) => {
@@ -37,6 +38,18 @@ export default function PrivacySettingsPage() {
       } else {
         toast.success('Toestemming ingetrokken. Je data is verwijderd.')
       }
+    },
+    onError: () => toast.error('Er is iets misgegaan. Probeer opnieuw.'),
+  })
+
+  const setCohort = trpc.cohort.setMyOptOut.useMutation({
+    onSuccess: ({ optOut }) => {
+      utils.cohort.getMyOptOut.invalidate()
+      toast.success(
+        optOut
+          ? 'Je doet niet meer mee aan de aggregaten van je therapeut.'
+          : 'Je telt weer mee in de overzichten van je therapeut.',
+      )
     },
     onError: () => toast.error('Er is iets misgegaan. Probeer opnieuw.'),
   })
@@ -138,6 +151,68 @@ export default function PrivacySettingsPage() {
               checked={consentGiven}
               onCheckedChange={handleToggle}
               disabled={isLoading || setConsent.isPending}
+            />
+          </div>
+        </Tile>
+
+        {/* Cohort analytics opt-out */}
+        <Tile accentBar={cohortStatus?.optOut ? P.danger : P.lime}>
+          <div className="flex items-start gap-4">
+            <div className="flex-1 min-w-0">
+              <p
+                className="athletic-mono"
+                style={{
+                  color: P.ink,
+                  fontSize: 13,
+                  fontWeight: 900,
+                  letterSpacing: '0.08em',
+                }}
+              >
+                MEEDOEN AAN AGGREGATEN
+              </p>
+              <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 4, lineHeight: '17px' }}>
+                Je therapeut (en bij Movement Based Therapy de admin) ziet
+                gemiddelden en trends over alle patiënten — bijvoorbeeld
+                gemiddelde pijn over 30 dagen. Jouw individuele data is altijd
+                herkenbaar voor jouw therapeut, maar je kunt jezelf uitsluiten
+                van deze aggregaten.
+              </p>
+              <div className="mt-3">
+                {cohortStatus?.optOut ? (
+                  <span
+                    className="athletic-mono px-2 py-1 rounded-full"
+                    style={{
+                      backgroundColor: P.surfaceHi,
+                      color: P.danger,
+                      fontSize: 10,
+                      fontWeight: 900,
+                      letterSpacing: '0.08em',
+                      border: `1px solid ${P.danger}`,
+                    }}
+                  >
+                    UITGESLOTEN
+                  </span>
+                ) : (
+                  <span
+                    className="athletic-mono px-2 py-1 rounded-full"
+                    style={{
+                      backgroundColor: P.surfaceHi,
+                      color: P.lime,
+                      fontSize: 10,
+                      fontWeight: 900,
+                      letterSpacing: '0.08em',
+                      border: `1px solid ${P.lime}`,
+                    }}
+                  >
+                    DOET MEE
+                  </span>
+                )}
+              </div>
+            </div>
+            <Switch
+              checked={!(cohortStatus?.optOut ?? false)}
+              onCheckedChange={(checked) => setCohort.mutate({ optOut: !checked })}
+              disabled={setCohort.isPending}
             />
           </div>
         </Tile>

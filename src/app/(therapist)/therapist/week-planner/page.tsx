@@ -1325,12 +1325,12 @@ function DayCell({
               }}
             />
             <MenuRow
-              label="Cardio"
+              label="Workout Builder"
               icon="cardio"
-              hint="Fietsen, roeien, etc."
+              hint="Cardio, intervallen, fietsen, roeien"
               onClick={() => {
                 setMenuOpen(false)
-                window.location.href = `/therapist/programs/new/cardio?patientId=${encodeURIComponent(patientId)}`
+                window.location.href = `/therapist/programs/new/workout?patientId=${encodeURIComponent(patientId)}`
               }}
             />
           </div>

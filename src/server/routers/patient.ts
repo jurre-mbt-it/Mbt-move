@@ -362,7 +362,7 @@ export const patientRouter = createTRPCRouter({
    * Vindt het actieve CARDIO-programma van de ingelogde patiënt en converteert
    * het naar de shape die de cardio-session pagina verwacht.
    *
-   * cardioParams JSONB komt uit twee wizards (zie programs/new/cardio en
+   * cardioParams JSONB komt uit twee wizards (zie programs/new/workout en
    * programs/new/walk-run) en heeft daarom verschillende velden — dit is de
    * brug die de UI uniform houdt.
    */
