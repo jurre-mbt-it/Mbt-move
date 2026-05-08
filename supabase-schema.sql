@@ -291,10 +291,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS "users_supabaseUserId_key" ON "users"("supabas
 -- aan Supabase auth-users op email. Zonder deze stap zouden THERAPIST/ADMIN
 -- accounts niet meer kunnen inloggen (de tRPC code weigert email-fallback
 -- voor die rollen om account-takeover te voorkomen).
+--
+-- Match is case-insensitive: Supabase normaliseert auth-emails naar lowercase,
+-- maar Prisma-rows kunnen oorspronkelijk met hoofdletters zijn aangemaakt
+-- (bijv. "Imara@..."). Een case-sensitive match zou die rows overslaan.
 UPDATE "users" u
 SET "supabaseUserId" = au.id::text
 FROM auth.users au
-WHERE u.email = au.email
+WHERE LOWER(u.email) = LOWER(au.email)
   AND u."supabaseUserId" IS NULL;
 
 -- ── Multi-week behandelplannen (milestone 2 week-planner) ───────────────────
