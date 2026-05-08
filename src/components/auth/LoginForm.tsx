@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Mail, Lock, ArrowRight, Sparkles } from 'lucide-react'
-import { P, DarkButton, DarkInput, Kicker } from '@/components/dark-ui'
+import { Mail, Lock, ArrowRight, Sparkles, KeyRound } from 'lucide-react'
+import { P, DarkButton, DarkInput, Kicker, MetaLabel } from '@/components/dark-ui'
 
 function getRoleRedirect(role?: string) {
   if (role === 'PATIENT') return '/patient/dashboard'
@@ -20,6 +20,8 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<'password' | 'magic'>('password')
   const [magicLinkSent, setMagicLinkSent] = useState(false)
+  const [otpCode, setOtpCode] = useState('')
+  const otpInputRef = useRef<HTMLInputElement>(null)
 
   const supabase = createClient()
 
@@ -69,6 +71,49 @@ export function LoginForm() {
       }
 
       setMagicLinkSent(true)
+      setTimeout(() => otpInputRef.current?.focus(), 100)
+    } catch {
+      setError('Er is een onverwachte fout opgetreden.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleVerifyOtp(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    const normalized = otpCode.replace(/\D/g, '')
+    if (normalized.length !== 6) {
+      setError('De code bestaat uit 6 cijfers.')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const { data, error: otpError } = await supabase.auth.verifyOtp({
+        email: email.trim().toLowerCase(),
+        token: normalized,
+        type: 'email',
+      })
+
+      if (otpError || !data.user) {
+        setError(
+          otpError?.message ?? 'De code klopt niet. Vraag een nieuwe aan of controleer je mail.',
+        )
+        return
+      }
+
+      let role = data.user.user_metadata?.role as string | undefined
+      try {
+        const res = await fetch('/api/auth/me')
+        if (res.ok) {
+          const me = await res.json()
+          if (me.role) role = me.role
+        }
+      } catch { /* fallback to metadata role */ }
+
+      router.push(getRoleRedirect(role))
+      router.refresh()
     } catch {
       setError('Er is een onverwachte fout opgetreden.')
     } finally {
@@ -98,27 +143,91 @@ export function LoginForm() {
       </div>
 
       {magicLinkSent ? (
-        <div className="text-center py-8">
-          <div
-            className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
-            style={{ background: P.surfaceHi, border: `1px solid ${P.lime}` }}
-          >
-            <Mail className="w-7 h-7" style={{ color: P.lime }} />
+        <div className="flex flex-col gap-5">
+          <div className="text-center">
+            <div
+              className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
+              style={{ background: P.surfaceHi, border: `1px solid ${P.lime}` }}
+            >
+              <Mail className="w-7 h-7" style={{ color: P.lime }} />
+            </div>
+            <h2
+              className="athletic-display mb-2"
+              style={{ color: P.ink, fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em' }}
+            >
+              CHECK JE E-MAIL
+            </h2>
+            <p style={{ color: P.inkMuted, fontSize: 14 }}>
+              We hebben een magic link en code gestuurd naar
+              <br />
+              <span style={{ color: P.ink, fontWeight: 700 }}>{email}</span>
+            </p>
+            <p style={{ color: P.inkDim, fontSize: 12, marginTop: 12, lineHeight: 1.5 }}>
+              Klik op de link in de mail, of vul de 6-cijfer code hieronder in als de
+              link niet werkt.
+            </p>
           </div>
-          <h2
-            className="athletic-display mb-2"
-            style={{ color: P.ink, fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em' }}
-          >
-            CHECK JE E-MAIL
-          </h2>
-          <p style={{ color: P.inkMuted, fontSize: 14 }}>
-            We hebben een magic link gestuurd naar
-            <br />
-            <span style={{ color: P.ink, fontWeight: 700 }}>{email}</span>
-          </p>
+
+          <form onSubmit={handleVerifyOtp} className="flex flex-col gap-3">
+            <label className="flex flex-col gap-1.5">
+              <MetaLabel>6-CIJFER CODE</MetaLabel>
+              <DarkInput
+                ref={otpInputRef}
+                type="tel"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={otpCode}
+                onChange={(e) => {
+                  setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))
+                  setError(null)
+                }}
+                placeholder="123456"
+                maxLength={6}
+                style={{
+                  textAlign: 'center',
+                  fontSize: 28,
+                  letterSpacing: '0.4em',
+                  fontWeight: 900,
+                  height: 64,
+                  fontFamily: 'ui-monospace, Menlo, monospace',
+                }}
+              />
+            </label>
+
+            {error && (
+              <div
+                className="rounded-xl px-4 py-3 text-sm"
+                style={{
+                  background: 'rgba(248,113,113,0.08)',
+                  color: P.danger,
+                  border: `1px solid ${P.danger}`,
+                }}
+              >
+                {error}
+              </div>
+            )}
+
+            <DarkButton
+              type="submit"
+              disabled={otpCode.length !== 6 || loading}
+              loading={loading}
+              size="lg"
+            >
+              <span className="flex items-center gap-2">
+                <KeyRound className="w-5 h-5" />
+                INLOGGEN MET CODE
+              </span>
+            </DarkButton>
+          </form>
+
           <button
-            onClick={() => { setMagicLinkSent(false); setMode('password') }}
-            className="athletic-mono mt-6 transition-colors"
+            onClick={() => {
+              setMagicLinkSent(false)
+              setOtpCode('')
+              setError(null)
+              setMode('password')
+            }}
+            className="athletic-mono transition-colors self-center"
             style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.12em' }}
             type="button"
           >
