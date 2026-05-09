@@ -84,7 +84,8 @@ export async function POST(req: NextRequest) {
     ? new Date(startDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
     : 'Zo snel mogelijk'
 
-  const safePatient = escapeHtml(patientName)
+  const safePatientFull = escapeHtml(patientName)
+  const safePatientFirst = escapeHtml(patientName.split(' ')[0] || patientName)
   const safeProgram = escapeHtml(programName)
   const safeStart = escapeHtml(startFormatted)
   const safeCode = accessCode ? escapeHtml(accessCode) : null
@@ -92,26 +93,10 @@ export async function POST(req: NextRequest) {
     ? escapeHtml(extraInstructions.trim()).replace(/\n/g, '<br/>')
     : null
 
-  const accessCodeBlock = safeCode
-    ? `
-        <p style="font-size: 13px; color: #71717a; margin: 12px 0 4px;">Jouw toegangscode</p>
-        <p style="font-family: monospace; font-size: 28px; font-weight: 700; color: #1a1a1a; margin: 0; letter-spacing: 2px;">${safeCode}</p>`
-    : ''
-
-  const instructionsBlock = safeInstructions
-    ? `
-      <div style="background: rgba(78,205,196,0.10); border-left: 3px solid #4ECDC4; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;">
-        <p style="font-size: 12px; color: #4ECDC4; font-weight: 600; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.05em;">Bericht van je therapeut</p>
-        <p style="color: #1a1a1a; margin: 0; line-height: 1.5;">${safeInstructions}</p>
-      </div>`
-    : ''
-
   const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://mbt-gym.nl'}/${safeCode ? 'login/code' : 'login'}`
-  const ctaLabel = safeCode ? 'Inloggen met toegangscode' : 'Inloggen en programma openen'
+  const ctaLabel = safeCode ? 'INLOGGEN MET CODE →' : 'PROGRAMMA OPENEN →'
 
   // Praktijk-footer — leeg als praktijk-gegevens onvolledig zijn (per spec).
-  // Mail wordt dan zonder footer verstuurd; therapeut ziet daarvoor een
-  // waarschuwing in de UI.
   const practiceFooter = renderEmailFooter({
     therapist: {
       firstName: caller.firstName,
@@ -122,35 +107,112 @@ export async function POST(req: NextRequest) {
     practice: caller.practice,
   })
 
-  const html = `
-    <div style="font-family: sans-serif; max-width: 540px; margin: 0 auto; padding: 32px 24px;">
-      <img src="https://mbt-gym.nl/Logo.jpg" alt="MBT Gym" style="height: 36px; margin-bottom: 24px;" />
-      <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 8px;">Hoi ${safePatient}</h2>
-      <p style="color: #52525b; margin: 0 0 24px;">
-        Jouw therapeut heeft een revalidatieprogramma voor je klaarstaan.
-      </p>
+  // Brand-kleuren — exact dezelfde palette als de rest van de app + de
+  // bestaande inviteMail (zie src/server/mail.ts).
+  const BRAND = {
+    bg: '#0A0E0F',
+    surface: '#141A1B',
+    surfaceHi: '#1C2425',
+    ink: '#F5F7F6',
+    inkMuted: '#7B8889',
+    lime: '#BEF264',
+    line: 'rgba(255,255,255,0.12)',
+  }
 
-      ${instructionsBlock}
+  const accessCodeBlock = safeCode
+    ? `
+              <tr><td style="padding:16px 28px 0 28px;">
+                <div style="background:rgba(255,255,255,0.04);border:1px solid ${BRAND.line};border-radius:10px;padding:14px 16px;">
+                  <div style="font-family:ui-monospace,Menlo,'SF Mono',monospace;font-size:10px;letter-spacing:0.14em;color:${BRAND.inkMuted};font-weight:700;text-transform:uppercase;margin-bottom:6px;">JOUW CODE</div>
+                  <div style="font-family:ui-monospace,Menlo,monospace;font-size:24px;font-weight:900;color:${BRAND.ink};letter-spacing:4px;">${safeCode}</div>
+                </div>
+              </td></tr>`
+    : ''
 
-      <div style="background: #f4f4f5; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-        <p style="font-size: 13px; color: #71717a; margin: 0 0 4px;">Programma</p>
-        <p style="font-weight: 600; margin: 0 0 12px;">${safeProgram}</p>
-        <p style="font-size: 13px; color: #71717a; margin: 0 0 4px;">Startdatum</p>
-        <p style="font-weight: 600; margin: 0;">${safeStart}</p>${accessCodeBlock}
-      </div>
+  const instructionsBlock = safeInstructions
+    ? `
+              <tr><td style="padding:20px 28px 0 28px;">
+                <div style="background:rgba(190,242,100,0.06);border-left:3px solid ${BRAND.lime};border-radius:8px;padding:14px 16px;">
+                  <div style="font-family:ui-monospace,Menlo,'SF Mono',monospace;font-size:10px;letter-spacing:0.14em;color:${BRAND.lime};font-weight:700;text-transform:uppercase;margin-bottom:6px;">BERICHT VAN JE THERAPEUT</div>
+                  <div style="color:${BRAND.ink};font-size:14px;line-height:1.5;">${safeInstructions}</div>
+                </div>
+              </td></tr>`
+    : ''
 
-      <a href="${loginUrl}"
-         style="display: inline-block; background: #4ECDC4; color: white; font-weight: 600; padding: 12px 24px; border-radius: 10px; text-decoration: none;">
-        ${ctaLabel}
-      </a>
+  const fallbackFooter = `
+            <tr><td style="padding:24px 28px 28px 28px;border-top:1px solid ${BRAND.line};">
+              <div style="font-family:ui-monospace,Menlo,'SF Mono',monospace;font-size:10px;letter-spacing:0.14em;color:${BRAND.inkMuted};text-transform:uppercase;font-weight:700;">
+                MOVEMENT BASED THERAPY · movementbasedtherapy.nl
+              </div>
+            </td></tr>`
 
-      ${practiceFooter || `
-      <p style="font-size: 12px; color: #a1a1aa; margin-top: 32px;">
-        Neem contact op met je therapeut voor vragen.
-      </p>
-      `}
-    </div>
-  `
+  const footerCell = practiceFooter
+    ? `<tr><td style="padding:20px 28px 28px 28px;">${practiceFooter}</td></tr>`
+    : fallbackFooter
+
+  // Layout volgt dezelfde tafel-gebaseerde structuur als inviteMail in
+  // src/server/mail.ts — table + width-attributen voor maximale compat in
+  // Outlook / Gmail / Apple Mail. Geen <img> bovenaan: tekst-wordmark "● MBT · GYM"
+  // ipv het bestaande Logo.jpg dat werd uitgerekt.
+  const html = `<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MBT·Gym</title>
+</head>
+<body style="margin:0;padding:0;background:${BRAND.bg};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.bg};padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:${BRAND.surface};border:1px solid ${BRAND.line};border-radius:20px;overflow:hidden;">
+        <tr><td style="padding:28px 28px 12px 28px;">
+          <div style="font-family:ui-monospace,Menlo,'SF Mono',monospace;font-size:11px;letter-spacing:0.2em;color:${BRAND.lime};font-weight:900;">● MBT · GYM</div>
+        </td></tr>
+
+        <tr><td style="padding:8px 28px 0 28px;">
+          <h1 style="margin:0;padding:4px 0 0 0;font-size:30px;line-height:36px;font-weight:900;letter-spacing:-1.2px;color:${BRAND.ink};text-transform:uppercase;">
+            HALLO ${safePatientFirst}
+          </h1>
+        </td></tr>
+
+        <tr><td style="padding:14px 28px 0 28px;">
+          <p style="margin:0;color:${BRAND.inkMuted};font-size:15px;line-height:22px;">
+            Je therapeut heeft een revalidatieprogramma voor je klaargezet.
+          </p>
+        </td></tr>
+
+        ${instructionsBlock}
+
+        <tr><td style="padding:20px 28px 0 28px;">
+          <div style="background:${BRAND.surfaceHi};border:1px solid ${BRAND.line};border-radius:12px;padding:16px;">
+            <div style="font-family:ui-monospace,Menlo,'SF Mono',monospace;font-size:10px;letter-spacing:0.14em;color:${BRAND.inkMuted};text-transform:uppercase;font-weight:700;">PROGRAMMA</div>
+            <div style="color:${BRAND.ink};font-size:16px;font-weight:700;margin-top:4px;">${safeProgram}</div>
+            <div style="font-family:ui-monospace,Menlo,'SF Mono',monospace;font-size:10px;letter-spacing:0.14em;color:${BRAND.inkMuted};text-transform:uppercase;font-weight:700;margin-top:14px;">STARTDATUM</div>
+            <div style="color:${BRAND.ink};font-size:14px;font-weight:700;margin-top:4px;">${safeStart}</div>
+          </div>
+        </td></tr>
+
+        ${accessCodeBlock}
+
+        <tr><td style="padding:24px 28px 0 28px;">
+          <a href="${loginUrl}" style="display:block;background:${BRAND.lime};color:${BRAND.bg};text-decoration:none;text-align:center;padding:16px 24px;border-radius:12px;font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:900;letter-spacing:0.16em;text-transform:uppercase;">
+            ${ctaLabel}
+          </a>
+        </td></tr>
+
+        <tr><td style="padding:20px 28px 4px 28px;">
+          <p style="margin:0;color:${BRAND.inkMuted};font-size:11px;line-height:17px;">
+            Knop werkt niet? Plak deze link in je browser:<br/>
+            <span style="color:${BRAND.ink};word-break:break-all;">${escapeHtml(loginUrl)}</span>
+          </p>
+        </td></tr>
+
+        ${footerCell}
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -160,9 +222,15 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: process.env.RESEND_FROM_EMAIL ?? 'noreply@mbt-gym.nl',
+        // Gebruik dezelfde env-var als src/server/mail.ts (RESEND_FROM) zodat
+        // afzender-display 1-op-1 matcht met de invite-mail. Default: brand-naam,
+        // niet bare email — dat zag de patient als "noreply@mbt-gym.nl".
+        from:
+          process.env.RESEND_FROM
+          ?? process.env.RESEND_FROM_EMAIL
+          ?? 'MBT Gym <noreply@mbt-gym.nl>',
         to,
-        subject: `Je revalidatieprogramma is klaar — ${programName}`,
+        subject: `Je revalidatieprogramma is klaar · ${programName}`,
         html,
       }),
     })
