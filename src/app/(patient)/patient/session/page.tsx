@@ -635,7 +635,6 @@ function SessionPageInner() {
   const [done, setDone] = useState<Set<string>>(new Set())
   const [feedback, setFeedback] = useState<Record<string, FeedbackEntry>>({})
   const [showFeedbackFor, setShowFeedbackFor] = useState<string | null>(null)
-  const [feedbackTimer, setFeedbackTimer] = useState(3)
   const [showRestTimer, setShowRestTimer] = useState(false)
   const [restSecondsLeft, setRestSecondsLeft] = useState(60)
   const [restDuration, setRestDuration] = useState(60)
@@ -825,14 +824,27 @@ function SessionPageInner() {
   }, [startRestTimer, restTimerEnabled])
 
   const markExerciseDone = useCallback((uid: string) => {
-    setFeedback(prev => ({
-      ...prev,
-      [uid]: prev[uid] ?? { smiley: null, pain: null, weight: null, rpe: null },
-    }))
-    clearInterval(feedbackTimerRef.current!)
-    setFeedbackTimer(3)
-    setShowFeedbackFor(uid)
-  }, [])
+    // Smiley/pijn/RPE/weight worden alleen aan het einde van de hele sessie
+    // gevraagd — geen per-oefening popup meer. Uitzondering: tendinopathie-
+    // programma's, daar IS pijn-tijdens-oefening de hele essentie van het
+    // protocol (Silbernagel) en moet die per-oefening worden vastgelegd.
+    const isTendinopathy = sessionData?.program?.tendinopathyMode ?? false
+
+    if (isTendinopathy) {
+      setFeedback(prev => ({
+        ...prev,
+        [uid]: prev[uid] ?? { smiley: null, pain: null, weight: null, rpe: null, painDuring: null },
+      }))
+      clearInterval(feedbackTimerRef.current!)
+      setShowFeedbackFor(uid)
+      return
+    }
+
+    // Geen popup → markeer direct done + spring naar volgende oefening.
+    setDone(prev => new Set(prev).add(uid))
+    const next = exercises.find(e => !doneRef.current.has(e.uid) && e.uid !== uid)
+    setExpanded(next?.uid ?? null)
+  }, [exercises, sessionData?.program?.tendinopathyMode])
 
   const saveFeedback = useCallback((uid: string) => {
     setDone(prev => new Set(prev).add(uid))
@@ -842,27 +854,7 @@ function SessionPageInner() {
     setExpanded(next?.uid ?? null)
   }, [exercises])
 
-  const saveFeedbackRef = useRef(saveFeedback)
-  useEffect(() => { saveFeedbackRef.current = saveFeedback }, [saveFeedback])
-
-  useEffect(() => {
-    if (showFeedbackFor === null) return
-    setFeedbackTimer(3)
-    let count = 3
-    feedbackTimerRef.current = setInterval(() => {
-      count -= 1
-      setFeedbackTimer(count)
-      if (count <= 0) {
-        clearInterval(feedbackTimerRef.current!)
-        saveFeedbackRef.current(showFeedbackFor)
-      }
-    }, 1000)
-    return () => clearInterval(feedbackTimerRef.current!)
-  }, [showFeedbackFor])
-
   const handleFeedbackChange = useCallback((uid: string, partial: Partial<FeedbackEntry>) => {
-    clearInterval(feedbackTimerRef.current!)
-    setFeedbackTimer(0)
     setFeedback(prev => ({ ...prev, [uid]: { ...prev[uid], ...partial } }))
   }, [])
 
@@ -1489,7 +1481,7 @@ function SessionPageInner() {
           feedback={feedback[showFeedbackFor] ?? { smiley: null, pain: null, weight: null, rpe: null, painDuring: null }}
           onChange={partial => handleFeedbackChange(showFeedbackFor, partial)}
           onSave={() => saveFeedback(showFeedbackFor)}
-          autoCloseIn={feedbackTimer}
+          autoCloseIn={0}
           tendinopathyMode={sessionData?.program?.tendinopathyMode}
         />
       )}
