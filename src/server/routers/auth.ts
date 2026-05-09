@@ -46,6 +46,10 @@ export const authRouter = createTRPCRouter({
         id: true,
         email: true,
         name: true,
+        firstName: true,
+        lastName: true,
+        jobTitle: true,
+        isPracticeOwner: true,
         role: true,
         avatarUrl: true,
         phone: true,
@@ -113,18 +117,35 @@ export const authRouter = createTRPCRouter({
   updateProfile: protectedProcedure
     .input(
       z.object({
-        name: z.string().optional(),
-        phone: z.string().optional(),
-        specialty: z.string().optional(),
-        bio: z.string().optional(),
+        firstName: z.string().trim().min(1).max(60).nullable().optional(),
+        lastName: z.string().trim().max(60).nullable().optional(),
+        jobTitle: z.string().trim().max(80).nullable().optional(),
+        phone: z.string().trim().max(40).nullable().optional(),
+        specialty: z.string().nullable().optional(),
+        bio: z.string().nullable().optional(),
         injuryInfo: z.string().nullable().optional(),
         injuryVisibleToTherapist: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Als firstName of lastName meegegeven is, hercomputeren we `name` zodat
+      // alle bestaande code-paden die `name` lezen consistent blijven met de
+      // nieuwe split. We halen de huidige waarden op als de input partial is.
+      const nameTouched = input.firstName !== undefined || input.lastName !== undefined
+      const data: Record<string, unknown> = { ...input }
+      if (nameTouched) {
+        const current = await ctx.prisma.user.findUnique({
+          where: { id: ctx.user.id },
+          select: { firstName: true, lastName: true },
+        })
+        const first = (input.firstName !== undefined ? input.firstName : current?.firstName) ?? ''
+        const last = (input.lastName !== undefined ? input.lastName : current?.lastName) ?? ''
+        const computed = `${first} ${last}`.trim()
+        data.name = computed.length > 0 ? computed : null
+      }
       return ctx.prisma.user.update({
         where: { id: ctx.user.id },
-        data: input,
+        data,
       })
     }),
 

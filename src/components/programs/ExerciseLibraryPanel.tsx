@@ -75,11 +75,13 @@ function DraggableLibraryItem({
 
       <button
         type="button"
+        aria-label={`Voeg ${exercise.name} toe aan programma`}
         onPointerDown={e => e.stopPropagation()}
         onClick={() => onAdd(exercise)}
-        className="opacity-0 group-hover:opacity-100 transition-opacity w-5 h-5 rounded flex items-center justify-center hover:bg-[rgba(255,255,255,0.08)] shrink-0"
+        className="w-6 h-6 rounded-full flex items-center justify-center transition-colors shrink-0 hover:bg-[#BEF264] hover:text-[#0A0E0F]"
+        style={{ background: 'rgba(190,242,100,0.12)', color: '#BEF264', border: '1px solid rgba(190,242,100,0.30)' }}
       >
-        <Plus className="w-3 h-3" />
+        <Plus className="w-3.5 h-3.5" />
       </button>
     </div>
   )

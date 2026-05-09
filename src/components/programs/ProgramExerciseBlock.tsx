@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 import { useAutosave } from '@/hooks/useAutosave'
 import {
   GripVertical, X, Plus, ArrowUp, ArrowDown, MoreHorizontal, Play,
-  Check, Loader2, AlertCircle,
+  Check, Loader2, AlertCircle, SlidersHorizontal, Trash2, StickyNote,
 } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -61,10 +61,57 @@ function InlineNumber({
       value={value}
       onChange={e => onChange(Math.max(min, Number(e.target.value)))}
       className={cn(
-        'w-12 h-6 text-center text-xs font-semibold bg-[#1C2425] rounded border-0 focus:outline-none focus:ring-1 focus:ring-[#BEF264]',
+        'w-10 h-5 text-center text-xs font-semibold bg-transparent rounded border-0 focus:outline-none focus:ring-1 focus:ring-[#BEF264]',
         className
       )}
     />
+  )
+}
+
+/** Vaste-veld chip (Sets, Reps, Pauze) met optionele filter/trash icoontjes. */
+function FixedChip({
+  label, children, onToggleRange, onRemove, isRange,
+}: {
+  label: string
+  children: React.ReactNode
+  onToggleRange?: () => void
+  onRemove?: () => void
+  isRange?: boolean
+}) {
+  return (
+    <div className="group/chip inline-flex items-center gap-1 bg-[#1C2425] border border-[rgba(255,255,255,0.06)] rounded-md pl-2 pr-1 py-0.5 text-xs h-7">
+      <span className="text-[#7B8889] font-medium">{label}</span>
+      <span className="flex items-center gap-0.5 text-foreground">{children}</span>
+      {(onToggleRange || onRemove) && (
+        <span className="flex items-center gap-0.5 ml-0.5">
+          {onToggleRange && (
+            <button
+              type="button"
+              onClick={onToggleRange}
+              title={isRange ? 'Verwijder range' : 'Maak range (min – max)'}
+              className={cn(
+                'w-5 h-5 rounded flex items-center justify-center transition-colors',
+                isRange
+                  ? 'text-[#BEF264] bg-[rgba(190,242,100,0.10)] hover:bg-[rgba(190,242,100,0.18)]'
+                  : 'text-[#7B8889] hover:text-foreground hover:bg-[rgba(255,255,255,0.06)]'
+              )}
+            >
+              <SlidersHorizontal className="w-3 h-3" />
+            </button>
+          )}
+          {onRemove && (
+            <button
+              type="button"
+              onClick={onRemove}
+              title="Verwijder veld"
+              className="w-5 h-5 rounded flex items-center justify-center text-[#7B8889] hover:text-red-400 hover:bg-[rgba(255,255,255,0.06)]"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          )}
+        </span>
+      )}
+    </div>
   )
 }
 
@@ -105,6 +152,23 @@ export function ProgramExerciseBlock({
       extraParams: exercise.extraParams.map(p => p.id === id ? { ...p, value } : p),
     })
 
+  /** Partiële update — voor velden anders dan `value`, bv. `valueMax` voor de
+   *  range-modus. `valueMax: undefined` verwijdert de range-bovengrens. */
+  const updateParamFields = (id: string, patch: Partial<ExtraParam>) =>
+    onUpdate(exercise.uid, {
+      extraParams: exercise.extraParams.map(p => {
+        if (p.id !== id) return p
+        const next: ExtraParam = { ...p, ...patch }
+        // 'undefined' wordt door spread NIET verwijderd, maar wel naar
+        // undefined gezet — wij willen de key écht weg om geen gerommel in
+        // JSON te krijgen.
+        if (patch.valueMax === undefined && 'valueMax' in patch) {
+          delete next.valueMax
+        }
+        return next
+      }),
+    })
+
   // Autosave de huidige extraParams als nieuwe standaard voor deze oefening
   // in de library. Last-edit-wins: andere instances van dezelfde oefening in
   // dit programma blijven ongemoeid (geen propagation), maar volgende keer
@@ -117,6 +181,9 @@ export function ProgramExerciseBlock({
         id: exercise.exerciseId,
         defaultExtraParams: params.map(p => ({
           id: p.id, label: p.label, type: p.type, value: p.value,
+          // valueMax wordt naar de oefening-default geschreven als die per-instance
+          // is gezet — handig voor "5-10 reps" als nieuwe default voor deze oefening.
+          ...(p.valueMax !== undefined ? { valueMax: p.valueMax } : {}),
           unit: p.unit, options: p.options, min: p.min, max: p.max,
         })),
       })
@@ -281,21 +348,239 @@ export function ProgramExerciseBlock({
           </button>
         </div>
 
-        {/* Second line: sets × reps · rest */}
-        <div className="flex items-center gap-1 pl-10 text-xs text-muted-foreground pb-1">
-          <InlineNumber value={exercise.sets} onChange={v => onUpdate(exercise.uid, { sets: v })} min={1} />
-          <span>×</span>
-          <InlineNumber value={exercise.reps} onChange={v => onUpdate(exercise.uid, { reps: v })} min={1} />
-          <select
-            value={exercise.repUnit}
-            onChange={e => onUpdate(exercise.uid, { repUnit: e.target.value as RepUnit })}
-            className="text-xs bg-[#1C2425] border-0 rounded px-1 h-6 focus:outline-none focus:ring-1 focus:ring-[#BEF264]"
-          >
-            {REP_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
-          </select>
-          <span className="text-zinc-300 mx-0.5">·</span>
-          <InlineNumber value={exercise.rest} onChange={v => onUpdate(exercise.uid, { rest: v })} min={0} className="w-10" />
-          <span className="text-[#7B8889]">s</span>
+        {/* Second line: pills + chip-row.
+            - Pills tonen alleen parameters die NOG NIET zijn toegevoegd, zodat
+              je snel kunt klikken zonder het menu te openen.
+            - Chips staan op één flex-wrap rij — sets, reps, pauze + extras
+              schuiven netjes naast elkaar door, ook bij smalle schermen. */}
+        <div className="pl-10 space-y-1 pb-1">
+
+          {/* Quick-add pills + notitie-pill (alleen tonen als nog geen notitie) */}
+          {(availableStandard.length > 0 || !exercise.notes) && (
+            <div className="flex flex-wrap gap-1">
+              {availableStandard.map(p => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => addParam(p)}
+                  className="inline-flex items-center gap-1 h-6 px-2 rounded-full text-[11px] font-semibold border border-[rgba(255,255,255,0.10)] text-[#7B8889] hover:text-[#BEF264] hover:border-[rgba(190,242,100,0.35)] hover:bg-[rgba(190,242,100,0.06)] transition-colors"
+                >
+                  <Plus className="w-2.5 h-2.5" strokeWidth={3} />
+                  {p.label}
+                </button>
+              ))}
+              {!exercise.notes && (
+                <button
+                  type="button"
+                  onClick={() => onUpdate(exercise.uid, { notes: ' ' })}
+                  title="Voeg een notitie toe die alleen voor deze patiënt zichtbaar is"
+                  className="inline-flex items-center gap-1 h-6 px-2 rounded-full text-[11px] font-semibold border border-[rgba(255,255,255,0.10)] text-[#7B8889] hover:text-[#4ECDC4] hover:border-[rgba(78,205,196,0.35)] hover:bg-[rgba(78,205,196,0.06)] transition-colors"
+                >
+                  <StickyNote className="w-2.5 h-2.5" />
+                  Notitie
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Param chips — alle waarden naast elkaar, één rij die wrapt. */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {/* Sets */}
+            <FixedChip
+              label="Set"
+              isRange={exercise.setsMax != null}
+              onToggleRange={() => onUpdate(exercise.uid, {
+                setsMax: exercise.setsMax == null ? Math.max(exercise.sets + 1, 2) : null,
+              })}
+            >
+              <InlineNumber value={exercise.sets} onChange={v => onUpdate(exercise.uid, { sets: v })} min={1} />
+              {exercise.setsMax != null && (
+                <>
+                  <span className="text-[#7B8889]">–</span>
+                  <InlineNumber
+                    value={exercise.setsMax}
+                    onChange={v => onUpdate(exercise.uid, { setsMax: Math.max(exercise.sets, v) })}
+                    min={Math.max(1, exercise.sets)}
+                  />
+                </>
+              )}
+            </FixedChip>
+
+            {/* Reps + repUnit-selector inline */}
+            <FixedChip
+              label={exercise.repUnit === 'sec' ? 'Houd vast' : exercise.repUnit === 'min' ? 'Duur' : 'Herhalingen'}
+              isRange={exercise.repsMax != null}
+              onToggleRange={() => onUpdate(exercise.uid, {
+                repsMax: exercise.repsMax == null ? Math.max(exercise.reps * 2, exercise.reps + 1) : null,
+              })}
+            >
+              <InlineNumber value={exercise.reps} onChange={v => onUpdate(exercise.uid, { reps: v })} min={1} />
+              {exercise.repsMax != null && (
+                <>
+                  <span className="text-[#7B8889]">–</span>
+                  <InlineNumber
+                    value={exercise.repsMax}
+                    onChange={v => onUpdate(exercise.uid, { repsMax: Math.max(exercise.reps, v) })}
+                    min={Math.max(1, exercise.reps)}
+                  />
+                </>
+              )}
+              <select
+                value={exercise.repUnit}
+                onChange={e => onUpdate(exercise.uid, { repUnit: e.target.value as RepUnit })}
+                className="text-xs bg-transparent border-0 rounded px-0.5 h-5 focus:outline-none focus:ring-1 focus:ring-[#BEF264] text-[#7B8889]"
+              >
+                {REP_UNITS.map(u => <option key={u.value} value={u.value} className="bg-[#1C2425]">{u.label}</option>)}
+              </select>
+            </FixedChip>
+
+            {/* Pauze (rest) — geen range-support op schema-niveau, dus alleen
+                enkele waarde. */}
+            <FixedChip label="Pauze">
+              <InlineNumber value={exercise.rest} onChange={v => onUpdate(exercise.uid, { rest: v })} min={0} />
+              <span className="text-[#7B8889]">s</span>
+            </FixedChip>
+
+            {/* Extra params — elk in een chip met filter (range) en trash. */}
+            {exercise.extraParams.map(param => {
+              const isRange = param.valueMax !== undefined && param.valueMax !== null && param.valueMax !== ''
+              const supportsRange = param.type === 'number' || param.type === 'slider'
+              return (
+                <FixedChip
+                  key={param.id}
+                  label={param.label}
+                  isRange={isRange}
+                  onToggleRange={supportsRange
+                    ? () => updateParamFields(param.id, {
+                        valueMax: isRange
+                          ? undefined
+                          : (typeof param.value === 'number'
+                              ? Math.max((param.value as number) + 1, (param.value as number) * 2)
+                              : ''),
+                      })
+                    : undefined}
+                  onRemove={() => removeParam(param.id)}
+                >
+                  {param.type === 'number' ? (
+                    <>
+                      <InlineNumber
+                        value={param.value as number}
+                        onChange={v => updateParam(param.id, v)}
+                        min={param.min ?? 0}
+                      />
+                      {isRange && (
+                        <>
+                          <span className="text-[#7B8889]">–</span>
+                          <InlineNumber
+                            value={Number(param.valueMax) || 0}
+                            onChange={v => updateParamFields(param.id, { valueMax: v })}
+                            min={Number(param.value) || 0}
+                          />
+                        </>
+                      )}
+                      {param.unit && <span className="text-[#7B8889]">{param.unit}</span>}
+                    </>
+                  ) : param.type === 'slider' ? (
+                    <>
+                      <input
+                        type="range"
+                        min={param.min ?? 0}
+                        max={param.max ?? 10}
+                        value={param.value as number}
+                        onChange={e => updateParam(param.id, Number(e.target.value))}
+                        className="w-14 h-1 accent-[#BEF264]"
+                      />
+                      <span className="font-semibold w-4 text-center">{param.value}</span>
+                      {isRange && (
+                        <>
+                          <span className="text-[#7B8889]">–</span>
+                          <input
+                            type="range"
+                            min={param.min ?? 0}
+                            max={param.max ?? 10}
+                            value={Number(param.valueMax) || 0}
+                            onChange={e => updateParamFields(param.id, { valueMax: Number(e.target.value) })}
+                            className="w-14 h-1 accent-[#BEF264]"
+                          />
+                          <span className="font-semibold w-4 text-center">{param.valueMax}</span>
+                        </>
+                      )}
+                      {param.unit && <span className="text-[#7B8889]">{param.unit}</span>}
+                    </>
+                  ) : param.type === 'select' && param.options ? (
+                    <select
+                      value={param.value as string}
+                      onChange={e => updateParam(param.id, e.target.value)}
+                      className="bg-transparent border-0 text-xs font-semibold focus:outline-none"
+                    >
+                      {param.options.map(o => <option key={o} className="bg-[#1C2425]">{o}</option>)}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={param.value as string}
+                      onChange={e => updateParam(param.id, e.target.value)}
+                      className="w-16 bg-transparent border-0 text-xs font-semibold focus:outline-none"
+                    />
+                  )}
+                </FixedChip>
+              )
+            })}
+          </div>
+
+          {/* Patiënt-notitie — opgeslagen op deze ProgramExercise (niet op de
+              globale Exercise), dus alleen zichtbaar binnen dit specifieke
+              programma. Wordt meegestuurd naar de patiënt-app. */}
+          {exercise.notes !== null && exercise.notes !== undefined && (
+            <div className="flex items-start gap-1.5 mt-1 group/note">
+              <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#4ECDC4] shrink-0 pt-1">
+                <StickyNote className="w-2.5 h-2.5" />
+                Voor patiënt
+              </div>
+              <textarea
+                value={exercise.notes}
+                onChange={e => onUpdate(exercise.uid, { notes: e.target.value })}
+                placeholder="Specifieke instructie alleen voor deze patiënt — wordt met dit programma meegestuurd."
+                rows={2}
+                className="flex-1 text-xs bg-[#1C2425] border border-[rgba(78,205,196,0.20)] rounded-md px-2 py-1.5 resize-y min-h-[2.5rem] focus:outline-none focus:ring-1 focus:ring-[#4ECDC4] focus:border-[#4ECDC4] placeholder:text-[#566060]"
+              />
+              <button
+                type="button"
+                onClick={() => onUpdate(exercise.uid, { notes: null })}
+                title="Verwijder notitie"
+                className="w-5 h-5 rounded flex items-center justify-center text-[#7B8889] hover:text-red-400 hover:bg-[rgba(255,255,255,0.06)] mt-1 shrink-0"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+
+          {/* Inline autosave-status van defaults */}
+          {exercise.extraParams.length > 0 && defaultsAutosave.status !== 'idle' && (
+            <div
+              className="flex items-center gap-1 text-[10px] font-semibold text-[#7B8889]"
+              title="Deze parameters worden automatisch als standaard onthouden voor deze oefening."
+            >
+              {defaultsAutosave.status === 'saving' && (
+                <><Loader2 className="w-2.5 h-2.5 animate-spin" /> Onthouden…</>
+              )}
+              {defaultsAutosave.status === 'pending' && (
+                <><Loader2 className="w-2.5 h-2.5 animate-spin opacity-50" /> Onthouden…</>
+              )}
+              {defaultsAutosave.status === 'saved' && (
+                <><Check className="w-2.5 h-2.5" style={{ color: '#BEF264' }} /> Onthouden</>
+              )}
+              {defaultsAutosave.status === 'error' && (
+                <button
+                  type="button"
+                  onClick={() => { void defaultsAutosave.saveNow() }}
+                  className="flex items-center gap-1 text-red-400 hover:text-red-300"
+                >
+                  <AlertCircle className="w-2.5 h-2.5" /> Mislukt — opnieuw
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -322,82 +607,6 @@ export function ProgramExerciseBlock({
         </DialogContent>
       </Dialog>
 
-      {/* Extra params */}
-      {exercise.extraParams.length > 0 && (
-        <div className="px-8 pb-2 flex flex-wrap gap-2 items-center">
-          {defaultsAutosave.status !== 'idle' && (
-            <div
-              className="flex items-center gap-1 text-[10px] font-semibold text-[#7B8889] px-1"
-              title="Deze parameters worden automatisch als standaard onthouden voor deze oefening."
-            >
-              {defaultsAutosave.status === 'saving' && (
-                <><Loader2 className="w-2.5 h-2.5 animate-spin" /> Onthouden…</>
-              )}
-              {defaultsAutosave.status === 'pending' && (
-                <><Loader2 className="w-2.5 h-2.5 animate-spin opacity-50" /> Onthouden…</>
-              )}
-              {defaultsAutosave.status === 'saved' && (
-                <><Check className="w-2.5 h-2.5" style={{ color: '#BEF264' }} /> Onthouden</>
-              )}
-              {defaultsAutosave.status === 'error' && (
-                <button
-                  type="button"
-                  onClick={() => { void defaultsAutosave.saveNow() }}
-                  className="flex items-center gap-1 text-red-400 hover:text-red-300"
-                >
-                  <AlertCircle className="w-2.5 h-2.5" /> Mislukt — opnieuw
-                </button>
-              )}
-            </div>
-          )}
-          {exercise.extraParams.map(param => (
-            <div key={param.id} className="flex items-center gap-1 bg-[#1C2425] border rounded-md px-2 py-1 text-xs group/param">
-              <span className="text-muted-foreground">{param.label}:</span>
-              {param.type === 'number' ? (
-                <input
-                  type="number"
-                  value={param.value as number}
-                  min={param.min}
-                  max={param.max}
-                  onChange={e => updateParam(param.id, Number(e.target.value))}
-                  className="w-10 text-center bg-transparent border-0 focus:outline-none font-semibold"
-                />
-              ) : param.type === 'slider' ? (
-                <div className="flex items-center gap-1">
-                  <input
-                    type="range"
-                    min={param.min ?? 0}
-                    max={param.max ?? 10}
-                    value={param.value as number}
-                    onChange={e => updateParam(param.id, Number(e.target.value))}
-                    className="w-16 h-1 accent-[#BEF264]"
-                  />
-                  <span className="font-semibold w-4 text-center">{param.value}</span>
-                </div>
-              ) : param.type === 'select' && param.options ? (
-                <select
-                  value={param.value as string}
-                  onChange={e => updateParam(param.id, e.target.value)}
-                  className="bg-transparent border-0 text-xs font-semibold focus:outline-none"
-                >
-                  {param.options.map(o => <option key={o}>{o}</option>)}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  value={param.value as string}
-                  onChange={e => updateParam(param.id, e.target.value)}
-                  className="w-16 bg-transparent border-0 text-xs font-semibold focus:outline-none"
-                />
-              )}
-              {param.unit && <span className="text-muted-foreground">{param.unit}</span>}
-              <button onClick={() => removeParam(param.id)} className="opacity-0 group-hover/param:opacity-100 ml-0.5">
-                <X className="w-2.5 h-2.5 text-[#7B8889] hover:text-destructive" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }

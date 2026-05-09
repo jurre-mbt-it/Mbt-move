@@ -153,14 +153,85 @@ export const adminRouter = createTRPCRouter({
 
   // ── Practices ─────────────────────────────────────────────────────────
 
-  listPractices: adminProcedure.query(({ ctx }) => {
-    return ctx.prisma.practice.findMany({
+  listPractices: adminProcedure.query(async ({ ctx }) => {
+    const practices = await ctx.prisma.practice.findMany({
       orderBy: { createdAt: 'asc' },
       include: {
         _count: { select: { users: true } },
+        users: {
+          where: { isPracticeOwner: true },
+          select: { id: true, name: true, firstName: true, lastName: true, email: true },
+          take: 1,
+        },
       },
     })
+    // Vlak `users[0]` af naar `owner` voor de client.
+    return practices.map(({ users, ...rest }) => ({
+      ...rest,
+      owner: users[0] ?? null,
+    }))
   }),
+
+  /** Therapeuten van een specifieke praktijk — voor de owner-picker dropdown. */
+  listPracticeMembers: adminProcedure
+    .input(z.object({ practiceId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      return ctx.prisma.user.findMany({
+        where: {
+          practiceId: input.practiceId,
+          role: { in: ['THERAPIST', 'ADMIN'] },
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          firstName: true,
+          lastName: true,
+          isPracticeOwner: true,
+        },
+        orderBy: [{ isPracticeOwner: 'desc' }, { name: 'asc' }],
+      })
+    }),
+
+  /** Owner van een praktijk wijzigen of loskoppelen. Demoot de huidige owner
+   *  en promoot de nieuwe in één transactie — anders zou de partial unique
+   *  index (één owner per practice) een conflict opleveren. */
+  setPracticeOwner: mfaAdminProcedure
+    .input(z.object({
+      practiceId: z.string(),
+      userId: z.string().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.userId) {
+        const target = await ctx.prisma.user.findUnique({
+          where: { id: input.userId },
+          select: { practiceId: true, role: true },
+        })
+        if (!target) throw new TRPCError({ code: 'NOT_FOUND', message: 'User niet gevonden' })
+        if (target.practiceId !== input.practiceId) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'User hoort niet bij deze praktijk' })
+        }
+        if (target.role !== 'THERAPIST' && target.role !== 'ADMIN') {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Alleen THERAPIST of ADMIN kan owner zijn' })
+        }
+      }
+      return ctx.prisma.$transaction(async (tx) => {
+        // Stap 1: huidige owner demoten (kan niemand zijn — dan no-op)
+        await tx.user.updateMany({
+          where: { practiceId: input.practiceId, isPracticeOwner: true },
+          data: { isPracticeOwner: false },
+        })
+        // Stap 2: nieuwe owner promoten (of leeg laten als userId=null)
+        if (input.userId) {
+          await tx.user.update({
+            where: { id: input.userId },
+            data: { isPracticeOwner: true },
+          })
+        }
+        return { ok: true }
+      })
+    }),
 
   createPractice: mfaAdminProcedure
     .input(z.object({ name: z.string().min(2) }))

@@ -6,10 +6,24 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-function createPrismaClient() {
-  const connectionString = process.env.DATABASE_URL
+function createPrismaClient(): PrismaClient {
+  // Vercel build-step heeft niet altijd DATABASE_URL beschikbaar (alleen DIRECT_URL),
+  // dus we vallen terug op DIRECT_URL als DATABASE_URL ontbreekt.
+  const connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL
   if (!connectionString || connectionString.includes('placeholder') || connectionString.includes('localhost')) {
-    return new PrismaClient()
+    // Lazy stub: throwt pas bij eerste DB-call. Voorkomt dat `next build` crasht
+    // tijdens "Collecting page data" als env vars in de build-sandbox missen.
+    // In productie bestaat dit pad niet (DATABASE_URL altijd gezet); dit is
+    // puur build-time vangnet sinds Prisma v7 een lege `new PrismaClient()`
+    // niet meer toestaat.
+    return new Proxy({} as PrismaClient, {
+      get(_target, prop) {
+        throw new Error(
+          `[prisma] DATABASE_URL/DIRECT_URL ontbreekt — kan ${String(prop)} niet uitvoeren. ` +
+          `Stel de env var in via Vercel project settings of .env.local.`
+        )
+      },
+    })
   }
 
   // Supabase PgBouncer (transaction mode) vereist pgbouncer=true

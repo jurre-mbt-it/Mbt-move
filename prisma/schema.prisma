@@ -224,6 +224,20 @@ model User {
   specialty     String?
   bio           String?
   licenseNumber String?
+  // Naam-split — naast `name` (canonical, voor backwards-compat) houden we
+  // firstName/lastName apart. UI bewerkt firstName/lastName, server hercomputeert
+  // `name = trim(firstName + ' ' + lastName)` om beide in sync te houden.
+  // Backfill via SQL bij eerste migratie voor bestaande rows.
+  firstName     String?
+  lastName      String?
+  // Functietitel — getoond in email-footer onder de therapeut-naam.
+  // Bijv. "Sportfysiotherapeut", "Manueel therapeut".
+  jobTitle      String?
+  // Praktijk-eigenaarschap — onafhankelijk van `role`. Max één owner per
+  // practice afgedwongen via partial unique index in SQL-migratie. Owner mag
+  // praktijkgegevens (Practice) bewerken; andere therapeuten in dezelfde
+  // praktijk hebben read-only toegang.
+  isPracticeOwner Boolean @default(false)
 
   // Patient fields — blessure / injury info
   injuryInfo                String?
@@ -432,15 +446,33 @@ model Exercise {
 }
 
 model Practice {
-  id          String       @id @default(cuid())
-  name        String
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id                  String       @id @default(cuid())
+  name                String
+  // Adres + contact — alle nullable zodat bestaande praktijken niet breken.
+  // Worden meegerenderd in de email-footer als ze ingevuld zijn; lege velden
+  // worden in de footer overgeslagen, of de hele footer als de minimale set
+  // (addressLine1 + city + email-of-phone) ontbreekt.
+  addressLine1        String?
+  addressLine2        String?
+  postalCode          String?
+  city                String?
+  country             String?      @default("Nederland")
+  phone               String?
+  email               String?
+  website             String?
+  logoUrl             String?
+  agbCodePractice     String?
+  // Plain text, max 500 chars. Wordt onderaan de email-footer gerenderd in
+  // kleinere grijze typografie. Geen HTML/markdown om XSS-risico in mail-
+  // templates te vermijden.
+  privacyDisclaimer   String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
   // Clinical Insight Engine — gefaseerde rollout per praktijk.
-  cieEnabled  Boolean      @default(false)
-  users       User[]
-  exercises   Exercise[]
-  inviteCodes InviteCode[]
+  cieEnabled          Boolean      @default(false)
+  users               User[]
+  exercises           Exercise[]
+  inviteCodes         InviteCode[]
 
   @@map("practices")
 }
@@ -651,7 +683,12 @@ model ProgramExercise {
   day            Int      @default(1)
   order          Int      @default(0)
   sets           Int      @default(3)
+  // Optionele bovengrens voor sets-range. NULL = `sets` als vaste waarde,
+  // ingevuld = "sets..setsMax" als range (bv. 3-5 sets).
+  setsMax        Int?
   reps           Int      @default(10)
+  // Optionele bovengrens voor reps-range. NULL = enkele waarde, ingevuld = range.
+  repsMax        Int?
   repUnit        String   @default("reps")
   restTime       Int      @default(60)
   supersetGroup  String?

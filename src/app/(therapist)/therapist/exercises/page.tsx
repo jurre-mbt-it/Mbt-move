@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Heart } from 'lucide-react'
 import { ExerciseCard } from '@/components/exercises/ExerciseCard'
 import { ExerciseVideoModal, type ExerciseForModal } from '@/components/exercises/ExerciseVideoModal'
@@ -38,6 +39,7 @@ type ExerciseItem = {
 }
 
 export default function ExercisesPage() {
+  const router = useRouter()
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [query, setQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -463,6 +465,7 @@ export default function ExercisesPage() {
                 exercise={ex}
                 onPreview={() => openPreview(ex)}
                 onToggleFavorite={(id) => toggleFavorite.mutate({ exerciseId: id })}
+                onQuickAdd={(id) => router.push(`/therapist/programs/new?addExerciseId=${id}`)}
               />
             ))}
           </div>

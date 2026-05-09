@@ -15,11 +15,13 @@ import { insightsRouter } from './insights'
 import { rehabRouter } from './rehab'
 import { assessmentsRouter } from './assessments'
 import { cohortRouter } from './cohort'
+import { practiceRouter } from './practice'
 
 export const appRouter = createTRPCRouter({
   auth: authRouter,
   exercises: exercisesRouter,
   patients: patientsRouter,
+  practice: practiceRouter,
   programs: programsRouter,
   weekSchedules: weekSchedulesRouter,
   research: researchRouter,

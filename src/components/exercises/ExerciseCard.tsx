@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Play, Edit, MoreHorizontal, PlayCircle, Heart } from 'lucide-react'
+import { Play, Edit, MoreHorizontal, PlayCircle, Heart, Plus } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +33,9 @@ interface ExerciseCardProps {
   onPreview?: () => void
   /** When provided, toont een hartje rechts-boven op de thumbnail. */
   onToggleFavorite?: (id: string, currentlyFavorite: boolean) => void
+  /** Quick-add → handler krijgt de exercise-id. Toont Physitrack-stijl + bolletje
+   *  rechtsonder op de thumbnail. */
+  onQuickAdd?: (id: string) => void
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -50,6 +53,7 @@ export function ExerciseCard({
   onAddToCollection,
   onPreview,
   onToggleFavorite,
+  onQuickAdd,
 }: ExerciseCardProps) {
   const category = EXERCISE_CATEGORIES.find(c => c.value === exercise.category)
   const difficulty = DIFFICULTIES.find(d => d.value === exercise.difficulty)
@@ -148,6 +152,25 @@ export function ExerciseCard({
             />
           ))}
         </div>
+
+        {/* Quick-add — Physitrack-stijl + bolletje, altijd zichtbaar zodat je
+            zonder hover door de bibliotheek kunt klikken. Plek: bottom-left zodat
+            'ie de difficulty-dots niet overlapt. */}
+        {onQuickAdd && (
+          <button
+            type="button"
+            aria-label={`Voeg ${exercise.name} toe aan programma`}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              onQuickAdd(exercise.id)
+            }}
+            className="absolute bottom-2 left-2 w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-md hover:scale-110 active:scale-95"
+            style={{ background: '#BEF264', color: '#0A0E0F' }}
+          >
+            <Plus className="w-4 h-4" strokeWidth={3} />
+          </button>
+        )}
       </div>
 
       <CardContent className="p-4">

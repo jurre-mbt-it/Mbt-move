@@ -87,7 +87,49 @@ export const exercisesRouter = createTRPCRouter({
         orderBy: { createdAt: 'desc' },
       })
 
-      return exercises.map(ex => ({
+      // "Laatst gebruikt door deze therapeut" — proxy via Program.updatedAt
+      // van programma's die deze user heeft gemaakt (creatorId = me).
+      // ProgramExercise heeft zelf geen createdAt; updatedAt van het ouder-programma
+      // is precies genoeg voor sorteer-doeleinden.
+      const exerciseIds = exercises.map(e => e.id)
+      const usages = exerciseIds.length > 0
+        ? await ctx.prisma.programExercise.findMany({
+            where: {
+              exerciseId: { in: exerciseIds },
+              program: { creatorId: ctx.user!.id },
+            },
+            select: {
+              exerciseId: true,
+              program: { select: { updatedAt: true } },
+            },
+          })
+        : []
+      const lastUsedMap = new Map<string, Date>()
+      for (const u of usages) {
+        const cur = lastUsedMap.get(u.exerciseId)
+        if (!cur || u.program.updatedAt > cur) {
+          lastUsedMap.set(u.exerciseId, u.program.updatedAt)
+        }
+      }
+
+      // Groepeer oefeningen met dezelfde naam (case-insensitive) en zet binnen
+      // elke groep de meest recent gebruikte variant bovenaan. Groepen worden
+      // op hun beurt gesorteerd op de meest recente activiteit.
+      type Sortable = { ex: typeof exercises[number]; lastTouched: number }
+      const groups = new Map<string, Sortable[]>()
+      for (const ex of exercises) {
+        const lastTouched = (lastUsedMap.get(ex.id) ?? ex.createdAt).getTime()
+        const key = ex.name.trim().toLowerCase()
+        const arr = groups.get(key) ?? []
+        arr.push({ ex, lastTouched })
+        groups.set(key, arr)
+      }
+      const sortedGroups = Array.from(groups.values())
+        .map(arr => arr.sort((a, b) => b.lastTouched - a.lastTouched))
+        .sort((a, b) => b[0].lastTouched - a[0].lastTouched)
+      const sorted = sortedGroups.flatMap(g => g.map(item => item.ex))
+
+      return sorted.map(ex => ({
         ...ex,
         isFavorite: favoriteIds.has(ex.id),
         muscleLoads: muscleLoadsRecord(ex),
@@ -270,6 +312,7 @@ export const exercisesRouter = createTRPCRouter({
         label: z.string(),
         type: z.enum(['number', 'text', 'select', 'slider']),
         value: z.union([z.string(), z.number()]),
+        valueMax: z.union([z.string(), z.number()]).optional(),
         unit: z.string().optional(),
         options: z.array(z.string()).optional(),
         min: z.number().optional(),

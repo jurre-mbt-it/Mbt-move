@@ -16,11 +16,14 @@ type EditExercise = {
   id: string
   exerciseId: string
   sets: number
+  setsMax?: number | null
   reps: number
+  repsMax?: number | null
   repUnit: string | null
   restTime: number
   supersetGroup: string | null
   supersetOrder: number
+  notes: string | null
   day: number
   week: number
   exercise: {
@@ -91,8 +94,13 @@ export default function EditProgramPage({ params }: Props) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     trackOneRepMax: (pe.exercise as any).trackOneRepMax ?? false,
     sets: pe.sets,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setsMax: (pe as any).setsMax ?? null,
     reps: pe.reps,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    repsMax: (pe as any).repsMax ?? null,
     repUnit: (pe.repUnit as 'reps' | 'sec' | 'min') ?? 'reps',
+    notes: pe.notes ?? null,
     rest: pe.restTime,
     extraParams: [],
     supersetGroup: pe.supersetGroup ?? null,

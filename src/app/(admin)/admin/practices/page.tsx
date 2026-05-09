@@ -12,11 +12,17 @@ import {
   DarkHeader,
   DarkInput,
   DarkScreen,
+  DarkDialog,
+  DarkDialogContent,
+  DarkDialogHeader,
+  DarkDialogTitle,
+  DarkDialogDescription,
   Kicker,
   MetaLabel,
   P,
   Tile,
 } from '@/components/dark-ui'
+import { Crown, Check } from 'lucide-react'
 
 export default function AdminPracticesPage() {
   const [newName, setNewName] = useState('')
@@ -104,6 +110,7 @@ export default function AdminPracticesPage() {
                   remove.mutate({ id: p.id })
                 }
               }}
+              onChangedOwner={() => invalidate()}
               busy={rename.isPending || remove.isPending}
             />
           ))}
@@ -120,20 +127,35 @@ export default function AdminPracticesPage() {
   )
 }
 
+type PracticeOwner = {
+  id: string
+  email: string
+  name: string | null
+  firstName: string | null
+  lastName: string | null
+} | null
+
 function PracticeRow({
   practice,
   onRename,
   onDelete,
+  onChangedOwner,
   busy,
 }: {
-  practice: { id: string; name: string; _count?: { users: number } }
+  practice: { id: string; name: string; _count?: { users: number }; owner?: PracticeOwner }
   onRename: (name: string) => void
   onDelete: () => void
+  onChangedOwner: () => void
   busy?: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(practice.name)
+  const [ownerOpen, setOwnerOpen] = useState(false)
   const userCount = practice._count?.users ?? 0
+  const owner = practice.owner ?? null
+  const ownerLabel = owner
+    ? owner.firstName?.trim() || owner.name?.trim() || owner.email
+    : 'Geen eigenaar'
 
   return (
     <Tile>
@@ -156,15 +178,133 @@ function PracticeRow({
           <>
             <div className="flex-1 min-w-0">
               <p style={{ color: P.ink, fontSize: 14, fontWeight: 700 }}>{practice.name}</p>
-              <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.1em' }}>
-                {userCount} GEBRUIKER{userCount === 1 ? '' : 'S'}
-              </p>
+              <div className="flex items-center gap-3 mt-1">
+                <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.1em' }}>
+                  {userCount} GEBRUIKER{userCount === 1 ? '' : 'S'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setOwnerOpen(true)}
+                  className="flex items-center gap-1 athletic-mono"
+                  style={{
+                    color: owner ? P.lime : P.gold,
+                    fontSize: 11,
+                    letterSpacing: '0.1em',
+                  }}
+                  title={owner ? 'Wijzig eigenaar' : 'Wijs eigenaar toe'}
+                >
+                  <Crown className="w-3 h-3" />
+                  {ownerLabel.toUpperCase()}
+                </button>
+              </div>
             </div>
             <DarkButton size="sm" variant="secondary" onClick={() => setEditing(true)}>Wijzig</DarkButton>
             <DarkButton size="sm" variant="danger" onClick={onDelete} disabled={busy}>Verwijder</DarkButton>
           </>
         )}
       </div>
+
+      <OwnerPickerDialog
+        open={ownerOpen}
+        onClose={() => setOwnerOpen(false)}
+        practiceId={practice.id}
+        practiceName={practice.name}
+        currentOwnerId={owner?.id ?? null}
+        onSaved={() => { setOwnerOpen(false); onChangedOwner() }}
+      />
     </Tile>
+  )
+}
+
+function OwnerPickerDialog({
+  open, onClose, practiceId, practiceName, currentOwnerId, onSaved,
+}: {
+  open: boolean
+  onClose: () => void
+  practiceId: string
+  practiceName: string
+  currentOwnerId: string | null
+  onSaved: () => void
+}) {
+  const { data: members = [], isLoading } = trpc.admin.listPracticeMembers.useQuery(
+    { practiceId },
+    { enabled: open },
+  )
+  const setOwner = trpc.admin.setPracticeOwner.useMutation({
+    onSuccess: () => { toast.success('Eigenaar bijgewerkt'); onSaved() },
+    onError: (err) => toast.error(err.message ?? 'Bijwerken mislukt'),
+  })
+
+  return (
+    <DarkDialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DarkDialogContent>
+        <DarkDialogHeader>
+          <DarkDialogTitle>Eigenaar van {practiceName}</DarkDialogTitle>
+          <DarkDialogDescription>
+            De eigenaar mag praktijkgegevens bewerken (adres, logo, email-footer).
+            Andere therapeuten in de praktijk zien het profiel alleen-lezen.
+          </DarkDialogDescription>
+        </DarkDialogHeader>
+
+        <div className="flex flex-col gap-1.5 max-h-80 overflow-y-auto pr-1 mt-2">
+          {isLoading && (
+            <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11 }}>LADEN…</p>
+          )}
+          {!isLoading && members.length === 0 && (
+            <p className="text-sm" style={{ color: P.inkMuted }}>
+              Nog geen therapeuten gekoppeld aan deze praktijk.
+            </p>
+          )}
+          {members.map((m) => {
+            const isCurrent = m.id === currentOwnerId
+            const label = m.firstName?.trim() || m.name?.trim() || m.email
+            return (
+              <button
+                key={m.id}
+                type="button"
+                disabled={setOwner.isPending}
+                onClick={() => setOwner.mutate({ practiceId, userId: m.id })}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors"
+                style={{
+                  background: isCurrent ? 'rgba(190,242,100,0.10)' : P.surface,
+                  border: `1px solid ${isCurrent ? 'rgba(190,242,100,0.35)' : P.lineStrong}`,
+                }}
+              >
+                <Crown
+                  className="w-3.5 h-3.5 shrink-0"
+                  style={{ color: isCurrent ? P.lime : P.inkMuted }}
+                />
+                <div className="flex-1 min-w-0">
+                  <p style={{ color: P.ink, fontSize: 13, fontWeight: 600 }}>{label}</p>
+                  <p className="text-[11px]" style={{ color: P.inkMuted }}>{m.email}</p>
+                </div>
+                {isCurrent && <Check className="w-4 h-4" style={{ color: P.lime }} />}
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="flex gap-2 mt-3">
+          <DarkButton
+            variant="ghost"
+            onClick={onClose}
+            disabled={setOwner.isPending}
+            className="flex-1"
+          >
+            Sluiten
+          </DarkButton>
+          {currentOwnerId && (
+            <DarkButton
+              variant="danger"
+              size="sm"
+              disabled={setOwner.isPending}
+              onClick={() => setOwner.mutate({ practiceId, userId: null })}
+            >
+              Eigenaar loskoppelen
+            </DarkButton>
+          )}
+        </div>
+      </DarkDialogContent>
+    </DarkDialog>
   )
 }
