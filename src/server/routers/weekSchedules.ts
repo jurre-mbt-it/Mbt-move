@@ -864,6 +864,36 @@ export const weekSchedulesRouter = createTRPCRouter({
     }),
 
   /**
+   * Clear de legacy `programId` op een WeekScheduleDay. Voor backwards-compat
+   * met dagen die nog niet door de nieuwe UI zijn aangeraakt: items[] is leeg
+   * maar `day.programId` heeft een legacy waarde. Klik op X in de UI roept
+   * deze procedure aan ipv removeItem.
+   */
+  clearLegacyDay: therapistProcedure
+    .input(z.object({ dayId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const day = await ctx.prisma.weekScheduleDay.findUnique({
+        where: { id: input.dayId },
+        include: { weekSchedule: { select: { creatorId: true, practiceId: true } } },
+      })
+      if (!day) throw new TRPCError({ code: 'NOT_FOUND' })
+      const isAdmin = ctx.user.role === 'ADMIN'
+      const isOwner = day.weekSchedule.creatorId === ctx.user.id
+      const isSamePractice =
+        !!ctx.user.practiceId &&
+        !!day.weekSchedule.practiceId &&
+        day.weekSchedule.practiceId === ctx.user.practiceId
+      if (!isAdmin && !isOwner && !isSamePractice) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+      await ctx.prisma.weekScheduleDay.update({
+        where: { id: input.dayId },
+        data: { programId: null },
+      })
+      return { ok: true }
+    }),
+
+  /**
    * Bulk-reorder items binnen een dag, of verplaats items naar een andere dag.
    * Input is een list van (itemId, dayId, order). UI gebruikt dit voor
    * drag-drop binnen een dag én tussen dagen.
