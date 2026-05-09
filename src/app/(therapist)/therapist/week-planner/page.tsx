@@ -455,19 +455,33 @@ function WeekPlannerContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const utils = trpc.useUtils()
-
-  // ─ URL state ─
-  const selectedPatientId = searchParams.get('patientId') || ''
-  const monthParam = searchParams.get('month')  // 'YYYY-MM'
   const today = startOfDay(new Date())
-  const [year, month0] = (() => {
+
+  // ─ URL → initial state, daarna lokaal beheerd ─
+  // Next 16's `router.replace` triggert niet altijd een re-render van
+  // `useSearchParams()` (vooral met Suspense), waardoor klikken op een
+  // andere patiënt in de dropdown de UI niet ververst. Daarom houden we
+  // patientId/month als lokale state en syncen we de URL als afgeleide.
+  const [selectedPatientId, setSelectedPatientIdState] = useState(
+    () => searchParams.get('patientId') || '',
+  )
+  const [monthState, setMonthState] = useState<[number, number]>(() => {
+    const monthParam = searchParams.get('month')
     if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
       const [y, m] = monthParam.split('-').map(Number)
       return [y, m - 1]
     }
     return [today.getFullYear(), today.getMonth()]
-  })()
+  })
+  const [year, month0] = monthState
+
   function setUrl(patch: { patientId?: string; month?: string }) {
+    if (patch.patientId !== undefined) setSelectedPatientIdState(patch.patientId)
+    if (patch.month !== undefined && /^\d{4}-\d{2}$/.test(patch.month)) {
+      const [y, m] = patch.month.split('-').map(Number)
+      setMonthState([y, m - 1])
+    }
+    // URL-sync voor bookmarkability (niet load-bearing voor render).
     const p = new URLSearchParams(searchParams.toString())
     if (patch.patientId !== undefined) {
       if (patch.patientId) p.set('patientId', patch.patientId)
@@ -520,6 +534,19 @@ function WeekPlannerContent() {
     onSuccess: () => utils.weekSchedules.listWithItems.invalidate(),
     onError: (err) => toast.error(err.message ?? 'Verwijderen mislukt'),
   })
+  const clearLegacyDay = trpc.weekSchedules.clearLegacyDay.useMutation({
+    onSuccess: () => utils.weekSchedules.listWithItems.invalidate(),
+    onError: (err) => toast.error(err.message ?? 'Verwijderen mislukt'),
+  })
+
+  /** Branche op id: synthetische legacy items beginnen met `legacy-{dayId}`. */
+  function handleRemoveItem(item: ScheduleItem, dayId: string | null) {
+    if (item.id.startsWith('legacy-') && dayId) {
+      clearLegacyDay.mutate({ dayId })
+    } else {
+      removeItem.mutate({ id: item.id })
+    }
+  }
   const duplicateWeek = trpc.weekSchedules.duplicateWeek.useMutation({
     onSuccess: () => { utils.weekSchedules.listWithItems.invalidate(); toast.success('Week gedupliceerd') },
     onError: (err) => toast.error(err.message ?? 'Dupliceren mislukt'),
@@ -587,12 +614,35 @@ function WeekPlannerContent() {
   }
   const dateMap = useMemo(() => {
     const map = new Map<string, DayCellInfo>()
+    if (schedules.length === 0) return map
+
+    // Bepaal een baseline: eerste schedule MET startDate, anders eerste op
+    // createdAt. Andere schedules zonder startDate worden afgeleid van die
+    // baseline + (weekNumber-1)*7. Voorkomt dat legacy data zonder startDate
+    // onzichtbaar wordt — voorheen werd 'continue' gedaan.
+    const withStart = schedules.find(ws => ws.startDate)
+    let baseline: Date
+    let baselineWeekNumber: number
+    if (withStart) {
+      baseline = mondayOf(new Date(withStart.startDate!))
+      baselineWeekNumber = withStart.weekNumber
+    } else {
+      const earliest = schedules.reduce((a, b) =>
+        new Date(a.createdAt) < new Date(b.createdAt) ? a : b
+      )
+      baseline = mondayOf(new Date(earliest.createdAt))
+      baselineWeekNumber = earliest.weekNumber
+    }
+
     for (const ws of schedules) {
-      if (!ws.startDate) continue  // legacy zonder startDate skippen
-      const start = mondayOf(new Date(ws.startDate))
+      const start = ws.startDate
+        ? mondayOf(new Date(ws.startDate))
+        : addDays(baseline, (ws.weekNumber - baselineWeekNumber) * 7)
+
       for (const day of ws.days) {
         const date = addDays(start, day.dayOfWeek)
-        const items = (day.items ?? []).map(it => ({
+        // Items uit het nieuwe model.
+        let items: ScheduleItem[] = (day.items ?? []).map(it => ({
           id: it.id,
           order: it.order,
           programId: it.programId,
@@ -602,6 +652,21 @@ function WeekPlannerContent() {
           quickDurationSec: it.quickDurationSec,
           notes: it.notes,
         }))
+        // Backwards-compat: als items[] leeg is maar er staat een legacy
+        // programId op de dag → render die als synthetisch item zodat
+        // bestaande schedules zonder backfill toch zichtbaar zijn.
+        if (items.length === 0 && day.programId && day.program) {
+          items = [{
+            id: `legacy-${day.id}`,
+            order: 0,
+            programId: day.programId,
+            program: day.program,
+            quickCategory: null,
+            quickName: null,
+            quickDurationSec: null,
+            notes: null,
+          }]
+        }
         map.set(isoDate(date), {
           dayId: day.id,
           weekScheduleId: ws.id,
@@ -837,7 +902,7 @@ function WeekPlannerContent() {
                             key={item.id}
                             item={item}
                             status={statusFor(date, item)}
-                            onRemove={() => removeItem.mutate({ id: item.id })}
+                            onRemove={() => handleRemoveItem(item, info?.dayId ?? null)}
                           />
                         ))}
                       </div>
