@@ -63,18 +63,44 @@ export const exercisesRouter = createTRPCRouter({
       if (ctx.user!.practiceId) {
         visibility.push({ practiceId: ctx.user!.practiceId })
       }
+      // Bij een zoekopdracht: trigram-fuzzy + tag-match in raw SQL voor recall
+      // op typos, woordvarianten ("squatten" → "Squat") en synoniemen via tags
+      // ("zijwaarts heffen" → tag op "Abductie"-oefening). Postgres pg_trgm
+      // moet enabled zijn (zie 20260510_exercise_fuzzy_search.sql).
+      let searchOrderedIds: string[] | null = null
+      if (input?.query && input.query.trim().length >= 2) {
+        const q = input.query.trim()
+        const qLike = `%${q}%`
+        const qLower = q.toLowerCase()
+        const rows = await ctx.prisma.$queryRaw<Array<{ id: string }>>`
+          SELECT id
+          FROM public.exercises
+          WHERE
+            similarity(name, ${q}) > 0.2
+            OR name ILIKE ${qLike}
+            OR ${qLower} = ANY(tags)
+            OR EXISTS (
+              SELECT 1 FROM unnest(tags) AS t WHERE similarity(t, ${q}) > 0.3
+            )
+          ORDER BY GREATEST(
+            similarity(name, ${q}),
+            CASE WHEN name ILIKE ${qLike} THEN 0.95 ELSE 0 END,
+            CASE WHEN ${qLower} = ANY(tags) THEN 0.9 ELSE 0 END,
+            COALESCE((SELECT MAX(similarity(t, ${q})) FROM unnest(tags) AS t), 0) * 0.85
+          ) DESC,
+          length(name) ASC
+          LIMIT 200
+        `
+        searchOrderedIds = rows.map(r => r.id)
+        // Geen matches → meteen lege lijst terug
+        if (searchOrderedIds.length === 0) return []
+      }
+
       const exercises = await ctx.prisma.exercise.findMany({
         where: {
           AND: [
             { OR: visibility },
-            ...(input?.query
-              ? [{
-                  OR: [
-                    { name: { contains: input.query, mode: 'insensitive' as const } },
-                    { tags: { has: input.query.toLowerCase() } },
-                  ],
-                }]
-              : []),
+            ...(searchOrderedIds ? [{ id: { in: searchOrderedIds } }] : []),
           ],
           ...(input?.category ? { category: input.category as never } : {}),
           ...(input?.difficulty ? { difficulty: input.difficulty as never } : {}),
@@ -84,8 +110,21 @@ export const exercisesRouter = createTRPCRouter({
         include: {
           muscleLoads: true,
         },
+        // Bij geen query: nieuwste eerst (verdere sortering hieronder).
+        // Bij query: volgorde komt uit searchOrderedIds (similarity-DESC).
         orderBy: { createdAt: 'desc' },
       })
+
+      // Bij search: respecteer de similarity-volgorde uit de raw query.
+      if (searchOrderedIds) {
+        const rank = new Map(searchOrderedIds.map((id, i) => [id, i]))
+        exercises.sort((a, b) => (rank.get(a.id) ?? 999) - (rank.get(b.id) ?? 999))
+        return exercises.map(ex => ({
+          ...ex,
+          isFavorite: favoriteIds.has(ex.id),
+          muscleLoads: muscleLoadsRecord(ex),
+        }))
+      }
 
       // "Laatst gebruikt door deze therapeut" — proxy via Program.updatedAt
       // van programma's die deze user heeft gemaakt (creatorId = me).
