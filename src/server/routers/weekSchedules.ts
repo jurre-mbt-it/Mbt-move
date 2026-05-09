@@ -34,6 +34,23 @@ const DayInput = z.object({
   programId: z.string().nullable().optional(),
 })
 
+/**
+ * Synchroniseer legacy `WeekScheduleDay.programId` met het eerste
+ * program-gekoppelde item (op `order`). Voor backwards-compat met
+ * patient-app + iOS die nog via die kolom lezen.
+ */
+async function syncDayProgramId(prisma: PrismaClient, dayId: string) {
+  const firstProgramItem = await prisma.weekScheduleDayItem.findFirst({
+    where: { dayId, programId: { not: null } },
+    orderBy: { order: 'asc' },
+    select: { programId: true },
+  })
+  await prisma.weekScheduleDay.update({
+    where: { id: dayId },
+    data: { programId: firstProgramItem?.programId ?? null },
+  })
+}
+
 export const weekSchedulesRouter = createTRPCRouter({
   list: therapistProcedure
     .input(z.object({ patientId: z.string().optional(), isTemplate: z.boolean().optional() }).optional())
@@ -677,6 +694,13 @@ export const weekSchedulesRouter = createTRPCRouter({
   // Werken bovenop het nieuwe WeekScheduleDayItem-model. De legacy
   // WeekScheduleDay.programId blijft behouden (set door create/save) en zal
   // pas in fase 5 verwijderd worden zodat de patient-app niet breekt.
+  //
+  // Backwards-compat: bij elke item-mutation roepen we `syncDayProgramId`
+  // aan zodat WeekScheduleDay.programId altijd gelijk staat aan het EERSTE
+  // program-gekoppelde item op die dag (op order). Patient-app + iOS blijven
+  // dus werken zonder code-aanpassingen — multi-workouts worden voor hen
+  // gezien als alleen het eerste programma. Wordt verwijderd in fase 5 zodra
+  // alle consumers naar items[] zijn gemigreerd.
 
   /**
    * Geeft week-schedules met items[] EXTRA (naast legacy programId per dag).
@@ -761,7 +785,7 @@ export const weekSchedulesRouter = createTRPCRouter({
         select: { order: true },
       })
       const nextOrder = last ? last.order + 1 : 0
-      return ctx.prisma.weekScheduleDayItem.create({
+      const created = await ctx.prisma.weekScheduleDayItem.create({
         data: input.kind === 'program'
           ? {
               dayId: input.dayId,
@@ -781,6 +805,8 @@ export const weekSchedulesRouter = createTRPCRouter({
           program: { select: { id: true, name: true, status: true } },
         },
       })
+      await syncDayProgramId(ctx.prisma, input.dayId)
+      return created
     }),
 
   /** Velden van een item bewerken (naam, duur, notes, order). */
@@ -833,6 +859,7 @@ export const weekSchedulesRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
       await ctx.prisma.weekScheduleDayItem.delete({ where: { id: input.id } })
+      await syncDayProgramId(ctx.prisma, item.day.id)
       return { ok: true }
     }),
 
@@ -877,6 +904,14 @@ export const weekSchedulesRouter = createTRPCRouter({
           })
         )
       )
+      // Sync legacy programId voor alle dagen die door de moves zijn geraakt
+      // (zowel bron als doel). Backwards-compat met patient-app.
+      const touchedDayIds = new Set<string>()
+      for (const it of items) touchedDayIds.add(it.dayId)
+      for (const m of input.moves) touchedDayIds.add(m.dayId)
+      for (const dayId of touchedDayIds) {
+        await syncDayProgramId(ctx.prisma, dayId)
+      }
       return { ok: true }
     }),
 
@@ -977,6 +1012,10 @@ export const weekSchedulesRouter = createTRPCRouter({
       }
       if (creates.length > 0) {
         await ctx.prisma.weekScheduleDayItem.createMany({ data: creates })
+      }
+      // Sync legacy programId voor alle doel-dagen na de bulk create.
+      for (const td of target.days) {
+        await syncDayProgramId(ctx.prisma, td.id)
       }
       return { targetWeekScheduleId: target.id, copied: creates.length }
     }),
