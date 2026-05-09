@@ -59,9 +59,17 @@ export default function SettingsPage() {
         <ActionTile
           href="/therapist/settings/profile"
           label="Profiel"
-          sub="Persoonlijke gegevens en accountinformatie"
+          sub="Naam, functietitel en telefoon"
           bar={P.lime}
         />
+        {me?.practiceId && (
+          <ActionTile
+            href="/therapist/settings/practice"
+            label="Praktijkprofiel"
+            sub={me.isPracticeOwner ? 'Adres, logo en email-footer' : 'Bekijken (alleen eigenaar mag bewerken)'}
+            bar={P.lime}
+          />
+        )}
         <ActionTile
           href="/therapist/settings/security"
           label="Beveiliging & MFA"

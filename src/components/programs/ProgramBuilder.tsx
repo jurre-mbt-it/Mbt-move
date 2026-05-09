@@ -28,6 +28,7 @@ import { ExerciseLibraryPanel } from './ExerciseLibraryPanel'
 import { ProgramExerciseBlock } from './ProgramExerciseBlock'
 import { SupersetGroupBlock } from './SupersetGroupBlock'
 import { MuscleBalancePanel } from './MuscleBalancePanel'
+import { IncompletePracticeBanner } from '@/components/practice/IncompletePracticeBanner'
 import type { BuilderExercise, ProgramState } from './types'
 import { SUPERSET_LETTERS, DAY_LABELS } from '@/lib/program-constants'
 import { EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
@@ -1758,6 +1759,10 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           </DialogHeader>
 
           <div className="space-y-3 mt-2">
+            {/* Praktijk-incompleet waarschuwing — toont alleen als praktijk-
+                profiel onvolledig is. Mail gaat dan zonder footer. */}
+            <IncompletePracticeBanner variant="inline" />
+
             {/* Patient picker */}
             <div className="space-y-1.5">
               <Label className="text-xs">Patiënt</Label>

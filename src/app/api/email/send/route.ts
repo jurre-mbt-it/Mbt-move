@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
+import { renderEmailFooter } from '@/server/email/footer'
 
 function escapeHtml(input: string): string {
   return input
@@ -28,7 +29,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
   }
 
-  const caller = await prisma.user.findUnique({ where: { email: authUser.email } })
+  const caller = await prisma.user.findUnique({
+    where: { email: authUser.email },
+    include: { practice: true },
+  })
   if (!caller || (caller.role !== 'THERAPIST' && caller.role !== 'ADMIN')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
@@ -105,6 +109,19 @@ export async function POST(req: NextRequest) {
   const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://mbt-gym.nl'}/${safeCode ? 'login/code' : 'login'}`
   const ctaLabel = safeCode ? 'Inloggen met toegangscode' : 'Inloggen en programma openen'
 
+  // Praktijk-footer — leeg als praktijk-gegevens onvolledig zijn (per spec).
+  // Mail wordt dan zonder footer verstuurd; therapeut ziet daarvoor een
+  // waarschuwing in de UI.
+  const practiceFooter = renderEmailFooter({
+    therapist: {
+      firstName: caller.firstName,
+      lastName: caller.lastName,
+      jobTitle: caller.jobTitle,
+      name: caller.name,
+    },
+    practice: caller.practice,
+  })
+
   const html = `
     <div style="font-family: sans-serif; max-width: 540px; margin: 0 auto; padding: 32px 24px;">
       <img src="https://mbt-gym.nl/Logo.jpg" alt="MBT Gym" style="height: 36px; margin-bottom: 24px;" />
@@ -127,9 +144,11 @@ export async function POST(req: NextRequest) {
         ${ctaLabel}
       </a>
 
+      ${practiceFooter || `
       <p style="font-size: 12px; color: #a1a1aa; margin-top: 32px;">
-        MBT Gym · Clinician Portal · Neem contact op met je therapeut voor vragen.
+        Neem contact op met je therapeut voor vragen.
       </p>
+      `}
     </div>
   `
 
