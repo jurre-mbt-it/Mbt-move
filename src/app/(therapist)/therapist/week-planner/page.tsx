@@ -184,36 +184,71 @@ type ScheduleItem = {
   notes: string | null
 }
 
+type ItemStatus = 'scheduled' | 'completed' | 'missed' | 'in_progress'
+
+const STATUS_COLORS: Record<ItemStatus, string> = {
+  scheduled: 'transparent',           // geen extra accent — categorie-kleur leidt
+  completed: 'rgba(190,242,100,0.18)', // lime tint
+  missed:    'rgba(248,113,113,0.20)', // danger red tint
+  in_progress: 'rgba(244,194,97,0.20)', // gold/amber tint
+}
+const STATUS_BORDER: Record<ItemStatus, string> = {
+  scheduled: '',
+  completed: '#BEF264',
+  missed:    '#F87171',
+  in_progress: '#F4C261',
+}
+
 function ItemTile({
-  item, onRemove,
-}: { item: ScheduleItem; onRemove: () => void }) {
-  // Categorie afleiden: voor program-items proberen via een lookup elders;
-  // hier vangen we 'em via quickCategory of fallback default.
+  item, status, onRemove,
+}: { item: ScheduleItem; status: ItemStatus; onRemove: () => void }) {
   const category: Category = item.quickCategory ?? 'STRENGTH'  // default voor program-link
   const color = CATEGORY_COLORS[category]
   const name = item.programId ? (item.program?.name ?? 'Programma') : (item.quickName ?? 'Workout')
   const duration = item.quickDurationSec ? fmtDuration(item.quickDurationSec) : null
 
+  // Status overlay: extra strookje bovenaan voor done/missed/in-progress.
+  // Categorie-kleur blijft links als anchor zodat type direct herkenbaar is.
+  const statusBg = STATUS_COLORS[status]
+  const showStatusStripe = status !== 'scheduled'
+
   return (
     <div
-      className="group/tile relative rounded-md px-2 py-1 text-[11px] flex items-center gap-1.5 cursor-default"
+      className="group/tile relative rounded-md text-[11px] cursor-default overflow-hidden"
       style={{
         background: `${color}15`,
         borderLeft: `3px solid ${color}`,
         color: P.ink,
       }}
+      title={
+        status === 'completed' ? 'Voltooid'
+        : status === 'missed' ? 'Gemist'
+        : status === 'in_progress' ? 'Bezig'
+        : undefined
+      }
     >
-      <span style={{ color }} className="shrink-0"><CategoryIcon category={category} size={11} /></span>
-      <span className="flex-1 truncate">{name}</span>
-      {duration && <span className="text-[10px] opacity-70 shrink-0">{duration}</span>}
-      <button
-        type="button"
-        onClick={onRemove}
-        className="opacity-0 group-hover/tile:opacity-100 transition-opacity shrink-0 text-zinc-400 hover:text-red-400"
-        title="Verwijder"
+      {showStatusStripe && (
+        <div
+          className="absolute inset-x-0 top-0 h-[3px]"
+          style={{ background: STATUS_BORDER[status] }}
+        />
+      )}
+      <div
+        className="flex items-center gap-1.5 px-2 py-1"
+        style={{ background: statusBg }}
       >
-        <X className="w-3 h-3" />
-      </button>
+        <span style={{ color }} className="shrink-0"><CategoryIcon category={category} size={11} /></span>
+        <span className="flex-1 truncate">{name}</span>
+        {duration && <span className="text-[10px] opacity-70 shrink-0">{duration}</span>}
+        <button
+          type="button"
+          onClick={onRemove}
+          className="opacity-0 group-hover/tile:opacity-100 transition-opacity shrink-0 text-zinc-400 hover:text-red-400"
+          title="Verwijder"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </div>
     </div>
   )
 }
@@ -493,6 +528,56 @@ function WeekPlannerContent() {
   // ─ Computed maand-grid + mapping date → schedule day ─
   const grid = useMemo(() => monthGrid(year, month0), [year, month0])
 
+  // ─ SessionLog query voor zichtbaar bereik (status-kleuren fase 4) ─
+  const sessionRange = useMemo(() => {
+    const from = grid[0][0]
+    const to = addDays(grid[5][6], 1)  // exclusive
+    return { from: from.toISOString(), to: to.toISOString() }
+  }, [grid])
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: sessionsRaw = [] } = (trpc.weekSchedules.sessionsInRange.useQuery as any)(
+    { patientId: selectedPatientId, ...sessionRange },
+    { enabled: !!selectedPatientId, staleTime: 10_000 },
+  ) as { data: Array<{
+    id: string
+    scheduledAt: string | Date
+    completedAt: string | Date | null
+    status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED'
+    programId: string | null
+  }> }
+  // Map (programId, dateISO) → ItemStatus. Quick workouts (geen programId)
+  // krijgen geen status — blijven 'scheduled'.
+  const statusByKey = useMemo(() => {
+    const todayStart = startOfDay(new Date())
+    const map = new Map<string, ItemStatus>()
+    for (const s of sessionsRaw) {
+      if (!s.programId) continue
+      const sched = new Date(s.scheduledAt)
+      const key = `${s.programId}|${isoDate(sched)}`
+      let status: ItemStatus
+      if (s.completedAt) {
+        status = 'completed'
+      } else if (s.status === 'IN_PROGRESS') {
+        status = 'in_progress'
+      } else if (s.status === 'SKIPPED' || sched < todayStart) {
+        status = 'missed'
+      } else {
+        status = 'scheduled'
+      }
+      // Als er meerdere sessies op dezelfde sleutel zijn (re-schedule etc),
+      // kies de "best status": completed > in_progress > scheduled > missed.
+      const prev = map.get(key)
+      const prio: Record<ItemStatus, number> = { completed: 4, in_progress: 3, scheduled: 2, missed: 1 }
+      if (!prev || prio[status] > prio[prev]) map.set(key, status)
+    }
+    return map
+  }, [sessionsRaw])
+
+  function statusFor(date: Date, item: ScheduleItem): ItemStatus {
+    if (!item.programId) return 'scheduled'
+    return statusByKey.get(`${item.programId}|${isoDate(date)}`) ?? 'scheduled'
+  }
+
   // Schedule dag-info gemapt op ISO-datum.
   type DayCellInfo = {
     dayId: string | null            // null als nog geen schedule bestaat voor die week
@@ -751,6 +836,7 @@ function WeekPlannerContent() {
                           <ItemTile
                             key={item.id}
                             item={item}
+                            status={statusFor(date, item)}
                             onRemove={() => removeItem.mutate({ id: item.id })}
                           />
                         ))}
