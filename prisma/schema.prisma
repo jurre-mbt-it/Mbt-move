@@ -599,10 +599,11 @@ model Program {
   // Multi-tenant scope — defensief. Null = legacy (van vóór practice-scoping).
   practiceId String?
 
-  exercises        ProgramExercise[]
-  sessionLogs      SessionLog[]
-  weekScheduleDays WeekScheduleDay[]
-  cardioLogs       CardioLog[]
+  exercises             ProgramExercise[]
+  sessionLogs           SessionLog[]
+  weekScheduleDays      WeekScheduleDay[]
+  weekScheduleDayItems  WeekScheduleDayItem[] @relation("ProgramWeekScheduleItems")
+  cardioLogs            CardioLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -667,10 +668,48 @@ model WeekScheduleDay {
   weekScheduleId String
   weekSchedule   WeekSchedule @relation(fields: [weekScheduleId], references: [id], onDelete: Cascade)
   dayOfWeek      Int
+  // Legacy: 1 programma per dag. Behouden voor backward-compat met patient-app
+  // die nog deze shape leest. Vervangen door `items[]` voor multi-workout —
+  // wordt in latere fase verwijderd nadat alle consumers gemigreerd zijn.
   programId      String?
   program        Program?     @relation(fields: [programId], references: [id])
+  // Multi-workout per dag: 0..N losse items per dag (programma's of "snelle"
+  // workouts zonder programma-koppeling).
+  items          WeekScheduleDayItem[]
 
   @@map("week_schedule_days")
+}
+
+/// Eén workout binnen een dag — kan een gekoppeld programma zijn (variant A)
+/// of een losse "snelle workout" (variant B, TP-stijl) zonder oefeningen.
+/// Exact één van `programId` of `quickCategory` is gevuld; de andere set is null.
+model WeekScheduleDayItem {
+  id               String           @id @default(cuid())
+  day              WeekScheduleDay  @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  dayId            String
+  // Volgorde binnen de dag — laagste eerst gerenderd.
+  order            Int              @default(0)
+
+  // Variant A: koppeling aan bestaand programma uit de bibliotheek.
+  programId        String?
+  program          Program?         @relation("ProgramWeekScheduleItems", fields: [programId], references: [id], onDelete: SetNull)
+
+  // Variant B: losse "snelle" workout zonder programma — type, naam, duur.
+  // quickCategory hergebruikt de bestaande ExerciseCategory enum (STRENGTH,
+  // MOBILITY, PLYOMETRICS, CARDIO, STABILITY) zodat de UI de juiste
+  // kleur/icoon kan kiezen, zonder een nieuwe enum te introduceren.
+  quickCategory    ExerciseCategory?
+  quickName        String?
+  quickDurationSec Int?
+
+  // Optionele therapeut-notitie bij dit specifieke item.
+  notes            String?
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([dayId, order])
+  @@map("week_schedule_day_items")
 }
 
 model ProgramExercise {

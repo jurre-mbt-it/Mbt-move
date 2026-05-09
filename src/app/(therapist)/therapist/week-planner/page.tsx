@@ -1,11 +1,30 @@
 'use client'
 
+/**
+ * Week-planner — TrainingPeaks-style maandkalender met multi-workout per dag.
+ *
+ * Layout:
+ *   Header (patient-picker + maand-nav + Today)
+ *   Maand-grid (6 rijen × 7 kolommen, Mon-Sun)
+ *     Per dag-cel: items[] + "+" knop
+ *     Per week-rij: 3-dots menu (Dupliceer / Verplaats)
+ *
+ * Data-model: gebruikt WeekScheduleDayItem (multi-workout per dag) uit fase 1.
+ * Anchor: WeekSchedule.startDate = Maandag van week 1. Andere weken gemapt
+ *   via weekNumber-offset binnen één patient's chain.
+ */
+
 import { Suspense, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
-import { Plus, X } from 'lucide-react'
-import { IconRunning, IconCardio } from '@/components/icons'
+import {
+  ChevronLeft, ChevronRight, Plus, X, MoreHorizontal,
+  Search, Building2, Copy, Trash2,
+} from 'lucide-react'
+import {
+  IconStrength, IconMobility, IconPlyometrics, IconCardio, IconCore,
+} from '@/components/icons'
 import {
   DarkButton,
   DarkDialog as Dialog,
@@ -13,105 +32,420 @@ import {
   DarkDialogHeader as DialogHeader,
   DarkDialogTitle as DialogTitle,
   DarkInput,
-  DarkSelect,
   Display,
   Kicker,
   MetaLabel,
   P,
   Tile,
 } from '@/components/dark-ui'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { cn } from '@/lib/utils'
 
-const DAY_LABELS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-type Patient = { id: string; name: string }
-type DayProgram = { id: string; name: string } | null
-type ScheduleDay = { id: string; dayOfWeek: number; program?: DayProgram }
-type Schedule = { id: string; weekNumber: number; days: ScheduleDay[] }
+type Category = 'STRENGTH' | 'MOBILITY' | 'PLYOMETRICS' | 'CARDIO' | 'STABILITY'
+
+const CATEGORY_LABELS: Record<Category, string> = {
+  STRENGTH: 'Kracht',
+  MOBILITY: 'Mobiliteit',
+  PLYOMETRICS: 'Plyometrie',
+  CARDIO: 'Cardio',
+  STABILITY: 'Stabiliteit',
+}
+const CATEGORY_COLORS: Record<Category, string> = {
+  STRENGTH: '#BEF264',
+  MOBILITY: '#60a5fa',
+  PLYOMETRICS: '#f59e0b',
+  CARDIO: '#f87171',
+  STABILITY: '#a78bfa',
+}
+function CategoryIcon({ category, size = 14 }: { category: Category; size?: number }) {
+  const props = { size, className: undefined as string | undefined }
+  switch (category) {
+    case 'STRENGTH': return <IconStrength {...props} />
+    case 'MOBILITY': return <IconMobility {...props} />
+    case 'PLYOMETRICS': return <IconPlyometrics {...props} />
+    case 'CARDIO': return <IconCardio {...props} />
+    case 'STABILITY': return <IconCore {...props} />
+  }
+}
+
+const MONTH_LABELS_NL = [
+  'Januari', 'Februari', 'Maart', 'April', 'Mei', 'Juni',
+  'Juli', 'Augustus', 'September', 'Oktober', 'November', 'December',
+]
+const DAY_LABELS_SHORT = ['MA', 'DI', 'WO', 'DO', 'VR', 'ZA', 'ZO']
+
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+
+function isoDate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+function startOfDay(d: Date): Date {
+  const r = new Date(d); r.setHours(0, 0, 0, 0); return r
+}
+function mondayOf(d: Date): Date {
+  const r = startOfDay(d)
+  const dow = r.getDay()              // 0=Sun..6=Sat
+  const delta = (dow + 6) % 7         // 0 if Mon
+  r.setDate(r.getDate() - delta)
+  return r
+}
+function addDays(d: Date, n: number): Date {
+  const r = new Date(d); r.setDate(r.getDate() + n); return r
+}
+function sameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate()
+}
+function diffDays(a: Date, b: Date): number {
+  return Math.floor((startOfDay(a).getTime() - startOfDay(b).getTime()) / 86_400_000)
+}
+function fmtDuration(sec: number): string {
+  if (sec < 60) return `${sec}s`
+  const min = Math.round(sec / 60)
+  if (min < 60) return `${min} min`
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return m === 0 ? `${h}u` : `${h}u${m}`
+}
+
+/** Bouw een 6-rijen × 7-kolommen grid van datums voor een maand. Eerste kolom
+ *  = Maandag voor (of op) de 1e van de maand; laatste kolom = Zondag na (of
+ *  op) de laatste van de maand. Geeft 42 dagen, gegroepeerd in 6 weken. */
+function monthGrid(year: number, month0: number): Date[][] {
+  const first = new Date(year, month0, 1)
+  const start = mondayOf(first)
+  const weeks: Date[][] = []
+  for (let w = 0; w < 6; w++) {
+    const row: Date[] = []
+    for (let d = 0; d < 7; d++) row.push(addDays(start, w * 7 + d))
+    weeks.push(row)
+  }
+  return weeks
+}
+
+// ─── Patient picker ────────────────────────────────────────────────────────────
+
+type Patient = { id: string; name: string | null; email: string | null }
+
+function PatientPicker({
+  patients, selectedId, onSelect,
+}: { patients: Patient[]; selectedId: string | null; onSelect: (id: string | null) => void }) {
+  const current = patients.find(p => p.id === selectedId) ?? null
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors"
+          style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
+        >
+          <span>{current ? (current.name ?? current.email ?? 'Patiënt') : 'Kies patiënt…'}</span>
+          <ChevronRight className="w-3.5 h-3.5 rotate-90 opacity-60" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-72 max-h-80 overflow-y-auto">
+        <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          Patiënten
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {patients.length === 0 ? (
+          <div className="px-2 py-1.5 text-xs text-muted-foreground">Geen patiënten gekoppeld</div>
+        ) : (
+          patients.map(p => (
+            <DropdownMenuItem key={p.id} onSelect={() => onSelect(p.id)} className="flex items-center gap-2 text-sm">
+              <span className="truncate">{p.name ?? p.email ?? 'Onbekend'}</span>
+            </DropdownMenuItem>
+          ))
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+// ─── Item tile ────────────────────────────────────────────────────────────────
+
+type ScheduleItem = {
+  id: string
+  order: number
+  programId: string | null
+  program: { id: string; name: string; status?: string | null } | null
+  quickCategory: Category | null
+  quickName: string | null
+  quickDurationSec: number | null
+  notes: string | null
+}
+
+type ItemStatus = 'scheduled' | 'completed' | 'missed' | 'in_progress'
+
+const STATUS_COLORS: Record<ItemStatus, string> = {
+  scheduled: 'transparent',           // geen extra accent — categorie-kleur leidt
+  completed: 'rgba(190,242,100,0.18)', // lime tint
+  missed:    'rgba(248,113,113,0.20)', // danger red tint
+  in_progress: 'rgba(244,194,97,0.20)', // gold/amber tint
+}
+const STATUS_BORDER: Record<ItemStatus, string> = {
+  scheduled: '',
+  completed: '#BEF264',
+  missed:    '#F87171',
+  in_progress: '#F4C261',
+}
+
+function ItemTile({
+  item, status, onRemove,
+}: { item: ScheduleItem; status: ItemStatus; onRemove: () => void }) {
+  const category: Category = item.quickCategory ?? 'STRENGTH'  // default voor program-link
+  const color = CATEGORY_COLORS[category]
+  const name = item.programId ? (item.program?.name ?? 'Programma') : (item.quickName ?? 'Workout')
+  const duration = item.quickDurationSec ? fmtDuration(item.quickDurationSec) : null
+
+  // Status overlay: extra strookje bovenaan voor done/missed/in-progress.
+  // Categorie-kleur blijft links als anchor zodat type direct herkenbaar is.
+  const statusBg = STATUS_COLORS[status]
+  const showStatusStripe = status !== 'scheduled'
+
+  return (
+    <div
+      className="group/tile relative rounded-md text-[11px] cursor-default overflow-hidden"
+      style={{
+        background: `${color}15`,
+        borderLeft: `3px solid ${color}`,
+        color: P.ink,
+      }}
+      title={
+        status === 'completed' ? 'Voltooid'
+        : status === 'missed' ? 'Gemist'
+        : status === 'in_progress' ? 'Bezig'
+        : undefined
+      }
+    >
+      {showStatusStripe && (
+        <div
+          className="absolute inset-x-0 top-0 h-[3px]"
+          style={{ background: STATUS_BORDER[status] }}
+        />
+      )}
+      <div
+        className="flex items-center gap-1.5 px-2 py-1"
+        style={{ background: statusBg }}
+      >
+        <span style={{ color }} className="shrink-0"><CategoryIcon category={category} size={11} /></span>
+        <span className="flex-1 truncate">{name}</span>
+        {duration && <span className="text-[10px] opacity-70 shrink-0">{duration}</span>}
+        <button
+          type="button"
+          onClick={onRemove}
+          className="opacity-0 group-hover/tile:opacity-100 transition-opacity shrink-0 text-zinc-400 hover:text-red-400"
+          title="Verwijder"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Add-item modal ──────────────────────────────────────────────────────────
+
 type ProgramListItem = {
   id: string
   name: string
   isTemplate: boolean
-  status: 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED'
-  weeks: number
-  daysPerWeek: number
-  startDate?: string | Date | null
-  patient?: { id: string; name: string | null } | null
-  _count?: { exercises: number }
-  // Unieke `day`-waarden uit Program.exercises (1=Ma..7=Zo).
-  daysScheduled?: number[]
-  // Dominante categorie afgeleid uit exercises (STRENGTH/CARDIO/...).
+  status: string
   dominantCategory?: string | null
 }
 
-// Maandag van de kalenderweek waarin `d` valt (Ma=start, Zo=eind).
-function mondayOf(d: Date): Date {
-  const result = new Date(d)
-  result.setHours(0, 0, 0, 0)
-  const day = result.getDay() // 0=Sun..6=Sat
-  const offset = (day + 6) % 7 // 0 als 't al Ma is, anders aantal dagen terug
-  result.setDate(result.getDate() - offset)
-  return result
-}
+function AddItemModal({
+  open, onClose, dayId, dayLabel, programs, onSubmit,
+}: {
+  open: boolean
+  onClose: () => void
+  dayId: string | null
+  dayLabel: string
+  programs: ProgramListItem[]
+  onSubmit: (
+    payload:
+      | { kind: 'program'; programId: string }
+      | { kind: 'quick'; quickCategory: Category; quickName: string; quickDurationSec: number },
+  ) => Promise<void>
+}) {
+  const [tab, setTab] = useState<'library' | 'quick'>('library')
+  const [query, setQuery] = useState('')
+  const [busy, setBusy] = useState(false)
+  // Quick form state
+  const [qCat, setQCat] = useState<Category>('STRENGTH')
+  const [qName, setQName] = useState('')
+  const [qMinutes, setQMinutes] = useState<string>('30')
 
-function addDays(d: Date, n: number): Date {
-  const r = new Date(d)
-  r.setDate(r.getDate() + n)
-  return r
-}
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase().trim()
+    if (!q) return programs.slice(0, 30)
+    return programs.filter(p => p.name.toLowerCase().includes(q)).slice(0, 30)
+  }, [programs, query])
 
-function formatRange(from: Date, to: Date): string {
-  const sameMonth = from.getMonth() === to.getMonth()
-  const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }
-  if (sameMonth) {
-    return `${from.getDate()}-${to.toLocaleDateString('nl-NL', opts)}`
+  function reset() {
+    setTab('library'); setQuery(''); setQCat('STRENGTH'); setQName(''); setQMinutes('30')
   }
-  return `${from.toLocaleDateString('nl-NL', opts)}–${to.toLocaleDateString('nl-NL', opts)}`
-}
-type ExtraSession = {
-  id: string
-  scheduledAt: string | Date
-  completedAt: string | Date | null
-  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED'
-  duration: number | null
-  weekdayIndex: number
-  hasExercises: boolean
-}
-type RangeSession = {
-  id: string
-  scheduledAt: string | Date
-  completedAt: string | Date | null
-  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED'
-  duration: number | null
-  programId: string | null
-  programName: string | null
-  weekdayIndex: number
+  function handleClose() { reset(); onClose() }
+
+  async function handleProgramPick(programId: string) {
+    if (!dayId || busy) return
+    setBusy(true)
+    try { await onSubmit({ kind: 'program', programId }); handleClose() }
+    finally { setBusy(false) }
+  }
+
+  async function handleQuickSubmit() {
+    if (!dayId || busy) return
+    if (!qName.trim()) { toast.error('Naam is verplicht'); return }
+    const minutes = Math.max(1, Math.min(720, Number(qMinutes) || 30))
+    setBusy(true)
+    try {
+      await onSubmit({
+        kind: 'quick',
+        quickCategory: qCat,
+        quickName: qName.trim(),
+        quickDurationSec: minutes * 60,
+      })
+      handleClose()
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Workout toevoegen — {dayLabel}</DialogTitle>
+        </DialogHeader>
+
+        <div className="flex gap-1 mt-2 p-1 rounded-lg" style={{ background: P.surfaceLow, border: `1px solid ${P.line}` }}>
+          {(['library', 'quick'] as const).map(t => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              className="flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
+              style={{
+                background: tab === t ? P.surfaceHi : 'transparent',
+                color: tab === t ? P.ink : P.inkMuted,
+              }}
+            >
+              {t === 'library' ? 'Vanuit bibliotheek' : 'Snelle workout'}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'library' && (
+          <div className="space-y-2 mt-3">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <DarkInput
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Zoek programma…"
+                className="pl-8"
+                disabled={busy}
+              />
+            </div>
+            <div className="max-h-72 overflow-y-auto space-y-1 pr-1">
+              {filtered.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-3 text-center">Geen programma's gevonden.</p>
+              ) : (
+                filtered.map(p => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => handleProgramPick(p.id)}
+                    disabled={busy}
+                    className="w-full text-left px-3 py-2 rounded-lg transition-colors hover:bg-[#1C2425] flex items-center gap-2"
+                    style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+                  >
+                    <span className="flex-1 truncate text-sm">{p.name}</span>
+                    {p.isTemplate && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded uppercase" style={{ background: P.surfaceHi, color: P.inkMuted }}>
+                        Sjabloon
+                      </span>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {tab === 'quick' && (
+          <div className="space-y-3 mt-3">
+            <div>
+              <MetaLabel>Type</MetaLabel>
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {(Object.keys(CATEGORY_LABELS) as Category[]).map(c => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setQCat(c)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all"
+                    style={{
+                      background: qCat === c ? `${CATEGORY_COLORS[c]}20` : P.surface,
+                      color: qCat === c ? CATEGORY_COLORS[c] : P.inkMuted,
+                      border: `1px solid ${qCat === c ? CATEGORY_COLORS[c] : P.lineStrong}`,
+                    }}
+                  >
+                    <CategoryIcon category={c} size={11} />
+                    {CATEGORY_LABELS[c]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <MetaLabel>Naam</MetaLabel>
+              <DarkInput
+                className="mt-1.5"
+                value={qName}
+                onChange={e => setQName(e.target.value)}
+                placeholder="Bijv. Easy bike ride"
+                disabled={busy}
+              />
+            </div>
+            <div>
+              <MetaLabel>Duur (minuten)</MetaLabel>
+              <DarkInput
+                className="mt-1.5"
+                type="number"
+                min={1}
+                max={720}
+                value={qMinutes}
+                onChange={e => setQMinutes(e.target.value)}
+                disabled={busy}
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <DarkButton variant="ghost" onClick={handleClose} className="flex-1" disabled={busy}>
+                Annuleren
+              </DarkButton>
+              <DarkButton variant="primary" onClick={handleQuickSubmit} className="flex-1" disabled={busy}>
+                {busy ? 'Toevoegen…' : 'Toevoegen'}
+              </DarkButton>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
 }
 
-// Per-categorie kleurset voor chips. Tint = transparante achtergrond,
-// border = volle kleur. Fallback op P.lime (Strength) als categorie onbekend.
-type ChipStyle = { bg: string; border: string; text: string }
-const CATEGORY_STYLES: Record<string, ChipStyle> = {
-  STRENGTH:    { bg: 'rgba(190,242,100,0.12)', border: P.lime,   text: P.lime   },
-  MOBILITY:    { bg: 'rgba(125,211,252,0.12)', border: P.ice,    text: P.ice    },
-  PLYOMETRICS: { bg: 'rgba(244,194,97,0.12)',  border: P.gold,   text: P.gold   },
-  PLYO:        { bg: 'rgba(244,194,97,0.12)',  border: P.gold,   text: P.gold   },
-  CARDIO:      { bg: 'rgba(248,113,113,0.12)', border: P.danger, text: P.danger },
-  STABILITY:   { bg: 'rgba(167,139,250,0.12)', border: P.purple, text: P.purple },
-  MIXED:       { bg: 'rgba(190,242,100,0.12)', border: P.lime,   text: P.lime   },
-}
-const EXTRA_SESSION_STYLE: ChipStyle = {
-  bg: 'rgba(244,194,97,0.10)',
-  border: P.gold,
-  text: P.gold,
-}
-function chipStyle(category?: string | null): ChipStyle {
-  if (!category) return CATEGORY_STYLES.STRENGTH
-  return CATEGORY_STYLES[category] ?? CATEGORY_STYLES.STRENGTH
-}
+// ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function WeekPlannerPage() {
   return (
-    <Suspense>
+    <Suspense fallback={null}>
       <WeekPlannerContent />
     </Suspense>
   )
@@ -121,1369 +455,420 @@ function WeekPlannerContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const utils = trpc.useUtils()
-  const selectedPatientId = searchParams.get('patientId') ?? ''
-  const selectedWeek = Math.max(1, Number(searchParams.get('week') ?? '1') || 1)
 
-  // Cast naar shallow types; tRPC inference is te diep voor TS (TS2589).
-  const patientsQuery = trpc.patients.list.useQuery()
-  const patients: Patient[] = useMemo(
-    () => ((patientsQuery.data as { id: string; name: string }[] | undefined) ?? []).map(p => ({ id: p.id, name: p.name })),
-    [patientsQuery.data],
-  )
-
-  const schedulesQuery = trpc.weekSchedules.list.useQuery(
-    { patientId: selectedPatientId, isTemplate: false },
-    { enabled: !!selectedPatientId, staleTime: 30_000 },
-  )
-  const allSchedules: (Schedule & { startDate?: string | Date | null })[] = useMemo(
-    () => (schedulesQuery.data as (Schedule & { startDate?: string | Date | null })[] | undefined) ?? [],
-    [schedulesQuery.data],
-  )
-  const availableWeeks: number[] = useMemo(
-    () => [...new Set(allSchedules.map(s => s.weekNumber ?? 1))].sort((a, b) => a - b),
-    [allSchedules],
-  )
-  const schedule: Schedule | null = useMemo(
-    () => allSchedules.find(s => (s.weekNumber ?? 1) === selectedWeek) ?? null,
-    [allSchedules, selectedWeek],
-  )
-
-  // Programma's van deze patient — onafhankelijk van of ze al in een
-  // WeekSchedule zijn ingepland. Zo ziet de therapeut meteen of er iets is.
-  const patientProgramsQuery = trpc.programs.list.useQuery(
-    { patientId: selectedPatientId },
-    { enabled: !!selectedPatientId, staleTime: 30_000 },
-  )
-  const patientPrograms: ProgramListItem[] = useMemo(
-    () => ((patientProgramsQuery.data as ProgramListItem[] | undefined) ?? []).filter(p => !p.isTemplate),
-    [patientProgramsQuery.data],
-  )
-
-  const setDayProgramMutation = trpc.weekSchedules.setDayProgram.useMutation({
-    onSuccess: async () => {
-      await utils.weekSchedules.list.invalidate()
-    },
-    onError: () => toast.error('Bijwerken mislukt'),
-  })
-
-  const copyWeekMutation = trpc.weekSchedules.copyWeek.useMutation({
-    onSuccess: async ({ copied }) => {
-      await utils.weekSchedules.list.invalidate()
-      toast.success(`Week gekopieerd naar ${copied} ${copied === 1 ? 'week' : 'weken'}`)
-    },
-    onError: () => toast.error('Kopiëren mislukt'),
-  })
-
-  const deleteWeekMutation = trpc.weekSchedules.deleteWeek.useMutation({
-    onSuccess: async () => {
-      await utils.weekSchedules.list.invalidate()
-      toast.success('Week verwijderd')
-    },
-    onError: () => toast.error('Verwijderen mislukt'),
-  })
-
-  const updateUrl = (patientId: string, week: number) => {
-    const params = new URLSearchParams()
-    if (patientId) params.set('patientId', patientId)
-    if (week > 1) params.set('week', String(week))
-    router.replace(`/therapist/week-planner${params.toString() ? `?${params.toString()}` : ''}`)
+  // ─ URL state ─
+  const selectedPatientId = searchParams.get('patientId') || ''
+  const monthParam = searchParams.get('month')  // 'YYYY-MM'
+  const today = startOfDay(new Date())
+  const [year, month0] = (() => {
+    if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
+      const [y, m] = monthParam.split('-').map(Number)
+      return [y, m - 1]
+    }
+    return [today.getFullYear(), today.getMonth()]
+  })()
+  function setUrl(patch: { patientId?: string; month?: string }) {
+    const p = new URLSearchParams(searchParams.toString())
+    if (patch.patientId !== undefined) {
+      if (patch.patientId) p.set('patientId', patch.patientId)
+      else p.delete('patientId')
+    }
+    if (patch.month !== undefined) {
+      if (patch.month) p.set('month', patch.month)
+      else p.delete('month')
+    }
+    router.replace(`/therapist/week-planner?${p.toString()}`)
+  }
+  function navMonth(delta: number) {
+    const d = new Date(year, month0 + delta, 1)
+    setUrl({ month: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` })
+  }
+  function navToday() {
+    setUrl({ month: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}` })
   }
 
-  const setSelectedPatient = (patientId: string) => updateUrl(patientId, 1)
-  const setSelectedWeek = (week: number) => updateUrl(selectedPatientId, Math.max(1, week))
+  // ─ Data ─
+  const { data: patientsRaw = [] } = trpc.patients.list.useQuery(undefined, { staleTime: 60_000 })
+  const patients: Patient[] = patientsRaw.map(p => ({ id: p.id, name: p.name, email: p.email }))
 
-  const clearDay = (dayOfWeek: number) => {
+  const { data: schedules = [] } = trpc.weekSchedules.listWithItems.useQuery(
+    selectedPatientId ? { patientId: selectedPatientId, isTemplate: false } : undefined,
+    { enabled: !!selectedPatientId, staleTime: 10_000 },
+  )
+  // tRPC retourneert hier een diep-geneste union die TS doet verzuipen op
+  // .map. Cast naar de minimale shape die we lezen.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: programsRaw = [] } = (trpc.programs.list.useQuery as any)(
+    undefined,
+    { staleTime: 30_000 },
+  ) as { data: Array<{ id: string; name: string; isTemplate?: boolean; status?: string; dominantCategory?: string | null }> }
+  const programs: ProgramListItem[] = programsRaw.map(p => ({
+    id: p.id,
+    name: p.name,
+    isTemplate: p.isTemplate ?? false,
+    status: p.status ?? 'DRAFT',
+    dominantCategory: p.dominantCategory ?? null,
+  }))
+
+  // ─ Mutations ─
+  const ensureWeek = trpc.weekSchedules.create.useMutation()
+  const addItem = trpc.weekSchedules.addItem.useMutation({
+    onSuccess: () => utils.weekSchedules.listWithItems.invalidate(),
+    onError: (err) => toast.error(err.message ?? 'Toevoegen mislukt'),
+  })
+  const removeItem = trpc.weekSchedules.removeItem.useMutation({
+    onSuccess: () => utils.weekSchedules.listWithItems.invalidate(),
+    onError: (err) => toast.error(err.message ?? 'Verwijderen mislukt'),
+  })
+  const duplicateWeek = trpc.weekSchedules.duplicateWeek.useMutation({
+    onSuccess: () => { utils.weekSchedules.listWithItems.invalidate(); toast.success('Week gedupliceerd') },
+    onError: (err) => toast.error(err.message ?? 'Dupliceren mislukt'),
+  })
+
+  // ─ Computed maand-grid + mapping date → schedule day ─
+  const grid = useMemo(() => monthGrid(year, month0), [year, month0])
+
+  // ─ SessionLog query voor zichtbaar bereik (status-kleuren fase 4) ─
+  const sessionRange = useMemo(() => {
+    const from = grid[0][0]
+    const to = addDays(grid[5][6], 1)  // exclusive
+    return { from: from.toISOString(), to: to.toISOString() }
+  }, [grid])
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: sessionsRaw = [] } = (trpc.weekSchedules.sessionsInRange.useQuery as any)(
+    { patientId: selectedPatientId, ...sessionRange },
+    { enabled: !!selectedPatientId, staleTime: 10_000 },
+  ) as { data: Array<{
+    id: string
+    scheduledAt: string | Date
+    completedAt: string | Date | null
+    status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED'
+    programId: string | null
+  }> }
+  // Map (programId, dateISO) → ItemStatus. Quick workouts (geen programId)
+  // krijgen geen status — blijven 'scheduled'.
+  const statusByKey = useMemo(() => {
+    const todayStart = startOfDay(new Date())
+    const map = new Map<string, ItemStatus>()
+    for (const s of sessionsRaw) {
+      if (!s.programId) continue
+      const sched = new Date(s.scheduledAt)
+      const key = `${s.programId}|${isoDate(sched)}`
+      let status: ItemStatus
+      if (s.completedAt) {
+        status = 'completed'
+      } else if (s.status === 'IN_PROGRESS') {
+        status = 'in_progress'
+      } else if (s.status === 'SKIPPED' || sched < todayStart) {
+        status = 'missed'
+      } else {
+        status = 'scheduled'
+      }
+      // Als er meerdere sessies op dezelfde sleutel zijn (re-schedule etc),
+      // kies de "best status": completed > in_progress > scheduled > missed.
+      const prev = map.get(key)
+      const prio: Record<ItemStatus, number> = { completed: 4, in_progress: 3, scheduled: 2, missed: 1 }
+      if (!prev || prio[status] > prio[prev]) map.set(key, status)
+    }
+    return map
+  }, [sessionsRaw])
+
+  function statusFor(date: Date, item: ScheduleItem): ItemStatus {
+    if (!item.programId) return 'scheduled'
+    return statusByKey.get(`${item.programId}|${isoDate(date)}`) ?? 'scheduled'
+  }
+
+  // Schedule dag-info gemapt op ISO-datum.
+  type DayCellInfo = {
+    dayId: string | null            // null als nog geen schedule bestaat voor die week
+    weekScheduleId: string | null
+    weekNumber: number | null
+    items: ScheduleItem[]
+  }
+  const dateMap = useMemo(() => {
+    const map = new Map<string, DayCellInfo>()
+    for (const ws of schedules) {
+      if (!ws.startDate) continue  // legacy zonder startDate skippen
+      const start = mondayOf(new Date(ws.startDate))
+      for (const day of ws.days) {
+        const date = addDays(start, day.dayOfWeek)
+        const items = (day.items ?? []).map(it => ({
+          id: it.id,
+          order: it.order,
+          programId: it.programId,
+          program: it.program ?? null,
+          quickCategory: (it.quickCategory ?? null) as Category | null,
+          quickName: it.quickName,
+          quickDurationSec: it.quickDurationSec,
+          notes: it.notes,
+        }))
+        map.set(isoDate(date), {
+          dayId: day.id,
+          weekScheduleId: ws.id,
+          weekNumber: ws.weekNumber,
+          items,
+        })
+      }
+    }
+    return map
+  }, [schedules])
+
+  // ─ Add modal ─
+  const [addOpen, setAddOpen] = useState(false)
+  const [addDayDate, setAddDayDate] = useState<Date | null>(null)
+  const [addDayId, setAddDayId] = useState<string | null>(null)
+
+  async function openAddModal(date: Date) {
+    if (!selectedPatientId) {
+      toast.error('Kies eerst een patiënt')
+      return
+    }
+    const iso = isoDate(date)
+    let info = dateMap.get(iso)
+    if (!info?.dayId) {
+      // Geen schedule voor deze week → maak 'm aan
+      const monday = mondayOf(date)
+      // Zoek hoogste weekNumber binnen deze patient + 1
+      const maxWeek = schedules.reduce((m, ws) => Math.max(m, ws.weekNumber ?? 0), 0)
+      try {
+        const created = await ensureWeek.mutateAsync({
+          name: `Week van ${monday.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`,
+          patientId: selectedPatientId,
+          startDate: monday.toISOString(),
+          isTemplate: false,
+          days: Array.from({ length: 7 }, (_, i) => ({ dayOfWeek: i })),
+        })
+        // Nieuwe data invalideren + ophalen om de juiste dayId te vinden
+        await utils.weekSchedules.listWithItems.invalidate()
+        const created2 = await utils.weekSchedules.listWithItems.fetch(
+          { patientId: selectedPatientId, isTemplate: false },
+        )
+        const newWs = created2.find(w => w.id === created.id)
+        const newDay = newWs?.days.find(d => d.dayOfWeek === diffDays(date, monday))
+        if (!newDay) { toast.error('Kon dag niet vinden'); return }
+        info = { dayId: newDay.id, weekScheduleId: created.id, weekNumber: maxWeek + 1, items: [] }
+      } catch {
+        toast.error('Kon week niet aanmaken')
+        return
+      }
+    }
+    setAddDayDate(date)
+    setAddDayId(info.dayId)
+    setAddOpen(true)
+  }
+
+  async function handleAddSubmit(
+    payload:
+      | { kind: 'program'; programId: string }
+      | { kind: 'quick'; quickCategory: Category; quickName: string; quickDurationSec: number },
+  ) {
+    if (!addDayId) return
+    if (payload.kind === 'program') {
+      await addItem.mutateAsync({ kind: 'program', dayId: addDayId, programId: payload.programId })
+    } else {
+      await addItem.mutateAsync({
+        kind: 'quick', dayId: addDayId,
+        quickCategory: payload.quickCategory,
+        quickName: payload.quickName,
+        quickDurationSec: payload.quickDurationSec,
+      })
+    }
+  }
+
+  function handleDuplicateWeek(weekNumber: number) {
     if (!selectedPatientId) return
-    setDayProgramMutation.mutate({
+    const targetWeek = weekNumber + 1
+    duplicateWeek.mutate({
       patientId: selectedPatientId,
-      dayOfWeek,
-      programId: null,
-      weekNumber: selectedWeek,
+      sourceWeekNumber: weekNumber,
+      targetWeekNumber: targetWeek,
+      replace: false,
     })
   }
 
-  const assignProgram = (dayOfWeek: number, programId: string) => {
-    if (!selectedPatientId) return
-    setDayProgramMutation.mutate({
-      patientId: selectedPatientId,
-      dayOfWeek,
-      programId,
-      weekNumber: selectedWeek,
-    })
-  }
-
-  const handleAddWeek = () => {
-    const next = (availableWeeks[availableWeeks.length - 1] ?? 0) + 1
-    setSelectedWeek(next || 1)
-  }
-
-  const handleDeleteWeek = () => {
-    if (!selectedPatientId || !schedule) return
-    if (!confirm(`Week ${selectedWeek} verwijderen?`)) return
-    deleteWeekMutation.mutate({ patientId: selectedPatientId, weekNumber: selectedWeek })
-    // Na verwijderen terug naar week 1
-    setSelectedWeek(1)
-  }
-
-  const programByDay: Record<number, DayProgram> = {}
-  if (schedule) for (const d of schedule.days) programByDay[d.dayOfWeek] = d.program ?? null
-
-  const activePrograms = patientPrograms.filter(p => p.status === 'ACTIVE' || p.status === 'DRAFT')
-
-  // Vroegste gelogde sessie — als anchor-fallback wanneer er geen Program
-  // of WeekSchedule met startDate is. Zorgt dat patienten die alleen
-  // eigen workouts loggen ook 'verleden' weken in de tabs zien.
-  const firstActivityQuery = trpc.weekSchedules.firstActivityDate.useQuery(
-    { patientId: selectedPatientId },
-    { enabled: !!selectedPatientId, staleTime: 60_000 },
-  )
-  const firstActivityDate = (firstActivityQuery.data as { date: string | Date | null } | undefined)?.date ?? null
-
-  // Stabiele anchor-tijdstempel als ms-waarde. Volgorde van bronnen:
-  // 1. Vroegste van: WeekSchedule.startDate / activeProgram.startDate /
-  //    eerste SessionLog scheduledAt
-  // 2. Fallback: today minus 4 weken (zodat user altijd ~4 weken terug
-  //    kan navigeren ook bij nieuwe patiënten zonder historie)
-  const anchorTime: number = useMemo(() => {
-    const times: number[] = []
-    for (const s of allSchedules) {
-      if (s.startDate) {
-        const t = new Date(s.startDate).getTime()
-        if (!Number.isNaN(t)) times.push(t)
-      }
-    }
-    for (const p of activePrograms) {
-      if (p.startDate) {
-        const t = new Date(p.startDate).getTime()
-        if (!Number.isNaN(t)) times.push(t)
-      }
-    }
-    if (firstActivityDate) {
-      const t = new Date(firstActivityDate).getTime()
-      if (!Number.isNaN(t)) times.push(t)
-    }
-    if (times.length === 0) {
-      // Geen historie → ankr 4 weken terug zodat tabs 1..5 zichtbaar zijn
-      const fallback = new Date()
-      fallback.setDate(fallback.getDate() - 28)
-      return fallback.getTime()
-    }
-    return Math.min(...times)
-  }, [allSchedules, activePrograms, firstActivityDate])
-
-  // ms-waarde van today's Monday — herrekent niet per render want anchorTime
-  // is al stable, en today verandert niet binnen één sessie.
-  const week1MondayTime = useMemo(() => mondayOf(new Date(anchorTime)).getTime(), [anchorTime])
-  const todayMondayTime = useMemo(() => mondayOf(new Date()).getTime(), [])
-  const currentWeekNumber = Math.max(
-    1,
-    Math.floor((todayMondayTime - week1MondayTime) / (7 * 24 * 60 * 60 * 1000)) + 1,
-  )
-
-  // `from` = Ma 00:00 local · `to` = Zo (display, +6d). Voor de query
-  // gebruiken we exclusive next-Ma boundary in `rangeIso` zodat ook
-  // Zo-sessies (ook 23:59) erin zitten zonder TZ-bug op de server.
-  const weekRange = (n: number): { from: Date; to: Date } => {
-    const from = new Date(week1MondayTime + (n - 1) * 7 * 24 * 60 * 60 * 1000)
-    const to = new Date(from.getTime() + 6 * 24 * 60 * 60 * 1000)
-    return { from, to }
-  }
-
-  // Map: weekday-index (0=Ma..6=Zo) → programs die op die dag draaien
-  // (afgeleid uit ProgramExercise.day, 1-indexed → 0-indexed).
-  const programsByWeekday: Record<number, ProgramListItem[]> = {}
-  for (const p of activePrograms) {
-    for (const day of p.daysScheduled ?? []) {
-      const dow = day - 1
-      if (!programsByWeekday[dow]) programsByWeekday[dow] = []
-      programsByWeekday[dow].push(p)
-    }
-  }
-
-  // Sessies binnen de getoonde week — voor 'eigen workouts' chips +
-  // ✓ markers op afgeronde planned sessies. Filter strikt op datum-range
-  // van geselecteerde week (Ma..Zo), zodat tabs daadwerkelijk verschillen.
-  const rangeIso = useMemo(() => {
-    const fromMs = week1MondayTime + (selectedWeek - 1) * 7 * 24 * 60 * 60 * 1000
-    // Exclusive: volgende Ma 00:00 local. Server gebruikt `lt` zodat
-    // Zo-sessies (incl. 23:59) gewoon meedoen.
-    const toExclusiveMs = fromMs + 7 * 24 * 60 * 60 * 1000
-    return {
-      from: new Date(fromMs).toISOString(),
-      to: new Date(toExclusiveMs).toISOString(),
-    }
-  }, [selectedWeek, week1MondayTime])
-
-  const sessionsInRangeQuery = trpc.weekSchedules.sessionsInRange.useQuery(
-    {
-      patientId: selectedPatientId,
-      from: rangeIso.from,
-      to: rangeIso.to,
-    },
-    { enabled: !!selectedPatientId, staleTime: 30_000 },
-  )
-  const rangeSessions: RangeSession[] = useMemo(
-    () => (sessionsInRangeQuery.data as RangeSession[] | undefined) ?? [],
-    [sessionsInRangeQuery.data],
-  )
-
-  // Welke programIds matchen al met een actief programma op die weekdag?
-  // (Voor dedup: een sessie die matcht met een Program.day chip krijgt
-  //  alleen een ✓ marker; sessies die NIET matchen krijgen een eigen chip.)
-  const activeIdsByWeekday: Record<number, Set<string>> = {}
-  for (const dow in programsByWeekday) {
-    activeIdsByWeekday[dow] = new Set(programsByWeekday[dow].map(p => p.id))
-  }
-
-  // Per weekdag: chips voor extra/onbekende sessies (eigen workouts +
-  // sessies van inactieve/niet-passende programma's). Alle sessies in
-  // de range moeten ergens zichtbaar zijn — dus als een sessie niet
-  // matcht met een Program.day chip, krijgt 'ie z'n eigen chip.
-  const sessionChipsByDay: Record<number, RangeSession[]> = {}
-  // Per weekdag: set van programIds die afgerond zijn — voor ✓ markers
-  // op de Program.day chips die wél matchen.
-  const completedProgramByDay: Record<number, Set<string>> = {}
-
-  for (const s of rangeSessions) {
-    const dow = s.weekdayIndex
-    if (s.programId !== null && s.completedAt) {
-      const set = completedProgramByDay[dow] ?? new Set<string>()
-      set.add(s.programId)
-      completedProgramByDay[dow] = set
-    }
-    // Sessie krijgt een eigen chip wanneer:
-    //   1. programId === null (eigen workout), OF
-    //   2. programId NIET matcht met een Program.day op deze weekdag
-    //      (dus het programma is niet actief OF heeft geen exercise op
-    //      die dag → de sessie zou anders onzichtbaar zijn)
-    const matchesActive =
-      s.programId !== null && (activeIdsByWeekday[dow]?.has(s.programId) ?? false)
-    if (!matchesActive) {
-      const list = sessionChipsByDay[dow] ?? []
-      list.push(s)
-      sessionChipsByDay[dow] = list
-    }
-  }
-
-  const selectedPatient = patients.find(p => p.id === selectedPatientId) ?? null
+  // ─ Render ─
+  const monthLabel = `${MONTH_LABELS_NL[month0]} ${year}`
 
   return (
-    <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
-      <div className="max-w-5xl mx-auto px-4 pt-10 pb-8 space-y-6">
-        <div className="flex flex-col gap-1">
-          <Kicker>Planner</Kicker>
-          <Display size="md">WEEKSCHEMA</Display>
-          <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
-            Kies een patiënt en plan per weekdag
-          </MetaLabel>
+    <div className="max-w-[1400px] w-full flex flex-col gap-3">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <Kicker>Week-planner</Kicker>
+          <Display size="md">{monthLabel.toUpperCase()}</Display>
         </div>
+        <div className="flex items-center gap-2">
+          <PatientPicker
+            patients={patients}
+            selectedId={selectedPatientId || null}
+            onSelect={(id) => setUrl({ patientId: id ?? '' })}
+          />
+        </div>
+      </div>
 
-        {/* Patient picker */}
+      {/* Month nav */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => navMonth(-1)}
+            className="p-1.5 rounded-md transition-colors"
+            style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={navToday}
+            className="px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
+            style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
+          >
+            Vandaag
+          </button>
+          <button
+            type="button"
+            onClick={() => navMonth(1)}
+            className="p-1.5 rounded-md transition-colors"
+            style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {!selectedPatientId ? (
         <Tile>
-          <div className="flex items-center gap-3 flex-wrap">
-            <MetaLabel>Patiënt</MetaLabel>
-            <DarkSelect
-              value={selectedPatientId}
-              onChange={e => setSelectedPatient(e.target.value)}
-              disabled={patientsQuery.isLoading}
-              style={{ minWidth: 260 }}
-            >
-              <option value="">— Kies een patiënt —</option>
-              {patients.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </DarkSelect>
-            {selectedPatient && (
-              <span
-                className="athletic-mono"
-                style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.05em' }}
-              >
-                · {selectedPatient.name}
-              </span>
-            )}
+          <div className="flex items-center gap-3 py-6 text-center justify-center">
+            <Building2 className="w-5 h-5 opacity-50" />
+            <span className="text-sm" style={{ color: P.inkMuted }}>
+              Kies een patiënt om hun planner te zien
+            </span>
           </div>
         </Tile>
-
-        {/* Lopende programma's voor deze patient — los van WeekSchedule */}
-        {selectedPatientId && activePrograms.length > 0 && (
-          <Tile>
-            <div className="flex flex-col gap-2">
-              <Kicker>Lopende programma&apos;s ({activePrograms.length})</Kicker>
-              <div className="flex flex-col gap-2">
-                {activePrograms.map(p => (
-                  <ActiveProgramRow key={p.id} program={p} />
-                ))}
-              </div>
-            </div>
-          </Tile>
-        )}
-
-        {/* Week navigator */}
-        {selectedPatientId && (
-          <WeekNavigator
-            availableWeeks={availableWeeks}
-            selectedWeek={selectedWeek}
-            currentWeekNumber={currentWeekNumber}
-            weekRange={weekRange}
-            onSelect={setSelectedWeek}
-            onAddWeek={handleAddWeek}
-            onCopyWeek={(targets) => copyWeekMutation.mutate({
-              patientId: selectedPatientId,
-              fromWeekNumber: selectedWeek,
-              toWeekNumbers: targets,
-            })}
-            onDeleteWeek={schedule ? handleDeleteWeek : undefined}
-            isCopying={copyWeekMutation.isPending}
-          />
-        )}
-
-        {/* Week grid */}
-        {!selectedPatientId ? (
-          <Tile>
-            <div className="py-12 text-center">
-              <p style={{ color: P.inkMuted, fontSize: 13 }}>
-                Kies bovenaan een patiënt om hun weekschema te plannen.
-              </p>
-            </div>
-          </Tile>
-        ) : schedulesQuery.isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-7 gap-2">
-            {Array.from({ length: 7 }).map((_, i) => (
-              <div key={i} className="h-32 rounded-xl animate-pulse" style={{ background: P.surfaceHi }} />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-7 gap-2">
-            {Array.from({ length: 7 }).map((_, i) => (
-              <DayCell
-                key={i}
-                dayOfWeek={i}
-                program={programByDay[i] ?? null}
-                programDayMatches={programsByWeekday[i] ?? []}
-                sessionChips={sessionChipsByDay[i] ?? []}
-                completedProgramIds={completedProgramByDay[i] ?? new Set()}
-                patientId={selectedPatientId}
-                onClear={() => clearDay(i)}
-                onAssign={programId => assignProgram(i, programId)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function WeekNavigator({
-  availableWeeks,
-  selectedWeek,
-  currentWeekNumber,
-  weekRange,
-  onSelect,
-  onAddWeek,
-  onCopyWeek,
-  onDeleteWeek,
-  isCopying,
-}: {
-  availableWeeks: number[]
-  selectedWeek: number
-  currentWeekNumber: number
-  weekRange: (n: number) => { from: Date; to: Date }
-  onSelect: (week: number) => void
-  onAddWeek: () => void
-  onCopyWeek: (targets: number[]) => void
-  onDeleteWeek?: () => void
-  isCopying: boolean
-}) {
-  const [copyOpen, setCopyOpen] = useState(false)
-  const [copyTargets, setCopyTargets] = useState<Set<number>>(new Set())
-
-  // Tabs: alle bestaande weken + huidige selectie + laatste ~12 weken
-  // tot 'vandaag'. Zo zie je per default de geschiedenis (verleden weken)
-  // ook als die nog geen WeekSchedule-record hebben, zonder dat we
-  // bij een lang-lopende patiënt 50+ knoppen renderen.
-  const MAX_PAST_TABS = 12
-  const visibleWeeks = useMemo(() => {
-    const set = new Set(availableWeeks)
-    set.add(selectedWeek)
-    if (currentWeekNumber > 0) {
-      const start = Math.max(1, currentWeekNumber - MAX_PAST_TABS + 1)
-      for (let i = start; i <= currentWeekNumber; i++) set.add(i)
-    }
-    return [...set].sort((a, b) => a - b)
-  }, [availableWeeks, selectedWeek, currentWeekNumber])
-
-  const openCopy = () => {
-    // Default: stel volgende week voor als target
-    const nextWeek = (Math.max(0, ...availableWeeks)) + 1
-    setCopyTargets(new Set([nextWeek]))
-    setCopyOpen(true)
-  }
-
-  const toggleTarget = (n: number) => {
-    setCopyTargets(prev => {
-      const next = new Set(prev)
-      if (next.has(n)) next.delete(n)
-      else next.add(n)
-      return next
-    })
-  }
-
-  const submitCopy = () => {
-    const targets = [...copyTargets].filter(n => n !== selectedWeek)
-    if (targets.length === 0) return
-    onCopyWeek(targets)
-    setCopyOpen(false)
-  }
-
-  // Voor copy-dialog: aanbiedbare doel-weken (niet de bron-week)
-  const candidateTargets = useMemo(() => {
-    const max = Math.max(0, ...availableWeeks, selectedWeek)
-    const list: number[] = []
-    for (let i = 1; i <= max + 4; i++) if (i !== selectedWeek) list.push(i)
-    return list
-  }, [availableWeeks, selectedWeek])
-
-  return (
-    <Tile>
-      <div className="flex items-start gap-2 flex-wrap">
-        <MetaLabel style={{ marginTop: 6 }}>Week</MetaLabel>
-        <div className="flex items-start gap-1.5 flex-wrap">
-          {visibleWeeks.map(n => {
-            const isActive = n === selectedWeek
-            const isCurrent = n === currentWeekNumber
-            const isPast = n < currentWeekNumber
-            const range = weekRange(n)
-            const dateLabel = formatRange(range.from, range.to)
-            return (
-              <button
-                key={n}
-                type="button"
-                onClick={() => onSelect(n)}
-                className="athletic-tap athletic-mono px-3 py-1.5 rounded-md flex flex-col items-start gap-0.5"
-                style={{
-                  background: isActive ? P.lime : P.surfaceHi,
-                  color: isActive ? P.bg : isPast ? P.inkMuted : P.ink,
-                  border: `1px solid ${
-                    isActive ? P.lime : isCurrent ? P.gold : P.lineStrong
-                  }`,
-                  fontSize: 11,
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  opacity: isPast && !isActive ? 0.85 : 1,
-                }}
+      ) : (
+        <div className="rounded-2xl overflow-hidden" style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}>
+          {/* Day-of-week header row */}
+          <div className="grid grid-cols-[40px_repeat(7,1fr)] border-b" style={{ borderColor: P.line }}>
+            <div />
+            {DAY_LABELS_SHORT.map(d => (
+              <div
+                key={d}
+                className="athletic-mono px-2 py-1.5 text-[10px] tracking-widest font-bold"
+                style={{ color: P.inkMuted }}
               >
-                <span className="flex items-center gap-1.5">
-                  Week {n}
-                  {isCurrent && (
-                    <span
+                {d}
+              </div>
+            ))}
+          </div>
+
+          {/* 6 week rows */}
+          {grid.map((week, wIdx) => {
+            // Bepaal weekNumber van deze rij voor 3-dots menu (kies de 1e dag in deze rij die in onze maand valt)
+            const referenceDate = week.find(d => d.getMonth() === month0) ?? week[0]
+            const info = dateMap.get(isoDate(referenceDate))
+            const weekNum = info?.weekNumber ?? null
+            return (
+              <div
+                key={wIdx}
+                className="grid grid-cols-[40px_repeat(7,1fr)] border-b last:border-b-0"
+                style={{ borderColor: P.line, minHeight: 130 }}
+              >
+                {/* Week-rij menu */}
+                <div className="flex items-start justify-center pt-2">
+                  {weekNum !== null && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="p-1 rounded hover:bg-[rgba(255,255,255,0.05)]"
+                          title={`Week ${weekNum} acties`}
+                        >
+                          <MoreHorizontal className="w-3.5 h-3.5 text-zinc-300" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-56">
+                        <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          Week {weekNum}
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={() => handleDuplicateWeek(weekNum)} className="gap-2 text-xs">
+                          <Copy className="w-3.5 h-3.5" />
+                          Dupliceer naar volgende week
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
+
+                {/* 7 dag-cellen */}
+                {week.map((date, dIdx) => {
+                  const inMonth = date.getMonth() === month0
+                  const isToday = sameDay(date, today)
+                  const info = dateMap.get(isoDate(date))
+                  const items = info?.items ?? []
+                  return (
+                    <div
+                      key={dIdx}
+                      className="border-l p-1.5 flex flex-col gap-1 group/cell"
                       style={{
-                        background: isActive ? 'rgba(0,0,0,0.18)' : 'rgba(244,194,97,0.25)',
-                        color: isActive ? P.bg : P.gold,
-                        fontSize: 8,
-                        letterSpacing: '0.1em',
-                        padding: '1px 5px',
-                        borderRadius: 999,
-                        fontWeight: 900,
+                        borderColor: P.line,
+                        background: inMonth ? P.surfaceLow : 'transparent',
+                        opacity: inMonth ? 1 : 0.4,
                       }}
                     >
-                      VANDAAG
-                    </span>
-                  )}
-                </span>
-                <span style={{ fontSize: 9, opacity: 0.7, letterSpacing: '0.04em', textTransform: 'none', fontWeight: 600 }}>
-                  {dateLabel}
-                </span>
-              </button>
-            )
-          })}
-          <button
-            type="button"
-            onClick={onAddWeek}
-            className="athletic-tap athletic-mono px-3 py-1.5 rounded-md flex items-center gap-1 self-start"
-            style={{
-              background: P.surfaceLow,
-              color: P.inkMuted,
-              border: `1px dashed ${P.line}`,
-              fontSize: 11,
-              fontWeight: 800,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              minHeight: 42,
-            }}
-            title="Volgende week toevoegen"
-          >
-            <Plus className="w-3 h-3" />
-            Week
-          </button>
-        </div>
-        <div className="ml-auto flex items-center gap-2 self-start">
-          {selectedWeek !== currentWeekNumber && currentWeekNumber > 0 && (
-            <DarkButton
-              variant="secondary"
-              size="sm"
-              onClick={() => onSelect(currentWeekNumber)}
-            >
-              ↳ Vandaag
-            </DarkButton>
-          )}
-          <DarkButton
-            variant="secondary"
-            size="sm"
-            onClick={openCopy}
-            disabled={!availableWeeks.includes(selectedWeek) || isCopying}
-          >
-            Kopieer week
-          </DarkButton>
-          {onDeleteWeek && (
-            <button
-              type="button"
-              onClick={onDeleteWeek}
-              className="athletic-tap w-8 h-8 rounded-md flex items-center justify-center"
-              style={{ background: P.surfaceHi, color: P.danger }}
-              title={`Week ${selectedWeek} verwijderen`}
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Copy week dialog */}
-      <Dialog open={copyOpen} onOpenChange={setCopyOpen}>
-        <DialogContent
-          className="max-w-sm"
-          style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
-        >
-          <DialogHeader>
-            <DialogTitle style={{ color: P.ink }}>
-              Kopieer week {selectedWeek} naar…
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 pt-2">
-            <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.04em' }}>
-              Bestaande weken worden overschreven.
-            </p>
-            <div className="grid grid-cols-4 gap-1.5">
-              {candidateTargets.map(n => {
-                const checked = copyTargets.has(n)
-                const exists = availableWeeks.includes(n)
-                return (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => toggleTarget(n)}
-                    className="athletic-tap athletic-mono py-2 rounded-md"
-                    style={{
-                      background: checked ? P.lime : P.surfaceHi,
-                      color: checked ? P.bg : P.ink,
-                      border: `1px solid ${checked ? P.lime : P.lineStrong}`,
-                      fontSize: 11,
-                      fontWeight: 800,
-                      letterSpacing: '0.05em',
-                    }}
-                    title={exists ? 'Bestaat al — wordt overschreven' : 'Nieuw'}
-                  >
-                    Week {n}{exists ? ' ⚠' : ''}
-                  </button>
-                )
-              })}
-            </div>
-            <div className="flex justify-end gap-2 pt-1">
-              <DarkButton variant="secondary" size="sm" onClick={() => setCopyOpen(false)}>
-                Annuleren
-              </DarkButton>
-              <DarkButton
-                variant="primary"
-                size="sm"
-                onClick={submitCopy}
-                disabled={isCopying || copyTargets.size === 0}
-              >
-                Kopieer{copyTargets.size > 0 ? ` (${copyTargets.size})` : ''}
-              </DarkButton>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </Tile>
-  )
-}
-
-type SessionDetail = {
-  id: string
-  scheduledAt: string | Date
-  completedAt: string | Date | null
-  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED'
-  duration: number | null
-  painLevel: number | null
-  exertionLevel: number | null
-  notes: string | null
-  program: { id: string; name: string } | null
-  exerciseLogs: Array<{
-    id: string
-    setsCompleted: number | null
-    repsCompleted: number | null
-    duration: number | null
-    weight: number | null
-    painLevel: number | null
-    painDuring: number | null
-    notes: string | null
-    exercise: { name: string; category: string }
-  }>
-}
-
-function SessionDetailsDialog({
-  sessionId,
-  onOpenChange,
-}: {
-  sessionId: string | null
-  onOpenChange: (open: boolean) => void
-}) {
-  const open = !!sessionId
-  const detailsQuery = trpc.weekSchedules.sessionDetails.useQuery(
-    { sessionId: sessionId ?? '' },
-    { enabled: open, staleTime: 60_000 },
-  )
-  const data = detailsQuery.data as SessionDetail | undefined
-
-  const formatDateTime = (d: string | Date) => {
-    const date = new Date(d)
-    return date.toLocaleString('nl-NL', {
-      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-    })
-  }
-  const durationLabel = (sec: number | null) => {
-    if (!sec) return null
-    const m = Math.round(sec / 60)
-    return m >= 60 ? `${Math.floor(m / 60)}u ${m % 60}m` : `${m} min`
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-w-md"
-        style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
-      >
-        <DialogHeader>
-          <DialogTitle style={{ color: P.ink }}>
-            {data?.program?.name ?? 'Eigen workout'}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3 pt-2">
-          {detailsQuery.isLoading ? (
-            <p className="athletic-mono" style={{ color: P.inkDim, fontSize: 11 }}>Laden...</p>
-          ) : !data ? (
-            <p className="athletic-mono" style={{ color: P.inkDim, fontSize: 11 }}>Sessie niet gevonden</p>
-          ) : (
-            <>
-              {/* Meta-info */}
-              <div
-                className="athletic-mono flex flex-wrap items-center gap-x-3 gap-y-1"
-                style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.04em' }}
-              >
-                <span>{formatDateTime(data.scheduledAt)}</span>
-                {durationLabel(data.duration) && <span>· {durationLabel(data.duration)}</span>}
-                <span
-                  style={{
-                    background: data.status === 'COMPLETED' ? 'rgba(190,242,100,0.14)' : P.surfaceHi,
-                    color: data.status === 'COMPLETED' ? P.lime : P.inkMuted,
-                    padding: '1px 8px',
-                    borderRadius: 999,
-                    fontSize: 9,
-                    letterSpacing: '0.1em',
-                    fontWeight: 800,
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  {data.status === 'COMPLETED' ? 'Afgerond' : data.status}
-                </span>
-              </div>
-
-              {/* Subjective scores */}
-              {(data.painLevel != null || data.exertionLevel != null) && (
-                <div
-                  className="athletic-mono flex gap-3"
-                  style={{ color: P.ink, fontSize: 11, letterSpacing: '0.04em' }}
-                >
-                  {data.painLevel != null && (
-                    <span>Pijn: <strong style={{ color: data.painLevel >= 5 ? P.danger : P.lime }}>{data.painLevel}/10</strong></span>
-                  )}
-                  {data.exertionLevel != null && (
-                    <span>RPE: <strong>{data.exertionLevel}/10</strong></span>
-                  )}
-                </div>
-              )}
-
-              {/* Notes */}
-              {data.notes && (
-                <p
-                  className="athletic-mono italic px-3 py-2 rounded-md"
-                  style={{ color: P.inkMuted, fontSize: 11, background: P.surfaceHi, letterSpacing: '0.03em' }}
-                >
-                  "{data.notes}"
-                </p>
-              )}
-
-              {/* Exercise logs */}
-              {data.exerciseLogs.length > 0 ? (
-                <div className="space-y-1.5 max-h-[280px] overflow-y-auto">
-                  <Kicker>Oefeningen ({data.exerciseLogs.length})</Kicker>
-                  {data.exerciseLogs.map(ex => (
-                    <div
-                      key={ex.id}
-                      className="rounded-md px-3 py-2"
-                      style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}` }}
-                    >
-                      <div
-                        className="flex items-center justify-between gap-2"
-                        style={{ color: P.ink, fontSize: 12, fontWeight: 700 }}
-                      >
-                        <span className="truncate">{ex.exercise.name}</span>
+                      <div className="flex items-center justify-between">
                         <span
-                          className="athletic-mono shrink-0"
-                          style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.04em' }}
+                          className={cn('text-xs', isToday && 'font-bold')}
+                          style={{
+                            color: isToday ? P.lime : P.inkMuted,
+                          }}
                         >
-                          {ex.setsCompleted ?? 0}×{ex.repsCompleted ?? 0}
-                          {ex.weight ? ` · ${ex.weight}kg` : ''}
+                          {date.getDate()}
                         </span>
+                        {info?.weekNumber && dIdx === 0 && (
+                          <span className="athletic-mono text-[9px]" style={{ color: P.inkDim }}>
+                            W{info.weekNumber}
+                          </span>
+                        )}
                       </div>
-                      {(ex.painDuring != null || ex.painLevel != null || ex.notes) && (
-                        <div
-                          className="athletic-mono flex gap-3 mt-1"
-                          style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.04em' }}
+                      <div className="flex flex-col gap-1 flex-1">
+                        {items.map(item => (
+                          <ItemTile
+                            key={item.id}
+                            item={item}
+                            status={statusFor(date, item)}
+                            onRemove={() => removeItem.mutate({ id: item.id })}
+                          />
+                        ))}
+                      </div>
+                      {inMonth && (
+                        <button
+                          type="button"
+                          onClick={() => openAddModal(date)}
+                          className="opacity-0 group-hover/cell:opacity-100 transition-opacity self-start text-[10px] flex items-center gap-1 px-1.5 py-0.5 rounded"
+                          style={{ color: P.inkMuted, background: 'transparent' }}
                         >
-                          {ex.painDuring != null && <span>pijn: {ex.painDuring}/10</span>}
-                          {ex.painLevel != null && ex.painDuring == null && <span>pijn: {ex.painLevel}/10</span>}
-                          {ex.notes && <span className="italic truncate">"{ex.notes}"</span>}
-                        </div>
+                          <Plus className="w-3 h-3" />
+                          Workout
+                        </button>
                       )}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="athletic-mono" style={{ color: P.inkDim, fontSize: 11 }}>
-                  Geen oefeningen gelogd voor deze sessie.
-                </p>
-              )}
-
-              <div className="flex justify-end pt-1">
-                <DarkButton variant="secondary" size="sm" onClick={() => onOpenChange(false)}>
-                  Sluiten
-                </DarkButton>
+                  )
+                })}
               </div>
-            </>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function MoveDayDialog({
-  open,
-  onOpenChange,
-  programId,
-  programName,
-  fromDay,
-  occupiedDays,
-  week,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  programId: string
-  programName?: string
-  fromDay: number | null
-  occupiedDays: number[]
-  week?: number
-}) {
-  const utils = trpc.useUtils()
-  const changeDay = trpc.programs.changeDay.useMutation({
-    onSuccess: async () => {
-      await Promise.all([
-        utils.programs.list.invalidate(),
-        utils.programs.get.invalidate({ id: programId }),
-        utils.weekSchedules.list.invalidate(),
-      ])
-      toast.success('Dag verplaatst')
-      onOpenChange(false)
-    },
-    onError: () => toast.error('Verplaatsen mislukt'),
-  })
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-w-sm"
-        style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
-      >
-        <DialogHeader>
-          <DialogTitle style={{ color: P.ink }}>
-            {fromDay !== null
-              ? `${programName ? `${programName} · ` : ''}Verplaats ${DAY_LABELS[fromDay - 1]} naar…`
-              : ''}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="grid grid-cols-7 gap-1.5 pt-2">
-          {DAY_LABELS.map((label, i) => {
-            const targetDay = i + 1
-            const isCurrent = fromDay === targetDay
-            const isOccupied = occupiedDays.includes(targetDay) && !isCurrent
-            const disabled = isCurrent || isOccupied || changeDay.isPending
-            return (
-              <button
-                key={label}
-                type="button"
-                disabled={disabled}
-                onClick={() => {
-                  if (fromDay === null) return
-                  changeDay.mutate({ programId, fromDay, toDay: targetDay, week })
-                }}
-                className="athletic-tap athletic-mono py-2 rounded-md"
-                style={{
-                  background: P.surfaceHi,
-                  color: disabled ? P.inkDim : P.ink,
-                  border: `1px solid ${P.lineStrong}`,
-                  fontSize: 11,
-                  fontWeight: 800,
-                  letterSpacing: '0.05em',
-                  cursor: disabled ? 'not-allowed' : 'pointer',
-                  opacity: isCurrent ? 0.4 : isOccupied ? 0.5 : 1,
-                }}
-                title={isOccupied ? 'Al bezet binnen het programma' : ''}
-              >
-                {label}
-              </button>
             )
           })}
         </div>
-        <p className="athletic-mono pt-1" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.04em' }}>
-          Verandert alle oefeningen op die dag binnen het programma{week !== undefined ? ` (week ${week})` : ''}.
-        </p>
-      </DialogContent>
-    </Dialog>
-  )
-}
+      )}
 
-function ActiveProgramRow({ program }: { program: ProgramListItem }) {
-  const [moveFromDay, setMoveFromDay] = useState<number | null>(null)
-  const days = program.daysScheduled ?? []
-  const planned = days.length > 0
-  const style = chipStyle(program.dominantCategory)
-
-  return (
-    <div
-      className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg flex-wrap"
-      style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}` }}
-    >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span
-            className="truncate"
-            style={{ color: P.ink, fontSize: 13, fontWeight: 800, letterSpacing: '0.04em' }}
-          >
-            {program.name}
-          </span>
-          {program.dominantCategory && (
-            <span
-              className="athletic-mono"
-              style={{
-                background: style.bg,
-                color: style.text,
-                border: `1px solid ${style.border}`,
-                fontSize: 9,
-                letterSpacing: '0.1em',
-                padding: '1px 6px',
-                borderRadius: 999,
-                fontWeight: 800,
-                textTransform: 'uppercase',
-              }}
-            >
-              {program.dominantCategory}
-            </span>
-          )}
-        </div>
-        <div
-          className="athletic-mono flex items-center gap-2 flex-wrap"
-          style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.05em', marginTop: 4 }}
-        >
-          <span>
-            {program.weeks} wk · {program.daysPerWeek}×/wk · {program._count?.exercises ?? 0} oef.
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5 flex-wrap mt-2">
-          {planned ? (
-            days.map(d => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setMoveFromDay(d)}
-                className="athletic-tap athletic-mono px-2 py-1 rounded-md flex items-center gap-1"
-                style={{
-                  background: style.bg,
-                  color: style.text,
-                  border: `1px solid ${style.border}`,
-                  fontSize: 10,
-                  fontWeight: 800,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                }}
-                title="Klik om te verplaatsen"
-              >
-                {DAY_LABELS[d - 1]}
-                <span style={{ fontSize: 9, opacity: 0.7 }}>↔</span>
-              </button>
-            ))
-          ) : (
-            <span
-              className="athletic-mono"
-              style={{ color: P.gold, fontSize: 10, letterSpacing: '0.05em' }}
-            >
-              Geen dagen ingepland in dit programma
-            </span>
-          )}
-        </div>
-      </div>
-      <DarkButton
-        variant="secondary"
-        size="sm"
-        href={`/therapist/programs/${program.id}/edit`}
-      >
-        Open
-      </DarkButton>
-
-      <MoveDayDialog
-        open={moveFromDay !== null}
-        onOpenChange={open => { if (!open) setMoveFromDay(null) }}
-        programId={program.id}
-        programName={program.name}
-        fromDay={moveFromDay}
-        occupiedDays={days}
+      <AddItemModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        dayId={addDayId}
+        dayLabel={addDayDate ? addDayDate.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' }) : ''}
+        programs={programs}
+        onSubmit={handleAddSubmit}
       />
     </div>
-  )
-}
-
-function DayCell({
-  dayOfWeek,
-  program,
-  programDayMatches,
-  sessionChips,
-  completedProgramIds,
-  patientId,
-  onClear,
-  onAssign,
-}: {
-  dayOfWeek: number
-  program: DayProgram
-  programDayMatches: ProgramListItem[]
-  sessionChips: RangeSession[]
-  completedProgramIds: Set<string>
-  patientId: string
-  onClear: () => void
-  onAssign: (programId: string) => void
-}) {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const [moveTarget, setMoveTarget] = useState<ProgramListItem | null>(null)
-  const [detailsSessionId, setDetailsSessionId] = useState<string | null>(null)
-
-  // WeekSchedule program telt mee mits 't niet al via Program.day getoond wordt
-  const programDayIds = new Set(programDayMatches.map(p => p.id))
-  const showWeekScheduleOverlay = program && !programDayIds.has(program.id)
-
-  const hasContent =
-    programDayMatches.length > 0 || !!showWeekScheduleOverlay || sessionChips.length > 0
-
-  return (
-    <Tile>
-      <div className="flex flex-col gap-2 min-h-[120px]">
-        <div
-          className="athletic-mono"
-          style={{
-            color: P.inkMuted,
-            fontSize: 10,
-            letterSpacing: '0.12em',
-            fontWeight: 800,
-            textTransform: 'uppercase',
-          }}
-        >
-          {DAY_LABELS[dayOfWeek]}
-        </div>
-
-        {hasContent ? (
-          <div className="flex flex-col gap-1.5 flex-1">
-            {/* Programma's afgeleid uit Program.day — klikbaar om te verplaatsen */}
-            {programDayMatches.map(p => {
-              const style = chipStyle(p.dominantCategory)
-              const isDone = completedProgramIds.has(p.id)
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setMoveTarget(p)}
-                  className="athletic-tap rounded-md px-2 py-1.5 text-left flex items-center justify-between gap-1.5"
-                  style={{
-                    background: style.bg,
-                    border: `1px solid ${style.border}`,
-                    color: style.text,
-                  }}
-                  title={`${p.name}${p.dominantCategory ? ` · ${p.dominantCategory}` : ''}${isDone ? ' · afgerond' : ''} — klik om te verplaatsen`}
-                >
-                  <span
-                    className="athletic-mono truncate"
-                    style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', lineHeight: 1.3 }}
-                  >
-                    {p.name}
-                  </span>
-                  {isDone && (
-                    <span
-                      className="shrink-0"
-                      style={{ fontSize: 11, fontWeight: 900, lineHeight: 1 }}
-                      aria-label="Afgerond"
-                    >
-                      ✓
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-
-            {/* WeekSchedule overlay — een handmatig toegewezen programma (× om weg te halen) */}
-            {showWeekScheduleOverlay && program && (() => {
-              const isDone = completedProgramIds.has(program.id)
-              return (
-                <div className="flex items-center gap-1.5">
-                  <div
-                    className="flex-1 rounded-md px-2 py-1.5 flex items-center justify-between gap-1.5"
-                    style={{
-                      background: P.surfaceHi,
-                      border: `1px dashed ${P.line}`,
-                      color: P.ink,
-                    }}
-                    title={`Handmatig toegewezen via +${isDone ? ' · afgerond' : ''}`}
-                  >
-                    <span
-                      className="athletic-mono truncate"
-                      style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', lineHeight: 1.3 }}
-                    >
-                      {program.name}
-                    </span>
-                    {isDone && (
-                      <span
-                        className="shrink-0"
-                        style={{ color: P.lime, fontSize: 11, fontWeight: 900, lineHeight: 1 }}
-                        aria-label="Afgerond"
-                      >
-                        ✓
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={onClear}
-                    className="athletic-tap shrink-0 w-7 h-7 rounded-md flex items-center justify-center"
-                    style={{ background: P.surfaceHi, color: P.danger, fontSize: 12 }}
-                    title="Verwijder van deze dag"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )
-            })()}
-
-            {/* Sessie-chips — eigen workouts (programId=null) +
-                 sessies van programma's die niet (meer) actief zijn.
-                 Klikbaar om details popup te openen. */}
-            {sessionChips.map(s => {
-              const date = new Date(s.scheduledAt)
-              const dateLabel = date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
-              const isCompleted = s.status === 'COMPLETED' || !!s.completedAt
-              const label = s.programId === null
-                ? 'Eigen workout'
-                : (s.programName ?? 'Sessie')
-              const titlePrefix = s.programId === null ? 'Eigen workout' : `Sessie · ${s.programName ?? 'onbekend programma'}`
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setDetailsSessionId(s.id)}
-                  className="athletic-tap rounded-md px-2 py-1.5 flex items-start justify-between gap-1.5 text-left w-full"
-                  style={{
-                    background: EXTRA_SESSION_STYLE.bg,
-                    border: `1px solid ${EXTRA_SESSION_STYLE.border}`,
-                    color: EXTRA_SESSION_STYLE.text,
-                  }}
-                  title={`${titlePrefix} · ${dateLabel}${isCompleted ? ' (afgerond)' : ''} — klik voor details`}
-                >
-                  <div className="flex-1 min-w-0">
-                    <span
-                      className="athletic-mono truncate"
-                      style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.04em', lineHeight: 1.3, display: 'block' }}
-                    >
-                      {label}
-                    </span>
-                    <span
-                      className="athletic-mono"
-                      style={{ fontSize: 9, opacity: 0.75, letterSpacing: '0.05em' }}
-                    >
-                      {dateLabel}{s.duration ? ` · ${Math.round(s.duration / 60)}m` : ''}
-                    </span>
-                  </div>
-                  {isCompleted && (
-                    <span
-                      className="shrink-0"
-                      style={{ fontSize: 11, fontWeight: 900, lineHeight: 1 }}
-                      aria-label="Afgerond"
-                    >
-                      ✓
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-
-            <button
-              type="button"
-              onClick={() => setMenuOpen(true)}
-              className="athletic-tap self-end w-7 h-7 rounded-md flex items-center justify-center"
-              style={{ background: P.surfaceHi, color: P.inkMuted }}
-              title="Voeg extra programma toe"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setMenuOpen(true)}
-            className="athletic-tap flex-1 rounded-md flex items-center justify-center"
-            style={{
-              background: P.surfaceLow,
-              border: `1px dashed ${P.line}`,
-              color: P.inkMuted,
-              minHeight: 60,
-            }}
-            title="Voeg programma toe"
-          >
-            <Plus className="w-5 h-5" />
-          </button>
-        )}
-      </div>
-
-      {/* Move-day dialog voor klikken op Program.day chip */}
-      <MoveDayDialog
-        open={!!moveTarget}
-        onOpenChange={open => { if (!open) setMoveTarget(null) }}
-        programId={moveTarget?.id ?? ''}
-        programName={moveTarget?.name}
-        fromDay={moveTarget ? dayOfWeek + 1 : null}
-        occupiedDays={moveTarget?.daysScheduled ?? []}
-      />
-
-      {/* Session-details dialog voor klikken op een sessie-chip */}
-      <SessionDetailsDialog
-        sessionId={detailsSessionId}
-        onOpenChange={open => { if (!open) setDetailsSessionId(null) }}
-      />
-
-      {/* Add menu (kies type) */}
-      <Dialog open={menuOpen} onOpenChange={setMenuOpen}>
-        <DialogContent
-          className="max-w-sm"
-          style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
-        >
-          <DialogHeader>
-            <DialogTitle style={{ color: P.ink }}>
-              {DAY_LABELS[dayOfWeek]} — programma toevoegen
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-2 pt-2">
-            <MenuRow
-              label="Uit opgeslagen schema's"
-              hint="Kies een bestaand template of programma"
-              onClick={() => {
-                setMenuOpen(false)
-                setPickerOpen(true)
-              }}
-            />
-            <MenuRow
-              label="Nieuw kracht"
-              hint="Bouw een nieuw krachtprogramma"
-              onClick={() => {
-                setMenuOpen(false)
-                window.location.href = `/therapist/programs/new?patientId=${encodeURIComponent(patientId)}`
-              }}
-            />
-            <MenuRow
-              label="Walk-Run"
-              icon="run"
-              hint="Wandel/loop-protocol op maat"
-              onClick={() => {
-                setMenuOpen(false)
-                window.location.href = `/therapist/programs/new/walk-run?patientId=${encodeURIComponent(patientId)}`
-              }}
-            />
-            <MenuRow
-              label="Workout Builder"
-              icon="cardio"
-              hint="Cardio, intervallen, fietsen, roeien"
-              onClick={() => {
-                setMenuOpen(false)
-                window.location.href = `/therapist/programs/new/workout?patientId=${encodeURIComponent(patientId)}`
-              }}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Saved-programs picker */}
-      <SavedProgramsDialog
-        open={pickerOpen}
-        onOpenChange={setPickerOpen}
-        patientId={patientId}
-        onPick={programId => {
-          setPickerOpen(false)
-          onAssign(programId)
-        }}
-      />
-    </Tile>
-  )
-}
-
-function MenuRow({
-  label,
-  hint,
-  icon,
-  onClick,
-}: {
-  label: string
-  hint: string
-  icon?: 'run' | 'cardio'
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="athletic-tap flex items-center gap-3 px-3 py-2.5 rounded-lg text-left"
-      style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}` }}
-    >
-      <div
-        className="w-8 h-8 rounded-md flex items-center justify-center shrink-0"
-        style={{ background: P.surface, color: P.lime }}
-      >
-        {icon === 'run' ? <IconRunning size={16} /> : icon === 'cardio' ? <IconCardio size={16} /> : <Plus className="w-4 h-4" />}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div style={{ color: P.ink, fontSize: 13, fontWeight: 800, letterSpacing: '0.04em' }}>{label}</div>
-        <div className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.04em', marginTop: 1 }}>
-          {hint}
-        </div>
-      </div>
-    </button>
-  )
-}
-
-function SavedProgramsDialog({
-  open,
-  onOpenChange,
-  patientId,
-  onPick,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  patientId: string
-  onPick: (programId: string) => void
-}) {
-  const [search, setSearch] = useState('')
-  const programsQuery = trpc.programs.list.useQuery(undefined, { staleTime: 30_000, enabled: open })
-  const all = (programsQuery.data as ProgramListItem[] | undefined) ?? []
-
-  // Toon templates + programma's van deze patient (eigen programma's hebben voorrang voor de patient)
-  const candidates = all.filter(p => p.isTemplate || p.patient?.id === patientId)
-  const filtered = search
-    ? candidates.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
-    : candidates
-
-  const templates = filtered.filter(p => p.isTemplate)
-  const own = filtered.filter(p => !p.isTemplate)
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-w-md"
-        style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
-      >
-        <DialogHeader>
-          <DialogTitle style={{ color: P.ink }}>Kies een schema</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3 pt-2">
-          <DarkInput
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Zoek op naam..."
-          />
-          {programsQuery.isLoading ? (
-            <p className="athletic-mono" style={{ color: P.inkDim, fontSize: 11 }}>Laden...</p>
-          ) : filtered.length === 0 ? (
-            <p className="athletic-mono" style={{ color: P.inkDim, fontSize: 11 }}>
-              Geen schema&apos;s gevonden.
-            </p>
-          ) : (
-            <div className="space-y-3 max-h-[420px] overflow-y-auto">
-              {templates.length > 0 && (
-                <div className="space-y-1.5">
-                  <Kicker>Templates</Kicker>
-                  {templates.map(p => (
-                    <ProgramRow key={p.id} program={p} onPick={() => onPick(p.id)} />
-                  ))}
-                </div>
-              )}
-              {own.length > 0 && (
-                <div className="space-y-1.5">
-                  <Kicker>Programma&apos;s van deze patiënt</Kicker>
-                  {own.map(p => (
-                    <ProgramRow key={p.id} program={p} onPick={() => onPick(p.id)} />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-          <div className="flex justify-end pt-1">
-            <DarkButton variant="secondary" size="sm" onClick={() => onOpenChange(false)}>
-              Annuleren
-            </DarkButton>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function ProgramRow({ program, onPick }: { program: ProgramListItem; onPick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onPick}
-      className="athletic-tap w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-left"
-      style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}` }}
-    >
-      <div className="flex-1 min-w-0">
-        <div
-          className="truncate"
-          style={{ color: P.ink, fontSize: 13, fontWeight: 800, letterSpacing: '0.04em' }}
-        >
-          {program.name}
-        </div>
-        <div
-          className="athletic-mono"
-          style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.05em', marginTop: 1 }}
-        >
-          {program.weeks} wk · {program.daysPerWeek}×/wk · {program._count?.exercises ?? 0} oef.
-        </div>
-      </div>
-      <Plus className="w-4 h-4 shrink-0" style={{ color: P.lime }} />
-    </button>
   )
 }
