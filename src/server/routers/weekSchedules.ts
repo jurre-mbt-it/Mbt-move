@@ -672,4 +672,312 @@ export const weekSchedulesRouter = createTRPCRouter({
         },
       })
     }),
+
+  // ─── Multi-workout per dag — fase 2 procedures ─────────────────────────────
+  // Werken bovenop het nieuwe WeekScheduleDayItem-model. De legacy
+  // WeekScheduleDay.programId blijft behouden (set door create/save) en zal
+  // pas in fase 5 verwijderd worden zodat de patient-app niet breekt.
+
+  /**
+   * Geeft week-schedules met items[] EXTRA (naast legacy programId per dag).
+   * UI-laag mapt later van programId naar items voor de oude shape; nieuwe UI
+   * gebruikt items[] direct.
+   */
+  listWithItems: therapistProcedure
+    .input(z.object({ patientId: z.string().optional(), isTemplate: z.boolean().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const isAdmin = ctx.user.role === 'ADMIN'
+      const practiceId = ctx.user.practiceId
+      const ownership = isAdmin
+        ? {}
+        : practiceId
+          ? { OR: [{ creatorId: ctx.user.id }, { practiceId }] }
+          : { creatorId: ctx.user.id }
+      return ctx.prisma.weekSchedule.findMany({
+        where: {
+          ...ownership,
+          ...(input?.patientId !== undefined ? { patientId: input.patientId } : {}),
+          ...(input?.isTemplate !== undefined ? { isTemplate: input.isTemplate } : {}),
+        },
+        include: {
+          patient: { select: { id: true, name: true, email: true } },
+          days: {
+            include: {
+              program: { select: { id: true, name: true } },
+              items: {
+                include: { program: { select: { id: true, name: true, status: true } } },
+                orderBy: { order: 'asc' },
+              },
+            },
+            orderBy: { dayOfWeek: 'asc' },
+          },
+        },
+        orderBy: [{ patientId: 'asc' }, { weekNumber: 'asc' }],
+      })
+    }),
+
+  /**
+   * Voeg een item toe aan een dag. Twee varianten:
+   *   - { programId } → koppeling aan bestaand programma
+   *   - { quickCategory, quickName, quickDurationSec } → losse snelle workout
+   * Server bepaalt `order` automatisch (laatste positie binnen die dag).
+   * Authorisatie: alleen owner van het schedule of ADMIN of zelfde-praktijk.
+   */
+  addItem: therapistProcedure
+    .input(z.discriminatedUnion('kind', [
+      z.object({
+        kind: z.literal('program'),
+        dayId: z.string(),
+        programId: z.string(),
+        notes: z.string().nullable().optional(),
+      }),
+      z.object({
+        kind: z.literal('quick'),
+        dayId: z.string(),
+        quickCategory: z.enum(['STRENGTH', 'MOBILITY', 'PLYOMETRICS', 'CARDIO', 'STABILITY']),
+        quickName: z.string().min(1).max(120),
+        quickDurationSec: z.number().int().positive().max(60 * 60 * 12),  // max 12u
+        notes: z.string().nullable().optional(),
+      }),
+    ]))
+    .mutation(async ({ ctx, input }) => {
+      const day = await ctx.prisma.weekScheduleDay.findUnique({
+        where: { id: input.dayId },
+        include: { weekSchedule: { select: { creatorId: true, practiceId: true } } },
+      })
+      if (!day) throw new TRPCError({ code: 'NOT_FOUND' })
+      const isAdmin = ctx.user.role === 'ADMIN'
+      const isOwner = day.weekSchedule.creatorId === ctx.user.id
+      const isSamePractice =
+        !!ctx.user.practiceId &&
+        !!day.weekSchedule.practiceId &&
+        day.weekSchedule.practiceId === ctx.user.practiceId
+      if (!isAdmin && !isOwner && !isSamePractice) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+      const last = await ctx.prisma.weekScheduleDayItem.findFirst({
+        where: { dayId: input.dayId },
+        orderBy: { order: 'desc' },
+        select: { order: true },
+      })
+      const nextOrder = last ? last.order + 1 : 0
+      return ctx.prisma.weekScheduleDayItem.create({
+        data: input.kind === 'program'
+          ? {
+              dayId: input.dayId,
+              order: nextOrder,
+              programId: input.programId,
+              notes: input.notes ?? null,
+            }
+          : {
+              dayId: input.dayId,
+              order: nextOrder,
+              quickCategory: input.quickCategory,
+              quickName: input.quickName,
+              quickDurationSec: input.quickDurationSec,
+              notes: input.notes ?? null,
+            },
+        include: {
+          program: { select: { id: true, name: true, status: true } },
+        },
+      })
+    }),
+
+  /** Velden van een item bewerken (naam, duur, notes, order). */
+  updateItem: therapistProcedure
+    .input(z.object({
+      id: z.string(),
+      quickName: z.string().min(1).max(120).optional(),
+      quickDurationSec: z.number().int().positive().max(60 * 60 * 12).optional(),
+      notes: z.string().nullable().optional(),
+      order: z.number().int().min(0).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const item = await ctx.prisma.weekScheduleDayItem.findUnique({
+        where: { id: input.id },
+        include: { day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true } } } } },
+      })
+      if (!item) throw new TRPCError({ code: 'NOT_FOUND' })
+      const isAdmin = ctx.user.role === 'ADMIN'
+      const isOwner = item.day.weekSchedule.creatorId === ctx.user.id
+      const isSamePractice =
+        !!ctx.user.practiceId &&
+        !!item.day.weekSchedule.practiceId &&
+        item.day.weekSchedule.practiceId === ctx.user.practiceId
+      if (!isAdmin && !isOwner && !isSamePractice) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+      const { id, ...patch } = input
+      return ctx.prisma.weekScheduleDayItem.update({
+        where: { id },
+        data: patch,
+      })
+    }),
+
+  /** Item verwijderen. */
+  removeItem: therapistProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const item = await ctx.prisma.weekScheduleDayItem.findUnique({
+        where: { id: input.id },
+        include: { day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true } } } } },
+      })
+      if (!item) throw new TRPCError({ code: 'NOT_FOUND' })
+      const isAdmin = ctx.user.role === 'ADMIN'
+      const isOwner = item.day.weekSchedule.creatorId === ctx.user.id
+      const isSamePractice =
+        !!ctx.user.practiceId &&
+        !!item.day.weekSchedule.practiceId &&
+        item.day.weekSchedule.practiceId === ctx.user.practiceId
+      if (!isAdmin && !isOwner && !isSamePractice) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+      await ctx.prisma.weekScheduleDayItem.delete({ where: { id: input.id } })
+      return { ok: true }
+    }),
+
+  /**
+   * Bulk-reorder items binnen een dag, of verplaats items naar een andere dag.
+   * Input is een list van (itemId, dayId, order). UI gebruikt dit voor
+   * drag-drop binnen een dag én tussen dagen.
+   */
+  reorderItems: therapistProcedure
+    .input(z.object({
+      moves: z.array(z.object({
+        itemId: z.string(),
+        dayId: z.string(),
+        order: z.number().int().min(0),
+      })).min(1).max(200),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // Authorisatie via één lookup van alle betrokken schedules.
+      const itemIds = input.moves.map(m => m.itemId)
+      const items = await ctx.prisma.weekScheduleDayItem.findMany({
+        where: { id: { in: itemIds } },
+        include: { day: { include: { weekSchedule: { select: { id: true, creatorId: true, practiceId: true } } } } },
+      })
+      if (items.length !== itemIds.length) throw new TRPCError({ code: 'NOT_FOUND' })
+      const isAdmin = ctx.user.role === 'ADMIN'
+      for (const it of items) {
+        const isOwner = it.day.weekSchedule.creatorId === ctx.user.id
+        const isSamePractice =
+          !!ctx.user.practiceId &&
+          !!it.day.weekSchedule.practiceId &&
+          it.day.weekSchedule.practiceId === ctx.user.practiceId
+        if (!isAdmin && !isOwner && !isSamePractice) {
+          throw new TRPCError({ code: 'FORBIDDEN' })
+        }
+      }
+      // Transactie: alle moves atomisch toepassen.
+      await ctx.prisma.$transaction(
+        input.moves.map(m =>
+          ctx.prisma.weekScheduleDayItem.update({
+            where: { id: m.itemId },
+            data: { dayId: m.dayId, order: m.order },
+          })
+        )
+      )
+      return { ok: true }
+    }),
+
+  /**
+   * Dupliceer alle items van bron-week naar doel-week voor dezelfde patient.
+   * Maakt automatisch een doel-WeekSchedule + dagen aan als die nog niet bestaan
+   * (gemodelleerd op het bron-schema's name/description).
+   * Doel-week behoudt eigen bestaande items NIET — wordt vervangen indien `replace=true`,
+   * anders wordt er een 409 teruggegeven als doel niet leeg is.
+   */
+  duplicateWeek: therapistProcedure
+    .input(z.object({
+      patientId: z.string(),
+      sourceWeekNumber: z.number().int().min(1),
+      targetWeekNumber: z.number().int().min(1),
+      replace: z.boolean().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.sourceWeekNumber === input.targetWeekNumber) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Bron en doel zijn gelijk' })
+      }
+      await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
+      const source = await ctx.prisma.weekSchedule.findFirst({
+        where: { patientId: input.patientId, weekNumber: input.sourceWeekNumber, isTemplate: false },
+        include: {
+          days: { include: { items: { orderBy: { order: 'asc' } } }, orderBy: { dayOfWeek: 'asc' } },
+        },
+      })
+      if (!source) throw new TRPCError({ code: 'NOT_FOUND', message: 'Bron-week niet gevonden' })
+
+      let target = await ctx.prisma.weekSchedule.findFirst({
+        where: { patientId: input.patientId, weekNumber: input.targetWeekNumber, isTemplate: false },
+        include: { days: { include: { items: true } } },
+      })
+
+      // Als doel-week bestaat met content → afhankelijk van `replace`.
+      if (target) {
+        const hasContent = target.days.some(d => d.items.length > 0 || d.programId !== null)
+        if (hasContent && !input.replace) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Doel-week bevat al items. Stel replace=true om te overschrijven.',
+          })
+        }
+        // Wis alle bestaande items op alle dagen.
+        await ctx.prisma.weekScheduleDayItem.deleteMany({
+          where: { day: { weekScheduleId: target.id } },
+        })
+      } else {
+        // Maak een nieuwe doel-week aan (kopie van source-naam + 7 dagen leeg).
+        target = await ctx.prisma.weekSchedule.create({
+          data: {
+            id: createId(),
+            name: source.name,
+            description: source.description,
+            patientId: input.patientId,
+            isTemplate: false,
+            weekNumber: input.targetWeekNumber,
+            creatorId: ctx.user.id,
+            practiceId: ctx.user.practiceId ?? null,
+            days: {
+              create: Array.from({ length: 7 }, (_, i) => ({
+                id: createId(),
+                dayOfWeek: i,
+              })),
+            },
+          },
+          include: { days: { include: { items: true } } },
+        })
+      }
+
+      // Map source.dayOfWeek → target.day.id voor item-create.
+      const targetDayMap = new Map(target.days.map(d => [d.dayOfWeek, d.id]))
+
+      // Bouw item-creates op uit source.
+      const creates: Array<{
+        dayId: string; order: number;
+        programId?: string | null;
+        quickCategory?: 'STRENGTH' | 'MOBILITY' | 'PLYOMETRICS' | 'CARDIO' | 'STABILITY' | null;
+        quickName?: string | null;
+        quickDurationSec?: number | null;
+        notes?: string | null;
+      }> = []
+      for (const sDay of source.days) {
+        const tDayId = targetDayMap.get(sDay.dayOfWeek)
+        if (!tDayId) continue
+        for (const it of sDay.items) {
+          creates.push({
+            dayId: tDayId,
+            order: it.order,
+            programId: it.programId,
+            quickCategory: it.quickCategory ?? null,
+            quickName: it.quickName,
+            quickDurationSec: it.quickDurationSec,
+            notes: it.notes,
+          })
+        }
+      }
+      if (creates.length > 0) {
+        await ctx.prisma.weekScheduleDayItem.createMany({ data: creates })
+      }
+      return { targetWeekScheduleId: target.id, copied: creates.length }
+    }),
 })
