@@ -1,17 +1,26 @@
 /**
  * Email-footer voor outgoing mails — rendert praktijk + therapeut info.
  *
- * Stijl-keuze: light background + lime-accent (#BEF264) divider.
- * Reden: bestaande programma-assign mail (de vaakst-verstuurde flow) is
- * lichtgrijs/wit en dat geeft de beste compatibility in Gmail/Outlook/Apple
- * Mail. Dark themes in mail werken nog te onbetrouwbaar (Outlook negeert
- * background-colors, Gmail dwingt soms eigen colors af). De accent-kleur
- * komt uit het MBT brand-palette.
+ * Stijl: dark MBT brand (matcht inviteMail in src/server/mail.ts en de
+ * programma-assign mail). Lime-accent (#BEF264) divider boven, 2-koloms
+ * layout (therapeut links, praktijk rechts) via een nested table voor
+ * Outlook-compat.
  *
  * Fallback: als de praktijk geen MINIMALE set velden heeft (`name` +
  * `addressLine1` + `city` + (email of phone)), retourneert de helper een
  * lege string. De mail wordt dan zonder footer verstuurd — per spec.
  */
+
+const BRAND = {
+  bg: '#0A0E0F',
+  surface: '#141A1B',
+  surfaceHi: '#1C2425',
+  ink: '#F5F7F6',
+  inkMuted: '#7B8889',
+  inkDim: '#4A5454',
+  lime: '#BEF264',
+  line: 'rgba(255,255,255,0.12)',
+}
 
 export interface PracticeForFooter {
   name?: string | null
@@ -86,18 +95,18 @@ export function renderEmailFooter(opts: {
   const contactParts: string[] = []
   if (practice.phone?.trim()) {
     const safe = escapeHtml(practice.phone.trim())
-    contactParts.push(`<a href="tel:${safe}" style="color:#0F1516;text-decoration:none;">${safe}</a>`)
+    contactParts.push(`<a href="tel:${safe}" style="color:${BRAND.ink};text-decoration:none;">${safe}</a>`)
   }
   if (practice.email?.trim()) {
     const safe = escapeHtml(practice.email.trim())
-    contactParts.push(`<a href="mailto:${safe}" style="color:#0F1516;text-decoration:none;">${safe}</a>`)
+    contactParts.push(`<a href="mailto:${safe}" style="color:${BRAND.ink};text-decoration:none;">${safe}</a>`)
   }
   if (practice.website?.trim()) {
     let url = practice.website.trim()
     if (!url.match(/^https?:\/\//i)) url = `https://${url}`
     const safeHref = escapeHtml(url)
     const safeLabel = escapeHtml(url.replace(/^https?:\/\//i, '').replace(/\/$/, ''))
-    contactParts.push(`<a href="${safeHref}" style="color:#0F1516;text-decoration:none;">${safeLabel}</a>`)
+    contactParts.push(`<a href="${safeHref}" style="color:${BRAND.ink};text-decoration:none;">${safeLabel}</a>`)
   }
   const contactHtml = contactParts.join(' &nbsp;·&nbsp; ')
 
@@ -106,30 +115,32 @@ export function renderEmailFooter(opts: {
     ? escapeHtml(practice.privacyDisclaimer.trim()).replace(/\n/g, '<br/>')
     : ''
 
+  // Logo: max-height + max-width zodat een uitgerekt brondbestand alsnog
+  // proportioneel klein wordt gerenderd (was eerder onbeperkt breed).
   const logoBlock = practice.logoUrl?.trim()
-    ? `<img src="${escapeHtml(practice.logoUrl.trim())}" alt="${safePracticeName}" style="max-height:56px;max-width:140px;display:block;margin:0 0 12px;border:0;" />`
+    ? `<img src="${escapeHtml(practice.logoUrl.trim())}" alt="${safePracticeName}" style="max-height:48px;max-width:120px;height:auto;width:auto;display:block;margin:0 0 10px;border:0;" />`
     : ''
 
-  // Layout: 2px lime-divider boven, dan logo + therapeut-blok links, praktijk-blok rechts.
-  // Gebruik table-layout voor maximale email-client compat (geen flex/grid).
+  // Dark layout: 2px lime-divider boven, therapeut-blok links + praktijk-blok rechts.
+  // Tafel-gebaseerd zodat Outlook 'm correct rendert (geen flex/grid in mail).
   return `
-    <div style="margin-top:32px;padding-top:20px;border-top:2px solid #BEF264;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#0F1516;">
+    <div style="margin-top:24px;padding-top:18px;border-top:2px solid ${BRAND.lime};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:${BRAND.ink};">
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
         <tr>
-          <td valign="top" style="padding-right:16px;width:50%;">
+          <td valign="top" style="padding-right:14px;width:50%;">
             ${logoBlock}
-            ${safeTherapistName ? `<p style="margin:0;font-size:14px;font-weight:700;color:#0F1516;">${safeTherapistName}</p>` : ''}
-            ${safeJobTitle ? `<p style="margin:2px 0 0;font-size:13px;color:#566060;">${safeJobTitle}</p>` : ''}
+            ${safeTherapistName ? `<p style="margin:0;font-size:14px;font-weight:700;color:${BRAND.ink};">${safeTherapistName}</p>` : ''}
+            ${safeJobTitle ? `<p style="margin:2px 0 0;font-size:12px;color:${BRAND.inkMuted};">${safeJobTitle}</p>` : ''}
           </td>
-          <td valign="top" style="padding-left:16px;width:50%;border-left:1px solid #E5E7EB;">
-            <p style="margin:0 0 4px;font-size:14px;font-weight:700;color:#0F1516;">${safePracticeName}</p>
-            ${addressHtml ? `<p style="margin:0 0 8px;font-size:13px;color:#566060;line-height:1.5;">${addressHtml}</p>` : ''}
-            ${contactHtml ? `<p style="margin:0;font-size:13px;color:#0F1516;">${contactHtml}</p>` : ''}
-            ${safeAgb ? `<p style="margin:8px 0 0;font-size:12px;color:#7B8889;">AGB-praktijk: ${safeAgb}</p>` : ''}
+          <td valign="top" style="padding-left:14px;width:50%;border-left:1px solid ${BRAND.line};">
+            <p style="margin:0 0 4px;font-size:14px;font-weight:700;color:${BRAND.ink};">${safePracticeName}</p>
+            ${addressHtml ? `<p style="margin:0 0 8px;font-size:12px;color:${BRAND.inkMuted};line-height:1.5;">${addressHtml}</p>` : ''}
+            ${contactHtml ? `<p style="margin:0;font-size:12px;color:${BRAND.ink};">${contactHtml}</p>` : ''}
+            ${safeAgb ? `<p style="margin:8px 0 0;font-size:11px;color:${BRAND.inkMuted};">AGB-praktijk: ${safeAgb}</p>` : ''}
           </td>
         </tr>
       </table>
-      ${safeDisclaimer ? `<p style="margin:16px 0 0;font-size:11px;color:#9CA3AF;line-height:1.5;">${safeDisclaimer}</p>` : ''}
+      ${safeDisclaimer ? `<p style="margin:14px 0 0;font-size:11px;color:${BRAND.inkDim};line-height:1.5;">${safeDisclaimer}</p>` : ''}
     </div>
   `
 }

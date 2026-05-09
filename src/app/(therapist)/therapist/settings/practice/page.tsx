@@ -462,7 +462,7 @@ export default function PracticeSettingsPage() {
           <div
             className="rounded-xl overflow-hidden"
             style={{
-              background: '#ffffff',
+              background: P.bg,
               border: `1px solid ${P.lineStrong}`,
               padding: 0,
               maxWidth: previewMode === 'mobile' ? 375 : '100%',
@@ -526,20 +526,41 @@ function PreviewIframe({ html }: { html: string }) {
 }
 
 function buildPreviewHtml(footer: string): string {
-  // Simuleert de body van een echte mail — een korte voorbeeld-paragraaf
-  // boven de footer, zodat je ziet hoe 'ie aansluit op de mail-content.
+  // Simuleert een ingekorte versie van de echte programma-mail (zelfde dark
+  // MBT brand) zodat de therapeut ziet hoe de footer aansluit.
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-    <body style="margin:0;padding:24px;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#0F1516;">
-      <div style="max-width:540px;margin:0 auto;">
-        <h2 style="font-size:20px;font-weight:700;margin:0 0 8px;">Hoi {voornaam}</h2>
-        <p style="color:#566060;margin:0 0 24px;font-size:14px;">
-          Jouw therapeut heeft een revalidatieprogramma voor je klaarstaan…
-        </p>
-        <div style="background:#f4f4f5;border-radius:12px;padding:20px;margin-bottom:8px;">
-          <p style="margin:0;font-size:13px;color:#71717a;">Programma</p>
-          <p style="margin:4px 0 0;font-weight:600;">Revalidatieprogramma — voorbeeld</p>
-        </div>
-        ${footer || '<p style="margin-top:24px;padding:12px;background:#FEF3C7;border-radius:8px;font-size:12px;color:#92400E;">⚠ Geen footer — vul minimaal naam, adres, plaats en telefoon óf email in.</p>'}
-      </div>
+    <body style="margin:0;padding:0;background:#0A0E0F;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0A0E0F;padding:24px 16px;">
+        <tr><td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#141A1B;border:1px solid rgba(255,255,255,0.12);border-radius:20px;overflow:hidden;">
+            <tr><td style="padding:24px 24px 8px 24px;">
+              <div style="font-family:ui-monospace,Menlo,'SF Mono',monospace;font-size:11px;letter-spacing:0.2em;color:#BEF264;font-weight:900;">● MBT · GYM</div>
+            </td></tr>
+            <tr><td style="padding:6px 24px 0 24px;">
+              <h1 style="margin:0;padding:4px 0 0 0;font-size:26px;line-height:32px;font-weight:900;letter-spacing:-1px;color:#F5F7F6;text-transform:uppercase;">HALLO {voornaam}</h1>
+            </td></tr>
+            <tr><td style="padding:12px 24px 0 24px;">
+              <p style="margin:0;color:#7B8889;font-size:14px;line-height:21px;">Je therapeut heeft een revalidatieprogramma voor je klaargezet.</p>
+            </td></tr>
+            <tr><td style="padding:16px 24px 0 24px;">
+              <div style="background:#1C2425;border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:14px;">
+                <div style="font-family:ui-monospace,Menlo,monospace;font-size:10px;letter-spacing:0.14em;color:#7B8889;text-transform:uppercase;font-weight:700;">PROGRAMMA</div>
+                <div style="color:#F5F7F6;font-size:15px;font-weight:700;margin-top:4px;">Revalidatieprogramma — voorbeeld</div>
+              </div>
+            </td></tr>
+            <tr><td style="padding:18px 24px 0 24px;">
+              <div style="background:#BEF264;color:#0A0E0F;text-align:center;padding:14px 20px;border-radius:12px;font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:900;letter-spacing:0.16em;text-transform:uppercase;">PROGRAMMA OPENEN →</div>
+            </td></tr>
+            ${footer
+              ? `<tr><td style="padding:18px 24px 24px 24px;">${footer}</td></tr>`
+              : `<tr><td style="padding:20px 24px 24px 24px;">
+                  <div style="background:rgba(245,158,11,0.10);border:1px solid rgba(245,158,11,0.30);border-radius:8px;padding:12px;font-size:12px;color:#F59E0B;line-height:1.5;">
+                    ⚠ Geen footer — vul minimaal praktijknaam, adres, plaats en telefoon óf email in.
+                  </div>
+                </td></tr>`
+            }
+          </table>
+        </td></tr>
+      </table>
     </body></html>`
 }
