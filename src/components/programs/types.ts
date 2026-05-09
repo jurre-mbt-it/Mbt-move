@@ -6,6 +6,8 @@ export interface ExtraParam {
   label: string
   type: ParamType
   value: string | number
+  /** Optionele bovengrens — als gezet, wordt het veld als range "value – valueMax" weergegeven. */
+  valueMax?: string | number
   unit?: string
   options?: string[]
   min?: number
@@ -24,14 +26,22 @@ export interface BuilderExercise {
   videoUrl?: string | null
   trackOneRepMax: boolean
 
-  // Fixed params
+  // Fixed params — sets/reps zijn vereist; setsMax/repsMax zijn optioneel en
+  // converteren het veld naar een range (bv. 3-5 sets, 5-10 reps).
   sets: number
+  setsMax?: number | null
   reps: number
+  repsMax?: number | null
   repUnit: RepUnit
   rest: number          // seconds
 
   // Dynamic
   extraParams: ExtraParam[]
+
+  // Per-instance notitie voor de patiënt — wordt op ProgramExercise.notes
+  // opgeslagen, niet op de globale Exercise. Dus alleen zichtbaar binnen dit
+  // specifieke programma; andere therapeuten/patiënten zien deze tekst niet.
+  notes?: string | null
 
   // Superset
   supersetGroup: string | null  // null | 'A' | 'B' | 'C' …

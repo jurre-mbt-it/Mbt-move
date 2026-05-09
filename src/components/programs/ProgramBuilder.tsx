@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Label } from '@/components/ui/label'
 import { useCustomParams } from '@/hooks/useCustomParams'
@@ -19,8 +19,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { Textarea } from '@/components/ui/textarea'
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 
 import { ExerciseLibraryPanel } from './ExerciseLibraryPanel'
@@ -36,7 +37,12 @@ import { cn } from '@/lib/utils'
 import {
   Eye, Copy, Plus, Trash2, Rocket, Check, AlertCircle, Loader2,
   ChevronLeft, Layers, Search, CheckCircle2, X, BarChart2, Info,
+  User, ChevronDown,
 } from 'lucide-react'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 
 // ─── Drop zone for a single day column ────────────────────────────────────────
@@ -84,9 +90,12 @@ interface ProgramBuilderProps {
   initialState?: Partial<ProgramState> & { exercises?: BuilderExercise[] }
   programId?: string
   initialStatus?: ProgramStatus
+  /** Quick-add: id van een oefening die direct na laden van de bibliotheek aan
+   *  het programma wordt toegevoegd (wordt door /programs/new uit query gelezen). */
+  initialAddExerciseId?: string
 }
 
-export function ProgramBuilder({ initialState, programId, initialStatus }: ProgramBuilderProps) {
+export function ProgramBuilder({ initialState, programId, initialStatus, initialAddExerciseId }: ProgramBuilderProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   // Na opslaan doorsturen naar een oorspronkelijke pagina (bv week-planner).
@@ -96,7 +105,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
   const returnTo = rawReturnTo && /^\/[^/\\]/.test(rawReturnTo) ? rawReturnTo : null
 
   const [program, setProgram] = useState<ProgramState>(() => ({
-    name: initialState?.name ?? 'Nieuw programma',
+    name: initialState?.name ?? '',
     description: initialState?.description ?? '',
     patientId: initialState?.patientId ?? null,
     weeks: initialState?.weeks ?? 1,
@@ -108,6 +117,14 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
     trackOneRepMax: (initialState as Partial<ProgramState> | undefined)?.trackOneRepMax ?? false,
     exercises: initialState?.exercises ?? [],
   }))
+  // Houdt bij of de gebruiker zelf de naam heeft aangeraakt. Zo niet, mag de
+  // auto-suggestie de naam blijven bijwerken als patient/oefeningen wijzigen.
+  // Bestaande programma's met een naam → meteen "user-edited" zodat we 'm
+  // nooit overschrijven.
+  const [nameUserEdited, setNameUserEdited] = useState<boolean>(() => {
+    const n = (initialState?.name ?? '').trim()
+    return n.length > 0 && n !== 'Nieuw programma'
+  })
   const [exercises, setExercises] = useState<BuilderExercise[]>(
     initialState?.exercises ?? []
   )
@@ -133,6 +150,13 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
   // al kan zien. Nieuwe programma's beginnen als DRAFT.
   const [currentStatus, setCurrentStatus] = useState<ProgramStatus>(initialStatus ?? 'DRAFT')
 
+  // ── Deploy dialog state ───────────────────────────────────────────────────
+  const [deployDialogOpen, setDeployDialogOpen] = useState(false)
+  const [deployPatientId, setDeployPatientId] = useState<string | null>(null)
+  const [deployPatientSearch, setDeployPatientSearch] = useState('')
+  const [deployInstructions, setDeployInstructions] = useState('')
+  const [deployBusy, setDeployBusy] = useState(false)
+
   const { params: customParams } = useCustomParams()
   const utils = trpc.useUtils()
   const createProgram = trpc.programs.create.useMutation()
@@ -143,6 +167,17 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
     { isTemplate: true },
     { enabled: importDialogOpen, staleTime: 30_000 },
   ) as { data: Array<{ id: string; name: string; weeks: number; daysPerWeek: number; _count: { exercises: number } }> }
+  // Patiënten van deze therapeut — voor pill in header en deploy-picker.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: patientsList = [] } = (trpc.patients.list.useQuery as any)(undefined, { staleTime: 60_000 }) as { data: Array<{
+    id: string
+    name: string | null
+    email: string | null
+    avatarUrl: string | null
+  }> }
+  const currentPatient = patientsList.find(p => p.id === program.patientId) ?? null
+  const currentPatientFirstName = currentPatient?.name?.trim().split(/\s+/)[0] ?? null
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: libraryExercises = [] } = (trpc.exercises.list.useQuery as any)(undefined, { staleTime: 60_000 }) as { data: Array<{
     id: string
@@ -155,6 +190,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
     muscleLoads: Record<string, number>
     trackOneRepMax?: boolean
     defaultExtraParams?: unknown
+    bodyRegion?: string[]
   }> }
   const saving = createProgram.isPending || saveProgram.isPending
 
@@ -278,10 +314,13 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
       harderVariantId: null,
       videoUrl: ex.videoUrl,
       sets: 3,
+      setsMax: null,
       reps: 10,
+      repsMax: null,
       repUnit: 'reps',
       rest: 60,
       extraParams: inheritedParams,
+      notes: null,
       supersetGroup: null,
       supersetOrder: 0,
       selected: false,
@@ -413,8 +452,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
         easierVariantId: null,
         harderVariantId: null,
         videoUrl: ex.videoUrl,
-        sets: 3, reps: 10, repUnit: 'reps', rest: 60,
-        extraParams: inheritedParams, supersetGroup: null, supersetOrder: 0, selected: false,
+        sets: 3, setsMax: null, reps: 10, repsMax: null, repUnit: 'reps', rest: 60,
+        extraParams: inheritedParams, notes: null, supersetGroup: null, supersetOrder: 0, selected: false,
         trackOneRepMax: exWithDefaults.trackOneRepMax ?? false,
         day: targetDay, week: targetWeek,
       }
@@ -448,6 +487,11 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
     if (!draft) return
     setProgram(p => ({ ...p, ...draft.program }))
     setExercises(draft.exercises ?? [])
+    // Concepten van de gebruiker hebben hun eigen naam — niet overschrijven
+    // met de auto-suggestie.
+    if (draft.program?.name && draft.program.name.trim().length > 0) {
+      setNameUserEdited(true)
+    }
     toast.info('Concept hersteld', { duration: 2000 })
     // We intentionally only run this once per mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -481,22 +525,94 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
     exercises,
   }), [program, exercises])
 
+  // ── Quick-add via URL: één-malig de gevraagde oefening toevoegen zodra
+  // de bibliotheek geladen is.
+  const quickAddDoneRef = useRef(false)
+  useEffect(() => {
+    if (!initialAddExerciseId || quickAddDoneRef.current) return
+    if (libraryExercises.length === 0) return
+    const ex = libraryExercises.find(l => l.id === initialAddExerciseId)
+    if (!ex) {
+      quickAddDoneRef.current = true
+      toast.error('Oefening niet gevonden in bibliotheek')
+      return
+    }
+    quickAddDoneRef.current = true
+    addFromLibrary(ex)
+    toast.success(`"${ex.name}" toegevoegd`)
+  }, [initialAddExerciseId, libraryExercises, addFromLibrary])
+
+  // ── Smart name suggestion ──────────────────────────────────────────────────
+  // Dominante body-region uit de gesleepte oefeningen. FULL_BODY tellen we
+  // niet mee — dat geeft geen sturende suffix.
+  const REGION_LABELS_NL: Record<string, string> = {
+    KNEE: 'Knie', SHOULDER: 'Schouder', BACK: 'Rug', ANKLE: 'Enkel',
+    HIP: 'Heup', CERVICAL: 'Cervicaal', THORACIC: 'Thoracaal', LUMBAR: 'Lumbaal',
+    ELBOW: 'Elleboog', WRIST: 'Pols', FOOT: 'Voet',
+  }
+  const dominantRegion = useMemo(() => {
+    if (exercises.length === 0) return null
+    const libMap = new Map(libraryExercises.map(l => [l.id, l]))
+    const counts: Record<string, number> = {}
+    for (const ex of exercises) {
+      const lib = libMap.get(ex.exerciseId)
+      const regions = (lib?.bodyRegion ?? []) as string[]
+      for (const r of regions) {
+        if (r === 'FULL_BODY') continue
+        counts[r] = (counts[r] ?? 0) + 1
+      }
+    }
+    let best: string | null = null
+    let bestCount = 0
+    for (const [r, c] of Object.entries(counts)) {
+      if (c > bestCount) { best = r; bestCount = c }
+    }
+    return best
+  }, [exercises, libraryExercises])
+
+  // Auto-suggestie: vult de naam zolang de gebruiker 'm zelf nog niet heeft
+  // bewerkt. Zodra ze typen blijft de naam staan zoals zij 'm willen.
+  useEffect(() => {
+    if (nameUserEdited) return
+    let suggested = ''
+    if (currentPatient?.name) {
+      const first = currentPatient.name.trim().split(/\s+/)[0]
+      suggested = `Revalidatieprogramma ${first}`
+    } else if (program.isTemplate) {
+      suggested = 'Sjabloon'
+    }
+    if (dominantRegion && REGION_LABELS_NL[dominantRegion]) {
+      const label = REGION_LABELS_NL[dominantRegion]
+      suggested = suggested ? `${suggested} – ${label}` : label
+    }
+    if (suggested && suggested !== program.name) {
+      setProgram(p => ({ ...p, name: suggested }))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nameUserEdited, currentPatient, dominantRegion, program.isTemplate])
+
   // No useCallback: tRPC mutation refs in the dep array trigger
   // "excessively deep type instantiation". The autosave hook stores the
   // latest onSave via a ref, so a fresh function each render is fine.
   const persist = async (val: AutosaveValue) => {
+    // Geen lege naam-saves: server eist min(1) en we willen geen naamloze
+    // DRAFT records aanmaken. Zodra de gebruiker de naam invult of de auto-
+    // suggestie 'm vult, wordt deze save automatisch opnieuw getriggerd.
+    if (!val.program.name.trim()) return
     const exercisePayload = val.exercises.map((ex, i) => ({
       exerciseId: ex.exerciseId,
       week: ex.week,
       day: ex.day,
       order: i,
       sets: ex.sets,
+      setsMax: ex.setsMax ?? null,
       reps: ex.reps,
+      repsMax: ex.repsMax ?? null,
       repUnit: ex.repUnit,
       restTime: ex.rest,
       supersetGroup: ex.supersetGroup ?? null,
       supersetOrder: ex.supersetOrder,
-      notes: null,
+      notes: ex.notes?.trim() ? ex.notes : null,
     }))
     // Bibliotheek-save mag geen patientId houden, anders staat een template
     // gekoppeld aan een patiënt in de lijst.
@@ -557,40 +673,145 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
   }, [autosave.status, autosave.error, errorToastShownRef])
 
   const handleDeploy = async () => {
+    if (!program.name.trim()) {
+      toast.error('Geef het programma eerst een naam')
+      return
+    }
     if (exercises.length === 0) {
       toast.error('Voeg eerst oefeningen toe voordat je deployt')
       return
     }
+    // Eerst alle wijzigingen committen — anders deployt de modal een out-of-date
+    // versie als de patiënt aangepast wordt vlak voor klikken.
     try {
       await autosave.saveNow()
     } catch {
       toast.error('Opslaan mislukt — kon niet deployen')
       return
     }
-    if (!currentProgramId) {
+    if (!currentProgramId && !program.isTemplate) {
       toast.error('Sla het programma eerst op')
       return
     }
+    setDeployPatientId(program.patientId ?? null)
+    setDeployInstructions('')
+    setDeployPatientSearch('')
+    setDeployDialogOpen(true)
+  }
+
+  const filteredDeployPatients = useMemo(() => {
+    const q = deployPatientSearch.trim().toLowerCase()
+    if (!q) return patientsList
+    return patientsList.filter(p =>
+      (p.name?.toLowerCase().includes(q) ?? false)
+      || (p.email?.toLowerCase().includes(q) ?? false)
+    )
+  }, [patientsList, deployPatientSearch])
+
+  const confirmDeploy = async () => {
+    if (!deployPatientId) {
+      toast.error('Kies een patiënt')
+      return
+    }
+    const target = patientsList.find(p => p.id === deployPatientId)
+    if (!target) {
+      toast.error('Patiënt niet gevonden')
+      return
+    }
+    setDeployBusy(true)
     try {
+      // Sjabloon → eerst dupliceren als concreet programma voor deze patiënt;
+      // het sjabloon zelf laten we ongemoeid in de bibliotheek staan.
+      let targetProgramId = currentProgramId
+      let createdFromTemplate = false
+      if (program.isTemplate) {
+        if (!currentProgramId) {
+          toast.error('Sla het sjabloon eerst op')
+          return
+        }
+        const dup = await duplicateProgram.mutateAsync({
+          id: currentProgramId,
+          name: program.name,
+          patientId: deployPatientId,
+          isTemplate: false,
+        })
+        targetProgramId = dup.id
+        createdFromTemplate = true
+      } else if (program.patientId !== deployPatientId) {
+        // Niet-sjabloon, andere patiënt gekozen → patientId mee saven.
+        await saveProgram.mutateAsync({
+          id: currentProgramId!,
+          patientId: deployPatientId,
+        })
+      }
+      if (!targetProgramId) {
+        toast.error('Programma niet gevonden')
+        return
+      }
       await saveProgram.mutateAsync({
-        id: currentProgramId,
+        id: targetProgramId,
         status: 'ACTIVE',
         startDate: new Date().toISOString(),
       })
-      setCurrentStatus('ACTIVE')
-      toast.success('Programma gedeployed! Het is nu zichtbaar voor de patiënt.', { duration: 4000 })
-      if (returnTo) router.push(returnTo)
+
+      // Mail versturen — graceful failure: als mail niet lukt, deploy blijft staan.
+      let mailSent = true
+      if (target.email) {
+        try {
+          const res = await fetch('/api/email/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: target.email,
+              patientName: target.name ?? 'patiënt',
+              programName: program.name,
+              startDate: new Date().toISOString(),
+              extraInstructions: deployInstructions.trim() || undefined,
+            }),
+          })
+          const json = await res.json().catch(() => ({}))
+          if (!res.ok || json?.sent === false) mailSent = false
+        } catch {
+          mailSent = false
+        }
+      } else {
+        mailSent = false
+      }
+
+      if (!createdFromTemplate) {
+        setProgram(p => ({ ...p, patientId: deployPatientId }))
+        setCurrentStatus('ACTIVE')
+      }
+      setDeployDialogOpen(false)
+
+      if (createdFromTemplate) {
+        toast.success(`Programma toegepast op ${target.name ?? 'patiënt'} en gedeployed.`, { duration: 4000 })
+        router.push(`/therapist/programs/${targetProgramId}/edit`)
+      } else if (mailSent) {
+        toast.success('Programma gedeployed en mail verstuurd.', { duration: 4000 })
+      } else if (target.email) {
+        toast.warning('Programma gedeployed — mail kon niet worden verstuurd.', { duration: 5000 })
+      } else {
+        toast.success('Programma gedeployed (geen mail — patiënt heeft geen e-mailadres).', { duration: 4000 })
+      }
+      if (returnTo && !createdFromTemplate) router.push(returnTo)
     } catch {
       toast.error('Deployen mislukt')
+    } finally {
+      setDeployBusy(false)
     }
   }
 
   const handleSaveAsTemplate = async () => {
     const name = templateName.trim() || program.name
+    // Sjabloon-save: notes NIET meekopiëren — die zijn patiënt-specifiek
+    // bedoeld en horen niet in een herbruikbaar sjabloon te staan.
     const exercisePayload = exercises.map((ex, i) => ({
       exerciseId: ex.exerciseId,
       week: ex.week, day: ex.day, order: i,
-      sets: ex.sets, reps: ex.reps, repUnit: ex.repUnit, restTime: ex.rest,
+      sets: ex.sets, setsMax: ex.setsMax ?? null,
+      reps: ex.reps, repsMax: ex.repsMax ?? null,
+      repUnit: ex.repUnit, restTime: ex.rest,
       supersetGroup: ex.supersetGroup ?? null,
       supersetOrder: ex.supersetOrder, notes: null,
     }))
@@ -638,8 +859,10 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const tplExercises = (tpl as any).exercises as Array<{
         id: string; exerciseId: string; week: number; day: number;
-        sets: number; reps: number; repUnit: string; restTime: number;
+        sets: number; setsMax?: number | null; reps: number; repsMax?: number | null;
+        repUnit: string; restTime: number;
         supersetGroup: string | null; supersetOrder: number;
+        notes?: string | null;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         exercise: any
       }>
@@ -655,10 +878,13 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
         videoUrl: pe.exercise.videoUrl ?? null,
         trackOneRepMax: pe.exercise.trackOneRepMax ?? false,
         sets: pe.sets,
+        setsMax: pe.setsMax ?? null,
         reps: pe.reps,
+        repsMax: pe.repsMax ?? null,
         repUnit: (pe.repUnit as 'reps' | 'sec' | 'min') ?? 'reps',
         rest: pe.restTime,
         extraParams: [],
+        notes: pe.notes ?? null,
         supersetGroup: pe.supersetGroup ?? null,
         supersetOrder: pe.supersetOrder,
         selected: false,
@@ -720,9 +946,91 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
           </button>
           <Input
             value={program.name}
-            onChange={e => setProgram(p => ({ ...p, name: e.target.value }))}
-            className="h-8 text-sm font-semibold border-0 shadow-none focus-visible:ring-0 px-0 min-w-0"
+            onChange={e => {
+              setNameUserEdited(true)
+              setProgram(p => ({ ...p, name: e.target.value }))
+            }}
+            placeholder={program.isTemplate ? 'Naam van sjabloon…' : 'Naam programma…'}
+            className={cn(
+              'h-8 text-sm font-semibold border-0 shadow-none focus-visible:ring-0 px-0 min-w-0',
+              !program.name.trim() && 'placeholder:text-amber-400'
+            )}
           />
+
+          {/* Patient-pill: laat zien voor wie dit programma is. Voor sjablonen
+              tonen we een Sjabloon-pill ipv patientnaam. */}
+          {program.isTemplate ? (
+            <span
+              className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full"
+              style={{
+                background: 'rgba(123,136,137,0.15)',
+                color: '#7B8889',
+                border: '1px solid rgba(123,136,137,0.30)',
+                letterSpacing: '0.05em',
+              }}
+              title="Dit programma is een sjabloon en niet aan een patiënt gekoppeld."
+            >
+              <Layers className="w-2.5 h-2.5" />
+              Sjabloon
+            </span>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full transition-colors hover:opacity-80"
+                  style={
+                    currentPatientFirstName
+                      ? { background: 'rgba(78,205,196,0.12)', color: '#4ECDC4', border: '1px solid rgba(78,205,196,0.35)', letterSpacing: '0.05em' }
+                      : { background: 'rgba(245,158,11,0.10)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.30)', letterSpacing: '0.05em' }
+                  }
+                  title={
+                    currentPatientFirstName
+                      ? `Programma voor ${currentPatient?.name ?? currentPatientFirstName}. Klik om te wijzigen.`
+                      : 'Nog geen patiënt gekoppeld. Klik om te kiezen of doe het bij Deployen.'
+                  }
+                >
+                  <User className="w-2.5 h-2.5" />
+                  {currentPatientFirstName ? `Voor: ${currentPatientFirstName}` : 'Geen patiënt'}
+                  <ChevronDown className="w-2.5 h-2.5 opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-64 max-h-80 overflow-y-auto">
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Koppel aan patiënt
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {patientsList.length === 0 ? (
+                  <div className="px-2 py-1.5 text-xs text-muted-foreground">Nog geen patiënten</div>
+                ) : (
+                  patientsList.map(p => (
+                    <DropdownMenuItem
+                      key={p.id}
+                      onSelect={() => setProgram(prev => ({ ...prev, patientId: p.id }))}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: program.patientId === p.id ? '#4ECDC4' : '#4A5454' }} />
+                      <span className="truncate">{p.name ?? p.email ?? 'Onbekende patiënt'}</span>
+                      {program.patientId === p.id && <Check className="w-3 h-3 ml-auto text-[#4ECDC4]" />}
+                    </DropdownMenuItem>
+                  ))
+                )}
+                {program.patientId && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={() => setProgram(prev => ({ ...prev, patientId: null }))}
+                      className="text-xs text-muted-foreground"
+                    >
+                      <X className="w-3 h-3 mr-1.5" />
+                      Patiënt loskoppelen
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           {!program.isTemplate && (
             <span
               className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full"
@@ -828,10 +1136,11 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
             className="gap-1.5 h-7 text-xs shrink-0"
             style={{ background: '#BEF264' }}
             onClick={handleDeploy}
-            disabled={saving}
+            disabled={saving || !program.name.trim()}
+            title={!program.name.trim() ? 'Geef het programma eerst een naam' : undefined}
           >
             <Rocket className="w-3.5 h-3.5" />
-            {saving ? '...' : 'Deployen'}
+            {saving ? '...' : program.isTemplate ? 'Toepassen op patiënt' : 'Deployen'}
           </Button>
         </div>
 
@@ -1429,6 +1738,114 @@ export function ProgramBuilder({ initialState, programId, initialStatus }: Progr
               currentDay={program.currentDay}
               currentWeek={program.currentWeek}
             />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Deploy dialog ────────────────────────────────────────────────────── */}
+      <Dialog open={deployDialogOpen} onOpenChange={(o) => !o && !deployBusy && setDeployDialogOpen(false)}>
+        <DialogContent className="max-w-md" style={{ borderRadius: '16px' }}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Rocket className="w-4 h-4" />
+              {program.isTemplate ? 'Toepassen op patiënt' : 'Programma deployen'}
+            </DialogTitle>
+            <DialogDescription>
+              {program.isTemplate
+                ? 'Kies een patiënt — er wordt een kopie van dit sjabloon aangemaakt en direct live gezet.'
+                : 'Bevestig welke patiënt dit programma krijgt en stuur eventueel een bericht mee.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 mt-2">
+            {/* Patient picker */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Patiënt</Label>
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Zoek patiënt…"
+                  value={deployPatientSearch}
+                  onChange={e => setDeployPatientSearch(e.target.value)}
+                  className="pl-8"
+                  disabled={deployBusy}
+                />
+              </div>
+              <div className="max-h-44 overflow-y-auto pr-1 space-y-1 mt-1">
+                {patientsList.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-3 text-center">
+                    Nog geen patiënten gekoppeld.
+                  </p>
+                ) : filteredDeployPatients.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-3 text-center">
+                    Geen patiënten gevonden.
+                  </p>
+                ) : (
+                  filteredDeployPatients.map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setDeployPatientId(p.id)}
+                      disabled={deployBusy}
+                      className="w-full text-left"
+                    >
+                      <div
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors"
+                        style={
+                          deployPatientId === p.id
+                            ? { borderColor: '#4ECDC4', background: 'rgba(78,205,196,0.10)' }
+                            : { borderColor: 'rgba(255,255,255,0.10)' }
+                        }
+                      >
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: '#1C2425' }}>
+                          <User className="w-3.5 h-3.5 text-[#7B8889]" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{p.name ?? 'Onbekende patiënt'}</p>
+                          {p.email && (
+                            <p className="text-[11px] text-muted-foreground truncate">{p.email}</p>
+                          )}
+                        </div>
+                        {deployPatientId === p.id && <Check className="w-3.5 h-3.5 text-[#4ECDC4]" />}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Extra instructions */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">
+                Extra bericht voor patiënt <span className="text-muted-foreground font-normal">(optioneel)</span>
+              </Label>
+              <Textarea
+                placeholder="Bijv. begin rustig deze week, focus op techniek boven gewicht…"
+                value={deployInstructions}
+                onChange={e => setDeployInstructions(e.target.value)}
+                disabled={deployBusy}
+                rows={3}
+                className="resize-none"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Wordt meegestuurd in de mail naar de patiënt.
+              </p>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="flex-1" onClick={() => setDeployDialogOpen(false)} disabled={deployBusy}>
+                Annuleren
+              </Button>
+              <Button
+                className="flex-1 gap-2"
+                style={{ background: '#BEF264', color: '#0A0E0F' }}
+                disabled={!deployPatientId || deployBusy}
+                onClick={confirmDeploy}
+              >
+                <Rocket className="w-4 h-4" />
+                {deployBusy ? 'Bezig…' : program.isTemplate ? 'Toepassen + deploy' : 'Deploy + mail'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

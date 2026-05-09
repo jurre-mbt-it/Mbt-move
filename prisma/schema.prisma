@@ -651,7 +651,12 @@ model ProgramExercise {
   day            Int      @default(1)
   order          Int      @default(0)
   sets           Int      @default(3)
+  // Optionele bovengrens voor sets-range. NULL = `sets` als vaste waarde,
+  // ingevuld = "sets..setsMax" als range (bv. 3-5 sets).
+  setsMax        Int?
   reps           Int      @default(10)
+  // Optionele bovengrens voor reps-range. NULL = enkele waarde, ingevuld = range.
+  repsMax        Int?
   repUnit        String   @default("reps")
   restTime       Int      @default(60)
   supersetGroup  String?
