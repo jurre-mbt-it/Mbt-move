@@ -200,8 +200,8 @@ const STATUS_BORDER: Record<ItemStatus, string> = {
 }
 
 function ItemTile({
-  item, status, onRemove,
-}: { item: ScheduleItem; status: ItemStatus; onRemove: () => void }) {
+  item, status, onRemove, readOnly,
+}: { item: ScheduleItem; status: ItemStatus; onRemove: () => void; readOnly?: boolean }) {
   const category: Category = item.quickCategory ?? 'STRENGTH'  // default voor program-link
   const color = CATEGORY_COLORS[category]
   const name = item.programId ? (item.program?.name ?? 'Programma') : (item.quickName ?? 'Workout')
@@ -240,14 +240,16 @@ function ItemTile({
         <span style={{ color }} className="shrink-0"><CategoryIcon category={category} size={11} /></span>
         <span className="flex-1 truncate">{name}</span>
         {duration && <span className="text-[10px] opacity-70 shrink-0">{duration}</span>}
-        <button
-          type="button"
-          onClick={onRemove}
-          className="opacity-0 group-hover/tile:opacity-100 transition-opacity shrink-0 text-zinc-400 hover:text-red-400"
-          title="Verwijder"
-        >
-          <X className="w-3 h-3" />
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="opacity-0 group-hover/tile:opacity-100 transition-opacity shrink-0 text-zinc-400 hover:text-red-400"
+            title="Verwijder"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
       </div>
     </div>
   )
@@ -570,7 +572,9 @@ function WeekPlannerContent() {
     scheduledAt: string | Date
     completedAt: string | Date | null
     status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED'
+    duration: number | null
     programId: string | null
+    programName: string | null
   }> }
   // Map (programId, dateISO) → ItemStatus. Quick workouts (geen programId)
   // krijgen geen status — blijven 'scheduled'.
@@ -614,69 +618,116 @@ function WeekPlannerContent() {
   }
   const dateMap = useMemo(() => {
     const map = new Map<string, DayCellInfo>()
-    if (schedules.length === 0) return map
 
-    // Bepaal een baseline: eerste schedule MET startDate, anders eerste op
-    // createdAt. Andere schedules zonder startDate worden afgeleid van die
-    // baseline + (weekNumber-1)*7. Voorkomt dat legacy data zonder startDate
-    // onzichtbaar wordt — voorheen werd 'continue' gedaan.
-    const withStart = schedules.find(ws => ws.startDate)
-    let baseline: Date
-    let baselineWeekNumber: number
-    if (withStart) {
-      baseline = mondayOf(new Date(withStart.startDate!))
-      baselineWeekNumber = withStart.weekNumber
-    } else {
-      const earliest = schedules.reduce((a, b) =>
-        new Date(a.createdAt) < new Date(b.createdAt) ? a : b
-      )
-      baseline = mondayOf(new Date(earliest.createdAt))
-      baselineWeekNumber = earliest.weekNumber
+    // ── 1. WeekSchedule-items (geplande workouts) ──
+    if (schedules.length > 0) {
+      // Bepaal een baseline: eerste schedule MET startDate, anders eerste op
+      // createdAt. Andere schedules zonder startDate worden afgeleid van die
+      // baseline + (weekNumber-1)*7. Voorkomt dat legacy data zonder startDate
+      // onzichtbaar wordt — voorheen werd 'continue' gedaan.
+      const withStart = schedules.find(ws => ws.startDate)
+      let baseline: Date
+      let baselineWeekNumber: number
+      if (withStart) {
+        baseline = mondayOf(new Date(withStart.startDate!))
+        baselineWeekNumber = withStart.weekNumber
+      } else {
+        const earliest = schedules.reduce((a, b) =>
+          new Date(a.createdAt) < new Date(b.createdAt) ? a : b
+        )
+        baseline = mondayOf(new Date(earliest.createdAt))
+        baselineWeekNumber = earliest.weekNumber
+      }
+
+      for (const ws of schedules) {
+        const start = ws.startDate
+          ? mondayOf(new Date(ws.startDate))
+          : addDays(baseline, (ws.weekNumber - baselineWeekNumber) * 7)
+
+        for (const day of ws.days) {
+          const date = addDays(start, day.dayOfWeek)
+          // Items uit het nieuwe model.
+          let items: ScheduleItem[] = (day.items ?? []).map(it => ({
+            id: it.id,
+            order: it.order,
+            programId: it.programId,
+            program: it.program ?? null,
+            quickCategory: (it.quickCategory ?? null) as Category | null,
+            quickName: it.quickName,
+            quickDurationSec: it.quickDurationSec,
+            notes: it.notes,
+          }))
+          // Backwards-compat: als items[] leeg is maar er staat een legacy
+          // programId op de dag → render die als synthetisch item zodat
+          // bestaande schedules zonder backfill toch zichtbaar zijn.
+          if (items.length === 0 && day.programId && day.program) {
+            items = [{
+              id: `legacy-${day.id}`,
+              order: 0,
+              programId: day.programId,
+              program: day.program,
+              quickCategory: null,
+              quickName: null,
+              quickDurationSec: null,
+              notes: null,
+            }]
+          }
+          map.set(isoDate(date), {
+            dayId: day.id,
+            weekScheduleId: ws.id,
+            weekNumber: ws.weekNumber,
+            items,
+          })
+        }
+      }
     }
 
-    for (const ws of schedules) {
-      const start = ws.startDate
-        ? mondayOf(new Date(ws.startDate))
-        : addDays(baseline, (ws.weekNumber - baselineWeekNumber) * 7)
+    // ── 2. SessionLog-historie samenvoegen ──
+    // Voor alle SessionLogs die NIET al via items[] gerepresenteerd worden,
+    // voeg een synthetisch item toe. Dit toont historische sessies
+    // (voltooid + ingepland-maar-niet-gepland-via-WeekPlanner) als read-only
+    // tile in de juiste dag-cel.
+    for (const session of sessionsRaw) {
+      const date = startOfDay(new Date(session.scheduledAt))
+      const iso = isoDate(date)
+      const existing = map.get(iso)
 
-      for (const day of ws.days) {
-        const date = addDays(start, day.dayOfWeek)
-        // Items uit het nieuwe model.
-        let items: ScheduleItem[] = (day.items ?? []).map(it => ({
-          id: it.id,
-          order: it.order,
-          programId: it.programId,
-          program: it.program ?? null,
-          quickCategory: (it.quickCategory ?? null) as Category | null,
-          quickName: it.quickName,
-          quickDurationSec: it.quickDurationSec,
-          notes: it.notes,
-        }))
-        // Backwards-compat: als items[] leeg is maar er staat een legacy
-        // programId op de dag → render die als synthetisch item zodat
-        // bestaande schedules zonder backfill toch zichtbaar zijn.
-        if (items.length === 0 && day.programId && day.program) {
-          items = [{
-            id: `legacy-${day.id}`,
-            order: 0,
-            programId: day.programId,
-            program: day.program,
-            quickCategory: null,
-            quickName: null,
-            quickDurationSec: null,
-            notes: null,
-          }]
-        }
-        map.set(isoDate(date), {
-          dayId: day.id,
-          weekScheduleId: ws.id,
-          weekNumber: ws.weekNumber,
-          items,
+      // Skip als er al een item op die dag is met dezelfde programId
+      // (dan voegt de status-kleur al de info toe).
+      const alreadyMatched = existing?.items.some(it =>
+        it.programId !== null && it.programId === session.programId,
+      )
+      if (alreadyMatched) continue
+
+      const synthetic: ScheduleItem = {
+        id: `sessionlog-${session.id}`,
+        order: 999,  // historisch → onderaan de cel
+        programId: session.programId,
+        program: session.programId ? {
+          id: session.programId,
+          name: session.programName ?? 'Programma',
+          status: null,
+        } : null,
+        quickCategory: null,
+        quickName: session.programId ? null : 'Workout',  // fallback voor program-loze sessions
+        quickDurationSec: session.duration,
+        notes: null,
+      }
+
+      if (existing) {
+        existing.items = [...existing.items, synthetic]
+      } else {
+        map.set(iso, {
+          dayId: null,
+          weekScheduleId: null,
+          weekNumber: null,
+          items: [synthetic],
         })
       }
     }
+
     return map
-  }, [schedules])
+  }, [schedules, sessionsRaw])
 
   // ─ Add modal ─
   const [addOpen, setAddOpen] = useState(false)
@@ -903,6 +954,7 @@ function WeekPlannerContent() {
                             item={item}
                             status={statusFor(date, item)}
                             onRemove={() => handleRemoveItem(item, info?.dayId ?? null)}
+                            readOnly={item.id.startsWith('sessionlog-')}
                           />
                         ))}
                       </div>
