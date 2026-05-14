@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Label } from '@/components/ui/label'
 import { useCustomParams } from '@/hooks/useCustomParams'
@@ -1890,10 +1891,34 @@ function CopyMenu({
 }) {
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'day' | 'week'>('day')
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+
+  // Bij open: positioneer fixed t.o.v. viewport via button's bounding rect.
+  // Wordt ge-portald naar body zodat parent-overflow-clipping niet stoort.
+  useEffect(() => {
+    if (!open) { setMenuPos(null); return }
+    const updatePos = () => {
+      const rect = buttonRef.current?.getBoundingClientRect()
+      if (!rect) return
+      setMenuPos({
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right,
+      })
+    }
+    updatePos()
+    window.addEventListener('resize', updatePos)
+    window.addEventListener('scroll', updatePos, true)  // capture-fase voor inner scrolls
+    return () => {
+      window.removeEventListener('resize', updatePos)
+      window.removeEventListener('scroll', updatePos, true)
+    }
+  }, [open])
 
   if (!open) {
     return (
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen(true)}
         title="Kopieer deze dag of week"
@@ -1905,30 +1930,22 @@ function CopyMenu({
     )
   }
 
-  return (
-    <div className="relative">
-      <button
-        type="button"
+  const menuJsx = menuPos && (
+    <>
+      <div
+        className="fixed inset-0 z-[60]"
         onClick={() => setOpen(false)}
-        className="shrink-0 flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
-        style={{ background: '#1C2425', color: '#BEF264' }}
+      />
+      <div
+        className="fixed z-[70] rounded-xl shadow-2xl overflow-hidden"
+        style={{
+          top: menuPos.top,
+          right: menuPos.right,
+          background: '#141A1B',
+          border: '1px solid rgba(255,255,255,0.12)',
+          minWidth: 280,
+        }}
       >
-        <Copy className="w-3.5 h-3.5" />
-        <span className="hidden sm:inline">Kopieer</span>
-      </button>
-      <>
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setOpen(false)}
-        />
-        <div
-          className="absolute right-0 top-full mt-1 z-50 rounded-xl shadow-2xl overflow-hidden"
-          style={{
-            background: '#141A1B',
-            border: '1px solid rgba(255,255,255,0.12)',
-            minWidth: 280,
-          }}
-        >
           <div className="flex border-b" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
             <button
               type="button"
@@ -2035,6 +2052,23 @@ function CopyMenu({
           </div>
         </div>
       </>
-    </div>
+    )
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => setOpen(false)}
+        className="shrink-0 flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
+        style={{ background: '#1C2425', color: '#BEF264' }}
+      >
+        <Copy className="w-3.5 h-3.5" />
+        <span className="hidden sm:inline">Kopieer</span>
+      </button>
+      {/* Portaal naar body zodat parent overflow-y-auto het menu niet
+          afsnijdt en stacking-contexts geen z-index conflicten geven. */}
+      {typeof window !== 'undefined' && menuJsx && createPortal(menuJsx, document.body)}
+    </>
   )
 }
