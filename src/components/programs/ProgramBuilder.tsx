@@ -807,15 +807,28 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       }
       setDeployDialogOpen(false)
 
+      // Onderscheid in messaging: bij update van een al-ACTIVE programma is
+      // dit alleen een mail-notificatie — de wijzigingen waren al live via
+      // autosave. Bij eerste deploy is dit het echte live-zetten.
+      const wasAlreadyActive = currentStatus === 'ACTIVE' && !createdFromTemplate
       if (createdFromTemplate) {
         toast.success(`Programma toegepast op ${target.name ?? 'patiënt'} en gedeployed.`, { duration: 4000 })
         router.push(`/therapist/programs/${targetProgramId}/edit`)
       } else if (mailSent) {
-        toast.success('Programma gedeployed en mail verstuurd.', { duration: 4000 })
+        toast.success(
+          wasAlreadyActive ? 'Update-mail verstuurd aan patiënt.' : 'Programma gedeployed en mail verstuurd.',
+          { duration: 4000 },
+        )
       } else if (target.email) {
-        toast.warning('Programma gedeployed — mail kon niet worden verstuurd.', { duration: 5000 })
+        toast.warning(
+          wasAlreadyActive ? 'Update opgeslagen — mail kon niet worden verstuurd.' : 'Programma gedeployed — mail kon niet worden verstuurd.',
+          { duration: 5000 },
+        )
       } else {
-        toast.success('Programma gedeployed (geen mail — patiënt heeft geen e-mailadres).', { duration: 4000 })
+        toast.success(
+          wasAlreadyActive ? 'Update opgeslagen (geen mail — patiënt heeft geen e-mailadres).' : 'Programma gedeployed (geen mail — patiënt heeft geen e-mailadres).',
+          { duration: 4000 },
+        )
       }
       if (returnTo && !createdFromTemplate) router.push(returnTo)
     } catch {
@@ -1066,7 +1079,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               }
               title={
                 currentStatus === 'ACTIVE'
-                  ? 'Het programma is gedeployed en zichtbaar voor de patiënt.'
+                  ? 'Het programma is live — wijzigingen die je hier maakt worden direct opgeslagen en zijn meteen zichtbaar bij de patiënt.'
                   : currentStatus === 'DRAFT'
                   ? 'Concept — patiënt ziet dit nog niet. Klik DEPLOYEN om actief te maken.'
                   : currentStatus === 'COMPLETED'
@@ -1157,13 +1170,29 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           <Button
             size="sm"
             className="gap-1.5 h-7 text-xs shrink-0"
-            style={{ background: '#BEF264' }}
+            style={
+              currentStatus === 'ACTIVE'
+                ? { background: 'transparent', color: '#BEF264', border: '1px solid rgba(190,242,100,0.35)' }
+                : { background: '#BEF264' }
+            }
             onClick={handleDeploy}
             disabled={saving || !program.name.trim()}
-            title={!program.name.trim() ? 'Geef het programma eerst een naam' : undefined}
+            title={
+              !program.name.trim()
+                ? 'Geef het programma eerst een naam'
+                : currentStatus === 'ACTIVE'
+                  ? 'Wijzigingen zijn direct zichtbaar bij de patiënt. Klik om een update-mail te sturen.'
+                  : undefined
+            }
           >
             <Rocket className="w-3.5 h-3.5" />
-            {saving ? '...' : program.isTemplate ? 'Toepassen op patiënt' : 'Deployen'}
+            {saving
+              ? '...'
+              : program.isTemplate
+                ? 'Toepassen op patiënt'
+                : currentStatus === 'ACTIVE'
+                  ? 'Stuur update-mail'
+                  : 'Deployen'}
           </Button>
         </div>
 
@@ -1815,12 +1844,18 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Rocket className="w-4 h-4" />
-              {program.isTemplate ? 'Toepassen op patiënt' : 'Programma deployen'}
+              {program.isTemplate
+                ? 'Toepassen op patiënt'
+                : currentStatus === 'ACTIVE'
+                  ? 'Stuur update aan patiënt'
+                  : 'Programma deployen'}
             </DialogTitle>
             <DialogDescription>
               {program.isTemplate
                 ? 'Kies een patiënt — er wordt een kopie van dit sjabloon aangemaakt en direct live gezet.'
-                : 'Bevestig welke patiënt dit programma krijgt en stuur eventueel een bericht mee.'}
+                : currentStatus === 'ACTIVE'
+                  ? 'Het programma is al live — wijzigingen zijn direct zichtbaar bij de patiënt. Dit verstuurt alleen een update-mail met optioneel bericht.'
+                  : 'Bevestig welke patiënt dit programma krijgt en stuur eventueel een bericht mee.'}
             </DialogDescription>
           </DialogHeader>
 
