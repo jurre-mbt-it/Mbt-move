@@ -160,6 +160,10 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
   const [deployPatientSearch, setDeployPatientSearch] = useState('')
   const [deployInstructions, setDeployInstructions] = useState('')
   const [deployBusy, setDeployBusy] = useState(false)
+  /** Bij eerste deploy: optioneel ook als sjabloon in de bibliotheek bewaren
+   *  zodat de therapeut 'm later opnieuw kan toepassen op een andere patient.
+   *  Default false: patient-programma's blijven alleen bij die patient zichtbaar. */
+  const [deploySaveAsTemplate, setDeploySaveAsTemplate] = useState(false)
 
   const { params: customParams } = useCustomParams()
   const utils = trpc.useUtils()
@@ -719,6 +723,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
     setDeployPatientId(program.patientId ?? null)
     setDeployInstructions('')
     setDeployPatientSearch('')
+    setDeploySaveAsTemplate(false)
     setDeployDialogOpen(true)
   }
 
@@ -804,6 +809,23 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       if (!createdFromTemplate) {
         setProgram(p => ({ ...p, patientId: deployPatientId }))
         setCurrentStatus('ACTIVE')
+      }
+
+      // Save-as-template: wanneer de therapeut bij eerste-deploy heeft
+      // aangevinkt om óók een sjabloon in de bibliotheek te bewaren, maak
+      // een kopie met isTemplate=true + patientId=null. Best-effort: faalt
+      // 'ie, dan deploy is nog wel gelukt — alleen toast met fallback.
+      if (deploySaveAsTemplate && !createdFromTemplate && targetProgramId) {
+        try {
+          await duplicateProgram.mutateAsync({
+            id: targetProgramId,
+            name: program.name,
+            isTemplate: true,
+            patientId: null,
+          })
+        } catch {
+          toast.warning('Programma gedeployed — sjabloon-kopie mislukte, kun je later met "Opslaan als sjabloon" doen.', { duration: 6000 })
+        }
       }
       setDeployDialogOpen(false)
 
@@ -1937,6 +1959,30 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                 Wordt meegestuurd in de mail naar de patiënt.
               </p>
             </div>
+
+            {/* Save-as-template optie — alleen tonen voor eerste-deploy (DRAFT),
+                niet voor "stuur update-mail" op een al-actief programma waar het
+                originele programma al een patient-kopie is. */}
+            {currentStatus === 'DRAFT' && !program.isTemplate && (
+              <label className="flex items-start gap-2 cursor-pointer select-none rounded-lg p-2 -mx-2 hover:bg-[rgba(255,255,255,0.03)]">
+                <input
+                  type="checkbox"
+                  checked={deploySaveAsTemplate}
+                  onChange={(e) => setDeploySaveAsTemplate(e.target.checked)}
+                  disabled={deployBusy}
+                  className="mt-0.5 w-4 h-4 accent-[#BEF264] shrink-0"
+                />
+                <div className="flex-1 text-xs">
+                  <p className="font-semibold">Ook opslaan als sjabloon in bibliotheek</p>
+                  <p className="text-muted-foreground mt-0.5">
+                    Standaard verschijnt dit programma alleen bij {(() => {
+                      const target = patientsList.find(p => p.id === deployPatientId)
+                      return target?.name?.split(' ')[0] ?? 'de patiënt'
+                    })()}. Vink aan om óók een herbruikbare kopie in je hoofd-bibliotheek te bewaren.
+                  </p>
+                </div>
+              </label>
+            )}
 
             <div className="flex gap-2 pt-1">
               <Button variant="outline" className="flex-1" onClick={() => setDeployDialogOpen(false)} disabled={deployBusy}>

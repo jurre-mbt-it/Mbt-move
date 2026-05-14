@@ -47,6 +47,13 @@ export const programsRouter = createTRPCRouter({
     .input(z.object({
       patientId: z.string().optional(),
       isTemplate: z.boolean().optional(),
+      /** Patient-gekoppelde programma's meenemen in de output. Default false:
+       *  programma's die aan een patient gekoppeld zijn worden uit de hoofd-
+       *  lijst gefilterd zodat de bibliotheek schoon blijft. Therapeut ziet
+       *  ze nog steeds via het patient-profiel.
+       *  Wordt automatisch overschreven naar true zodra een specifieke
+       *  patientId is meegegeven (anders zou het filter nul matches geven). */
+      includeAssigned: z.boolean().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
       // Multi-tenant scope: admins zien alles. Therapeuten zien hun eigen
@@ -59,11 +66,17 @@ export const programsRouter = createTRPCRouter({
         : practiceId
           ? { OR: [{ creatorId: ctx.user!.id }, { practiceId }] }
           : { creatorId: ctx.user!.id }
+      const includeAssigned = input?.includeAssigned ?? (input?.patientId !== undefined)
+      // Sjablonen (isTemplate=true) zijn altijd patient-loos en blijven in
+      // het bibliotheek-overzicht. Voor niet-sjablonen verbergen we patient-
+      // programma's tenzij explicitly opt-in via includeAssigned.
+      const hideAssigned = !includeAssigned && input?.isTemplate !== true
       const programs = await ctx.prisma.program.findMany({
         where: {
           ...ownership,
           ...(input?.patientId !== undefined ? { patientId: input.patientId } : {}),
           ...(input?.isTemplate !== undefined ? { isTemplate: input.isTemplate } : {}),
+          ...(hideAssigned ? { patientId: null } : {}),
         },
         include: {
           patient: { select: { id: true, name: true, email: true } },
