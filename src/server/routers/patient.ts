@@ -222,9 +222,20 @@ export const patientRouter = createTRPCRouter({
         },
       })
 
-      // Alle oefeningen op één virtuele "vandaag-dag" — geen dag-filter want
-      // flexible programma's hebben geen week/day-schedule meer.
-      const exercisesPool = allExercises
+      // Programma-week bepalen op basis van startDate: progressie over
+      // meerdere weken (bv. week 1 inwerken, week 4 zwaarder) blijft mogelijk.
+      // Cap aan program.weeks; en val terug op hoogste week-met-oefeningen
+      // wanneer de therapeut nog niet alle weken heeft ingevuld.
+      const start = program.startDate ?? now
+      const daysSince = Math.max(0, Math.floor((now.getTime() - start.getTime()) / 86_400_000))
+      const elapsedWeek = Math.floor(daysSince / 7) + 1
+      const weeksWithExercises = [...new Set(allExercises.map(e => e.week))].sort((a, b) => a - b)
+      const maxAvailable = weeksWithExercises[weeksWithExercises.length - 1] ?? 1
+      const currentProgramWeek = Math.min(elapsedWeek, Math.min(program.weeks, maxAvailable))
+
+      // Filter naar oefeningen voor de huidige programma-week. Dag wordt
+      // genegeerd in flex-modus (patient kiest dag zelf).
+      const exercisesPool = allExercises.filter(e => e.week === currentProgramWeek)
 
       const targetReached = completedThisWeek >= weeklyTarget
 
@@ -232,7 +243,7 @@ export const patientRouter = createTRPCRouter({
         program: {
           id: program.id,
           name: program.name,
-          currentWeek: 1,
+          currentWeek: currentProgramWeek,
           currentDay: 1,
           weeks: program.weeks,
           isCatchUp: false,

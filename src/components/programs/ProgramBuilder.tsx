@@ -1508,17 +1508,34 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                   </div>
                 )}
               </div>
-            ) : (selectedUids.length >= 2 && (
-              <div className="flex items-center justify-end gap-2 px-3 md:px-4 pt-3 pb-2 border-b shrink-0">
-                <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={createSuperset}>
-                  <Layers className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Superset</span>
-                </Button>
-                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={clearSelection}>
-                  ✕
-                </Button>
-              </div>
-            ))}
+            ) : (
+              ((dayExercises.length > 0) || selectedUids.length >= 2) && (
+                <div className="flex items-center justify-end gap-2 px-3 md:px-4 pt-3 pb-2 border-b shrink-0">
+                  {dayExercises.length > 0 && (
+                    <CopyMenu
+                      weeks={weeks}
+                      days={days}
+                      currentWeek={program.currentWeek}
+                      currentDay={program.currentDay}
+                      exerciseCountForDay={exerciseCountForDay}
+                      onCopyDay={copyDayTo}
+                      onCopyWeek={copyWeekTo}
+                    />
+                  )}
+                  {selectedUids.length >= 2 && (
+                    <>
+                      <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={createSuperset}>
+                        <Layers className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Superset</span>
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={clearSelection}>
+                        ✕
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )
+            )}
 
             {/* Exercises */}
             <div className="flex-1 overflow-y-auto px-3 md:px-4 py-3 pb-32 md:pb-4">
