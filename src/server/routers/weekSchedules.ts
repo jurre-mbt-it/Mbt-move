@@ -964,8 +964,30 @@ export const weekSchedulesRouter = createTRPCRouter({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Bron en doel zijn gelijk' })
       }
       await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
+
+      // Scope source + target lookup tot week-schema's die deze user mag
+      // aanraken: eigen (creatorId=me), zelfde praktijk, of admin (overal).
+      // Zonder deze filter zou een mede-behandelende therapeut per ongeluk
+      // een collega's week-schema kunnen overschrijven (vooral met
+      // replace=true → deleteMany op de gevonden target).
+      const isAdmin = ctx.user.role === 'ADMIN'
+      const practiceId = ctx.user.practiceId ?? null
+      const accessibleScopeFilter = isAdmin
+        ? {}
+        : {
+            OR: [
+              { creatorId: ctx.user.id },
+              ...(practiceId ? [{ practiceId }] : []),
+            ],
+          }
+
       const source = await ctx.prisma.weekSchedule.findFirst({
-        where: { patientId: input.patientId, weekNumber: input.sourceWeekNumber, isTemplate: false },
+        where: {
+          patientId: input.patientId,
+          weekNumber: input.sourceWeekNumber,
+          isTemplate: false,
+          ...accessibleScopeFilter,
+        },
         include: {
           days: { include: { items: { orderBy: { order: 'asc' } } }, orderBy: { dayOfWeek: 'asc' } },
         },
@@ -973,7 +995,12 @@ export const weekSchedulesRouter = createTRPCRouter({
       if (!source) throw new TRPCError({ code: 'NOT_FOUND', message: 'Bron-week niet gevonden' })
 
       let target = await ctx.prisma.weekSchedule.findFirst({
-        where: { patientId: input.patientId, weekNumber: input.targetWeekNumber, isTemplate: false },
+        where: {
+          patientId: input.patientId,
+          weekNumber: input.targetWeekNumber,
+          isTemplate: false,
+          ...accessibleScopeFilter,
+        },
         include: { days: { include: { items: true } } },
       })
 
