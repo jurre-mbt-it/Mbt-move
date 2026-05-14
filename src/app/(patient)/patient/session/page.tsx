@@ -921,6 +921,44 @@ function SessionPageInner() {
     )
   }
 
+  // Flexible-schedule programma: weekly target bereikt → speciale "lekker
+  // bezig" boodschap ipv lege rustdag-screen. Patient kan na de reset op
+  // maandag weer beginnen.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const flexProg = sessionData?.program as any
+  if (flexProg?.flexibleSchedule && flexProg?.weeklyTargetReached) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: P.bg, color: P.ink }}>
+        <div className="text-6xl">🎉</div>
+        <p style={{ color: P.lime, fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em' }}>
+          Goed gedaan!
+        </p>
+        <p style={{ color: P.ink, fontSize: 15, maxWidth: 360, lineHeight: '22px' }}>
+          Je hebt alle programma's voor deze week voltooid — lekker bezig!
+        </p>
+        <div
+          className="athletic-mono px-3 py-1 rounded-full mt-1"
+          style={{
+            background: 'rgba(190,242,100,0.10)',
+            border: `1px solid ${P.lime}`,
+            color: P.lime,
+            fontSize: 11,
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+          }}
+        >
+          {flexProg.completedThisWeek} / {flexProg.weeklyTarget} deze week
+        </div>
+        <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 4 }}>
+          De teller reset elke maandag — rust uit en kom terug.
+        </p>
+        <DarkButton variant="secondary" onClick={() => router.push('/patient/dashboard')}>
+          Terug naar dashboard
+        </DarkButton>
+      </div>
+    )
+  }
+
   if (!sessionData?.program || exercises.length === 0) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: P.bg, color: P.ink }}>

@@ -116,6 +116,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
     isTemplate: initialState?.isTemplate ?? false,
     tendinopathyMode: (initialState as Partial<ProgramState> | undefined)?.tendinopathyMode ?? false,
     trackOneRepMax: (initialState as Partial<ProgramState> | undefined)?.trackOneRepMax ?? false,
+    flexibleSchedule: (initialState as Partial<ProgramState> | undefined)?.flexibleSchedule ?? false,
+    weeklyTarget: (initialState as Partial<ProgramState> | undefined)?.weeklyTarget ?? null,
     exercises: initialState?.exercises ?? [],
   }))
   // Houdt bij of de gebruiker zelf de naam heeft aangeraakt. Zo niet, mag de
@@ -520,6 +522,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       isTemplate: boolean
       tendinopathyMode: boolean
       trackOneRepMax: boolean
+      flexibleSchedule: boolean
+      weeklyTarget: number | null
     }
     exercises: BuilderExercise[]
   }
@@ -533,6 +537,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       isTemplate: program.isTemplate,
       tendinopathyMode: program.tendinopathyMode,
       trackOneRepMax: program.trackOneRepMax,
+      flexibleSchedule: program.flexibleSchedule ?? false,
+      weeklyTarget: program.weeklyTarget ?? null,
     },
     exercises,
   }), [program, exercises])
@@ -638,6 +644,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         daysPerWeek: val.program.daysPerWeek,
         isTemplate: val.program.isTemplate,
         patientId: patientIdForSave,
+        flexibleSchedule: val.program.flexibleSchedule,
+        weeklyTarget: val.program.flexibleSchedule ? val.program.weeklyTarget : null,
         exercises: exercisePayload,
       })
     } else {
@@ -648,6 +656,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         daysPerWeek: val.program.daysPerWeek,
         isTemplate: val.program.isTemplate,
         patientId: patientIdForSave ?? undefined,
+        flexibleSchedule: val.program.flexibleSchedule,
+        weeklyTarget: val.program.flexibleSchedule ? val.program.weeklyTarget : null,
       })
       if (val.exercises.length > 0) {
         await saveProgram.mutateAsync({ id: created.id, exercises: exercisePayload })
@@ -1219,6 +1229,50 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             >
               Epley per sessie
             </span>
+          )}
+
+          <div className="w-px h-4 bg-[rgba(255,255,255,0.08)] mx-1 hidden sm:block" />
+
+          {/* Flexibele week-toggle — patient kan elke dag het programma starten;
+              klaar zodra weeklyTarget keer voltooid binnen één week (Mo-Su). */}
+          <button
+            type="button"
+            onClick={() => setProgram(p => ({
+              ...p,
+              flexibleSchedule: !p.flexibleSchedule,
+              weeklyTarget: !p.flexibleSchedule && !p.weeklyTarget ? 3 : p.weeklyTarget,
+            }))}
+            className="flex items-center gap-2 text-xs font-medium"
+          >
+            <div
+              className="w-8 h-4 rounded-full relative transition-colors flex items-center"
+              style={{ background: program.flexibleSchedule ? '#BEF264' : '#4A5454' }}
+            >
+              <div
+                className="w-3 h-3 bg-white rounded-full absolute shadow transition-transform"
+                style={{ transform: program.flexibleSchedule ? 'translateX(18px)' : 'translateX(2px)' }}
+              />
+            </div>
+            <span className={program.flexibleSchedule ? 'text-[#BEF264] font-semibold' : 'text-muted-foreground'}>
+              Flexibele week
+            </span>
+          </button>
+          {program.flexibleSchedule && (
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-muted-foreground">×</span>
+              <input
+                type="number"
+                min={1}
+                max={14}
+                value={program.weeklyTarget ?? ''}
+                onChange={e => {
+                  const v = e.target.value
+                  setProgram(p => ({ ...p, weeklyTarget: v === '' ? null : Math.max(1, Math.min(14, Number(v))) }))
+                }}
+                className="w-12 h-6 text-center text-xs font-bold bg-[#1C2425] rounded border border-[rgba(255,255,255,0.10)] focus:outline-none focus:ring-1 focus:ring-[#BEF264]"
+              />
+              <span className="text-[10px] text-muted-foreground">/ week</span>
+            </div>
           )}
 
           {/* Destination toggle — bepaalt of Opslaan naar deze patiënt of de

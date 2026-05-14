@@ -199,6 +199,59 @@ export const patientRouter = createTRPCRouter({
 
     const allExercises = program.exercises.map(mapProgramExercise)
 
+    // Flexible-schedule modus: patient mag elke dag het hele programma starten;
+    // klaar zodra weeklyTarget keer voltooid in de huidige week (Mo-Su).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const flexible = (program as any).flexibleSchedule === true
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const weeklyTarget = (program as any).weeklyTarget as number | null | undefined
+
+    if (flexible && weeklyTarget && weeklyTarget > 0) {
+      // Bereken huidige week (Mo-Su) in patient's lokale TZ via server.
+      const now = new Date()
+      const day0 = now.getDay()  // 0=Su..6=Sa
+      const offsetFromMon = (day0 + 6) % 7
+      const weekStart = new Date(now); weekStart.setHours(0, 0, 0, 0); weekStart.setDate(weekStart.getDate() - offsetFromMon)
+      const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 7)
+
+      const completedThisWeek = await ctx.prisma.sessionLog.count({
+        where: {
+          patientId: targetPatientId,
+          programId: program.id,
+          completedAt: { gte: weekStart, lt: weekEnd },
+        },
+      })
+
+      // Alle oefeningen op één virtuele "vandaag-dag" — geen dag-filter want
+      // flexible programma's hebben geen week/day-schedule meer.
+      const exercisesPool = allExercises
+
+      const targetReached = completedThisWeek >= weeklyTarget
+
+      return {
+        program: {
+          id: program.id,
+          name: program.name,
+          currentWeek: 1,
+          currentDay: 1,
+          weeks: program.weeks,
+          isCatchUp: false,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          tendinopathyMode: (program as any).tendinopathyMode ?? false,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          trackOneRepMax: (program as any).trackOneRepMax ?? false,
+          flexibleSchedule: true,
+          weeklyTarget,
+          completedThisWeek,
+          weeklyTargetReached: targetReached,
+        },
+        // Wanneer target bereikt: lege lijst zodat oude clients (iOS) niet
+        // dezelfde oefeningen opnieuw aanbieden. Web-app gebruikt
+        // weeklyTargetReached om de "lekker bezig" boodschap te tonen.
+        exercises: targetReached ? [] : exercisesPool,
+      }
+    }
+
     const computed = computeCurrentWeekDay(
       program.startDate,
       program.weeks,
@@ -225,6 +278,10 @@ export const patientRouter = createTRPCRouter({
         tendinopathyMode: (program as any).tendinopathyMode ?? false,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         trackOneRepMax: (program as any).trackOneRepMax ?? false,
+        flexibleSchedule: false,
+        weeklyTarget: null,
+        completedThisWeek: 0,
+        weeklyTargetReached: false,
       },
       exercises: todayExercises,
     }
