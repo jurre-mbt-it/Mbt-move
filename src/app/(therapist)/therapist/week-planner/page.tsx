@@ -200,8 +200,15 @@ const STATUS_BORDER: Record<ItemStatus, string> = {
 }
 
 function ItemTile({
-  item, status, onRemove, readOnly,
-}: { item: ScheduleItem; status: ItemStatus; onRemove: () => void; readOnly?: boolean }) {
+  item, status, onRemove, onClick, readOnly,
+}: {
+  item: ScheduleItem
+  status: ItemStatus
+  onRemove: () => void
+  /** Klik op de tile (niet op de X). Alleen actief als sessie-details bestaan. */
+  onClick?: () => void
+  readOnly?: boolean
+}) {
   const category: Category = item.quickCategory ?? 'STRENGTH'  // default voor program-link
   const color = CATEGORY_COLORS[category]
   const name = item.programId ? (item.program?.name ?? 'Programma') : (item.quickName ?? 'Workout')
@@ -211,17 +218,27 @@ function ItemTile({
   // Categorie-kleur blijft links als anchor zodat type direct herkenbaar is.
   const statusBg = STATUS_COLORS[status]
   const showStatusStripe = status !== 'scheduled'
+  const isClickable = !!onClick
 
   return (
     <div
-      className="group/tile relative rounded-md text-[11px] cursor-default overflow-hidden"
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onClick={isClickable ? onClick : undefined}
+      onKeyDown={isClickable ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.() }
+      } : undefined}
+      className={cn(
+        'group/tile relative rounded-md text-[11px] overflow-hidden',
+        isClickable ? 'cursor-pointer hover:brightness-110 transition-[filter]' : 'cursor-default',
+      )}
       style={{
         background: `${color}15`,
         borderLeft: `3px solid ${color}`,
         color: P.ink,
       }}
       title={
-        status === 'completed' ? 'Voltooid'
+        status === 'completed' ? 'Voltooid — klik voor details'
         : status === 'missed' ? 'Gemist'
         : status === 'in_progress' ? 'Bezig'
         : undefined
@@ -243,7 +260,7 @@ function ItemTile({
         {!readOnly && (
           <button
             type="button"
-            onClick={onRemove}
+            onClick={(e) => { e.stopPropagation(); onRemove() }}
             className="opacity-0 group-hover/tile:opacity-100 transition-opacity shrink-0 text-zinc-400 hover:text-red-400"
             title="Verwijder"
           >
@@ -263,6 +280,171 @@ type ProgramListItem = {
   isTemplate: boolean
   status: string
   dominantCategory?: string | null
+}
+
+// ─── Session-detail modal ─────────────────────────────────────────────────────
+
+type SessionDetail = {
+  id: string
+  scheduledAt: string | Date
+  completedAt: string | Date | null
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED'
+  duration: number | null
+  notes: string | null
+  program: { id: string; name: string } | null
+  exerciseLogs: Array<{
+    id: string
+    exerciseId: string
+    setsCompleted: number | null
+    repsCompleted: number | null
+    duration: number | null
+    weight: number | null
+    painLevel: number | null
+    painDuring: number | null
+    notes: string | null
+    exercise: { name: string; category: string }
+  }>
+}
+
+const STATUS_LABEL: Record<SessionDetail['status'], string> = {
+  PENDING: 'Gepland',
+  IN_PROGRESS: 'Bezig',
+  COMPLETED: 'Voltooid',
+  SKIPPED: 'Overgeslagen',
+}
+const STATUS_TONE: Record<SessionDetail['status'], string> = {
+  PENDING: '#7B8889',
+  IN_PROGRESS: '#F4C261',
+  COMPLETED: '#BEF264',
+  SKIPPED: '#F87171',
+}
+
+function SessionDetailModal({
+  open, onClose, sessionId,
+}: { open: boolean; onClose: () => void; sessionId: string | null }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, isLoading, error } = (trpc.weekSchedules.sessionDetails.useQuery as any)(
+    { sessionId: sessionId ?? '' },
+    { enabled: open && !!sessionId, staleTime: 30_000 },
+  ) as { data: SessionDetail | null | undefined; isLoading: boolean; error: { message: string } | null }
+
+  const sched = data?.scheduledAt ? new Date(data.scheduledAt) : null
+  const completed = data?.completedAt ? new Date(data.completedAt) : null
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>
+            {data?.program?.name ?? 'Sessie-details'}
+          </DialogTitle>
+        </DialogHeader>
+
+        {isLoading && (
+          <p className="text-sm py-4 text-center" style={{ color: P.inkMuted }}>Laden…</p>
+        )}
+        {error && (
+          <p className="text-sm py-4" style={{ color: P.danger }}>
+            Details konden niet worden geladen: {error.message}
+          </p>
+        )}
+        {data && (
+          <div className="space-y-3 mt-2">
+            {/* Status + datum + duur */}
+            <div className="flex items-center flex-wrap gap-2 text-xs">
+              <span
+                className="px-2 py-0.5 rounded-full font-bold"
+                style={{
+                  background: `${STATUS_TONE[data.status]}20`,
+                  color: STATUS_TONE[data.status],
+                  border: `1px solid ${STATUS_TONE[data.status]}50`,
+                }}
+              >
+                {STATUS_LABEL[data.status]}
+              </span>
+              {sched && (
+                <span style={{ color: P.inkMuted }}>
+                  Gepland: {sched.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </span>
+              )}
+              {completed && (
+                <span style={{ color: P.inkMuted }}>
+                  · Voltooid: {completed.toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'short' })}
+                </span>
+              )}
+              {data.duration ? (
+                <span style={{ color: P.inkMuted }}>· Duur: {fmtDuration(data.duration)}</span>
+              ) : null}
+            </div>
+
+            {/* Sessie-notitie */}
+            {data.notes && (
+              <Tile>
+                <MetaLabel>Notitie patient</MetaLabel>
+                <p className="text-sm mt-1" style={{ color: P.ink, whiteSpace: 'pre-wrap' }}>
+                  {data.notes}
+                </p>
+              </Tile>
+            )}
+
+            {/* Exercise logs */}
+            {data.exerciseLogs.length === 0 ? (
+              <p className="text-xs py-3 text-center" style={{ color: P.inkMuted }}>
+                Geen oefen-data gelogd voor deze sessie.
+              </p>
+            ) : (
+              <div className="space-y-1.5 max-h-[50vh] overflow-y-auto pr-1">
+                {data.exerciseLogs.map(log => {
+                  const cat = (log.exercise.category as Category) ?? 'STRENGTH'
+                  const color = CATEGORY_COLORS[cat]
+                  const setLine = log.setsCompleted && log.repsCompleted
+                    ? `${log.setsCompleted} × ${log.repsCompleted}`
+                    : log.setsCompleted
+                      ? `${log.setsCompleted} sets`
+                      : log.duration
+                        ? fmtDuration(log.duration)
+                        : '—'
+                  return (
+                    <div
+                      key={log.id}
+                      className="rounded-lg p-2.5 text-xs"
+                      style={{
+                        background: P.surface,
+                        border: `1px solid ${P.lineStrong}`,
+                        borderLeft: `3px solid ${color}`,
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span style={{ color }} className="shrink-0">
+                          <CategoryIcon category={cat} size={12} />
+                        </span>
+                        <span className="font-semibold flex-1 truncate" style={{ color: P.ink }}>
+                          {log.exercise.name}
+                        </span>
+                        <span className="athletic-mono font-bold" style={{ color: P.ink, fontSize: 11 }}>
+                          {setLine}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-3 mt-1.5" style={{ color: P.inkMuted, fontSize: 10 }}>
+                        {log.weight ? <span>⚖ {log.weight}kg</span> : null}
+                        {log.painLevel != null ? <span>NRS pijn: {log.painLevel}/10</span> : null}
+                        {log.painDuring != null ? <span>Pijn tijdens: {log.painDuring}/10</span> : null}
+                      </div>
+                      {log.notes && (
+                        <p className="mt-1.5 text-[11px]" style={{ color: P.ink, whiteSpace: 'pre-wrap' }}>
+                          {log.notes}
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 function AddItemModal({
@@ -576,11 +758,13 @@ function WeekPlannerContent() {
     programId: string | null
     programName: string | null
   }> }
-  // Map (programId, dateISO) → ItemStatus. Quick workouts (geen programId)
-  // krijgen geen status — blijven 'scheduled'.
-  const statusByKey = useMemo(() => {
+  // Map (programId, dateISO) → { status, sessionId }. Quick workouts (geen
+  // programId) krijgen geen status — blijven 'scheduled'. sessionId wordt
+  // gebruikt voor de session-detail modal wanneer therapeut op een tile klikt.
+  type SessionMatch = { status: ItemStatus; sessionId: string }
+  const sessionByKey = useMemo(() => {
     const todayStart = startOfDay(new Date())
-    const map = new Map<string, ItemStatus>()
+    const map = new Map<string, SessionMatch>()
     for (const s of sessionsRaw) {
       if (!s.programId) continue
       const sched = new Date(s.scheduledAt)
@@ -599,14 +783,27 @@ function WeekPlannerContent() {
       // kies de "best status": completed > in_progress > scheduled > missed.
       const prev = map.get(key)
       const prio: Record<ItemStatus, number> = { completed: 4, in_progress: 3, scheduled: 2, missed: 1 }
-      if (!prev || prio[status] > prio[prev]) map.set(key, status)
+      if (!prev || prio[status] > prio[prev.status]) {
+        map.set(key, { status, sessionId: s.id })
+      }
     }
     return map
   }, [sessionsRaw])
 
   function statusFor(date: Date, item: ScheduleItem): ItemStatus {
     if (!item.programId) return 'scheduled'
-    return statusByKey.get(`${item.programId}|${isoDate(date)}`) ?? 'scheduled'
+    return sessionByKey.get(`${item.programId}|${isoDate(date)}`)?.status ?? 'scheduled'
+  }
+
+  /** Geef het bijbehorende SessionLog-id terug zodat klikken op een gedane
+   *  tile de detail-modal kan openen. Voor sessionlog-prefixed items zit
+   *  het id in de prefix; voor andere items lookup via sessionByKey. */
+  function sessionIdFor(date: Date, item: ScheduleItem): string | null {
+    if (item.id.startsWith('sessionlog-')) {
+      return item.id.slice('sessionlog-'.length)
+    }
+    if (!item.programId) return null
+    return sessionByKey.get(`${item.programId}|${isoDate(date)}`)?.sessionId ?? null
   }
 
   // Schedule dag-info gemapt op ISO-datum.
@@ -731,6 +928,7 @@ function WeekPlannerContent() {
 
   // ─ Add modal ─
   const [addOpen, setAddOpen] = useState(false)
+  const [detailSessionId, setDetailSessionId] = useState<string | null>(null)
   const [addDayDate, setAddDayDate] = useState<Date | null>(null)
   const [addDayId, setAddDayId] = useState<string | null>(null)
 
@@ -948,15 +1146,19 @@ function WeekPlannerContent() {
                         )}
                       </div>
                       <div className="flex flex-col gap-1 flex-1">
-                        {items.map(item => (
-                          <ItemTile
-                            key={item.id}
-                            item={item}
-                            status={statusFor(date, item)}
-                            onRemove={() => handleRemoveItem(item, info?.dayId ?? null)}
-                            readOnly={item.id.startsWith('sessionlog-')}
-                          />
-                        ))}
+                        {items.map(item => {
+                          const sId = sessionIdFor(date, item)
+                          return (
+                            <ItemTile
+                              key={item.id}
+                              item={item}
+                              status={statusFor(date, item)}
+                              onRemove={() => handleRemoveItem(item, info?.dayId ?? null)}
+                              onClick={sId ? () => setDetailSessionId(sId) : undefined}
+                              readOnly={item.id.startsWith('sessionlog-')}
+                            />
+                          )
+                        })}
                       </div>
                       {inMonth && (
                         <button
@@ -985,6 +1187,12 @@ function WeekPlannerContent() {
         dayLabel={addDayDate ? addDayDate.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' }) : ''}
         programs={programs}
         onSubmit={handleAddSubmit}
+      />
+
+      <SessionDetailModal
+        open={!!detailSessionId}
+        onClose={() => setDetailSessionId(null)}
+        sessionId={detailSessionId}
       />
     </div>
   )
