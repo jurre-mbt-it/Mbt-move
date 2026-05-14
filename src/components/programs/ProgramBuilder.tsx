@@ -164,6 +164,10 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
    *  zodat de therapeut 'm later opnieuw kan toepassen op een andere patient.
    *  Default false: patient-programma's blijven alleen bij die patient zichtbaar. */
   const [deploySaveAsTemplate, setDeploySaveAsTemplate] = useState(false)
+  /** Bij update van een al-ACTIVE programma: kiezen of de patient een mail
+   *  krijgt of dat we alleen opslaan. Default true: meestal wil je informeren
+   *  bij een bewuste update. */
+  const [deploySendEmail, setDeploySendEmail] = useState(true)
 
   const { params: customParams } = useCustomParams()
   const utils = trpc.useUtils()
@@ -724,6 +728,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
     setDeployInstructions('')
     setDeployPatientSearch('')
     setDeploySaveAsTemplate(false)
+    setDeploySendEmail(true)
     setDeployDialogOpen(true)
   }
 
@@ -782,9 +787,17 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         startDate: new Date().toISOString(),
       })
 
-      // Mail versturen — graceful failure: als mail niet lukt, deploy blijft staan.
+      // Mail versturen — bij ACTIVE-update kan de therapeut kiezen 'alleen
+      // opslaan' (deploySendEmail=false). Bij eerste deploy / template-toepassen
+      // sturen we altijd. Graceful failure: als mail niet lukt, deploy blijft.
+      const wasAlreadyActive = currentStatus === 'ACTIVE' && !createdFromTemplate
+      const shouldSendMail = !(wasAlreadyActive && !deploySendEmail)
       let mailSent = true
-      if (target.email) {
+      let mailSkipped = false
+      if (!shouldSendMail) {
+        mailSkipped = true
+        mailSent = false
+      } else if (target.email) {
         try {
           const res = await fetch('/api/email/send', {
             method: 'POST',
@@ -832,10 +845,11 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       // Onderscheid in messaging: bij update van een al-ACTIVE programma is
       // dit alleen een mail-notificatie — de wijzigingen waren al live via
       // autosave. Bij eerste deploy is dit het echte live-zetten.
-      const wasAlreadyActive = currentStatus === 'ACTIVE' && !createdFromTemplate
       if (createdFromTemplate) {
         toast.success(`Programma toegepast op ${target.name ?? 'patiënt'} en gedeployed.`, { duration: 4000 })
         router.push(`/therapist/programs/${targetProgramId}/edit`)
+      } else if (mailSkipped) {
+        toast.success('Wijzigingen opgeslagen — geen mail verstuurd.', { duration: 4000 })
       } else if (mailSent) {
         toast.success(
           wasAlreadyActive ? 'Update-mail verstuurd aan patiënt.' : 'Programma gedeployed en mail verstuurd.',
@@ -1203,7 +1217,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               !program.name.trim()
                 ? 'Geef het programma eerst een naam'
                 : currentStatus === 'ACTIVE'
-                  ? 'Wijzigingen zijn direct zichtbaar bij de patiënt. Klik om een update-mail te sturen.'
+                  ? 'Wijzigingen zijn direct zichtbaar. Klik om te kiezen: mail sturen of alleen opslaan.'
                   : undefined
             }
           >
@@ -1213,7 +1227,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               : program.isTemplate
                 ? 'Toepassen op patiënt'
                 : currentStatus === 'ACTIVE'
-                  ? 'Stuur update-mail'
+                  ? 'Update'
                   : 'Deployen'}
           </Button>
         </div>
@@ -1869,14 +1883,14 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               {program.isTemplate
                 ? 'Toepassen op patiënt'
                 : currentStatus === 'ACTIVE'
-                  ? 'Stuur update aan patiënt'
+                  ? 'Programma updaten'
                   : 'Programma deployen'}
             </DialogTitle>
             <DialogDescription>
               {program.isTemplate
                 ? 'Kies een patiënt — er wordt een kopie van dit sjabloon aangemaakt en direct live gezet.'
                 : currentStatus === 'ACTIVE'
-                  ? 'Het programma is al live — wijzigingen zijn direct zichtbaar bij de patiënt. Dit verstuurt alleen een update-mail met optioneel bericht.'
+                  ? 'Wijzigingen zijn al opgeslagen en direct zichtbaar bij de patiënt. Kies hieronder of je de patiënt op de hoogte wil brengen via mail of dat je alleen opslaat.'
                   : 'Bevestig welke patiënt dit programma krijgt en stuur eventueel een bericht mee.'}
             </DialogDescription>
           </DialogHeader>
@@ -1942,23 +1956,83 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               </div>
             </div>
 
-            {/* Extra instructions */}
-            <div className="space-y-1.5">
-              <Label className="text-xs">
-                Extra bericht voor patiënt <span className="text-muted-foreground font-normal">(optioneel)</span>
-              </Label>
-              <Textarea
-                placeholder="Bijv. begin rustig deze week, focus op techniek boven gewicht…"
-                value={deployInstructions}
-                onChange={e => setDeployInstructions(e.target.value)}
-                disabled={deployBusy}
-                rows={3}
-                className="resize-none"
-              />
-              <p className="text-[11px] text-muted-foreground">
-                Wordt meegestuurd in de mail naar de patiënt.
-              </p>
-            </div>
+            {/* Mail-keuze — alleen voor update van een al-ACTIVE patient-programma.
+                Bij eerste deploy of template-toepassen sturen we altijd mail
+                (dat is dan de eerste keer dat de patient weet dat 'ie iets heeft). */}
+            {currentStatus === 'ACTIVE' && !program.isTemplate && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">Wat wil je doen?</Label>
+                <div className="space-y-1.5">
+                  <label
+                    className="flex items-start gap-2 cursor-pointer select-none rounded-lg px-3 py-2 border transition-colors"
+                    style={
+                      deploySendEmail
+                        ? { borderColor: '#4ECDC4', background: 'rgba(78,205,196,0.10)' }
+                        : { borderColor: 'rgba(255,255,255,0.10)' }
+                    }
+                  >
+                    <input
+                      type="radio"
+                      name="deployMailChoice"
+                      checked={deploySendEmail}
+                      onChange={() => setDeploySendEmail(true)}
+                      disabled={deployBusy}
+                      className="mt-0.5 w-4 h-4 accent-[#4ECDC4] shrink-0"
+                    />
+                    <div className="flex-1 text-xs">
+                      <p className="font-semibold">Patient op de hoogte brengen</p>
+                      <p className="text-muted-foreground mt-0.5">
+                        Stuur een update-mail met optioneel bericht.
+                      </p>
+                    </div>
+                  </label>
+                  <label
+                    className="flex items-start gap-2 cursor-pointer select-none rounded-lg px-3 py-2 border transition-colors"
+                    style={
+                      !deploySendEmail
+                        ? { borderColor: '#4ECDC4', background: 'rgba(78,205,196,0.10)' }
+                        : { borderColor: 'rgba(255,255,255,0.10)' }
+                    }
+                  >
+                    <input
+                      type="radio"
+                      name="deployMailChoice"
+                      checked={!deploySendEmail}
+                      onChange={() => setDeploySendEmail(false)}
+                      disabled={deployBusy}
+                      className="mt-0.5 w-4 h-4 accent-[#4ECDC4] shrink-0"
+                    />
+                    <div className="flex-1 text-xs">
+                      <p className="font-semibold">Alleen opslaan, geen mail</p>
+                      <p className="text-muted-foreground mt-0.5">
+                        Wijzigingen zijn al live — geen extra notificatie naar patiënt.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Extra instructions — verbergen als therapeut bij update koos voor
+                alleen-opslaan (geen mail = geen bericht om mee te sturen). */}
+            {!(currentStatus === 'ACTIVE' && !program.isTemplate && !deploySendEmail) && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">
+                  Extra bericht voor patiënt <span className="text-muted-foreground font-normal">(optioneel)</span>
+                </Label>
+                <Textarea
+                  placeholder="Bijv. begin rustig deze week, focus op techniek boven gewicht…"
+                  value={deployInstructions}
+                  onChange={e => setDeployInstructions(e.target.value)}
+                  disabled={deployBusy}
+                  rows={3}
+                  className="resize-none"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Wordt meegestuurd in de mail naar de patiënt.
+                </p>
+              </div>
+            )}
 
             {/* Save-as-template optie — alleen tonen voor eerste-deploy (DRAFT),
                 niet voor "stuur update-mail" op een al-actief programma waar het
@@ -1995,7 +2069,13 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                 onClick={confirmDeploy}
               >
                 <Rocket className="w-4 h-4" />
-                {deployBusy ? 'Bezig…' : program.isTemplate ? 'Toepassen + deploy' : 'Deploy + mail'}
+                {deployBusy
+                  ? 'Bezig…'
+                  : program.isTemplate
+                    ? 'Toepassen + deploy'
+                    : currentStatus === 'ACTIVE'
+                      ? (deploySendEmail ? 'Update + mail' : 'Alleen opslaan')
+                      : 'Deploy + mail'}
               </Button>
             </div>
           </div>
