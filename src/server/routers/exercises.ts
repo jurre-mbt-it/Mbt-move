@@ -371,6 +371,36 @@ export const exercisesRouter = createTRPCRouter({
       return { ok: true }
     }),
 
+  /**
+   * Snel een video-URL koppelen aan een oefening — voor de inline-flow in de
+   * program-builder. Detecteert YouTube/Vimeo automatisch op basis van de URL.
+   * Met `videoUrl=null` wordt de video-koppeling gewist.
+   */
+  setVideoUrl: creatorProcedure
+    .input(z.object({
+      id: z.string(),
+      videoUrl: z.string().url().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.prisma.exercise.findUnique({ where: { id: input.id } })
+      if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
+      const canEdit = existing.createdById === ctx.user!.id || ctx.user!.role === 'ADMIN'
+      if (!canEdit) throw new TRPCError({ code: 'FORBIDDEN' })
+
+      // Auto-detect mediaType uit URL — same regex als de ExerciseCard.
+      let mediaType: 'YOUTUBE' | 'VIMEO' | 'UPLOAD' | null = null
+      if (input.videoUrl) {
+        if (/(?:youtube\.com|youtu\.be)/i.test(input.videoUrl)) mediaType = 'YOUTUBE'
+        else if (/vimeo\.com/i.test(input.videoUrl)) mediaType = 'VIMEO'
+        else mediaType = 'UPLOAD'
+      }
+      return ctx.prisma.exercise.update({
+        where: { id: input.id },
+        data: { videoUrl: input.videoUrl, mediaType },
+        select: { id: true, videoUrl: true, mediaType: true },
+      })
+    }),
+
   delete: creatorProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {

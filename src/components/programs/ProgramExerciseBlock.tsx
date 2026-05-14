@@ -120,6 +120,32 @@ export function ProgramExerciseBlock({
   isInSuperset = false, allExercises = [], customParams = [],
 }: Props) {
   const [videoOpen, setVideoOpen] = useState(false)
+  const [videoUrlDraft, setVideoUrlDraft] = useState('')
+  const setVideoUrl = trpc.exercises.setVideoUrl.useMutation({
+    onError: (err) => toast.error(err.message ?? 'Toevoegen mislukt'),
+  })
+
+  async function handleAddVideoUrl(e: React.FormEvent) {
+    e.preventDefault()
+    const url = videoUrlDraft.trim()
+    if (!url) return
+    try {
+      // Lichte client-side check zodat we niet onnodig naar server gaan
+      // bij overduidelijk ongeldige URL's (server valideert ook met zod.url).
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const _ = new URL(url)
+    } catch {
+      toast.error('Geen geldige URL')
+      return
+    }
+    await setVideoUrl.mutateAsync({ id: exercise.exerciseId, videoUrl: url })
+    // Lokale builder-state updaten — andere instances van dezelfde oefening
+    // in dit programma worden bij volgende reload pas bijgewerkt. Acceptabel
+    // voor een zeldzame multi-instance flow; werkt direct voor de single case.
+    onUpdate(exercise.uid, { videoUrl: url })
+    setVideoUrlDraft('')
+    toast.success('Video gekoppeld')
+  }
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: exercise.uid,
@@ -596,12 +622,35 @@ export function ProgramExerciseBlock({
           {exercise.videoUrl ? (
             <VideoPlayer url={exercise.videoUrl} />
           ) : (
-            <div className="flex flex-col items-center justify-center py-10 text-center rounded-xl border-2 border-dashed">
-              <div className="w-12 h-12 rounded-full bg-[#1C2425] flex items-center justify-center mb-3">
+            <div className="flex flex-col items-center justify-center py-8 px-4 text-center rounded-xl border-2 border-dashed gap-3">
+              <div className="w-12 h-12 rounded-full bg-[#1C2425] flex items-center justify-center">
                 <Play className="w-5 h-5 text-[#7B8889]" />
               </div>
-              <p className="text-sm font-medium">Nog geen video gekoppeld</p>
-              <p className="text-xs text-muted-foreground mt-1">Voeg een video URL toe bij het bewerken van de oefening</p>
+              <div>
+                <p className="text-sm font-medium">Nog geen video gekoppeld</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Plak een YouTube of Vimeo link en sla 'm op — wordt direct
+                  gekoppeld aan deze oefening voor alle programma's.
+                </p>
+              </div>
+              <form onSubmit={handleAddVideoUrl} className="w-full max-w-sm flex gap-2 mt-2">
+                <input
+                  type="url"
+                  placeholder="https://youtube.com/..."
+                  value={videoUrlDraft}
+                  onChange={e => setVideoUrlDraft(e.target.value)}
+                  disabled={setVideoUrl.isPending}
+                  className="flex-1 h-9 px-3 text-sm bg-[#1C2425] rounded-md border border-[rgba(255,255,255,0.10)] focus:outline-none focus:ring-1 focus:ring-[#BEF264] focus:border-[#BEF264] placeholder:text-[#566060]"
+                />
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={setVideoUrl.isPending || !videoUrlDraft.trim()}
+                  style={{ background: '#BEF264', color: '#0A0E0F' }}
+                >
+                  {setVideoUrl.isPending ? '…' : 'Koppel'}
+                </Button>
+              </form>
             </div>
           )}
         </DialogContent>
