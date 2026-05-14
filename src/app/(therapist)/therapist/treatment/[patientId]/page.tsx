@@ -116,6 +116,8 @@ export default function TreatmentPage({
 
   const { data: patient, isLoading: patientLoading } = trpc.patients.get.useQuery({ id: patientId })
   const { data: todayData, isLoading: todayLoading } = trpc.patient.getTodayExercises.useQuery({ patientId })
+  const { data: previousSessions = [] } = trpc.patients.recentSessions.useQuery({ patientId, limit: 1 })
+  const previousSession = previousSessions[0] ?? null
   const draftKey = `mbt-treatment-draft-${patientId}`
   const logMutation = trpc.patients.logSessionForPatient.useMutation({
     onSuccess: () => {
@@ -128,6 +130,7 @@ export default function TreatmentPage({
 
   const [startedAt, setStartedAt] = useState(() => new Date())
   const [editingStart, setEditingStart] = useState(false)
+  const [previousOpen, setPreviousOpen] = useState(true)
   const [mode, setMode] = useState<'choose' | 'program' | 'free'>('choose')
   const [rows, setRows] = useState<LogRow[]>([])
   const [dirty, setDirty] = useState(false) // gebruiker heeft lijst aangepast; niet meer auto-repoppen
@@ -169,6 +172,11 @@ export default function TreatmentPage({
     value: { mode, rows, painLevel, exertionLevel, notes, dirty, startedAt: startedAt.toISOString() },
     enabled: mode !== 'choose' || rows.length > 0 || notes.length > 0,
   })
+
+  // Zodra de sessie écht begint (modus is gekozen), klap "vorige behandeling" in.
+  useEffect(() => {
+    if (mode !== 'choose') setPreviousOpen(false)
+  }, [mode])
 
   // Bij "Volg programma" → laad programma-oefeningen één keer in.
   // `dirty` voorkomt dat auto-repop na verwijderen van alle rijen gebeurt.
@@ -494,6 +502,15 @@ export default function TreatmentPage({
           </Tile>
         )}
 
+        {/* Vorige behandeling — direct zichtbaar bij start, inklapbaar tijdens sessie */}
+        {previousSession && (
+          <PreviousSessionPanel
+            session={previousSession}
+            open={previousOpen}
+            onToggle={() => setPreviousOpen((v) => !v)}
+          />
+        )}
+
         {/* Mode chooser */}
         {mode === 'choose' && (
           <section className="flex flex-col gap-3">
@@ -559,7 +576,6 @@ export default function TreatmentPage({
               </p>
             </Tile>
           )}
-          <AddExerciseRow onAdd={addRow} />
 
           {rowsForRender.map((item) => {
             if (item.kind === 'single') {
@@ -609,6 +625,8 @@ export default function TreatmentPage({
               </div>
             )
           })}
+
+          <AddExerciseRow onAdd={addRow} />
         </section>
         )}
 
@@ -1324,6 +1342,228 @@ function Chip({
         <span style={{ opacity: 0.7 }}>{count}</span>
       )}
     </button>
+  )
+}
+
+type PreviousExercise = {
+  id: string
+  name: string
+  sets: number | null
+  reps: number | null
+  painLevel: number | null
+  weight: number | null
+  weightsPerSet: unknown
+  extraParams: unknown
+  supersetGroup: string | null
+  painDuring: number | null
+  notes: string | null
+}
+
+type PreviousSession = {
+  id: string
+  completedAt: Date | string | null
+  durationMinutes: number | null
+  programName: string | null
+  painLevel: number | null
+  exertionLevel: number | null
+  notes: string | null
+  exercises: PreviousExercise[]
+}
+
+function formatRelativeDate(input: Date | string | null): string {
+  if (!input) return '—'
+  const d = new Date(input)
+  if (isNaN(d.getTime())) return '—'
+  const now = new Date()
+  const diffMs = now.getTime() - d.getTime()
+  const dayMs = 24 * 60 * 60 * 1000
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const startOfThat = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const dayDiff = Math.round((startOfToday - startOfThat) / dayMs)
+  const time = d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
+  const dateStr = d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+  if (dayDiff === 0) return `vandaag · ${time}`
+  if (dayDiff === 1) return `gisteren · ${time}`
+  if (dayDiff > 1 && dayDiff < 7) return `${dayDiff} dagen geleden · ${dateStr}`
+  if (diffMs < 0) return `${dateStr} · ${time}`
+  return `${dateStr} · ${time}`
+}
+
+function formatWeights(weightsPerSet: unknown, fallback: number | null): string | null {
+  if (Array.isArray(weightsPerSet) && weightsPerSet.length > 0) {
+    const cleaned = weightsPerSet.map((w) => (typeof w === 'number' && !Number.isNaN(w) ? `${w}` : '—'))
+    if (cleaned.some((c) => c !== '—')) return cleaned.join(' · ') + ' kg'
+  }
+  if (typeof fallback === 'number' && !Number.isNaN(fallback)) return `${fallback} kg`
+  return null
+}
+
+function summarizeExtraParams(extraParams: unknown): string | null {
+  if (!Array.isArray(extraParams) || extraParams.length === 0) return null
+  const parts: string[] = []
+  for (const p of extraParams) {
+    if (!p || typeof p !== 'object') continue
+    const obj = p as Record<string, unknown>
+    const label = typeof obj.label === 'string' ? obj.label : null
+    const value = obj.value
+    if (!label || value === undefined || value === null || value === '') continue
+    const unit = typeof obj.unit === 'string' ? obj.unit : ''
+    parts.push(`${label} ${value}${unit ? ' ' + unit : ''}`)
+  }
+  return parts.length ? parts.join(' · ') : null
+}
+
+function PreviousSessionPanel({
+  session,
+  open,
+  onToggle,
+}: {
+  session: PreviousSession
+  open: boolean
+  onToggle: () => void
+}) {
+  const dateLabel = formatRelativeDate(session.completedAt)
+  const exerciseCount = session.exercises.length
+
+  return (
+    <Tile accentBar={P.lime}>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between gap-2 athletic-tap"
+        aria-expanded={open}
+      >
+        <div className="flex flex-col items-start gap-0.5 min-w-0">
+          <MetaLabel style={{ color: P.lime }}>VORIGE BEHANDELING</MetaLabel>
+          <span
+            className="athletic-mono"
+            style={{ color: P.ink, fontSize: 13, fontWeight: 700, letterSpacing: '0.02em' }}
+          >
+            {dateLabel}
+          </span>
+          <span
+            className="athletic-mono"
+            style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.08em' }}
+          >
+            {exerciseCount} oef.
+            {session.durationMinutes ? ` · ${session.durationMinutes}m` : ''}
+            {session.programName ? ` · ${session.programName}` : ''}
+          </span>
+        </div>
+        <span
+          aria-hidden
+          className="athletic-mono"
+          style={{ color: P.inkMuted, fontSize: 14, lineHeight: 1, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}
+        >
+          ▾
+        </span>
+      </button>
+
+      {open && (
+        <div className="mt-3 flex flex-col gap-2">
+          {(session.painLevel !== null || session.exertionLevel !== null) && (
+            <div className="flex gap-2 flex-wrap">
+              {session.painLevel !== null && (
+                <span
+                  className="athletic-mono px-2 py-1 rounded"
+                  style={{
+                    background: 'rgba(248,113,113,0.10)',
+                    color: P.danger,
+                    border: `1px solid rgba(248,113,113,0.30)`,
+                    fontSize: 10, letterSpacing: '0.08em', fontWeight: 800,
+                  }}
+                >
+                  PIJN {session.painLevel}/10
+                </span>
+              )}
+              {session.exertionLevel !== null && (
+                <span
+                  className="athletic-mono px-2 py-1 rounded"
+                  style={{
+                    background: 'rgba(244,194,97,0.10)',
+                    color: P.gold,
+                    border: `1px solid rgba(244,194,97,0.30)`,
+                    fontSize: 10, letterSpacing: '0.08em', fontWeight: 800,
+                  }}
+                >
+                  RPE {session.exertionLevel}/10
+                </span>
+              )}
+            </div>
+          )}
+
+          {exerciseCount === 0 ? (
+            <p style={{ color: P.inkMuted, fontSize: 12 }}>Geen oefeningen gelogd.</p>
+          ) : (
+            <ul className="flex flex-col gap-1.5">
+              {session.exercises.map((ex) => {
+                const weights = formatWeights(ex.weightsPerSet, ex.weight)
+                const extras = summarizeExtraParams(ex.extraParams)
+                return (
+                  <li
+                    key={ex.id}
+                    className="rounded-lg px-2.5 py-2"
+                    style={{ background: P.surfaceHi, border: `1px solid ${P.line}` }}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span style={{ color: P.ink, fontSize: 13, fontWeight: 600 }}>
+                        {ex.supersetGroup && (
+                          <span
+                            className="athletic-mono"
+                            style={{
+                              color: SUPERSET_COLORS[ex.supersetGroup]?.text ?? P.ink,
+                              fontSize: 10, fontWeight: 900, letterSpacing: '0.1em', marginRight: 6,
+                            }}
+                          >
+                            {ex.supersetGroup}
+                          </span>
+                        )}
+                        {ex.name}
+                      </span>
+                      <span
+                        className="athletic-mono"
+                        style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.04em', whiteSpace: 'nowrap' }}
+                      >
+                        {ex.sets ?? '—'} × {ex.reps ?? '—'}
+                      </span>
+                    </div>
+                    {(weights || extras || ex.painDuring !== null || ex.notes) && (
+                      <div
+                        className="athletic-mono mt-1 flex flex-wrap gap-x-3 gap-y-0.5"
+                        style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.04em' }}
+                      >
+                        {weights && <span>{weights}</span>}
+                        {extras && <span>{extras}</span>}
+                        {ex.painDuring !== null && (
+                          <span style={{ color: P.danger }}>Pijn {ex.painDuring}/10</span>
+                        )}
+                        {ex.notes && (
+                          <span style={{ color: P.inkMuted, textTransform: 'none', fontStyle: 'italic' }}>
+                            “{ex.notes}”
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+
+          {session.notes && (
+            <div
+              className="rounded-lg px-2.5 py-2"
+              style={{ background: P.surfaceHi, border: `1px dashed ${P.lineStrong}` }}
+            >
+              <MetaLabel>Notities</MetaLabel>
+              <p style={{ color: P.ink, fontSize: 12, marginTop: 2, whiteSpace: 'pre-wrap' }}>
+                {session.notes}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+    </Tile>
   )
 }
 

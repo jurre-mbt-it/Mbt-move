@@ -43,7 +43,27 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const { data: patient, isLoading } = trpc.patients.get.useQuery({ id })
   const { data: programsRaw = [] } = trpc.programs.list.useQuery({ patientId: id })
   const [historyLimit, setHistoryLimit] = useState(5)
-  const { data: recentSessions = [] } = trpc.patients.recentSessions.useQuery({ patientId: id, limit: historyLimit })
+  const { data: recentSessionsRaw = [] } = trpc.patients.recentSessions.useQuery({ patientId: id, limit: historyLimit })
+  // Shallow cast — tRPC inference depth is te diep voor TS2589 nadat extra velden
+  // (weightsPerSet/extraParams/...) zijn toegevoegd in recentSessions.
+  type RecentSession = {
+    id: string
+    completedAt: Date | string | null
+    durationMinutes: number | null
+    programName: string | null
+    painLevel: number | null
+    exertionLevel: number | null
+    notes: string | null
+    exercises: Array<{
+      id: string
+      name: string
+      sets: number | null
+      reps: number | null
+      painLevel: number | null
+      weight: number | null
+    }>
+  }
+  const recentSessions = recentSessionsRaw as RecentSession[]
   const utils = trpc.useUtils()
   const [inviteFallback, setInviteFallback] = useState<{
     url: string
