@@ -697,8 +697,13 @@ function ExerciseTile({
   const weights = r.weightsPerSet.length === setsCount ? r.weightsPerSet : resizeWeights(r.weightsPerSet, setsCount)
   const availableParams = STANDARD_PARAMS.filter((p) => !r.extraParams.some((ep) => ep.label === p.label))
 
+  const anyMenuOpen = paramMenuOpen || supersetMenuOpen
+
   return (
-    <Tile>
+    <Tile
+      className="!overflow-visible"
+      style={anyMenuOpen ? { zIndex: 20 } : undefined}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">

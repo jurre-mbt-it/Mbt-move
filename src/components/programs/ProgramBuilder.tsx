@@ -298,12 +298,17 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
     easierVariantId?: string | null; harderVariantId?: string | null;
     trackOneRepMax?: boolean;
     defaultExtraParams?: unknown;
+    defaultRepUnit?: string;
   }) => {
     const inheritedParams = (Array.isArray(ex.defaultExtraParams) ? ex.defaultExtraParams : [])
       .map((p, i) => ({
         ...(p as object),
         id: `p-${Date.now()}-${i}`, // nieuwe instance-id zodat update-by-id niet kruist met andere exercises
       })) as BuilderExercise['extraParams']
+    const inheritedRepUnit = (ex.defaultRepUnit === 'sec' || ex.defaultRepUnit === 'min')
+      ? ex.defaultRepUnit
+      : 'reps'
+    const inheritedReps = inheritedRepUnit === 'sec' ? 30 : 10
     const newEx: BuilderExercise = {
       uid: `uid-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       exerciseId: ex.id,
@@ -316,9 +321,9 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       videoUrl: ex.videoUrl,
       sets: 3,
       setsMax: null,
-      reps: 10,
+      reps: inheritedReps,
       repsMax: null,
-      repUnit: 'reps',
+      repUnit: inheritedRepUnit,
       rest: 60,
       extraParams: inheritedParams,
       notes: null,
@@ -437,12 +442,18 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       // Resolve target day/week: prefer explicit day-column data, fall back to current view
       const targetDay = overData?.type === 'day-column' ? overData.day : program.currentDay
       const targetWeek = overData?.type === 'day-column' ? overData.week : program.currentWeek
-      const exWithDefaults = ex as typeof ex & { trackOneRepMax?: boolean; defaultExtraParams?: unknown }
+      const exWithDefaults = ex as typeof ex & { trackOneRepMax?: boolean; defaultExtraParams?: unknown; defaultRepUnit?: string }
       const inheritedParams = (Array.isArray(exWithDefaults.defaultExtraParams) ? exWithDefaults.defaultExtraParams : [])
         .map((p, i) => ({
           ...(p as object),
           id: `p-${Date.now()}-${i}`,
         })) as BuilderExercise['extraParams']
+      const inheritedRepUnit = (exWithDefaults.defaultRepUnit === 'sec' || exWithDefaults.defaultRepUnit === 'min')
+        ? exWithDefaults.defaultRepUnit
+        : 'reps'
+      // Voor seconden-oefeningen (plank/wall sit/etc) wil je niet een
+      // standaard van 10 reps; zet een zinvolle hold-duur als startwaarde.
+      const inheritedReps = inheritedRepUnit === 'sec' ? 30 : 10
       const newEx: BuilderExercise = {
         uid: `uid-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         exerciseId: ex.id,
@@ -453,7 +464,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         easierVariantId: null,
         harderVariantId: null,
         videoUrl: ex.videoUrl,
-        sets: 3, setsMax: null, reps: 10, repsMax: null, repUnit: 'reps', rest: 60,
+        sets: 3, setsMax: null, reps: inheritedReps, repsMax: null, repUnit: inheritedRepUnit, rest: 60,
         extraParams: inheritedParams, notes: null, supersetGroup: null, supersetOrder: 0, selected: false,
         trackOneRepMax: exWithDefaults.trackOneRepMax ?? false,
         day: targetDay, week: targetWeek,

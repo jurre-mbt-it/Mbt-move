@@ -7,7 +7,7 @@
  */
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
-import { createTRPCRouter, therapistProcedure, adminProcedure, mfaAdminProcedure } from '@/server/trpc'
+import { createTRPCRouter, protectedProcedure, therapistProcedure, adminProcedure, mfaAdminProcedure } from '@/server/trpc'
 
 const ACTIVE_LINK = { isActive: true, status: 'APPROVED' as const }
 
@@ -30,6 +30,133 @@ async function assertTreating(
 
 function weeksBetween(from: Date, to: Date): number {
   return Math.floor((to.getTime() - from.getTime()) / (7 * 24 * 3600 * 1000))
+}
+
+/**
+ * Laadt de volledige tracker-state voor een patient (actief protocol + fases +
+ * criteria + statuses + berekende expected-phase). Gedeeld tussen therapeut-
+ * en patient-query — patient-query roept dit met de eigen userId aan.
+ */
+async function loadTrackerState(
+  prisma: typeof import('@/lib/prisma').prisma,
+  patientId: string,
+) {
+  const tracker = await prisma.patientRehabTracker.findFirst({
+    where: { patientId, deactivatedAt: null },
+    include: {
+      protocol: {
+        include: {
+          phases: {
+            orderBy: { order: 'asc' },
+            include: { criteria: { orderBy: { order: 'asc' } } },
+          },
+        },
+      },
+      activatedBy: { select: { id: true, name: true, email: true } },
+    },
+  })
+
+  if (!tracker) return null
+
+  const criterionIds = tracker.protocol.phases.flatMap((p) =>
+    p.criteria.map((c) => c.id),
+  )
+  const statuses = criterionIds.length
+    ? await prisma.rehabCriterionStatus.findMany({
+        where: { patientId, criterionId: { in: criterionIds } },
+      })
+    : []
+  const statusByCriterionId = new Map(statuses.map((s) => [s.criterionId, s]))
+
+  const now = new Date()
+  let weeksSinceSurgery: number | null = null
+  let expectedPhaseOrder: number | null = null
+  if (tracker.surgeryDate) {
+    weeksSinceSurgery = weeksBetween(tracker.surgeryDate, now)
+    for (const phase of tracker.protocol.phases) {
+      if (phase.typicalStartWeek == null) continue
+      if (weeksSinceSurgery < phase.typicalStartWeek) continue
+      if (phase.typicalEndWeek == null || weeksSinceSurgery < phase.typicalEndWeek) {
+        expectedPhaseOrder = phase.order
+        break
+      }
+    }
+    if (weeksSinceSurgery < 0) {
+      const preOp = tracker.protocol.phases.find((p) => p.order === 0)
+      if (preOp) expectedPhaseOrder = preOp.order
+    }
+  }
+
+  const total = criterionIds.length
+  const met = statuses.filter((s) => s.status === 'MET').length
+  const inProgress = statuses.filter((s) => s.status === 'IN_PROGRESS').length
+  const progressPct = total > 0 ? Math.round((met / total) * 100) : 0
+
+  return {
+    patientId,
+    protocolId: tracker.protocolId,
+    protocol: {
+      id: tracker.protocol.id,
+      key: tracker.protocol.key,
+      name: tracker.protocol.name,
+      description: tracker.protocol.description,
+      sourceReference: tracker.protocol.sourceReference,
+    },
+    surgeryDate: tracker.surgeryDate,
+    injuryDate: tracker.injuryDate,
+    activatedAt: tracker.activatedAt,
+    activatedByName: tracker.activatedBy.name ?? tracker.activatedBy.email,
+    notes: tracker.notes,
+    weeksSinceSurgery,
+    expectedPhaseOrder,
+    progress: { total, met, inProgress, pct: progressPct },
+    phases: tracker.protocol.phases.map((phase) => {
+      const phaseStatuses = phase.criteria.map((c) => statusByCriterionId.get(c.id))
+      const phaseTotal = phase.criteria.length
+      const phaseMet = phaseStatuses.filter((s) => s?.status === 'MET').length
+      const phaseInProgress = phaseStatuses.filter((s) => s?.status === 'IN_PROGRESS').length
+      return {
+        id: phase.id,
+        order: phase.order,
+        shortName: phase.shortName,
+        name: phase.name,
+        description: phase.description,
+        keyGoals: phase.keyGoals,
+        typicalStartWeek: phase.typicalStartWeek,
+        typicalEndWeek: phase.typicalEndWeek,
+        progress: {
+          total: phaseTotal,
+          met: phaseMet,
+          inProgress: phaseInProgress,
+          pct: phaseTotal > 0 ? Math.round((phaseMet / phaseTotal) * 100) : 0,
+        },
+        criteria: phase.criteria.map((c) => {
+          const s = statusByCriterionId.get(c.id)
+          return {
+            id: c.id,
+            order: c.order,
+            name: c.name,
+            testDescription: c.testDescription,
+            reference: c.reference,
+            targetValue: c.targetValue,
+            targetUnit: c.targetUnit,
+            inputType: c.inputType,
+            isBonus: c.isBonus,
+            isBilateral: c.isBilateral,
+            newtonMinGreen: c.newtonMinGreen,
+            newtonMinOrange: c.newtonMinOrange,
+            lsiMinGreen: c.lsiMinGreen,
+            lsiMinOrange: c.lsiMinOrange,
+            status: s?.status ?? 'NOT_MET',
+            measurementValue: s?.measurementValue ?? null,
+            measurementDate: s?.measurementDate ?? null,
+            notes: s?.notes ?? null,
+            updatedAt: s?.updatedAt ?? null,
+          }
+        }),
+      }
+    }),
+  }
 }
 
 export const rehabRouter = createTRPCRouter({
@@ -58,136 +185,16 @@ export const rehabRouter = createTRPCRouter({
     .input(z.object({ patientId: z.string() }))
     .query(async ({ ctx, input }) => {
       await assertTreating(ctx.prisma, ctx.user, input.patientId)
-
-      const tracker = await ctx.prisma.patientRehabTracker.findFirst({
-        // Alleen actieve tracker tonen — gedeactiveerde trackers zijn soft-deleted
-        // maar blijven in de DB (criterion statuses worden bewaard voor re-activatie).
-        where: { patientId: input.patientId, deactivatedAt: null },
-        include: {
-          protocol: {
-            include: {
-              phases: {
-                orderBy: { order: 'asc' },
-                include: {
-                  criteria: { orderBy: { order: 'asc' } },
-                },
-              },
-            },
-          },
-          activatedBy: { select: { id: true, name: true, email: true } },
-        },
-      })
-
-      if (!tracker) return null
-
-      // Haal statuses op voor alle criteria van dit protocol
-      const criterionIds = tracker.protocol.phases.flatMap((p) =>
-        p.criteria.map((c) => c.id),
-      )
-      const statuses = criterionIds.length
-        ? await ctx.prisma.rehabCriterionStatus.findMany({
-            where: {
-              patientId: input.patientId,
-              criterionId: { in: criterionIds },
-            },
-          })
-        : []
-      const statusByCriterionId = new Map(statuses.map((s) => [s.criterionId, s]))
-
-      // Bereken expected phase op basis van operatiedatum
-      const now = new Date()
-      let weeksSinceSurgery: number | null = null
-      let expectedPhaseOrder: number | null = null
-      if (tracker.surgeryDate) {
-        weeksSinceSurgery = weeksBetween(tracker.surgeryDate, now)
-        // Kies fase waar typicalStartWeek <= wss < typicalEndWeek (of endWeek null)
-        for (const phase of tracker.protocol.phases) {
-          if (phase.typicalStartWeek == null) continue
-          if (weeksSinceSurgery < phase.typicalStartWeek) continue
-          if (phase.typicalEndWeek == null || weeksSinceSurgery < phase.typicalEndWeek) {
-            expectedPhaseOrder = phase.order
-            break
-          }
-        }
-        // Voor surgery nog niet gebeurd: blijf in pre-op
-        if (weeksSinceSurgery < 0) {
-          const preOp = tracker.protocol.phases.find((p) => p.order === 0)
-          if (preOp) expectedPhaseOrder = preOp.order
-        }
-      }
-
-      // Overall progress: % criteria MET
-      const total = criterionIds.length
-      const met = statuses.filter((s) => s.status === 'MET').length
-      const inProgress = statuses.filter((s) => s.status === 'IN_PROGRESS').length
-      const progressPct = total > 0 ? Math.round((met / total) * 100) : 0
-
-      return {
-        patientId: input.patientId,
-        protocolId: tracker.protocolId,
-        protocol: {
-          id: tracker.protocol.id,
-          key: tracker.protocol.key,
-          name: tracker.protocol.name,
-          description: tracker.protocol.description,
-          sourceReference: tracker.protocol.sourceReference,
-        },
-        surgeryDate: tracker.surgeryDate,
-        injuryDate: tracker.injuryDate,
-        activatedAt: tracker.activatedAt,
-        activatedByName: tracker.activatedBy.name ?? tracker.activatedBy.email,
-        notes: tracker.notes,
-        weeksSinceSurgery,
-        expectedPhaseOrder,
-        progress: { total, met, inProgress, pct: progressPct },
-        phases: tracker.protocol.phases.map((phase) => {
-          const phaseStatuses = phase.criteria.map((c) => statusByCriterionId.get(c.id))
-          const phaseTotal = phase.criteria.length
-          const phaseMet = phaseStatuses.filter((s) => s?.status === 'MET').length
-          const phaseInProgress = phaseStatuses.filter((s) => s?.status === 'IN_PROGRESS').length
-          return {
-            id: phase.id,
-            order: phase.order,
-            shortName: phase.shortName,
-            name: phase.name,
-            description: phase.description,
-            keyGoals: phase.keyGoals,
-            typicalStartWeek: phase.typicalStartWeek,
-            typicalEndWeek: phase.typicalEndWeek,
-            progress: {
-              total: phaseTotal,
-              met: phaseMet,
-              inProgress: phaseInProgress,
-              pct: phaseTotal > 0 ? Math.round((phaseMet / phaseTotal) * 100) : 0,
-            },
-            criteria: phase.criteria.map((c) => {
-              const s = statusByCriterionId.get(c.id)
-              return {
-                id: c.id,
-                order: c.order,
-                name: c.name,
-                testDescription: c.testDescription,
-                reference: c.reference,
-                targetValue: c.targetValue,
-                targetUnit: c.targetUnit,
-                inputType: c.inputType,
-                isBonus: c.isBonus,
-                isBilateral: c.isBilateral,
-                newtonMinGreen: c.newtonMinGreen,
-                newtonMinOrange: c.newtonMinOrange,
-                lsiMinGreen: c.lsiMinGreen,
-                lsiMinOrange: c.lsiMinOrange,
-                status: s?.status ?? 'NOT_MET',
-                measurementValue: s?.measurementValue ?? null,
-                measurementDate: s?.measurementDate ?? null,
-                notes: s?.notes ?? null,
-                updatedAt: s?.updatedAt ?? null,
-              }
-            }),
-          }
-        }),
-      }
+      return loadTrackerState(ctx.prisma, input.patientId)
     }),
+
+  /**
+   * Read-only tracker voor de ingelogde patient zelf. Geen edit-mutations
+   * gekoppeld — patient ziet alleen status-kleuren, geen measurement-dialogs.
+   */
+  getMyTracker: protectedProcedure.query(async ({ ctx }) => {
+    return loadTrackerState(ctx.prisma, ctx.user.id)
+  }),
 
   activateForPatient: therapistProcedure
     .input(

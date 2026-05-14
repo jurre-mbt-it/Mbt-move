@@ -224,6 +224,8 @@ async function main() {
           movementPattern: stdEx.movementPattern as MovementPattern | null,
           instructions: stdEx.instructions,
           tags: stdEx.tags,
+          defaultRepUnit: stdEx.defaultRepUnit ?? 'reps',
+          defaultExtraParams: (stdEx.defaultExtraParams ?? []) as unknown as object,
           muscleLoads: {
             create: Object.entries(stdEx.muscleLoads).map(([muscle, load]) => ({
               muscle,
@@ -246,6 +248,8 @@ async function main() {
           movementPattern: stdEx.movementPattern as MovementPattern | null,
           instructions: stdEx.instructions,
           tags: stdEx.tags,
+          defaultRepUnit: stdEx.defaultRepUnit ?? 'reps',
+          defaultExtraParams: (stdEx.defaultExtraParams ?? []) as unknown as object,
           isPublic: true,
           createdById: admin.id,
           muscleLoads: {

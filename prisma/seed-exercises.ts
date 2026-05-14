@@ -13,6 +13,17 @@
  * Progressie/regressie wordt in seed.ts gekoppeld via exercise-progressions.ts.
  */
 
+type SeedExtraParam = {
+  id: string
+  label: string
+  type: 'number' | 'text' | 'select' | 'slider'
+  value: string | number
+  unit?: string
+  options?: string[]
+  min?: number
+  max?: number
+}
+
 type SeedExercise = {
   name: string
   description: string
@@ -25,6 +36,10 @@ type SeedExercise = {
   tags: string[]
   instructions: string[]
   muscleLoads: Record<string, number>
+  /** Primaire tracking-unit ('reps' is default — alleen overriden voor isometrische oefeningen). */
+  defaultRepUnit?: 'reps' | 'sec' | 'min'
+  /** Extra parameters die standaard verschijnen wanneer oefening in een programma komt (bv. Afstand voor sleds/carries). */
+  defaultExtraParams?: SeedExtraParam[]
 }
 
 export const STANDARD_EXERCISES: SeedExercise[] = [
@@ -43,6 +58,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['isometrisch', 'knie', 'beginner', 'revalidatie'],
     instructions: ['Leun met rug tegen muur', 'Zak tot 90 graden in de knieën', 'Houd de positie vast', 'Adem rustig door'],
     muscleLoads: { Quadriceps: 4, Glutes: 1, Core: 2 },
+    defaultRepUnit: 'sec',
   },
   {
     name: 'Bodyweight Squat',
@@ -602,6 +618,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['glutes', 'isometrisch', 'finisher'],
     instructions: ['Hip thrust positie met sub-maximaal gewicht', 'Houd ~70% van top-positie vast', 'Span glutes bewust aan tijdens hele hold', '2-3 sets van 20-45 seconden'],
     muscleLoads: { Glutes: 4, Hamstrings: 3, Core: 3 },
+    defaultRepUnit: 'sec',
   },
   {
     name: 'Frog Pump',
@@ -1520,6 +1537,19 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     muscleLoads: { Bovenrug: 4, Lats: 3, Biceps: 3, Core: 3, 'Schouders posterieur': 2 },
   },
   {
+    name: 'Ring Row',
+    description: 'Horizontaal roeien aan gymnastiek-ringen. Vrijhangende ringen vragen meer rotatiestabiliteit en scapula-controle dan een vaste stang — ideaal als progressie van Inverted Row en als rehab-row met instelbare zwaarte (ring-hoogte aanpassen).',
+    category: 'STRENGTH',
+    bodyRegion: ['BACK', 'SHOULDER'],
+    difficulty: 'BEGINNER',
+    loadType: 'BODYWEIGHT',
+    isUnilateral: false,
+    movementPattern: 'PULL_HORIZONTAL',
+    tags: ['rug', 'row', 'ringen', 'lichaamsgewicht', 'scapula', 'rehab'],
+    instructions: ['Stel ringen in op heup-/borsthoogte', 'Hang met gestrekt lichaam in plank-positie onder de ringen', 'Trek borst naar de ringen — ringen langs de ribben', 'Knijp schouderbladen samen, ellebogen langs lichaam', 'Daal gecontroleerd terug naar gestrekte arm'],
+    muscleLoads: { Lats: 3, Bovenrug: 4, 'Schouders posterieur': 4, Biceps: 3, Core: 4 },
+  },
+  {
     name: 'Chest-Supported Row',
     description: 'Row met borstondersteuning. Vergelijkbare lat-activatie als bent-over row, maar significant LAGERE erector spinae belasting [Fenwick 2009]. Ideaal bij lage rugklachten.',
     category: 'STRENGTH',
@@ -1704,6 +1734,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['mobility', 'grip', 'schouder', 'decompressie'],
     instructions: ['Hang met overhandse grip, voeten van de grond', 'Laat schouders passief opgetrokken (hang in scapular elevation)', 'Adem rustig, ontspan in de hang', '20-60 sec per set'],
     muscleLoads: { Onderarmen: 4, Lats: 1, Core: 1 },
+    defaultRepUnit: 'sec',
   },
   {
     name: 'Single-Arm Lat Pulldown',
@@ -1924,6 +1955,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['core', 'isometrisch', 'anti-extensie'],
     instructions: ['Lig op rug, armen/benen gestrekt', 'Druk onderrug in de grond', 'Hef schouders en benen iets op (boot-vorm)', 'Houd positie vast'],
     muscleLoads: { Core: 4, 'Hip flexors': 3 },
+    defaultRepUnit: 'sec',
   },
   {
     name: 'Cable Crunch',
@@ -2145,6 +2177,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['core', 'anti-laterale-flexie', 'isometrisch', 'ql'],
     instructions: ['Pak zwaar gewicht in één hand', 'Sta volledig stil, romp recht', 'Andere arm langs het lichaam', 'Hold 30-60 sec, wissel zijde'],
     muscleLoads: { Core: 4, Obliques: 5, Onderarmen: 4 },
+    defaultRepUnit: 'sec',
   },
   {
     name: 'McGill Side Bridge',
@@ -2158,6 +2191,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['core', 'mcgill', 'big-3', 'lage rugpijn', 'rehab'],
     instructions: ['Side plank op de elleboog, voeten gestapeld of voor elkaar', 'Heupen omhoog, romp recht', 'Hold 10 seconden', '8 reps × 3 sets per zijde, korte rust ertussen'],
     muscleLoads: { Obliques: 4, Core: 4, Abductoren: 3 },
+    defaultRepUnit: 'sec',
   },
   {
     name: 'Mountain Climber (Slow)',
@@ -2188,6 +2222,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['core', 'rug', 'stabiliteit', 'mcgill', 'tva'],
     instructions: ['Viervoetersstand', 'Strek tegenovergestelde arm en been', 'Houd romp stabiel (geen rotatie)', 'Wissel van kant'],
     muscleLoads: { Core: 5, Onderrug: 3, Glutes: 3, 'Schouders posterieur': 2 },
+    defaultRepUnit: 'sec',
   },
   {
     name: 'Side Plank',
@@ -2201,6 +2236,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['core', 'lateraal', 'stabiliteit', 'mcgill', 'quadratus lumborum'],
     instructions: ['Lig op je zij op onderarm', 'Hef heupen omhoog (rechte lijn)', 'Houd positie vast', 'Wissel kant'],
     muscleLoads: { Core: 4, Abductoren: 4, Glutes: 3, 'Schouders lateraal': 2 },
+    defaultRepUnit: 'sec',
   },
   {
     name: 'Plank',
@@ -2214,6 +2250,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['core', 'plank', 'isometrisch'],
     instructions: ['Onderarmen en tenen op de grond', 'Lichaam in rechte lijn', 'Houd de positie vast', 'Niet laten doorzakken'],
     muscleLoads: { Core: 4, 'Schouders anterieur': 2, Onderrug: 2, Glutes: 2 },
+    defaultRepUnit: 'sec',
   },
   {
     name: 'Pallof Press',
@@ -2685,6 +2722,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['carry', 'functioneel', 'grip'],
     instructions: ['Pak zwaar gewicht in elke hand', 'Loop met rechte houding', 'Schouders naar achteren', 'Strakke core'],
     muscleLoads: { Core: 4, Onderarmen: 5, 'Schouders lateraal': 3, Bovenrug: 3, Glutes: 2 },
+    defaultExtraParams: [{ id: 'dist', label: 'Afstand', type: 'number', value: 20, unit: 'm', min: 0 }],
   },
   {
     name: 'Suitcase Carry',
@@ -2698,6 +2736,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['carry', 'core', 'anti-lateraal'],
     instructions: ['Gewicht in één hand', 'Houd romp recht zonder zijwaarts leunen', 'Loop gecontroleerd'],
     muscleLoads: { Core: 5, Onderarmen: 4, Abductoren: 3, 'Schouders lateraal': 2 },
+    defaultExtraParams: [{ id: 'dist', label: 'Afstand', type: 'number', value: 20, unit: 'm', min: 0 }],
   },
   {
     name: 'Front-Rack Carry',
@@ -2711,6 +2750,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['carry', 'core', 'thoracale extensie', 'kettlebell'],
     instructions: ['Twee kettlebells/dumbbells in front-rack positie', 'Ellebogen onder de gewichten, hoog tegen de borst', 'Loop met rechte romp, ribbenkast naar beneden', 'Adem rustig door, geen Valsalva'],
     muscleLoads: { Core: 5, Obliques: 4, Bovenrug: 3, 'Schouders anterieur': 3, Onderarmen: 3 },
+    defaultExtraParams: [{ id: 'dist', label: 'Afstand', type: 'number', value: 20, unit: 'm', min: 0 }],
   },
   {
     name: 'Single-Arm Front-Rack Carry',
@@ -2724,6 +2764,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['carry', 'core', 'anti-rotatie', 'anti-laterale-flexie', 'unilateraal'],
     instructions: ['Eén kettlebell in front-rack', 'Andere arm langs het lichaam', 'Loop zonder romp-rotatie of laterale lean', 'Ribbenkast naar beneden, glutes lichtjes aan'],
     muscleLoads: { Core: 5, Obliques: 5, Bovenrug: 3, 'Schouders anterieur': 3 },
+    defaultExtraParams: [{ id: 'dist', label: 'Afstand', type: 'number', value: 20, unit: 'm', min: 0 }],
   },
   {
     name: 'Overhead Carry',
@@ -2737,6 +2778,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['carry', 'overhead', 'schouder-stabiliteit', 'serratus'],
     instructions: ['Druk twee dumbbells/kettlebells boven het hoofd', 'Armen volledig gestrekt, achter de oren', 'Loop gecontroleerd, behoud actieve schouder-positie', 'Adem normaal, ribbenkast neer'],
     muscleLoads: { 'Schouders anterieur': 4, 'Schouders lateraal': 3, Trapezius: 4, Core: 5, Triceps: 3 },
+    defaultExtraParams: [{ id: 'dist', label: 'Afstand', type: 'number', value: 20, unit: 'm', min: 0 }],
   },
   {
     name: 'Single-Arm Overhead Carry',
@@ -2750,6 +2792,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['carry', 'overhead', 'unilateraal', 'core', 'gevorderd'],
     instructions: ['Druk één kettlebell of dumbbell boven het hoofd', 'Andere arm langs het lichaam', 'Loop zonder zijwaarts leunen', 'Houd schouderblad gepakt en gefixeerd'],
     muscleLoads: { 'Schouders anterieur': 4, 'Schouders lateraal': 4, Trapezius: 4, Core: 5, Obliques: 5 },
+    defaultExtraParams: [{ id: 'dist', label: 'Afstand', type: 'number', value: 20, unit: 'm', min: 0 }],
   },
   {
     name: 'Mixed Carry (Waiter + Suitcase)',
@@ -2763,6 +2806,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['carry', 'gemengd', 'core', 'asymmetrisch', 'gevorderd'],
     instructions: ['Eén kettlebell overhead (waiter)', 'Andere kettlebell in suitcase positie (langs het lichaam)', 'Loop gecontroleerd zonder romp-rotatie', 'Wissel halverwege de set'],
     muscleLoads: { 'Schouders anterieur': 4, 'Schouders lateraal': 4, Trapezius: 4, Core: 5, Obliques: 5, Onderarmen: 4 },
+    defaultExtraParams: [{ id: 'dist', label: 'Afstand', type: 'number', value: 20, unit: 'm', min: 0 }],
   },
   {
     name: 'Yoke Walk',
@@ -2776,6 +2820,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['carry', 'strongman', 'yoke', 'core', 'gevorderd'],
     instructions: ['Yoke op de bovenrug, schouderbladen samenknijpen', 'Pak het frame stevig vast', 'Korte snelle stappen, ribbenkast neer', 'Geen zijwaartse zwaai'],
     muscleLoads: { Core: 5, Quadriceps: 4, Glutes: 4, ErectorSpinae: 4, Bovenrug: 4, Calves: 3 },
+    defaultExtraParams: [{ id: 'dist', label: 'Afstand', type: 'number', value: 20, unit: 'm', min: 0 }],
   },
   {
     name: 'Bear Hug Carry',
@@ -2789,6 +2834,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['carry', 'sandbag', 'bear hug', 'core', 'odd-object'],
     instructions: ['Klem sandbag of zware plate hoog tegen de borst', 'Houd ellebogen naar elkaar geklemd', 'Loop met rechte romp, leun niet achterover', 'Adem rustig door'],
     muscleLoads: { Core: 5, Borst: 3, Onderarmen: 3, Glutes: 2, Quadriceps: 2 },
+    defaultExtraParams: [{ id: 'dist', label: 'Afstand', type: 'number', value: 20, unit: 'm', min: 0 }],
   },
   {
     name: 'Goblet Carry',
@@ -2802,6 +2848,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['carry', 'goblet', 'beginner', 'core'],
     instructions: ['Houd kettlebell verticaal tegen de borst', 'Ellebogen onder de bel naar elkaar', 'Loop met rechte romp', 'Span core gedurende de wandeling'],
     muscleLoads: { Core: 4, Bovenrug: 3, 'Schouders anterieur': 2, Onderarmen: 3 },
+    defaultExtraParams: [{ id: 'dist', label: 'Afstand', type: 'number', value: 20, unit: 'm', min: 0 }],
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -2832,6 +2879,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['lies', 'adductoren', 'revalidatie', 'zijplank'],
     instructions: ['Lig op zij, onderste knie gebogen onder je', 'Bovenste been op bank op kniehoogte', 'Til heup van de grond, houd 10-30s', 'Progressie naar long-lever'],
     muscleLoads: { Adductoren: 4, Core: 4, Abductoren: 3 },
+    defaultRepUnit: 'sec',
   },
   {
     name: 'Adductor Squeeze (bal, 45°)',
@@ -3065,6 +3113,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['anti-extension', 'core', 'quadruped'],
     instructions: ['Start op handen en knieën', 'Til knieën 2-3 cm van de grond', 'Hold 20-30s of stap contralateraal voor/achteruit', 'Rug neutraal, heupen stabiel'],
     muscleLoads: { Core: 4, 'Schouders anterieur': 3, Quadriceps: 3, Bovenrug: 2 },
+    defaultRepUnit: 'sec',
   },
   {
     name: 'Renegade Row',
@@ -3397,6 +3446,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['sled', 'push', 'conditioning', 'concentric-only', 'quadriceps'],
     instructions: ['Plaats handen op de bovenkant van de sled-palen', 'Voorover leunen, ~45° lichaamshelling', 'Loop met korte krachtige stappen', 'Duw aaneengesloten voor 10-20m'],
     muscleLoads: { Quadriceps: 5, Glutes: 4, Calves: 4, Core: 3 },
+    defaultExtraParams: [{ id: 'dist', label: 'Afstand', type: 'number', value: 20, unit: 'm', min: 0 }],
   },
   {
     name: 'Sled pull',
@@ -3410,6 +3460,7 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['sled', 'pull', 'conditioning', 'posterior-chain', 'hamstrings'],
     instructions: ['Bevestig touw of harness aan sled', 'Loop vooruit met gestrekte armen of touw over schouder', 'Blijf heup-dominant — houd knieën niet te ver naar voren', '10-20m per set'],
     muscleLoads: { Hamstrings: 4, Glutes: 4, ErectorSpinae: 3, Lats: 3, Core: 3 },
+    defaultExtraParams: [{ id: 'dist', label: 'Afstand', type: 'number', value: 20, unit: 'm', min: 0 }],
   },
   {
     name: 'Sled drag',
@@ -3423,6 +3474,21 @@ export const STANDARD_EXERCISES: SeedExercise[] = [
     tags: ['sled', 'drag', 'backward', 'quadriceps', 'knie-rehab', 'concentric-only'],
     instructions: ['Bevestig handvatten of riem aan sled', 'Loop achteruit met korte, rustige stappen', 'Knie komt bij elke stap naar voren — quad-focus', 'Rechte rug, licht voorover'],
     muscleLoads: { Quadriceps: 5, Glutes: 3, Core: 3 },
+    defaultExtraParams: [{ id: 'dist', label: 'Afstand', type: 'number', value: 20, unit: 'm', min: 0 }],
+  },
+  {
+    name: 'Sled Push (Chest Press)',
+    description: 'Sled-variant waarbij je de slee duwt vanuit een bench-press houding — handen op borsthoogte tegen de palen, ellebogen langs lichaam. Hoge pectoralis-, anterior deltoid- en triceps-activatie, concentric-only zonder excentrische rep-belasting van een echte bench press. Bruikbaar als shoulder-vriendelijke push-progressie en bij borst-/schouderrehab.',
+    category: 'STRENGTH',
+    bodyRegion: ['SHOULDER', 'FULL_BODY'],
+    difficulty: 'INTERMEDIATE',
+    loadType: 'WEIGHTED',
+    isUnilateral: false,
+    movementPattern: 'PUSH_HORIZONTAL',
+    tags: ['sled', 'push', 'chest-press', 'concentric-only', 'borst', 'schouder'],
+    instructions: ['Plaats handen op borsthoogte tegen de sled-palen', 'Sta met rechte rug, lichte voorwaartse helling', 'Strek de armen kort en krachtig — push als bench press', 'Stap mee, blijf duwen voor 10-15m', 'Geen excentrische fase — laat de slee afremmen'],
+    muscleLoads: { 'Pectoralis Major': 4, 'Schouders anterieur': 3, Triceps: 4, Core: 3, Glutes: 2, Quadriceps: 2 },
+    defaultExtraParams: [{ id: 'dist', label: 'Afstand', type: 'number', value: 15, unit: 'm', min: 0 }],
   },
   {
     name: 'Triple extension hip lock drill',

@@ -413,6 +413,10 @@ model Exercise {
   // aan een programma wordt toegevoegd. Vorm: ExtraParam[] uit
   // src/components/programs/types.ts.
   defaultExtraParams Json         @default("[]")
+  // Standaard tracking-unit voor de primaire as (reps/sec/min). Wordt
+  // overgenomen in ProgramExercise.repUnit bij toevoegen aan een programma.
+  // "sec" voor isometrische oefeningen (plank/wall sit/dead hang).
+  defaultRepUnit String           @default("reps")
   createdBy      User             @relation(fields: [createdById], references: [id])
   createdById    String
   createdAt      DateTime         @default(now())

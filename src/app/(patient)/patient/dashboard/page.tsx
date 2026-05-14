@@ -27,6 +27,7 @@ export default function PatientDashboard() {
   const { data: rawWorkloadSessions } = trpc.patient.getWorkloadSessions.useQuery()
   const { data: rawRecoverySessions } = trpc.patient.getRecoverySessions.useQuery()
   const { data: todayWellness } = trpc.wellness.today.useQuery()
+  const { data: rehabTracker } = trpc.rehab.getMyTracker.useQuery()
 
   const workloadSessions = rawWorkloadSessions?.map((s) => ({ ...s, date: new Date(s.date) })) ?? []
   const recoverySessions =
@@ -238,6 +239,16 @@ export default function PatientDashboard() {
             label="Mijn programma"
             sub={`${activeProgram.name ?? ''} · alle weken bekijken`}
             bar={P.purple}
+          />
+        )}
+
+        {/* Rehab-protocol — alleen tonen als therapeut een tracker heeft geactiveerd */}
+        {rehabTracker && (
+          <ActionTile
+            href="/patient/rehab"
+            label="Mijn revalidatie"
+            sub={`${rehabTracker.protocol.name} · ${rehabTracker.progress.pct}% behaald`}
+            bar={P.lime}
           />
         )}
 
