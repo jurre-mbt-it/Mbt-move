@@ -46,6 +46,12 @@ type EditProgram = {
   status: 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED'
   updatedAt: string | Date
   exercises: EditExercise[]
+  // Builder-toggles — moeten meekomen van server anders worden ze bij elke
+  // remount (na autosave) terug naar default false gezet.
+  tendinopathyMode?: boolean
+  trackOneRepMax?: boolean
+  flexibleSchedule?: boolean
+  weeklyTarget?: number | null
 }
 
 export default function EditProgramPage({ params }: Props) {
@@ -129,6 +135,10 @@ export default function EditProgramPage({ params }: Props) {
           daysPerWeek: program.daysPerWeek,
           isTemplate: program.isTemplate,
           patientId: program.patientId ?? null,
+          tendinopathyMode: program.tendinopathyMode ?? false,
+          trackOneRepMax: program.trackOneRepMax ?? false,
+          flexibleSchedule: program.flexibleSchedule ?? false,
+          weeklyTarget: program.weeklyTarget ?? null,
           exercises,
         }}
       />
