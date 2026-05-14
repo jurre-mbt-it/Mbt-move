@@ -116,8 +116,10 @@ export default function TreatmentPage({
 
   const { data: patient, isLoading: patientLoading } = trpc.patients.get.useQuery({ id: patientId })
   const { data: todayData, isLoading: todayLoading } = trpc.patient.getTodayExercises.useQuery({ patientId })
-  const { data: previousSessions = [] } = trpc.patients.recentSessions.useQuery({ patientId, limit: 1 })
-  const previousSession = previousSessions[0] ?? null
+  const { data: previousSessionsRaw = [] } = trpc.patients.recentSessions.useQuery({ patientId, limit: 1 })
+  // Shallow cast — tRPC inference is anders te diep (TS2589) bij iteratie over exercises.
+  const previousSessions = previousSessionsRaw as unknown as PreviousSession[]
+  const previousSession: PreviousSession | null = previousSessions[0] ?? null
   const draftKey = `mbt-treatment-draft-${patientId}`
   const logMutation = trpc.patients.logSessionForPatient.useMutation({
     onSuccess: () => {
@@ -131,7 +133,7 @@ export default function TreatmentPage({
   const [startedAt, setStartedAt] = useState(() => new Date())
   const [editingStart, setEditingStart] = useState(false)
   const [previousOpen, setPreviousOpen] = useState(true)
-  const [mode, setMode] = useState<'choose' | 'program' | 'free'>('choose')
+  const [mode, setMode] = useState<'choose' | 'program' | 'free' | 'previous'>('choose')
   const [rows, setRows] = useState<LogRow[]>([])
   const [dirty, setDirty] = useState(false) // gebruiker heeft lijst aangepast; niet meer auto-repoppen
   const [painLevel, setPainLevel] = useState<number | null>(null)
@@ -202,6 +204,35 @@ export default function TreatmentPage({
       )
     }
   }, [mode, todayData, dirty, rows.length])
+
+  // Bij "Vorige sessie" → laad de oefeningen uit de laatste sessie als startpunt.
+  // Sets/reps/superset/extra params worden overgenomen; weight-velden + pijn
+  // worden bewust leeg gezet — dat moet vandaag opnieuw worden ingevuld.
+  useEffect(() => {
+    if (mode === 'previous' && previousSession && !dirty && rows.length === 0) {
+      setRows(
+        previousSession.exercises.map((e, idx) => {
+          const sets = Math.max(1, e.sets ?? 1)
+          return {
+            uid: `prev-${Date.now()}-${idx}-${e.id}`,
+            exerciseId: e.exerciseId,
+            name: e.name,
+            hasProgramTarget: false,
+            targetSets: 0,
+            targetReps: 0,
+            repUnit: 'reps',
+            setsCompleted: e.sets != null ? String(e.sets) : '',
+            repsCompleted: e.reps != null ? String(e.reps) : '',
+            weightsPerSet: Array(sets).fill(''),
+            extraParams: clonePresetParams(e.extraParams),
+            supersetGroup: e.supersetGroup ?? null,
+            painDuring: '',
+            visible: { weight: true, pain: true },
+          }
+        }),
+      )
+    }
+  }, [mode, previousSession, dirty, rows.length])
 
   // Live timer tick
   useEffect(() => {
@@ -515,7 +546,7 @@ export default function TreatmentPage({
         {mode === 'choose' && (
           <section className="flex flex-col gap-3">
             <Kicker>Hoe wil je starten?</Kicker>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <button
                 type="button"
                 onClick={() => setMode('program')}
@@ -533,6 +564,27 @@ export default function TreatmentPage({
                 </p>
                 <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 2 }}>
                   {todayData?.exercises.length ?? 0} oefeningen voor vandaag. Je kunt tijdens de sessie aanpassen.
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('previous')}
+                disabled={!previousSession || previousSession.exercises.length === 0}
+                className="athletic-tap rounded-xl p-5 text-left"
+                style={{
+                  background: P.surface,
+                  border: `1px solid ${P.ice}`,
+                  opacity: previousSession && previousSession.exercises.length > 0 ? 1 : 0.4,
+                }}
+              >
+                <Kicker>Vorige sessie</Kicker>
+                <p style={{ color: P.ink, fontSize: 15, fontWeight: 700, marginTop: 6 }}>
+                  {previousSession ? 'Herhaal als startpunt' : 'Geen vorige sessie'}
+                </p>
+                <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 2 }}>
+                  {previousSession
+                    ? `${previousSession.exercises.length} oef. uit ${formatRelativeDate(previousSession.completedAt)}. Sets/reps aanpasbaar.`
+                    : 'Nog niets gelogd voor deze patient.'}
                 </p>
               </button>
               <button
@@ -1347,6 +1399,7 @@ function Chip({
 
 type PreviousExercise = {
   id: string
+  exerciseId: string
   name: string
   sets: number | null
   reps: number | null

@@ -993,6 +993,7 @@ export const patientsRouter = createTRPCRouter({
         notes: s.notes,
         exercises: s.exerciseLogs.map((el) => ({
           id: el.id,
+          exerciseId: el.exerciseId,
           name: exerciseNameById.get(el.exerciseId) ?? 'Oefening',
           sets: el.setsCompleted,
           reps: el.repsCompleted,
