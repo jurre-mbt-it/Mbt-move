@@ -21,6 +21,21 @@ export const LAST_SEEN_RELEASE_KEY = 'mbt-last-seen-release'
 
 export const releaseNotes: ReleaseNote[] = [
   {
+    id: '2026-05-14-rehab-view-en-exercise-defaults',
+    date: '2026-05-14',
+    title: 'Read-only revalidatie voor patiënten + slimmere oefening-defaults',
+    highlight: 'Patiënten zien nu hun criteria-protocol mee, en oefeningen openen met de juiste parameters (seconden voor isometrisch werk, meters voor sleeën en carries).',
+    items: [
+      'Patiëntenoverzicht onderscheidt atleten: per kaart een gouden ATLEET-badge en filterpills bovenaan voor Alle / Patiënten / Atleten.',
+      'Snelle workout op het atleet-dashboard: + knop in het midden van de onderbalk linkt direct naar een quick workout.',
+      'Revalidatie-protocol voor patiënten: heeft een patiënt een actief criteria-protocol, dan ziet die op zijn dashboard een tegel "Mijn revalidatie". Klikken opent een read-only overzicht van fases en criteria — groen/oranje/rood per criterium. De patiënt kan niets wijzigen; jij blijft als therapeut de statussen aanpassen.',
+      'Isometrische oefeningen openen voortaan in seconden: Plank, Side Plank, Wall Sit, Dead Hang, Bird Dog, Hollow Body Hold, McGill Side Bridge, Copenhagen Side Plank, Bear Crawl, Suitcase Hold en Mid-Range Hip Thrust Hold krijgen automatisch sec als unit + 30 sec als startwaarde wanneer je ze aan een programma toevoegt.',
+      'Sleeën en carries krijgen "Afstand" als standaard extra-parameter (20m default): Sled push/pull/drag, Farmer\'s Walk, Suitcase/Front-Rack/Overhead Carry, Yoke Walk, Bear Hug Carry, Goblet Carry en Mixed Carry.',
+      'Twee nieuwe oefeningen toegevoegd: Ring Row (bodyweight pull-horizontal, beginner) en Sled Push (Chest Press) — slee duwen vanuit een bench-press positie, concentric-only.',
+      'Parameter-menu bug opgelost: bij "Start behandeling" werd het + PARAMETER uitklap-menu afgesneden door de volgende oefening — staat nu netjes bovenop.',
+    ],
+  },
+  {
     id: '2026-05-11-live-behandeling-uitbreiding',
     date: '2026-05-11',
     title: 'Live behandeling uitgebreid + sessie achteraf bewerken',
