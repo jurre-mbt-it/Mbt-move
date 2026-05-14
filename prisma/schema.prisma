@@ -595,6 +595,14 @@ model Program {
   tendinopathyMode Boolean       @default(false)
   trackOneRepMax   Boolean       @default(false)
 
+  // Flexible-schedule modus: patient kan dit programma elke dag van de week
+  // starten in plaats van vastgepind op specifieke dagen. Klaar zodra de
+  // patient `weeklyTarget` keer voltooid heeft (Mo-Su rolling). Resulteert
+  // in een "lekker bezig" melding aan patient-zijde + suppressie van de
+  // oefeningen voor de rest van die week.
+  flexibleSchedule Boolean       @default(false)
+  weeklyTarget     Int?
+
   creator   User    @relation("ProgramCreator", fields: [creatorId], references: [id])
   creatorId String
   patient   User?   @relation("ProgramPatient", fields: [patientId], references: [id], onDelete: Cascade)

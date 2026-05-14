@@ -153,6 +153,11 @@ export const programsRouter = createTRPCRouter({
       // omdat de wizards verschillende velden vastleggen (zone-training,
       // intervallen, walk-run weken, etc.). UI blijft de bron van waarheid.
       cardioParams: z.unknown().optional(),
+      // Flexible-schedule modus + weekly target. Wanneer aan, kan patient
+      // het programma elke dag van de week starten; klaar zodra weeklyTarget
+      // is bereikt.
+      flexibleSchedule: z.boolean().optional(),
+      weeklyTarget: z.number().int().min(1).max(14).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const { patientId, cardioParams, ...rest } = input
@@ -183,6 +188,8 @@ export const programsRouter = createTRPCRouter({
       startDate: z.string().nullable().optional(),
       endDate: z.string().nullable().optional(),
       exercises: z.array(ProgramExerciseInput).optional(),
+      flexibleSchedule: z.boolean().optional(),
+      weeklyTarget: z.number().int().min(1).max(14).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const { id, exercises, startDate, endDate, ...data } = input

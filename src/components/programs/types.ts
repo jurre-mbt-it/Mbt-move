@@ -80,4 +80,8 @@ export interface ProgramState {
   isTemplate: boolean
   tendinopathyMode: boolean
   trackOneRepMax: boolean
+  /** Patient mag programma elke dag starten; klaar zodra `weeklyTarget`
+   *  is bereikt binnen een rolling week (Mo-Su). */
+  flexibleSchedule?: boolean
+  weeklyTarget?: number | null
 }
