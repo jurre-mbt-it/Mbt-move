@@ -3,17 +3,19 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, CalendarDays, Zap, User, Menu, X, Dumbbell, ChevronRight } from 'lucide-react'
+import { Home, CalendarDays, Zap, User, Menu, X, Dumbbell, ChevronRight, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { P } from '@/components/dark-ui'
 
-// iOS-parity: 4 tabs, uppercase mono labels.
+// 5 cells: 2 left tabs, center FAB (quick workout), 2 right tabs.
 const MAIN_NAV = [
   { href: '/athlete/dashboard', label: 'HOME', icon: Home },
   { href: '/athlete/schedule', label: 'SCHEMA', icon: CalendarDays },
   { href: '/athlete/workouts', label: 'TRAINING', icon: Zap },
   { href: '/athlete/profile', label: 'PROFIEL', icon: User },
 ]
+
+const QUICK_WORKOUT_HREF = '/athlete/session?mode=quick'
 
 const DRAWER_ITEMS = [
   { href: '/athlete/exercises', label: 'Oefeningen', icon: Dumbbell, description: 'Oefeningen bibliotheek' },
@@ -98,19 +100,71 @@ export function AthleteBottomNav() {
         </div>
       </div>
 
-      {/* Bottom nav */}
+      {/* Bottom nav — 6 cells: 2 left tabs, center FAB, 2 right tabs, MEER drawer */}
       <nav
         className="fixed bottom-0 left-0 right-0 z-30 border-t"
         style={{ background: P.bg, borderColor: P.lineStrong }}
       >
-        <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
-          {MAIN_NAV.map(({ href, label, icon: Icon }) => {
+        <div className="grid grid-cols-6 items-center h-16 max-w-lg mx-auto px-2">
+          {MAIN_NAV.slice(0, 2).map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + '/')
             return (
               <Link
                 key={href}
                 href={href}
-                className={cn('flex flex-col items-center gap-1 flex-1 py-2 athletic-mono transition-colors')}
+                className={cn('flex flex-col items-center gap-1 py-2 athletic-mono transition-colors')}
+                style={{
+                  color: active ? P.lime : P.inkMuted,
+                  fontSize: 9,
+                  letterSpacing: '0.14em',
+                }}
+              >
+                <Icon className="w-5 h-5" />
+                <span>{label}</span>
+              </Link>
+            )
+          })}
+
+          {/* Center + button — direct naar quick workout */}
+          <Link
+            href={QUICK_WORKOUT_HREF}
+            className="athletic-tap flex flex-col items-center justify-center"
+            aria-label="Snelle workout"
+          >
+            <span
+              className="flex items-center justify-center rounded-full"
+              style={{
+                background: P.lime,
+                color: P.bg,
+                width: 44,
+                height: 44,
+                marginTop: -10,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+              }}
+            >
+              <Plus className="w-6 h-6" strokeWidth={3} />
+            </span>
+            <span
+              className="athletic-mono"
+              style={{
+                color: P.inkMuted,
+                fontSize: 9,
+                letterSpacing: '0.14em',
+                fontWeight: 700,
+                marginTop: 1,
+              }}
+            >
+              SNEL
+            </span>
+          </Link>
+
+          {MAIN_NAV.slice(2).map(({ href, label, icon: Icon }) => {
+            const active = pathname === href || pathname.startsWith(href + '/')
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={cn('flex flex-col items-center gap-1 py-2 athletic-mono transition-colors')}
                 style={{
                   color: active ? P.lime : P.inkMuted,
                   fontSize: 9,
@@ -124,12 +178,12 @@ export function AthleteBottomNav() {
           })}
           <button
             onClick={() => setDrawerOpen(true)}
-            className="flex flex-col items-center gap-1 flex-1 py-2 athletic-mono transition-colors"
+            className="flex flex-col items-center gap-1 py-2 athletic-mono transition-colors"
             style={{ color: P.inkMuted, fontSize: 9, letterSpacing: '0.14em' }}
             type="button"
           >
             <Menu className="w-5 h-5" />
-            <span>Meer</span>
+            <span>MEER</span>
           </button>
         </div>
       </nav>

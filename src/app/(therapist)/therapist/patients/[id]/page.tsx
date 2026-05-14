@@ -550,14 +550,30 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                   <div className="space-y-2">
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div>
-                        <p
-                          className="athletic-mono"
-                          style={{ color: P.ink, fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}
-                        >
-                          {session.completedAt
-                            ? new Date(session.completedAt).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
-                            : '—'}
-                        </p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p
+                            className="athletic-mono"
+                            style={{ color: P.ink, fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}
+                          >
+                            {session.completedAt
+                              ? new Date(session.completedAt).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
+                              : '—'}
+                          </p>
+                          <Link
+                            href={`/therapist/patients/${id}/sessions/${session.id}/edit`}
+                            className="athletic-mono"
+                            style={{
+                              color: P.lime,
+                              fontSize: 10,
+                              letterSpacing: '0.12em',
+                              padding: '2px 6px',
+                              border: `1px solid ${P.lime}`,
+                              borderRadius: 4,
+                            }}
+                          >
+                            BEWERK
+                          </Link>
+                        </div>
                         {session.programName && (
                           <p
                             className="athletic-mono"

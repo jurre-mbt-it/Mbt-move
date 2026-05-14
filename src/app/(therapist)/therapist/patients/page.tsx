@@ -27,6 +27,7 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }>
 }
 
 type QuickFilter = 'all' | 'active' | 'low-compliance'
+type RoleFilter = 'all' | 'PATIENT' | 'ATHLETE'
 
 export default function PatientsPage() {
   return (
@@ -42,6 +43,7 @@ function PatientsPageInner() {
   const initialFilter = (searchParams.get('filter') as QuickFilter | null) ?? 'all'
   const [search, setSearch] = useState('')
   const [quickFilter, setQuickFilter] = useState<QuickFilter>(initialFilter)
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>('all')
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteName, setInviteName] = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
@@ -97,6 +99,8 @@ function PatientsPageInner() {
 
   const activeCount = patients.filter(p => p.programStatus === 'ACTIVE').length
   const lowComplianceCount = patients.filter(p => p.complianceLow).length
+  const patientCount = patients.filter(p => p.role === 'PATIENT').length
+  const athleteCount = patients.filter(p => p.role === 'ATHLETE').length
 
   const filtered = patients
     .filter(p => {
@@ -104,6 +108,7 @@ function PatientsPageInner() {
       if (quickFilter === 'low-compliance') return p.complianceLow
       return true
     })
+    .filter(p => roleFilter === 'all' || p.role === roleFilter)
     .filter(p =>
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       p.email.toLowerCase().includes(search.toLowerCase())
@@ -148,6 +153,31 @@ function PatientsPageInner() {
             active={quickFilter === 'low-compliance'}
             onClick={() => setQuickFilter(quickFilter === 'low-compliance' ? 'all' : 'low-compliance')}
           />
+        </div>
+
+        {/* Role filter pills */}
+        <div className="flex gap-2">
+          {([
+            { value: 'all', label: `Alle (${patients.length})`, color: P.ice },
+            { value: 'PATIENT', label: `Patiënten (${patientCount})`, color: P.lime },
+            { value: 'ATHLETE', label: `Atleten (${athleteCount})`, color: P.gold },
+          ] as const).map(opt => {
+            const active = roleFilter === opt.value
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setRoleFilter(opt.value)}
+                className="athletic-tap athletic-mono px-3 py-1.5 rounded-full text-xs transition-colors"
+                style={active
+                  ? { border: `1.5px solid ${opt.color}`, background: opt.color + '15', color: opt.color, fontWeight: 800, letterSpacing: '0.06em' }
+                  : { border: `1.5px solid ${P.lineStrong}`, color: P.inkMuted, background: 'transparent', fontWeight: 700, letterSpacing: '0.06em' }
+                }
+              >
+                {opt.label}
+              </button>
+            )
+          })}
         </div>
 
         {/* Search */}
@@ -204,6 +234,23 @@ function PatientsPageInner() {
                         >
                           {patient.name}
                         </h3>
+                        {patient.role === 'ATHLETE' && (
+                          <span
+                            className="athletic-mono"
+                            style={{
+                              background: P.gold + '20',
+                              color: P.gold,
+                              fontSize: 10,
+                              letterSpacing: '0.1em',
+                              padding: '2px 8px',
+                              borderRadius: 999,
+                              fontWeight: 800,
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            Atleet
+                          </span>
+                        )}
                         {status && (
                           <span
                             className="athletic-mono"

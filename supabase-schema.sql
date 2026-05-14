@@ -307,3 +307,12 @@ WHERE LOWER(u.email) = LOWER(au.email)
 ALTER TABLE "week_schedules" ADD COLUMN IF NOT EXISTS "weekNumber" INTEGER NOT NULL DEFAULT 1;
 CREATE INDEX IF NOT EXISTS "week_schedules_patientId_weekNumber_idx"
   ON "week_schedules"("patientId", "weekNumber");
+
+-- ── Live behandeling: per-set gewicht, extra parameters, supersets ──────────
+-- weightsPerSet: JSON-array met één gewicht (kg) per set.
+-- extraParams:   JSON-array van { id, label, type, value, unit?, options?, min?, max? }
+--                volgens schema-builder STANDARD_PARAMS (Tempo/RPE/Pauze/...).
+-- supersetGroup: 'A'..'F' label voor superset-koppeling tijdens behandeling.
+ALTER TABLE "exercise_logs" ADD COLUMN IF NOT EXISTS "weightsPerSet" JSONB;
+ALTER TABLE "exercise_logs" ADD COLUMN IF NOT EXISTS "extraParams"   JSONB;
+ALTER TABLE "exercise_logs" ADD COLUMN IF NOT EXISTS "supersetGroup" TEXT;

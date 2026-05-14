@@ -15,6 +15,7 @@ import {
   Shield,
   Settings,
   LogOut,
+  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -140,6 +141,14 @@ export function TherapistSidebar() {
             Admin
           </Link>
         )}
+        <Link
+          href="/therapist/release-notes"
+          className="athletic-tap flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors"
+          style={{ color: P.inkMuted }}
+        >
+          <Sparkles className="w-4.5 h-4.5 shrink-0" />
+          Wat is nieuw
+        </Link>
         <Link
           href="/therapist/settings"
           className="athletic-tap flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors"

@@ -3,6 +3,7 @@ import { TherapistBottomNav } from '@/components/layout/TherapistBottomNav'
 import { Header } from '@/components/layout/Header'
 import { PageTransition } from '@/components/layout/PageTransition'
 import { BetaDisclaimer } from '@/components/system/BetaDisclaimer'
+import { WhatsNewModal } from '@/components/system/WhatsNewModal'
 
 export default function TherapistLayout({
   children,
@@ -33,6 +34,7 @@ export default function TherapistLayout({
       {/* Bottom nav: alleen op mobiel */}
       <TherapistBottomNav />
       <BetaDisclaimer />
+      <WhatsNewModal />
     </div>
   )
 }

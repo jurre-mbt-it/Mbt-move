@@ -24,20 +24,86 @@ import {
 } from '@/components/dark-ui'
 import { trpc } from '@/lib/trpc/client'
 import { useDraftBackup, loadDraft, clearStoredDraft } from '@/hooks/useAutosave'
+import {
+  STANDARD_PARAMS,
+  SUPERSET_COLORS,
+  SUPERSET_LETTERS,
+} from '@/lib/program-constants'
+
+type ParamType = 'number' | 'text' | 'select' | 'slider'
+
+type LiveExtraParam = {
+  id: string
+  label: string
+  type: ParamType
+  value: string | number
+  unit?: string
+  options?: string[]
+  min?: number
+  max?: number
+}
 
 type LogRow = {
   uid: string
   exerciseId: string
   name: string
+  /** true alleen bij rows die uit een echt programma komen — bepaalt of "Doel: …" zichtbaar is */
+  hasProgramTarget: boolean
   targetSets: number
   targetReps: number
   repUnit: string
   setsCompleted: string // text-input
   repsCompleted: string
-  weight: string
+  /** Per-set gewicht in kg — array-lengte volgt setsCompleted */
+  weightsPerSet: string[]
+  /** Extra parameters per oefening (Tempo, RPE, Pauze, …) — zelfde shape als program-builder */
+  extraParams: LiveExtraParam[]
+  /** Superset-label (A..F) of null */
+  supersetGroup: string | null
   painDuring: string
   /** Per-exercise visibility for toggleable parameters (sets/reps altijd zichtbaar). */
   visible: { weight: boolean; pain: boolean }
+}
+
+function clonePresetParams(input: unknown): LiveExtraParam[] {
+  if (!Array.isArray(input)) return []
+  const out: LiveExtraParam[] = []
+  for (const raw of input) {
+    if (!raw || typeof raw !== 'object') continue
+    const p = raw as Record<string, unknown>
+    const label = String(p.label ?? '')
+    if (!label) continue
+    const type: ParamType =
+      p.type === 'number' || p.type === 'text' || p.type === 'select' || p.type === 'slider'
+        ? p.type
+        : 'number'
+    out.push({
+      id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      label,
+      type,
+      value: typeof p.value === 'string' || typeof p.value === 'number' ? p.value : 0,
+      unit: typeof p.unit === 'string' ? p.unit : undefined,
+      options: Array.isArray(p.options) ? p.options.filter((o): o is string => typeof o === 'string') : undefined,
+      min: typeof p.min === 'number' ? p.min : undefined,
+      max: typeof p.max === 'number' ? p.max : undefined,
+    })
+  }
+  return out
+}
+
+function resizeWeights(current: string[], targetCount: number): string[] {
+  if (targetCount <= 0) return ['']
+  if (current.length === targetCount) return current
+  if (current.length > targetCount) return current.slice(0, targetCount)
+  return [...current, ...Array(targetCount - current.length).fill('')]
+}
+
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : String(n)
+}
+
+function timeInputValue(d: Date): string {
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
 }
 
 export default function TreatmentPage({
@@ -60,7 +126,8 @@ export default function TreatmentPage({
     onError: (e) => toast.error(`Opslaan mislukt: ${e.message}`),
   })
 
-  const [startedAt] = useState(() => new Date())
+  const [startedAt, setStartedAt] = useState(() => new Date())
+  const [editingStart, setEditingStart] = useState(false)
   const [mode, setMode] = useState<'choose' | 'program' | 'free'>('choose')
   const [rows, setRows] = useState<LogRow[]>([])
   const [dirty, setDirty] = useState(false) // gebruiker heeft lijst aangepast; niet meer auto-repoppen
@@ -79,6 +146,7 @@ export default function TreatmentPage({
     exertionLevel: number | null
     notes: string
     dirty: boolean
+    startedAt?: string
   }
   useEffect(() => {
     const draft = loadDraft<DraftShape>(draftKey)
@@ -89,12 +157,16 @@ export default function TreatmentPage({
     setExertionLevel(draft.exertionLevel)
     setNotes(draft.notes)
     setDirty(draft.dirty)
+    if (draft.startedAt) {
+      const d = new Date(draft.startedAt)
+      if (!isNaN(d.getTime())) setStartedAt(d)
+    }
     toast.info('Live sessie hersteld', { duration: 2000 })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   useDraftBackup<DraftShape>({
     key: draftKey,
-    value: { mode, rows, painLevel, exertionLevel, notes, dirty },
+    value: { mode, rows, painLevel, exertionLevel, notes, dirty, startedAt: startedAt.toISOString() },
     enabled: mode !== 'choose' || rows.length > 0 || notes.length > 0,
   })
 
@@ -107,12 +179,15 @@ export default function TreatmentPage({
           uid: e.uid,
           exerciseId: e.exerciseId,
           name: e.name,
+          hasProgramTarget: true,
           targetSets: e.sets,
           targetReps: e.reps,
           repUnit: e.repUnit,
           setsCompleted: String(e.sets),
           repsCompleted: String(e.reps),
-          weight: '',
+          weightsPerSet: Array(Math.max(1, e.sets)).fill(''),
+          extraParams: clonePresetParams(e.defaultExtraParams),
+          supersetGroup: e.supersetGroup ?? null,
           painDuring: '',
           visible: { weight: true, pain: true },
         })),
@@ -130,7 +205,16 @@ export default function TreatmentPage({
 
   const updateRow = (uid: string, patch: Partial<LogRow>) => {
     setDirty(true)
-    setRows((prev) => prev.map((r) => (r.uid === uid ? { ...r, ...patch } : r)))
+    setRows((prev) => prev.map((r) => {
+      if (r.uid !== uid) return r
+      const merged = { ...r, ...patch }
+      // Bij wijziging van setsCompleted het weightsPerSet array meeschalen
+      if (patch.setsCompleted !== undefined) {
+        const target = Math.max(1, Number(patch.setsCompleted) || 1)
+        merged.weightsPerSet = resizeWeights(merged.weightsPerSet, target)
+      }
+      return merged
+    }))
   }
 
   const removeRow = (uid: string) => {
@@ -174,12 +258,15 @@ export default function TreatmentPage({
         uid: `new-${Date.now()}-${ex.id}`,
         exerciseId: ex.id,
         name: ex.name,
-        targetSets: 3,
-        targetReps: 10,
+        hasProgramTarget: false,
+        targetSets: 0,
+        targetReps: 0,
         repUnit: 'reps',
-        setsCompleted: '3',
-        repsCompleted: '10',
-        weight: '',
+        setsCompleted: '',
+        repsCompleted: '',
+        weightsPerSet: [''],
+        extraParams: [],
+        supersetGroup: null,
         painDuring: '',
         visible: { weight: true, pain: true },
       },
@@ -197,6 +284,77 @@ export default function TreatmentPage({
     )
   }
 
+  const addExtraParam = (uid: string, tpl: typeof STANDARD_PARAMS[number]) => {
+    setDirty(true)
+    setRows((prev) =>
+      prev.map((r) => {
+        if (r.uid !== uid) return r
+        if (r.extraParams.some((p) => p.label === tpl.label)) return r
+        const tplAny = tpl as typeof tpl & { min?: number; max?: number; options?: string[] }
+        return {
+          ...r,
+          extraParams: [
+            ...r.extraParams,
+            {
+              id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              label: tpl.label,
+              type: tpl.type,
+              value: tpl.type === 'number' || tpl.type === 'slider' ? 0 : '',
+              unit: 'unit' in tpl ? tpl.unit : undefined,
+              options: tplAny.options,
+              min: tplAny.min,
+              max: tplAny.max,
+            },
+          ],
+        }
+      }),
+    )
+  }
+
+  const updateExtraParam = (uid: string, paramId: string, value: string | number) => {
+    setDirty(true)
+    setRows((prev) =>
+      prev.map((r) =>
+        r.uid !== uid
+          ? r
+          : { ...r, extraParams: r.extraParams.map((p) => (p.id === paramId ? { ...p, value } : p)) },
+      ),
+    )
+  }
+
+  const removeExtraParam = (uid: string, paramId: string) => {
+    setDirty(true)
+    setRows((prev) =>
+      prev.map((r) =>
+        r.uid !== uid
+          ? r
+          : { ...r, extraParams: r.extraParams.filter((p) => p.id !== paramId) },
+      ),
+    )
+  }
+
+  const setSupersetGroup = (uid: string, group: string | null) => {
+    setDirty(true)
+    setRows((prev) => prev.map((r) => (r.uid === uid ? { ...r, supersetGroup: group } : r)))
+  }
+
+  const applyStartTime = (hhmm: string) => {
+    const [hStr, mStr] = hhmm.split(':')
+    const h = Number(hStr)
+    const m = Number(mStr)
+    if (Number.isNaN(h) || Number.isNaN(m)) return
+    const d = new Date(startedAt)
+    d.setHours(h, m, 0, 0)
+    // Niet in de toekomst zetten
+    const now = new Date()
+    if (d.getTime() > now.getTime()) {
+      toast.error('Starttijd kan niet in de toekomst liggen')
+      return
+    }
+    setStartedAt(d)
+    setEditingStart(false)
+  }
+
   const canSubmit = useMemo(() => rows.length > 0 && !logMutation.isPending, [rows, logMutation.isPending])
 
   function handleSubmit() {
@@ -210,14 +368,24 @@ export default function TreatmentPage({
       painLevel,
       exertionLevel,
       notes: notes.trim() || undefined,
-      exercises: rows.map((r) => ({
-        exerciseId: r.exerciseId,
-        setsCompleted: r.setsCompleted ? Number(r.setsCompleted) : undefined,
-        repsCompleted: r.repsCompleted ? Number(r.repsCompleted) : undefined,
-        // Verborgen parameters worden niet gelogd (null), zichtbare alleen als ingevuld.
-        weight: r.visible.weight && r.weight ? Number(r.weight) : null,
-        painDuring: r.visible.pain && r.painDuring ? Number(r.painDuring) : null,
-      })),
+      exercises: rows.map((r) => {
+        const weights = r.visible.weight
+          ? r.weightsPerSet.map((w) => (w === '' ? null : Number(w))).filter((n) => n === null || !Number.isNaN(n)) as Array<number | null>
+          : null
+        // Legacy "weight" = laatste niet-lege set, t.b.v. 1RM/trends die op single weight rekenen
+        const lastFilled = weights ? [...weights].reverse().find((n) => n !== null) ?? null : null
+        return {
+          exerciseId: r.exerciseId,
+          setsCompleted: r.setsCompleted ? Number(r.setsCompleted) : undefined,
+          repsCompleted: r.repsCompleted ? Number(r.repsCompleted) : undefined,
+          weight: lastFilled,
+          weightsPerSet: weights,
+          extraParams: r.extraParams.length ? r.extraParams : null,
+          supersetGroup: r.supersetGroup,
+          // Verborgen parameters worden niet gelogd (null)
+          painDuring: r.visible.pain && r.painDuring ? Number(r.painDuring) : null,
+        }
+      }),
     })
   }
 
@@ -243,16 +411,38 @@ export default function TreatmentPage({
     )
   }
 
+  // Groepeer rows op supersetGroup; rows zonder groep blijven los, rows mét
+  // groep komen visueel bij elkaar (gerangschikt op groep-letter).
+  const rowsForRender: Array<{ kind: 'single'; row: LogRow } | { kind: 'group'; group: string; rows: LogRow[] }> = []
+  const seenGroups = new Set<string>()
+  for (const r of rows) {
+    if (!r.supersetGroup) {
+      rowsForRender.push({ kind: 'single', row: r })
+    } else if (!seenGroups.has(r.supersetGroup)) {
+      seenGroups.add(r.supersetGroup)
+      rowsForRender.push({
+        kind: 'group',
+        group: r.supersetGroup,
+        rows: rows.filter((x) => x.supersetGroup === r.supersetGroup),
+      })
+    }
+  }
+
   return (
     <DarkScreen>
       <DarkHeader
         title="Live behandeling"
         backHref={`/therapist/patients/${patientId}`}
         right={
-          <span className="athletic-mono inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px]"
-            style={{ color: P.lime, border: `1px solid ${P.lime}`, backgroundColor: P.surface }}>
+          <button
+            type="button"
+            onClick={() => setEditingStart(true)}
+            title="Klik om starttijd aan te passen"
+            className="athletic-mono inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px]"
+            style={{ color: P.lime, border: `1px solid ${P.lime}`, backgroundColor: P.surface }}
+          >
             <PulsingDot color={P.lime} size={6} /> LIVE · {durationMin}M
-          </span>
+          </button>
         }
       />
 
@@ -270,6 +460,39 @@ export default function TreatmentPage({
             </MetaLabel>
           )}
         </div>
+
+        {/* Start-time editor */}
+        {editingStart && (
+          <Tile>
+            <MetaLabel>Starttijd aanpassen</MetaLabel>
+            <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, marginTop: 4 }}>
+              Sessie gestart om {timeInputValue(startedAt)} — pas aan als je later bent begonnen.
+            </p>
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                type="time"
+                defaultValue={timeInputValue(startedAt)}
+                onChange={(e) => applyStartTime(e.target.value)}
+                className="px-2 py-1.5 rounded"
+                style={{
+                  background: P.surfaceHi,
+                  border: `1px solid ${P.lineStrong}`,
+                  color: P.ink,
+                  fontSize: 14,
+                  colorScheme: 'dark',
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setEditingStart(false)}
+                className="athletic-mono"
+                style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.1em' }}
+              >
+                SLUITEN
+              </button>
+            </div>
+          </Tile>
+        )}
 
         {/* Mode chooser */}
         {mode === 'choose' && (
@@ -338,89 +561,54 @@ export default function TreatmentPage({
           )}
           <AddExerciseRow onAdd={addRow} />
 
-          {rows.map((r) => (
-            <Tile key={r.uid}>{/* exercise row */}
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <span style={{ color: P.ink, fontSize: 14, fontWeight: 700 }}>{r.name}</span>
-                  <div className="athletic-mono mt-0.5" style={{ color: P.inkMuted, fontSize: 11, textTransform: 'none', fontWeight: 500 }}>
-                    Doel: {r.targetSets} × {r.targetReps} {r.repUnit}
-                  </div>
-                </div>
-                <button type="button" onClick={() => removeRow(r.uid)}
-                  className="athletic-tap athletic-mono"
-                  style={{ color: P.inkDim, fontSize: 11, letterSpacing: '0.12em', padding: '4px 8px' }}>
-                  ×
-                </button>
-              </div>
+          {rowsForRender.map((item) => {
+            if (item.kind === 'single') {
+              return (
+                <ExerciseTile
+                  key={item.row.uid}
+                  row={item.row}
+                  onUpdate={updateRow}
+                  onRemove={removeRow}
+                  onToggleVisible={toggleVisible}
+                  onAddParam={addExtraParam}
+                  onUpdateParam={updateExtraParam}
+                  onRemoveParam={removeExtraParam}
+                  onSetSuperset={setSupersetGroup}
+                />
+              )
+            }
+            const colors = SUPERSET_COLORS[item.group] ?? { bg: 'rgba(255,255,255,0.04)', border: P.lineStrong, text: P.ink }
+            return (
               <div
-                className="grid gap-2 mt-3"
-                style={{
-                  gridTemplateColumns: `repeat(${2 + (r.visible.weight ? 1 : 0) + (r.visible.pain ? 1 : 0)}, minmax(0, 1fr))`,
-                }}
+                key={`group-${item.group}`}
+                className="rounded-xl p-2 flex flex-col gap-2"
+                style={{ background: colors.bg, border: `1px solid ${colors.border}` }}
               >
-                <LabeledInput label="Sets" value={r.setsCompleted} onChange={(v) => updateRow(r.uid, { setsCompleted: v })} inputMode="numeric" />
-                <LabeledInput label={`Reps (${r.repUnit})`} value={r.repsCompleted} onChange={(v) => updateRow(r.uid, { repsCompleted: v })} inputMode="numeric" />
-                {r.visible.weight && (
-                  <LabeledInput
-                    label="Gewicht (kg)"
-                    value={r.weight}
-                    onChange={(v) => updateRow(r.uid, { weight: v })}
-                    inputMode="decimal"
-                    onRemove={() => toggleVisible(r.uid, 'weight')}
-                  />
-                )}
-                {r.visible.pain && (
-                  <LabeledInput
-                    label="Pijn /10"
-                    value={r.painDuring}
-                    onChange={(v) => updateRow(r.uid, { painDuring: v })}
-                    inputMode="numeric"
-                    onRemove={() => toggleVisible(r.uid, 'pain')}
-                  />
-                )}
-              </div>
-              {/* Toggle-rij voor verborgen parameters */}
-              {(!r.visible.weight || !r.visible.pain) && (
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {!r.visible.weight && (
-                    <button
-                      type="button"
-                      onClick={() => toggleVisible(r.uid, 'weight')}
-                      className="athletic-mono athletic-tap px-2 py-1 rounded-full"
-                      style={{
-                        background: P.surfaceHi,
-                        color: P.inkMuted,
-                        border: `1px dashed ${P.lineStrong}`,
-                        fontSize: 10,
-                        letterSpacing: '0.08em',
-                        fontWeight: 800,
-                      }}
-                    >
-                      + GEWICHT
-                    </button>
-                  )}
-                  {!r.visible.pain && (
-                    <button
-                      type="button"
-                      onClick={() => toggleVisible(r.uid, 'pain')}
-                      className="athletic-mono athletic-tap px-2 py-1 rounded-full"
-                      style={{
-                        background: P.surfaceHi,
-                        color: P.inkMuted,
-                        border: `1px dashed ${P.lineStrong}`,
-                        fontSize: 10,
-                        letterSpacing: '0.08em',
-                        fontWeight: 800,
-                      }}
-                    >
-                      + PIJN
-                    </button>
-                  )}
+                <div className="flex items-center justify-between px-1">
+                  <span
+                    className="athletic-mono"
+                    style={{ color: colors.text, fontSize: 11, letterSpacing: '0.14em', fontWeight: 900 }}
+                  >
+                    SUPERSET {item.group} · {item.rows.length} oef.
+                  </span>
                 </div>
-              )}
-            </Tile>
-          ))}
+                {item.rows.map((r, idx) => (
+                  <ExerciseTile
+                    key={r.uid}
+                    row={r}
+                    supersetLabel={`${item.group}${idx + 1}`}
+                    onUpdate={updateRow}
+                    onRemove={removeRow}
+                    onToggleVisible={toggleVisible}
+                    onAddParam={addExtraParam}
+                    onUpdateParam={updateExtraParam}
+                    onRemoveParam={removeExtraParam}
+                    onSetSuperset={setSupersetGroup}
+                  />
+                ))}
+              </div>
+            )
+          })}
         </section>
         )}
 
@@ -479,6 +667,327 @@ export default function TreatmentPage({
         )}
       </div>
     </DarkScreen>
+  )
+}
+
+function ExerciseTile({
+  row: r,
+  supersetLabel,
+  onUpdate,
+  onRemove,
+  onToggleVisible,
+  onAddParam,
+  onUpdateParam,
+  onRemoveParam,
+  onSetSuperset,
+}: {
+  row: LogRow
+  supersetLabel?: string
+  onUpdate: (uid: string, patch: Partial<LogRow>) => void
+  onRemove: (uid: string) => void
+  onToggleVisible: (uid: string, field: 'weight' | 'pain') => void
+  onAddParam: (uid: string, tpl: typeof STANDARD_PARAMS[number]) => void
+  onUpdateParam: (uid: string, paramId: string, value: string | number) => void
+  onRemoveParam: (uid: string, paramId: string) => void
+  onSetSuperset: (uid: string, group: string | null) => void
+}) {
+  const [paramMenuOpen, setParamMenuOpen] = useState(false)
+  const [supersetMenuOpen, setSupersetMenuOpen] = useState(false)
+  const setsCount = Math.max(1, Number(r.setsCompleted) || 1)
+  const weights = r.weightsPerSet.length === setsCount ? r.weightsPerSet : resizeWeights(r.weightsPerSet, setsCount)
+  const availableParams = STANDARD_PARAMS.filter((p) => !r.extraParams.some((ep) => ep.label === p.label))
+
+  return (
+    <Tile>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {supersetLabel && (
+              <span
+                className="athletic-mono"
+                style={{
+                  color: SUPERSET_COLORS[supersetLabel[0]]?.text ?? P.ink,
+                  background: SUPERSET_COLORS[supersetLabel[0]]?.bg ?? P.surfaceHi,
+                  border: `1px solid ${SUPERSET_COLORS[supersetLabel[0]]?.border ?? P.lineStrong}`,
+                  fontSize: 10,
+                  fontWeight: 900,
+                  letterSpacing: '0.1em',
+                  padding: '1px 5px',
+                  borderRadius: 4,
+                }}
+              >
+                {supersetLabel}
+              </span>
+            )}
+            <span style={{ color: P.ink, fontSize: 14, fontWeight: 700 }}>{r.name}</span>
+          </div>
+          {r.hasProgramTarget && (
+            <div className="athletic-mono mt-0.5" style={{ color: P.inkMuted, fontSize: 11, textTransform: 'none', fontWeight: 500 }}>
+              Doel: {r.targetSets} × {r.targetReps} {r.repUnit}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-1 relative">
+          <button
+            type="button"
+            onClick={() => { setSupersetMenuOpen((v) => !v); setParamMenuOpen(false) }}
+            title="Superset-groep"
+            className="athletic-tap athletic-mono"
+            style={{
+              color: r.supersetGroup ? (SUPERSET_COLORS[r.supersetGroup]?.text ?? P.lime) : P.inkMuted,
+              fontSize: 11, letterSpacing: '0.1em', padding: '4px 6px',
+              border: `1px solid ${r.supersetGroup ? (SUPERSET_COLORS[r.supersetGroup]?.border ?? P.lime) : P.lineStrong}`,
+              borderRadius: 4,
+              fontWeight: 900,
+            }}
+          >
+            {r.supersetGroup ?? 'SS'}
+          </button>
+          {supersetMenuOpen && (
+            <div
+              className="absolute right-0 top-full mt-1 z-10 rounded-lg p-2 flex flex-col gap-1"
+              style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}`, minWidth: 140 }}
+            >
+              <button
+                type="button"
+                onClick={() => { onSetSuperset(r.uid, null); setSupersetMenuOpen(false) }}
+                className="athletic-mono athletic-tap text-left px-2 py-1 rounded"
+                style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.08em' }}
+              >
+                GEEN SUPERSET
+              </button>
+              {SUPERSET_LETTERS.map((letter) => {
+                const c = SUPERSET_COLORS[letter]
+                return (
+                  <button
+                    key={letter}
+                    type="button"
+                    onClick={() => { onSetSuperset(r.uid, letter); setSupersetMenuOpen(false) }}
+                    className="athletic-mono athletic-tap text-left px-2 py-1 rounded"
+                    style={{
+                      background: r.supersetGroup === letter ? c.bg : 'transparent',
+                      color: c.text,
+                      fontSize: 11, letterSpacing: '0.08em', fontWeight: 800,
+                      border: `1px solid ${r.supersetGroup === letter ? c.border : 'transparent'}`,
+                    }}
+                  >
+                    SUPERSET {letter}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+          <button type="button" onClick={() => onRemove(r.uid)}
+            className="athletic-tap athletic-mono"
+            style={{ color: P.inkDim, fontSize: 11, letterSpacing: '0.12em', padding: '4px 8px' }}>
+            ×
+          </button>
+        </div>
+      </div>
+      <div
+        className="grid gap-2 mt-3"
+        style={{ gridTemplateColumns: `repeat(${2 + (r.visible.pain ? 1 : 0)}, minmax(0, 1fr))` }}
+      >
+        <LabeledInput label="Sets" value={r.setsCompleted} onChange={(v) => onUpdate(r.uid, { setsCompleted: v })} inputMode="numeric" />
+        <LabeledInput label={`Reps (${r.repUnit})`} value={r.repsCompleted} onChange={(v) => onUpdate(r.uid, { repsCompleted: v })} inputMode="numeric" />
+        {r.visible.pain && (
+          <LabeledInput
+            label="Pijn /10"
+            value={r.painDuring}
+            onChange={(v) => onUpdate(r.uid, { painDuring: v })}
+            inputMode="numeric"
+            onRemove={() => onToggleVisible(r.uid, 'pain')}
+          />
+        )}
+      </div>
+
+      {/* Per-set gewicht: één input per set */}
+      {r.visible.weight && (
+        <div className="mt-3" style={{ position: 'relative' }}>
+          <div className="flex items-center justify-between">
+            <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.12em' }}>
+              GEWICHT (KG) · PER SET
+            </span>
+            <button
+              type="button"
+              onClick={() => onToggleVisible(r.uid, 'weight')}
+              aria-label="Verberg gewicht"
+              className="athletic-tap"
+              style={{
+                width: 18, height: 18, borderRadius: 999,
+                background: P.surfaceHi, color: P.inkMuted,
+                border: `1px solid ${P.lineStrong}`,
+                fontSize: 10, lineHeight: 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              ×
+            </button>
+          </div>
+          <div
+            className="grid gap-1.5 mt-1.5"
+            style={{ gridTemplateColumns: `repeat(${Math.min(setsCount, 6)}, minmax(0, 1fr))` }}
+          >
+            {weights.map((w, idx) => (
+              <div key={idx} className="flex flex-col gap-0.5">
+                <span className="athletic-mono" style={{ color: P.inkDim, fontSize: 9, letterSpacing: '0.1em' }}>
+                  S{idx + 1}
+                </span>
+                <DarkInput
+                  value={w}
+                  onChange={(e) => {
+                    const next = [...weights]
+                    next[idx] = e.target.value
+                    onUpdate(r.uid, { weightsPerSet: next })
+                  }}
+                  inputMode="decimal"
+                  style={{ padding: '6px 8px', fontSize: 13 }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Extra parameters (Tempo/RPE/Pauze/…) */}
+      {r.extraParams.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {r.extraParams.map((p) => (
+            <div
+              key={p.id}
+              className="flex items-center gap-1 px-2 py-1 rounded-md group/param"
+              style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}`, fontSize: 12 }}
+            >
+              <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.08em' }}>
+                {p.label.toUpperCase()}
+              </span>
+              {p.type === 'number' ? (
+                <input
+                  type="number"
+                  value={p.value as number}
+                  min={p.min}
+                  max={p.max}
+                  onChange={(e) => onUpdateParam(r.uid, p.id, Number(e.target.value))}
+                  className="bg-transparent text-center font-semibold focus:outline-none"
+                  style={{ color: P.ink, width: 48, fontSize: 13 }}
+                />
+              ) : p.type === 'slider' ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    type="range"
+                    min={p.min ?? 0}
+                    max={p.max ?? 10}
+                    value={p.value as number}
+                    onChange={(e) => onUpdateParam(r.uid, p.id, Number(e.target.value))}
+                    className="w-16 h-1"
+                    style={{ accentColor: P.lime }}
+                  />
+                  <span className="font-semibold" style={{ color: P.ink, width: 20, textAlign: 'center', fontSize: 13 }}>
+                    {p.value}
+                  </span>
+                </div>
+              ) : p.type === 'select' && p.options ? (
+                <select
+                  value={p.value as string}
+                  onChange={(e) => onUpdateParam(r.uid, p.id, e.target.value)}
+                  className="bg-transparent text-xs font-semibold focus:outline-none"
+                  style={{ color: P.ink }}
+                >
+                  <option value="">—</option>
+                  {p.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={p.value as string}
+                  onChange={(e) => onUpdateParam(r.uid, p.id, e.target.value)}
+                  className="bg-transparent text-xs font-semibold focus:outline-none"
+                  style={{ color: P.ink, width: 64 }}
+                />
+              )}
+              {p.unit && (
+                <span style={{ color: P.inkDim, fontSize: 10 }}>{p.unit}</span>
+              )}
+              <button
+                type="button"
+                onClick={() => onRemoveParam(r.uid, p.id)}
+                aria-label={`Verwijder ${p.label}`}
+                style={{ color: P.inkDim, fontSize: 11, marginLeft: 2 }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Toggle-rij voor verborgen parameters + + parameter knop */}
+      <div className="flex flex-wrap gap-1.5 mt-2 relative">
+        {!r.visible.weight && (
+          <button
+            type="button"
+            onClick={() => onToggleVisible(r.uid, 'weight')}
+            className="athletic-mono athletic-tap px-2 py-1 rounded-full"
+            style={{
+              background: P.surfaceHi, color: P.inkMuted,
+              border: `1px dashed ${P.lineStrong}`,
+              fontSize: 10, letterSpacing: '0.08em', fontWeight: 800,
+            }}
+          >
+            + GEWICHT
+          </button>
+        )}
+        {!r.visible.pain && (
+          <button
+            type="button"
+            onClick={() => onToggleVisible(r.uid, 'pain')}
+            className="athletic-mono athletic-tap px-2 py-1 rounded-full"
+            style={{
+              background: P.surfaceHi, color: P.inkMuted,
+              border: `1px dashed ${P.lineStrong}`,
+              fontSize: 10, letterSpacing: '0.08em', fontWeight: 800,
+            }}
+          >
+            + PIJN
+          </button>
+        )}
+        {availableParams.length > 0 && (
+          <button
+            type="button"
+            onClick={() => { setParamMenuOpen((v) => !v); setSupersetMenuOpen(false) }}
+            className="athletic-mono athletic-tap px-2 py-1 rounded-full"
+            style={{
+              background: P.surfaceHi, color: P.lime,
+              border: `1px dashed ${P.lime}`,
+              fontSize: 10, letterSpacing: '0.08em', fontWeight: 800,
+            }}
+          >
+            + PARAMETER
+          </button>
+        )}
+        {paramMenuOpen && (
+          <div
+            className="absolute left-0 top-full mt-1 z-10 rounded-lg p-1.5 flex flex-col gap-0.5"
+            style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}`, minWidth: 180 }}
+          >
+            {availableParams.map((p) => (
+              <button
+                key={p.label}
+                type="button"
+                onClick={() => { onAddParam(r.uid, p); setParamMenuOpen(false) }}
+                className="athletic-mono athletic-tap text-left px-2 py-1 rounded"
+                style={{ color: P.ink, fontSize: 11, letterSpacing: '0.06em' }}
+              >
+                + {p.label.toUpperCase()}
+                {'unit' in p && p.unit && (
+                  <span style={{ color: P.inkDim, marginLeft: 4 }}>{p.unit}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </Tile>
   )
 }
 

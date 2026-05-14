@@ -94,6 +94,7 @@ export const patientsRouter = createTRPCRouter({
         phone: true,
         dateOfBirth: true,
         createdAt: true,
+        role: true,
         patientPrograms: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -144,6 +145,7 @@ export const patientsRouter = createTRPCRouter({
       return {
         accessStatus: myRel?.status ?? 'APPROVED',
         id: p.id,
+        role: p.role,
         name: p.name ?? p.email,
         email: p.email,
         phone: p.phone,
@@ -562,6 +564,18 @@ export const patientsRouter = createTRPCRouter({
             repsCompleted: z.number().int().min(0).optional(),
             painLevel: z.number().int().min(0).max(10).nullable().optional(),
             weight: z.number().nullable().optional(),
+            weightsPerSet: z.array(z.number().nullable()).nullable().optional(),
+            extraParams: z.array(z.object({
+              id: z.string(),
+              label: z.string(),
+              type: z.enum(['number', 'text', 'select', 'slider']),
+              value: z.union([z.string(), z.number()]),
+              unit: z.string().optional(),
+              options: z.array(z.string()).optional(),
+              min: z.number().optional(),
+              max: z.number().optional(),
+            })).nullable().optional(),
+            supersetGroup: z.string().nullable().optional(),
             estimatedOneRepMax: z.number().nullable().optional(),
             painDuring: z.number().int().min(0).max(10).nullable().optional(),
           }),
@@ -603,6 +617,9 @@ export const patientsRouter = createTRPCRouter({
               repsCompleted: ex.repsCompleted ?? null,
               painLevel: ex.painLevel ?? null,
               weight: ex.weight ?? null,
+              weightsPerSet: ex.weightsPerSet ?? undefined,
+              extraParams: ex.extraParams ?? undefined,
+              supersetGroup: ex.supersetGroup ?? null,
               estimatedOneRepMax: ex.estimatedOneRepMax ?? null,
               painDuring: ex.painDuring ?? null,
             })),
@@ -610,6 +627,157 @@ export const patientsRouter = createTRPCRouter({
         },
         select: { id: true },
       })
+    }),
+
+  /**
+   * Bewerk een eerder gelogde sessie (na "BEHANDELING AFRONDEN"). Vervangt
+   * de exerciseLogs volledig — eenvoudiger dan diff-en, en past bij de
+   * intentie ("alles is editable na opslaan").
+   */
+  updateSessionLog: therapistProcedure
+    .input(
+      z.object({
+        sessionId: z.string(),
+        scheduledAt: z.string().optional(),
+        completedAt: z.string().optional(),
+        durationSeconds: z.number().int().min(0).optional(),
+        painLevel: z.number().int().min(0).max(10).nullable().optional(),
+        exertionLevel: z.number().int().min(0).max(10).nullable().optional(),
+        notes: z.string().nullable().optional(),
+        exercises: z.array(
+          z.object({
+            exerciseId: z.string(),
+            setsCompleted: z.number().int().min(0).nullable().optional(),
+            repsCompleted: z.number().int().min(0).nullable().optional(),
+            painLevel: z.number().int().min(0).max(10).nullable().optional(),
+            weight: z.number().nullable().optional(),
+            weightsPerSet: z.array(z.number().nullable()).nullable().optional(),
+            extraParams: z.array(z.object({
+              id: z.string(),
+              label: z.string(),
+              type: z.enum(['number', 'text', 'select', 'slider']),
+              value: z.union([z.string(), z.number()]),
+              unit: z.string().optional(),
+              options: z.array(z.string()).optional(),
+              min: z.number().optional(),
+              max: z.number().optional(),
+            })).nullable().optional(),
+            supersetGroup: z.string().nullable().optional(),
+            painDuring: z.number().int().min(0).max(10).nullable().optional(),
+          }),
+        ).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const session = await ctx.prisma.sessionLog.findUnique({
+        where: { id: input.sessionId },
+        select: { patientId: true },
+      })
+      if (!session) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Sessie niet gevonden' })
+      }
+      if (!(await hasPatientAccess(ctx.prisma, ctx.user, session.patientId))) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+
+      const updates: Record<string, unknown> = {}
+      if (input.scheduledAt) updates.scheduledAt = new Date(input.scheduledAt)
+      if (input.completedAt) updates.completedAt = new Date(input.completedAt)
+      if (input.durationSeconds !== undefined) updates.duration = input.durationSeconds
+      if (input.painLevel !== undefined) updates.painLevel = input.painLevel
+      if (input.exertionLevel !== undefined) updates.exertionLevel = input.exertionLevel
+      if (input.notes !== undefined) updates.notes = input.notes ?? null
+
+      await ctx.prisma.$transaction(async (tx) => {
+        if (Object.keys(updates).length > 0) {
+          await tx.sessionLog.update({
+            where: { id: input.sessionId },
+            data: updates,
+          })
+        }
+        if (input.exercises) {
+          await tx.exerciseLog.deleteMany({ where: { sessionId: input.sessionId } })
+          if (input.exercises.length > 0) {
+            await tx.exerciseLog.createMany({
+              data: input.exercises.map((ex) => ({
+                id: createId(),
+                sessionId: input.sessionId,
+                exerciseId: ex.exerciseId,
+                setsCompleted: ex.setsCompleted ?? null,
+                repsCompleted: ex.repsCompleted ?? null,
+                painLevel: ex.painLevel ?? null,
+                weight: ex.weight ?? null,
+                weightsPerSet: (ex.weightsPerSet ?? undefined) as never,
+                extraParams: (ex.extraParams ?? undefined) as never,
+                supersetGroup: ex.supersetGroup ?? null,
+                painDuring: ex.painDuring ?? null,
+              })),
+            })
+          }
+        }
+      })
+
+      return { id: input.sessionId }
+    }),
+
+  /**
+   * Volledige sessie ophalen voor bewerking — inclusief alle exerciseLogs
+   * met nieuwe velden (weightsPerSet, extraParams, supersetGroup).
+   */
+  getSessionLog: therapistProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const session = await ctx.prisma.sessionLog.findUnique({
+        where: { id: input.sessionId },
+        include: {
+          program: { select: { id: true, name: true } },
+          exerciseLogs: true,
+        },
+      })
+      if (!session) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Sessie niet gevonden' })
+      }
+      if (!(await hasPatientAccess(ctx.prisma, ctx.user, session.patientId))) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+      const exerciseIds = session.exerciseLogs.map((el) => el.exerciseId)
+      const exercises = exerciseIds.length
+        ? await ctx.prisma.exercise.findMany({
+            where: { id: { in: exerciseIds } },
+            select: { id: true, name: true, category: true },
+          })
+        : []
+      const nameById = new Map(exercises.map((e) => [e.id, e]))
+      return {
+        id: session.id,
+        patientId: session.patientId,
+        programName: session.program?.name ?? null,
+        scheduledAt: session.scheduledAt,
+        completedAt: session.completedAt,
+        durationSeconds: session.duration,
+        painLevel: session.painLevel,
+        exertionLevel: session.exertionLevel,
+        notes: session.notes,
+        exercises: session.exerciseLogs.map((el) => ({
+          id: el.id,
+          exerciseId: el.exerciseId,
+          name: nameById.get(el.exerciseId)?.name ?? 'Oefening',
+          category: nameById.get(el.exerciseId)?.category ?? 'STRENGTH',
+          setsCompleted: el.setsCompleted,
+          repsCompleted: el.repsCompleted,
+          weight: el.weight,
+          weightsPerSet: Array.isArray(el.weightsPerSet)
+            ? (el.weightsPerSet as Array<number | null>)
+            : null,
+          extraParams: Array.isArray(el.extraParams)
+            ? (el.extraParams as Array<Record<string, unknown>>)
+            : [],
+          supersetGroup: el.supersetGroup,
+          painLevel: el.painLevel,
+          painDuring: el.painDuring,
+          notes: el.notes,
+        })),
+      }
     }),
 
   /**

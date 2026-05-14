@@ -102,7 +102,21 @@ function AccessCodeInner() {
       // (finalize maakt ook de Prisma user-row aan; aparte sync-user call is overbodig).
       await finalizeMutation.mutateAsync()
 
-      router.replace('/patient/dashboard')
+      // Rol-based redirect — DB is authoritative (user_metadata.role kan stale zijn).
+      let role: string | null = null
+      try {
+        const res = await fetch('/api/auth/me')
+        if (res.ok) {
+          const data = await res.json()
+          role = data.role ?? null
+        }
+      } catch { /* fallback hieronder */ }
+      const dest = role === 'ATHLETE'
+        ? '/athlete/dashboard'
+        : role === 'PATIENT'
+        ? '/patient/dashboard'
+        : '/patient/dashboard'
+      router.replace(dest)
     } catch (err) {
       setError(
         err instanceof Error

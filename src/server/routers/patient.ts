@@ -58,6 +58,7 @@ function mapProgramExercise(pe: {
     easierVariantId: string | null
     harderVariantId: string | null
     trackOneRepMax?: boolean
+    defaultExtraParams?: unknown
   }
 }) {
   return {
@@ -82,6 +83,9 @@ function mapProgramExercise(pe: {
     easierVariantId: pe.exercise.easierVariantId ?? null,
     harderVariantId: pe.exercise.harderVariantId ?? null,
     trackOneRepMax: pe.exercise.trackOneRepMax ?? false,
+    defaultExtraParams: Array.isArray(pe.exercise.defaultExtraParams)
+      ? (pe.exercise.defaultExtraParams as Array<Record<string, unknown>>)
+      : [],
   }
 }
 
@@ -182,7 +186,7 @@ export const patientRouter = createTRPCRouter({
               select: {
                 name: true, category: true, difficulty: true,
                 videoUrl: true, easierVariantId: true, harderVariantId: true,
-                trackOneRepMax: true,
+                trackOneRepMax: true, defaultExtraParams: true,
               },
             },
           },
