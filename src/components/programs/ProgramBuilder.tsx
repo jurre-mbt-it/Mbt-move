@@ -209,14 +209,20 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
   // ── Derived ─────────────────────────────────────────────────────────────────
+  // In flexibele-week-modus heeft "dag van de week" geen betekenis — patient
+  // doet het programma 'n vrij aantal keer per week. Daarom pool alle oefeningen
+  // van de huidige week samen (i.p.v. filteren op currentDay).
   const dayExercises = useMemo(() =>
     exercises
-      .filter(e => e.day === program.currentDay && e.week === program.currentWeek)
+      .filter(e =>
+        e.week === program.currentWeek
+        && (program.flexibleSchedule ? true : e.day === program.currentDay)
+      )
       .sort((a, b) => {
         if (a.supersetGroup && a.supersetGroup === b.supersetGroup) return a.supersetOrder - b.supersetOrder
         return 0
       }),
-    [exercises, program.currentDay, program.currentWeek]
+    [exercises, program.currentDay, program.currentWeek, program.flexibleSchedule]
   )
 
   const selectedUids = exercises.filter(e => e.selected).map(e => e.uid)
@@ -1307,6 +1313,9 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               ...p,
               flexibleSchedule: !p.flexibleSchedule,
               weeklyTarget: !p.flexibleSchedule && !p.weeklyTarget ? 3 : p.weeklyTarget,
+              // Bij aanzetten van flex: terug naar dag 1 zodat nieuwe oefeningen
+              // niet per ongeluk in een onzichtbare day-bucket landen.
+              currentDay: !p.flexibleSchedule ? 1 : p.currentDay,
             }))}
             className="flex items-center gap-2 text-xs font-medium"
           >
@@ -1428,73 +1437,88 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           {/* CENTER: canvas */}
           <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
 
-            {/* Day tabs */}
-            <div className="flex items-center gap-1 px-3 md:px-4 pt-3 pb-2 border-b shrink-0 overflow-x-auto">
-              {days.map(d => {
-                const count = exerciseCountForDay(d, program.currentWeek)
-                return (
+            {/* Day tabs — verbergen in flex-modus omdat dag-van-de-week dan
+                geen betekenis heeft. Bulk-kopie + superset-acties krijgen in
+                flex-modus een eigen smalle toolbar zodat ze toch beschikbaar
+                blijven. */}
+            {!program.flexibleSchedule ? (
+              <div className="flex items-center gap-1 px-3 md:px-4 pt-3 pb-2 border-b shrink-0 overflow-x-auto">
+                {days.map(d => {
+                  const count = exerciseCountForDay(d, program.currentWeek)
+                  return (
+                    <button
+                      key={d}
+                      onClick={() => setProgram(p => ({ ...p, currentDay: d }))}
+                      className={cn(
+                        'shrink-0 flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-colors',
+                        program.currentDay === d ? 'text-white' : 'text-muted-foreground hover:bg-[#1C2425]'
+                      )}
+                      style={program.currentDay === d ? { background: '#BEF264' } : {}}
+                    >
+                      {DAY_LABELS[d - 1]}
+                      {count > 0 && (
+                        <span
+                          className="text-xs rounded-full px-1.5 py-0"
+                          style={{
+                            background: program.currentDay === d ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.12)',
+                            color: program.currentDay === d ? '#fff' : '#7B8889',
+                          }}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+
+                {program.daysPerWeek < 7 && (
                   <button
-                    key={d}
-                    onClick={() => setProgram(p => ({ ...p, currentDay: d }))}
-                    className={cn(
-                      'shrink-0 flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-colors',
-                      program.currentDay === d ? 'text-white' : 'text-muted-foreground hover:bg-[#1C2425]'
-                    )}
-                    style={program.currentDay === d ? { background: '#BEF264' } : {}}
+                    onClick={() => setProgram(p => ({ ...p, daysPerWeek: p.daysPerWeek + 1 }))}
+                    className="shrink-0 px-2 py-1.5 rounded-lg text-xs md:text-sm text-muted-foreground hover:bg-[#1C2425] flex items-center gap-1"
                   >
-                    {DAY_LABELS[d - 1]}
-                    {count > 0 && (
-                      <span
-                        className="text-xs rounded-full px-1.5 py-0"
-                        style={{
-                          background: program.currentDay === d ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.12)',
-                          color: program.currentDay === d ? '#fff' : '#7B8889',
-                        }}
-                      >
-                        {count}
-                      </span>
-                    )}
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Dag</span>
                   </button>
-                )
-              })}
+                )}
 
-              {program.daysPerWeek < 7 && (
-                <button
-                  onClick={() => setProgram(p => ({ ...p, daysPerWeek: p.daysPerWeek + 1 }))}
-                  className="shrink-0 px-2 py-1.5 rounded-lg text-xs md:text-sm text-muted-foreground hover:bg-[#1C2425] flex items-center gap-1"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Dag</span>
-                </button>
-              )}
+                {/* Bulk-kopie menu — toont alleen als er iets te kopiëren is */}
+                {dayExercises.length > 0 && (
+                  <div className="ml-auto shrink-0">
+                    <CopyMenu
+                      weeks={weeks}
+                      days={days}
+                      currentWeek={program.currentWeek}
+                      currentDay={program.currentDay}
+                      exerciseCountForDay={exerciseCountForDay}
+                      onCopyDay={copyDayTo}
+                      onCopyWeek={copyWeekTo}
+                    />
+                  </div>
+                )}
 
-              {/* Bulk-kopie menu — toont alleen als er iets te kopiëren is */}
-              {dayExercises.length > 0 && (
-                <div className="ml-auto shrink-0">
-                  <CopyMenu
-                    weeks={weeks}
-                    days={days}
-                    currentWeek={program.currentWeek}
-                    currentDay={program.currentDay}
-                    exerciseCountForDay={exerciseCountForDay}
-                    onCopyDay={copyDayTo}
-                    onCopyWeek={copyWeekTo}
-                  />
-                </div>
-              )}
-
-              {selectedUids.length >= 2 && (
-                <div className={cn('flex items-center gap-2 shrink-0', dayExercises.length > 0 ? '' : 'ml-auto')}>
-                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={createSuperset}>
-                    <Layers className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Superset</span>
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={clearSelection}>
-                    ✕
-                  </Button>
-                </div>
-              )}
-            </div>
+                {selectedUids.length >= 2 && (
+                  <div className={cn('flex items-center gap-2 shrink-0', dayExercises.length > 0 ? '' : 'ml-auto')}>
+                    <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={createSuperset}>
+                      <Layers className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Superset</span>
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={clearSelection}>
+                      ✕
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : (selectedUids.length >= 2 && (
+              <div className="flex items-center justify-end gap-2 px-3 md:px-4 pt-3 pb-2 border-b shrink-0">
+                <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={createSuperset}>
+                  <Layers className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Superset</span>
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={clearSelection}>
+                  ✕
+                </Button>
+              </div>
+            ))}
 
             {/* Exercises */}
             <div className="flex-1 overflow-y-auto px-3 md:px-4 py-3 pb-32 md:pb-4">
