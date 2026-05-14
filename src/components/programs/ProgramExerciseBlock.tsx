@@ -20,6 +20,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import { VideoPlayer } from '@/components/exercises/VideoPlayer'
+import { NumericInput } from '@/components/ui/numeric-input'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { CustomParameter } from './types'
@@ -54,15 +55,18 @@ interface Props {
 function InlineNumber({
   value, onChange, min = 0, className,
 }: { value: number; onChange: (n: number) => void; min?: number; className?: string }) {
+  // Hergebruikt de shared NumericInput zodat het veld leeg kan zijn tijdens
+  // edit (backspace clear → typ direct nieuw cijfer zonder eerst te selecteren).
+  // allowEmpty=false: op blur snapt 'ie terug naar de vorige value.
   return (
-    <input
-      type="number"
-      min={min}
+    <NumericInput
       value={value}
-      onChange={e => onChange(Math.max(min, Number(e.target.value)))}
+      onChange={v => onChange(Math.max(min, v ?? min))}
+      min={min}
+      allowEmpty={false}
       className={cn(
         'w-10 h-5 text-center text-xs font-semibold bg-transparent rounded border-0 focus:outline-none focus:ring-1 focus:ring-[#BEF264]',
-        className
+        className,
       )}
     />
   )
@@ -211,10 +215,8 @@ export function ProgramExerciseBlock({
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
       className={cn(
-        'group rounded-lg border bg-[#141A1B] transition-all cursor-grab active:cursor-grabbing touch-none',
+        'group rounded-lg border bg-[#141A1B] transition-all',
         isDragging ? 'opacity-50 shadow-xl z-50' : 'hover:border-[rgba(255,255,255,0.16)]',
         exercise.selected && 'ring-2 ring-[#BEF264] border-[#BEF264]',
         isInSuperset && 'border-transparent'
@@ -222,9 +224,20 @@ export function ProgramExerciseBlock({
     >
       {/* Header row */}
       <div className="flex flex-col px-2 pt-2 pb-1 gap-1">
-        {/* Top line: drag-indicator + checkbox + color + name + menu + X */}
+        {/* Top line: drag-handle + checkbox + color + name + menu + X.
+            Drag-listeners zitten ALLEEN op de GripVertical — anders triggert
+            klikken op een input/pill een drag wanneer de cursor 6px+ beweegt,
+            waardoor de tile spontaan verplaatst. */}
         <div className="flex items-center gap-2">
-          <GripVertical className="w-4 h-4 text-zinc-300 shrink-0" />
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing touch-none shrink-0 p-0.5 -m-0.5 rounded hover:bg-[rgba(255,255,255,0.05)]"
+            aria-label="Sleep om te verplaatsen"
+          >
+            <GripVertical className="w-4 h-4 text-zinc-300" />
+          </button>
 
           <input
             type="checkbox"
