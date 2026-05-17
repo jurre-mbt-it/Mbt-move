@@ -2,7 +2,7 @@
  * Email-footer voor outgoing mails — rendert praktijk + therapeut info.
  *
  * Stijl: dark MBT brand (matcht inviteMail in src/server/mail.ts en de
- * programma-assign mail). Lime-accent (#BEF264) divider boven, 2-koloms
+ * programma-assign mail). Lime-accent (#e87a55) divider boven, 2-koloms
  * layout (therapeut links, praktijk rechts) via een nested table voor
  * Outlook-compat.
  *
@@ -18,7 +18,7 @@ const BRAND = {
   ink: '#F5F7F6',
   inkMuted: '#7B8889',
   inkDim: '#4A5454',
-  lime: '#BEF264',
+  lime: '#e87a55',
   line: 'rgba(255,255,255,0.12)',
 }
 

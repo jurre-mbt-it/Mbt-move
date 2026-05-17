@@ -76,7 +76,7 @@ const SCORE_BG: Record<ScoreValue, string> = {
   NOT_TESTED: P.surfaceHi,
   FAIL: 'rgba(248,113,113,0.12)',
   PARTIAL: 'rgba(244,194,97,0.14)',
-  PASS: 'rgba(190,242,100,0.14)',
+  PASS: 'rgba(232,122,85,0.14)',
 }
 
 const SCORE_LABEL: Record<ScoreValue, string> = {

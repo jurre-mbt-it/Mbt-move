@@ -60,7 +60,7 @@ function DayDropZone({
       ref={setNodeRef}
       className={cn(
         'min-h-24 rounded-xl p-2 transition-colors',
-        isOver ? 'bg-[#BEF26410] border-2 border-dashed border-[#BEF264]' : 'border-2 border-dashed border-transparent',
+        isOver ? 'bg-[#e87a5510] border-2 border-dashed border-[#e87a55]' : 'border-2 border-dashed border-transparent',
         isEmpty && !isOver && 'border-[rgba(255,255,255,0.12)] border-dashed'
       )}
     >
@@ -79,7 +79,7 @@ function DayDropZone({
 function DragOverlayCard({ name }: { name: string }) {
   return (
     <div className="bg-[#141A1B] border rounded-lg shadow-xl px-3 py-2 text-sm font-semibold flex items-center gap-2 opacity-95">
-      <div className="w-2 h-2 rounded-full bg-[#BEF264]" />
+      <div className="w-2 h-2 rounded-full bg-[#e87a55]" />
       {name}
     </div>
   )
@@ -1114,7 +1114,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full"
               style={
                 currentStatus === 'ACTIVE'
-                  ? { background: 'rgba(190,242,100,0.12)', color: '#BEF264', border: '1px solid rgba(190,242,100,0.35)' }
+                  ? { background: 'rgba(232,122,85,0.12)', color: '#e87a55', border: '1px solid rgba(232,122,85,0.35)' }
                   : currentStatus === 'COMPLETED' || currentStatus === 'ARCHIVED'
                   ? { background: 'rgba(123,136,137,0.15)', color: '#7B8889', border: '1px solid rgba(123,136,137,0.30)' }
                   : { background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.35)' }
@@ -1133,7 +1133,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                 className="w-1.5 h-1.5 rounded-full"
                 style={{
                   background:
-                    currentStatus === 'ACTIVE' ? '#BEF264'
+                    currentStatus === 'ACTIVE' ? '#e87a55'
                     : currentStatus === 'DRAFT' ? '#f59e0b'
                     : '#7B8889',
                 }}
@@ -1154,7 +1154,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                 onClick={() => setProgram(p => ({ ...p, currentWeek: w }))}
                 className={cn(
                   'px-2.5 py-1 rounded text-xs font-medium transition-colors',
-                  program.currentWeek === w ? 'bg-[#BEF264] text-white' : 'text-muted-foreground hover:bg-[#1C2425]'
+                  program.currentWeek === w ? 'bg-[#e87a55] text-white' : 'text-muted-foreground hover:bg-[#1C2425]'
                 )}
               >
                 W{w}
@@ -1197,7 +1197,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               <><Loader2 className="w-3 h-3 animate-spin opacity-50 text-muted-foreground" /><span className="text-muted-foreground">Wijzigingen…</span></>
             )}
             {autosave.status === 'saved' && (
-              <><Check className="w-3 h-3" style={{ color: '#BEF264' }} /><span className="text-muted-foreground">Opgeslagen</span></>
+              <><Check className="w-3 h-3" style={{ color: '#e87a55' }} /><span className="text-muted-foreground">Opgeslagen</span></>
             )}
             {autosave.status === 'error' && (
               <button
@@ -1214,8 +1214,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             className="gap-1.5 h-7 text-xs shrink-0"
             style={
               currentStatus === 'ACTIVE'
-                ? { background: 'transparent', color: '#BEF264', border: '1px solid rgba(190,242,100,0.35)' }
-                : { background: '#BEF264' }
+                ? { background: 'transparent', color: '#e87a55', border: '1px solid rgba(232,122,85,0.35)' }
+                : { background: '#e87a55' }
             }
             onClick={handleDeploy}
             disabled={saving || !program.name.trim()}
@@ -1247,27 +1247,27 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           >
             <div
               className="w-8 h-4 rounded-full relative transition-colors flex items-center"
-              style={{ background: program.tendinopathyMode ? '#BEF264' : '#4A5454' }}
+              style={{ background: program.tendinopathyMode ? '#e87a55' : '#4A5454' }}
             >
               <div
                 className="w-3 h-3 bg-white rounded-full absolute shadow transition-transform"
                 style={{ transform: program.tendinopathyMode ? 'translateX(18px)' : 'translateX(2px)' }}
               />
             </div>
-            <span className={program.tendinopathyMode ? 'text-[#BEF264] font-semibold' : 'text-muted-foreground'}>
+            <span className={program.tendinopathyMode ? 'text-[#e87a55] font-semibold' : 'text-muted-foreground'}>
               Tendinopathie pijn tracking
             </span>
           </button>
           <div className="relative group">
             <Info className="w-3.5 h-3.5 text-[#7B8889] cursor-help" />
-            <div className="absolute left-5 top-0 z-50 w-64 hidden group-hover:block bg-[#BEF264] text-white text-xs rounded-lg px-3 py-2 shadow-xl">
+            <div className="absolute left-5 top-0 z-50 w-64 hidden group-hover:block bg-[#e87a55] text-white text-xs rounded-lg px-3 py-2 shadow-xl">
               Voor peesproblematiek (achilles, patella, RC): splitst pijn in tijdens vs 24u erna + ochtend stijfheid. Gebruikt Silbernagel-protocol grenzen.
             </div>
           </div>
           {program.tendinopathyMode && (
             <span
               className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
-              style={{ background: '#BEF26422', color: '#BEF264' }}
+              style={{ background: '#e87a5522', color: '#e87a55' }}
             >
               Actief voor alle oefeningen
             </span>
@@ -1283,21 +1283,21 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           >
             <div
               className="w-8 h-4 rounded-full relative transition-colors flex items-center"
-              style={{ background: program.trackOneRepMax ? '#BEF264' : '#4A5454' }}
+              style={{ background: program.trackOneRepMax ? '#e87a55' : '#4A5454' }}
             >
               <div
                 className="w-3 h-3 bg-white rounded-full absolute shadow transition-transform"
                 style={{ transform: program.trackOneRepMax ? 'translateX(18px)' : 'translateX(2px)' }}
               />
             </div>
-            <span className={program.trackOneRepMax ? 'text-[#BEF264] font-semibold' : 'text-muted-foreground'}>
+            <span className={program.trackOneRepMax ? 'text-[#e87a55] font-semibold' : 'text-muted-foreground'}>
               1RM tracking
             </span>
           </button>
           {program.trackOneRepMax && (
             <span
               className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
-              style={{ background: '#BEF26422', color: '#BEF264' }}
+              style={{ background: '#e87a5522', color: '#e87a55' }}
             >
               Epley per sessie
             </span>
@@ -1321,14 +1321,14 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           >
             <div
               className="w-8 h-4 rounded-full relative transition-colors flex items-center"
-              style={{ background: program.flexibleSchedule ? '#BEF264' : '#4A5454' }}
+              style={{ background: program.flexibleSchedule ? '#e87a55' : '#4A5454' }}
             >
               <div
                 className="w-3 h-3 bg-white rounded-full absolute shadow transition-transform"
                 style={{ transform: program.flexibleSchedule ? 'translateX(18px)' : 'translateX(2px)' }}
               />
             </div>
-            <span className={program.flexibleSchedule ? 'text-[#BEF264] font-semibold' : 'text-muted-foreground'}>
+            <span className={program.flexibleSchedule ? 'text-[#e87a55] font-semibold' : 'text-muted-foreground'}>
               Flexibele week
             </span>
           </button>
@@ -1344,7 +1344,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                   const v = e.target.value
                   setProgram(p => ({ ...p, weeklyTarget: v === '' ? null : Math.max(1, Math.min(14, Number(v))) }))
                 }}
-                className="w-12 h-6 text-center text-xs font-bold bg-[#1C2425] rounded border border-[rgba(255,255,255,0.10)] focus:outline-none focus:ring-1 focus:ring-[#BEF264]"
+                className="w-12 h-6 text-center text-xs font-bold bg-[#1C2425] rounded border border-[rgba(255,255,255,0.10)] focus:outline-none focus:ring-1 focus:ring-[#e87a55]"
               />
               <span className="text-[10px] text-muted-foreground">/ week</span>
             </div>
@@ -1362,7 +1362,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               disabled={!program.patientId}
               className="athletic-tap px-2.5 py-0.5 rounded text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
-                background: !program.isTemplate && program.patientId ? '#BEF264' : 'transparent',
+                background: !program.isTemplate && program.patientId ? '#e87a55' : 'transparent',
                 color: !program.isTemplate && program.patientId ? '#0F1516' : '#7B8889',
                 border: '1px solid rgba(255,255,255,0.12)',
                 letterSpacing: '0.04em',
@@ -1376,7 +1376,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               onClick={() => setProgram(p => ({ ...p, isTemplate: true }))}
               className="athletic-tap px-2.5 py-0.5 rounded text-[11px] font-bold transition-colors"
               style={{
-                background: program.isTemplate ? '#BEF264' : 'transparent',
+                background: program.isTemplate ? '#e87a55' : 'transparent',
                 color: program.isTemplate ? '#0F1516' : '#7B8889',
                 border: '1px solid rgba(255,255,255,0.12)',
                 letterSpacing: '0.04em',
@@ -1396,7 +1396,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               onClick={() => setProgram(p => ({ ...p, currentWeek: w }))}
               className={cn(
                 'shrink-0 px-3 py-1 rounded text-xs font-medium transition-colors',
-                program.currentWeek === w ? 'bg-[#BEF264] text-white' : 'text-muted-foreground bg-[#1C2425]'
+                program.currentWeek === w ? 'bg-[#e87a55] text-white' : 'text-muted-foreground bg-[#1C2425]'
               )}
             >
               Week {w}
@@ -1453,7 +1453,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                         'shrink-0 flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-colors',
                         program.currentDay === d ? 'text-white' : 'text-muted-foreground hover:bg-[#1C2425]'
                       )}
-                      style={program.currentDay === d ? { background: '#BEF264' } : {}}
+                      style={program.currentDay === d ? { background: '#e87a55' } : {}}
                     >
                       {DAY_LABELS[d - 1]}
                       {count > 0 && (
@@ -1592,7 +1592,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               <Button
                 onClick={() => setMobileLibraryOpen(true)}
                 className="w-12 h-12 rounded-full shadow-lg"
-                style={{ background: '#BEF264' }}
+                style={{ background: '#e87a55' }}
               >
                 <Plus className="w-5 h-5" />
               </Button>
@@ -1661,7 +1661,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                     'shrink-0 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
                     mobileCategory === c.value ? 'text-white border-transparent' : 'border-[rgba(255,255,255,0.12)] text-muted-foreground bg-[#141A1B]'
                   )}
-                  style={mobileCategory === c.value ? { background: '#BEF264' } : {}}
+                  style={mobileCategory === c.value ? { background: '#e87a55' } : {}}
                 >
                   {c.label}
                 </button>
@@ -1691,7 +1691,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                     className={cn(
                       'w-full flex items-center gap-3 px-3 py-3 rounded-xl border text-left transition-all',
                       selected
-                        ? 'border-[#BEF264] bg-[#f0fdfa]'
+                        ? 'border-[#e87a55] bg-[#f0fdfa]'
                         : 'border-[rgba(255,255,255,0.06)] bg-[#141A1B] hover:border-[rgba(255,255,255,0.12)]'
                     )}
                   >
@@ -1700,7 +1700,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                       style={{ background: { STRENGTH: '#BEF264', MOBILITY: '#60a5fa', PLYOMETRICS: '#f59e0b', CARDIO: '#f87171', STABILITY: '#a78bfa' }[ex.category] ?? '#BEF264' }}
                     />
                     <span className="flex-1 text-sm font-medium">{ex.name}</span>
-                    {selected && <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: '#BEF264' }} />}
+                    {selected && <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: '#e87a55' }} />}
                   </button>
                 )
               })
@@ -1711,7 +1711,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           <div className="px-4 py-3 border-t shrink-0">
             <Button
               className="w-full gap-2"
-              style={{ background: '#BEF264' }}
+              style={{ background: '#e87a55' }}
               disabled={mobileSelected.size === 0}
               onClick={() => {
                 const source = libraryExercises
@@ -1763,7 +1763,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                     key={t.id}
                     type="button"
                     onClick={() => handleImportTemplate(t.id)}
-                    className="w-full text-left p-2.5 rounded-lg border hover:border-[#BEF264]/40 transition-colors"
+                    className="w-full text-left p-2.5 rounded-lg border hover:border-[#e87a55]/40 transition-colors"
                     style={{ borderColor: 'rgba(255,255,255,0.10)' }}
                   >
                     <p className="text-sm font-medium truncate">{t.name}</p>
@@ -1795,7 +1795,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             <div>
               <Label className="text-xs">Naam template</Label>
               <input
-                className="w-full mt-1.5 h-9 rounded-md border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#BEF264]"
+                className="w-full mt-1.5 h-9 rounded-md border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#e87a55]"
                 value={templateName}
                 onChange={e => setTemplateName(e.target.value)}
                 placeholder={program.name}
@@ -1815,7 +1815,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                         ? 'text-white border-transparent'
                         : 'border-[rgba(255,255,255,0.12)] text-muted-foreground hover:border-[rgba(255,255,255,0.2)]'
                     )}
-                    style={templateCategory === cat ? { background: '#BEF264' } : {}}
+                    style={templateCategory === cat ? { background: '#e87a55' } : {}}
                   >
                     {cat}
                   </button>
@@ -1824,7 +1824,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             </div>
             <div className="flex gap-2 pt-1">
               <Button
-                style={{ background: '#BEF264' }}
+                style={{ background: '#e87a55' }}
                 onClick={handleSaveAsTemplate}
                 disabled={templateSaving}
                 className="flex-1"
@@ -2085,7 +2085,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                   checked={deploySaveAsTemplate}
                   onChange={(e) => setDeploySaveAsTemplate(e.target.checked)}
                   disabled={deployBusy}
-                  className="mt-0.5 w-4 h-4 accent-[#BEF264] shrink-0"
+                  className="mt-0.5 w-4 h-4 accent-[#e87a55] shrink-0"
                 />
                 <div className="flex-1 text-xs">
                   <p className="font-semibold">Ook opslaan als sjabloon in bibliotheek</p>
@@ -2105,7 +2105,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               </Button>
               <Button
                 className="flex-1 gap-2"
-                style={{ background: '#BEF264', color: '#0A0E0F' }}
+                style={{ background: '#e87a55', color: '#0A0E0F' }}
                 disabled={!deployPatientId || deployBusy}
                 onClick={confirmDeploy}
               >
@@ -2208,9 +2208,9 @@ function CopyMenu({
               onClick={() => setMode('day')}
               className={cn(
                 'flex-1 px-3 py-2 text-xs font-bold tracking-wider uppercase transition-colors',
-                mode === 'day' ? 'text-[#BEF264]' : 'text-muted-foreground',
+                mode === 'day' ? 'text-[#e87a55]' : 'text-muted-foreground',
               )}
-              style={mode === 'day' ? { background: 'rgba(190,242,100,0.08)' } : {}}
+              style={mode === 'day' ? { background: 'rgba(232,122,85,0.08)' } : {}}
             >
               Dag → dag
             </button>
@@ -2219,9 +2219,9 @@ function CopyMenu({
               onClick={() => setMode('week')}
               className={cn(
                 'flex-1 px-3 py-2 text-xs font-bold tracking-wider uppercase transition-colors',
-                mode === 'week' ? 'text-[#BEF264]' : 'text-muted-foreground',
+                mode === 'week' ? 'text-[#e87a55]' : 'text-muted-foreground',
               )}
-              style={mode === 'week' ? { background: 'rgba(190,242,100,0.08)' } : {}}
+              style={mode === 'week' ? { background: 'rgba(232,122,85,0.08)' } : {}}
             >
               Week → week
             </button>
@@ -2259,11 +2259,11 @@ function CopyMenu({
                               'aspect-square rounded text-[10px] font-bold transition-colors flex flex-col items-center justify-center',
                               isCurrent
                                 ? 'opacity-30 cursor-not-allowed'
-                                : 'hover:bg-[#BEF264] hover:text-black',
+                                : 'hover:bg-[#e87a55] hover:text-black',
                             )}
                             style={{
-                              background: cnt > 0 ? 'rgba(190,242,100,0.08)' : 'rgba(255,255,255,0.04)',
-                              color: cnt > 0 ? '#BEF264' : '#7B8889',
+                              background: cnt > 0 ? 'rgba(232,122,85,0.08)' : 'rgba(255,255,255,0.04)',
+                              color: cnt > 0 ? '#e87a55' : '#7B8889',
                               border: '1px solid rgba(255,255,255,0.08)',
                             }}
                           >
@@ -2317,7 +2317,7 @@ function CopyMenu({
         type="button"
         onClick={() => setOpen(false)}
         className="shrink-0 flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
-        style={{ background: '#1C2425', color: '#BEF264' }}
+        style={{ background: '#1C2425', color: '#e87a55' }}
       >
         <Copy className="w-3.5 h-3.5" />
         <span className="hidden sm:inline">Kopieer</span>

@@ -551,7 +551,7 @@ export default function ExercisesPage() {
                     {ex.videoUrl && (
                       <span
                         className="w-7 h-7 rounded-full flex items-center justify-center"
-                        style={{ background: 'rgba(190,242,100,0.12)', color: P.lime, fontSize: 12 }}
+                        style={{ background: 'rgba(232,122,85,0.12)', color: P.lime, fontSize: 12 }}
                       >
                         ▶
                       </span>

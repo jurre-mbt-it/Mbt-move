@@ -51,7 +51,7 @@ function DraggableLibraryItem({
   })
 
   const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined
-  const color = CATEGORY_COLORS[exercise.category] ?? '#BEF264'
+  const color = CATEGORY_COLORS[exercise.category] ?? '#e87a55'
 
   return (
     <div
@@ -78,8 +78,8 @@ function DraggableLibraryItem({
         aria-label={`Voeg ${exercise.name} toe aan programma`}
         onPointerDown={e => e.stopPropagation()}
         onClick={() => onAdd(exercise)}
-        className="w-6 h-6 rounded-full flex items-center justify-center transition-colors shrink-0 hover:bg-[#BEF264] hover:text-[#0A0E0F]"
-        style={{ background: 'rgba(190,242,100,0.12)', color: '#BEF264', border: '1px solid rgba(190,242,100,0.30)' }}
+        className="w-6 h-6 rounded-full flex items-center justify-center transition-colors shrink-0 hover:bg-[#e87a55] hover:text-[#0A0E0F]"
+        style={{ background: 'rgba(232,122,85,0.12)', color: '#e87a55', border: '1px solid rgba(232,122,85,0.30)' }}
       >
         <Plus className="w-3.5 h-3.5" />
       </button>
@@ -158,13 +158,13 @@ export function ExerciseLibraryPanel({ onAdd, exercises: propExercises }: Exerci
 
         {/* Quick-add: wanneer er niks matcht en er is een zoekterm */}
         {query.trim().length >= 2 && filtered.length === 0 && (
-          <div className="mt-2 p-2 rounded border border-dashed" style={{ borderColor: '#BEF264' }}>
+          <div className="mt-2 p-2 rounded border border-dashed" style={{ borderColor: '#e87a55' }}>
             {!quickAddCategory ? (
               <button
                 type="button"
                 onClick={() => setQuickAddCategory('STRENGTH')}
                 className="w-full text-xs text-left px-2 py-1.5 rounded hover:bg-white/5"
-                style={{ color: '#BEF264', fontWeight: 700 }}
+                style={{ color: '#e87a55', fontWeight: 700 }}
               >
                 + Voeg &ldquo;{query.trim()}&rdquo; toe als nieuwe oefening
               </button>
@@ -226,7 +226,7 @@ export function ExerciseLibraryPanel({ onAdd, exercises: propExercises }: Exerci
                       }
                     }}
                     className="px-2 py-1 rounded text-xs font-bold"
-                    style={{ background: '#BEF264', color: '#0A0E0F' }}
+                    style={{ background: '#e87a55', color: '#0A0E0F' }}
                   >
                     TOEVOEGEN
                   </button>

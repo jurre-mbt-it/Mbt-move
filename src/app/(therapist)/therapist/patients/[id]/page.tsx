@@ -26,7 +26,7 @@ import { RehabActivationToggle } from '@/components/rehab/RehabActivationToggle'
 import { RehabTracker } from '@/components/rehab/RehabTracker'
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  ACTIVE:    { label: 'Actief',    bg: 'rgba(190,242,100,0.14)', text: P.lime },
+  ACTIVE:    { label: 'Actief',    bg: 'rgba(232,122,85,0.14)', text: P.lime },
   DRAFT:     { label: 'Concept',   bg: 'rgba(244,194,97,0.14)',  text: P.gold },
   COMPLETED: { label: 'Afgerond',  bg: 'rgba(255,255,255,0.06)', text: P.inkMuted },
 }
@@ -616,7 +616,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                           <span
                             className="athletic-mono"
                             style={{
-                              background: session.painLevel >= 6 ? 'rgba(248,113,113,0.15)' : 'rgba(190,242,100,0.14)',
+                              background: session.painLevel >= 6 ? 'rgba(248,113,113,0.15)' : 'rgba(232,122,85,0.14)',
                               color: session.painLevel >= 6 ? P.danger : P.lime,
                               fontSize: 10,
                               padding: '2px 8px',

@@ -596,7 +596,7 @@ function WorkoutBuilderContent() {
                       onClick={() => set('activity', key)}
                       className="athletic-tap flex flex-col items-center gap-1 p-3 rounded-xl text-center transition-all"
                       style={form.activity === key
-                        ? { border: `1px solid ${P.lime}`, background: 'rgba(190,242,100,0.10)' }
+                        ? { border: `1px solid ${P.lime}`, background: 'rgba(232,122,85,0.10)' }
                         : { border: `1px solid ${P.line}`, background: P.surfaceHi }}
                     >
                       <span style={{ fontSize: 22 }}>
@@ -749,7 +749,7 @@ function WorkoutBuilderContent() {
                       type="range" min={1} max={10} step={1}
                       value={form.targetRpe ?? 5}
                       onChange={e => set('targetRpe', +e.target.value)}
-                      className="flex-1 accent-[#BEF264]"
+                      className="flex-1 accent-[#e87a55]"
                     />
                     <span
                       className="athletic-display w-6 text-center"

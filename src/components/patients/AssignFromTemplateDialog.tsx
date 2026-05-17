@@ -123,7 +123,7 @@ export function AssignFromTemplateDialog({ open, onOpenChange, patient }: Props)
                   className="flex items-center gap-3 p-3 rounded-xl border transition-colors"
                   style={
                     selectedId === t.id
-                      ? { borderColor: '#BEF264', background: 'rgba(190,242,100,0.10)' }
+                      ? { borderColor: '#e87a55', background: 'rgba(232,122,85,0.10)' }
                       : { borderColor: 'rgba(255,255,255,0.12)' }
                   }
                 >
@@ -157,7 +157,7 @@ export function AssignFromTemplateDialog({ open, onOpenChange, patient }: Props)
             </Button>
             <Button
               className="flex-1 gap-2"
-              style={{ background: '#BEF264', color: '#0A0E0F' }}
+              style={{ background: '#e87a55', color: '#0A0E0F' }}
               disabled={!selected || !startDate || busy}
               onClick={handleAssignAndDeploy}
             >

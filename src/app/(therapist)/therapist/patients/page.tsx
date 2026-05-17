@@ -20,7 +20,7 @@ import {
 } from '@/components/dark-ui'
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  ACTIVE:    { label: 'Actief',       bg: 'rgba(190,242,100,0.14)', text: P.lime },
+  ACTIVE:    { label: 'Actief',       bg: 'rgba(232,122,85,0.14)', text: P.lime },
   DRAFT:     { label: 'Concept',      bg: 'rgba(244,194,97,0.14)',  text: P.gold },
   COMPLETED: { label: 'Afgerond',     bg: 'rgba(255,255,255,0.06)', text: P.inkMuted },
   ARCHIVED:  { label: 'Gearchiveerd', bg: 'rgba(255,255,255,0.06)', text: P.inkMuted },
@@ -389,7 +389,7 @@ function PatientsPageInner() {
               <div className="space-y-4 mt-2">
                 <div
                   className="rounded-lg p-4 space-y-3"
-                  style={{ border: `1px solid ${P.lime}`, background: 'rgba(190,242,100,0.08)' }}
+                  style={{ border: `1px solid ${P.lime}`, background: 'rgba(232,122,85,0.08)' }}
                 >
                   <div>
                     <MetaLabel style={{ color: P.lime }}>INVITE AANGEMAAKT</MetaLabel>

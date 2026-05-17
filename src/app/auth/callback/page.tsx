@@ -81,7 +81,7 @@ function CallbackHandler() {
     return (
       <div className="text-center space-y-4">
         <p className="text-red-400">{error}</p>
-        <a href="/login" className="text-sm underline" style={{ color: '#BEF264' }}>
+        <a href="/login" className="text-sm underline" style={{ color: '#e87a55' }}>
           Terug naar inloggen
         </a>
       </div>
@@ -90,7 +90,7 @@ function CallbackHandler() {
 
   return (
     <div className="text-center space-y-3">
-      <Loader2 className="w-8 h-8 animate-spin mx-auto" style={{ color: '#BEF264' }} />
+      <Loader2 className="w-8 h-8 animate-spin mx-auto" style={{ color: '#e87a55' }} />
       <p className="text-[#7B8889] text-sm">Even geduld, je wordt ingelogd...</p>
     </div>
   )
@@ -102,7 +102,7 @@ export default function AuthCallbackPage() {
       <Suspense
         fallback={
           <div className="text-center space-y-3">
-            <Loader2 className="w-8 h-8 animate-spin mx-auto" style={{ color: '#BEF264' }} />
+            <Loader2 className="w-8 h-8 animate-spin mx-auto" style={{ color: '#e87a55' }} />
             <p className="text-[#7B8889] text-sm">Even geduld...</p>
           </div>
         }

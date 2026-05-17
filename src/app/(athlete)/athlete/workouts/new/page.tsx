@@ -763,7 +763,7 @@ function ExerciseCard({
     <div
       className="rounded-xl overflow-hidden transition-all"
       style={{
-        background: allCompleted && isActive ? 'rgba(190,242,100,0.06)' : P.surface,
+        background: allCompleted && isActive ? 'rgba(232,122,85,0.06)' : P.surface,
         border: `1px solid ${allCompleted && isActive ? P.lime : P.line}`,
         borderLeft: `3px solid ${color}`,
       }}
@@ -852,7 +852,7 @@ function ExerciseCard({
               className="flex items-center gap-1 rounded-full transition-colors shrink-0"
               style={{
                 padding: '4px 10px',
-                background: set.completed ? 'rgba(190,242,100,0.12)' : P.surfaceLow,
+                background: set.completed ? 'rgba(232,122,85,0.12)' : P.surfaceLow,
                 border: `1px solid ${set.completed ? P.lime : P.line}`,
                 color: set.completed ? P.lime : P.inkMuted,
                 fontFamily: mono,

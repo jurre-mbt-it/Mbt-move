@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
     surfaceHi: '#1C2425',
     ink: '#F5F7F6',
     inkMuted: '#7B8889',
-    lime: '#BEF264',
+    lime: '#e87a55',
     line: 'rgba(255,255,255,0.12)',
   }
 
@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
   const instructionsBlock = safeInstructions
     ? `
               <tr><td style="padding:20px 28px 0 28px;">
-                <div style="background:rgba(190,242,100,0.06);border-left:3px solid ${BRAND.lime};border-radius:8px;padding:14px 16px;">
+                <div style="background:rgba(232,122,85,0.06);border-left:3px solid ${BRAND.lime};border-radius:8px;padding:14px 16px;">
                   <div style="font-family:ui-monospace,Menlo,'SF Mono',monospace;font-size:10px;letter-spacing:0.14em;color:${BRAND.lime};font-weight:700;text-transform:uppercase;margin-bottom:6px;">BERICHT VAN JE THERAPEUT</div>
                   <div style="color:${BRAND.ink};font-size:14px;line-height:1.5;">${safeInstructions}</div>
                 </div>

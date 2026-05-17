@@ -19,7 +19,7 @@ const MUSCLE_PAIRS: [string, string][] = [
 ]
 
 const LOAD_COLORS = [
-  '', '#c6f7f2', '#5eead4', '#BEF264', '#0D9488', '#134E4A',
+  '', '#c6f7f2', '#5eead4', '#e87a55', '#0D9488', '#134E4A',
 ]
 
 export function MuscleBalancePanel({ exercises, currentDay, currentWeek }: Props) {
@@ -85,7 +85,7 @@ export function MuscleBalancePanel({ exercises, currentDay, currentWeek }: Props
           sorted.map(([muscle, load]) => {
             const pct = Math.round((load / maxLoad) * 100)
             const intensity = Math.min(5, Math.ceil((load / maxLoad) * 5))
-            const color = LOAD_COLORS[intensity] ?? '#BEF264'
+            const color = LOAD_COLORS[intensity] ?? '#e87a55'
 
             return (
               <div key={muscle} className="space-y-0.5">

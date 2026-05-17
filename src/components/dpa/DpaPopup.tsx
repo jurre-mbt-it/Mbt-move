@@ -55,9 +55,9 @@ export function DpaPopup() {
         <div className="px-5 pt-6 pb-4" style={{ background: '#141A1B' }}>
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
-            style={{ background: '#1C2425', border: '1px solid #BEF264' }}
+            style={{ background: '#1C2425', border: '1px solid #e87a55' }}
           >
-            <FileText className="w-5 h-5" style={{ color: '#BEF264' }} />
+            <FileText className="w-5 h-5" style={{ color: '#e87a55' }} />
           </div>
           <h2 className="text-lg font-bold leading-tight" style={{ color: '#F5F7F6' }}>
             Verwerkingsovereenkomst
@@ -82,7 +82,7 @@ export function DpaPopup() {
               <li key={i} className="flex items-start gap-2.5 text-sm" style={{ color: '#7B8889' }}>
                 <CheckCircle2
                   className="w-4 h-4 mt-0.5 shrink-0"
-                  style={{ color: '#BEF264' }}
+                  style={{ color: '#e87a55' }}
                 />
                 <span>{item}</span>
               </li>
@@ -92,7 +92,7 @@ export function DpaPopup() {
           <Link
             href="/patient/legal/dpa"
             className="text-xs flex items-center gap-1 mt-2"
-            style={{ color: '#BEF264' }}
+            style={{ color: '#e87a55' }}
             target="_blank"
           >
             <FileText className="w-3.5 h-3.5" />
@@ -108,7 +108,7 @@ export function DpaPopup() {
         <div className="px-5 pb-6 space-y-2" style={{ background: '#0A0E0F' }}>
           <Button
             className="w-full font-semibold"
-            style={{ background: '#BEF264', color: '#0A0E0F', height: 48 }}
+            style={{ background: '#e87a55', color: '#0A0E0F', height: 48 }}
             onClick={() => accept.mutate()}
             disabled={accept.isPending}
           >

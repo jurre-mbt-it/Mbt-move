@@ -331,7 +331,7 @@ function categoryLabel(cat: string | null | undefined): string {
 
 function categoryColor(cat: string | null | undefined): string {
   switch (cat) {
-    case 'STRENGTH': return '#BEF264'
+    case 'STRENGTH': return '#e87a55'
     case 'MOBILITY': return '#60a5fa'
     case 'PLYOMETRICS': return '#f59e0b'
     case 'CARDIO': return '#f87171'

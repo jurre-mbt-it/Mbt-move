@@ -192,7 +192,7 @@ export default function PatientProgramPage() {
                       className="athletic-mono inline-flex items-center gap-1 px-2 py-1 rounded"
                       style={{
                         color: P.lime,
-                        background: 'rgba(190,242,100,0.10)',
+                        background: 'rgba(232,122,85,0.10)',
                         border: `1px solid ${P.lime}33`,
                         fontSize: 10,
                         fontWeight: 900,

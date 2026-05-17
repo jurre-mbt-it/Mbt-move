@@ -142,7 +142,7 @@ export default function AdminDpaPage() {
                     <span
                       className="athletic-mono inline-flex items-center gap-1.5 px-2 py-1 rounded-full"
                       style={{
-                        background: 'rgba(190,242,100,0.12)',
+                        background: 'rgba(232,122,85,0.12)',
                         color: P.lime,
                         fontSize: 10,
                         letterSpacing: '0.12em',

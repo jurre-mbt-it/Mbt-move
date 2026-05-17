@@ -52,9 +52,9 @@ export function ConsentPopup() {
         <div className="px-5 pt-6 pb-4" style={{ background: '#141A1B' }}>
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
-            style={{ background: '#1C2425', border: '1px solid #BEF264' }}
+            style={{ background: '#1C2425', border: '1px solid #e87a55' }}
           >
-            <ShieldCheck className="w-5 h-5" style={{ color: '#BEF264' }} />
+            <ShieldCheck className="w-5 h-5" style={{ color: '#e87a55' }} />
           </div>
           <h2 className="text-lg font-bold leading-tight" style={{ color: '#F5F7F6' }}>Data toestemming</h2>
           <p className="text-sm mt-1" style={{ color: '#7B8889' }}>
@@ -76,7 +76,7 @@ export function ConsentPopup() {
               <li key={i} className="flex items-start gap-2.5 text-sm" style={{ color: '#7B8889' }}>
                 <CheckCircle2
                   className="w-4 h-4 mt-0.5 shrink-0"
-                  style={{ color: '#BEF264' }}
+                  style={{ color: '#e87a55' }}
                 />
                 <span>{item}</span>
               </li>
@@ -100,7 +100,7 @@ export function ConsentPopup() {
           </Button>
           <Button
             className="flex-1 font-semibold"
-            style={{ background: '#BEF264', color: '#0A0E0F' }}
+            style={{ background: '#e87a55', color: '#0A0E0F' }}
             onClick={handleAccept}
             disabled={setConsent.isPending}
           >

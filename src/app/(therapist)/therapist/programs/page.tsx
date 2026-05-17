@@ -191,7 +191,7 @@ export default function ProgramsPage() {
                   id="asTemplate"
                   checked={duplicateAsTemplate}
                   onChange={e => setDuplicateAsTemplate(e.target.checked)}
-                  className="accent-[#BEF264]"
+                  className="accent-[#e87a55]"
                 />
                 <label htmlFor="asTemplate" style={{ color: P.ink, fontSize: 13 }}>
                   Opslaan als template

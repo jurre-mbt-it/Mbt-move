@@ -210,7 +210,7 @@ export default function SecuritySettingsPage() {
           {shownCodes && (
             <div
               className="mt-4 rounded-lg p-3 space-y-3"
-              style={{ border: `1px solid ${P.lime}`, background: 'rgba(190,242,100,0.08)' }}
+              style={{ border: `1px solid ${P.lime}`, background: 'rgba(232,122,85,0.08)' }}
             >
               <MetaLabel style={{ color: P.lime }}>
                 NIEUW · WORDT NIET OPNIEUW GETOOND

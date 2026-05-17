@@ -57,7 +57,7 @@ export function ExerciseCard({
 }: ExerciseCardProps) {
   const category = EXERCISE_CATEGORIES.find(c => c.value === exercise.category)
   const difficulty = DIFFICULTIES.find(d => d.value === exercise.difficulty)
-  const color = CATEGORY_COLORS[exercise.category] ?? '#BEF264'
+  const color = CATEGORY_COLORS[exercise.category] ?? '#e87a55'
   const dots = DIFFICULTY_DOTS[exercise.difficulty as keyof typeof DIFFICULTY_DOTS] ?? 1
 
   const hasVideo = exercise.mediaType === 'YOUTUBE' || exercise.mediaType === 'VIMEO'
@@ -102,7 +102,7 @@ export function ExerciseCard({
           <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-all">
             <div
               className="w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-              style={{ background: '#BEF264' }}
+              style={{ background: '#e87a55' }}
             >
               <Play className="w-5 h-5 text-white ml-0.5" />
             </div>
@@ -166,7 +166,7 @@ export function ExerciseCard({
               onQuickAdd(exercise.id)
             }}
             className="absolute bottom-2 left-2 w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-md hover:scale-110 active:scale-95"
-            style={{ background: '#BEF264', color: '#0A0E0F' }}
+            style={{ background: '#e87a55', color: '#0A0E0F' }}
           >
             <Plus className="w-4 h-4" strokeWidth={3} />
           </button>

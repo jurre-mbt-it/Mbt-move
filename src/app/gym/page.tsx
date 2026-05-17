@@ -13,7 +13,7 @@ const P = {
   ink: '#F5F7F6',
   inkMuted: '#7B8889',
   inkDim: '#4A5454',
-  lime: '#BEF264',
+  lime: '#e87a55',
   limeDark: '#65A30D',
   brand: '#e87a55',
   brandDeep: '#c9613f',
@@ -83,11 +83,11 @@ export default function GymLandingPage() {
         /* Primary CTA — brighten + lift + arrow shift */
         .mbt-cta {
           transition: transform 220ms cubic-bezier(.2,.8,.2,1), box-shadow 220ms ease, filter 220ms ease;
-          box-shadow: 0 0 0 0 rgba(190,242,100,0);
+          box-shadow: 0 0 0 0 rgba(232,122,85,0);
         }
         .mbt-cta:hover {
           transform: translateY(-2px);
-          box-shadow: 0 10px 30px -8px rgba(190,242,100,0.55);
+          box-shadow: 0 10px 30px -8px rgba(232,122,85,0.55);
           filter: brightness(1.06);
         }
         .mbt-cta .mbt-arrow { transition: transform 220ms cubic-bezier(.2,.8,.2,1); display: inline-block; }
@@ -160,7 +160,7 @@ export default function GymLandingPage() {
         }
         .mbt-phone:hover {
           transform: translateY(-12px) rotate(-1deg) !important;
-          box-shadow: 0 40px 80px -20px rgba(190,242,100,0.28), 0 20px 40px -20px rgba(0,0,0,0.7) !important;
+          box-shadow: 0 40px 80px -20px rgba(232,122,85,0.28), 0 20px 40px -20px rgba(0,0,0,0.7) !important;
         }
         .mbt-phone-elevated:hover {
           transform: translateY(-36px) rotate(1deg) !important;
@@ -516,7 +516,7 @@ function RadialGlow() {
         position: 'absolute',
         inset: 0,
         background:
-          'radial-gradient(600px 400px at 80% 0%, rgba(190,242,100,0.12), transparent 70%), radial-gradient(800px 500px at 0% 30%, rgba(147,197,253,0.06), transparent 70%)',
+          'radial-gradient(600px 400px at 80% 0%, rgba(232,122,85,0.12), transparent 70%), radial-gradient(800px 500px at 0% 30%, rgba(147,197,253,0.06), transparent 70%)',
         pointerEvents: 'none',
       }}
     />
@@ -807,7 +807,7 @@ function PhoneFrame({
         border: `1px solid ${P.lineStrong}`,
         padding: 10,
         boxShadow: elevated
-          ? '0 40px 80px -20px rgba(190,242,100,0.18), 0 20px 40px -20px rgba(0,0,0,0.6)'
+          ? '0 40px 80px -20px rgba(232,122,85,0.18), 0 20px 40px -20px rgba(0,0,0,0.6)'
           : '0 30px 60px -20px rgba(0,0,0,0.7)',
         transform: elevated ? 'translateY(-24px)' : 'none',
         position: 'relative',
@@ -1262,7 +1262,7 @@ function ACWRMeter() {
           inset: '18px 0',
           borderRadius: 999,
           background:
-            'linear-gradient(90deg, #F87171 0%, #F4C261 25%, #BEF264 40%, #BEF264 65%, #F4C261 80%, #F87171 100%)',
+            'linear-gradient(90deg, #F87171 0%, #F4C261 25%, #e87a55 40%, #e87a55 65%, #F4C261 80%, #F87171 100%)',
           opacity: 0.9,
         }}
       />
@@ -1473,7 +1473,7 @@ function CTASection() {
             position: 'absolute',
             inset: 0,
             background:
-              'radial-gradient(500px 300px at 50% 50%, rgba(190,242,100,0.18), transparent 70%)',
+              'radial-gradient(500px 300px at 50% 50%, rgba(232,122,85,0.18), transparent 70%)',
             pointerEvents: 'none',
           }}
         />

@@ -22,7 +22,7 @@ const STATUS_COLOR: Record<StatusValue, string> = {
 const STATUS_BG: Record<StatusValue, string> = {
   NOT_MET: 'rgba(248,113,113,0.12)',
   IN_PROGRESS: 'rgba(244,194,97,0.14)',
-  MET: 'rgba(190,242,100,0.14)',
+  MET: 'rgba(232,122,85,0.14)',
 }
 
 const STATUS_LABEL: Record<StatusValue, string> = {

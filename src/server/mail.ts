@@ -79,7 +79,7 @@ const MBT_BRAND = {
   surface: '#141A1B',
   ink: '#F5F7F6',
   inkMuted: '#7B8889',
-  lime: '#BEF264',
+  lime: '#e87a55',
   line: 'rgba(255,255,255,0.12)',
 }
 

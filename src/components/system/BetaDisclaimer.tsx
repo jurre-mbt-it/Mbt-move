@@ -85,7 +85,7 @@ export function BetaDisclaimer() {
           <Button
             onClick={handleAccept}
             className="w-full font-semibold"
-            style={{ background: '#BEF264', color: '#0A0E0F' }}
+            style={{ background: '#e87a55', color: '#0A0E0F' }}
           >
             Ik begrijp het en ga akkoord
           </Button>

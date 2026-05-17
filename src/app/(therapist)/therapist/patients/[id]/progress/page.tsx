@@ -94,7 +94,7 @@ function SessionCalendar({ sessions }: { sessions: { date: string }[] }) {
           {row.map((day, di) => {
             if (!day) return <div key={di} className="aspect-square rounded-md" />
             const bg = day.isFuture ? P.surfaceLow
-              : day.completed ? 'rgba(190,242,100,0.18)' : P.surfaceHi
+              : day.completed ? 'rgba(232,122,85,0.18)' : P.surfaceHi
             const border = day.isFuture ? P.line
               : day.completed ? P.lime : P.inkDim
             return (
@@ -110,7 +110,7 @@ function SessionCalendar({ sessions }: { sessions: { date: string }[] }) {
       ))}
       <div className="flex items-center gap-4 mt-3">
         {[
-          { color: 'rgba(190,242,100,0.18)', border: P.lime,   label: 'Sessie' },
+          { color: 'rgba(232,122,85,0.18)', border: P.lime,   label: 'Sessie' },
           { color: P.surfaceHi,               border: P.inkDim, label: 'Geen sessie' },
         ].map(({ color, border, label }) => (
           <div key={label} className="flex items-center gap-1.5">

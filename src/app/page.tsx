@@ -42,7 +42,7 @@ export default function RootPage() {
 
   return (
     <div className="athletic-dark min-h-screen flex items-center justify-center" style={{ background: '#0A0E0F' }}>
-      <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#BEF264', borderTopColor: 'transparent' }} />
+      <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#e87a55', borderTopColor: 'transparent' }} />
     </div>
   )
 }

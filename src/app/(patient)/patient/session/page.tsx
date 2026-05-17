@@ -939,7 +939,7 @@ function SessionPageInner() {
         <div
           className="athletic-mono px-3 py-1 rounded-full mt-1"
           style={{
-            background: 'rgba(190,242,100,0.10)',
+            background: 'rgba(232,122,85,0.10)',
             border: `1px solid ${P.lime}`,
             color: P.lime,
             fontSize: 11,
@@ -1356,7 +1356,7 @@ function SessionPageInner() {
                 {variants.harder && (
                   <div
                     className="flex items-center gap-2 rounded-xl px-3 py-2"
-                    style={{ background: 'rgba(190,242,100,0.10)' }}
+                    style={{ background: 'rgba(232,122,85,0.10)' }}
                   >
                     <TrendingUp className="w-3.5 h-3.5 shrink-0" style={{ color: P.lime }} />
                     <span style={{ color: P.lime, fontSize: 12 }}>

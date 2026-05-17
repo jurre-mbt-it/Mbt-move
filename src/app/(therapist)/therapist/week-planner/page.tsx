@@ -188,13 +188,13 @@ type ItemStatus = 'scheduled' | 'completed' | 'missed' | 'in_progress'
 
 const STATUS_COLORS: Record<ItemStatus, string> = {
   scheduled: 'transparent',           // geen extra accent — categorie-kleur leidt
-  completed: 'rgba(190,242,100,0.18)', // lime tint
+  completed: 'rgba(232,122,85,0.18)', // lime tint
   missed:    'rgba(248,113,113,0.20)', // danger red tint
   in_progress: 'rgba(244,194,97,0.20)', // gold/amber tint
 }
 const STATUS_BORDER: Record<ItemStatus, string> = {
   scheduled: '',
-  completed: '#BEF264',
+  completed: '#e87a55',
   missed:    '#F87171',
   in_progress: '#F4C261',
 }
@@ -315,7 +315,7 @@ const STATUS_LABEL: Record<SessionDetail['status'], string> = {
 const STATUS_TONE: Record<SessionDetail['status'], string> = {
   PENDING: '#7B8889',
   IN_PROGRESS: '#F4C261',
-  COMPLETED: '#BEF264',
+  COMPLETED: '#e87a55',
   SKIPPED: '#F87171',
 }
 

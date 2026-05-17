@@ -248,7 +248,7 @@ function AccessCodeInner() {
                     color: P.lime,
                     fontSize: 12,
                     letterSpacing: '0.04em',
-                    background: 'rgba(190,242,100,0.08)',
+                    background: 'rgba(232,122,85,0.08)',
                     border: `1px solid ${P.lime}33`,
                   }}
                 >

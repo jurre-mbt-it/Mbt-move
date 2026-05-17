@@ -11,7 +11,7 @@ import { EXERCISE_CATEGORIES, DIFFICULTIES } from '@/lib/exercise-constants'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ReactPlayer = dynamic(() => import('react-player') as any, { ssr: false }) as any
 
-const MBT_GREEN = '#BEF264'
+const MBT_GREEN = '#e87a55'
 
 const CATEGORY_COLORS: Record<string, string> = {
   STRENGTH:    '#BEF264',
@@ -49,7 +49,7 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
 
   const categoryLabel = EXERCISE_CATEGORIES.find(c => c.value === exercise.category)?.label ?? exercise.category
   const difficultyLabel = DIFFICULTIES.find(d => d.value === exercise.difficulty)?.label ?? exercise.difficulty
-  const color = CATEGORY_COLORS[exercise.category ?? ''] ?? '#BEF264'
+  const color = CATEGORY_COLORS[exercise.category ?? ''] ?? '#e87a55'
 
   const primaryMuscles = exercise.muscleLoads
     ? Object.entries(exercise.muscleLoads)
@@ -77,7 +77,7 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
                 playIcon={
                   <div
                     className="w-14 h-14 rounded-full flex items-center justify-center"
-                    style={{ background: '#BEF264' }}
+                    style={{ background: '#e87a55' }}
                   >
                     <span className="text-white text-xl ml-1">▶</span>
                   </div>
@@ -200,9 +200,9 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
                 </div>
               )}
               {exercise.harderVariant && (
-                <div className="flex items-center gap-2 text-xs rounded-xl px-3 py-2" style={{ background: 'rgba(190,242,100,0.10)' }}>
+                <div className="flex items-center gap-2 text-xs rounded-xl px-3 py-2" style={{ background: 'rgba(232,122,85,0.10)' }}>
                   <TrendingUp className="w-3.5 h-3.5 shrink-0" style={{ color: MBT_GREEN }} />
-                  <span style={{ color: '#BEF264' }}>
+                  <span style={{ color: '#e87a55' }}>
                     <span className="font-semibold">Te makkelijk?</span> Probeer: {exercise.harderVariant}
                   </span>
                 </div>

@@ -534,7 +534,7 @@ function buildPreviewHtml(footer: string): string {
         <tr><td align="center">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#141A1B;border:1px solid rgba(255,255,255,0.12);border-radius:20px;overflow:hidden;">
             <tr><td style="padding:24px 24px 8px 24px;">
-              <div style="font-family:ui-monospace,Menlo,'SF Mono',monospace;font-size:11px;letter-spacing:0.2em;color:#BEF264;font-weight:900;">● MBT · GYM</div>
+              <div style="font-family:ui-monospace,Menlo,'SF Mono',monospace;font-size:11px;letter-spacing:0.2em;color:#e87a55;font-weight:900;">● MBT · GYM</div>
             </td></tr>
             <tr><td style="padding:6px 24px 0 24px;">
               <h1 style="margin:0;padding:4px 0 0 0;font-size:26px;line-height:32px;font-weight:900;letter-spacing:-1px;color:#F5F7F6;text-transform:uppercase;">HALLO {voornaam}</h1>
@@ -549,7 +549,7 @@ function buildPreviewHtml(footer: string): string {
               </div>
             </td></tr>
             <tr><td style="padding:18px 24px 0 24px;">
-              <div style="background:#BEF264;color:#0A0E0F;text-align:center;padding:14px 20px;border-radius:12px;font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:900;letter-spacing:0.16em;text-transform:uppercase;">PROGRAMMA OPENEN →</div>
+              <div style="background:#e87a55;color:#0A0E0F;text-align:center;padding:14px 20px;border-radius:12px;font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:900;letter-spacing:0.16em;text-transform:uppercase;">PROGRAMMA OPENEN →</div>
             </td></tr>
             ${footer
               ? `<tr><td style="padding:18px 24px 24px 24px;">${footer}</td></tr>`

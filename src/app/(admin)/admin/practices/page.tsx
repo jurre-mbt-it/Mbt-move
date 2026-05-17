@@ -266,8 +266,8 @@ function OwnerPickerDialog({
                 onClick={() => setOwner.mutate({ practiceId, userId: m.id })}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors"
                 style={{
-                  background: isCurrent ? 'rgba(190,242,100,0.10)' : P.surface,
-                  border: `1px solid ${isCurrent ? 'rgba(190,242,100,0.35)' : P.lineStrong}`,
+                  background: isCurrent ? 'rgba(232,122,85,0.10)' : P.surface,
+                  border: `1px solid ${isCurrent ? 'rgba(232,122,85,0.35)' : P.lineStrong}`,
                 }}
               >
                 <Crown

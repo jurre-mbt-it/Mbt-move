@@ -377,7 +377,7 @@ export default function AthleteSessionPage() {
           <div
             className="w-16 h-16 rounded-full flex items-center justify-center mx-auto"
             style={{
-              background: 'rgba(190,242,100,0.12)',
+              background: 'rgba(232,122,85,0.12)',
               border: `1px solid ${P.lime}`,
             }}
           >
@@ -649,7 +649,7 @@ function AddExerciseSheet({
                   type="button"
                   className="w-full flex items-center gap-3 rounded-xl text-left transition-all active:scale-[0.98]"
                   style={{
-                    background: alreadyAdded ? 'rgba(190,242,100,0.10)' : P.surfaceLow,
+                    background: alreadyAdded ? 'rgba(232,122,85,0.10)' : P.surfaceLow,
                     border: `1px solid ${alreadyAdded ? P.lime : P.line}`,
                     padding: '12px 14px',
                   }}

@@ -322,7 +322,7 @@ function WalkRunWizardContent() {
                       onClick={() => loadTemplate(tpl.id)}
                       className="athletic-tap w-full text-left p-3 rounded-xl transition-all flex items-start gap-3"
                       style={state.templateId === tpl.id
-                        ? { border: `1px solid ${P.lime}`, background: 'rgba(190,242,100,0.10)' }
+                        ? { border: `1px solid ${P.lime}`, background: 'rgba(232,122,85,0.10)' }
                         : { border: `1px solid ${P.line}`, background: P.surfaceHi }}
                     >
                       <span style={{ fontSize: 22, color: P.ink }}>
@@ -540,7 +540,7 @@ function WalkRunWizardContent() {
                 <div className="flex items-center gap-3">
                   <div
                     className="w-10 h-10 rounded-full flex items-center justify-center"
-                    style={{ background: 'rgba(190,242,100,0.18)' }}
+                    style={{ background: 'rgba(232,122,85,0.18)' }}
                   >
                     <IconRunning size={22} />
                   </div>

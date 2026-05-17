@@ -65,7 +65,7 @@ function InlineNumber({
       min={min}
       allowEmpty={false}
       className={cn(
-        'w-10 h-5 text-center text-xs font-semibold bg-transparent rounded border-0 focus:outline-none focus:ring-1 focus:ring-[#BEF264]',
+        'w-10 h-5 text-center text-xs font-semibold bg-transparent rounded border-0 focus:outline-none focus:ring-1 focus:ring-[#e87a55]',
         className,
       )}
     />
@@ -96,7 +96,7 @@ function FixedChip({
               className={cn(
                 'w-5 h-5 rounded flex items-center justify-center transition-colors',
                 isRange
-                  ? 'text-[#BEF264] bg-[rgba(190,242,100,0.10)] hover:bg-[rgba(190,242,100,0.18)]'
+                  ? 'text-[#e87a55] bg-[rgba(232,122,85,0.10)] hover:bg-[rgba(232,122,85,0.18)]'
                   : 'text-[#7B8889] hover:text-foreground hover:bg-[rgba(255,255,255,0.06)]'
               )}
             >
@@ -157,7 +157,7 @@ export function ProgramExerciseBlock({
   })
 
   const style = { transform: CSS.Transform.toString(transform), transition }
-  const color = CATEGORY_COLORS[exercise.category] ?? '#BEF264'
+  const color = CATEGORY_COLORS[exercise.category] ?? '#e87a55'
 
   const addParam = (tpl: { label: string; type: 'number' | 'text' | 'select' | 'slider'; unit?: string; options?: string[]; min?: number; max?: number; defaultValue?: string | number }) => {
     if (exercise.extraParams.find(p => p.label === tpl.label)) return
@@ -244,7 +244,7 @@ export function ProgramExerciseBlock({
       className={cn(
         'group rounded-lg border bg-[#141A1B] transition-all',
         isDragging ? 'opacity-50 shadow-xl z-50' : 'hover:border-[rgba(255,255,255,0.16)]',
-        exercise.selected && 'ring-2 ring-[#BEF264] border-[#BEF264]',
+        exercise.selected && 'ring-2 ring-[#e87a55] border-[#e87a55]',
         isInSuperset && 'border-transparent'
       )}
     >
@@ -269,7 +269,7 @@ export function ProgramExerciseBlock({
             type="checkbox"
             checked={exercise.selected}
             onChange={() => onToggleSelect(exercise.uid)}
-            className="w-3.5 h-3.5 shrink-0 accent-[#BEF264]"
+            className="w-3.5 h-3.5 shrink-0 accent-[#e87a55]"
           />
 
           <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
@@ -402,7 +402,7 @@ export function ProgramExerciseBlock({
                   key={p.label}
                   type="button"
                   onClick={() => addParam(p)}
-                  className="inline-flex items-center gap-1 h-6 px-2 rounded-full text-[11px] font-semibold border border-[rgba(255,255,255,0.10)] text-[#7B8889] hover:text-[#BEF264] hover:border-[rgba(190,242,100,0.35)] hover:bg-[rgba(190,242,100,0.06)] transition-colors"
+                  className="inline-flex items-center gap-1 h-6 px-2 rounded-full text-[11px] font-semibold border border-[rgba(255,255,255,0.10)] text-[#7B8889] hover:text-[#e87a55] hover:border-[rgba(232,122,85,0.35)] hover:bg-[rgba(232,122,85,0.06)] transition-colors"
                 >
                   <Plus className="w-2.5 h-2.5" strokeWidth={3} />
                   {p.label}
@@ -467,7 +467,7 @@ export function ProgramExerciseBlock({
               <select
                 value={exercise.repUnit}
                 onChange={e => onUpdate(exercise.uid, { repUnit: e.target.value as RepUnit })}
-                className="text-xs bg-transparent border-0 rounded px-0.5 h-5 focus:outline-none focus:ring-1 focus:ring-[#BEF264] text-[#7B8889]"
+                className="text-xs bg-transparent border-0 rounded px-0.5 h-5 focus:outline-none focus:ring-1 focus:ring-[#e87a55] text-[#7B8889]"
               >
                 {REP_UNITS.map(u => <option key={u.value} value={u.value} className="bg-[#1C2425]">{u.label}</option>)}
               </select>
@@ -527,7 +527,7 @@ export function ProgramExerciseBlock({
                         max={param.max ?? 10}
                         value={param.value as number}
                         onChange={e => updateParam(param.id, Number(e.target.value))}
-                        className="w-14 h-1 accent-[#BEF264]"
+                        className="w-14 h-1 accent-[#e87a55]"
                       />
                       <span className="font-semibold w-4 text-center">{param.value}</span>
                       {isRange && (
@@ -539,7 +539,7 @@ export function ProgramExerciseBlock({
                             max={param.max ?? 10}
                             value={Number(param.valueMax) || 0}
                             onChange={e => updateParamFields(param.id, { valueMax: Number(e.target.value) })}
-                            className="w-14 h-1 accent-[#BEF264]"
+                            className="w-14 h-1 accent-[#e87a55]"
                           />
                           <span className="font-semibold w-4 text-center">{param.valueMax}</span>
                         </>
@@ -653,13 +653,13 @@ export function ProgramExerciseBlock({
                   value={videoUrlDraft}
                   onChange={e => setVideoUrlDraft(e.target.value)}
                   disabled={setVideoUrl.isPending}
-                  className="flex-1 h-9 px-3 text-sm bg-[#1C2425] rounded-md border border-[rgba(255,255,255,0.10)] focus:outline-none focus:ring-1 focus:ring-[#BEF264] focus:border-[#BEF264] placeholder:text-[#566060]"
+                  className="flex-1 h-9 px-3 text-sm bg-[#1C2425] rounded-md border border-[rgba(255,255,255,0.10)] focus:outline-none focus:ring-1 focus:ring-[#e87a55] focus:border-[#e87a55] placeholder:text-[#566060]"
                 />
                 <Button
                   type="submit"
                   size="sm"
                   disabled={setVideoUrl.isPending || !videoUrlDraft.trim()}
-                  style={{ background: '#BEF264', color: '#0A0E0F' }}
+                  style={{ background: '#e87a55', color: '#0A0E0F' }}
                 >
                   {setVideoUrl.isPending ? '…' : 'Koppel'}
                 </Button>
