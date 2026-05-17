@@ -22,7 +22,7 @@ import { trpc } from '@/lib/trpc/client'
 const NAV_ITEMS = [
   { href: '/patient/dashboard', label: 'HOME', icon: Home },
   { href: '/patient/schedule', label: 'SCHEMA', icon: CalendarDays },
-  { href: '/patient/session', label: 'TRAINING', icon: Dumbbell },
+  { href: '/patient/training', label: 'TRAINING', icon: Dumbbell },
   { href: '/patient/settings', label: 'INSTELLINGEN', icon: Settings },
 ]
 
