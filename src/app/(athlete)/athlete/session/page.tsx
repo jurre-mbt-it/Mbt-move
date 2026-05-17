@@ -506,32 +506,31 @@ export default function AthleteSessionPage() {
               </span>
             </div>
             <div className="flex gap-1">
-              {Array.from({ length: 11 }, (_, i) => i).map(n => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setSessionPain(sessionPain === n ? null : n)}
-                  className="athletic-tap flex-1 rounded-lg athletic-mono transition-all"
-                  style={{
-                    height: 36,
-                    background:
-                      sessionPain === n
-                        ? n === 0
-                          ? P.lime
-                          : n < 3
-                            ? P.lime
-                            : n < 6
-                              ? P.gold
-                              : P.danger
-                        : P.surfaceHi,
-                    color: sessionPain === n ? P.bg : P.inkMuted,
-                    fontSize: 11,
-                    fontWeight: 900,
-                  }}
-                >
-                  {n}
-                </button>
-              ))}
+              {Array.from({ length: 11 }, (_, i) => i).map(n => {
+                // Heatmap: groen → goud → rood. 0-2 groen, 3-5 goud, 6-10 rood.
+                const baseColor = n < 3 ? P.lime : n < 6 ? P.gold : P.danger
+                const selected = sessionPain === n
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setSessionPain(selected ? null : n)}
+                    className="athletic-tap flex-1 rounded-lg athletic-mono transition-all"
+                    style={{
+                      height: 36,
+                      background: selected ? baseColor : `${baseColor}1F`,
+                      color: selected ? P.bg : baseColor,
+                      border: selected
+                        ? `2px solid ${baseColor}`
+                        : `1px solid ${baseColor}33`,
+                      fontSize: 11,
+                      fontWeight: 900,
+                    }}
+                  >
+                    {n}
+                  </button>
+                )
+              })}
             </div>
           </div>
 

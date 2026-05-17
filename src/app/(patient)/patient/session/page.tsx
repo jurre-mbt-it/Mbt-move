@@ -230,22 +230,27 @@ function FeedbackModal({
               </span>
             </div>
             <div className="flex gap-1">
-              {Array.from({ length: 11 }, (_, i) => (
-                <button
-                  key={i}
-                  onClick={() => onChange({ painDuring: feedback.painDuring === i ? null : i, pain: feedback.painDuring === i ? null : i })}
-                  className="athletic-tap flex-1 rounded-lg athletic-mono transition-all"
-                  style={{
-                    height: 44,
-                    background: feedback.painDuring === i ? painColor(i, true) : P.surfaceHi,
-                    color: feedback.painDuring === i ? P.bg : P.inkMuted,
-                    fontSize: 12,
-                    fontWeight: 900,
-                  }}
-                >
-                  {i}
-                </button>
-              ))}
+              {Array.from({ length: 11 }, (_, i) => {
+                const selected = feedback.painDuring === i
+                const color = painColor(i, true)
+                return (
+                  <button
+                    key={i}
+                    onClick={() => onChange({ painDuring: selected ? null : i, pain: selected ? null : i })}
+                    className="athletic-tap flex-1 rounded-lg athletic-mono transition-all"
+                    style={{
+                      height: 44,
+                      background: selected ? color : `${color}1F`,
+                      color: selected ? P.bg : color,
+                      border: selected ? `2px solid ${color}` : `1px solid ${color}33`,
+                      fontSize: 12,
+                      fontWeight: 900,
+                    }}
+                  >
+                    {i}
+                  </button>
+                )
+              })}
             </div>
             {(feedback.painDuring ?? 0) > 5 && (
               <div
@@ -282,22 +287,27 @@ function FeedbackModal({
               </span>
             </div>
             <div className="flex gap-1">
-              {Array.from({ length: 11 }, (_, i) => (
-                <button
-                  key={i}
-                  onClick={() => onChange({ pain: feedback.pain === i ? null : i })}
-                  className="athletic-tap flex-1 rounded-lg athletic-mono transition-all"
-                  style={{
-                    height: 44,
-                    background: feedback.pain === i ? painColor(i) : P.surfaceHi,
-                    color: feedback.pain === i ? P.bg : P.inkMuted,
-                    fontSize: 12,
-                    fontWeight: 900,
-                  }}
-                >
-                  {i}
-                </button>
-              ))}
+              {Array.from({ length: 11 }, (_, i) => {
+                const selected = feedback.pain === i
+                const color = painColor(i)
+                return (
+                  <button
+                    key={i}
+                    onClick={() => onChange({ pain: selected ? null : i })}
+                    className="athletic-tap flex-1 rounded-lg athletic-mono transition-all"
+                    style={{
+                      height: 44,
+                      background: selected ? color : `${color}1F`,
+                      color: selected ? P.bg : color,
+                      border: selected ? `2px solid ${color}` : `1px solid ${color}33`,
+                      fontSize: 12,
+                      fontWeight: 900,
+                    }}
+                  >
+                    {i}
+                  </button>
+                )
+              })}
             </div>
           </div>
         )}
@@ -740,9 +750,9 @@ function SessionSummary({
                   className="athletic-tap rounded-lg athletic-mono transition-all"
                   style={{
                     height: 36,
-                    background: selected ? color : P.surfaceHi,
-                    color: selected ? P.bg : P.inkMuted,
-                    border: selected ? `2px solid ${color}` : `1px solid ${P.line}`,
+                    background: selected ? color : `${color}1F`,
+                    color: selected ? P.bg : color,
+                    border: selected ? `2px solid ${color}` : `1px solid ${color}33`,
                     fontSize: 11,
                     fontWeight: 900,
                   }}

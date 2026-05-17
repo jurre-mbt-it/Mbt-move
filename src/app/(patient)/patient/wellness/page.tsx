@@ -267,8 +267,10 @@ function ItemRow({
       </div>
       <div className="flex gap-1.5">
         {[1, 2, 3, 4, 5].map((n) => {
+          // Heatmap per button: 1-2 rood, 3 goud, 4-5 groen. Per knop dim
+          // wanneer niet geselecteerd, vol wanneer wel.
+          const buttonColor = n >= 4 ? P.lime : n === 3 ? P.gold : P.danger
           const active = n === value
-          const below = n <= value
           return (
             <button
               key={n}
@@ -278,13 +280,11 @@ function ItemRow({
                 'athletic-tap flex-1 h-11 rounded-lg flex items-center justify-center athletic-mono',
               )}
               style={{
-                backgroundColor: below ? color : P.surface,
+                backgroundColor: active ? buttonColor : `${buttonColor}1F`,
                 border: active
-                  ? `2px solid ${P.ink}`
-                  : below
-                    ? `1px solid ${color}`
-                    : `1px solid ${P.lineStrong}`,
-                color: below ? P.bg : P.inkMuted,
+                  ? `2px solid ${buttonColor}`
+                  : `1px solid ${buttonColor}33`,
+                color: active ? P.bg : buttonColor,
                 fontSize: 14,
                 fontWeight: 900,
               }}
