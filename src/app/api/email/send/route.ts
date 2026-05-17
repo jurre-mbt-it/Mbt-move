@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { renderEmailFooter } from '@/server/email/footer'
+import { getAppUrl } from '@/lib/app-url'
 
 function escapeHtml(input: string): string {
   return input
@@ -93,7 +94,7 @@ export async function POST(req: NextRequest) {
     ? escapeHtml(extraInstructions.trim()).replace(/\n/g, '<br/>')
     : null
 
-  const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://mbt-gym.nl'}/${safeCode ? 'login/code' : 'login'}`
+  const loginUrl = `${getAppUrl()}/${safeCode ? 'login/code' : 'login'}`
   const ctaLabel = safeCode ? 'INLOGGEN MET CODE →' : 'PROGRAMMA OPENEN →'
 
   // Praktijk-footer — leeg als praktijk-gegevens onvolledig zijn (per spec).
