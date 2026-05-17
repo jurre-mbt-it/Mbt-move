@@ -472,9 +472,9 @@ function NewWorkoutPageInner() {
               className="w-full rounded-xl transition-colors"
               style={{
                 padding: '10px 14px',
-                border: `2px solid ${saveAsProgram ? P.lime : P.line}`,
-                background: saveAsProgram ? 'rgba(190,242,100,0.10)' : 'transparent',
-                color: saveAsProgram ? P.lime : P.inkMuted,
+                border: `2px solid ${saveAsProgram ? P.brand : P.line}`,
+                background: saveAsProgram ? 'rgba(232,122,85,0.10)' : 'transparent',
+                color: saveAsProgram ? P.brand : P.inkMuted,
                 fontFamily: mono,
                 fontSize: 11,
                 fontWeight: 900,
@@ -541,7 +541,7 @@ function NewWorkoutPageInner() {
               <div
                 className="flex items-center gap-2 rounded-full"
                 style={{
-                  background: paused ? P.purple : P.lime,
+                  background: paused ? P.purple : P.brand,
                   color: P.bg,
                   padding: '6px 14px',
                   fontFamily: mono,
@@ -616,8 +616,8 @@ function NewWorkoutPageInner() {
               className="w-full rounded-2xl flex items-center justify-center gap-2 transition-colors"
               style={{
                 padding: 16,
-                border: `2px dashed ${P.lime}`,
-                color: P.lime,
+                border: `2px dashed ${P.brand}`,
+                color: P.brand,
                 background: 'transparent',
                 fontFamily: mono,
                 fontSize: 12,
@@ -962,9 +962,9 @@ function ExercisePickerView({
             className="shrink-0 rounded-full transition-colors"
             style={{
               padding: '6px 14px',
-              background: !categoryFilter ? P.lime : P.surface,
+              background: !categoryFilter ? P.brand : P.surface,
               color: !categoryFilter ? P.bg : P.inkMuted,
-              border: `1px solid ${!categoryFilter ? P.lime : P.line}`,
+              border: `1px solid ${!categoryFilter ? P.brand : P.line}`,
               fontFamily: mono,
               fontSize: 10,
               fontWeight: 900,

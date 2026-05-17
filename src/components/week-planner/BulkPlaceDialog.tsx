@@ -96,7 +96,7 @@ export function BulkPlaceDialog({ open, onOpenChange, programs, patientId, onPla
                 onClick={() => setCategory(c.value)}
                 className="athletic-tap px-2.5 py-1 rounded-full text-xs font-bold"
                 style={{
-                  background: category === c.value ? P.lime : P.surfaceHi,
+                  background: category === c.value ? P.brand : P.surfaceHi,
                   color: category === c.value ? '#0F1516' : P.ink,
                   letterSpacing: '0.06em',
                   textTransform: 'uppercase',
@@ -124,8 +124,8 @@ export function BulkPlaceDialog({ open, onOpenChange, programs, patientId, onPla
                   onClick={() => setProgramId(p.id)}
                   className={cn('athletic-tap w-full text-left px-3 py-2 rounded-lg')}
                   style={{
-                    background: programId === p.id ? 'rgba(190,242,100,0.16)' : P.surfaceHi,
-                    border: programId === p.id ? `1px solid ${P.lime}` : `1px solid transparent`,
+                    background: programId === p.id ? 'rgba(232,122,85,0.16)' : P.surfaceHi,
+                    border: programId === p.id ? `1px solid ${P.brand}` : `1px solid transparent`,
                     color: P.ink,
                   }}
                 >
@@ -167,7 +167,7 @@ export function BulkPlaceDialog({ open, onOpenChange, programs, patientId, onPla
                 onClick={() => toggleDay(i)}
                 className="athletic-tap w-10 h-10 rounded-lg text-xs font-bold"
                 style={{
-                  background: daysOfWeek.has(i) ? P.lime : P.surfaceHi,
+                  background: daysOfWeek.has(i) ? P.brand : P.surfaceHi,
                   color: daysOfWeek.has(i) ? '#0F1516' : P.ink,
                   letterSpacing: '0.06em',
                 }}
@@ -184,7 +184,7 @@ export function BulkPlaceDialog({ open, onOpenChange, programs, patientId, onPla
             Annuleren
           </Button>
           <Button
-            style={{ background: canPlace ? P.lime : P.surfaceHi, color: canPlace ? '#0F1516' : P.inkMuted }}
+            style={{ background: canPlace ? P.brand : P.surfaceHi, color: canPlace ? '#0F1516' : P.inkMuted }}
             onClick={handlePlace}
             disabled={!canPlace || placing}
           >

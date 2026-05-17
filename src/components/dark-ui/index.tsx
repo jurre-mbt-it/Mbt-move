@@ -28,6 +28,8 @@ export const P = {
   limeDark: '#65A30D',
   limeMid: '#D4EC6C',
   limeDeep: '#84CC16',
+  brand: '#e87a55',
+  brandDeep: '#c9613f',
   danger: '#F87171',
   dangerDark: '#991B1B',
   gold: '#F4C261',
@@ -406,7 +408,7 @@ export function DarkButton({
 }) {
   const bg =
     variant === 'primary'
-      ? P.lime
+      ? P.brand
       : variant === 'danger'
         ? P.danger
         : variant === 'ghost'
@@ -604,7 +606,7 @@ export const DarkInput = React.forwardRef<
       {...props}
       className={cn(
         'w-full rounded-xl px-4 py-3 text-[15px] outline-none transition-colors',
-        'focus:border-[color:var(--p-lime)]',
+        'focus:border-[color:var(--p-brand)]',
         className,
       )}
       style={{
@@ -627,7 +629,7 @@ export const DarkTextarea = React.forwardRef<
       {...props}
       className={cn(
         'w-full rounded-xl px-4 py-3 text-[15px] outline-none transition-colors',
-        'focus:border-[color:var(--p-lime)]',
+        'focus:border-[color:var(--p-brand)]',
         className,
       )}
       style={{
@@ -652,7 +654,7 @@ export const DarkSelect = React.forwardRef<
       {...props}
       className={cn(
         'w-full rounded-xl px-4 py-3 text-[15px] outline-none transition-colors',
-        'focus:border-[color:var(--p-lime)]',
+        'focus:border-[color:var(--p-brand)]',
         className,
       )}
       style={{
@@ -883,7 +885,7 @@ if (typeof document !== 'undefined' && !document.getElementById('dark-ui-styles'
   el.textContent = `
     .dark-tab[data-state="inactive"] { color: ${P.inkMuted}; background: transparent; }
     .dark-tab[data-state="inactive"]:hover { color: ${P.ink}; background: ${P.surfaceHi}; }
-    .dark-tab[data-state="active"] { color: ${P.bg}; background: ${P.lime}; }
+    .dark-tab[data-state="active"] { color: ${P.bg}; background: ${P.brand}; }
   `
   document.head.appendChild(el)
 }

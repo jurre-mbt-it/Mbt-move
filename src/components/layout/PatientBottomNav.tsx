@@ -135,7 +135,7 @@ export function PatientBottomNav() {
                 key={href}
                 href={href}
                 className={cn('flex flex-col items-center gap-1 py-2 transition-colors')}
-                style={{ color: active ? P.lime : P.inkMuted }}
+                style={{ color: active ? P.brand : P.inkMuted }}
               >
                 <Icon className="w-5 h-5" />
                 <span
@@ -161,7 +161,7 @@ export function PatientBottomNav() {
             <span
               className="flex items-center justify-center rounded-full"
               style={{
-                background: P.lime,
+                background: P.brand,
                 color: P.bg,
                 width: 44,
                 height: 44,
@@ -193,7 +193,7 @@ export function PatientBottomNav() {
                 key={href}
                 href={href}
                 className={cn('flex flex-col items-center gap-1 py-2 transition-colors')}
-                style={{ color: active ? P.lime : P.inkMuted }}
+                style={{ color: active ? P.brand : P.inkMuted }}
               >
                 <Icon className="w-5 h-5" />
                 <span

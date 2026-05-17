@@ -120,7 +120,7 @@ export default function ProgramLibraryPage() {
                 className="athletic-tap athletic-mono px-3 py-1.5 rounded-full text-xs font-bold transition-colors"
                 style={
                   category === cat
-                    ? { background: P.lime, color: P.bg, border: `1px solid ${P.lime}`, letterSpacing: '0.08em', textTransform: 'uppercase' }
+                    ? { background: P.brand, color: P.bg, border: `1px solid ${P.brand}`, letterSpacing: '0.08em', textTransform: 'uppercase' }
                     : { background: P.surfaceHi, color: P.inkMuted, border: `1px solid ${P.lineStrong}`, letterSpacing: '0.08em', textTransform: 'uppercase' }
                 }
               >
@@ -222,7 +222,7 @@ function LibraryCard({ program, onCopy }: { program: Program; onCopy: () => void
   const [expanded, setExpanded] = useState(false)
 
   return (
-    <Tile accentBar={P.lime}>
+    <Tile accentBar={P.brand}>
       <div className="flex items-start justify-between gap-2">
         <button
           type="button"
@@ -236,8 +236,8 @@ function LibraryCard({ program, onCopy }: { program: Program; onCopy: () => void
               <span
                 className="athletic-mono inline-block mb-2"
                 style={{
-                  background: 'rgba(190,242,100,0.14)',
-                  color: P.lime,
+                  background: 'rgba(232,122,85,0.14)',
+                  color: P.brand,
                   fontSize: 10,
                   letterSpacing: '0.12em',
                   padding: '2px 8px',

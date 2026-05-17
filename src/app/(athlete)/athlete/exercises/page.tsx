@@ -96,9 +96,9 @@ export default function AthleteExercisesPage() {
             className="shrink-0 rounded-full transition-colors"
             style={{
               padding: '6px 14px',
-              background: !categoryFilter ? P.lime : P.surface,
+              background: !categoryFilter ? P.brand : P.surface,
               color: !categoryFilter ? P.bg : P.inkMuted,
-              border: `1px solid ${!categoryFilter ? P.lime : P.line}`,
+              border: `1px solid ${!categoryFilter ? P.brand : P.line}`,
               fontFamily: mono,
               fontSize: 10,
               fontWeight: 900,

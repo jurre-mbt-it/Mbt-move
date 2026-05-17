@@ -170,7 +170,7 @@ export default function DpaPage() {
               <li key={i} className="flex items-start gap-2" style={{ color: P.ink }}>
                 <span
                   className="mt-2 w-1.5 h-1.5 rounded-full shrink-0"
-                  style={{ backgroundColor: P.lime }}
+                  style={{ backgroundColor: P.brand }}
                 />
                 {item}
               </li>
@@ -190,7 +190,7 @@ export default function DpaPage() {
               <li key={i} className="flex items-start gap-2" style={{ color: P.ink }}>
                 <span
                   className="mt-2 w-1.5 h-1.5 rounded-full shrink-0"
-                  style={{ backgroundColor: P.lime }}
+                  style={{ backgroundColor: P.brand }}
                 />
                 {item}
               </li>
@@ -204,7 +204,7 @@ export default function DpaPage() {
             <li className="flex items-start gap-2" style={{ color: P.ink }}>
               <span
                 className="mt-2 w-1.5 h-1.5 rounded-full shrink-0"
-                style={{ backgroundColor: P.lime }}
+                style={{ backgroundColor: P.brand }}
               />
               <span>
                 <strong>Overeenkomst</strong> — uitvoering van de behandelovereenkomst (art. 6 lid 1
@@ -214,7 +214,7 @@ export default function DpaPage() {
             <li className="flex items-start gap-2" style={{ color: P.ink }}>
               <span
                 className="mt-2 w-1.5 h-1.5 rounded-full shrink-0"
-                style={{ backgroundColor: P.lime }}
+                style={{ backgroundColor: P.brand }}
               />
               <span>
                 <strong>Wettelijke verplichting</strong> — bewaarplicht op grond van de WGBO (art. 6
@@ -224,7 +224,7 @@ export default function DpaPage() {
             <li className="flex items-start gap-2" style={{ color: P.ink }}>
               <span
                 className="mt-2 w-1.5 h-1.5 rounded-full shrink-0"
-                style={{ backgroundColor: P.lime }}
+                style={{ backgroundColor: P.brand }}
               />
               <span>
                 <strong>Gerechtvaardigde belangen</strong> — behandelkwaliteit en veiligheid (art. 6
@@ -299,7 +299,7 @@ export default function DpaPage() {
             <a
               href={`mailto:${CONTROLLER_EMAIL}`}
               className="underline"
-              style={{ color: P.lime }}
+              style={{ color: P.brand }}
             >
               {CONTROLLER_EMAIL}
             </a>
@@ -343,7 +343,7 @@ export default function DpaPage() {
               <li key={i} className="flex items-start gap-2" style={{ color: P.ink }}>
                 <span
                   className="mt-2 w-1.5 h-1.5 rounded-full shrink-0"
-                  style={{ backgroundColor: P.lime }}
+                  style={{ backgroundColor: P.brand }}
                 />
                 {item}
               </li>
@@ -357,7 +357,7 @@ export default function DpaPage() {
             <a
               href={`mailto:${CONTROLLER_EMAIL}`}
               className="underline"
-              style={{ color: P.lime }}
+              style={{ color: P.brand }}
             >
               {CONTROLLER_EMAIL}
             </a>
@@ -373,7 +373,7 @@ export default function DpaPage() {
           </p>
         </Section>
 
-        <Tile accentBar={P.lime}>
+        <Tile accentBar={P.brand}>
           <p style={{ color: P.inkMuted, fontSize: 11, lineHeight: '16px' }}>
             <strong style={{ color: P.ink }}>Versie:</strong> {DPA_VERSION} &nbsp;|&nbsp;
             <strong style={{ color: P.ink }}>Ingangsdatum:</strong> {EFFECTIVE_DATE} &nbsp;|&nbsp;
@@ -392,7 +392,7 @@ export default function DpaPage() {
               className="w-full"
               style={{
                 width: '100%',
-                backgroundColor: hasScrolled ? P.lime : P.surfaceHi,
+                backgroundColor: hasScrolled ? P.brand : P.surfaceHi,
                 color: hasScrolled ? P.bg : P.inkMuted,
                 transition: 'background 0.3s',
               }}

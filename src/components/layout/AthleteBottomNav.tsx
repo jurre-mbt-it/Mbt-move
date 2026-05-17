@@ -77,7 +77,7 @@ export function AthleteBottomNav() {
                 className="athletic-tap flex items-center gap-3 px-3 py-3 rounded-xl transition-colors"
                 style={{
                   background: active ? P.surfaceHi : 'transparent',
-                  color: active ? P.lime : P.ink,
+                  color: active ? P.brand : P.ink,
                 }}
               >
                 <div
@@ -86,7 +86,7 @@ export function AthleteBottomNav() {
                 >
                   <Icon
                     className="w-4.5 h-4.5"
-                    style={{ color: active ? P.lime : P.inkMuted }}
+                    style={{ color: active ? P.brand : P.inkMuted }}
                   />
                 </div>
                 <div className="flex-1">
@@ -114,7 +114,7 @@ export function AthleteBottomNav() {
                 href={href}
                 className={cn('flex flex-col items-center gap-1 py-2 athletic-mono transition-colors')}
                 style={{
-                  color: active ? P.lime : P.inkMuted,
+                  color: active ? P.brand : P.inkMuted,
                   fontSize: 9,
                   letterSpacing: '0.14em',
                 }}
@@ -134,7 +134,7 @@ export function AthleteBottomNav() {
             <span
               className="flex items-center justify-center rounded-full"
               style={{
-                background: P.lime,
+                background: P.brand,
                 color: P.bg,
                 width: 44,
                 height: 44,
@@ -166,7 +166,7 @@ export function AthleteBottomNav() {
                 href={href}
                 className={cn('flex flex-col items-center gap-1 py-2 athletic-mono transition-colors')}
                 style={{
-                  color: active ? P.lime : P.inkMuted,
+                  color: active ? P.brand : P.inkMuted,
                   fontSize: 9,
                   letterSpacing: '0.14em',
                 }}

@@ -54,7 +54,7 @@ export default function PatientProfilePage() {
           <div
             className="athletic-mono w-20 h-20 rounded-full flex items-center justify-center"
             style={{
-              backgroundColor: P.lime,
+              backgroundColor: P.brand,
               color: P.bg,
               fontSize: 28,
               fontWeight: 900,

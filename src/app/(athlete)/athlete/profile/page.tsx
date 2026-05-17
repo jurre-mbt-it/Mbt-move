@@ -66,7 +66,7 @@ export default function AthleteProfilePage() {
             <div
               className="w-16 h-16 rounded-full flex items-center justify-center shrink-0"
               style={{
-                background: P.lime,
+                background: P.brand,
                 color: P.bg,
                 fontWeight: 900,
                 fontSize: 22,

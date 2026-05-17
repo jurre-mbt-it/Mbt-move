@@ -327,7 +327,7 @@ export function WeekPlannerEditor({ initialData }: Props) {
             <input
               value={name}
               onChange={e => setName(e.target.value)}
-              className="mt-1 w-full h-9 rounded-md px-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#BEF264]"
+              className="mt-1 w-full h-9 rounded-md px-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e87a55]"
               style={{ background: P.surfaceHi, color: P.ink, border: `1px solid ${P.line}` }}
               placeholder="bv. Knie revalidatie week 1–4"
             />
@@ -339,7 +339,7 @@ export function WeekPlannerEditor({ initialData }: Props) {
             <input
               value={description}
               onChange={e => setDescription(e.target.value)}
-              className="mt-1 w-full h-9 rounded-md px-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#BEF264]"
+              className="mt-1 w-full h-9 rounded-md px-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e87a55]"
               style={{ background: P.surfaceHi, color: P.ink, border: `1px solid ${P.line}` }}
               placeholder="Korte omschrijving…"
             />
@@ -352,7 +352,7 @@ export function WeekPlannerEditor({ initialData }: Props) {
               <select
                 value={patientId}
                 onChange={e => setPatientId(e.target.value)}
-                className="mt-1 w-full h-9 rounded-md px-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#BEF264]"
+                className="mt-1 w-full h-9 rounded-md px-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e87a55]"
                 style={{ background: P.surfaceHi, color: P.ink, border: `1px solid ${P.line}` }}
               >
                 <option value="">— Geen patiënt (template) —</option>
@@ -368,7 +368,7 @@ export function WeekPlannerEditor({ initialData }: Props) {
                 type="checkbox"
                 checked={isTemplate}
                 onChange={e => setIsTemplate(e.target.checked)}
-                className="w-4 h-4 accent-[#BEF264]"
+                className="w-4 h-4 accent-[#e87a55]"
               />
               <span className="text-sm" style={{ color: P.ink }}>Template</span>
             </label>
@@ -420,8 +420,8 @@ export function WeekPlannerEditor({ initialData }: Props) {
                 onClick={() => openPicker(i)}
                 className="athletic-tap text-left rounded-xl p-3 transition-colors hover:brightness-110 min-h-[92px] sm:min-h-[120px]"
                 style={{
-                  background: program ? 'rgba(190,242,100,0.06)' : P.surface,
-                  border: `1px solid ${program ? 'rgba(190,242,100,0.3)' : P.line}`,
+                  background: program ? 'rgba(232,122,85,0.06)' : P.surface,
+                  border: `1px solid ${program ? 'rgba(232,122,85,0.3)' : P.line}`,
                 }}
               >
                 <div className="flex items-center justify-between gap-2 mb-2">

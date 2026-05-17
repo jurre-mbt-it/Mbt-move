@@ -193,7 +193,7 @@ export default function PatientSchedulePage() {
                 style={{
                   background: isSelected ? P.surfaceHi : P.surface,
                   border: isSelected
-                    ? `2px solid ${P.lime}`
+                    ? `2px solid ${P.brand}`
                     : isDone
                       ? `2px solid ${P.lime}`
                       : isMissed
@@ -218,7 +218,7 @@ export default function PatientSchedulePage() {
                   {isDone
                     ? <CheckCircle2 className="w-4 h-4" style={{ color: P.lime }} />
                     : isPlanned || isMissed || hasSession
-                      ? <Dumbbell className="w-3.5 h-3.5" style={{ color: isSelected ? P.lime : isMissed ? P.danger : P.ink }} />
+                      ? <Dumbbell className="w-3.5 h-3.5" style={{ color: isSelected ? P.brand : isMissed ? P.danger : P.ink }} />
                       : <Moon className="w-3.5 h-3.5" style={{ color: P.inkDim }} />
                   }
                 </div>
@@ -228,7 +228,7 @@ export default function PatientSchedulePage() {
                     style={{
                       fontSize: 10,
                       fontWeight: 700,
-                      color: isSelected ? P.lime : isDone ? P.lime : isMissed ? P.danger : P.inkMuted,
+                      color: isSelected ? P.brand : isDone ? P.lime : isMissed ? P.danger : P.inkMuted,
                     }}
                   >
                     {count}
@@ -323,7 +323,7 @@ export default function PatientSchedulePage() {
               <Link
                 href={isToday ? '/patient/session' : `/patient/session?week=${program.currentWeek}&day=${selectedDay}`}
                 className="athletic-tap flex items-center justify-center gap-2 py-4 rounded-2xl mt-2"
-                style={{ background: isToday ? P.lime : P.gold, color: P.bg }}
+                style={{ background: isToday ? P.brand : P.gold, color: P.bg }}
               >
                 <Play className="w-4 h-4 fill-current" />
                 <span

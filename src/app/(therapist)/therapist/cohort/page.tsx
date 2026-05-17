@@ -43,7 +43,7 @@ export default function TherapistCohortPage() {
               className="athletic-tap athletic-mono px-3 py-1.5 rounded-lg transition-all"
               style={
                 windowDays === w.days
-                  ? { background: P.lime, color: P.bg, fontSize: 11, fontWeight: 900, letterSpacing: '0.1em' }
+                  ? { background: P.brand, color: P.bg, fontSize: 11, fontWeight: 900, letterSpacing: '0.1em' }
                   : { background: P.surfaceHi, color: P.inkMuted, fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', border: `1px solid ${P.line}` }
               }
             >
@@ -58,7 +58,7 @@ export default function TherapistCohortPage() {
             label="Cohort"
             value={isLoading ? '…' : data?.cohortSize ?? 0}
             unit="patiënten"
-            tint={P.lime}
+            tint={P.brand}
           />
           <MetricTile
             label="Sessies"
@@ -120,7 +120,7 @@ export default function TherapistCohortPage() {
               <span
                 className="athletic-mono"
                 style={{
-                  color: P.lime,
+                  color: P.brand,
                   fontSize: 32,
                   fontWeight: 900,
                   letterSpacing: '-0.02em',
@@ -213,13 +213,13 @@ export default function TherapistCohortPage() {
                       >
                         <div
                           className="h-full rounded-full"
-                          style={{ width: `${widthPct}%`, background: P.lime }}
+                          style={{ width: `${widthPct}%`, background: P.brand }}
                         />
                       </div>
                     </div>
                     <span
                       className="athletic-mono shrink-0"
-                      style={{ color: P.lime, fontSize: 12, fontWeight: 900 }}
+                      style={{ color: P.brand, fontSize: 12, fontWeight: 900 }}
                     >
                       {ex.count}×
                     </span>

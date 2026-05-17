@@ -554,7 +554,7 @@ export default function TreatmentPage({
                 className="athletic-tap rounded-xl p-5 text-left"
                 style={{
                   background: P.surface,
-                  border: `1px solid ${P.lime}`,
+                  border: `1px solid ${P.brand}`,
                   opacity: todayData?.program ? 1 : 0.4,
                 }}
               >
@@ -1032,8 +1032,8 @@ function ExerciseTile({
             onClick={() => { setParamMenuOpen((v) => !v); setSupersetMenuOpen(false) }}
             className="athletic-mono athletic-tap px-2 py-1 rounded-full"
             style={{
-              background: P.surfaceHi, color: P.lime,
-              border: `1px dashed ${P.lime}`,
+              background: P.surfaceHi, color: P.brand,
+              border: `1px dashed ${P.brand}`,
               fontSize: 10, letterSpacing: '0.08em', fontWeight: 800,
             }}
           >
@@ -1168,7 +1168,7 @@ function AddExerciseRow({ onAdd }: { onAdd: (ex: { id: string; name: string }) =
         style={{
           background: P.surface,
           border: `1px dashed ${P.lineStrong}`,
-          color: P.lime,
+          color: P.brand,
           fontSize: 13,
           fontWeight: 700,
         }}
@@ -1285,8 +1285,8 @@ function AddExerciseRow({ onAdd }: { onAdd: (ex: { id: string; name: string }) =
               className="athletic-tap w-full rounded-lg py-2 flex items-center justify-center gap-2"
               style={{
                 background: 'transparent',
-                border: `1px dashed ${P.lime}`,
-                color: P.lime,
+                border: `1px dashed ${P.brand}`,
+                color: P.brand,
                 fontSize: 12,
                 fontWeight: 700,
               }}
@@ -1304,9 +1304,9 @@ function AddExerciseRow({ onAdd }: { onAdd: (ex: { id: string; name: string }) =
                     onClick={() => setQuickAddCategory(cat)}
                     className="athletic-mono athletic-tap px-2.5 py-1 rounded-full"
                     style={{
-                      background: quickAddCategory === cat ? P.lime : P.surfaceHi,
+                      background: quickAddCategory === cat ? P.brand : P.surfaceHi,
                       color: quickAddCategory === cat ? P.bg : P.inkMuted,
-                      border: `1px solid ${quickAddCategory === cat ? P.lime : P.lineStrong}`,
+                      border: `1px solid ${quickAddCategory === cat ? P.brand : P.lineStrong}`,
                       fontSize: 10,
                       letterSpacing: '0.1em',
                       fontWeight: 900,
@@ -1320,7 +1320,7 @@ function AddExerciseRow({ onAdd }: { onAdd: (ex: { id: string; name: string }) =
                 <button
                   type="button"
                   className="athletic-tap athletic-mono rounded-lg px-3 py-2"
-                  style={{ background: P.lime, color: P.bg, fontSize: 11, fontWeight: 900, letterSpacing: '0.1em' }}
+                  style={{ background: P.brand, color: P.bg, fontSize: 11, fontWeight: 900, letterSpacing: '0.1em' }}
                   disabled={createExercise.isPending}
                   onClick={async () => {
                     try {
@@ -1479,7 +1479,7 @@ function PreviousSessionPanel({
   const exerciseCount = session.exercises.length
 
   return (
-    <Tile accentBar={P.lime}>
+    <Tile accentBar={P.brand}>
       <button
         type="button"
         onClick={onToggle}
@@ -1487,7 +1487,7 @@ function PreviousSessionPanel({
         aria-expanded={open}
       >
         <div className="flex flex-col items-start gap-0.5 min-w-0">
-          <MetaLabel style={{ color: P.lime }}>VORIGE BEHANDELING</MetaLabel>
+          <MetaLabel style={{ color: P.brand }}>VORIGE BEHANDELING</MetaLabel>
           <span
             className="athletic-mono"
             style={{ color: P.ink, fontSize: 13, fontWeight: 700, letterSpacing: '0.02em' }}

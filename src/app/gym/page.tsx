@@ -15,6 +15,8 @@ const P = {
   inkDim: '#4A5454',
   lime: '#BEF264',
   limeDark: '#65A30D',
+  brand: '#e87a55',
+  brandDeep: '#c9613f',
   gold: '#F4C261',
   ice: '#93C5FD',
   danger: '#F87171',
@@ -59,7 +61,7 @@ export default function GymLandingPage() {
         .mbt-hero-word:hover {
           transform: translateX(8px);
         }
-        .mbt-hero-word[data-accent="lime"]:hover { color: ${P.lime}; }
+        .mbt-hero-word[data-accent="lime"]:hover { color: ${P.brand}; }
         .mbt-hero-word[data-accent="ice"]:hover { color: ${P.ice}; }
         .mbt-hero-word[data-accent="gold"]:hover { color: ${P.gold}; }
         .mbt-hero-word[data-accent="purple"]:hover { color: ${P.purple}; }
@@ -72,7 +74,7 @@ export default function GymLandingPage() {
           left: 0; right: 100%;
           bottom: -4px;
           height: 1px;
-          background: ${P.lime};
+          background: ${P.brand};
           transition: right 260ms cubic-bezier(.2,.8,.2,1);
         }
         .mbt-nav-link:hover { color: ${P.ink}; }
@@ -97,7 +99,7 @@ export default function GymLandingPage() {
         }
         .mbt-ghost:hover {
           background: ${P.surface};
-          border-color: ${P.lime};
+          border-color: ${P.brand};
           transform: translateY(-2px);
         }
 
@@ -202,7 +204,7 @@ export default function GymLandingPage() {
 
 /* ───────────────────────── Shared primitives ───────────────────────── */
 
-function Kicker({ children, color = P.lime }: { children: React.ReactNode; color?: string }) {
+function Kicker({ children, color = P.brand }: { children: React.ReactNode; color?: string }) {
   return (
     <span
       style={{
@@ -244,7 +246,7 @@ function MetaLabel({
   )
 }
 
-function PulsingDot({ color = P.lime }: { color?: string }) {
+function PulsingDot({ color = P.brand }: { color?: string }) {
   return (
     <span
       style={{
@@ -272,7 +274,7 @@ function PrimaryCTA({
       href={href}
       className="mbt-cta"
       style={{
-        background: P.lime,
+        background: P.brand,
         color: '#0A0E0F',
         padding: '16px 24px',
         borderRadius: 12,
@@ -403,7 +405,7 @@ function TopBar() {
           <a
             href={requestAccess}
             style={{
-              color: P.lime,
+              color: P.brand,
               textDecoration: 'none',
               fontFamily: mono,
               fontSize: 12,
@@ -462,7 +464,7 @@ function Hero() {
           <span
             className="mbt-hero-word"
             data-accent="purple"
-            style={{ color: P.lime }}
+            style={{ color: P.brand }}
           >
             REPEAT.
           </span>
@@ -496,7 +498,7 @@ function Hero() {
             gap: 16,
           }}
         >
-          <StatTile value="24/7" unit="COACH IN JE ZAK" color={P.lime} />
+          <StatTile value="24/7" unit="COACH IN JE ZAK" color={P.brand} />
           <StatTile value="sRPE" unit="WORKLOAD-TRACKING" color={P.gold} />
           <StatTile value="0.8–1.3" unit="ACWR SWEET-SPOT" color={P.ice} />
           <StatTile value="iOS" unit="NATIVE / TESTFLIGHT" color={P.purple} />
@@ -589,7 +591,7 @@ const FEATURES: Array<{
     title: 'JOUW WEEK, VOLLEDIG GEPLAND',
     body:
       'Je coach zet workouts, mobility-blokken en cardio in een weekplanner. Jij ziet per dag precies wat je moet doen — en wat je gisteren deed.',
-    color: P.lime,
+    color: P.brand,
   },
   {
     kicker: '02 · WORKOUT',
@@ -758,7 +760,7 @@ function PhoneMockups() {
             paddingTop: 4,
           }}
         >
-          ZO VOELT <span style={{ color: P.lime }}>TRAINEN</span> AAN.
+          ZO VOELT <span style={{ color: P.brand }}>TRAINEN</span> AAN.
         </h2>
 
         <div
@@ -902,7 +904,7 @@ function MockTodayScreen() {
 function MockWorkoutScreen() {
   return (
     <>
-      <MetaLabel color={P.lime}>SET 3 VAN 4</MetaLabel>
+      <MetaLabel color={P.brand}>SET 3 VAN 4</MetaLabel>
       <div
         style={{
           fontSize: 32,
@@ -955,7 +957,7 @@ function MockWorkoutScreen() {
       </div>
       <div
         style={{
-          background: P.lime,
+          background: P.brand,
           color: '#0A0E0F',
           borderRadius: 14,
           padding: '14px 16px',
@@ -995,7 +997,7 @@ function MockRecoveryScreen() {
           fontSize: 72,
           fontWeight: 900,
           letterSpacing: -3,
-          color: P.lime,
+          color: P.brand,
           lineHeight: 1.12,
           paddingTop: 6,
         }}
@@ -1178,7 +1180,7 @@ function WorkloadSection() {
               paddingTop: 4,
             }}
           >
-            DE <span style={{ color: P.lime }}>ACWR</span> IN JE BROEKZAK.
+            DE <span style={{ color: P.brand }}>ACWR</span> IN JE BROEKZAK.
           </h2>
           <p
             style={{
@@ -1220,7 +1222,7 @@ function WorkloadSection() {
               fontSize: 96,
               fontWeight: 900,
               letterSpacing: -4,
-              color: P.lime,
+              color: P.brand,
               lineHeight: 1.12,
               paddingTop: 8,
             }}
@@ -1353,7 +1355,7 @@ function ForWhoSection() {
       title: 'IN HERSTEL',
       body:
         'Na een blessure structureel terugbouwen met een therapeut die meekijkt — niet raden wat veilig is.',
-      color: P.lime,
+      color: P.brand,
     },
     {
       kicker: 'ATLETEN',
@@ -1497,7 +1499,7 @@ function CTASection() {
             }}
           >
             KLAAR OM TE{' '}
-            <span style={{ color: P.lime }}>PUSHEN</span>?
+            <span style={{ color: P.brand }}>PUSHEN</span>?
           </h2>
           <p
             style={{

@@ -334,9 +334,9 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
                         onClick={() => setSelectedExercise(name)}
                         className="athletic-tap athletic-mono text-xs px-3 py-1.5 rounded-full font-bold transition-all"
                         style={{
-                          background: activeEx === name ? P.lime : P.surfaceHi,
+                          background: activeEx === name ? P.brand : P.surfaceHi,
                           color: activeEx === name ? P.bg : P.inkMuted,
-                          border: `1px solid ${activeEx === name ? P.lime : P.lineStrong}`,
+                          border: `1px solid ${activeEx === name ? P.brand : P.lineStrong}`,
                           letterSpacing: '0.08em',
                           textTransform: 'uppercase',
                         }}

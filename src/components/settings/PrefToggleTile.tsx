@@ -11,7 +11,7 @@ interface Props {
   bar?: string
 }
 
-export function PrefToggleTile({ prefKey, defaultValue, label, sub, bar = P.lime }: Props) {
+export function PrefToggleTile({ prefKey, defaultValue, label, sub, bar = P.brand }: Props) {
   const [enabled, setEnabled] = useBoolPref(prefKey, defaultValue)
 
   return (
@@ -44,8 +44,8 @@ export function PrefToggleTile({ prefKey, defaultValue, label, sub, bar = P.lime
           style={{
             width: 44,
             height: 26,
-            background: enabled ? P.lime : P.surfaceHi,
-            border: `1px solid ${enabled ? P.lime : P.lineStrong}`,
+            background: enabled ? P.brand : P.surfaceHi,
+            border: `1px solid ${enabled ? P.brand : P.lineStrong}`,
           }}
         >
           <span

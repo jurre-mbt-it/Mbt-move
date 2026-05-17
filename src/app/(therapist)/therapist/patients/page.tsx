@@ -216,7 +216,7 @@ function PatientsPageInner() {
                     {/* Avatar */}
                     <div
                       className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 athletic-mono"
-                      style={{ background: P.surfaceHi, color: P.lime, fontSize: 13, fontWeight: 900 }}
+                      style={{ background: P.surfaceHi, color: P.brand, fontSize: 13, fontWeight: 900 }}
                     >
                       {patient.avatarInitials}
                     </div>
@@ -418,7 +418,7 @@ function PatientsPageInner() {
                       style={{
                         padding: '4px 10px',
                         borderRadius: 6,
-                        background: P.lime,
+                        background: P.brand,
                         color: P.bg,
                         fontSize: 10,
                         fontWeight: 900,

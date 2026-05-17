@@ -122,9 +122,9 @@ export default function PatientProgramPage() {
                 onClick={() => setActiveWeek(w)}
                 className="athletic-tap shrink-0 px-4 py-1.5 rounded-full athletic-mono transition-colors"
                 style={{
-                  background: active ? P.lime : P.surface,
+                  background: active ? P.brand : P.surface,
                   color: active ? P.bg : P.inkMuted,
-                  border: `1px solid ${active ? P.lime : P.line}`,
+                  border: `1px solid ${active ? P.brand : P.line}`,
                   fontSize: 12,
                   fontWeight: 900,
                   letterSpacing: '0.1em',

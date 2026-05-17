@@ -371,7 +371,7 @@ export default function CardioSessionPage() {
             href="/patient/dashboard"
             className="athletic-tap athletic-mono rounded-xl px-4 py-3 flex items-center justify-center"
             style={{
-              background: P.lime,
+              background: P.brand,
               color: P.bg,
               fontSize: 12,
               fontWeight: 900,

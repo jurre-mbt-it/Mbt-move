@@ -134,7 +134,7 @@ export function LoginForm() {
           </span>
           <span
             className="athletic-mono"
-            style={{ color: P.lime, fontSize: 24, fontWeight: 900, letterSpacing: '0.16em' }}
+            style={{ color: P.brand, fontSize: 24, fontWeight: 900, letterSpacing: '0.16em' }}
           >
             GYM
           </span>
@@ -280,7 +280,7 @@ export function LoginForm() {
                 <button
                   type="button"
                   className="athletic-mono transition-colors"
-                  style={{ color: P.lime, fontSize: 10, letterSpacing: '0.14em' }}
+                  style={{ color: P.brand, fontSize: 10, letterSpacing: '0.14em' }}
                   onClick={() => setMode('magic')}
                 >
                   WACHTWOORD VERGETEN
@@ -345,12 +345,12 @@ export function LoginForm() {
           >
             {mode === 'password' ? (
               <span className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5" style={{ color: P.lime }} />
+                <Sparkles className="w-5 h-5" style={{ color: P.brand }} />
                 MAGIC LINK
               </span>
             ) : (
               <span className="flex items-center gap-2">
-                <Lock className="w-5 h-5" style={{ color: P.lime }} />
+                <Lock className="w-5 h-5" style={{ color: P.brand }} />
                 WACHTWOORD
               </span>
             )}
@@ -363,7 +363,7 @@ export function LoginForm() {
               <a
                 href="/register"
                 className="athletic-mono transition-colors"
-                style={{ color: P.lime, fontSize: 11, letterSpacing: '0.14em' }}
+                style={{ color: P.brand, fontSize: 11, letterSpacing: '0.14em' }}
               >
                 MAAK EEN ACCOUNT
               </a>

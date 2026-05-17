@@ -1134,7 +1134,7 @@ function WeekPlannerContent() {
                         <span
                           className={cn('text-xs', isToday && 'font-bold')}
                           style={{
-                            color: isToday ? P.lime : P.inkMuted,
+                            color: isToday ? P.brand : P.inkMuted,
                           }}
                         >
                           {date.getDate()}

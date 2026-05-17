@@ -141,7 +141,7 @@ export function DayPicker({ open, onOpenChange, dayLabel, programs, patientId, p
                     'athletic-tap px-2.5 py-1 rounded-full text-xs font-bold tracking-wide transition-colors',
                   )}
                   style={{
-                    background: category === c.value ? P.lime : P.surfaceHi,
+                    background: category === c.value ? P.brand : P.surfaceHi,
                     color: category === c.value ? '#0F1516' : P.ink,
                     letterSpacing: '0.06em',
                     textTransform: 'uppercase',
@@ -193,9 +193,9 @@ export function DayPicker({ open, onOpenChange, dayLabel, programs, patientId, p
               onClick={() => setMode('create')}
               className="athletic-tap w-full text-left px-3 py-2 rounded-lg mt-2 inline-flex items-center gap-2"
               style={{
-                background: 'rgba(190,242,100,0.08)',
-                color: P.lime,
-                border: `1px solid ${P.lime}`,
+                background: 'rgba(232,122,85,0.08)',
+                color: P.brand,
+                border: `1px solid ${P.brand}`,
               }}
             >
               <Plus className="w-4 h-4" />
@@ -227,7 +227,7 @@ export function DayPicker({ open, onOpenChange, dayLabel, programs, patientId, p
                 value={newName}
                 onChange={e => setNewName(e.target.value)}
                 placeholder="bv. Krachttraining onderlichaam"
-                className="mt-1 w-full h-9 rounded-md px-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#BEF264]"
+                className="mt-1 w-full h-9 rounded-md px-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#e87a55]"
                 style={{ background: P.surfaceHi, color: P.ink, border: `1px solid ${P.line}` }}
                 autoFocus
               />
@@ -245,7 +245,7 @@ export function DayPicker({ open, onOpenChange, dayLabel, programs, patientId, p
                     onClick={() => setNewCategory(c.value)}
                     className="athletic-tap px-2.5 py-1 rounded-full text-xs font-bold"
                     style={{
-                      background: newCategory === c.value ? P.lime : P.surfaceHi,
+                      background: newCategory === c.value ? P.brand : P.surfaceHi,
                       color: newCategory === c.value ? '#0F1516' : P.ink,
                       letterSpacing: '0.06em',
                       textTransform: 'uppercase',
@@ -268,9 +268,9 @@ export function DayPicker({ open, onOpenChange, dayLabel, programs, patientId, p
                   disabled={!patientId}
                   className="athletic-tap px-3 py-2 rounded-lg text-xs font-bold text-left disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{
-                    background: destination === 'patient' ? 'rgba(190,242,100,0.12)' : P.surfaceHi,
-                    color: destination === 'patient' ? P.lime : P.ink,
-                    border: `1px solid ${destination === 'patient' ? P.lime : 'transparent'}`,
+                    background: destination === 'patient' ? 'rgba(232,122,85,0.12)' : P.surfaceHi,
+                    color: destination === 'patient' ? P.brand : P.ink,
+                    border: `1px solid ${destination === 'patient' ? P.brand : 'transparent'}`,
                     letterSpacing: '0.04em',
                   }}
                   title={!patientId ? 'Koppel eerst een patiënt aan het schema' : undefined}
@@ -286,9 +286,9 @@ export function DayPicker({ open, onOpenChange, dayLabel, programs, patientId, p
                   onClick={() => setDestination('library')}
                   className="athletic-tap px-3 py-2 rounded-lg text-xs font-bold text-left"
                   style={{
-                    background: destination === 'library' ? 'rgba(190,242,100,0.12)' : P.surfaceHi,
-                    color: destination === 'library' ? P.lime : P.ink,
-                    border: `1px solid ${destination === 'library' ? P.lime : 'transparent'}`,
+                    background: destination === 'library' ? 'rgba(232,122,85,0.12)' : P.surfaceHi,
+                    color: destination === 'library' ? P.brand : P.ink,
+                    border: `1px solid ${destination === 'library' ? P.brand : 'transparent'}`,
                     letterSpacing: '0.04em',
                   }}
                 >
@@ -306,7 +306,7 @@ export function DayPicker({ open, onOpenChange, dayLabel, programs, patientId, p
                 Annuleren
               </Button>
               <Button
-                style={{ background: P.lime, color: '#0F1516' }}
+                style={{ background: P.brand, color: '#0F1516' }}
                 onClick={handleCreate}
                 disabled={createProgram.isPending || !newName.trim()}
               >

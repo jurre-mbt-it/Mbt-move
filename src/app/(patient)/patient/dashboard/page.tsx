@@ -120,7 +120,7 @@ export default function PatientDashboard() {
                     <div key={e.uid} className="flex items-center gap-2">
                       <span
                         className="w-1.5 h-1.5 rounded-full"
-                        style={{ backgroundColor: P.lime }}
+                        style={{ backgroundColor: P.brand }}
                       />
                       <span style={{ color: P.ink, fontSize: 13 }} className="truncate">
                         {e.name}
@@ -146,7 +146,7 @@ export default function PatientDashboard() {
                 href="/patient/session"
                 className="athletic-tap athletic-mono rounded-xl px-4 py-3 flex items-center gap-1"
                 style={{
-                  backgroundColor: P.lime,
+                  backgroundColor: P.brand,
                   color: P.bg,
                   fontSize: 12,
                   fontWeight: 900,
@@ -248,7 +248,7 @@ export default function PatientDashboard() {
             href="/patient/rehab"
             label="Mijn revalidatie"
             sub={`${rehabTracker.protocol.name} · ${rehabTracker.progress.pct}% behaald`}
-            bar={P.lime}
+            bar={P.brand}
           />
         )}
 

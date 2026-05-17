@@ -272,7 +272,7 @@ export default function PrivacySettingsPage() {
                 <div key={i} className="flex items-start gap-2.5">
                   <span
                     className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0"
-                    style={{ backgroundColor: P.lime }}
+                    style={{ backgroundColor: P.brand }}
                   />
                   <span style={{ color: P.inkMuted, fontSize: 13 }}>{item}</span>
                 </div>

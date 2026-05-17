@@ -287,7 +287,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                   style={{
                     padding: '4px 10px',
                     borderRadius: 6,
-                    background: P.lime,
+                    background: P.brand,
                     color: P.bg,
                     fontSize: 10,
                     fontWeight: 900,
@@ -583,11 +583,11 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                             href={`/therapist/patients/${id}/sessions/${session.id}/edit`}
                             className="athletic-mono"
                             style={{
-                              color: P.lime,
+                              color: P.brand,
                               fontSize: 10,
                               letterSpacing: '0.12em',
                               padding: '2px 6px',
-                              border: `1px solid ${P.lime}`,
+                              border: `1px solid ${P.brand}`,
                               borderRadius: 4,
                             }}
                           >
@@ -698,7 +698,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           <TabsContent value="voortgang">
             <Tile
               href={`/therapist/patients/${patient.id}/progress`}
-              accentBar={P.lime}
+              accentBar={P.brand}
             >
               <div className="flex items-center gap-3">
                 <div>

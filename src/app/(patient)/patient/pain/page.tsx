@@ -203,8 +203,8 @@ export default function PainReportPage() {
                   className="athletic-tap px-3 py-1.5 rounded-xl transition-all"
                   style={{
                     background: selected ? P.surfaceHi : P.surfaceLow,
-                    color: selected ? P.lime : P.inkMuted,
-                    border: selected ? `1.5px solid ${P.lime}` : `1.5px solid ${P.line}`,
+                    color: selected ? P.brand : P.inkMuted,
+                    border: selected ? `1.5px solid ${P.brand}` : `1.5px solid ${P.line}`,
                     fontSize: 12,
                     fontWeight: 700,
                   }}
@@ -228,9 +228,9 @@ export default function PainReportPage() {
                   onClick={() => setContext(selected ? null : (c.value as PainContext))}
                   className="athletic-tap flex items-center gap-2 px-3 py-3 rounded-2xl transition-all text-left"
                   style={{
-                    background: selected ? 'rgba(190,242,100,0.10)' : P.surfaceLow,
-                    border: selected ? `2px solid ${P.lime}` : `2px solid ${P.line}`,
-                    color: selected ? P.lime : P.inkMuted,
+                    background: selected ? 'rgba(232,122,85,0.10)' : P.surfaceLow,
+                    border: selected ? `2px solid ${P.brand}` : `2px solid ${P.line}`,
+                    color: selected ? P.brand : P.inkMuted,
                     fontSize: 13,
                     fontWeight: 600,
                   }}

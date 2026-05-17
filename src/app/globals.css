@@ -23,6 +23,8 @@
   --p-ink-dim: #4A5454;
   --p-lime: #BEF264;
   --p-lime-dark: #65A30D;
+  --p-brand: #e87a55;
+  --p-brand-deep: #c9613f;
   --p-danger: #F87171;
   --p-danger-dark: #991B1B;
   --p-gold: #F4C261;
@@ -180,7 +182,7 @@ body {
   --card-foreground: var(--p-ink);
   --popover: var(--p-surface);
   --popover-foreground: var(--p-ink);
-  --primary: var(--p-lime);
+  --primary: var(--p-brand);
   --primary-foreground: var(--p-bg);
   --secondary: var(--p-surface-hi);
   --secondary-foreground: var(--p-ink);
@@ -192,16 +194,16 @@ body {
   --destructive-foreground: var(--p-bg);
   --border: var(--p-line);
   --input: var(--p-surface-hi);
-  --ring: var(--p-lime);
+  --ring: var(--p-brand);
 
   --sidebar: var(--p-bg);
   --sidebar-foreground: var(--p-ink);
-  --sidebar-primary: var(--p-lime);
+  --sidebar-primary: var(--p-brand);
   --sidebar-primary-foreground: var(--p-bg);
   --sidebar-accent: var(--p-surface-hi);
   --sidebar-accent-foreground: var(--p-ink);
   --sidebar-border: var(--p-line-strong);
-  --sidebar-ring: var(--p-lime);
+  --sidebar-ring: var(--p-brand);
 
   background: var(--p-bg);
   color: var(--p-ink);

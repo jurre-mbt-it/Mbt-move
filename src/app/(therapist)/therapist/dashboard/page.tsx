@@ -101,7 +101,7 @@ export default function TherapistDashboard() {
         <MetricTile
           label="Actief"
           value={isLoading ? '…' : activePatients.length}
-          tint={P.lime}
+          tint={P.brand}
           sub="Patiënten met programma"
           href="/therapist/patients?filter=active"
         />
@@ -128,7 +128,7 @@ export default function TherapistDashboard() {
           <Link
             href="/therapist/patients"
             className="athletic-mono"
-            style={{ color: P.lime, fontSize: 11, letterSpacing: '0.12em' }}
+            style={{ color: P.brand, fontSize: 11, letterSpacing: '0.12em' }}
           >
             ALLES →
           </Link>
@@ -155,7 +155,7 @@ export default function TherapistDashboard() {
                 <div className="flex items-center gap-3">
                   <div
                     className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 athletic-mono"
-                    style={{ background: P.surfaceHi, color: P.lime, fontSize: 13, fontWeight: 900 }}
+                    style={{ background: P.surfaceHi, color: P.brand, fontSize: 13, fontWeight: 900 }}
                   >
                     {p.avatarInitials}
                   </div>
@@ -182,7 +182,7 @@ export default function TherapistDashboard() {
                       >
                         <div
                           className="h-full"
-                          style={{ width: `${pct}%`, backgroundColor: P.lime }}
+                          style={{ width: `${pct}%`, backgroundColor: P.brand }}
                         />
                       </div>
                       <span
@@ -208,7 +208,7 @@ export default function TherapistDashboard() {
             href="/therapist/programs/new"
             label="Nieuw programma"
             sub="Strength / cardio / walk-run"
-            bar={P.lime}
+            bar={P.brand}
           />
           <ActionTile
             href="/therapist/exercises/new"

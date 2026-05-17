@@ -153,7 +153,7 @@ export default function AthleteDashboard() {
                     width: 6,
                     height: 6,
                     borderRadius: 999,
-                    background: P.lime,
+                    background: P.brand,
                     display: 'inline-block',
                   }}
                 />
@@ -286,7 +286,7 @@ export default function AthleteDashboard() {
             label="PROGRAMMA"
             sub="Eigen schema maken"
             href="/athlete/programs/new"
-            bar={P.lime}
+            bar={P.brand}
           />
           <ActionTile
             label="OEFENINGEN"
@@ -328,7 +328,7 @@ export default function AthleteDashboard() {
                   fontSize: 11,
                   letterSpacing: '0.14em',
                   fontWeight: 900,
-                  color: P.lime,
+                  color: P.brand,
                   textDecoration: 'none',
                 }}
               >
@@ -417,7 +417,7 @@ function TrainNowTile({
   if (!hasPlan) {
     // Freestyle — geen programma voor vandaag
     return (
-      <Tile accentBar={P.lime} style={{ padding: 24 }}>
+      <Tile accentBar={P.brand} style={{ padding: 24 }}>
         <Kicker>TRAIN NOW</Kicker>
         <div
           className="athletic-display"
@@ -446,7 +446,7 @@ function TrainNowTile({
 
   // Heeft plan vandaag, nog niet gedaan
   return (
-    <Tile accentBar={P.lime} style={{ padding: 24 }}>
+    <Tile accentBar={P.brand} style={{ padding: 24 }}>
       <div className="flex items-center justify-between">
         <Kicker>VANDAAG · {todayDayName}</Kicker>
         <span

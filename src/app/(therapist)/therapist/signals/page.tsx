@@ -121,7 +121,7 @@ export default function SignalsDashboardPage() {
                         width: 6,
                         height: 6,
                         borderRadius: 999,
-                        background: P.lime,
+                        background: P.brand,
                         display: 'inline-block',
                       }}
                     />

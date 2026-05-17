@@ -51,7 +51,7 @@ export default function AdminCohortPage() {
             className="athletic-tap athletic-mono px-3 py-1.5 rounded-lg transition-all"
             style={
               windowDays === w.days
-                ? { background: P.lime, color: P.bg, fontSize: 11, fontWeight: 900, letterSpacing: '0.1em' }
+                ? { background: P.brand, color: P.bg, fontSize: 11, fontWeight: 900, letterSpacing: '0.1em' }
                 : { background: P.surfaceHi, color: P.inkMuted, fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', border: `1px solid ${P.line}` }
             }
           >

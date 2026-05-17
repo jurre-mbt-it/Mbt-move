@@ -115,7 +115,7 @@ function CircularTimer({ seconds, total, onSkip }: { seconds: number; total: num
         <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
           <circle cx="60" cy="60" r={r} fill="none" stroke={P.surfaceHi} strokeWidth="8" />
           <circle
-            cx="60" cy="60" r={r} fill="none" stroke={P.lime} strokeWidth="8"
+            cx="60" cy="60" r={r} fill="none" stroke={P.brand} strokeWidth="8"
             strokeLinecap="round"
             strokeDasharray={circ}
             strokeDashoffset={offset}
@@ -178,7 +178,7 @@ function FeedbackModal({
           {autoCloseIn > 0 && (
             <div
               className="w-7 h-7 rounded-full flex items-center justify-center athletic-mono"
-              style={{ background: P.lime, color: P.bg, fontSize: 12, fontWeight: 900 }}
+              style={{ background: P.brand, color: P.bg, fontSize: 12, fontWeight: 900 }}
             >
               {autoCloseIn}
             </div>
@@ -504,13 +504,13 @@ function SessionSummary({
 
         {/* Tendinopathie follow-up reminder */}
         {tendinopathyMode && (
-          <Tile accentBar={P.lime}>
+          <Tile accentBar={P.brand}>
             <div className="flex items-start gap-3">
-              <Bell className="w-4 h-4 mt-0.5 shrink-0" style={{ color: P.lime }} />
+              <Bell className="w-4 h-4 mt-0.5 shrink-0" style={{ color: P.brand }} />
               <div>
                 <p
                   className="athletic-mono"
-                  style={{ color: P.lime, fontSize: 12, fontWeight: 900, letterSpacing: '0.12em' }}
+                  style={{ color: P.brand, fontSize: 12, fontWeight: 900, letterSpacing: '0.12em' }}
                 >
                   24U FOLLOW-UP HERINNERING
                 </p>
@@ -981,9 +981,9 @@ function SessionPageInner() {
         >
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ background: P.surfaceHi, border: `1px solid ${P.lime}` }}
+            style={{ background: P.surfaceHi, border: `1px solid ${P.brand}` }}
           >
-            <RotateCcw className="w-5 h-5" style={{ color: P.lime }} />
+            <RotateCcw className="w-5 h-5" style={{ color: P.brand }} />
           </div>
           <div>
             <Kicker>Open sessie</Kicker>
@@ -1133,7 +1133,7 @@ function SessionPageInner() {
                   playIcon={
                     <div
                       className="w-14 h-14 rounded-full flex items-center justify-center"
-                      style={{ background: P.lime }}
+                      style={{ background: P.brand }}
                     >
                       <span style={{ color: P.bg, fontSize: 20, marginLeft: 4 }}>▶</span>
                     </div>
@@ -1312,7 +1312,7 @@ function SessionPageInner() {
                 <button
                   onClick={() => setShowCuesFor(showCues ? null : e.uid)}
                   className="athletic-tap flex items-center gap-1.5 athletic-mono mb-2"
-                  style={{ color: P.lime, fontSize: 11, fontWeight: 900, letterSpacing: '0.1em' }}
+                  style={{ color: P.brand, fontSize: 11, fontWeight: 900, letterSpacing: '0.1em' }}
                 >
                   <Lightbulb className="w-3.5 h-3.5" />
                   COACHING CUES {showCues ? '▲' : '▼'}
@@ -1327,7 +1327,7 @@ function SessionPageInner() {
                       >
                         <span
                           className="mt-px"
-                          style={{ color: P.lime, fontWeight: 900 }}
+                          style={{ color: P.brand, fontWeight: 900 }}
                         >
                           ·
                         </span>

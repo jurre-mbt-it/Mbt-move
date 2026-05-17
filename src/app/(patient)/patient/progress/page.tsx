@@ -229,7 +229,7 @@ export default function ProgressPage() {
                     <span
                       className="athletic-mono"
                       style={{
-                        color: isCurrent ? P.lime : P.inkMuted,
+                        color: isCurrent ? P.brand : P.inkMuted,
                         fontSize: 10,
                         fontWeight: 900,
                       }}
@@ -240,7 +240,7 @@ export default function ProgressPage() {
                       className="w-full rounded-t-lg"
                       style={{
                         height: `${heightPct}%`,
-                        backgroundColor: isCurrent ? P.lime : P.surfaceHi,
+                        backgroundColor: isCurrent ? P.brand : P.surfaceHi,
                         minHeight: 4,
                       }}
                     />
@@ -538,7 +538,7 @@ export default function ProgressPage() {
                   href="/patient/follow-up"
                   className="athletic-mono inline-flex items-center gap-1 mt-1"
                   style={{
-                    color: P.lime,
+                    color: P.brand,
                     fontSize: 11,
                     fontWeight: 900,
                     letterSpacing: '0.08em',

@@ -239,14 +239,14 @@ export default function AthleteSessionPage() {
             <div
               className="flex flex-col items-center justify-center py-12 rounded-2xl text-center gap-3"
               style={{
-                background: 'rgba(190,242,100,0.06)',
-                border: `2px dashed ${P.lime}`,
+                background: 'rgba(232,122,85,0.06)',
+                border: `2px dashed ${P.brand}`,
               }}
             >
               <IconStrength size={40} />
               <p
                 style={{
-                  color: P.lime,
+                  color: P.brand,
                   fontWeight: 900,
                   fontSize: 14,
                   letterSpacing: '0.08em',
@@ -275,7 +275,7 @@ export default function AthleteSessionPage() {
                   style={{
                     background: P.surface,
                     padding: '12px 14px',
-                    borderLeft: `3px solid ${P.lime}`,
+                    borderLeft: `3px solid ${P.brand}`,
                     border: `1px solid ${P.line}`,
                   }}
                 >
@@ -284,7 +284,7 @@ export default function AthleteSessionPage() {
                     style={{
                       background: P.surfaceHi,
                       border: `1px solid ${P.line}`,
-                      color: P.lime,
+                      color: P.brand,
                       fontFamily: mono,
                       fontSize: 14,
                       fontWeight: 900,
@@ -330,8 +330,8 @@ export default function AthleteSessionPage() {
             className="w-full flex items-center justify-center gap-2 rounded-xl transition-all active:scale-[0.98]"
             style={{
               padding: '14px 16px',
-              border: `2px dashed ${P.lime}`,
-              color: P.lime,
+              border: `2px dashed ${P.brand}`,
+              color: P.brand,
               background: 'transparent',
               fontFamily: mono,
               fontSize: 12,
@@ -446,7 +446,7 @@ export default function AthleteSessionPage() {
                 fontFamily: mono,
                 fontSize: 13,
                 fontWeight: 900,
-                color: P.lime,
+                color: P.brand,
                 letterSpacing: '0.04em',
               }}
             >
@@ -468,7 +468,7 @@ export default function AthleteSessionPage() {
         </div>
 
         {/* Hero: current exercise */}
-        <Tile accentBar={P.lime} style={{ padding: 20 }}>
+        <Tile accentBar={P.brand} style={{ padding: 20 }}>
           <Kicker>VANDAAG · ACTIEF</Kicker>
           <div
             className="athletic-display"
@@ -517,8 +517,8 @@ export default function AthleteSessionPage() {
           className="w-full flex items-center justify-center gap-2 rounded-xl transition-all active:scale-[0.98]"
           style={{
             padding: '12px 16px',
-            border: `1px dashed ${P.lime}`,
-            color: P.lime,
+            border: `1px dashed ${P.brand}`,
+            color: P.brand,
             background: 'transparent',
             fontFamily: mono,
             fontSize: 11,

@@ -306,7 +306,7 @@ function ViewToggle({
       onClick={onClick}
       className="athletic-mono athletic-tap rounded-lg px-4 py-1.5 transition-colors"
       style={{
-        backgroundColor: active ? P.lime : 'transparent',
+        backgroundColor: active ? P.brand : 'transparent',
         color: active ? P.bg : P.inkMuted,
         fontSize: 11,
         fontWeight: 900,

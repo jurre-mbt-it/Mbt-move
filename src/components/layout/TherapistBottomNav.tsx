@@ -39,7 +39,7 @@ export function TherapistBottomNav() {
                 'flex flex-col items-center gap-0.5 flex-1 py-2 athletic-mono transition-colors',
               )}
               style={{
-                color: active ? P.lime : P.inkMuted,
+                color: active ? P.brand : P.inkMuted,
                 fontSize: 9,
                 letterSpacing: '0.12em',
               }}

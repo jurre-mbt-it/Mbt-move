@@ -65,7 +65,7 @@ export function TherapistSidebar() {
           </span>
           <span
             className="athletic-mono"
-            style={{ color: P.lime, fontSize: 13, fontWeight: 900, letterSpacing: '0.2em' }}
+            style={{ color: P.brand, fontSize: 13, fontWeight: 900, letterSpacing: '0.2em' }}
           >
             GYM
           </span>
@@ -92,10 +92,10 @@ export function TherapistSidebar() {
               )}
               style={{
                 backgroundColor: active ? P.surfaceHi : 'transparent',
-                color: active ? P.lime : P.inkMuted,
+                color: active ? P.brand : P.inkMuted,
                 fontWeight: active ? 800 : 600,
                 letterSpacing: active ? '0.04em' : undefined,
-                borderLeft: active ? `2px solid ${P.lime}` : '2px solid transparent',
+                borderLeft: active ? `2px solid ${P.brand}` : '2px solid transparent',
               }}
             >
               <Icon className="w-4.5 h-4.5 shrink-0" />
@@ -112,11 +112,11 @@ export function TherapistSidebar() {
             )}
             style={{
               backgroundColor: pathname.startsWith('/therapist/assessments') ? P.surfaceHi : 'transparent',
-              color: pathname.startsWith('/therapist/assessments') ? P.lime : P.inkMuted,
+              color: pathname.startsWith('/therapist/assessments') ? P.brand : P.inkMuted,
               fontWeight: pathname.startsWith('/therapist/assessments') ? 800 : 600,
               letterSpacing: pathname.startsWith('/therapist/assessments') ? '0.04em' : undefined,
               borderLeft: pathname.startsWith('/therapist/assessments')
-                ? `2px solid ${P.lime}`
+                ? `2px solid ${P.brand}`
                 : '2px solid transparent',
             }}
           >
@@ -135,7 +135,7 @@ export function TherapistSidebar() {
           <Link
             href="/admin/dashboard"
             className="athletic-tap flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors"
-            style={{ color: P.lime, fontWeight: 700 }}
+            style={{ color: P.brand, fontWeight: 700 }}
           >
             <Shield className="w-4.5 h-4.5 shrink-0" />
             Admin

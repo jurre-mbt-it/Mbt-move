@@ -76,7 +76,7 @@ export default function AthleteSchedulePage() {
                   onClick={() => setSelectedDay(dayNum)}
                   className="flex-1 flex flex-col items-center gap-1.5 py-2 rounded-lg transition-colors"
                   style={{
-                    background: isSelected ? P.lime : P.surfaceLow,
+                    background: isSelected ? P.brand : P.surfaceLow,
                     color: isSelected ? P.bg : P.ink,
                   }}
                 >
@@ -97,7 +97,7 @@ export default function AthleteSchedulePage() {
                     style={{
                       background:
                         hasExercises
-                          ? isSelected ? P.bg : P.lime
+                          ? isSelected ? P.bg : P.brand
                           : isToday && !isSelected
                             ? P.gold
                             : 'transparent',
@@ -127,9 +127,9 @@ export default function AthleteSchedulePage() {
               <span
                 className="rounded-full px-2 py-0.5"
                 style={{
-                  background: 'rgba(190,242,100,0.12)',
-                  border: `1px solid ${P.lime}`,
-                  color: P.lime,
+                  background: 'rgba(232,122,85,0.12)',
+                  border: `1px solid ${P.brand}`,
+                  color: P.brand,
                   fontFamily: mono,
                   fontSize: 9,
                   fontWeight: 900,
@@ -181,7 +181,7 @@ export default function AthleteSchedulePage() {
                 style={{
                   background: P.surface,
                   padding: '12px 14px',
-                  borderLeft: `3px solid ${P.lime}`,
+                  borderLeft: `3px solid ${P.brand}`,
                   border: `1px solid ${P.line}`,
                 }}
               >
@@ -190,7 +190,7 @@ export default function AthleteSchedulePage() {
                   style={{
                     background: P.surfaceHi,
                     border: `1px solid ${P.line}`,
-                    color: P.lime,
+                    color: P.brand,
                     fontFamily: mono,
                     fontSize: 14,
                     fontWeight: 900,

@@ -81,8 +81,8 @@ export function VideoInput({ value, onChange }: VideoInputProps) {
           <div
             className="athletic-tap rounded-xl p-6 text-center cursor-pointer transition-colors"
             style={{
-              border: `2px dashed ${dragging ? P.lime : P.lineStrong}`,
-              background: dragging ? 'rgba(190,242,100,0.08)' : P.surface,
+              border: `2px dashed ${dragging ? P.brand : P.lineStrong}`,
+              background: dragging ? 'rgba(232,122,85,0.08)' : P.surface,
             }}
             onDragOver={e => {
               e.preventDefault()

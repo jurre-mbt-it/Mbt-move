@@ -89,8 +89,8 @@ export default function AdminUsersPage() {
         </div>
 
         {/* Therapeut uitnodigen */}
-        <Tile accentBar={P.lime}>
-          <Kicker style={{ color: P.lime }}>THERAPEUT UITNODIGEN</Kicker>
+        <Tile accentBar={P.brand}>
+          <Kicker style={{ color: P.brand }}>THERAPEUT UITNODIGEN</Kicker>
           <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 4, marginBottom: 12, lineHeight: 1.5 }}>
             Verstuur een uitnodigingsmail via Supabase. De therapeut kan een wachtwoord instellen en inloggen.
           </p>

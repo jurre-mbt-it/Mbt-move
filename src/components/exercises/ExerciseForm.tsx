@@ -137,8 +137,8 @@ function Toggle({
       style={{
         width: 44,
         height: 26,
-        background: checked ? P.lime : P.surfaceHi,
-        border: `1px solid ${checked ? P.lime : P.lineStrong}`,
+        background: checked ? P.brand : P.surfaceHi,
+        border: `1px solid ${checked ? P.brand : P.lineStrong}`,
       }}
     >
       <span
@@ -350,9 +350,9 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
                     className="athletic-tap athletic-mono flex-1 rounded-lg transition-colors"
                     style={{
                       padding: '10px 0',
-                      background: active ? P.lime : P.surface,
+                      background: active ? P.brand : P.surface,
                       color: active ? P.bg : P.inkMuted,
-                      border: `1px solid ${active ? P.lime : P.line}`,
+                      border: `1px solid ${active ? P.brand : P.line}`,
                       fontSize: 11,
                       fontWeight: 900,
                       letterSpacing: '0.14em',
@@ -380,9 +380,9 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
                     className="athletic-tap athletic-mono rounded-full transition-colors"
                     style={{
                       padding: '6px 12px',
-                      background: active ? P.lime : P.surface,
+                      background: active ? P.brand : P.surface,
                       color: active ? P.bg : P.inkMuted,
-                      border: `1px solid ${active ? P.lime : P.line}`,
+                      border: `1px solid ${active ? P.brand : P.line}`,
                       fontSize: 10,
                       fontWeight: 900,
                       letterSpacing: '0.12em',
@@ -418,9 +418,9 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
                 disabled={!tagDraft.trim()}
                 className="athletic-tap rounded-xl shrink-0 flex items-center justify-center"
                 style={{
-                  background: tagDraft.trim() ? P.lime : P.surfaceHi,
+                  background: tagDraft.trim() ? P.brand : P.surfaceHi,
                   color: tagDraft.trim() ? P.bg : P.inkDim,
-                  border: `1px solid ${tagDraft.trim() ? P.lime : P.lineStrong}`,
+                  border: `1px solid ${tagDraft.trim() ? P.brand : P.lineStrong}`,
                   width: 48,
                   height: 48,
                   fontSize: 18,
@@ -625,9 +625,9 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
                     type="button"
                     className="athletic-tap rounded-xl text-left transition-colors"
                     style={{
-                      background: active ? 'rgba(190,242,100,0.08)' : P.surface,
-                      border: `1px solid ${active ? P.lime : P.line}`,
-                      color: active ? P.lime : P.ink,
+                      background: active ? 'rgba(232,122,85,0.08)' : P.surface,
+                      border: `1px solid ${active ? P.brand : P.line}`,
+                      color: active ? P.brand : P.ink,
                       padding: '10px 14px',
                       fontSize: 13,
                       fontWeight: active ? 800 : 600,
@@ -710,7 +710,7 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
               textTransform: 'uppercase',
             }}
           >
-            <Sparkles className="w-4 h-4" style={{ color: P.lime }} />
+            <Sparkles className="w-4 h-4" style={{ color: P.brand }} />
             AUTO-INSCHATTING SPIERBELASTING
           </button>
           <MuscleLoadSliders

@@ -4,10 +4,10 @@ import { ActionTile, Kicker, MetaLabel, MetricTile, P } from '@/components/dark-
 import { trpc } from '@/lib/trpc/client'
 
 const quickLinks = [
-  { href: '/admin/users', label: 'Users & rollen', description: 'Wijs rollen toe + koppel aan praktijk', bar: P.lime },
+  { href: '/admin/users', label: 'Users & rollen', description: 'Wijs rollen toe + koppel aan praktijk', bar: P.brand },
   { href: '/admin/practices', label: 'Praktijken', description: 'Multi-tenant groepen beheren', bar: P.ice },
   { href: '/admin/rehab-protocols', label: 'Revalidatie-protocollen', description: 'Protocol-catalog + criteria bewerken', bar: P.purple },
-  { href: '/admin/cohort', label: 'Cohort analytics', description: 'Platform-aggregaten over alle gebruikers (opt-out gerespecteerd)', bar: P.lime },
+  { href: '/admin/cohort', label: 'Cohort analytics', description: 'Platform-aggregaten over alle gebruikers (opt-out gerespecteerd)', bar: P.brand },
   { href: '/therapist/patients', label: 'Patiënten', description: 'Beheer patiënten en hun programma\'s', bar: P.purple },
   { href: '/therapist/exercises', label: 'Oefeningen', description: 'Oefeningenbibliotheek beheren', bar: P.gold },
   { href: '/therapist/programs', label: "Programma's", description: "Revalidatieprogramma's beheren", bar: P.ice },
@@ -21,7 +21,7 @@ export default function AdminDashboard() {
     stats.isLoading ? '…' : n != null ? n.toLocaleString('nl-NL') : '—'
 
   const tiles = [
-    { label: 'Total Users', value: display(stats.data?.totalUsers), tint: P.lime },
+    { label: 'Total Users', value: display(stats.data?.totalUsers), tint: P.brand },
     { label: 'Sessions (7d)', value: display(stats.data?.sessionsThisWeek), tint: P.ice },
     { label: 'MFA Enabled', value: display(stats.data?.mfaEnabled), tint: P.gold },
     { label: 'System Status', value: 'OK', tint: P.lime },

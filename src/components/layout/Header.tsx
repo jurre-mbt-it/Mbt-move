@@ -56,7 +56,7 @@ export function Header({ title, userName, userEmail, userAvatar, settingsBase = 
           </span>
           <span
             className="athletic-mono"
-            style={{ color: P.lime, fontSize: 11, fontWeight: 900, letterSpacing: '0.2em' }}
+            style={{ color: P.brand, fontSize: 11, fontWeight: 900, letterSpacing: '0.2em' }}
           >
             GYM
           </span>
@@ -98,11 +98,11 @@ export function Header({ title, userName, userEmail, userAvatar, settingsBase = 
             <button
               type="button"
               className="flex items-center gap-2 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2"
-              style={{ '--tw-ring-color': P.lime } as React.CSSProperties}
+              style={{ '--tw-ring-color': P.brand } as React.CSSProperties}
             >
               <Avatar className="w-8 h-8">
                 {userAvatar && <AvatarImage src={userAvatar} alt={userName} />}
-                <AvatarFallback style={{ background: P.lime, color: P.bg, fontWeight: 800 }}>
+                <AvatarFallback style={{ background: P.brand, color: P.bg, fontWeight: 800 }}>
                   {initials}
                 </AvatarFallback>
               </Avatar>

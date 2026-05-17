@@ -86,12 +86,12 @@ export default function MyWorkoutsPage() {
         </div>
 
         {/* Quick Start */}
-        <Tile href="/athlete/workouts/new" accentBar={P.lime} style={{ padding: 20 }}>
+        <Tile href="/athlete/workouts/new" accentBar={P.brand} style={{ padding: 20 }}>
           <div className="flex items-center gap-4">
             <div
               className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
               style={{
-                background: 'rgba(190,242,100,0.12)',
+                background: 'rgba(232,122,85,0.12)',
                 border: `1px solid ${P.lineStrong}`,
               }}
             >
@@ -99,7 +99,7 @@ export default function MyWorkoutsPage() {
                 style={{
                   fontSize: 22,
                   fontWeight: 900,
-                  color: P.lime,
+                  color: P.brand,
                   lineHeight: 1,
                 }}
               >
@@ -126,7 +126,7 @@ export default function MyWorkoutsPage() {
                 <MetaLabel>START EEN NIEUWE WORKOUT</MetaLabel>
               </div>
             </div>
-            <span style={{ color: P.lime, fontSize: 22, fontWeight: 900 }}>
+            <span style={{ color: P.brand, fontSize: 22, fontWeight: 900 }}>
               →
             </span>
           </div>

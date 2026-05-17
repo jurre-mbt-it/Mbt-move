@@ -194,7 +194,7 @@ export default function ExercisesPage() {
             onClick={() => setActiveCollection(null)}
             className="shrink-0 px-3 py-1.5 rounded-full athletic-mono transition-colors"
             style={{
-              background: activeCollection === null ? P.lime : 'transparent',
+              background: activeCollection === null ? P.brand : 'transparent',
               color: activeCollection === null ? P.bg : P.inkMuted,
               border: activeCollection === null ? 'none' : `1px solid ${P.lineStrong}`,
               fontSize: 11,
@@ -316,7 +316,7 @@ export default function ExercisesPage() {
               onClick={() => setView('grid')}
               className="px-3 py-2 athletic-mono transition-colors"
               style={{
-                background: view === 'grid' ? P.lime : 'transparent',
+                background: view === 'grid' ? P.brand : 'transparent',
                 color: view === 'grid' ? P.bg : P.inkMuted,
                 fontSize: 11,
                 fontWeight: 800,
@@ -329,7 +329,7 @@ export default function ExercisesPage() {
               onClick={() => setView('list')}
               className="px-3 py-2 athletic-mono transition-colors"
               style={{
-                background: view === 'list' ? P.lime : 'transparent',
+                background: view === 'list' ? P.brand : 'transparent',
                 color: view === 'list' ? P.bg : P.inkMuted,
                 fontSize: 11,
                 fontWeight: 800,
@@ -355,9 +355,9 @@ export default function ExercisesPage() {
                       onClick={() => setSelectedCategory(selectedCategory === c.value ? null : c.value)}
                       className="px-2.5 py-1 rounded-full athletic-mono transition-colors"
                       style={{
-                        background: selectedCategory === c.value ? P.lime : P.surfaceHi,
+                        background: selectedCategory === c.value ? P.brand : P.surfaceHi,
                         color: selectedCategory === c.value ? P.bg : P.inkMuted,
-                        border: `1px solid ${selectedCategory === c.value ? P.lime : P.lineStrong}`,
+                        border: `1px solid ${selectedCategory === c.value ? P.brand : P.lineStrong}`,
                         fontSize: 10,
                         fontWeight: 800,
                         letterSpacing: '0.08em',
@@ -379,9 +379,9 @@ export default function ExercisesPage() {
                       onClick={() => setSelectedRegion(selectedRegion === r.value ? null : r.value)}
                       className="px-2.5 py-1 rounded-full athletic-mono transition-colors"
                       style={{
-                        background: selectedRegion === r.value ? P.lime : P.surfaceHi,
+                        background: selectedRegion === r.value ? P.brand : P.surfaceHi,
                         color: selectedRegion === r.value ? P.bg : P.inkMuted,
-                        border: `1px solid ${selectedRegion === r.value ? P.lime : P.lineStrong}`,
+                        border: `1px solid ${selectedRegion === r.value ? P.brand : P.lineStrong}`,
                         fontSize: 10,
                         fontWeight: 800,
                         letterSpacing: '0.08em',
@@ -403,9 +403,9 @@ export default function ExercisesPage() {
                       onClick={() => setSelectedDifficulty(selectedDifficulty === d.value ? null : d.value)}
                       className="px-2.5 py-1 rounded-full athletic-mono transition-colors"
                       style={{
-                        background: selectedDifficulty === d.value ? P.lime : P.surfaceHi,
+                        background: selectedDifficulty === d.value ? P.brand : P.surfaceHi,
                         color: selectedDifficulty === d.value ? P.bg : P.inkMuted,
-                        border: `1px solid ${selectedDifficulty === d.value ? P.lime : P.lineStrong}`,
+                        border: `1px solid ${selectedDifficulty === d.value ? P.brand : P.lineStrong}`,
                         fontSize: 10,
                         fontWeight: 800,
                         letterSpacing: '0.08em',

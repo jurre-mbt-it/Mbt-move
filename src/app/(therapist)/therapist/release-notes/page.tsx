@@ -35,7 +35,7 @@ export default function ReleaseNotesPage() {
 
         <div className="flex flex-col gap-3">
           {releaseNotes.map((note) => (
-            <Tile key={note.id} accentBar={P.lime}>
+            <Tile key={note.id} accentBar={P.brand}>
               <div className="flex items-baseline justify-between gap-3 flex-wrap">
                 <h2 style={{ color: P.ink, fontSize: 16, fontWeight: 800, letterSpacing: '-0.01em' }}>
                   {note.title}
@@ -56,7 +56,7 @@ export default function ReleaseNotesPage() {
                     className="flex items-start gap-2"
                     style={{ color: P.inkMuted, fontSize: 13, lineHeight: '20px' }}
                   >
-                    <span style={{ color: P.lime, marginTop: 1 }}>•</span>
+                    <span style={{ color: P.brand, marginTop: 1 }}>•</span>
                     <span>{item}</span>
                   </li>
                 ))}

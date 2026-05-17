@@ -84,7 +84,7 @@ export function WhatsNewModal() {
         <ul className="mt-4 space-y-2">
           {note.items.map((item, i) => (
             <li key={i} className="flex items-start gap-2" style={{ color: P.inkMuted, fontSize: 13, lineHeight: '20px' }}>
-              <span style={{ color: P.lime, marginTop: 1 }}>•</span>
+              <span style={{ color: P.brand, marginTop: 1 }}>•</span>
               <span>{item}</span>
             </li>
           ))}

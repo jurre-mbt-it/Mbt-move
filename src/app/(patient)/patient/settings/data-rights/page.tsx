@@ -287,7 +287,7 @@ export default function DataRightsPage() {
           Vragen of hulp nodig? Mail{' '}
           <a
             href="mailto:jurre@movementbasedtherapy.nl"
-            style={{ color: P.lime, textDecoration: 'none' }}
+            style={{ color: P.brand, textDecoration: 'none' }}
           >
             jurre@movementbasedtherapy.nl
           </a>
