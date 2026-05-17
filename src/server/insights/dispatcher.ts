@@ -10,6 +10,7 @@
  */
 import type { Insight, PrismaClient } from '@prisma/client'
 import { sendMail, escapeHtml } from '@/server/mail'
+import { getAppUrl } from '@/lib/app-url'
 
 const BRAND = {
   bg: '#0A0E0F',
@@ -35,8 +36,7 @@ function renderCriticalEmail(insight: Insight, patientName: string): {
   text: string
 } {
   const subject = `[KRITIEK] ${insight.title}`
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://mbt-gym.nl'
-  const dashboardUrl = `${appUrl}/therapist/signals`
+  const dashboardUrl = `${getAppUrl()}/therapist/signals`
 
   const safeTitle = escapeHtml(insight.title)
   const safeSuggestion = escapeHtml(insight.suggestion)

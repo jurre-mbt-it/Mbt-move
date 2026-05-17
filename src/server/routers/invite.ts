@@ -39,6 +39,7 @@ import {
 import { auditLog } from '@/server/audit'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { inviteMail, sendMail } from '@/server/mail'
+import { getAppUrl } from '@/lib/app-url'
 
 const CODE_TTL_HOURS = 24
 const MAX_REDEEM_ATTEMPTS = 5
@@ -196,9 +197,7 @@ export const inviteRouter = createTRPCRouter({
       // Stuur een branded invite-mail via Resend (als geconfigureerd). Bevat
       // de URL naar /login/code. De 6-cijfer code zelf komt later via
       // Supabase's OTP-mail wanneer de patiënt op de URL "Stuur code" klikt.
-      const instructionUrl = `${
-        process.env.NEXT_PUBLIC_APP_URL ?? 'https://mbt-gym.nl'
-      }/login/code?email=${encodeURIComponent(email)}`
+      const instructionUrl = `${getAppUrl()}/login/code?email=${encodeURIComponent(email)}`
 
       const mail = inviteMail({
         recipientName: input.name.trim(),
@@ -319,9 +318,7 @@ export const inviteRouter = createTRPCRouter({
         },
       })
 
-      const instructionUrl = `${
-        process.env.NEXT_PUBLIC_APP_URL ?? 'https://mbt-gym.nl'
-      }/login/code?email=${encodeURIComponent(email)}`
+      const instructionUrl = `${getAppUrl()}/login/code?email=${encodeURIComponent(email)}`
 
       const mail = inviteMail({
         recipientName: patient.name ?? email,

@@ -411,8 +411,8 @@ export const patientsRouter = createTRPCRouter({
       }
 
       const redirectBase =
-        process.env.NEXT_PUBLIC_APP_URL ||
-        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+        process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.trim()}` : 'http://localhost:3000')
 
       const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
         data: { role, name },
@@ -497,8 +497,8 @@ export const patientsRouter = createTRPCRouter({
       }
 
       const redirectBase =
-        process.env.NEXT_PUBLIC_APP_URL ||
-        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+        process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.trim()}` : 'http://localhost:3000')
 
       const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(patient.email, {
         data: { role: patient.role, name: patient.name },
