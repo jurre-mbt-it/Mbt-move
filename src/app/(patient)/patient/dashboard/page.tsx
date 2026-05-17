@@ -13,8 +13,7 @@ import {
   Tile,
   WeekProgress,
 } from '@/components/dark-ui'
-import { RecoveryPanel } from '@/components/recovery/RecoveryPanel'
-import { WorkloadPanel } from '@/components/workload/WorkloadPanel'
+import { WeeklyTrendChart } from '@/components/charts/WeeklyTrendChart'
 import { ConsentPopup } from '@/components/research/ConsentPopup'
 import { DpaPopup } from '@/components/dpa/DpaPopup'
 
@@ -24,14 +23,9 @@ export default function PatientDashboard() {
   const { data: sessionData } = trpc.patient.getTodayExercises.useQuery()
   const { data: activeProgram } = trpc.patient.getActiveProgram.useQuery()
   const { data: sessionHistory } = trpc.patient.getSessionHistory.useQuery({ limit: 20 })
-  const { data: rawWorkloadSessions } = trpc.patient.getWorkloadSessions.useQuery()
-  const { data: rawRecoverySessions } = trpc.patient.getRecoverySessions.useQuery()
   const { data: todayWellness } = trpc.wellness.today.useQuery()
   const { data: rehabTracker } = trpc.rehab.getMyTracker.useQuery()
 
-  const workloadSessions = rawWorkloadSessions?.map((s) => ({ ...s, date: new Date(s.date) })) ?? []
-  const recoverySessions =
-    rawRecoverySessions?.map((s) => ({ ...s, completedAt: new Date(s.completedAt) })) ?? []
 
   const todayExercises = sessionData?.exercises ?? []
   const program = sessionData?.program ?? null
@@ -266,9 +260,9 @@ export default function PatientDashboard() {
           bar={P.danger}
         />
 
-        {/* Recovery & Workload panels (gekleurd door .athletic-dark context) */}
-        <RecoveryPanel sessions={recoverySessions} />
-        <WorkloadPanel sessions={workloadSessions} />
+        {/* Recovery + workload panels tijdelijk uit — berekening klopt nog
+            niet helemaal. Vervangen door weekly RPE + pijn-grafiek. */}
+        <WeeklyTrendChart sessions={sessionHistory ?? []} />
 
         {/* Last session */}
         {lastSession && (

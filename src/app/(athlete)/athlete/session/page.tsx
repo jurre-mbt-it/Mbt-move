@@ -93,6 +93,8 @@ export default function AthleteSessionPage() {
   const [showAddExercise, setShowAddExercise] = useState(false)
   const [addExerciseQuery, setAddExerciseQuery] = useState('')
   const [videoModal, setVideoModal] = useState<{ url: string; name: string } | null>(null)
+  const [sessionRpe, setSessionRpe] = useState<number | null>(null)
+  const [sessionPain, setSessionPain] = useState<number | null>(null)
 
   const baseExercises = isQuickMode ? [] : programExercises
   const exercises: LiveExercise[] = [...baseExercises, ...extraExercises]
@@ -150,13 +152,13 @@ export default function AthleteSessionPage() {
         scheduledAt: new Date().toISOString(),
         completedAt: new Date().toISOString(),
         durationSeconds: Math.max(elapsed, 1),
-        painLevel: null,
-        exertionLevel: null,
+        painLevel: sessionPain,
+        exertionLevel: sessionRpe,
         exercises: exercises.map(e => ({
           exerciseId: e.exerciseId,
           setsCompleted: e.sets,
           repsCompleted: e.reps,
-          painLevel: null,
+          painLevel: sessionPain,
         })),
       })
       await Promise.all([
@@ -444,6 +446,95 @@ export default function AthleteSessionPage() {
           <MetaLabel>
             {completed.size}/{exercises.length} OEFENINGEN · {mins}:{secs.toString().padStart(2, '0')}
           </MetaLabel>
+
+          {/* RPE — verplicht voor workload */}
+          <div className="text-left">
+            <div className="flex items-baseline justify-between mb-2">
+              <p style={{ color: P.ink, fontSize: 13, fontWeight: 700 }}>
+                Hoe zwaar voelde de sessie?
+              </p>
+              <span
+                className="athletic-mono"
+                style={{
+                  color: sessionRpe !== null ? P.brand : P.inkMuted,
+                  fontSize: 13,
+                  fontWeight: 900,
+                }}
+              >
+                {sessionRpe !== null ? `${sessionRpe}/10` : '—'}
+              </span>
+            </div>
+            <div className="flex gap-1">
+              {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setSessionRpe(sessionRpe === n ? null : n)}
+                  className="athletic-tap flex-1 rounded-lg athletic-mono transition-all"
+                  style={{
+                    height: 44,
+                    background: sessionRpe === n ? P.brand : P.surfaceHi,
+                    color: sessionRpe === n ? P.bg : P.inkMuted,
+                    fontSize: 12,
+                    fontWeight: 900,
+                  }}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <p style={{ color: P.inkMuted, fontSize: 10, marginTop: 6 }}>
+              1 = heel licht · 10 = maximaal
+            </p>
+          </div>
+
+          {/* Pijn-score (0-10) — optioneel */}
+          <div className="text-left">
+            <div className="flex items-baseline justify-between mb-2">
+              <p style={{ color: P.ink, fontSize: 13, fontWeight: 700 }}>
+                Pijn tijdens de sessie
+              </p>
+              <span
+                className="athletic-mono"
+                style={{
+                  color: sessionPain !== null ? P.danger : P.inkMuted,
+                  fontSize: 13,
+                  fontWeight: 900,
+                }}
+              >
+                {sessionPain !== null ? `${sessionPain}/10` : 'Geen'}
+              </span>
+            </div>
+            <div className="flex gap-1">
+              {Array.from({ length: 11 }, (_, i) => i).map(n => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setSessionPain(sessionPain === n ? null : n)}
+                  className="athletic-tap flex-1 rounded-lg athletic-mono transition-all"
+                  style={{
+                    height: 36,
+                    background:
+                      sessionPain === n
+                        ? n === 0
+                          ? P.lime
+                          : n < 3
+                            ? P.lime
+                            : n < 6
+                              ? P.gold
+                              : P.danger
+                        : P.surfaceHi,
+                    color: sessionPain === n ? P.bg : P.inkMuted,
+                    fontSize: 11,
+                    fontWeight: 900,
+                  }}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {error && (
             <p style={{ color: P.danger, fontSize: 13 }}>{error}</p>
           )}

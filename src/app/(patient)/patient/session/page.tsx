@@ -314,6 +314,137 @@ function FeedbackModal({
   )
 }
 
+// ─── Minute picker — horizontale scroll-wheel met snap per minuut ────────────
+
+function MinutePicker({
+  value,
+  onChange,
+  min = 1,
+  max = 120,
+}: {
+  value: number
+  onChange: (n: number) => void
+  min?: number
+  max?: number
+}) {
+  const TICK_W = 14 // px per minuut-tick
+  const containerRef = useRef<HTMLDivElement>(null)
+  const programmaticScroll = useRef(false)
+  const ticks = useMemo(() => Array.from({ length: max - min + 1 }, (_, i) => min + i), [min, max])
+
+  // Scroll naar waarde wanneer prop verandert (incl. eerste render).
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const targetLeft = (value - min) * TICK_W
+    if (Math.abs(el.scrollLeft - targetLeft) < 1) return
+    programmaticScroll.current = true
+    el.scrollTo({ left: targetLeft, behavior: 'auto' })
+    // Reset flag na frame zodat user-scroll weer telt.
+    requestAnimationFrame(() => { programmaticScroll.current = false })
+  }, [value, min])
+
+  function handleScroll() {
+    if (programmaticScroll.current) return
+    const el = containerRef.current
+    if (!el) return
+    const idx = Math.round(el.scrollLeft / TICK_W)
+    const next = Math.max(min, Math.min(max, min + idx))
+    if (next !== value) onChange(next)
+  }
+
+  return (
+    <div className="relative" style={{ height: 56 }}>
+      {/* Center-indicator: oranje verticale lijn met getal-pijl */}
+      <div
+        aria-hidden
+        className="absolute top-0 bottom-0 pointer-events-none"
+        style={{
+          left: '50%',
+          width: 2,
+          marginLeft: -1,
+          background: P.brand,
+          borderRadius: 1,
+          zIndex: 2,
+        }}
+      />
+      {/* Fade-outs links/rechts zodat de strook visueel afloopt */}
+      <div
+        aria-hidden
+        className="absolute top-0 bottom-0 left-0 pointer-events-none"
+        style={{
+          width: 32,
+          background: `linear-gradient(to right, ${P.surface}, rgba(20,26,27,0))`,
+          zIndex: 1,
+        }}
+      />
+      <div
+        aria-hidden
+        className="absolute top-0 bottom-0 right-0 pointer-events-none"
+        style={{
+          width: 32,
+          background: `linear-gradient(to left, ${P.surface}, rgba(20,26,27,0))`,
+          zIndex: 1,
+        }}
+      />
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="overflow-x-auto overflow-y-hidden scrollbar-none"
+        style={{
+          scrollSnapType: 'x mandatory',
+          // Half-screen padding zodat eerste/laatste tick onder de center-cursor kan
+          paddingLeft: 'calc(50% - 1px)',
+          paddingRight: 'calc(50% - 1px)',
+          WebkitOverflowScrolling: 'touch',
+          height: '100%',
+        }}
+      >
+        <div className="flex items-end h-full" style={{ minWidth: ticks.length * TICK_W }}>
+          {ticks.map(m => {
+            const isMajor = m % 5 === 0
+            const isTen = m % 10 === 0
+            return (
+              <div
+                key={m}
+                className="flex flex-col items-center justify-end shrink-0"
+                style={{
+                  width: TICK_W,
+                  height: '100%',
+                  scrollSnapAlign: 'center',
+                }}
+              >
+                {isTen && (
+                  <span
+                    className="athletic-mono"
+                    style={{
+                      color: P.inkMuted,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: '0.04em',
+                      marginBottom: 2,
+                    }}
+                  >
+                    {m}
+                  </span>
+                )}
+                <div
+                  style={{
+                    width: 2,
+                    height: isTen ? 18 : isMajor ? 14 : 8,
+                    background: isMajor ? P.ink : P.inkDim,
+                    borderRadius: 1,
+                  }}
+                />
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Session Summary ──────────────────────────────────────────────────────────
 
 function SessionSummary({
@@ -330,13 +461,19 @@ function SessionSummary({
   feedback: Record<string, FeedbackEntry>
   setWeights: Record<string, number[]>
   elapsed: number
-  onFinish: (sessionSmiley: number | null, sessionRpe: number | null, durationSeconds: number) => void
+  onFinish: (
+    sessionSmiley: number | null,
+    sessionRpe: number | null,
+    sessionPain: number | null,
+    durationSeconds: number,
+  ) => void
   isSaving: boolean
   tendinopathyMode?: boolean
   sessionOneRmPRs?: Record<string, number>
 }) {
   const [sessionSmiley, setSessionSmiley] = useState<number | null>(null)
   const [sessionRpe, setSessionRpe] = useState<number | null>(null)
+  const [sessionPain, setSessionPain] = useState<number | null>(null)
   const [durationMinutes, setDurationMinutes] = useState(() => Math.max(1, Math.round(elapsed / 60)))
 
   const now = new Date()
@@ -375,33 +512,18 @@ function SessionSummary({
           <MetaLabel style={{ marginTop: 6 }}>{exercises.length} OEFENINGEN</MetaLabel>
         </div>
 
-        {/* Editable duration */}
+        {/* Editable duration — scroll picker, snap per minuut */}
         <Tile>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-3">
             <MetaLabel>DUUR</MetaLabel>
-            <div className="flex items-center gap-3">
-              <button
-                className="athletic-tap w-8 h-8 rounded-full flex items-center justify-center"
-                style={{ background: P.surfaceHi, color: P.ink }}
-                onClick={() => setDurationMinutes(m => Math.max(1, m - 5))}
-              >
-                <Minus className="w-3.5 h-3.5" />
-              </button>
-              <span
-                className="athletic-mono w-16 text-center"
-                style={{ color: P.ink, fontSize: 18, fontWeight: 900 }}
-              >
-                {durationMinutes} min
-              </span>
-              <button
-                className="athletic-tap w-8 h-8 rounded-full flex items-center justify-center"
-                style={{ background: P.surfaceHi, color: P.ink }}
-                onClick={() => setDurationMinutes(m => m + 5)}
-              >
-                <Plus className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <span
+              className="athletic-mono"
+              style={{ color: P.brand, fontSize: 22, fontWeight: 900 }}
+            >
+              {durationMinutes}<span style={{ color: P.inkMuted, fontSize: 12, marginLeft: 4 }}>min</span>
+            </span>
           </div>
+          <MinutePicker value={durationMinutes} onChange={setDurationMinutes} />
           <div className="flex justify-between mt-3">
             <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11 }}>
               Start: {fmtTime(startTime)}
@@ -589,8 +711,51 @@ function SessionSummary({
           )}
         </Tile>
 
+        {/* Sessie-pijn — overall pijn-score voor de hele workout, optioneel */}
+        <Tile>
+          <div className="flex items-baseline justify-between">
+            <p style={{ color: P.ink, fontSize: 14, fontWeight: 800 }}>Pijn tijdens de sessie</p>
+            <span
+              className="athletic-mono"
+              style={{
+                color: sessionPain !== null ? painColor(sessionPain) : P.inkMuted,
+                fontSize: 13,
+                fontWeight: 900,
+              }}
+            >
+              {sessionPain !== null ? `${sessionPain}/10` : 'Geen'}
+            </span>
+          </div>
+          <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
+            0 = geen pijn · 10 = niet meer te dragen.
+          </MetaLabel>
+          <div className="grid grid-cols-11 gap-1 mt-3">
+            {Array.from({ length: 11 }, (_, i) => i).map(val => {
+              const selected = sessionPain === val
+              const color = painColor(val)
+              return (
+                <button
+                  key={val}
+                  onClick={() => setSessionPain(selected ? null : val)}
+                  className="athletic-tap rounded-lg athletic-mono transition-all"
+                  style={{
+                    height: 36,
+                    background: selected ? color : P.surfaceHi,
+                    color: selected ? P.bg : P.inkMuted,
+                    border: selected ? `2px solid ${color}` : `1px solid ${P.line}`,
+                    fontSize: 11,
+                    fontWeight: 900,
+                  }}
+                >
+                  {val}
+                </button>
+              )
+            })}
+          </div>
+        </Tile>
+
         <DarkButton
-          onClick={() => onFinish(sessionSmiley, sessionRpe, durationMinutes * 60)}
+          onClick={() => onFinish(sessionSmiley, sessionRpe, sessionPain, durationMinutes * 60)}
           disabled={isSaving || sessionRpe === null}
           loading={isSaving}
           size="lg"
@@ -858,10 +1023,21 @@ function SessionPageInner() {
     setFeedback(prev => ({ ...prev, [uid]: { ...prev[uid], ...partial } }))
   }, [])
 
-  const handleFinish = useCallback(async (sessionSmiley: number | null, sessionRpe: number | null, durationSeconds: number) => {
+  const handleFinish = useCallback(async (
+    sessionSmiley: number | null,
+    sessionRpe: number | null,
+    sessionPain: number | null,
+    durationSeconds: number,
+  ) => {
     const tendinopathyMode = sessionData?.program?.tendinopathyMode ?? false
-    const pains = Object.values(feedback).filter(f => f.pain !== null).map(f => f.pain!)
-    const avgPain = pains.length > 0 ? Math.round(pains.reduce((a, b) => a + b, 0) / pains.length) : null
+    // Expliciete sessie-pijn als die is ingevuld, anders fallback op gemiddelde
+    // van per-oefening pijn-scores zodat oude flows niets verliezen.
+    const perExercisePains = Object.values(feedback).filter(f => f.pain !== null).map(f => f.pain!)
+    const avgPerExercisePain =
+      perExercisePains.length > 0
+        ? Math.round(perExercisePains.reduce((a, b) => a + b, 0) / perExercisePains.length)
+        : null
+    const painLevel = sessionPain ?? avgPerExercisePain
     // Expliciete RPE direct gebruiken voor exertionLevel (workload sRPE = RPE × duur).
     // Smiley blijft losse "hoe voelt je lichaam"-indicator, maar telt niet mee in workload.
     const exertionLevel = sessionRpe
@@ -874,7 +1050,7 @@ function SessionPageInner() {
       scheduledAt: scheduledAt.toISOString(),
       completedAt: completedAt.toISOString(),
       durationSeconds,
-      painLevel: avgPain,
+      painLevel,
       exertionLevel,
       exercises: exercises.map(e => {
         const weights = setWeights[e.uid] ?? []

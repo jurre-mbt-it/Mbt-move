@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
 import { createClient } from '@/lib/supabase/client'
-import { RecoveryPanel } from '@/components/recovery/RecoveryPanel'
-import { WorkloadPanel } from '@/components/workload/WorkloadPanel'
+import { WeeklyTrendChart } from '@/components/charts/WeeklyTrendChart'
 import {
   P,
   Kicker,
@@ -55,18 +54,6 @@ export default function AthleteDashboard() {
   const { data: sessionHistory } = trpc.patient.getSessionHistory.useQuery({
     limit: 20,
   })
-  const { data: rawWorkloadSessions } =
-    trpc.patient.getWorkloadSessions.useQuery()
-  const { data: rawRecoverySessions } =
-    trpc.patient.getRecoverySessions.useQuery()
-
-  const workloadSessions =
-    rawWorkloadSessions?.map((s) => ({ ...s, date: new Date(s.date) })) ?? []
-  const recoverySessions =
-    rawRecoverySessions?.map((s) => ({
-      ...s,
-      completedAt: new Date(s.completedAt),
-    })) ?? []
 
   const todayExercises = sessionData?.exercises ?? []
   const lastSession = sessionHistory?.[0] ?? null
@@ -308,12 +295,9 @@ export default function AthleteDashboard() {
           />
         </div>
 
-        {/* ── Recovery + Workload panels ────────────────── */}
-        <div className="pt-2 space-y-3">
-          <Kicker style={{ color: P.ice }}>RECOVERY</Kicker>
-          <RecoveryPanel sessions={recoverySessions} />
-          <Kicker style={{ color: P.gold }}>WORKLOAD</Kicker>
-          <WorkloadPanel sessions={workloadSessions} />
+        {/* ── Wekelijkse trend (RPE + pijn) ─────────────── */}
+        <div className="pt-2">
+          <WeeklyTrendChart sessions={sessionHistory ?? []} />
         </div>
 
         {/* ── Last session recap ────────────────────────── */}

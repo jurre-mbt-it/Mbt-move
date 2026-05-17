@@ -253,6 +253,15 @@ body {
   animation: athletic-pulse 1.8s ease-in-out infinite;
 }
 
+/* Verberg scrollbar in scroll-pickers (horizontale minute-picker etc.) */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 /* Tap-scale (voor buttons / pressable tiles) */
 .athletic-tap {
   transition: transform 140ms ease, opacity 140ms ease, background-color 140ms ease;
