@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { trpc } from '@/lib/trpc/client'
 import {
-  Search, X, Plus,
+  Search, X, Plus, Play,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import {
@@ -15,6 +16,9 @@ import {
   DarkButton,
 } from '@/components/dark-ui'
 import { IconStrength } from '@/components/icons'
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ReactPlayer = dynamic(() => import('react-player') as any, { ssr: false }) as any
 
 type DbExercise = {
   id: string
@@ -39,6 +43,7 @@ type LiveExercise = {
   reps: number
   repUnit: string
   restTime: number
+  videoUrl: string | null
 }
 
 function dbExerciseToLive(ex: DbExercise): LiveExercise {
@@ -51,6 +56,7 @@ function dbExerciseToLive(ex: DbExercise): LiveExercise {
     reps: 10,
     repUnit: 'reps',
     restTime: 60,
+    videoUrl: (ex.videoUrl as string | null | undefined) ?? null,
   }
 }
 
@@ -79,12 +85,14 @@ export default function AthleteSessionPage() {
     reps: e.reps,
     repUnit: e.repUnit,
     restTime: e.restTime,
+    videoUrl: e.videoUrl ?? null,
   }))
 
   // Extra exercises added during session
   const [extraExercises, setExtraExercises] = useState<LiveExercise[]>([])
   const [showAddExercise, setShowAddExercise] = useState(false)
   const [addExerciseQuery, setAddExerciseQuery] = useState('')
+  const [videoModal, setVideoModal] = useState<{ url: string; name: string } | null>(null)
 
   const baseExercises = isQuickMode ? [] : programExercises
   const exercises: LiveExercise[] = [...baseExercises, ...extraExercises]
@@ -268,58 +276,82 @@ export default function AthleteSessionPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {exercises.map((e, i) => (
-                <div
-                  key={e.uid}
-                  className="flex items-center gap-3 rounded-xl"
-                  style={{
-                    background: P.surface,
-                    padding: '12px 14px',
-                    borderLeft: `3px solid ${P.brand}`,
-                    border: `1px solid ${P.line}`,
-                  }}
-                >
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+              {exercises.map((e, i) => {
+                const clickable = !!e.videoUrl
+                const Wrapper = clickable ? 'button' : 'div'
+                return (
+                  <Wrapper
+                    key={e.uid}
+                    type={clickable ? 'button' : undefined}
+                    onClick={
+                      clickable
+                        ? () => setVideoModal({ url: e.videoUrl!, name: e.name })
+                        : undefined
+                    }
+                    className={`flex items-center gap-3 rounded-xl w-full text-left ${clickable ? 'athletic-tap' : ''}`}
                     style={{
-                      background: P.surfaceHi,
+                      background: P.surface,
+                      padding: '12px 14px',
+                      borderLeft: `3px solid ${P.brand}`,
                       border: `1px solid ${P.line}`,
-                      color: P.brand,
-                      fontFamily: mono,
-                      fontSize: 14,
-                      fontWeight: 900,
                     }}
                   >
-                    {i + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className="truncate"
-                      style={{
-                        color: P.ink,
-                        fontSize: 14,
-                        fontWeight: 800,
-                        letterSpacing: '-0.01em',
-                      }}
-                    >
-                      {e.name}
-                    </p>
                     <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
                       style={{
+                        background: P.surfaceHi,
+                        border: `1px solid ${P.line}`,
+                        color: P.brand,
                         fontFamily: mono,
-                        fontSize: 10,
-                        letterSpacing: '0.14em',
-                        fontWeight: 700,
-                        color: P.inkMuted,
-                        marginTop: 3,
-                        textTransform: 'uppercase',
+                        fontSize: 14,
+                        fontWeight: 900,
                       }}
                     >
-                      {e.sets} × {e.reps} {e.repUnit}
+                      {i + 1}
                     </div>
-                  </div>
-                </div>
-              ))}
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className="truncate"
+                        style={{
+                          color: P.ink,
+                          fontSize: 14,
+                          fontWeight: 800,
+                          letterSpacing: '-0.01em',
+                        }}
+                      >
+                        {e.name}
+                      </p>
+                      <div
+                        style={{
+                          fontFamily: mono,
+                          fontSize: 10,
+                          letterSpacing: '0.14em',
+                          fontWeight: 700,
+                          color: P.inkMuted,
+                          marginTop: 3,
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        {e.sets} × {e.reps} {e.repUnit}
+                      </div>
+                    </div>
+                    {clickable && (
+                      <span
+                        aria-hidden
+                        className="inline-flex items-center justify-center rounded-full shrink-0"
+                        style={{
+                          width: 28,
+                          height: 28,
+                          background: 'rgba(232,122,85,0.15)',
+                          color: P.brand,
+                        }}
+                      >
+                        <Play className="w-3.5 h-3.5" style={{ marginLeft: 1 }} fill="currentColor" />
+                      </span>
+                    )}
+                  </Wrapper>
+                )
+              })}
             </div>
           )}
 
@@ -364,6 +396,14 @@ export default function AthleteSessionPage() {
             added={extraExercises}
             onAdd={addExercise}
             onClose={() => { setShowAddExercise(false); setAddExerciseQuery('') }}
+          />
+        )}
+
+        {videoModal && (
+          <VideoModal
+            url={videoModal.url}
+            name={videoModal.name}
+            onClose={() => setVideoModal(null)}
           />
         )}
       </div>
@@ -467,9 +507,33 @@ export default function AthleteSessionPage() {
           </div>
         </div>
 
-        {/* Hero: current exercise */}
-        <Tile accentBar={P.brand} style={{ padding: 20 }}>
-          <Kicker>VANDAAG · ACTIEF</Kicker>
+        {/* Hero: current exercise — klikbaar als er een video is */}
+        <Tile
+          accentBar={P.brand}
+          style={{ padding: 20 }}
+          onClick={
+            current?.videoUrl
+              ? () => setVideoModal({ url: current.videoUrl!, name: current.name })
+              : undefined
+          }
+        >
+          <div className="flex items-center justify-between">
+            <Kicker>VANDAAG · ACTIEF</Kicker>
+            {current?.videoUrl && (
+              <span
+                aria-hidden
+                className="inline-flex items-center justify-center rounded-full"
+                style={{
+                  width: 28,
+                  height: 28,
+                  background: P.brand,
+                  color: P.bg,
+                }}
+              >
+                <Play className="w-3.5 h-3.5" style={{ marginLeft: 1 }} fill="currentColor" />
+              </span>
+            )}
+          </div>
           <div
             className="athletic-display"
             style={{
@@ -490,6 +554,7 @@ export default function AthleteSessionPage() {
               {current
                 ? `${current.sets} × ${current.reps} ${current.repUnit.toUpperCase()}`
                 : ''}
+              {current?.videoUrl ? ' · TAP VOOR VIDEO' : ''}
             </MetaLabel>
           </div>
         </Tile>
@@ -560,6 +625,91 @@ export default function AthleteSessionPage() {
           onClose={() => { setShowAddExercise(false); setAddExerciseQuery('') }}
         />
       )}
+
+      {videoModal && (
+        <VideoModal
+          url={videoModal.url}
+          name={videoModal.name}
+          onClose={() => setVideoModal(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── Video modal — fullscreen overlay met player ─────────────────────────────
+
+function VideoModal({
+  url,
+  name,
+  onClose,
+}: {
+  url: string
+  name: string
+  onClose: () => void
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    // Lock body scroll while open
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prev
+    }
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl rounded-2xl overflow-hidden"
+        style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="flex items-center justify-between px-4 py-3"
+          style={{ borderBottom: `1px solid ${P.line}` }}
+        >
+          <span
+            className="truncate"
+            style={{
+              color: P.ink,
+              fontSize: 14,
+              fontWeight: 800,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+            }}
+          >
+            {name}
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Sluiten"
+            className="athletic-tap p-1 rounded-lg shrink-0"
+            style={{ color: P.inkMuted }}
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="aspect-video bg-black">
+          <ReactPlayer
+            url={url}
+            width="100%"
+            height="100%"
+            controls
+            playing
+            playsinline
+          />
+        </div>
+      </div>
     </div>
   )
 }
