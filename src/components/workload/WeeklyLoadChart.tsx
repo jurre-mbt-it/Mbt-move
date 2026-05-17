@@ -16,8 +16,10 @@ interface Props {
   footnote?: string
   /** Index van de "actieve" week (default: laatste bar). Krijgt vollere kleur. */
   activeIndex?: number
-  /** Hoogte van het bar-gebied in pixels (default 132). */
+  /** Hoogte van het bar-gebied in pixels (default 80). */
   height?: number
+  /** Max breedte per bar in pixels (default 22). */
+  barWidth?: number
 }
 
 /**
@@ -35,7 +37,8 @@ export function WeeklyLoadChart({
   kicker = 'WEKELIJKSE BELASTING · sRPE',
   footnote,
   activeIndex,
-  height = 132,
+  height = 80,
+  barWidth = 22,
 }: Props) {
   if (bars.length === 0) return null
 
@@ -44,9 +47,9 @@ export function WeeklyLoadChart({
 
   return (
     <Tile>
-      <Kicker style={{ marginBottom: 14, color: P.brand }}>{kicker}</Kicker>
+      <Kicker style={{ marginBottom: 10, color: P.brand }}>{kicker}</Kicker>
 
-      <div className="flex items-end gap-2" style={{ height }}>
+      <div className="flex items-end gap-1.5" style={{ height }}>
         {bars.map((bar, i) => {
           const pct = Math.max(4, (bar.value / max) * 100)
           const isActive = i === active
@@ -61,16 +64,14 @@ export function WeeklyLoadChart({
               }`}
             >
               <div
-                className="w-full max-w-[34px] transition-all duration-500"
+                className="w-full transition-all duration-500"
                 style={{
+                  maxWidth: barWidth,
                   height: `${pct}%`,
-                  borderRadius: '8px 8px 2px 2px',
+                  borderRadius: '6px 6px 2px 2px',
                   background: isActive
                     ? `linear-gradient(180deg, ${P.brand} 0%, ${P.brandDeep} 100%)`
-                    : `linear-gradient(180deg, rgba(232,122,85,0.55) 0%, rgba(201,97,63,0.18) 100%)`,
-                  boxShadow: isActive
-                    ? '0 8px 24px -10px rgba(232,122,85,0.55)'
-                    : 'none',
+                    : `linear-gradient(180deg, rgba(232,122,85,0.5) 0%, rgba(201,97,63,0.15) 100%)`,
                 }}
               />
             </div>
@@ -78,12 +79,12 @@ export function WeeklyLoadChart({
         })}
       </div>
 
-      <div className="flex items-end justify-between mt-3 px-0.5">
+      <div className="flex items-end justify-between mt-2 px-0.5">
         <span
           className="athletic-mono"
           style={{
             color: P.inkMuted,
-            fontSize: 10,
+            fontSize: 9,
             letterSpacing: '0.14em',
             fontWeight: 700,
             textTransform: 'uppercase',
@@ -91,17 +92,17 @@ export function WeeklyLoadChart({
         >
           {footnote ?? `${bars.length} weken`}
         </span>
-        <div className="flex gap-2">
+        <div className="flex gap-1.5">
           {bars.map((bar, i) => (
             <span
               key={`label-${i}`}
               className="athletic-mono"
               style={{
                 color: i === active ? P.ink : P.inkDim,
-                fontSize: 9,
-                letterSpacing: '0.08em',
+                fontSize: 8,
+                letterSpacing: '0.06em',
                 fontWeight: 700,
-                width: 34,
+                width: barWidth,
                 textAlign: 'center',
                 textTransform: 'uppercase',
               }}
