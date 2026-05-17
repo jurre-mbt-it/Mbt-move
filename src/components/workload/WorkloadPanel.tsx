@@ -8,6 +8,7 @@ import {
   type SessionWorkload,
 } from '@/lib/workload-monitoring'
 import { TrendingUp, TrendingDown, Minus, AlertTriangle } from 'lucide-react'
+import { WeeklyLoadChart } from '@/components/workload/WeeklyLoadChart'
 
 interface Props {
   sessions: SessionWorkload[]
@@ -17,7 +18,6 @@ export function WorkloadPanel({ sessions }: Props) {
   const acwr = useMemo(() => calculateACWR(sessions), [sessions])
   const zone = ACWR_ZONE_CONFIG[acwr.zone]
 
-  const maxWeekly = Math.max(...acwr.weeklyHistory.map(w => w.totalSRPE), 1)
   const needlePercent = ((Math.min(1.8, Math.max(0.4, acwr.acwr)) - 0.4) / 1.4) * 100
 
   const wowAbs = Math.abs(acwr.weekOverWeekChange)
@@ -145,67 +145,20 @@ export function WorkloadPanel({ sessions }: Props) {
 
       {/* Weekly bar chart */}
       {acwr.weeklyHistory.length > 0 && (
-        <Tile>
-          <Kicker style={{ marginBottom: 12 }}>WEKELIJKSE BELASTING · sRPE</Kicker>
-          <div className="flex items-end gap-2" style={{ height: 128 }}>
-            {acwr.weeklyHistory.map((week, i) => {
-              const pct = (week.totalSRPE / maxWeekly) * 100
-              const isCurrentWeek = i === acwr.weeklyHistory.length - 1
-              const barColor = isCurrentWeek ? zone.color : P.inkDim
-
-              return (
-                <div key={week.weekLabel} className="flex-1 flex flex-col items-center gap-1.5">
-                  <span
-                    className="athletic-mono"
-                    style={{
-                      color: isCurrentWeek ? zone.color : P.inkMuted,
-                      fontSize: 10,
-                      fontWeight: 900,
-                      letterSpacing: '0.04em',
-                    }}
-                  >
-                    {week.totalSRPE}
-                  </span>
-                  <div
-                    className="w-full flex items-end justify-center"
-                    style={{ height: 82 }}
-                  >
-                    <div
-                      className="w-full max-w-[32px] rounded-t-md transition-all duration-500"
-                      style={{ height: `${Math.max(4, pct)}%`, background: barColor }}
-                    />
-                  </div>
-                  <span
-                    className="athletic-mono"
-                    style={{
-                      color: isCurrentWeek ? P.ink : P.inkMuted,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      letterSpacing: '0.08em',
-                    }}
-                  >
-                    {week.weekLabel}
-                  </span>
-                  <span
-                    className="athletic-mono"
-                    style={{
-                      color: P.inkDim,
-                      fontSize: 9,
-                      fontWeight: 700,
-                      letterSpacing: '0.06em',
-                    }}
-                  >
-                    {week.sessionCount}×
-                  </span>
-                </div>
-              )
-            })}
-          </div>
+        <div className="flex flex-col gap-3">
+          <WeeklyLoadChart
+            bars={acwr.weeklyHistory.map((w) => ({
+              label: w.weekLabel,
+              value: w.totalSRPE,
+              sessionCount: w.sessionCount,
+            }))}
+            footnote={`${acwr.weeklyHistory[acwr.weeklyHistory.length - 1].totalSRPE} sRPE deze week`}
+          />
 
           {/* Gabbett recommendation */}
           {wowAbs > 10 && (
             <div
-              className="mt-4 rounded-xl p-3 flex items-start gap-2.5"
+              className="rounded-xl p-3 flex items-start gap-2.5"
               style={{
                 background: wowAbs > 25 ? 'rgba(248,113,113,0.12)' : 'rgba(244,194,97,0.12)',
                 border: `1px solid ${wowAbs > 25 ? 'rgba(248,113,113,0.3)' : 'rgba(244,194,97,0.3)'}`,
@@ -246,7 +199,7 @@ export function WorkloadPanel({ sessions }: Props) {
               </div>
             </div>
           )}
-        </Tile>
+        </div>
       )}
 
       {/* Session details this week */}
