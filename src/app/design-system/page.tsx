@@ -22,6 +22,7 @@ import {
   Tile,
   WeekProgress,
 } from '@/components/dark-ui'
+import { WeeklyLoadChart } from '@/components/workload/WeeklyLoadChart'
 
 export const metadata = { title: 'Design System' }
 
@@ -170,6 +171,44 @@ export default function DesignSystemPage() {
             <DarkButton size="md">Medium</DarkButton>
             <DarkButton size="lg">Large</DarkButton>
           </div>
+        </section>
+
+        {/* Weekly load chart — orange brand variant */}
+        <section className="flex flex-col gap-3">
+          <Kicker>Wekelijkse belasting — voorstel</Kicker>
+          <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.08em' }}>
+            Glass-stijl bars in brand-oranje. Huidige week feller, oudere weken vervaagd.
+          </p>
+
+          {/* Variant A — 7 weken, huidige actief */}
+          <WeeklyLoadChart
+            bars={[
+              { label: 'W18', value: 1240, sessionCount: 3 },
+              { label: 'W19', value: 1680, sessionCount: 4 },
+              { label: 'W20', value: 980, sessionCount: 2 },
+              { label: 'W21', value: 1420, sessionCount: 3 },
+              { label: 'W22', value: 1100, sessionCount: 3 },
+              { label: 'W23', value: 1560, sessionCount: 4 },
+              { label: 'W24', value: 1320, sessionCount: 3 },
+            ]}
+            footnote="22 sessies · 8.7k sRPE"
+          />
+
+          {/* Variant B — sessies per week (zoals screenshot uit gym-app) */}
+          <WeeklyLoadChart
+            kicker="SESSIES · WEEK"
+            bars={[
+              { label: 'MA', value: 1 },
+              { label: 'DI', value: 2 },
+              { label: 'WO', value: 3 },
+              { label: 'DO', value: 2 },
+              { label: 'VR', value: 1 },
+              { label: 'ZA', value: 0 },
+              { label: 'ZO', value: 0 },
+            ]}
+            footnote="9 sessies deze week"
+            activeIndex={3}
+          />
         </section>
 
         {/* Form */}
