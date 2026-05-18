@@ -9,6 +9,14 @@
 import { use, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import {
+  DndContext, closestCenter, PointerSensor,
+  useSensor, useSensors, type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext, useSortable, arrayMove, verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 import {
   DarkButton,
@@ -451,20 +459,51 @@ export default function TreatmentPage({
   }
 
   // Groepeer rows op supersetGroup; rows zonder groep blijven los, rows mét
-  // groep komen visueel bij elkaar (gerangschikt op groep-letter).
-  const rowsForRender: Array<{ kind: 'single'; row: LogRow } | { kind: 'group'; group: string; rows: LogRow[] }> = []
-  const seenGroups = new Set<string>()
-  for (const r of rows) {
-    if (!r.supersetGroup) {
-      rowsForRender.push({ kind: 'single', row: r })
-    } else if (!seenGroups.has(r.supersetGroup)) {
-      seenGroups.add(r.supersetGroup)
-      rowsForRender.push({
-        kind: 'group',
-        group: r.supersetGroup,
-        rows: rows.filter((x) => x.supersetGroup === r.supersetGroup),
-      })
+  // groep komen visueel bij elkaar (volgorde = eerste voorkomen in rows[]).
+  const rowsForRender = useMemo<
+    Array<{ kind: 'single'; row: LogRow } | { kind: 'group'; group: string; rows: LogRow[] }>
+  >(() => {
+    const out: Array<{ kind: 'single'; row: LogRow } | { kind: 'group'; group: string; rows: LogRow[] }> = []
+    const seenGroups = new Set<string>()
+    for (const r of rows) {
+      if (!r.supersetGroup) {
+        out.push({ kind: 'single', row: r })
+      } else if (!seenGroups.has(r.supersetGroup)) {
+        seenGroups.add(r.supersetGroup)
+        out.push({
+          kind: 'group',
+          group: r.supersetGroup,
+          rows: rows.filter((x) => x.supersetGroup === r.supersetGroup),
+        })
+      }
     }
+    return out
+  }, [rows])
+
+  // Stable id per render-item — gebruikt door dnd-kit voor sortable matching.
+  const itemId = (item: typeof rowsForRender[number]) =>
+    item.kind === 'single' ? `single-${item.row.uid}` : `group-${item.group}`
+
+  const sortableIds = useMemo(() => rowsForRender.map(itemId), [rowsForRender])
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIdx = sortableIds.indexOf(active.id as string)
+    const newIdx = sortableIds.indexOf(over.id as string)
+    if (oldIdx < 0 || newIdx < 0) return
+    const reordered = arrayMove(rowsForRender, oldIdx, newIdx)
+    // Flatten terug naar rows[] — supersets blijven als blok bij elkaar omdat
+    // we de hele group meeschuiven, niet de individuele rows.
+    const next: LogRow[] = []
+    for (const item of reordered) {
+      if (item.kind === 'single') next.push(item.row)
+      else next.push(...item.rows)
+    }
+    setDirty(true)
+    setRows(next)
   }
 
   return (
@@ -629,54 +668,78 @@ export default function TreatmentPage({
             </Tile>
           )}
 
-          {rowsForRender.map((item) => {
-            if (item.kind === 'single') {
-              return (
-                <ExerciseTile
-                  key={item.row.uid}
-                  row={item.row}
-                  onUpdate={updateRow}
-                  onRemove={removeRow}
-                  onToggleVisible={toggleVisible}
-                  onAddParam={addExtraParam}
-                  onUpdateParam={updateExtraParam}
-                  onRemoveParam={removeExtraParam}
-                  onSetSuperset={setSupersetGroup}
-                />
-              )
-            }
-            const colors = SUPERSET_COLORS[item.group] ?? { bg: 'rgba(255,255,255,0.04)', border: P.lineStrong, text: P.ink }
-            return (
-              <div
-                key={`group-${item.group}`}
-                className="rounded-xl p-2 flex flex-col gap-2"
-                style={{ background: colors.bg, border: `1px solid ${colors.border}` }}
-              >
-                <div className="flex items-center justify-between px-1">
-                  <span
-                    className="athletic-mono"
-                    style={{ color: colors.text, fontSize: 11, letterSpacing: '0.14em', fontWeight: 900 }}
-                  >
-                    SUPERSET {item.group} · {item.rows.length} oef.
-                  </span>
-                </div>
-                {item.rows.map((r, idx) => (
-                  <ExerciseTile
-                    key={r.uid}
-                    row={r}
-                    supersetLabel={`${item.group}${idx + 1}`}
-                    onUpdate={updateRow}
-                    onRemove={removeRow}
-                    onToggleVisible={toggleVisible}
-                    onAddParam={addExtraParam}
-                    onUpdateParam={updateExtraParam}
-                    onRemoveParam={removeExtraParam}
-                    onSetSuperset={setSupersetGroup}
-                  />
-                ))}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+              <div className="flex flex-col gap-3">
+                {rowsForRender.map((item) => {
+                  if (item.kind === 'single') {
+                    return (
+                      <SortableSingle key={itemId(item)} id={itemId(item)}>
+                        {(dragHandle) => (
+                          <ExerciseTile
+                            row={item.row}
+                            dragHandle={dragHandle}
+                            onUpdate={updateRow}
+                            onRemove={removeRow}
+                            onToggleVisible={toggleVisible}
+                            onAddParam={addExtraParam}
+                            onUpdateParam={updateExtraParam}
+                            onRemoveParam={removeExtraParam}
+                            onSetSuperset={setSupersetGroup}
+                          />
+                        )}
+                      </SortableSingle>
+                    )
+                  }
+                  const colors = SUPERSET_COLORS[item.group] ?? { bg: 'rgba(255,255,255,0.04)', border: P.lineStrong, text: P.ink }
+                  return (
+                    <SortableGroup key={itemId(item)} id={itemId(item)}>
+                      {(dragHandle) => (
+                        <div
+                          className="rounded-xl p-2 flex flex-col gap-2"
+                          style={{ background: colors.bg, border: `1px solid ${colors.border}` }}
+                        >
+                          <div className="flex items-center justify-between px-1">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                {...dragHandle}
+                                aria-label="Sleep superset"
+                                className="athletic-mono touch-none"
+                                style={{ color: colors.text, cursor: 'grab', fontSize: 14, padding: '2px 4px' }}
+                              >
+                                ⋮⋮
+                              </button>
+                              <span
+                                className="athletic-mono"
+                                style={{ color: colors.text, fontSize: 11, letterSpacing: '0.14em', fontWeight: 900 }}
+                              >
+                                SUPERSET {item.group} · {item.rows.length} oef.
+                              </span>
+                            </div>
+                          </div>
+                          {item.rows.map((r, idx) => (
+                            <ExerciseTile
+                              key={r.uid}
+                              row={r}
+                              supersetLabel={`${item.group}${idx + 1}`}
+                              onUpdate={updateRow}
+                              onRemove={removeRow}
+                              onToggleVisible={toggleVisible}
+                              onAddParam={addExtraParam}
+                              onUpdateParam={updateExtraParam}
+                              onRemoveParam={removeExtraParam}
+                              onSetSuperset={setSupersetGroup}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </SortableGroup>
+                  )
+                })}
               </div>
-            )
-          })}
+            </SortableContext>
+          </DndContext>
 
           <AddExerciseRow onAdd={addRow} />
         </section>
@@ -740,9 +803,57 @@ export default function TreatmentPage({
   )
 }
 
+type DragHandleProps = Record<string, unknown>
+
+/**
+ * Render-prop wrappers voor dnd-kit. We geven `dragHandle` (attributes + listeners
+ * gecombineerd) door zodat de child kan kiezen waar de greep zit — bij singles in
+ * de title-row, bij supersets in de header-balk.
+ */
+function SortableSingle({
+  id,
+  children,
+}: {
+  id: string
+  children: (dragHandle: DragHandleProps) => React.ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+  return (
+    <div ref={setNodeRef} style={style}>
+      {children({ ...attributes, ...listeners })}
+    </div>
+  )
+}
+
+function SortableGroup({
+  id,
+  children,
+}: {
+  id: string
+  children: (dragHandle: DragHandleProps) => React.ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+  return (
+    <div ref={setNodeRef} style={style}>
+      {children({ ...attributes, ...listeners })}
+    </div>
+  )
+}
+
 function ExerciseTile({
   row: r,
   supersetLabel,
+  dragHandle,
   onUpdate,
   onRemove,
   onToggleVisible,
@@ -753,6 +864,9 @@ function ExerciseTile({
 }: {
   row: LogRow
   supersetLabel?: string
+  /** Alleen aanwezig voor losse oefeningen (top-niveau). Supersets dragen
+   *  als blok — daar zit de greep op de superset-header. */
+  dragHandle?: DragHandleProps
   onUpdate: (uid: string, patch: Partial<LogRow>) => void
   onRemove: (uid: string) => void
   onToggleVisible: (uid: string, field: 'weight' | 'pain') => void
@@ -777,6 +891,17 @@ function ExerciseTile({
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
+            {dragHandle && (
+              <button
+                type="button"
+                {...dragHandle}
+                aria-label="Sleep oefening"
+                className="athletic-mono touch-none shrink-0"
+                style={{ color: P.inkDim, cursor: 'grab', fontSize: 14, padding: '0 2px' }}
+              >
+                ⋮⋮
+              </button>
+            )}
             {supersetLabel && (
               <span
                 className="athletic-mono"
@@ -805,8 +930,18 @@ function ExerciseTile({
         <div className="flex items-center gap-1 relative">
           <button
             type="button"
-            onClick={() => { setSupersetMenuOpen((v) => !v); setParamMenuOpen(false) }}
-            title="Superset-groep"
+            onClick={() => {
+              // Al in superset → 1 klik = ontkoppelen (oefening blijft staan,
+              // alleen de groep-koppeling vervalt). Nog geen superset → menu.
+              if (r.supersetGroup) {
+                onSetSuperset(r.uid, null)
+                setSupersetMenuOpen(false)
+              } else {
+                setSupersetMenuOpen((v) => !v)
+                setParamMenuOpen(false)
+              }
+            }}
+            title={r.supersetGroup ? 'Klik om uit superset te halen' : 'Voeg toe aan superset'}
             className="athletic-tap athletic-mono"
             style={{
               color: r.supersetGroup ? (SUPERSET_COLORS[r.supersetGroup]?.text ?? P.lime) : P.inkMuted,
