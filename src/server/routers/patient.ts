@@ -53,6 +53,7 @@ function mapProgramExercise(pe: {
     name: string
     category: string
     difficulty: string
+    description?: string | null
     videoUrl: string | null
     muscleLoads?: { muscle: string; load: number }[]
     easierVariantId: string | null
@@ -69,6 +70,7 @@ function mapProgramExercise(pe: {
     name: pe.exercise.name,
     category: pe.exercise.category,
     difficulty: pe.exercise.difficulty,
+    description: pe.exercise.description ?? null,
     sets: pe.sets,
     reps: pe.reps,
     repUnit: pe.repUnit,
@@ -184,7 +186,7 @@ export const patientRouter = createTRPCRouter({
           include: {
             exercise: {
               select: {
-                name: true, category: true, difficulty: true,
+                name: true, category: true, difficulty: true, description: true,
                 videoUrl: true, easierVariantId: true, harderVariantId: true,
                 trackOneRepMax: true, defaultExtraParams: true,
               },
