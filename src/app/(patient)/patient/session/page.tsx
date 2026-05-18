@@ -7,12 +7,17 @@ import { cn } from '@/lib/utils'
 import { trpc } from '@/lib/trpc/client'
 import { SUPERSET_COLORS } from '@/lib/program-constants'
 import {
-  ChevronLeft, Clock, ChevronDown, ChevronUp, Lightbulb,
+  ChevronLeft, ChevronRight, Clock, ChevronDown, ChevronUp, Lightbulb, LayoutList, Target,
   TrendingUp, TrendingDown, CheckCircle2, SkipForward, Minus, Plus, Trophy, Bell, RotateCcw,
 } from 'lucide-react'
 import { P, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-ui'
 import { useDraftBackup, loadDraft, clearStoredDraft } from '@/hooks/useAutosave'
-import { useBoolPref, PREF_REST_TIMER_ENABLED } from '@/hooks/useLocalPref'
+import {
+  useBoolPref,
+  useStringPref,
+  PREF_REST_TIMER_ENABLED,
+  PREF_SESSION_VIEW_MODE,
+} from '@/hooks/useLocalPref'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ReactPlayer = dynamic(() => import('react-player') as any, { ssr: false }) as any
@@ -805,6 +810,9 @@ function SessionPageInner() {
   const exercises: SessionExercise[] = sessionData?.exercises ?? []
 
   const [restTimerEnabled] = useBoolPref(PREF_REST_TIMER_ENABLED, true)
+  const [viewModeRaw, setViewMode] = useStringPref(PREF_SESSION_VIEW_MODE, 'focus')
+  const viewMode: 'focus' | 'overview' = viewModeRaw === 'overview' ? 'overview' : 'focus'
+  const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [setsCompleted, setSetsCompleted] = useState<Record<string, number>>({})
   const [done, setDone] = useState<Set<string>>(new Set())
@@ -908,6 +916,31 @@ function SessionPageInner() {
     enabled: !showResumeBanner && !!sessionData?.program?.id,
   })
 
+  // Step-structuur (alleen welke uids horen bij welke stap) — bewust een
+  // memo vóór alle early-returns zodat de hooks-volgorde constant blijft.
+  // Een step = losse oefening óf een complete superset.
+  const stepUids: string[][] = useMemo(() => {
+    const processed = new Set<string>()
+    const groups = new Map<string, string[]>()
+    exercises.forEach(e => {
+      if (!e.supersetGroup) return
+      const g = groups.get(e.supersetGroup) ?? []
+      g.push(e.uid)
+      groups.set(e.supersetGroup, g)
+    })
+    const out: string[][] = []
+    exercises.forEach(e => {
+      if (e.supersetGroup) {
+        if (processed.has(e.supersetGroup)) return
+        processed.add(e.supersetGroup)
+        out.push(groups.get(e.supersetGroup) ?? [e.uid])
+      } else {
+        out.push([e.uid])
+      }
+    })
+    return out
+  }, [exercises])
+
   // Set initial expanded after exercises load
   useEffect(() => {
     if (exercises.length > 0 && expanded === null) {
@@ -915,6 +948,34 @@ function SessionPageInner() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exercises.length])
+
+  // Spring bij eerste render naar de eerste nog-niet-voltooide stap. Cruciaal
+  // bij resume: als iemand 4 oefeningen heeft gedaan moet stap-voor-stap niet
+  // teruggaan naar 1. Doe dit maar één keer per page-load.
+  const initialStepSyncedRef = useRef(false)
+  useEffect(() => {
+    if (initialStepSyncedRef.current) return
+    if (stepUids.length === 0) return
+    initialStepSyncedRef.current = true
+    const firstPending = stepUids.findIndex(uids => !uids.every(uid => done.has(uid)))
+    if (firstPending > 0) {
+      setCurrentStepIndex(firstPending)
+    }
+  }, [stepUids, done])
+
+  // In focus-mode: spring de eerste niet-afgevinkte oefening van de huidige
+  // stap automatisch open zodra de stap wijzigt. We overschrijven niet als
+  // de gebruiker handmatig een ándere oefening binnen de huidige stap kiest
+  // (bv. een tweede superset-oefening uitklappen).
+  useEffect(() => {
+    if (viewMode !== 'focus') return
+    const stepKeys = stepUids[currentStepIndex]
+    if (!stepKeys || stepKeys.length === 0) return
+    if (expanded && stepKeys.includes(expanded)) return
+    const firstOpen = stepKeys.find(uid => !done.has(uid)) ?? stepKeys[0]
+    setExpanded(firstOpen)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStepIndex, viewMode, stepUids.length])
 
   // Session elapsed timer
   useEffect(() => {
@@ -1569,9 +1630,15 @@ function SessionPageInner() {
     )
   }
 
-  // Build ordered list of cards (supersets grouped)
+  // Build ordered steps: een step = losse oefening óf een complete superset.
+  // Zelfde data als oude `cards` maar gestructureerd zodat focus-mode er één
+  // tegelijk kan tonen en de voortgang per stap kan tellen.
+  type Step =
+    | { kind: 'single'; key: string; uids: string[]; render: () => React.ReactElement }
+    | { kind: 'superset'; key: string; uids: string[]; render: () => React.ReactElement }
+
   const processedSupersets = new Set<string>()
-  const cards: React.ReactElement[] = []
+  const steps: Step[] = []
 
   exercises.forEach(e => {
     if (e.supersetGroup) {
@@ -1579,40 +1646,70 @@ function SessionPageInner() {
       processedSupersets.add(e.supersetGroup)
       const group = supersetGroups.get(e.supersetGroup)!
       const colors = SUPERSET_COLORS[e.supersetGroup] ?? SUPERSET_COLORS.A
-      cards.push(
-        <div
-          key={`superset-${e.supersetGroup}`}
-          className="rounded-2xl overflow-hidden"
-          style={{ border: `2px solid ${colors.border}`, background: P.surface }}
-        >
+      const groupKey = e.supersetGroup
+      steps.push({
+        kind: 'superset',
+        key: `superset-${groupKey}`,
+        uids: group.map(ex => ex.uid),
+        render: () => (
           <div
-            className="px-4 py-1.5 flex items-center gap-1.5"
-            style={{ background: colors.border + '22' }}
+            key={`superset-${groupKey}`}
+            className="rounded-2xl overflow-hidden"
+            style={{ border: `2px solid ${colors.border}`, background: P.surface }}
           >
-            <span
-              className="athletic-mono"
-              style={{ color: colors.text, fontSize: 10, fontWeight: 900, letterSpacing: '0.16em' }}
+            <div
+              className="px-4 py-1.5 flex items-center gap-1.5"
+              style={{ background: colors.border + '22' }}
             >
-              SUPERSET {e.supersetGroup}
-            </span>
+              <span
+                className="athletic-mono"
+                style={{ color: colors.text, fontSize: 10, fontWeight: 900, letterSpacing: '0.16em' }}
+              >
+                SUPERSET {groupKey}
+              </span>
+            </div>
+            <div style={{ borderTop: `1px solid ${colors.border}33` }}>
+              {group.map((ex, idx) => (
+                <div key={ex.uid} style={{ borderTop: idx > 0 ? `1px solid ${colors.border}33` : 'none' }}>
+                  {renderExercise(ex)}
+                </div>
+              ))}
+            </div>
           </div>
-          <div style={{ borderTop: `1px solid ${colors.border}33` }}>
-            {group.map((ex, idx) => (
-              <div key={ex.uid} style={{ borderTop: idx > 0 ? `1px solid ${colors.border}33` : 'none' }}>
-                {renderExercise(ex)}
-              </div>
-            ))}
-          </div>
-        </div>
-      )
+        ),
+      })
     } else {
-      cards.push(
-        <Tile key={e.uid} style={{ padding: 0 }}>
-          {renderExercise(e)}
-        </Tile>
-      )
+      const uid = e.uid
+      steps.push({
+        kind: 'single',
+        key: uid,
+        uids: [uid],
+        render: () => (
+          <Tile key={uid} style={{ padding: 0 }}>
+            {renderExercise(e)}
+          </Tile>
+        ),
+      })
     }
   })
+
+  // Houd currentStepIndex binnen bounds wanneer exercises veranderen.
+  const safeStepIndex = Math.min(currentStepIndex, Math.max(0, steps.length - 1))
+
+  // Voortgangsberekening voor de balk verschilt per modus:
+  //  - overview: percentage afgevinkte oefeningen (zoals altijd).
+  //  - focus:    percentage afgewerkte stappen — een stap telt als 'klaar'
+  //              zodra alle uids in die stap in `done` staan.
+  const stepsCompleted = stepUids.filter(uids => uids.every(uid => done.has(uid))).length
+  const focusProgress = steps.length > 0 ? ((safeStepIndex + (stepsCompleted > safeStepIndex ? 1 : 0)) / steps.length) * 100 : 0
+  const visibleProgress = viewMode === 'focus' ? focusProgress : progress
+
+  const isLastStep = safeStepIndex >= steps.length - 1
+  const currentStepUids = stepUids[safeStepIndex] ?? []
+  const currentStepDone =
+    currentStepUids.length > 0 && currentStepUids.every(uid => done.has(uid))
+  const goPrevStep = () => setCurrentStepIndex(i => Math.max(0, i - 1))
+  const goNextStep = () => setCurrentStepIndex(i => Math.min(steps.length - 1, i + 1))
 
   return (
     <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
@@ -1640,8 +1737,17 @@ function SessionPageInner() {
               className="athletic-mono"
               style={{ color: P.ink, fontSize: 13, fontWeight: 800, marginTop: 2 }}
             >
-              <span style={{ color: doneCount > 0 ? P.lime : P.ink }}>{doneCount}</span>
-              /{exercises.length} GEDAAN
+              {viewMode === 'focus' ? (
+                <>
+                  <span style={{ color: P.brand }}>STAP {safeStepIndex + 1}</span>
+                  <span style={{ color: P.inkMuted }}> / {steps.length}</span>
+                </>
+              ) : (
+                <>
+                  <span style={{ color: doneCount > 0 ? P.lime : P.ink }}>{doneCount}</span>
+                  /{exercises.length} GEDAAN
+                </>
+              )}
             </p>
           </div>
           <div
@@ -1656,28 +1762,125 @@ function SessionPageInner() {
         <div className="h-2 rounded-full overflow-hidden" style={{ background: P.surfaceHi }}>
           <div
             className="h-full rounded-full transition-all duration-300"
-            style={{ background: P.lime, width: `${progress}%` }}
+            style={{ background: viewMode === 'focus' ? P.brand : P.lime, width: `${visibleProgress}%` }}
           />
+        </div>
+
+        {/* View-mode toggle */}
+        <div
+          className="mt-3 grid grid-cols-2 gap-1 p-1 rounded-2xl"
+          style={{ background: P.surfaceHi, border: `1px solid ${P.line}` }}
+        >
+          <button
+            onClick={() => setViewMode('focus')}
+            className="athletic-tap athletic-mono flex items-center justify-center gap-1.5 rounded-xl transition-all"
+            style={{
+              height: 36,
+              background: viewMode === 'focus' ? P.surface : 'transparent',
+              color: viewMode === 'focus' ? P.brand : P.inkMuted,
+              border: viewMode === 'focus' ? `1px solid ${P.brand}` : '1px solid transparent',
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: '0.1em',
+            }}
+            aria-pressed={viewMode === 'focus'}
+          >
+            <Target className="w-3.5 h-3.5" />
+            STAP VOOR STAP
+          </button>
+          <button
+            onClick={() => setViewMode('overview')}
+            className="athletic-tap athletic-mono flex items-center justify-center gap-1.5 rounded-xl transition-all"
+            style={{
+              height: 36,
+              background: viewMode === 'overview' ? P.surface : 'transparent',
+              color: viewMode === 'overview' ? P.ink : P.inkMuted,
+              border: viewMode === 'overview' ? `1px solid ${P.lineStrong}` : '1px solid transparent',
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: '0.1em',
+            }}
+            aria-pressed={viewMode === 'overview'}
+          >
+            <LayoutList className="w-3.5 h-3.5" />
+            OVERZICHT
+          </button>
         </div>
       </div>
 
       {/* Exercise cards */}
       <div className="max-w-lg mx-auto px-4 pt-4 pb-6 space-y-3">
-        {cards}
+        {viewMode === 'focus' && steps.length > 0 ? (
+          <>
+            {steps[safeStepIndex].render()}
 
-        {/* Finish CTA */}
-        {doneCount > 0 && (
-          <div className="pt-2">
-            <DarkButton
-              onClick={() => setPhase('summary')}
-              size="lg"
-              variant={doneCount === exercises.length ? 'primary' : 'secondary'}
-            >
-              {doneCount === exercises.length
-                ? 'SESSIE AFRONDEN 🎉'
-                : `DOORGAAN (${doneCount}/${exercises.length})`}
-            </DarkButton>
-          </div>
+            {/* Navigatie: vorige / volgende stap */}
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <button
+                onClick={goPrevStep}
+                disabled={safeStepIndex === 0}
+                className="athletic-tap athletic-mono flex items-center justify-center gap-1.5 rounded-2xl transition-all"
+                style={{
+                  height: 52,
+                  background: P.surfaceHi,
+                  color: safeStepIndex === 0 ? P.inkDim : P.ink,
+                  border: `1.5px solid ${P.line}`,
+                  fontSize: 12,
+                  fontWeight: 800,
+                  letterSpacing: '0.1em',
+                  opacity: safeStepIndex === 0 ? 0.5 : 1,
+                }}
+              >
+                <ChevronLeft className="w-4 h-4" />
+                VORIGE
+              </button>
+              {isLastStep ? (
+                <DarkButton
+                  onClick={() => setPhase('summary')}
+                  size="lg"
+                  variant={doneCount === exercises.length ? 'primary' : 'secondary'}
+                >
+                  {doneCount === exercises.length ? 'AFRONDEN 🎉' : 'AFRONDEN'}
+                </DarkButton>
+              ) : (
+                <button
+                  onClick={goNextStep}
+                  className="athletic-tap athletic-mono flex items-center justify-center gap-1.5 rounded-2xl transition-all"
+                  style={{
+                    height: 52,
+                    background: currentStepDone ? P.lime : P.brand,
+                    color: P.bg,
+                    border: `1.5px solid ${currentStepDone ? P.lime : P.brand}`,
+                    fontSize: 12,
+                    fontWeight: 900,
+                    letterSpacing: '0.1em',
+                  }}
+                >
+                  VOLGENDE
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            {steps.map(s => s.render())}
+
+            {/* Finish CTA */}
+            {doneCount > 0 && (
+              <div className="pt-2">
+                <DarkButton
+                  onClick={() => setPhase('summary')}
+                  size="lg"
+                  variant={doneCount === exercises.length ? 'primary' : 'secondary'}
+                >
+                  {doneCount === exercises.length
+                    ? 'SESSIE AFRONDEN 🎉'
+                    : `DOORGAAN (${doneCount}/${exercises.length})`}
+                </DarkButton>
+              </div>
+            )}
+          </>
         )}
       </div>
 
