@@ -24,7 +24,7 @@ export const P = {
   ink: '#F5F7F6',
   inkMuted: '#7B8889',
   inkDim: '#4A5454',
-  lime: '#e87a55',
+  lime: '#BEF264',
   limeDark: '#65A30D',
   limeMid: '#D4EC6C',
   limeDeep: '#84CC16',
