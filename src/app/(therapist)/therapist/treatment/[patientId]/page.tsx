@@ -77,6 +77,43 @@ type LogRow = {
   visible: { weight: boolean; pain: boolean }
 }
 
+/**
+ * Memory-item zoals teruggegeven door `exercises.lastUsedParams`. Past de
+ * laatste waarden van DEZE therapeut voor DEZE oefening op een rij toe —
+ * zodat hij niet elke keer Tempo / Band kleur / sets-reps opnieuw hoeft
+ * in te tikken.
+ */
+type LastUsedMemoryItem = {
+  setsCompleted: number | null
+  repsCompleted: number | null
+  repUnit: string
+  weightsPerSet?: unknown
+  extraParams?: unknown
+}
+
+function applyMemoryToRow(
+  r: LogRow,
+  mem: LastUsedMemoryItem | undefined,
+  opts: { fillSetsReps: boolean },
+): LogRow {
+  if (!mem) return r
+  const next: LogRow = { ...r }
+  // Extra parameters (Tempo, Band kleur, ...) — vervang als memory iets heeft,
+  // zodat de eerder ingevulde waarden voorrang krijgen op kale defaults.
+  const memParams = clonePresetParams(mem.extraParams)
+  if (memParams.length > 0) next.extraParams = memParams
+  if (opts.fillSetsReps) {
+    if (mem.setsCompleted != null) next.setsCompleted = String(mem.setsCompleted)
+    if (mem.repsCompleted != null) next.repsCompleted = String(mem.repsCompleted)
+    if (mem.repUnit) next.repUnit = mem.repUnit
+    if (Array.isArray(mem.weightsPerSet) && mem.weightsPerSet.length > 0) {
+      const strs = (mem.weightsPerSet as unknown[]).map((w) => (w == null ? '' : String(w)))
+      next.weightsPerSet = strs
+    }
+  }
+  return next
+}
+
 function clonePresetParams(input: unknown): LiveExtraParam[] {
   if (!Array.isArray(input)) return []
   const out: LiveExtraParam[] = []
@@ -126,6 +163,7 @@ export default function TreatmentPage({
   const { patientId } = use(params)
   const router = useRouter()
 
+  const utils = trpc.useUtils()
   const { data: patient, isLoading: patientLoading } = trpc.patients.get.useQuery({ id: patientId })
   const { data: todayData, isLoading: todayLoading } = trpc.patient.getTodayExercises.useQuery({ patientId })
   const { data: previousSessionsRaw = [] } = trpc.patients.recentSessions.useQuery({ patientId, limit: 1 })
@@ -196,27 +234,40 @@ export default function TreatmentPage({
   // `dirty` voorkomt dat auto-repop na verwijderen van alle rijen gebeurt.
   useEffect(() => {
     if (mode === 'program' && todayData?.exercises && !dirty && rows.length === 0) {
-      setRows(
-        todayData.exercises.map((e) => ({
-          uid: e.uid,
-          exerciseId: e.exerciseId,
-          name: e.name,
-          hasProgramTarget: true,
-          targetSets: e.sets,
-          targetReps: e.reps,
-          repUnit: e.repUnit,
-          setsCompleted: String(e.sets),
-          repsCompleted: String(e.reps),
-          weightsPerSet: Array(Math.max(1, e.sets)).fill(''),
-          extraParams: clonePresetParams(e.defaultExtraParams),
-          supersetGroup: e.supersetGroup ?? null,
-          phase: 'MAIN',
-          painDuring: '',
-          visible: { weight: true, pain: true },
-        })),
-      )
+      const initialRows: LogRow[] = todayData.exercises.map((e) => ({
+        uid: e.uid,
+        exerciseId: e.exerciseId,
+        name: e.name,
+        hasProgramTarget: true,
+        targetSets: e.sets,
+        targetReps: e.reps,
+        repUnit: e.repUnit,
+        setsCompleted: String(e.sets),
+        repsCompleted: String(e.reps),
+        weightsPerSet: Array(Math.max(1, e.sets)).fill(''),
+        extraParams: clonePresetParams(e.defaultExtraParams),
+        supersetGroup: e.supersetGroup ?? null,
+        phase: 'MAIN',
+        painDuring: '',
+        visible: { weight: true, pain: true },
+      }))
+      setRows(initialRows)
+      // Memory: vul Tempo / Band kleur / RPE etc. voor uit laatste sessie,
+      // maar respecteer sets/reps/repUnit van het programma (dat is doelbewust
+      // zo geprogrammeerd).
+      const ids = Array.from(new Set(initialRows.map((r) => r.exerciseId)))
+      if (ids.length > 0) {
+        utils.exercises.lastUsedParams
+          .fetch({ exerciseIds: ids })
+          .then((memory) => {
+            setRows((prev) =>
+              prev.map((r) => applyMemoryToRow(r, memory[r.exerciseId], { fillSetsReps: false })),
+            )
+          })
+          .catch(() => {})
+      }
     }
-  }, [mode, todayData, dirty, rows.length])
+  }, [mode, todayData, dirty, rows.length, utils])
 
   // Bij "Vorige sessie" → laad de oefeningen uit de laatste sessie als startpunt.
   // Sets/reps/superset/extra params worden overgenomen; weight-velden + pijn
@@ -305,8 +356,9 @@ export default function TreatmentPage({
 
   const addRow = (ex: { id: string; name: string }, phase: SessionPhase = 'MAIN') => {
     setDirty(true)
+    const newUid = `new-${Date.now()}-${ex.id}`
     const newRow: LogRow = {
-      uid: `new-${Date.now()}-${ex.id}`,
+      uid: newUid,
       exerciseId: ex.id,
       name: ex.name,
       hasProgramTarget: false,
@@ -332,6 +384,19 @@ export default function TreatmentPage({
       }
       return [...prev, newRow]
     })
+    // Memory-fetch: pak de laatst gebruikte parameters van deze oefening
+    // (globaal voor deze therapeut) en vul de net toegevoegde rij voor.
+    // Faalt stil — een lege memory is altijd OK, je krijgt dan gewoon defaults.
+    utils.exercises.lastUsedParams
+      .fetch({ exerciseIds: [ex.id] })
+      .then((memory) => {
+        const mem = memory[ex.id]
+        if (!mem) return
+        setRows((prev) =>
+          prev.map((r) => (r.uid === newUid ? applyMemoryToRow(r, mem, { fillSetsReps: true }) : r)),
+        )
+      })
+      .catch(() => {})
   }
 
   const toggleVisible = (uid: string, field: 'weight' | 'pain') => {
@@ -1052,7 +1117,12 @@ function ExerciseTile({
         style={{ gridTemplateColumns: `repeat(${2 + (r.visible.pain ? 1 : 0)}, minmax(0, 1fr))` }}
       >
         <LabeledInput label="Sets" value={r.setsCompleted} onChange={(v) => onUpdate(r.uid, { setsCompleted: v })} inputMode="numeric" />
-        <LabeledInput label={`Reps (${r.repUnit})`} value={r.repsCompleted} onChange={(v) => onUpdate(r.uid, { repsCompleted: v })} inputMode="numeric" />
+        <RepsInput
+          unit={r.repUnit}
+          onUnitChange={(u) => onUpdate(r.uid, { repUnit: u })}
+          value={r.repsCompleted}
+          onChange={(v) => onUpdate(r.uid, { repsCompleted: v })}
+        />
         {r.visible.pain && (
           <LabeledInput
             label="Pijn /10"
@@ -1251,6 +1321,65 @@ function ExerciseTile({
         )}
       </div>
     </Tile>
+  )
+}
+
+/**
+ * Reps-input met inline eenheid-selector (reps · sec · min). Voor
+ * isometrische oefeningen (Wall Sit, Plank, ...) klikt de therapeut "sec"
+ * aan zonder dat hij naar een ander scherm hoeft — voorkomt dat hij
+ * standaard reps invult voor een tijd-gemeten oefening.
+ */
+function RepsInput({
+  unit,
+  onUnitChange,
+  value,
+  onChange,
+}: {
+  unit: string
+  onUnitChange: (u: string) => void
+  value: string
+  onChange: (v: string) => void
+}) {
+  const UNITS: Array<{ value: string; label: string }> = [
+    { value: 'reps', label: 'REPS' },
+    { value: 'sec',  label: 'SEC'  },
+    { value: 'min',  label: 'MIN'  },
+  ]
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-0.5">
+        {UNITS.map((u) => {
+          const active = unit === u.value
+          return (
+            <button
+              key={u.value}
+              type="button"
+              onClick={() => onUnitChange(u.value)}
+              className="athletic-mono athletic-tap"
+              style={{
+                color: active ? P.bg : P.inkMuted,
+                background: active ? P.brand : 'transparent',
+                border: `1px solid ${active ? P.brand : P.lineStrong}`,
+                borderRadius: 4,
+                padding: '2px 6px',
+                fontSize: 10,
+                letterSpacing: '0.12em',
+                fontWeight: 900,
+              }}
+            >
+              {u.label}
+            </button>
+          )
+        })}
+      </div>
+      <DarkInput
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        inputMode="numeric"
+        style={{ padding: '8px 10px', fontSize: 14 }}
+      />
+    </div>
   )
 }
 
