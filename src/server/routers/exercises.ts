@@ -553,4 +553,65 @@ export const exercisesRouter = createTRPCRouter({
           muscleLoads: muscleLoadsRecord(item.exercise),
         }))
     }),
+
+  // Laatste gebruikte parameters per oefening (globaal voor deze therapeut,
+  // ongeacht patiënt). Vult de live-behandeling-rij voor met de waarden die
+  // de therapeut de vorige keer voor deze oefening invulde, zodat hij niet
+  // elke keer Tempo / Band kleur / sets-reps opnieuw hoeft in te tikken.
+  lastUsedParams: therapistProcedure
+    .input(z.object({ exerciseIds: z.array(z.string()).min(1).max(100) }))
+    .query(async ({ ctx, input }) => {
+      // Pak alle ExerciseLogs voor deze exerciseIds binnen COMPLETED sessies
+      // van patiënten die aan deze therapeut gekoppeld zijn. Sorteer recent
+      // → oud, en hou per exerciseId de eerste (= nieuwste) entry.
+      const logs = await ctx.prisma.exerciseLog.findMany({
+        where: {
+          exerciseId: { in: input.exerciseIds },
+          session: {
+            status: 'COMPLETED',
+            patient: {
+              patientTherapists: {
+                some: { therapistId: ctx.user!.id, isActive: true },
+              },
+            },
+          },
+        },
+        select: {
+          exerciseId: true,
+          setsCompleted: true,
+          repsCompleted: true,
+          weightsPerSet: true,
+          extraParams: true,
+          session: { select: { completedAt: true } },
+        },
+        orderBy: { session: { completedAt: 'desc' } },
+        take: input.exerciseIds.length * 20,
+      })
+
+      // Repunit zit niet op ExerciseLog; haal die los op uit Exercise default.
+      const exercises = await ctx.prisma.exercise.findMany({
+        where: { id: { in: input.exerciseIds } },
+        select: { id: true, defaultRepUnit: true },
+      })
+      const defaultRepUnitById = new Map(exercises.map((e) => [e.id, e.defaultRepUnit]))
+
+      const out: Record<string, {
+        setsCompleted: number | null
+        repsCompleted: number | null
+        repUnit: string
+        weightsPerSet: unknown
+        extraParams: unknown
+      }> = {}
+      for (const log of logs) {
+        if (out[log.exerciseId]) continue
+        out[log.exerciseId] = {
+          setsCompleted: log.setsCompleted,
+          repsCompleted: log.repsCompleted,
+          repUnit: defaultRepUnitById.get(log.exerciseId) ?? 'reps',
+          weightsPerSet: log.weightsPerSet,
+          extraParams: log.extraParams,
+        }
+      }
+      return out
+    }),
 })
