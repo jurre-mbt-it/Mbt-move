@@ -5,6 +5,7 @@ import { useCallback, useSyncExternalStore } from 'react'
 const PREF_PREFIX = 'mbt-pref:'
 
 export const PREF_REST_TIMER_ENABLED = 'rest-timer-enabled'
+export const PREF_SESSION_VIEW_MODE = 'session-view-mode'
 
 function readRaw(key: string): string | null {
   if (typeof window === 'undefined') return null
@@ -55,6 +56,32 @@ export function useBoolPref(
       try {
         localStorage.setItem(PREF_PREFIX + key, v ? '1' : '0')
         // Notify same-tab subscribers — 'storage' only fires across tabs.
+        window.dispatchEvent(new Event('mbt-pref'))
+      } catch {}
+    },
+    [key],
+  )
+
+  return [value, update]
+}
+
+/**
+ * String preference backed by localStorage. Reads return `defaultValue`
+ * tot een waarde gezet is, of als window niet beschikbaar is (SSR).
+ */
+export function useStringPref(
+  key: string,
+  defaultValue: string,
+): [string, (v: string) => void] {
+  const getSnapshot = useCallback(() => readRaw(key), [key])
+  const getServerSnapshot = useCallback(() => null, [])
+  const raw = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+  const value = raw ?? defaultValue
+
+  const update = useCallback(
+    (v: string) => {
+      try {
+        localStorage.setItem(PREF_PREFIX + key, v)
         window.dispatchEvent(new Event('mbt-pref'))
       } catch {}
     },
