@@ -316,3 +316,6 @@ CREATE INDEX IF NOT EXISTS "week_schedules_patientId_weekNumber_idx"
 ALTER TABLE "exercise_logs" ADD COLUMN IF NOT EXISTS "weightsPerSet" JSONB;
 ALTER TABLE "exercise_logs" ADD COLUMN IF NOT EXISTS "extraParams"   JSONB;
 ALTER TABLE "exercise_logs" ADD COLUMN IF NOT EXISTS "supersetGroup" TEXT;
+-- phase: 'WARMUP' of 'MAIN' — onderscheidt warming-up oefeningen van het
+-- hoofddeel in een sessie. NULL = legacy = behandelen als MAIN.
+ALTER TABLE "exercise_logs" ADD COLUMN IF NOT EXISTS "phase"         TEXT;

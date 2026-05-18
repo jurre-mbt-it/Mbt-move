@@ -785,6 +785,7 @@ model ExerciseLog {
   weightsPerSet       Json?      // [number|null, ...] één entry per set
   extraParams         Json?      // [{ id, label, type, value, unit?, options?, min?, max? }, ...]
   supersetGroup       String?    // 'A'..'F' of null
+  phase               String?    // 'WARMUP' of 'MAIN' (null = legacy = MAIN)
   estimatedOneRepMax  Float?     // Epley: weight × (1 + reps/30)
   painDuring          Int?       // 0-10 NRS, tendinopathy mode
   painAfter24h        Int?       // 0-10 NRS, filled via follow-up

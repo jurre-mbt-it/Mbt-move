@@ -51,6 +51,8 @@ type LiveExtraParam = {
   max?: number
 }
 
+type SessionPhase = 'WARMUP' | 'MAIN'
+
 type LogRow = {
   uid: string
   exerciseId: string
@@ -68,6 +70,8 @@ type LogRow = {
   extraParams: LiveExtraParam[]
   /** Superset-label (A..F) of null */
   supersetGroup: string | null
+  /** Welk deel van de sessie: warming-up of hoofddeel */
+  phase: SessionPhase
   painDuring: string
   /** Per-exercise visibility for toggleable parameters (sets/reps altijd zichtbaar). */
   visible: { weight: boolean; pain: boolean }
@@ -206,6 +210,7 @@ export default function TreatmentPage({
           weightsPerSet: Array(Math.max(1, e.sets)).fill(''),
           extraParams: clonePresetParams(e.defaultExtraParams),
           supersetGroup: e.supersetGroup ?? null,
+          phase: 'MAIN',
           painDuring: '',
           visible: { weight: true, pain: true },
         })),
@@ -234,6 +239,7 @@ export default function TreatmentPage({
             weightsPerSet: Array(sets).fill(''),
             extraParams: clonePresetParams(e.extraParams),
             supersetGroup: e.supersetGroup ?? null,
+            phase: ((e as { phase?: SessionPhase | null }).phase ?? 'MAIN') as SessionPhase,
             painDuring: '',
             visible: { weight: true, pain: true },
           }
@@ -297,27 +303,35 @@ export default function TreatmentPage({
     setRows([]) // triggert de useEffect opnieuw
   }
 
-  const addRow = (ex: { id: string; name: string }) => {
+  const addRow = (ex: { id: string; name: string }, phase: SessionPhase = 'MAIN') => {
     setDirty(true)
-    setRows((prev) => [
-      ...prev,
-      {
-        uid: `new-${Date.now()}-${ex.id}`,
-        exerciseId: ex.id,
-        name: ex.name,
-        hasProgramTarget: false,
-        targetSets: 0,
-        targetReps: 0,
-        repUnit: 'reps',
-        setsCompleted: '',
-        repsCompleted: '',
-        weightsPerSet: [''],
-        extraParams: [],
-        supersetGroup: null,
-        painDuring: '',
-        visible: { weight: true, pain: true },
-      },
-    ])
+    const newRow: LogRow = {
+      uid: `new-${Date.now()}-${ex.id}`,
+      exerciseId: ex.id,
+      name: ex.name,
+      hasProgramTarget: false,
+      targetSets: 0,
+      targetReps: 0,
+      repUnit: 'reps',
+      setsCompleted: '',
+      repsCompleted: '',
+      weightsPerSet: [''],
+      extraParams: [],
+      supersetGroup: null,
+      phase,
+      painDuring: '',
+      visible: { weight: true, pain: true },
+    }
+    // Invariant: warm-up rows komen altijd vóór main rows in de array, zodat
+    // de twee secties consistent kunnen renderen via filter zonder extra index.
+    setRows((prev) => {
+      if (phase === 'WARMUP') {
+        const lastWarmupIdx = prev.map((r) => r.phase).lastIndexOf('WARMUP')
+        const insertAt = lastWarmupIdx + 1
+        return [...prev.slice(0, insertAt), newRow, ...prev.slice(insertAt)]
+      }
+      return [...prev, newRow]
+    })
   }
 
   const toggleVisible = (uid: string, field: 'weight' | 'pain') => {
@@ -429,6 +443,7 @@ export default function TreatmentPage({
           weightsPerSet: weights,
           extraParams: r.extraParams.length ? r.extraParams : null,
           supersetGroup: r.supersetGroup,
+          phase: r.phase,
           // Verborgen parameters worden niet gelogd (null)
           painDuring: r.visible.pain && r.painDuring ? Number(r.painDuring) : null,
         }
@@ -458,14 +473,14 @@ export default function TreatmentPage({
     )
   }
 
-  // Groepeer rows op supersetGroup; rows zonder groep blijven los, rows mét
-  // groep komen visueel bij elkaar (volgorde = eerste voorkomen in rows[]).
-  const rowsForRender = useMemo<
-    Array<{ kind: 'single'; row: LogRow } | { kind: 'group'; group: string; rows: LogRow[] }>
-  >(() => {
-    const out: Array<{ kind: 'single'; row: LogRow } | { kind: 'group'; group: string; rows: LogRow[] }> = []
+  type RenderItem = { kind: 'single'; row: LogRow } | { kind: 'group'; group: string; rows: LogRow[] }
+
+  // Groepeer rows op supersetGroup binnen één fase; rows zonder groep blijven
+  // los, rows mét groep komen visueel bij elkaar (volgorde = eerste voorkomen).
+  function buildItems(phaseRows: LogRow[]): RenderItem[] {
+    const out: RenderItem[] = []
     const seenGroups = new Set<string>()
-    for (const r of rows) {
+    for (const r of phaseRows) {
       if (!r.supersetGroup) {
         out.push({ kind: 'single', row: r })
       } else if (!seenGroups.has(r.supersetGroup)) {
@@ -473,37 +488,49 @@ export default function TreatmentPage({
         out.push({
           kind: 'group',
           group: r.supersetGroup,
-          rows: rows.filter((x) => x.supersetGroup === r.supersetGroup),
+          rows: phaseRows.filter((x) => x.supersetGroup === r.supersetGroup),
         })
       }
     }
     return out
-  }, [rows])
+  }
+
+  const warmupRows = useMemo(() => rows.filter((r) => r.phase === 'WARMUP'), [rows])
+  const mainRows = useMemo(() => rows.filter((r) => r.phase !== 'WARMUP'), [rows])
+  const warmupItems = useMemo(() => buildItems(warmupRows), [warmupRows])
+  const mainItems = useMemo(() => buildItems(mainRows), [mainRows])
 
   // Stable id per render-item — gebruikt door dnd-kit voor sortable matching.
-  const itemId = (item: typeof rowsForRender[number]) =>
-    item.kind === 'single' ? `single-${item.row.uid}` : `group-${item.group}`
+  // Suffix per fase zodat ids uniek zijn tussen secties.
+  const itemId = (item: RenderItem, phase: SessionPhase) =>
+    item.kind === 'single'
+      ? `${phase}-single-${item.row.uid}`
+      : `${phase}-group-${item.group}`
 
-  const sortableIds = useMemo(() => rowsForRender.map(itemId), [rowsForRender])
+  const warmupIds = useMemo(() => warmupItems.map((it) => itemId(it, 'WARMUP')), [warmupItems])
+  const mainIds = useMemo(() => mainItems.map((it) => itemId(it, 'MAIN')), [mainItems])
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-    const oldIdx = sortableIds.indexOf(active.id as string)
-    const newIdx = sortableIds.indexOf(over.id as string)
-    if (oldIdx < 0 || newIdx < 0) return
-    const reordered = arrayMove(rowsForRender, oldIdx, newIdx)
-    // Flatten terug naar rows[] — supersets blijven als blok bij elkaar omdat
-    // we de hele group meeschuiven, niet de individuele rows.
-    const next: LogRow[] = []
-    for (const item of reordered) {
-      if (item.kind === 'single') next.push(item.row)
-      else next.push(...item.rows)
+  function handleDragEndForPhase(phase: SessionPhase) {
+    return (event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over || active.id === over.id) return
+      const items = phase === 'WARMUP' ? warmupItems : mainItems
+      const ids = phase === 'WARMUP' ? warmupIds : mainIds
+      const oldIdx = ids.indexOf(active.id as string)
+      const newIdx = ids.indexOf(over.id as string)
+      if (oldIdx < 0 || newIdx < 0) return
+      const reordered = arrayMove(items, oldIdx, newIdx)
+      const flat: LogRow[] = []
+      for (const item of reordered) {
+        if (item.kind === 'single') flat.push(item.row)
+        else flat.push(...item.rows)
+      }
+      setDirty(true)
+      // Behoud invariant: warm-up vóór main.
+      setRows(phase === 'WARMUP' ? [...flat, ...mainRows] : [...warmupRows, ...flat])
     }
-    setDirty(true)
-    setRows(next)
   }
 
   return (
@@ -644,106 +671,132 @@ export default function TreatmentPage({
           </section>
         )}
 
-        {/* Exercise rows */}
-        {mode !== 'choose' && (
-        <section className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <Kicker>Oefeningen · {rows.length}</Kicker>
-            {mode === 'program' && dirty && (
-              <button
-                type="button"
-                onClick={resetToProgram}
-                className="athletic-mono"
-                style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.14em' }}
-              >
-                HERSTEL PROGRAMMA
-              </button>
-            )}
-          </div>
-          {rows.length === 0 && (
-            <Tile>
-              <p style={{ color: P.inkMuted, fontSize: 13, textAlign: 'center', padding: 8 }}>
-                Geen oefeningen voor vandaag in het programma. Log een vrije sessie met alleen notities.
-              </p>
-            </Tile>
-          )}
-
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
-              <div className="flex flex-col gap-3">
-                {rowsForRender.map((item) => {
-                  if (item.kind === 'single') {
-                    return (
-                      <SortableSingle key={itemId(item)} id={itemId(item)}>
-                        {(dragHandle) => (
-                          <ExerciseTile
-                            row={item.row}
-                            dragHandle={dragHandle}
-                            onUpdate={updateRow}
-                            onRemove={removeRow}
-                            onToggleVisible={toggleVisible}
-                            onAddParam={addExtraParam}
-                            onUpdateParam={updateExtraParam}
-                            onRemoveParam={removeExtraParam}
-                            onSetSuperset={setSupersetGroup}
-                          />
-                        )}
-                      </SortableSingle>
-                    )
-                  }
-                  const colors = SUPERSET_COLORS[item.group] ?? { bg: 'rgba(255,255,255,0.04)', border: P.lineStrong, text: P.ink }
-                  return (
-                    <SortableGroup key={itemId(item)} id={itemId(item)}>
-                      {(dragHandle) => (
-                        <div
-                          className="rounded-xl p-2 flex flex-col gap-2"
-                          style={{ background: colors.bg, border: `1px solid ${colors.border}` }}
+        {/* Exercise rows — twee secties: warming-up + hoofddeel */}
+        {mode !== 'choose' && (() => {
+          const renderItems = (items: RenderItem[]) => items.map((item) => {
+            if (item.kind === 'single') {
+              const id = `single-${item.row.uid}` // alleen voor key; sortable-id zit in wrapper
+              return (
+                <SortableSingle key={id} id={item.row.phase === 'WARMUP' ? `WARMUP-single-${item.row.uid}` : `MAIN-single-${item.row.uid}`}>
+                  {(dragHandle) => (
+                    <ExerciseTile
+                      row={item.row}
+                      dragHandle={dragHandle}
+                      onUpdate={updateRow}
+                      onRemove={removeRow}
+                      onToggleVisible={toggleVisible}
+                      onAddParam={addExtraParam}
+                      onUpdateParam={updateExtraParam}
+                      onRemoveParam={removeExtraParam}
+                      onSetSuperset={setSupersetGroup}
+                    />
+                  )}
+                </SortableSingle>
+              )
+            }
+            const colors = SUPERSET_COLORS[item.group] ?? { bg: 'rgba(255,255,255,0.04)', border: P.lineStrong, text: P.ink }
+            const groupPhase: SessionPhase = item.rows[0]?.phase ?? 'MAIN'
+            return (
+              <SortableGroup key={`group-${item.group}`} id={`${groupPhase}-group-${item.group}`}>
+                {(dragHandle) => (
+                  <div
+                    className="rounded-xl p-2 flex flex-col gap-2"
+                    style={{ background: colors.bg, border: `1px solid ${colors.border}` }}
+                  >
+                    <div className="flex items-center justify-between px-1">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          {...dragHandle}
+                          aria-label="Sleep superset"
+                          className="athletic-mono touch-none"
+                          style={{ color: colors.text, cursor: 'grab', fontSize: 14, padding: '2px 4px' }}
                         >
-                          <div className="flex items-center justify-between px-1">
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                {...dragHandle}
-                                aria-label="Sleep superset"
-                                className="athletic-mono touch-none"
-                                style={{ color: colors.text, cursor: 'grab', fontSize: 14, padding: '2px 4px' }}
-                              >
-                                ⋮⋮
-                              </button>
-                              <span
-                                className="athletic-mono"
-                                style={{ color: colors.text, fontSize: 11, letterSpacing: '0.14em', fontWeight: 900 }}
-                              >
-                                SUPERSET {item.group} · {item.rows.length} oef.
-                              </span>
-                            </div>
-                          </div>
-                          {item.rows.map((r, idx) => (
-                            <ExerciseTile
-                              key={r.uid}
-                              row={r}
-                              supersetLabel={`${item.group}${idx + 1}`}
-                              onUpdate={updateRow}
-                              onRemove={removeRow}
-                              onToggleVisible={toggleVisible}
-                              onAddParam={addExtraParam}
-                              onUpdateParam={updateExtraParam}
-                              onRemoveParam={removeExtraParam}
-                              onSetSuperset={setSupersetGroup}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </SortableGroup>
-                  )
-                })}
-              </div>
-            </SortableContext>
-          </DndContext>
+                          ⋮⋮
+                        </button>
+                        <span
+                          className="athletic-mono"
+                          style={{ color: colors.text, fontSize: 11, letterSpacing: '0.14em', fontWeight: 900 }}
+                        >
+                          SUPERSET {item.group} · {item.rows.length} oef.
+                        </span>
+                      </div>
+                    </div>
+                    {item.rows.map((r, idx) => (
+                      <ExerciseTile
+                        key={r.uid}
+                        row={r}
+                        supersetLabel={`${item.group}${idx + 1}`}
+                        onUpdate={updateRow}
+                        onRemove={removeRow}
+                        onToggleVisible={toggleVisible}
+                        onAddParam={addExtraParam}
+                        onUpdateParam={updateExtraParam}
+                        onRemoveParam={removeExtraParam}
+                        onSetSuperset={setSupersetGroup}
+                      />
+                    ))}
+                  </div>
+                )}
+              </SortableGroup>
+            )
+          })
 
-          <AddExerciseRow onAdd={addRow} />
-        </section>
-        )}
+          return (
+            <>
+              {/* WARMING UP — altijd zichtbaar zodat de feature ontdekbaar is */}
+              <section className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <Kicker style={{ color: P.gold }}>Warming up · {warmupRows.length}</Kicker>
+                </div>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndForPhase('WARMUP')}>
+                  <SortableContext items={warmupIds} strategy={verticalListSortingStrategy}>
+                    <div className="flex flex-col gap-3">
+                      {renderItems(warmupItems)}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+                <AddExerciseRow
+                  onAdd={(ex) => addRow(ex, 'WARMUP')}
+                  label="+ Warming-up oefening toevoegen"
+                  accent={P.gold}
+                />
+              </section>
+
+              {/* HOOFDDEEL */}
+              <section className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <Kicker>Oefeningen · {mainRows.length}</Kicker>
+                  {mode === 'program' && dirty && (
+                    <button
+                      type="button"
+                      onClick={resetToProgram}
+                      className="athletic-mono"
+                      style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.14em' }}
+                    >
+                      HERSTEL PROGRAMMA
+                    </button>
+                  )}
+                </div>
+                {rows.length === 0 && (
+                  <Tile>
+                    <p style={{ color: P.inkMuted, fontSize: 13, textAlign: 'center', padding: 8 }}>
+                      Geen oefeningen voor vandaag in het programma. Log een vrije sessie met alleen notities.
+                    </p>
+                  </Tile>
+                )}
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndForPhase('MAIN')}>
+                  <SortableContext items={mainIds} strategy={verticalListSortingStrategy}>
+                    <div className="flex flex-col gap-3">
+                      {renderItems(mainItems)}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+                <AddExerciseRow onAdd={(ex) => addRow(ex)} />
+              </section>
+            </>
+          )
+        })()}
 
         {/* Overall pain + RPE — visueel onderscheiden met kleur-accenten */}
         {mode !== 'choose' && (
@@ -1252,7 +1305,15 @@ function LabeledInput({
   )
 }
 
-function AddExerciseRow({ onAdd }: { onAdd: (ex: { id: string; name: string }) => void }) {
+function AddExerciseRow({
+  onAdd,
+  label = '+ Oefening toevoegen',
+  accent,
+}: {
+  onAdd: (ex: { id: string; name: string }) => void
+  label?: string
+  accent?: string
+}) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [collectionId, setCollectionId] = useState<string | null>(null)
@@ -1295,6 +1356,7 @@ function AddExerciseRow({ onAdd }: { onAdd: (ex: { id: string; name: string }) =
   }
 
   if (!open) {
+    const color = accent ?? P.brand
     return (
       <button
         type="button"
@@ -1302,13 +1364,13 @@ function AddExerciseRow({ onAdd }: { onAdd: (ex: { id: string; name: string }) =
         className="athletic-tap w-full rounded-xl py-3 flex items-center justify-center gap-2"
         style={{
           background: P.surface,
-          border: `1px dashed ${P.lineStrong}`,
-          color: P.brand,
+          border: `1px dashed ${accent ?? P.lineStrong}`,
+          color,
           fontSize: 13,
           fontWeight: 700,
         }}
       >
-        + Oefening toevoegen
+        {label}
       </button>
     )
   }
