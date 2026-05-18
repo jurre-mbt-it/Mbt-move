@@ -418,6 +418,65 @@ export default function TreatmentPage({
 
   const canSubmit = useMemo(() => rows.length > 0 && !logMutation.isPending, [rows, logMutation.isPending])
 
+  // ── Render-grouping per fase (warming-up boven, hoofddeel onder) ─────────
+  // BELANGRIJK: deze hooks moeten boven de early-returns blijven — anders
+  // verandert de hook-volgorde tussen renders en crashed React.
+  type RenderItem = { kind: 'single'; row: LogRow } | { kind: 'group'; group: string; rows: LogRow[] }
+
+  function buildItems(phaseRows: LogRow[]): RenderItem[] {
+    const out: RenderItem[] = []
+    const seenGroups = new Set<string>()
+    for (const r of phaseRows) {
+      if (!r.supersetGroup) {
+        out.push({ kind: 'single', row: r })
+      } else if (!seenGroups.has(r.supersetGroup)) {
+        seenGroups.add(r.supersetGroup)
+        out.push({
+          kind: 'group',
+          group: r.supersetGroup,
+          rows: phaseRows.filter((x) => x.supersetGroup === r.supersetGroup),
+        })
+      }
+    }
+    return out
+  }
+
+  const warmupRows = useMemo(() => rows.filter((r) => r.phase === 'WARMUP'), [rows])
+  const mainRows = useMemo(() => rows.filter((r) => r.phase !== 'WARMUP'), [rows])
+  const warmupItems = useMemo(() => buildItems(warmupRows), [warmupRows])
+  const mainItems = useMemo(() => buildItems(mainRows), [mainRows])
+
+  const itemId = (item: RenderItem, phase: SessionPhase) =>
+    item.kind === 'single'
+      ? `${phase}-single-${item.row.uid}`
+      : `${phase}-group-${item.group}`
+
+  const warmupIds = useMemo(() => warmupItems.map((it) => itemId(it, 'WARMUP')), [warmupItems])
+  const mainIds = useMemo(() => mainItems.map((it) => itemId(it, 'MAIN')), [mainItems])
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+
+  function handleDragEndForPhase(phase: SessionPhase) {
+    return (event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over || active.id === over.id) return
+      const items = phase === 'WARMUP' ? warmupItems : mainItems
+      const ids = phase === 'WARMUP' ? warmupIds : mainIds
+      const oldIdx = ids.indexOf(active.id as string)
+      const newIdx = ids.indexOf(over.id as string)
+      if (oldIdx < 0 || newIdx < 0) return
+      const reordered = arrayMove(items, oldIdx, newIdx)
+      const flat: LogRow[] = []
+      for (const item of reordered) {
+        if (item.kind === 'single') flat.push(item.row)
+        else flat.push(...item.rows)
+      }
+      setDirty(true)
+      // Behoud invariant: warm-up vóór main.
+      setRows(phase === 'WARMUP' ? [...flat, ...mainRows] : [...warmupRows, ...flat])
+    }
+  }
+
   function handleSubmit() {
     const now = new Date()
     logMutation.mutate({
@@ -473,65 +532,6 @@ export default function TreatmentPage({
     )
   }
 
-  type RenderItem = { kind: 'single'; row: LogRow } | { kind: 'group'; group: string; rows: LogRow[] }
-
-  // Groepeer rows op supersetGroup binnen één fase; rows zonder groep blijven
-  // los, rows mét groep komen visueel bij elkaar (volgorde = eerste voorkomen).
-  function buildItems(phaseRows: LogRow[]): RenderItem[] {
-    const out: RenderItem[] = []
-    const seenGroups = new Set<string>()
-    for (const r of phaseRows) {
-      if (!r.supersetGroup) {
-        out.push({ kind: 'single', row: r })
-      } else if (!seenGroups.has(r.supersetGroup)) {
-        seenGroups.add(r.supersetGroup)
-        out.push({
-          kind: 'group',
-          group: r.supersetGroup,
-          rows: phaseRows.filter((x) => x.supersetGroup === r.supersetGroup),
-        })
-      }
-    }
-    return out
-  }
-
-  const warmupRows = useMemo(() => rows.filter((r) => r.phase === 'WARMUP'), [rows])
-  const mainRows = useMemo(() => rows.filter((r) => r.phase !== 'WARMUP'), [rows])
-  const warmupItems = useMemo(() => buildItems(warmupRows), [warmupRows])
-  const mainItems = useMemo(() => buildItems(mainRows), [mainRows])
-
-  // Stable id per render-item — gebruikt door dnd-kit voor sortable matching.
-  // Suffix per fase zodat ids uniek zijn tussen secties.
-  const itemId = (item: RenderItem, phase: SessionPhase) =>
-    item.kind === 'single'
-      ? `${phase}-single-${item.row.uid}`
-      : `${phase}-group-${item.group}`
-
-  const warmupIds = useMemo(() => warmupItems.map((it) => itemId(it, 'WARMUP')), [warmupItems])
-  const mainIds = useMemo(() => mainItems.map((it) => itemId(it, 'MAIN')), [mainItems])
-
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
-
-  function handleDragEndForPhase(phase: SessionPhase) {
-    return (event: DragEndEvent) => {
-      const { active, over } = event
-      if (!over || active.id === over.id) return
-      const items = phase === 'WARMUP' ? warmupItems : mainItems
-      const ids = phase === 'WARMUP' ? warmupIds : mainIds
-      const oldIdx = ids.indexOf(active.id as string)
-      const newIdx = ids.indexOf(over.id as string)
-      if (oldIdx < 0 || newIdx < 0) return
-      const reordered = arrayMove(items, oldIdx, newIdx)
-      const flat: LogRow[] = []
-      for (const item of reordered) {
-        if (item.kind === 'single') flat.push(item.row)
-        else flat.push(...item.rows)
-      }
-      setDirty(true)
-      // Behoud invariant: warm-up vóór main.
-      setRows(phase === 'WARMUP' ? [...flat, ...mainRows] : [...warmupRows, ...flat])
-    }
-  }
 
   return (
     <DarkScreen>
