@@ -336,10 +336,34 @@ export const patientsRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Kan rol van deze gebruiker niet wijzigen' })
       }
 
-      return ctx.prisma.user.update({
+      const updated = await ctx.prisma.user.update({
         where: { id: input.id },
         data: { role: input.role },
+        select: { id: true, role: true, supabaseUserId: true, email: true },
       })
+
+      // Sync ook Supabase user_metadata.role — anders blijft de proxy/middleware
+      // en LoginForm de oude rol gebruiken (die lezen user_metadata, niet de DB).
+      try {
+        const supabaseAdmin = createSupabaseAdminClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        )
+        let supaUserId = updated.supabaseUserId
+        if (!supaUserId) {
+          const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
+          supaUserId = users.find(u => u.email?.toLowerCase() === updated.email.toLowerCase())?.id ?? null
+        }
+        if (supaUserId) {
+          await supabaseAdmin.auth.admin.updateUserById(supaUserId, {
+            user_metadata: { role: updated.role },
+          })
+        }
+      } catch (e) {
+        console.error('changeRole: failed to sync Supabase user_metadata', e)
+      }
+
+      return updated
     }),
 
   /**

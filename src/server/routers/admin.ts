@@ -69,11 +69,36 @@ export const adminRouter = createTRPCRouter({
           message: 'Je kunt je eigen admin-rol niet intrekken',
         })
       }
-      return ctx.prisma.user.update({
+      const updated = await ctx.prisma.user.update({
         where: { id: input.userId },
         data: { role: input.role },
-        select: { id: true, name: true, email: true, role: true },
+        select: { id: true, name: true, email: true, role: true, supabaseUserId: true },
       })
+
+      // Sync ook Supabase user_metadata.role — proxy/middleware en LoginForm
+      // lezen user_metadata, niet de DB. Zonder deze sync blijft de gebruiker
+      // op de oude rol vastzitten bij login-redirect.
+      try {
+        const supabaseAdmin = createSupabaseAdminClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        )
+        let supaUserId = updated.supabaseUserId
+        if (!supaUserId) {
+          const { data: { users } } = await supabaseAdmin.auth.admin.listUsers()
+          supaUserId = users.find(u => u.email?.toLowerCase() === updated.email.toLowerCase())?.id ?? null
+        }
+        if (supaUserId) {
+          await supabaseAdmin.auth.admin.updateUserById(supaUserId, {
+            user_metadata: { role: updated.role },
+          })
+        }
+      } catch (e) {
+        console.error('setUserRole: failed to sync Supabase user_metadata', e)
+      }
+
+      const { supabaseUserId: _omit, ...rest } = updated
+      return rest
     }),
 
   setUserPractice: mfaAdminProcedure
