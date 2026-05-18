@@ -50,6 +50,7 @@ type SessionExercise = {
   name: string
   category: string
   difficulty: string
+  description: string | null
   sets: number
   reps: number
   repUnit: string
@@ -1366,7 +1367,14 @@ function SessionPageInner() {
         })()}
 
         {/* Expanded content */}
-        {isExpanded && !isDone && (
+        {isExpanded && !isDone && (() => {
+          // Therapeut-notes per programma-oefening overrulen de standaard
+          // beschrijving uit de Exercise-library. Lege strings tellen niet.
+          const note = e.notes?.trim() || ''
+          const desc = e.description?.trim() || ''
+          const instructie = note || desc || null
+          const isCustom = note.length > 0
+          return (
           <div className="px-4 pb-4 pt-3 space-y-4" style={{ borderTop: `1px solid ${P.line}` }}>
             {/* Video player */}
             {e.videoUrl && (
@@ -1386,6 +1394,29 @@ function SessionPageInner() {
                     </div>
                   }
                 />
+              </div>
+            )}
+
+            {/* Uitleg/instructie — therapeut-notes overrulen default beschrijving */}
+            {instructie && (
+              <div
+                className="rounded-2xl px-4 py-3"
+                style={{
+                  background: isCustom ? 'rgba(232,122,85,0.08)' : P.surfaceHi,
+                  border: `1px solid ${isCustom ? P.brand + '55' : P.line}`,
+                }}
+              >
+                {isCustom && (
+                  <p
+                    className="athletic-mono mb-1"
+                    style={{ color: P.brand, fontSize: 10, fontWeight: 900, letterSpacing: '0.14em' }}
+                  >
+                    NOTITIE VAN JE THERAPEUT
+                  </p>
+                )}
+                <p style={{ color: P.ink, fontSize: 13, lineHeight: '20px', whiteSpace: 'pre-line' }}>
+                  {instructie}
+                </p>
               </div>
             )}
 
@@ -1625,7 +1656,8 @@ function SessionPageInner() {
               </DarkButton>
             )}
           </div>
-        )}
+          )
+        })()}
       </div>
     )
   }
