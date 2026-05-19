@@ -50,3 +50,8 @@ next-env.d.ts
 dev-main.sh
 scripts/apply-practices-rls.mjs
 supabase/.temp/
+
+# compliance documents — bevat persoonlijke / praktijk-data (KvK, BIG, adres).
+# Repo is publiek, dus deze map blijft lokaal. Bewaar handmatig op
+# versleutelde cloud (1Password, encrypted Drive).
+compliance/
