@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { trpc } from '@/lib/trpc/client'
 import { DarkButton, Kicker, MetaLabel, P, Tile } from '@/components/dark-ui'
 import { createClient } from '@/lib/supabase/client'
+import { resolvePostLoginRedirect } from '@/lib/auth/post-login-redirect'
 
 interface FactorData {
   id: string
@@ -18,6 +19,8 @@ interface FactorData {
 
 export function MfaEnrollForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const required = searchParams.get('required') === '1'
   const [factorData, setFactorData] = useState<FactorData | null>(null)
   const [verifyCode, setVerifyCode] = useState('')
   const [loading, setLoading] = useState(false)
@@ -82,7 +85,14 @@ export function MfaEnrollForm() {
       // Sync MFA-status naar de database zodat mfaEnabled = true
       await syncMfa.mutateAsync()
 
-      router.push('/therapist/settings/security')
+      // Wanneer dit een verplichte enroll vanuit login is, gate verder
+      // afhandelen (DPA / dashboard). Anders: terug naar security-settings.
+      if (required) {
+        const next = await resolvePostLoginRedirect(supabase)
+        router.push(next)
+      } else {
+        router.push('/therapist/settings/security')
+      }
       router.refresh()
     } catch {
       setError('Verificatie mislukt. Probeer opnieuw.')
@@ -104,7 +114,7 @@ export function MfaEnrollForm() {
   return (
     <div className="max-w-md w-full flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <Kicker>Account · Beveiliging</Kicker>
+        <Kicker>{required ? 'Verplichte stap · Beveiliging' : 'Account · Beveiliging'}</Kicker>
         <h1
           className="athletic-display"
           style={{ fontSize: 28, lineHeight: '34px', letterSpacing: '-0.025em', paddingTop: 2 }}
@@ -112,7 +122,9 @@ export function MfaEnrollForm() {
           MFA INSCHAKELEN
         </h1>
         <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
-          Scan de QR-code met je authenticator-app (bijv. Google Authenticator, Authy of 1Password)
+          {required
+            ? 'Voor toegang tot patiëntgegevens is tweetraps-verificatie verplicht. Scan de QR-code met je authenticator-app om door te gaan.'
+            : 'Scan de QR-code met je authenticator-app (bijv. Google Authenticator, Authy of 1Password)'}
         </MetaLabel>
       </div>
 
@@ -193,9 +205,11 @@ export function MfaEnrollForm() {
           MFA activeren
         </DarkButton>
 
-        <DarkButton variant="ghost" href="/therapist/settings/security">
-          Annuleren
-        </DarkButton>
+        {!required && (
+          <DarkButton variant="ghost" href="/therapist/settings/security">
+            Annuleren
+          </DarkButton>
+        )}
       </form>
     </div>
   )

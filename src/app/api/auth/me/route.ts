@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/auth-helpers-nextjs'
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
+import { DPA_VERSION } from '@/lib/dpa-constants'
 
 export async function GET() {
   try {
@@ -37,7 +38,13 @@ export async function GET() {
           ...(user.email ? [{ email: user.email }] : []),
         ],
       },
-      select: { role: true, name: true },
+      select: {
+        role: true,
+        name: true,
+        mfaEnabled: true,
+        dpaAcceptedVersion: true,
+        dpaAcceptedAt: true,
+      },
     })
 
     // Self-heal: als user_metadata.role afwijkt van DB, sync 'm bij.
@@ -61,6 +68,9 @@ export async function GET() {
     return NextResponse.json({
       role: dbUser?.role || user.user_metadata?.role || null,
       name: dbUser?.name || user.user_metadata?.name || null,
+      mfaEnabled: !!dbUser?.mfaEnabled,
+      dpaAccepted: dbUser?.dpaAcceptedVersion === DPA_VERSION,
+      dpaAcceptedAt: dbUser?.dpaAcceptedAt?.toISOString() ?? null,
     })
   } catch {
     return NextResponse.json({ role: null }, { status: 500 })

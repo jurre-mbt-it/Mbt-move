@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
+import { resolvePostLoginRedirect } from '@/lib/auth/post-login-redirect'
 
 export function MfaChallenge() {
   const router = useRouter()
@@ -50,7 +51,8 @@ export function MfaChallenge() {
         return
       }
 
-      router.push('/')
+      const next = await resolvePostLoginRedirect(supabase)
+      router.push(next)
       router.refresh()
     } catch {
       setError('Verification failed. Please try again.')

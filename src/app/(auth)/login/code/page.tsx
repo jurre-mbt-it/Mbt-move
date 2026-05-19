@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
 import { createClient } from '@/lib/supabase/client'
 import { DarkButton, DarkInput, Kicker, MetaLabel, P } from '@/components/dark-ui'
+import { resolvePostLoginRedirect } from '@/lib/auth/post-login-redirect'
 
 export default function AccessCodePage() {
   return (
@@ -102,20 +103,8 @@ function AccessCodeInner() {
       // (finalize maakt ook de Prisma user-row aan; aparte sync-user call is overbodig).
       await finalizeMutation.mutateAsync()
 
-      // Rol-based redirect — DB is authoritative (user_metadata.role kan stale zijn).
-      let role: string | null = null
-      try {
-        const res = await fetch('/api/auth/me')
-        if (res.ok) {
-          const data = await res.json()
-          role = data.role ?? null
-        }
-      } catch { /* fallback hieronder */ }
-      const dest = role === 'ATHLETE'
-        ? '/athlete/dashboard'
-        : role === 'PATIENT'
-        ? '/patient/dashboard'
-        : '/patient/dashboard'
+      // Gate beslist volgende stap (DPA voor patiënt/athlete, MFA voor staff).
+      const dest = await resolvePostLoginRedirect(supabase)
       router.replace(dest)
     } catch (err) {
       setError(

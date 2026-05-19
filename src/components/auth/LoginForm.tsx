@@ -3,63 +3,29 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Mail, Lock, ArrowRight, Sparkles, KeyRound } from 'lucide-react'
+import { Mail, KeyRound, Sparkles } from 'lucide-react'
 import { P, DarkButton, DarkInput, Kicker, MetaLabel } from '@/components/dark-ui'
-
-function getRoleRedirect(role?: string) {
-  if (role === 'PATIENT') return '/patient/dashboard'
-  if (role === 'ATHLETE') return '/athlete/dashboard'
-  return '/therapist/dashboard'
-}
+import { resolvePostLoginRedirect } from '@/lib/auth/post-login-redirect'
 
 export function LoginForm() {
   const router = useRouter()
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [mode, setMode] = useState<'password' | 'magic'>('password')
-  const [magicLinkSent, setMagicLinkSent] = useState(false)
+  const [codeSent, setCodeSent] = useState(false)
   const [otpCode, setOtpCode] = useState('')
   const otpInputRef = useRef<HTMLInputElement>(null)
 
   const supabase = createClient()
 
-  async function handleEmailPassword(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-
-      if (error) {
-        setError(error.message === 'Invalid login credentials'
-          ? 'Ongeldig e-mailadres of wachtwoord'
-          : error.message)
-        return
-      }
-
-      if (data.user) {
-        const role = data.user.user_metadata?.role
-        router.push(getRoleRedirect(role))
-        router.refresh()
-      }
-    } catch {
-      setError('Er is een onverwachte fout opgetreden.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleMagicLink(e: React.FormEvent) {
+  async function handleRequestCode(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
     try {
       const { error } = await supabase.auth.signInWithOtp({
-        email,
+        email: email.trim().toLowerCase(),
         options: {
           emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/auth/callback`,
         },
@@ -70,7 +36,7 @@ export function LoginForm() {
         return
       }
 
-      setMagicLinkSent(true)
+      setCodeSent(true)
       setTimeout(() => otpInputRef.current?.focus(), 100)
     } catch {
       setError('Er is een onverwachte fout opgetreden.')
@@ -103,16 +69,8 @@ export function LoginForm() {
         return
       }
 
-      let role = data.user.user_metadata?.role as string | undefined
-      try {
-        const res = await fetch('/api/auth/me')
-        if (res.ok) {
-          const me = await res.json()
-          if (me.role) role = me.role
-        }
-      } catch { /* fallback to metadata role */ }
-
-      router.push(getRoleRedirect(role))
+      const next = await resolvePostLoginRedirect(supabase)
+      router.push(next)
       router.refresh()
     } catch {
       setError('Er is een onverwachte fout opgetreden.')
@@ -142,7 +100,7 @@ export function LoginForm() {
         <Kicker>Movement Based Therapy</Kicker>
       </div>
 
-      {magicLinkSent ? (
+      {codeSent ? (
         <div className="flex flex-col gap-5">
           <div className="text-center">
             <div
@@ -158,13 +116,12 @@ export function LoginForm() {
               CHECK JE E-MAIL
             </h2>
             <p style={{ color: P.inkMuted, fontSize: 14 }}>
-              We hebben een magic link en code gestuurd naar
+              We hebben een code en magic link gestuurd naar
               <br />
               <span style={{ color: P.ink, fontWeight: 700 }}>{email}</span>
             </p>
             <p style={{ color: P.inkDim, fontSize: 12, marginTop: 12, lineHeight: 1.5 }}>
-              Klik op de link in de mail, of vul de 6-cijfer code hieronder in als de
-              link niet werkt.
+              Klik op de link in de mail, of vul de 6-cijfer code hieronder in.
             </p>
           </div>
 
@@ -222,23 +179,20 @@ export function LoginForm() {
 
           <button
             onClick={() => {
-              setMagicLinkSent(false)
+              setCodeSent(false)
               setOtpCode('')
               setError(null)
-              setMode('password')
             }}
             className="athletic-mono transition-colors self-center"
             style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.12em' }}
             type="button"
           >
-            TERUG NAAR INLOGGEN
+            ANDER E-MAILADRES
           </button>
         </div>
       ) : (
         <>
-          {/* Form */}
-          <form onSubmit={mode === 'password' ? handleEmailPassword : handleMagicLink} className="flex flex-col gap-3">
-            {/* Email field */}
+          <form onSubmit={handleRequestCode} className="flex flex-col gap-3">
             <div className="relative">
               <Mail
                 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5"
@@ -251,44 +205,11 @@ export function LoginForm() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={loading}
+                autoFocus
                 style={{ paddingLeft: 48, height: 56 }}
               />
             </div>
 
-            {/* Password field */}
-            {mode === 'password' && (
-              <div className="relative">
-                <Lock
-                  className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5"
-                  style={{ color: P.inkDim }}
-                />
-                <DarkInput
-                  type="password"
-                  placeholder="Wachtwoord"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={loading}
-                  style={{ paddingLeft: 48, height: 56 }}
-                />
-              </div>
-            )}
-
-            {/* Forgot password */}
-            {mode === 'password' && (
-              <div className="text-right">
-                <button
-                  type="button"
-                  className="athletic-mono transition-colors"
-                  style={{ color: P.brand, fontSize: 10, letterSpacing: '0.14em' }}
-                  onClick={() => setMode('magic')}
-                >
-                  WACHTWOORD VERGETEN
-                </button>
-              </div>
-            )}
-
-            {/* Error */}
             {error && (
               <div
                 className="rounded-xl px-4 py-3 text-sm"
@@ -302,62 +223,24 @@ export function LoginForm() {
               </div>
             )}
 
-            {/* Submit button */}
-            <DarkButton
-              type="submit"
-              disabled={loading}
-              loading={loading}
-              size="lg"
-              variant={mode === 'password' ? 'primary' : 'secondary'}
-            >
-              {mode === 'password' ? (
-                <span className="flex items-center gap-2">
-                  SIGN IN
-                  <ArrowRight className="w-5 h-5" />
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5" />
-                  STUUR MAGIC LINK
-                </span>
-              )}
+            <DarkButton type="submit" disabled={loading || !email} loading={loading} size="lg">
+              <span className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5" />
+                STUUR INLOGCODE
+              </span>
             </DarkButton>
           </form>
 
-          {/* Divider */}
-          <div className="flex items-center gap-4 my-6">
-            <div className="flex-1 h-px" style={{ background: P.lineStrong }} />
-            <span
-              className="athletic-mono"
-              style={{ color: P.inkDim, fontSize: 10, letterSpacing: '0.2em' }}
-            >
-              OF
-            </span>
-            <div className="flex-1 h-px" style={{ background: P.lineStrong }} />
-          </div>
-
-          {/* Toggle mode */}
-          <DarkButton
-            type="button"
-            size="lg"
-            variant="ghost"
-            onClick={() => setMode(mode === 'password' ? 'magic' : 'password')}
+          <p
+            className="athletic-mono text-center mt-6"
+            style={{ color: P.inkDim, fontSize: 11, letterSpacing: '0.14em', lineHeight: 1.6 }}
           >
-            {mode === 'password' ? (
-              <span className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5" style={{ color: P.brand }} />
-                MAGIC LINK
-              </span>
-            ) : (
-              <span className="flex items-center gap-2">
-                <Lock className="w-5 h-5" style={{ color: P.brand }} />
-                WACHTWOORD
-              </span>
-            )}
-          </DarkButton>
+            JE ONTVANGT EEN 6-CIJFER CODE PER MAIL.
+            <br />
+            GEEN WACHTWOORD NODIG.
+          </p>
 
-          {/* Footer links */}
-          <div className="mt-8 text-center">
+          <div className="mt-10 text-center">
             <p style={{ color: P.inkMuted, fontSize: 13 }}>
               Nog geen account?{' '}
               <a
