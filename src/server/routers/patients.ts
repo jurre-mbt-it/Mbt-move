@@ -3,6 +3,7 @@ import { TRPCError } from '@trpc/server'
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
 import type { PrismaClient } from '@prisma/client'
 import { createTRPCRouter, therapistProcedure, mfaTherapistProcedure } from '@/server/trpc'
+import { auditLog } from '@/server/audit'
 
 const createId = () => crypto.randomUUID()
 
@@ -225,6 +226,18 @@ export const patientsRouter = createTRPCRouter({
       })
 
       if (!p) return null
+
+      // NEN 7513 / Wabvpz: dossier-toegang door therapeut moet gelogd
+      // worden. auditLog faalt silently, breekt de query nooit.
+      await auditLog({
+        event: 'PATIENT_VIEWED',
+        userId: me.id,
+        actorEmail: me.email,
+        resource: 'User',
+        resourceId: p.id,
+        metadata: { route: 'patients.get' },
+        req: ctx.req,
+      })
 
       const myRel = p.patientTherapists[0] ?? null
       const program = p.patientPrograms[0] ?? null
@@ -817,6 +830,16 @@ export const patientsRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
 
+      await auditLog({
+        event: 'PATIENT_VIEWED',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        resource: 'User',
+        resourceId: input.patientId,
+        metadata: { route: 'patients.getDashboardData' },
+        req: ctx.req,
+      })
+
       const since = new Date()
       since.setDate(since.getDate() - 60) // 60d historie
 
@@ -894,6 +917,16 @@ export const patientsRouter = createTRPCRouter({
       if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.patientId))) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
+
+      await auditLog({
+        event: 'PATIENT_VIEWED',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        resource: 'User',
+        resourceId: input.patientId,
+        metadata: { route: 'patients.getProgress' },
+        req: ctx.req,
+      })
 
       // Sessions (last 90 days)
       const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
@@ -975,6 +1008,16 @@ export const patientsRouter = createTRPCRouter({
       if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.patientId))) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
+
+      await auditLog({
+        event: 'SESSION_LOG_VIEWED',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        resource: 'User',
+        resourceId: input.patientId,
+        metadata: { route: 'patients.recentSessions', limit: input.limit },
+        req: ctx.req,
+      })
 
       const sessions = await ctx.prisma.sessionLog.findMany({
         where: { patientId: input.patientId, status: 'COMPLETED' },
