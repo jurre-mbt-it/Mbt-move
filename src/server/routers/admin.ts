@@ -292,15 +292,20 @@ export const adminRouter = createTRPCRouter({
       name: z.string().min(1).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // Normaliseer naar lowercase — Supabase auth slaat email lowercase op,
+      // dus zonder dit krijg je een mismatch tussen Prisma.email en Supabase.email
+      // waardoor de email-fallback in resolveUser nooit aanslaat.
+      const email = input.email.toLowerCase().trim()
+
       // Blokkeer als de gebruiker al in Prisma bestaat
       const existing = await ctx.prisma.user.findUnique({
-        where: { email: input.email },
+        where: { email },
         select: { id: true, role: true },
       })
       if (existing) {
         throw new TRPCError({
           code: 'CONFLICT',
-          message: `${input.email} bestaat al als ${existing.role}.`,
+          message: `${email} bestaat al als ${existing.role}.`,
         })
       }
 
@@ -309,22 +314,32 @@ export const adminRouter = createTRPCRouter({
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
       )
 
-      const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-        input.email,
+      const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+        email,
         { data: { role: 'THERAPIST', name: input.name ?? '' } },
       )
-      if (inviteError) {
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: inviteError.message })
+      if (inviteError || !inviteData?.user) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: inviteError?.message ?? 'Supabase invite gaf geen user terug',
+        })
       }
 
-      // Pre-create Prisma user zodat ze direct kunnen inloggen
+      // Pre-create Prisma user mét supabaseUserId én practiceId van de
+      // uitnodigende admin. Zonder supabaseUserId weigert resolveUser (zie
+      // trpc.ts) THERAPIST/ADMIN-rows via email-fallback te koppelen — dat is
+      // een security-defense, maar betekent dat je hem hier MOET vullen anders
+      // krijgt de nieuwe collega UNAUTHORIZED op elke tRPC-call.
       const user = await ctx.prisma.user.create({
         data: {
-          email: input.email,
-          name: input.name ?? input.email.split('@')[0],
+          id: inviteData.user.id,
+          supabaseUserId: inviteData.user.id,
+          email,
+          name: input.name ?? email.split('@')[0],
           role: 'THERAPIST',
+          practiceId: ctx.user.practiceId ?? null,
         },
-        select: { id: true, email: true, name: true, role: true },
+        select: { id: true, email: true, name: true, role: true, practiceId: true },
       })
 
       return { ok: true, user }
