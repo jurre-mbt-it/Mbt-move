@@ -639,6 +639,9 @@ export const patientsRouter = createTRPCRouter({
         data: {
           id: createId(),
           patientId: input.patientId,
+          // Behandelend therapeut wordt vastgelegd zodat collega's in de
+          // historie zien wie deze sessie heeft uitgevoerd.
+          therapistId: ctx.user.id,
           programId: input.programId ?? undefined,
           scheduledAt: new Date(input.scheduledAt),
           completedAt: new Date(input.completedAt),
@@ -770,6 +773,7 @@ export const patientsRouter = createTRPCRouter({
         where: { id: input.sessionId },
         include: {
           program: { select: { id: true, name: true } },
+          therapist: { select: { id: true, name: true } },
           exerciseLogs: true,
         },
       })
@@ -791,6 +795,8 @@ export const patientsRouter = createTRPCRouter({
         id: session.id,
         patientId: session.patientId,
         programName: session.program?.name ?? null,
+        therapistId: session.therapistId,
+        therapistName: session.therapist?.name ?? null,
         scheduledAt: session.scheduledAt,
         completedAt: session.completedAt,
         durationSeconds: session.duration,
@@ -852,6 +858,7 @@ export const patientsRouter = createTRPCRouter({
         orderBy: { completedAt: 'desc' },
         include: {
           program: { select: { id: true, name: true } },
+          therapist: { select: { id: true, name: true } },
           exerciseLogs: {
             select: { exerciseId: true },
           },
@@ -899,6 +906,8 @@ export const patientsRouter = createTRPCRouter({
           id: s.id,
           completedAt: s.completedAt,
           programName: s.program?.name ?? null,
+          therapistId: s.therapistId,
+          therapistName: s.therapist?.name ?? null,
           durationMinutes: s.duration ? Math.round(s.duration / 60) : 0,
           exerciseCount: s.exerciseLogs.length,
           painLevel: s.painLevel,
@@ -1025,6 +1034,7 @@ export const patientsRouter = createTRPCRouter({
         take: input.limit,
         include: {
           program: { select: { id: true, name: true } },
+          therapist: { select: { id: true, name: true } },
           exerciseLogs: {
             select: {
               id: true,
@@ -1057,6 +1067,11 @@ export const patientsRouter = createTRPCRouter({
         completedAt: s.completedAt,
         durationMinutes: s.duration ? Math.round(s.duration / 60) : null,
         programName: s.program?.name ?? null,
+        // Wie heeft de behandeling uitgevoerd? therapistId === patientId →
+        // patient logde zelf (UI: "Patiënt zelf"). null → legacy log van
+        // vóór deze feature (UI: "—"). Anders → therapeut-naam.
+        therapistId: s.therapistId,
+        therapistName: s.therapist?.name ?? null,
         painLevel: s.painLevel,
         exertionLevel: s.exertionLevel,
         notes: s.notes,

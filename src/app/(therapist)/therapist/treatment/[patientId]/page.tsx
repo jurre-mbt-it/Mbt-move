@@ -668,6 +668,7 @@ export default function TreatmentPage({
         {previousSession && (
           <PreviousSessionPanel
             session={previousSession}
+            patientId={patientId}
             open={previousOpen}
             onToggle={() => setPreviousOpen((v) => !v)}
           />
@@ -1743,6 +1744,8 @@ type PreviousSession = {
   completedAt: Date | string | null
   durationMinutes: number | null
   programName: string | null
+  therapistId: string | null
+  therapistName: string | null
   painLevel: number | null
   exertionLevel: number | null
   notes: string | null
@@ -1794,15 +1797,24 @@ function summarizeExtraParams(extraParams: unknown): string | null {
 
 function PreviousSessionPanel({
   session,
+  patientId,
   open,
   onToggle,
 }: {
   session: PreviousSession
+  patientId: string
   open: boolean
   onToggle: () => void
 }) {
   const dateLabel = formatRelativeDate(session.completedAt)
   const exerciseCount = session.exercises.length
+  // null = legacy log van vóór de therapist-tracking feature; gelijk aan
+  // patientId = patient logde zelf via patient-app.
+  const performer = session.therapistId === null
+    ? '—'
+    : session.therapistId === patientId
+      ? 'Patiënt zelf'
+      : session.therapistName ?? 'Onbekend'
 
   return (
     <Tile accentBar={P.brand}>
@@ -1827,6 +1839,7 @@ function PreviousSessionPanel({
             {exerciseCount} oef.
             {session.durationMinutes ? ` · ${session.durationMinutes}m` : ''}
             {session.programName ? ` · ${session.programName}` : ''}
+            {` · door ${performer}`}
           </span>
         </div>
         <span

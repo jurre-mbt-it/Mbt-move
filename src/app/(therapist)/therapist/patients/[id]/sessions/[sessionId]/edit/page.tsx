@@ -293,6 +293,21 @@ export default function EditSessionPage({
               />
             </div>
           </div>
+          {/* Wie heeft deze sessie uitgevoerd? Read-only info — niet
+              wijzigbaar via deze knop om audit-integriteit te behouden. */}
+          <div className="mt-3 flex items-center gap-2">
+            <MetaLabel>Door</MetaLabel>
+            <span
+              className="athletic-mono"
+              style={{ color: P.ink, fontSize: 12, letterSpacing: '0.04em' }}
+            >
+              {session.therapistId === null
+                ? '—'
+                : session.therapistId === session.patientId
+                  ? 'Patiënt zelf'
+                  : session.therapistName ?? 'Onbekend'}
+            </span>
+          </div>
         </Tile>
 
         {/* Oefeningen */}

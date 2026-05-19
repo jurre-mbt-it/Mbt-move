@@ -319,3 +319,16 @@ ALTER TABLE "exercise_logs" ADD COLUMN IF NOT EXISTS "supersetGroup" TEXT;
 -- phase: 'WARMUP' of 'MAIN' — onderscheidt warming-up oefeningen van het
 -- hoofddeel in een sessie. NULL = legacy = behandelen als MAIN.
 ALTER TABLE "exercise_logs" ADD COLUMN IF NOT EXISTS "phase"         TEXT;
+
+-- ── Wie heeft de behandeling gedaan? ────────────────────────────────────────
+-- Bij collega-therapeuten die dezelfde patient zien is het belangrijk om
+-- bij de historie en bij "vorige keer" te kunnen tonen door wie de sessie
+-- gelogd is. NULL = patient logde zelf via patient-app (geen therapeut).
+-- ON DELETE SET NULL: een verwijderde therapeut mag de patient-historie
+-- niet cascade-deleten; we tonen dan "—".
+ALTER TABLE "session_logs" ADD COLUMN IF NOT EXISTS "therapistId" TEXT;
+CREATE INDEX IF NOT EXISTS "session_logs_therapistId_idx" ON "session_logs"("therapistId");
+DO $$ BEGIN
+  ALTER TABLE "session_logs" ADD CONSTRAINT "session_logs_therapistId_fkey"
+    FOREIGN KEY ("therapistId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN null; END $$;

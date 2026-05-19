@@ -51,6 +51,8 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     completedAt: Date | string | null
     durationMinutes: number | null
     programName: string | null
+    therapistId: string | null
+    therapistName: string | null
     painLevel: number | null
     exertionLevel: number | null
     notes: string | null
@@ -62,6 +64,14 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       painLevel: number | null
       weight: number | null
     }>
+  }
+  // therapistId-semantiek: null = legacy/onbekend, === patientId = patient
+  // logde zelf, anders = behandelend therapeut. Houdt collega's geïnformeerd
+  // wie welke sessie heeft uitgevoerd.
+  const formatPerformer = (s: RecentSession): string => {
+    if (s.therapistId === null) return '—'
+    if (s.therapistId === id) return 'Patiënt zelf'
+    return s.therapistName ?? 'Onbekend'
   }
   const recentSessions = recentSessionsRaw as RecentSession[]
   const utils = trpc.useUtils()
@@ -594,14 +604,13 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                             BEWERK
                           </Link>
                         </div>
-                        {session.programName && (
-                          <p
-                            className="athletic-mono"
-                            style={{ color: P.inkMuted, fontSize: 11, marginTop: 2, letterSpacing: '0.04em' }}
-                          >
-                            {session.programName}
-                          </p>
-                        )}
+                        <p
+                          className="athletic-mono"
+                          style={{ color: P.inkMuted, fontSize: 11, marginTop: 2, letterSpacing: '0.04em' }}
+                        >
+                          {session.programName ? `${session.programName} · ` : ''}
+                          DOOR {formatPerformer(session).toUpperCase()}
+                        </p>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
                         {session.durationMinutes != null && (

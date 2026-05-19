@@ -281,7 +281,8 @@ model User {
   collections            ExerciseCollection[]
   appointments           Appointment[]          @relation("PatientAppointments")
   therapistAppointments  Appointment[]          @relation("TherapistAppointments")
-  sessionLogs            SessionLog[]
+  sessionLogs            SessionLog[]           @relation("SessionLogPatient")
+  therapistSessionLogs   SessionLog[]           @relation("SessionLogTherapist")
   cardioLogs             CardioLog[]
   notifications          Notification[]
   messages               Message[]
@@ -753,8 +754,13 @@ model SessionLog {
   id            String        @id @default(cuid())
   program       Program?      @relation(fields: [programId], references: [id], onDelete: SetNull)
   programId     String?
-  patient       User          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient       User          @relation("SessionLogPatient", fields: [patientId], references: [id], onDelete: Cascade)
   patientId     String
+  // Null = patient logde de sessie zelf (via patient-app). Bij therapist-live-log
+  // staat hier de behandelend therapeut. SetNull omdat een verwijderde therapeut
+  // de historie van de patient niet mag cascade-deleten.
+  therapist     User?         @relation("SessionLogTherapist", fields: [therapistId], references: [id], onDelete: SetNull)
+  therapistId   String?
   status        SessionStatus @default(PENDING)
   scheduledAt   DateTime
   completedAt   DateTime?
@@ -768,6 +774,7 @@ model SessionLog {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([therapistId])
   @@map("session_logs")
 }
 

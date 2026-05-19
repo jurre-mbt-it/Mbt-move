@@ -332,6 +332,9 @@ export const patientRouter = createTRPCRouter({
       const sessionLog = await ctx.prisma.sessionLog.create({
         data: {
           patientId: ctx.user.id,
+          // Markeer expliciet als zelf-gelogd (patient == therapist). Zo kan de
+          // UI in collega-historie "Patiënt zelf" tonen i.p.v. "—" (legacy).
+          therapistId: ctx.user.id,
           programId: input.programId ?? undefined,
           scheduledAt: new Date(input.scheduledAt),
           completedAt: new Date(input.completedAt),
