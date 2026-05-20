@@ -778,6 +778,14 @@ function SessionSummary({
         >
           {isSaving ? 'OPSLAAN…' : 'OPSLAAN & AFSLUITEN'}
         </DarkButton>
+        {sessionRpe === null && !isSaving && (
+          <p
+            className="text-center"
+            style={{ color: P.danger, fontSize: 12, fontWeight: 600, marginTop: -4 }}
+          >
+            Vul eerst <span style={{ textDecoration: 'underline' }}>Hoe zwaar was de sessie?</span> in om op te slaan.
+          </p>
+        )}
       </div>
     </div>
   )
@@ -1117,34 +1125,44 @@ function SessionPageInner() {
     const completedAt = new Date()
     const scheduledAt = new Date(completedAt.getTime() - durationSeconds * 1000)
 
-    await logSession.mutateAsync({
-      programId: sessionData?.program?.id,
-      scheduledAt: scheduledAt.toISOString(),
-      completedAt: completedAt.toISOString(),
-      durationSeconds,
-      painLevel,
-      exertionLevel,
-      exercises: exercises.map(e => {
-        const weights = setWeights[e.uid] ?? []
-        const lastSetWeight = weights.filter(w => w > 0).slice(-1)[0] ?? null
-        const feedbackWeight = feedback[e.uid]?.weight ?? null
-        const finalWeight = lastSetWeight ?? (feedbackWeight && feedbackWeight > 0 ? feedbackWeight : null)
-        const reps = extraReps[e.uid] ?? e.reps
-        const programTrack1rm = sessionData?.program?.trackOneRepMax ?? false
-        const estimated1rm = (programTrack1rm && finalWeight && finalWeight > 0)
-          ? calcEpley(finalWeight, reps)
-          : null
-        return {
-          exerciseId: e.exerciseId,
-          setsCompleted: setsCompleted[e.uid] ?? 0,
-          repsCompleted: reps,
-          painLevel: tendinopathyMode ? (feedback[e.uid]?.painDuring ?? null) : (feedback[e.uid]?.pain ?? null),
-          weight: finalWeight,
-          estimatedOneRepMax: estimated1rm,
-          painDuring: tendinopathyMode ? (feedback[e.uid]?.painDuring ?? null) : null,
-        }
-      }),
-    })
+    try {
+      await logSession.mutateAsync({
+        programId: sessionData?.program?.id,
+        scheduledAt: scheduledAt.toISOString(),
+        completedAt: completedAt.toISOString(),
+        durationSeconds,
+        painLevel,
+        exertionLevel,
+        exercises: exercises.map(e => {
+          const weights = setWeights[e.uid] ?? []
+          const lastSetWeight = weights.filter(w => w > 0).slice(-1)[0] ?? null
+          const feedbackWeight = feedback[e.uid]?.weight ?? null
+          const finalWeight = lastSetWeight ?? (feedbackWeight && feedbackWeight > 0 ? feedbackWeight : null)
+          const reps = extraReps[e.uid] ?? e.reps
+          const programTrack1rm = sessionData?.program?.trackOneRepMax ?? false
+          const estimated1rm = (programTrack1rm && finalWeight && finalWeight > 0)
+            ? calcEpley(finalWeight, reps)
+            : null
+          return {
+            exerciseId: e.exerciseId,
+            setsCompleted: setsCompleted[e.uid] ?? 0,
+            repsCompleted: reps,
+            painLevel: tendinopathyMode ? (feedback[e.uid]?.painDuring ?? null) : (feedback[e.uid]?.pain ?? null),
+            weight: finalWeight,
+            estimatedOneRepMax: estimated1rm,
+            painDuring: tendinopathyMode ? (feedback[e.uid]?.painDuring ?? null) : null,
+          }
+        }),
+      })
+    } catch (err) {
+      // Niet stilletjes laten falen: anders denkt patient dat de sessie is
+      // opgeslagen terwijl er niets in de DB belandt. Concept blijft staan
+      // (geen clearStoredDraft, geen router.push) zodat hij opnieuw kan klikken.
+      const message = err instanceof Error ? err.message : 'Onbekende fout'
+      console.error('[session] logSession failed', err)
+      alert(`Opslaan mislukt: ${message}\n\nProbeer het opnieuw. Je ingevulde sets en feedback blijven bewaard.`)
+      return
+    }
 
     // Invalidate all patient queries so dashboard shows fresh data immediately
     await Promise.all([
