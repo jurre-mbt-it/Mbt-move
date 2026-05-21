@@ -32,6 +32,7 @@ import {
 } from '@/components/dark-ui'
 import { trpc } from '@/lib/trpc/client'
 import { useDraftBackup, loadDraft, clearStoredDraft } from '@/hooks/useAutosave'
+import { PerformerToggle, type PerformerFilter } from '@/components/patients/PerformerToggle'
 import {
   STANDARD_PARAMS,
   SUPERSET_COLORS,
@@ -166,7 +167,12 @@ export default function TreatmentPage({
   const utils = trpc.useUtils()
   const { data: patient, isLoading: patientLoading } = trpc.patients.get.useQuery({ id: patientId })
   const { data: todayData, isLoading: todayLoading } = trpc.patient.getTodayExercises.useQuery({ patientId })
-  const { data: previousSessionsRaw = [] } = trpc.patients.recentSessions.useQuery({ patientId, limit: 1 })
+  const [previousPerformer, setPreviousPerformer] = useState<PerformerFilter>('all')
+  const { data: previousSessionsRaw = [] } = trpc.patients.recentSessions.useQuery({
+    patientId,
+    limit: 1,
+    performedBy: previousPerformer,
+  })
   // Shallow cast — tRPC inference is anders te diep (TS2589) bij iteratie over exercises.
   const previousSessions = previousSessionsRaw as unknown as PreviousSession[]
   const previousSession: PreviousSession | null = previousSessions[0] ?? null
@@ -665,14 +671,31 @@ export default function TreatmentPage({
         )}
 
         {/* Vorige behandeling — direct zichtbaar bij start, inklapbaar tijdens sessie */}
-        {previousSession && (
+        {mode === 'choose' && (
+          <PerformerToggle
+            value={previousPerformer}
+            onChange={setPreviousPerformer}
+            ariaLabel="Filter laatste behandeling op uitvoerder"
+          />
+        )}
+        {previousSession ? (
           <PreviousSessionPanel
             session={previousSession}
             patientId={patientId}
             open={previousOpen}
             onToggle={() => setPreviousOpen((v) => !v)}
           />
-        )}
+        ) : mode === 'choose' && previousPerformer !== 'all' ? (
+          <Tile>
+            <div className="py-4 text-center">
+              <p style={{ color: P.inkMuted, fontSize: 12 }}>
+                {previousPerformer === 'patient'
+                  ? 'Patiënt heeft nog niks zelf gelogd.'
+                  : 'Nog geen sessie door therapeut gelogd.'}
+              </p>
+            </div>
+          </Tile>
+        ) : null}
 
         {/* Mode chooser */}
         {mode === 'choose' && (
