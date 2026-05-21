@@ -43,7 +43,12 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const { data: patient, isLoading } = trpc.patients.get.useQuery({ id })
   const { data: programsRaw = [] } = trpc.programs.list.useQuery({ patientId: id })
   const [historyLimit, setHistoryLimit] = useState(5)
-  const { data: recentSessionsRaw = [] } = trpc.patients.recentSessions.useQuery({ patientId: id, limit: historyLimit })
+  const [historyPerformer, setHistoryPerformer] = useState<'all' | 'patient' | 'therapist'>('all')
+  const { data: recentSessionsRaw = [] } = trpc.patients.recentSessions.useQuery({
+    patientId: id,
+    limit: historyLimit,
+    performedBy: historyPerformer,
+  })
   // Shallow cast — tRPC inference depth is te diep voor TS2589 nadat extra velden
   // (weightsPerSet/extraParams/...) zijn toegevoegd in recentSessions.
   type RecentSession = {
@@ -560,16 +565,29 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
           {/* ── TAB: Geschiedenis ─────────────────────────────────── */}
           <TabsContent value="geschiedenis" className="space-y-3">
+            <PerformerToggle
+              value={historyPerformer}
+              onChange={(v) => {
+                setHistoryPerformer(v)
+                setHistoryLimit(5)
+              }}
+            />
             <div className="flex items-center justify-between">
               <MetaLabel>
                 Laatste {recentSessions.length} sessie{recentSessions.length !== 1 ? 's' : ''}
+                {historyPerformer === 'patient' && ' · door patiënt'}
+                {historyPerformer === 'therapist' && ' · door therapeut'}
               </MetaLabel>
             </div>
             {recentSessions.length === 0 ? (
               <Tile>
                 <div className="py-8 text-center">
                   <p style={{ color: P.inkMuted, fontSize: 13 }}>
-                    Nog geen gelogde sessies
+                    {historyPerformer === 'patient'
+                      ? 'Patiënt heeft nog niks zelf gelogd'
+                      : historyPerformer === 'therapist'
+                        ? 'Nog geen sessies door therapeut gelogd'
+                        : 'Nog geen gelogde sessies'}
                   </p>
                 </div>
               </Tile>
@@ -735,6 +753,56 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           </TabsContent>
         </Tabs>
       </div>
+    </div>
+  )
+}
+
+function PerformerToggle({
+  value,
+  onChange,
+}: {
+  value: 'all' | 'patient' | 'therapist'
+  onChange: (v: 'all' | 'patient' | 'therapist') => void
+}) {
+  const options: Array<{ key: 'all' | 'patient' | 'therapist'; label: string }> = [
+    { key: 'all', label: 'Alles' },
+    { key: 'patient', label: 'Patiënt' },
+    { key: 'therapist', label: 'Therapeut' },
+  ]
+  return (
+    <div
+      role="tablist"
+      aria-label="Filter op uitvoerder"
+      className="grid grid-cols-3 rounded-xl"
+      style={{ background: P.surface, border: `1px solid ${P.line}`, padding: 3, gap: 3 }}
+    >
+      {options.map((opt) => {
+        const active = value === opt.key
+        return (
+          <button
+            key={opt.key}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(opt.key)}
+            className="athletic-mono athletic-tap"
+            style={{
+              padding: '8px 10px',
+              borderRadius: 9,
+              background: active ? P.surfaceHi : 'transparent',
+              color: active ? P.ink : P.inkMuted,
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
     </div>
   )
 }

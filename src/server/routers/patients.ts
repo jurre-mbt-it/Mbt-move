@@ -1012,7 +1012,11 @@ export const patientsRouter = createTRPCRouter({
   // security review #6.
   /** Laatste N gelogde sessies van deze patient, voor de geschiedenis-tab. */
   recentSessions: therapistProcedure
-    .input(z.object({ patientId: z.string(), limit: z.number().int().min(1).max(50).default(5) }))
+    .input(z.object({
+      patientId: z.string(),
+      limit: z.number().int().min(1).max(50).default(5),
+      performedBy: z.enum(['all', 'patient', 'therapist']).default('all'),
+    }))
     .query(async ({ ctx, input }) => {
       if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.patientId))) {
         throw new TRPCError({ code: 'FORBIDDEN' })
@@ -1024,12 +1028,21 @@ export const patientsRouter = createTRPCRouter({
         actorEmail: ctx.user.email,
         resource: 'User',
         resourceId: input.patientId,
-        metadata: { route: 'patients.recentSessions', limit: input.limit },
+        metadata: { route: 'patients.recentSessions', limit: input.limit, performedBy: input.performedBy },
         req: ctx.req,
       })
 
+      // therapistId === patientId → patient logde zelf; anders (en niet null)
+      // → therapeut logde namens. null = legacy en valt buiten beide filters.
+      const performerWhere =
+        input.performedBy === 'patient'
+          ? { therapistId: input.patientId }
+          : input.performedBy === 'therapist'
+            ? { AND: [{ therapistId: { not: input.patientId } }, { therapistId: { not: null } }] }
+            : {}
+
       const sessions = await ctx.prisma.sessionLog.findMany({
-        where: { patientId: input.patientId, status: 'COMPLETED' },
+        where: { patientId: input.patientId, status: 'COMPLETED', ...performerWhere },
         orderBy: { completedAt: 'desc' },
         take: input.limit,
         include: {
