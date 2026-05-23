@@ -9,11 +9,18 @@ import {
 import { trpc } from '@/lib/trpc/client'
 import {
   DARK_CHART_STYLES,
+  DarkButton,
   DarkChartTooltip,
+  DarkDialog as Dialog,
+  DarkDialogContent as DialogContent,
+  DarkDialogFooter as DialogFooter,
+  DarkDialogHeader as DialogHeader,
+  DarkDialogTitle as DialogTitle,
   DarkTabs as Tabs,
   DarkTabsContent as TabsContent,
   DarkTabsList as TabsList,
   DarkTabsTrigger as TabsTrigger,
+  DarkTextarea,
   Display,
   Kicker,
   MetaLabel,
@@ -136,6 +143,17 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
   const { data: patient } = trpc.patients.get.useQuery({ id })
   const { data: progress, isLoading } = trpc.patients.getProgress.useQuery({ patientId: id })
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null)
+  const [pdfDialogOpen, setPdfDialogOpen] = useState(false)
+  const [pdfNote, setPdfNote] = useState('')
+
+  function openPdf(withNote: boolean) {
+    const note = withNote ? pdfNote.trim() : ''
+    const url = note
+      ? `/print/progress/${id}?note=${encodeURIComponent(note)}`
+      : `/print/progress/${id}`
+    window.open(url, '_blank', 'noopener')
+    setPdfDialogOpen(false)
+  }
 
   const sessions = progress?.sessions ?? []
   const oneRmByExercise = progress?.oneRmByExercise ?? {}
@@ -188,13 +206,72 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
           ← {(patient?.name ?? 'PATIËNT').toUpperCase()}
         </Link>
 
-        <div className="flex flex-col gap-1">
-          <Kicker>Voortgang</Kicker>
-          <Display size="md">RAPPORT</Display>
-          <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
-            Laatste 90 dagen · {sessions.length} sessies
-          </MetaLabel>
+        <div className="flex items-end justify-between gap-3 flex-wrap">
+          <div className="flex flex-col gap-1">
+            <Kicker>Voortgang</Kicker>
+            <Display size="md">RAPPORT</Display>
+            <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
+              Laatste 90 dagen · {sessions.length} sessies
+            </MetaLabel>
+          </div>
+          {sessions.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setPdfDialogOpen(true)}
+              className="athletic-mono athletic-tap"
+              style={{
+                background: P.lime,
+                color: P.bg,
+                border: 0,
+                borderRadius: 8,
+                padding: '8px 14px',
+                fontSize: 11,
+                fontWeight: 900,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+              }}
+            >
+              Exporteer PDF
+            </button>
+          )}
         </div>
+
+        <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
+          <DialogContent
+            style={{
+              borderRadius: '16px',
+              background: P.surface,
+              color: P.ink,
+              border: `1px solid ${P.lineStrong}`,
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle style={{ color: P.ink }}>Voortgangsrapport exporteren</DialogTitle>
+            </DialogHeader>
+            <div className="mt-2 space-y-3">
+              <MetaLabel>Notitie behandelaar (optioneel)</MetaLabel>
+              <DarkTextarea
+                rows={5}
+                value={pdfNote}
+                onChange={(e) => setPdfNote(e.target.value)}
+                placeholder="bv. Toelichting voor verwijzer, advies, observatie deze maand…"
+                maxLength={4000}
+              />
+              <p style={{ color: P.inkMuted, fontSize: 11 }}>
+                Verschijnt prominent bovenaan in het rapport. Laat leeg om over te slaan.
+              </p>
+            </div>
+            <DialogFooter>
+              <DarkButton variant="ghost" size="sm" onClick={() => openPdf(false)}>
+                Zonder notitie
+              </DarkButton>
+              <DarkButton variant="primary" size="sm" onClick={() => openPdf(true)}>
+                Genereer PDF
+              </DarkButton>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Summary stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

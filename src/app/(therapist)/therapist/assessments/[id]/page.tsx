@@ -224,7 +224,14 @@ export default function AssessmentDetailPage({ params }: { params: Promise<{ id:
               </div>
             </div>
           </div>
-          <div className="mt-3 flex justify-end">
+          <div className="mt-3 flex justify-end gap-2">
+            <DarkButton
+              variant="secondary"
+              size="sm"
+              onClick={() => window.open(`/print/assessment/${id}`, '_blank', 'noopener')}
+            >
+              Exporteer PDF
+            </DarkButton>
             <DarkButton
               variant="danger"
               size="sm"

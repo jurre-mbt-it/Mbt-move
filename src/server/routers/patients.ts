@@ -1007,6 +1007,74 @@ export const patientsRouter = createTRPCRouter({
       }
     }),
 
+  /**
+   * HTML-rendering van het voortgangsrapport — bedoeld voor mbt-gym
+   * (Expo `expo-print` rendert deze string naar PDF). Web gebruikt
+   * `/print/progress/[patientId]` direct.
+   */
+  getProgressPdfHtml: therapistProcedure
+    .input(
+      z.object({
+        patientId: z.string(),
+        /** Optionele vrije notitie van de behandelaar; verschijnt bovenaan in PDF. */
+        note: z.string().max(4000).optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.patientId))) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+
+      const patient = await ctx.prisma.user.findUnique({
+        where: { id: input.patientId },
+        select: { id: true, name: true, email: true },
+      })
+      if (!patient) {
+        throw new TRPCError({ code: 'NOT_FOUND' })
+      }
+
+      const { getPatientProgressData } = await import('@/lib/progress-data')
+      const { getPatientRehabTrackerData } = await import('@/lib/rehab-data')
+      const { renderProgressPdfHtml } = await import('@/lib/pdf/progress')
+      const [progress, rehabTracker] = await Promise.all([
+        getPatientProgressData(ctx.prisma, input.patientId),
+        getPatientRehabTrackerData(ctx.prisma, input.patientId),
+      ])
+
+      await auditLog({
+        event: 'DATA_EXPORTED',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        resource: 'PatientProgress',
+        resourceId: input.patientId,
+        metadata: {
+          route: 'patients.getProgressPdfHtml',
+          surface: 'mobile',
+          hasRehabTracker: !!rehabTracker,
+          hasNote: !!input.note,
+        },
+        req: ctx.req,
+      })
+
+      const html = renderProgressPdfHtml({
+        progress: {
+          patient: { name: patient.name, email: patient.email },
+          generatedAt: new Date(),
+          ...progress,
+          rehabTracker,
+          note: input.note ?? null,
+        },
+        autoPrint: false,
+      })
+
+      const safeName = (patient.name ?? patient.email).replace(/[^a-zA-Z0-9-_ ]/g, '').slice(0, 60)
+      return {
+        html,
+        // Gemak voor de mobile-client: gesuggereerde bestandsnaam voor het PDF.
+        filenameHint: `voortgang-${safeName || 'patient'}-${new Date().toISOString().slice(0, 10)}.pdf`,
+      }
+    }),
+
   // Search binnen eigen gekoppelde patiënten. ADMIN mag globaal zoeken.
   // Eerder leverde deze endpoint PII van alle patiënten in de DB op — zie
   // security review #6.
