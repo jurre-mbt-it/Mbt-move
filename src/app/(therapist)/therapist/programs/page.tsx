@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
@@ -55,6 +55,32 @@ function readTab(sp: URLSearchParams | null): TabValue {
 }
 
 export default function ProgramsPage() {
+  // useSearchParams() bailt static prerender uit — Next 16 vereist daarom een
+  // Suspense-boundary in de boom. Inner-component houdt de hook lokaal zodat
+  // de page-export server-side veilig render-baar blijft.
+  return (
+    <Suspense fallback={<ProgramsPageFallback />}>
+      <ProgramsPageInner />
+    </Suspense>
+  )
+}
+
+function ProgramsPageFallback() {
+  return (
+    <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+      <div className="max-w-5xl mx-auto px-4 pt-10 pb-8 space-y-6">
+        <div className="h-8 w-48 rounded animate-pulse" style={{ background: P.surfaceHi }} />
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-24 rounded-xl animate-pulse" style={{ background: P.surfaceHi }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ProgramsPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const tab = readTab(searchParams)
