@@ -1,12 +1,15 @@
 import { AthleteBottomNav } from '@/components/layout/AthleteBottomNav'
 import { PageTransition } from '@/components/layout/PageTransition'
 import { BetaDisclaimer } from '@/components/system/BetaDisclaimer'
+import { requireRole } from '@/lib/auth/require-role'
 
-export default function AthleteLayout({
+export default async function AthleteLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  await requireRole('ATHLETE')
+
   return (
     <div
       className="athletic-dark min-h-screen pb-16 overflow-x-hidden w-full"

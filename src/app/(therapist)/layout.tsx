@@ -4,12 +4,18 @@ import { Header } from '@/components/layout/Header'
 import { PageTransition } from '@/components/layout/PageTransition'
 import { BetaDisclaimer } from '@/components/system/BetaDisclaimer'
 import { WhatsNewModal } from '@/components/system/WhatsNewModal'
+import { requireRole } from '@/lib/auth/require-role'
 
-export default function TherapistLayout({
+export default async function TherapistLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  // Server-side role-guard. ADMIN mag meekijken (zelfde patroon als
+  // therapistProcedure in tRPC). Patient/athlete worden naar hun eigen
+  // dashboard gestuurd voordat de shell überhaupt rendert.
+  await requireRole(['THERAPIST', 'ADMIN'])
+
   return (
     <div
       className="athletic-dark flex h-screen overflow-hidden"

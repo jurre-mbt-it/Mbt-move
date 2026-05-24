@@ -1,12 +1,15 @@
 import { PatientBottomNav } from '@/components/layout/PatientBottomNav'
 import { PageTransition } from '@/components/layout/PageTransition'
 import { BetaDisclaimer } from '@/components/system/BetaDisclaimer'
+import { requireRole } from '@/lib/auth/require-role'
 
-export default function PatientLayout({
+export default async function PatientLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  await requireRole('PATIENT')
+
   return (
     <div
       className="athletic-dark min-h-screen flex flex-col pb-16"

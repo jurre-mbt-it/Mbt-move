@@ -37,8 +37,25 @@ export async function proxy(request: NextRequest) {
     }
 
     if (isAuthRoute && user) {
-      const role = user.user_metadata?.role
-      const dest = role === 'PATIENT' ? '/patient/dashboard' : role === 'ATHLETE' ? '/athlete/dashboard' : '/therapist/dashboard'
+      // BUGFIX 2026-05-24: we lazen `user.user_metadata?.role` als bron voor
+      // de role-dashboard-redirect. Die is undefined voor users die hun
+      // invite recent hadden gered, met als gevolg: stille fallback naar
+      // /therapist/dashboard voor patiënt/atleet. (Voorval: Jamie Rijff.)
+      // Bron van waarheid is de Prisma `User.role`-kolom. Dynamische import
+      // houdt Prisma uit de cold-start van requests die deze tak niet raken.
+      const { prisma } = await import('@/lib/prisma')
+      const dbUser = await prisma.user.findUnique({
+        where: { supabaseUserId: user.id },
+        select: { role: true },
+      })
+      if (!dbUser) {
+        return NextResponse.redirect(new URL('/login?error=session-stale', request.url))
+      }
+      const dest =
+        dbUser.role === 'PATIENT' ? '/patient/dashboard'
+          : dbUser.role === 'ATHLETE' ? '/athlete/dashboard'
+            : dbUser.role === 'ADMIN' ? '/admin/dashboard'
+              : '/therapist/dashboard'
       return NextResponse.redirect(new URL(dest, request.url))
     }
   } catch {
