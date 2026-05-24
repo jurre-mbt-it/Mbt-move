@@ -41,7 +41,55 @@ function createPrismaClient(): PrismaClient {
   return new PrismaClient({ adapter })
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient()
+const basePrisma = globalForPrisma.prisma ?? createPrismaClient()
 
-// In development hergebruik de client om hot-reload verbindingen te voorkomen
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+/**
+ * Soft-delete enforcement op `User`. AVG art. 17 (right-to-be-forgotten)
+ * markeert verwijderingsverzoeken via `deletedAt` met een 30-dagen grace
+ * (cron `api/cron/gdpr-cleanup` ruimt definitief op). Tijdens die window
+ * mogen reads de verwijderde rij niet meer zien — anders blijft een
+ * "vergeten" patiënt in patient-lijsten, exports, etc. staan.
+ *
+ * Deze client-extension injecteert `deletedAt: null` op alle reads van
+ * User. Escape-hatch voor admin/cron-flows: passeer `deletedAt: undefined`
+ * óf overschrijf expliciet (bv. `deletedAt: { not: null }`) in de WHERE
+ * — die top-level value wint van de default door spread-order.
+ */
+const READ_OPS = new Set([
+  'findUnique',
+  'findUniqueOrThrow',
+  'findFirst',
+  'findFirstOrThrow',
+  'findMany',
+  'count',
+  'aggregate',
+  'groupBy',
+])
+
+const extendedPrisma = basePrisma.$extends({
+  query: {
+    user: {
+      async $allOperations({ operation, args, query }) {
+        if (READ_OPS.has(operation)) {
+          const a = args as { where?: Record<string, unknown> }
+          a.where = { deletedAt: null, ...(a.where ?? {}) }
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return query(args as any)
+      },
+    },
+  },
+})
+
+/**
+ * Type-cast terug naar `PrismaClient` zodat alle downstream-helpers die
+ * `prisma: PrismaClient` typen ongewijzigd blijven werken. We voegen via
+ * deze extension géén nieuwe model-properties of methods toe (alleen
+ * `query`-interceptors), dus de cast verliest geen API-oppervlak.
+ */
+export const prisma = extendedPrisma as unknown as PrismaClient
+
+// In development hergebruik de basis-client om hot-reload verbindingen
+// te voorkomen. We slaan de NIET-extended client op zodat hot-reload de
+// extension opnieuw toepast (extended client is een readonly type).
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = basePrisma

@@ -21,6 +21,7 @@ import { redirect } from 'next/navigation'
 import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
+import { DPA_VERSION } from '@/lib/dpa-constants'
 
 export type RequiredRole = 'THERAPIST' | 'ADMIN' | 'PATIENT' | 'ATHLETE'
 
@@ -31,6 +32,7 @@ export type SessionUser = {
   role: RequiredRole
   practiceId: string | null
   supabaseUserId: string
+  dpaAcceptedVersion: string | null
 }
 
 const ROLE_HOME: Record<RequiredRole, string> = {
@@ -39,6 +41,10 @@ const ROLE_HOME: Record<RequiredRole, string> = {
   PATIENT: '/patient/dashboard',
   ATHLETE: '/athlete/dashboard',
 }
+
+/** Rollen die de DPA (Verwerkingsovereenkomst) moeten accepteren vóór ze
+ *  patient-data raken. Therapeut/admin tekenen DPA buiten de app om. */
+const DPA_REQUIRED_ROLES: ReadonlySet<RequiredRole> = new Set(['PATIENT', 'ATHLETE'])
 
 /**
  * Resolve current logged-in user via Supabase cookie → Prisma row.
@@ -64,6 +70,7 @@ export const getServerUser = cache(async (): Promise<SessionUser | null> => {
         role: true,
         practiceId: true,
         supabaseUserId: true,
+        dpaAcceptedVersion: true,
       },
     })
     if (!dbUser || !dbUser.supabaseUserId) return null
@@ -77,15 +84,26 @@ export const getServerUser = cache(async (): Promise<SessionUser | null> => {
  * Eis dat de huidige user een van de toegestane rollen heeft. Anders redirect.
  *  - Niet ingelogd                  → /login
  *  - Wel ingelogd, verkeerde rol    → eigen dashboard (geen access-denied-page)
+ *  - PATIENT/ATHLETE zonder DPA     → /onboarding/dpa
+ *
+ * `skipDpa: true` is een escape-hatch voor pagina's die nog vóór DPA-accept
+ * bereikbaar moeten zijn (settings, logout). De /onboarding/dpa-page zelf
+ * leeft buiten de role-segment groups en hoeft deze guard niet aan te
+ * roepen.
  */
 export async function requireRole(
   allowed: RequiredRole | RequiredRole[],
+  options: { skipDpa?: boolean } = {},
 ): Promise<SessionUser> {
   const user = await getServerUser()
   if (!user) redirect('/login')
 
   const ok = Array.isArray(allowed) ? allowed.includes(user.role) : user.role === allowed
   if (!ok) redirect(ROLE_HOME[user.role])
+
+  if (!options.skipDpa && DPA_REQUIRED_ROLES.has(user.role) && user.dpaAcceptedVersion !== DPA_VERSION) {
+    redirect('/onboarding/dpa')
+  }
 
   return user
 }
