@@ -438,12 +438,29 @@ export const inviteRouter = createTRPCRouter({
         orderBy: { createdAt: 'desc' },
       })
 
-      // Registreer poging altijd (ook als invite bestaat) zodat we fraud kunnen zien
+      // Registreer poging atomair via updateMany. Audit M3: voorkomt dubbele
+      // OTP-mails bij concurrent calls (dubbel-klik, retry-race). De WHERE
+      // bevat een debounce-window van OTP_DEBOUNCE_MS — een tweede call
+      // binnen dat window wint geen rij, en wij keren ok=throttled terug
+      // zonder Supabase opnieuw te triggeren.
+      const OTP_DEBOUNCE_MS = 3_000
+      let throttled = false
       if (invite) {
-        await ctx.prisma.inviteCode.update({
-          where: { id: invite.id },
+        const debounceCutoff = new Date(Date.now() - OTP_DEBOUNCE_MS)
+        const updated = await ctx.prisma.inviteCode.updateMany({
+          where: {
+            id: invite.id,
+            OR: [{ lastAttemptAt: null }, { lastAttemptAt: { lt: debounceCutoff } }],
+          },
           data: { attempts: { increment: 1 }, lastAttemptAt: new Date() },
         })
+        if (updated.count === 0) {
+          // Vorige OTP is binnen 3s verstuurd. UI ziet visueel hetzelfde
+          // resultaat als een succesvolle verzending; échte fouten (geen
+          // invite, max attempts, year-mismatch) gaan hieronder nog
+          // door alle reguliere paden.
+          throttled = true
+        }
       }
 
       function throwGeneric(reason: 'no-invite' | 'year-mismatch'): never {
@@ -482,7 +499,12 @@ export const inviteRouter = createTRPCRouter({
       const expectedYear = invite.dateOfBirth.getUTCFullYear()
       if (expectedYear !== input.birthYear) throwGeneric('year-mismatch')
 
-      // Match! Trigger Supabase OTP-mail.
+      // Match! Trigger Supabase OTP-mail — tenzij we binnen debounce-window
+      // zitten (zojuist al verstuurd), dan respecteren we de eerdere send.
+      if (throttled) {
+        return { ok: true, delivered: true, throttled: true }
+      }
+
       const admin = getSupabaseAdmin()
       if (!admin) {
         // Supabase niet geconfigureerd — dev-mode

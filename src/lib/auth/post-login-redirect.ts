@@ -22,8 +22,16 @@ function roleDashboard(role?: string | null): string {
 }
 
 function isSafeNext(next: string | null | undefined): next is string {
-  // Alleen relatieve paden (single leading slash, niet //evil.tld).
-  return !!next && /^\/[^/\\]/.test(next)
+  if (!next) return false
+  // Sanity-limit op lengte; voorkomt absurde redirects en DoS via lange URLs.
+  if (next.length > 1024) return false
+  // Eerste karakter moet `/` zijn, tweede mag niet `/` of `\` zijn
+  // (anders is het een protocol-relative URL of een back-slash schema).
+  if (!/^\/[^/\\]/.test(next)) return false
+  // Geen whitespace of HTML-confusing tekens — voorkomt header-injection
+  // en open-redirect-omzeiling via padding-tricks. Audit M2.
+  if (/[\s<>"`]/.test(next)) return false
+  return true
 }
 
 /**

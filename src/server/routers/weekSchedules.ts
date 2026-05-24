@@ -150,9 +150,23 @@ export const weekSchedulesRouter = createTRPCRouter({
     }))
     .mutation(async ({ ctx, input }) => {
       const { id, days, patientId, startDate, endDate, ...rest } = input
-      const existing = await ctx.prisma.weekSchedule.findFirst({ where: { id, creatorId: ctx.user.id } })
+      // Owner-check + nieuwe patient-link in één lokale invariant. Eerst
+      // ownership, dan de target patient (kan ander zijn dan `existing.patientId`
+      // bij her-toewijzing). Audit M1 — voorkomt dat een toekomstige refactor
+      // de assertPatientLink call laat verdwijnen zonder dat de re-assignment
+      // gevaarlijk wordt.
+      const existing = await ctx.prisma.weekSchedule.findFirst({
+        where: { id, creatorId: ctx.user.id },
+        select: { id: true, patientId: true },
+      })
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
       await assertPatientLink(ctx.prisma, ctx.user, patientId)
+      // Als de patient verandert, dubbel-check ook de huidige link (zou
+      // theoretisch al gecovered moeten zijn door ownership, maar
+      // defense-in-depth).
+      if (existing.patientId && existing.patientId !== patientId) {
+        await assertPatientLink(ctx.prisma, ctx.user, existing.patientId)
+      }
 
       await ctx.prisma.weekScheduleDay.deleteMany({ where: { weekScheduleId: id } })
 
