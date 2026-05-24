@@ -1,6 +1,7 @@
 import { PrismaClient, UserRole, ExerciseCategory, BodyRegion, LoadType, MovementPattern } from '@prisma/client'
 import { STANDARD_EXERCISES } from './seed-exercises'
 import { PROGRESSION_CHAINS } from './exercise-progressions'
+import { seedClinicalTests } from '../scripts/seed-clinical-tests'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
 import { config } from 'dotenv'
@@ -429,6 +430,8 @@ async function main() {
     }
   }
   console.log(`Insight rules: ${rulesCreated} created, ${rulesUpdated} updated`)
+
+  await seedClinicalTests(prisma)
 
   console.log('Seeding complete!')
 }

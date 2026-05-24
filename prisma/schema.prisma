@@ -156,14 +156,14 @@ enum InsightActionType {
 // ─── Revalidatie-protocollen (stoplicht-tracker) ─────────────────────────────
 
 enum RehabCriterionStatusValue {
-  NOT_MET       // rood
-  IN_PROGRESS   // oranje — bijna
-  MET           // groen — behaald
+  NOT_MET // rood
+  IN_PROGRESS // oranje — bijna
+  MET // groen — behaald
 }
 
 enum RehabCriterionInputType {
-  NUMERIC   // bv 125 (graden), 95 (%), 20 (reps)
-  TEXT      // kwalitatief ("goed" / "matig" / "slecht")
+  NUMERIC // bv 125 (graden), 95 (%), 20 (reps)
+  TEXT // kwalitatief ("goed" / "matig" / "slecht")
   PASS_FAIL // slagen / niet slagen
 }
 
@@ -190,10 +190,28 @@ enum AssessmentTestType {
 }
 
 enum AssessmentScore {
-  NOT_TESTED  // grijs / overgeslagen
-  FAIL        // rood
-  PARTIAL     // oranje
-  PASS        // groen
+  NOT_TESTED // grijs / overgeslagen
+  FAIL // rood
+  PARTIAL // oranje
+  PASS // groen
+}
+
+enum TestConstruct {
+  STRENGTH
+  ROM
+  POWER
+  BALANCE
+  ENDURANCE
+  PROVOCATION
+  NEURODYNAMIC
+  MOVEMENT_QUALITY
+  SENSORIMOTOR
+  FUNCTIONAL
+  SPORT_SPECIFIC
+  SENSIBILITY
+  RESPIRATORY
+  EFFUSION
+  DECISION_RULE
 }
 
 enum TissueLimitation {
@@ -204,35 +222,35 @@ enum TissueLimitation {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
+  id             String    @id @default(cuid())
+  email          String    @unique
   // Stabiele binding aan de Supabase auth-user. Email is mutable; deze UUID
   // niet. Lookups in tRPC context gebeuren primair op deze kolom — fallback
   // op email-match alleen voor legacy rows zonder supabaseUserId, en alleen
   // als het een 1-op-1 match is (anders geweigerd, voorkomt account-takeover
   // via Supabase email-change).
-  supabaseUserId String? @unique
-  name          String?
-  role          UserRole  @default(PATIENT)
-  avatarUrl     String?
-  phone         String?
-  dateOfBirth   DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  supabaseUserId String?   @unique
+  name           String?
+  role           UserRole  @default(PATIENT)
+  avatarUrl      String?
+  phone          String?
+  dateOfBirth    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   // Therapist fields
-  specialty     String?
-  bio           String?
-  licenseNumber String?
+  specialty       String?
+  bio             String?
+  licenseNumber   String?
   // Naam-split — naast `name` (canonical, voor backwards-compat) houden we
   // firstName/lastName apart. UI bewerkt firstName/lastName, server hercomputeert
   // `name = trim(firstName + ' ' + lastName)` om beide in sync te houden.
   // Backfill via SQL bij eerste migratie voor bestaande rows.
-  firstName     String?
-  lastName      String?
+  firstName       String?
+  lastName        String?
   // Functietitel — getoond in email-footer onder de therapeut-naam.
   // Bijv. "Sportfysiotherapeut", "Manueel therapeut".
-  jobTitle      String?
+  jobTitle        String?
   // Praktijk-eigenaarschap — onafhankelijk van `role`. Max één owner per
   // practice afgedwongen via partial unique index in SQL-migratie. Owner mag
   // praktijkgegevens (Practice) bewerken; andere therapeuten in dezelfde
@@ -240,22 +258,22 @@ model User {
   isPracticeOwner Boolean @default(false)
 
   // Patient fields — blessure / injury info
-  injuryInfo                String?
-  injuryVisibleToTherapist  Boolean  @default(false)
+  injuryInfo               String?
+  injuryVisibleToTherapist Boolean @default(false)
 
   // DPA (Verwerkingsovereenkomst — AVG verplicht)
   dpaAcceptedVersion String?
   dpaAcceptedAt      DateTime?
 
   // MFA
-  mfaEnabled        Boolean   @default(false)
-  mfaSecret         String?
-  mfaEnforcedAt     DateTime? // moment waarop admin/therapist rol MFA verplicht kreeg
+  mfaEnabled                    Boolean   @default(false)
+  mfaSecret                     String?
+  mfaEnforcedAt                 DateTime? // moment waarop admin/therapist rol MFA verplicht kreeg
   mfaLastBackupCodesGeneratedAt DateTime?
 
   // Admin-toegekende feature-flags (opt-in per therapeut).
   // Mobility Assessment (Ready State methodology) — admin schakelt per therapeut in.
-  canUseAssessment  Boolean   @default(false)
+  canUseAssessment Boolean @default(false)
 
   // Cohort analytics opt-out — patient/athlete kan zichzelf uitsluiten van
   // platform-aggregaten (gemiddelden / trends voor therapeut + admin).
@@ -265,44 +283,44 @@ model User {
   cohortAnalyticsOptOut Boolean @default(false)
 
   // AVG art. 17 — right to be forgotten
-  deletedAt             DateTime?  // soft-delete tombstone (records stay during 30-day grace)
-  deletionRequestedAt   DateTime?  // when patient requested deletion
+  deletedAt           DateTime? // soft-delete tombstone (records stay during 30-day grace)
+  deletionRequestedAt DateTime? // when patient requested deletion
 
   // Multi-tenant: praktijk-scope. null = legacy / admin / cross-tenant.
-  practiceId    String?
-  practice      Practice? @relation(fields: [practiceId], references: [id], onDelete: SetNull)
+  practiceId String?
+  practice   Practice? @relation(fields: [practiceId], references: [id], onDelete: SetNull)
 
   // Relations
-  therapistPatients      PatientTherapist[]     @relation("TherapistRelation")
-  patientTherapists      PatientTherapist[]     @relation("PatientRelation")
-  createdPrograms        Program[]              @relation("ProgramCreator")
-  patientPrograms        Program[]              @relation("ProgramPatient")
-  exercises              Exercise[]
-  collections            ExerciseCollection[]
-  appointments           Appointment[]          @relation("PatientAppointments")
-  therapistAppointments  Appointment[]          @relation("TherapistAppointments")
-  sessionLogs            SessionLog[]           @relation("SessionLogPatient")
-  therapistSessionLogs   SessionLog[]           @relation("SessionLogTherapist")
-  cardioLogs             CardioLog[]
-  notifications          Notification[]
-  messages               Message[]
-  createdWeekSchedules   WeekSchedule[]         @relation("CreatedWeekSchedules")
-  patientWeekSchedules   WeekSchedule[]         @relation("PatientWeekSchedules")
-  researchConsent        ResearchConsent?
-  favoriteExercises      FavoriteExercise[]
-  wellnessChecks         WellnessCheck[]
-  painEntries            PainEntry[]
-  invitesSent            InviteCode[]           @relation("InviteSender")
-  auditLogs              AuditLog[]
-  mfaBackupCodes         MfaBackupCode[]
+  therapistPatients     PatientTherapist[]   @relation("TherapistRelation")
+  patientTherapists     PatientTherapist[]   @relation("PatientRelation")
+  createdPrograms       Program[]            @relation("ProgramCreator")
+  patientPrograms       Program[]            @relation("ProgramPatient")
+  exercises             Exercise[]
+  collections           ExerciseCollection[]
+  appointments          Appointment[]        @relation("PatientAppointments")
+  therapistAppointments Appointment[]        @relation("TherapistAppointments")
+  sessionLogs           SessionLog[]         @relation("SessionLogPatient")
+  therapistSessionLogs  SessionLog[]         @relation("SessionLogTherapist")
+  cardioLogs            CardioLog[]
+  notifications         Notification[]
+  messages              Message[]
+  createdWeekSchedules  WeekSchedule[]       @relation("CreatedWeekSchedules")
+  patientWeekSchedules  WeekSchedule[]       @relation("PatientWeekSchedules")
+  researchConsent       ResearchConsent?
+  favoriteExercises     FavoriteExercise[]
+  wellnessChecks        WellnessCheck[]
+  painEntries           PainEntry[]
+  invitesSent           InviteCode[]         @relation("InviteSender")
+  auditLogs             AuditLog[]
+  mfaBackupCodes        MfaBackupCode[]
 
   // CIE relations
-  patientInsightStatus   PatientInsightStatus?  @relation("PatientInsightStatusPatient")
-  insightStatusEnabled   PatientInsightStatus[] @relation("PatientInsightStatusEnabler")
-  insights               Insight[]              @relation("InsightPatient")
-  insightStatusChanges   Insight[]              @relation("InsightStatusChanger")
-  insightActions         InsightAction[]        @relation("InsightActionActor")
-  insightPrefs           TherapistInsightPref?
+  patientInsightStatus PatientInsightStatus?  @relation("PatientInsightStatusPatient")
+  insightStatusEnabled PatientInsightStatus[] @relation("PatientInsightStatusEnabler")
+  insights             Insight[]              @relation("InsightPatient")
+  insightStatusChanges Insight[]              @relation("InsightStatusChanger")
+  insightActions       InsightAction[]        @relation("InsightActionActor")
+  insightPrefs         TherapistInsightPref?
 
   // Rehab-tracker relations
   rehabTracker           PatientRehabTracker?   @relation("RehabTrackerPatient")
@@ -310,8 +328,13 @@ model User {
   rehabStatusUpdates     RehabCriterionStatus[] @relation("RehabStatusUpdater")
 
   // Mobility assessment relations
-  assessmentsAsPatient   PatientAssessment[]    @relation("AssessmentPatient")
-  assessmentsAsTherapist PatientAssessment[]    @relation("AssessmentTherapist")
+  assessmentsAsPatient   PatientAssessment[] @relation("AssessmentPatient")
+  assessmentsAsTherapist PatientAssessment[] @relation("AssessmentTherapist")
+
+  // Clinical-test library relations
+  clinicalTestAssignments   PatientTestAssignment[] @relation("ClinicalTestPatient")
+  clinicalTestsAssignedByMe PatientTestAssignment[] @relation("ClinicalTestAssigner")
+  clinicalTestResultsLogged PatientTestResult[]     @relation("ClinicalTestResultPerformer")
 
   @@index([deletedAt])
   @@map("users")
@@ -321,12 +344,12 @@ model User {
 /// patient/therapist moet ze zelf bewaren (print / password-manager).
 /// Bij `usedAt != null` is de code al verbrand en kan niet opnieuw.
 model MfaBackupCode {
-  id          String    @id @default(cuid())
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId      String
-  codeHash    String    @unique
-  usedAt      DateTime?
-  createdAt   DateTime  @default(now())
+  id        String    @id @default(cuid())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  codeHash  String    @unique
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
 
   @@index([userId])
   @@index([userId, usedAt])
@@ -338,11 +361,11 @@ model WellnessCheck {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
   date      DateTime // start-of-day, 1 per user per day
-  sleep     Int      // 1-5 (5 = great sleep)
-  soreness  Int      // 1-5 (5 = no soreness)
-  fatigue   Int      // 1-5 (5 = fresh)
-  mood      Int      // 1-5 (5 = great)
-  stress    Int      // 1-5 (5 = calm)
+  sleep     Int // 1-5 (5 = great sleep)
+  soreness  Int // 1-5 (5 = no soreness)
+  fatigue   Int // 1-5 (5 = fresh)
+  mood      Int // 1-5 (5 = great)
+  stress    Int // 1-5 (5 = calm)
   notes     String?
   createdAt DateTime @default(now())
 
@@ -352,15 +375,15 @@ model WellnessCheck {
 }
 
 model PainEntry {
-  id        String   @id @default(cuid())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    String
-  nrs       Int      // 0-10 NRS pain scale
-  location  String   // e.g. "Knie links"
-  context   String   // 'rest' | 'movement' | 'exercise' | 'after' | 'always'
-  notes     String?
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  nrs        Int // 0-10 NRS pain scale
+  location   String // e.g. "Knie links"
+  context    String // 'rest' | 'movement' | 'exercise' | 'after' | 'always'
+  notes      String?
   reportedAt DateTime @default(now())
-  createdAt DateTime @default(now())
+  createdAt  DateTime @default(now())
 
   @@index([userId, reportedAt])
   @@map("pain_entries")
@@ -374,57 +397,57 @@ enum PatientAccessStatus {
 }
 
 model PatientTherapist {
-  id           String              @id @default(cuid())
-  therapist    User                @relation("TherapistRelation", fields: [therapistId], references: [id], onDelete: Cascade)
-  therapistId  String
-  patient      User                @relation("PatientRelation", fields: [patientId], references: [id], onDelete: Cascade)
-  patientId    String
-  createdAt    DateTime            @default(now())
-  isActive     Boolean             @default(true)
+  id          String              @id @default(cuid())
+  therapist   User                @relation("TherapistRelation", fields: [therapistId], references: [id], onDelete: Cascade)
+  therapistId String
+  patient     User                @relation("PatientRelation", fields: [patientId], references: [id], onDelete: Cascade)
+  patientId   String
+  createdAt   DateTime            @default(now())
+  isActive    Boolean             @default(true)
   // Consent-workflow: patient moet expliciet toestemming geven. Bestaande
   // rijen krijgen default APPROVED om huidige koppelingen niet te breken.
-  status       PatientAccessStatus @default(APPROVED)
-  requestedAt  DateTime?
-  respondedAt  DateTime?
-  notes        String?
+  status      PatientAccessStatus @default(APPROVED)
+  requestedAt DateTime?
+  respondedAt DateTime?
+  notes       String?
 
   @@unique([therapistId, patientId])
   @@map("patient_therapists")
 }
 
 model Exercise {
-  id             String           @id @default(cuid())
-  name           String
-  description    String?
-  category       ExerciseCategory
-  bodyRegion     BodyRegion[]
-  difficulty     Difficulty       @default(BEGINNER)
-  mediaType      MediaType?
-  videoUrl       String?
-  thumbnailUrl   String?
-  instructions   String[]
-  tips           String[]
-  tags           String[]
-  isPublic       Boolean          @default(false)
-  loadType       LoadType         @default(BODYWEIGHT)
-  isUnilateral   Boolean          @default(false)
-  movementPattern MovementPattern?
-  trackOneRepMax Boolean          @default(false)
+  id                 String           @id @default(cuid())
+  name               String
+  description        String?
+  category           ExerciseCategory
+  bodyRegion         BodyRegion[]
+  difficulty         Difficulty       @default(BEGINNER)
+  mediaType          MediaType?
+  videoUrl           String?
+  thumbnailUrl       String?
+  instructions       String[]
+  tips               String[]
+  tags               String[]
+  isPublic           Boolean          @default(false)
+  loadType           LoadType         @default(BODYWEIGHT)
+  isUnilateral       Boolean          @default(false)
+  movementPattern    MovementPattern?
+  trackOneRepMax     Boolean          @default(false)
   // Standaard-parameters die overgenomen worden wanneer deze oefening
   // aan een programma wordt toegevoegd. Vorm: ExtraParam[] uit
   // src/components/programs/types.ts.
-  defaultExtraParams Json         @default("[]")
+  defaultExtraParams Json             @default("[]")
   // Standaard tracking-unit voor de primaire as (reps/sec/min). Wordt
   // overgenomen in ProgramExercise.repUnit bij toevoegen aan een programma.
   // "sec" voor isometrische oefeningen (plank/wall sit/dead hang).
-  defaultRepUnit String           @default("reps")
-  createdBy      User             @relation(fields: [createdById], references: [id])
-  createdById    String
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  defaultRepUnit     String           @default("reps")
+  createdBy          User             @relation(fields: [createdById], references: [id])
+  createdById        String
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
   // Muscle loading (1-5 per muscle group)
-  muscleLoads    MuscleLoad[]
+  muscleLoads MuscleLoad[]
 
   // Progression variants (self-referential)
   easierVariantId String?
@@ -434,50 +457,50 @@ model Exercise {
   harderVariant   Exercise?  @relation("ProgressionHarder", fields: [harderVariantId], references: [id])
   harderOf        Exercise[] @relation("ProgressionHarder")
 
-  programExercises ProgramExercise[]
-  collectionItems  ExerciseCollectionItem[]
-  favoritedBy      FavoriteExercise[]
-  insights         Insight[]
+  programExercises        ProgramExercise[]
+  collectionItems         ExerciseCollectionItem[]
+  favoritedBy             FavoriteExercise[]
+  insights                Insight[]
   assessmentMobilizations AssessmentTestMobilization[]
 
   // Multi-tenant: oefening is zichtbaar binnen deze praktijk. null = globaal
   // (admin-beheerd / legacy). Gecombineerd met isPublic (true = ook globaal
   // zichtbaar) voor de resolution-regels.
-  practiceId  String?
-  practice    Practice? @relation(fields: [practiceId], references: [id], onDelete: SetNull)
+  practiceId String?
+  practice   Practice? @relation(fields: [practiceId], references: [id], onDelete: SetNull)
 
   @@index([practiceId])
   @@map("exercises")
 }
 
 model Practice {
-  id                  String       @id @default(cuid())
-  name                String
+  id                String       @id @default(cuid())
+  name              String
   // Adres + contact — alle nullable zodat bestaande praktijken niet breken.
   // Worden meegerenderd in de email-footer als ze ingevuld zijn; lege velden
   // worden in de footer overgeslagen, of de hele footer als de minimale set
   // (addressLine1 + city + email-of-phone) ontbreekt.
-  addressLine1        String?
-  addressLine2        String?
-  postalCode          String?
-  city                String?
-  country             String?      @default("Nederland")
-  phone               String?
-  email               String?
-  website             String?
-  logoUrl             String?
-  agbCodePractice     String?
+  addressLine1      String?
+  addressLine2      String?
+  postalCode        String?
+  city              String?
+  country           String?      @default("Nederland")
+  phone             String?
+  email             String?
+  website           String?
+  logoUrl           String?
+  agbCodePractice   String?
   // Plain text, max 500 chars. Wordt onderaan de email-footer gerenderd in
   // kleinere grijze typografie. Geen HTML/markdown om XSS-risico in mail-
   // templates te vermijden.
-  privacyDisclaimer   String?
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
+  privacyDisclaimer String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
   // Clinical Insight Engine — gefaseerde rollout per praktijk.
-  cieEnabled          Boolean      @default(false)
-  users               User[]
-  exercises           Exercise[]
-  inviteCodes         InviteCode[]
+  cieEnabled        Boolean      @default(false)
+  users             User[]
+  exercises         Exercise[]
+  inviteCodes       InviteCode[]
 
   @@map("practices")
 }
@@ -486,22 +509,22 @@ model Practice {
 /// mailt die naar de patiënt. Patiënt logt in met e-mail + geboortejaar + code.
 /// Only codeHash is stored — klare code bestaat alleen tijdens de request.
 model InviteCode {
-  id             String    @id @default(cuid())
-  codeHash       String    @unique
-  email          String
-  name           String
-  dateOfBirth    DateTime  // full date; alleen year wordt gecontroleerd bij redeem
-  role           UserRole  @default(PATIENT)
-  practiceId     String?
-  practice       Practice? @relation(fields: [practiceId], references: [id], onDelete: SetNull)
-  invitedById    String
-  invitedBy      User      @relation("InviteSender", fields: [invitedById], references: [id], onDelete: Cascade)
-  expiresAt      DateTime
-  usedAt         DateTime?
-  usedByUserId  String?    // link naar de aangemaakte/bestaande User na redeem
-  attempts       Int       @default(0)
-  lastAttemptAt  DateTime?
-  createdAt      DateTime  @default(now())
+  id            String    @id @default(cuid())
+  codeHash      String    @unique
+  email         String
+  name          String
+  dateOfBirth   DateTime // full date; alleen year wordt gecontroleerd bij redeem
+  role          UserRole  @default(PATIENT)
+  practiceId    String?
+  practice      Practice? @relation(fields: [practiceId], references: [id], onDelete: SetNull)
+  invitedById   String
+  invitedBy     User      @relation("InviteSender", fields: [invitedById], references: [id], onDelete: Cascade)
+  expiresAt     DateTime
+  usedAt        DateTime?
+  usedByUserId  String? // link naar de aangemaakte/bestaande User na redeem
+  attempts      Int       @default(0)
+  lastAttemptAt DateTime?
+  createdAt     DateTime  @default(now())
 
   @@index([email])
   @@index([invitedById])
@@ -512,17 +535,17 @@ model InviteCode {
 /// AVG art. 32 — audit-trail van kritieke acties (login, data-view, consent, export, delete).
 /// Nooit patient-vrije PII direct in metadata; alleen IDs + event-type.
 model AuditLog {
-  id          String   @id @default(cuid())
-  userId      String?
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  actorEmail  String?  // fallback als user verwijderd is
-  event       String   // bv. LOGIN_SUCCESS, INVITE_CREATED, DATA_EXPORTED
-  resource    String?  // bv. 'Patient', 'Program', 'SessionLog'
-  resourceId  String?
-  ip          String?
-  userAgent   String?
-  metadata    Json?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  actorEmail String? // fallback als user verwijderd is
+  event      String // bv. LOGIN_SUCCESS, INVITE_CREATED, DATA_EXPORTED
+  resource   String? // bv. 'Patient', 'Program', 'SessionLog'
+  resourceId String?
+  ip         String?
+  userAgent  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
 
   @@index([userId, createdAt])
   @@index([event, createdAt])
@@ -547,8 +570,8 @@ model MuscleLoad {
   id         String   @id @default(cuid())
   exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
   exerciseId String
-  muscle     String   // e.g. "Quadriceps", "Hamstrings"
-  load       Int      // 1-5
+  muscle     String // e.g. "Quadriceps", "Hamstrings"
+  load       Int // 1-5
 
   @@unique([exerciseId, muscle])
   @@map("muscle_loads")
@@ -557,7 +580,7 @@ model MuscleLoad {
 model ExerciseCollection {
   id          String   @id @default(cuid())
   name        String
-  color       String?  // hex color label
+  color       String? // hex color label
   therapist   User     @relation(fields: [therapistId], references: [id])
   therapistId String
   createdAt   DateTime @default(now())
@@ -591,17 +614,17 @@ model Program {
   daysPerWeek  Int           @default(3)
   startDate    DateTime?
   endDate      DateTime?
-  cardioParams Json?         // CardioParams JSONB for cardio programs
+  cardioParams Json? // CardioParams JSONB for cardio programs
 
-  tendinopathyMode Boolean       @default(false)
-  trackOneRepMax   Boolean       @default(false)
+  tendinopathyMode Boolean @default(false)
+  trackOneRepMax   Boolean @default(false)
 
   // Flexible-schedule modus: patient kan dit programma elke dag van de week
   // starten in plaats van vastgepind op specifieke dagen. Klaar zodra de
   // patient `weeklyTarget` keer voltooid heeft (Mo-Su rolling). Resulteert
   // in een "lekker bezig" melding aan patient-zijde + suppressie van de
   // oefeningen voor de rest van die week.
-  flexibleSchedule Boolean       @default(false)
+  flexibleSchedule Boolean @default(false)
   weeklyTarget     Int?
 
   creator   User    @relation("ProgramCreator", fields: [creatorId], references: [id])
@@ -612,11 +635,11 @@ model Program {
   // Multi-tenant scope — defensief. Null = legacy (van vóór practice-scoping).
   practiceId String?
 
-  exercises             ProgramExercise[]
-  sessionLogs           SessionLog[]
-  weekScheduleDays      WeekScheduleDay[]
-  weekScheduleDayItems  WeekScheduleDayItem[] @relation("ProgramWeekScheduleItems")
-  cardioLogs            CardioLog[]
+  exercises            ProgramExercise[]
+  sessionLogs          SessionLog[]
+  weekScheduleDays     WeekScheduleDay[]
+  weekScheduleDayItems WeekScheduleDayItem[] @relation("ProgramWeekScheduleItems")
+  cardioLogs           CardioLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -627,25 +650,25 @@ model Program {
 }
 
 model CardioLog {
-  id           String          @id @default(cuid())
-  program      Program?        @relation(fields: [programId], references: [id], onDelete: SetNull)
+  id           String         @id @default(cuid())
+  program      Program?       @relation(fields: [programId], references: [id], onDelete: SetNull)
   programId    String?
-  patient      User            @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient      User           @relation(fields: [patientId], references: [id], onDelete: Cascade)
   patientId    String
   activity     CardioActivity
   protocol     CardioProtocol
-  durationSec  Int             // seconds
-  distanceM    Int?            // meters
+  durationSec  Int // seconds
+  distanceM    Int? // meters
   avgHeartRate Int?
   maxHeartRate Int?
-  zone         Int?            // 1-5
+  zone         Int? // 1-5
   calories     Int?
-  rpe          Int?            // 1-10
-  painLevel    Int?            // 0-10
+  rpe          Int? // 1-10
+  painLevel    Int? // 0-10
   notes        String?
-  intervals    Json?           // interval details JSONB
-  completedAt  DateTime        @default(now())
-  createdAt    DateTime        @default(now())
+  intervals    Json? // interval details JSONB
+  completedAt  DateTime       @default(now())
+  createdAt    DateTime       @default(now())
 
   @@map("cardio_logs")
 }
@@ -669,7 +692,7 @@ model WeekSchedule {
   updatedAt   DateTime          @updatedAt
 
   // Multi-tenant scope. Null = legacy.
-  practiceId  String?
+  practiceId String?
 
   @@index([practiceId])
   @@index([creatorId, practiceId])
@@ -677,15 +700,15 @@ model WeekSchedule {
 }
 
 model WeekScheduleDay {
-  id             String       @id
+  id             String                @id
   weekScheduleId String
-  weekSchedule   WeekSchedule @relation(fields: [weekScheduleId], references: [id], onDelete: Cascade)
+  weekSchedule   WeekSchedule          @relation(fields: [weekScheduleId], references: [id], onDelete: Cascade)
   dayOfWeek      Int
   // Legacy: 1 programma per dag. Behouden voor backward-compat met patient-app
   // die nog deze shape leest. Vervangen door `items[]` voor multi-workout —
   // wordt in latere fase verwijderd nadat alle consumers gemigreerd zijn.
   programId      String?
-  program        Program?     @relation(fields: [programId], references: [id])
+  program        Program?              @relation(fields: [programId], references: [id])
   // Multi-workout per dag: 0..N losse items per dag (programma's of "snelle"
   // workouts zonder programma-koppeling).
   items          WeekScheduleDayItem[]
@@ -697,15 +720,15 @@ model WeekScheduleDay {
 /// of een losse "snelle workout" (variant B, TP-stijl) zonder oefeningen.
 /// Exact één van `programId` of `quickCategory` is gevuld; de andere set is null.
 model WeekScheduleDayItem {
-  id               String           @id @default(cuid())
-  day              WeekScheduleDay  @relation(fields: [dayId], references: [id], onDelete: Cascade)
-  dayId            String
+  id    String          @id @default(cuid())
+  day   WeekScheduleDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  dayId String
   // Volgorde binnen de dag — laagste eerst gerenderd.
-  order            Int              @default(0)
+  order Int             @default(0)
 
   // Variant A: koppeling aan bestaand programma uit de bibliotheek.
-  programId        String?
-  program          Program?         @relation("ProgramWeekScheduleItems", fields: [programId], references: [id], onDelete: SetNull)
+  programId String?
+  program   Program? @relation("ProgramWeekScheduleItems", fields: [programId], references: [id], onDelete: SetNull)
 
   // Variant B: losse "snelle" workout zonder programma — type, naam, duur.
   // quickCategory hergebruikt de bestaande ExerciseCategory enum (STRENGTH,
@@ -716,36 +739,36 @@ model WeekScheduleDayItem {
   quickDurationSec Int?
 
   // Optionele therapeut-notitie bij dit specifieke item.
-  notes            String?
+  notes String?
 
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([dayId, order])
   @@map("week_schedule_day_items")
 }
 
 model ProgramExercise {
-  id             String   @id @default(cuid())
-  program        Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
-  programId      String
-  exercise       Exercise @relation(fields: [exerciseId], references: [id])
-  exerciseId     String
-  week           Int      @default(1)
-  day            Int      @default(1)
-  order          Int      @default(0)
-  sets           Int      @default(3)
+  id            String   @id @default(cuid())
+  program       Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  programId     String
+  exercise      Exercise @relation(fields: [exerciseId], references: [id])
+  exerciseId    String
+  week          Int      @default(1)
+  day           Int      @default(1)
+  order         Int      @default(0)
+  sets          Int      @default(3)
   // Optionele bovengrens voor sets-range. NULL = `sets` als vaste waarde,
   // ingevuld = "sets..setsMax" als range (bv. 3-5 sets).
-  setsMax        Int?
-  reps           Int      @default(10)
+  setsMax       Int?
+  reps          Int      @default(10)
   // Optionele bovengrens voor reps-range. NULL = enkele waarde, ingevuld = range.
-  repsMax        Int?
-  repUnit        String   @default("reps")
-  restTime       Int      @default(60)
-  supersetGroup  String?
-  supersetOrder  Int      @default(0)
-  notes          String?
+  repsMax       Int?
+  repUnit       String   @default("reps")
+  restTime      Int      @default(60)
+  supersetGroup String?
+  supersetOrder Int      @default(0)
+  notes         String?
 
   @@map("program_exercises")
 }
@@ -764,10 +787,10 @@ model SessionLog {
   status        SessionStatus @default(PENDING)
   scheduledAt   DateTime
   completedAt   DateTime?
-  duration      Int?          // seconds
+  duration      Int? // seconds
   notes         String?
-  painLevel     Int?          // 0-10
-  exertionLevel Int?          // 0-10 RPE
+  painLevel     Int? // 0-10
+  exertionLevel Int? // 0-10 RPE
 
   exerciseLogs ExerciseLog[]
 
@@ -779,24 +802,24 @@ model SessionLog {
 }
 
 model ExerciseLog {
-  id                  String     @id @default(cuid())
-  session             SessionLog @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  sessionId           String
-  exerciseId          String
-  setsCompleted       Int?
-  repsCompleted       Int?
-  duration            Int?
-  notes               String?
-  painLevel           Int?
-  weight              Float?     // kg used in last set (legacy single-weight)
-  weightsPerSet       Json?      // [number|null, ...] één entry per set
-  extraParams         Json?      // [{ id, label, type, value, unit?, options?, min?, max? }, ...]
-  supersetGroup       String?    // 'A'..'F' of null
-  phase               String?    // 'WARMUP' of 'MAIN' (null = legacy = MAIN)
-  estimatedOneRepMax  Float?     // Epley: weight × (1 + reps/30)
-  painDuring          Int?       // 0-10 NRS, tendinopathy mode
-  painAfter24h        Int?       // 0-10 NRS, filled via follow-up
-  morningStiffness    Int?       // 0-10, filled via follow-up
+  id                 String     @id @default(cuid())
+  session            SessionLog @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId          String
+  exerciseId         String
+  setsCompleted      Int?
+  repsCompleted      Int?
+  duration           Int?
+  notes              String?
+  painLevel          Int?
+  weight             Float? // kg used in last set (legacy single-weight)
+  weightsPerSet      Json? // [number|null, ...] één entry per set
+  extraParams        Json? // [{ id, label, type, value, unit?, options?, min?, max? }, ...]
+  supersetGroup      String? // 'A'..'F' of null
+  phase              String? // 'WARMUP' of 'MAIN' (null = legacy = MAIN)
+  estimatedOneRepMax Float? // Epley: weight × (1 + reps/30)
+  painDuring         Int? // 0-10 NRS, tendinopathy mode
+  painAfter24h       Int? // 0-10 NRS, filled via follow-up
+  morningStiffness   Int? // 0-10, filled via follow-up
 
   @@map("exercise_logs")
 }
@@ -809,7 +832,7 @@ model Appointment {
   therapistId String
   status      AppointmentStatus @default(SCHEDULED)
   scheduledAt DateTime
-  duration    Int               // minutes
+  duration    Int // minutes
   notes       String?
   location    String?
 
@@ -876,15 +899,15 @@ model AnonymizedRecord {
   // anonymousId references AnonymousIdMapping.anonymousId — no direct FK to prevent reverse lookup
   anonymousId       String
   recordDate        DateTime
-  ageAtRecord       Int      // computed from dateOfBirth at time of recording; DOB not stored
-  diagnosisCategory String?  // normalized diagnosis category (e.g. "ACL", "Schouder impingement")
+  ageAtRecord       Int // computed from dateOfBirth at time of recording; DOB not stored
+  diagnosisCategory String? // normalized diagnosis category (e.g. "ACL", "Schouder impingement")
   exerciseName      String?
   setsCompleted     Int?
   repsCompleted     Int?
-  sessionDuration   Int?     // seconds
-  painLevel         Int?     // 0-10
-  exertionLevel     Int?     // 0-10 RPE
-  promData          Json?    // PROM scores placeholder
+  sessionDuration   Int? // seconds
+  painLevel         Int? // 0-10
+  exertionLevel     Int? // 0-10 RPE
+  promData          Json? // PROM scores placeholder
   createdAt         DateTime @default(now())
 
   @@map("anonymized_records")
@@ -897,17 +920,17 @@ model AnonymizedRecord {
 /// Opt-in tracking per patient + patient-objection flag (AVG art. 21).
 /// One row per patient; absence = not-yet-enabled.
 model PatientInsightStatus {
-  patientId             String    @id
-  patient               User      @relation("PatientInsightStatusPatient", fields: [patientId], references: [id], onDelete: Cascade)
-  enabled               Boolean   @default(false)
-  enabledById           String?
-  enabledBy             User?     @relation("PatientInsightStatusEnabler", fields: [enabledById], references: [id])
-  enabledAt             DateTime?
-  disabledAt            DateTime?
-  patientObjection      Boolean   @default(false)
-  patientObjectionAt    DateTime?
-  patientObjectionNote  String?
-  updatedAt             DateTime  @updatedAt
+  patientId            String    @id
+  patient              User      @relation("PatientInsightStatusPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  enabled              Boolean   @default(false)
+  enabledById          String?
+  enabledBy            User?     @relation("PatientInsightStatusEnabler", fields: [enabledById], references: [id])
+  enabledAt            DateTime?
+  disabledAt           DateTime?
+  patientObjection     Boolean   @default(false)
+  patientObjectionAt   DateTime?
+  patientObjectionNote String?
+  updatedAt            DateTime  @updatedAt
 
   @@map("patient_insight_status")
 }
@@ -915,25 +938,25 @@ model PatientInsightStatus {
 /// Generated insight row — one per detected trigger.
 /// patientId-scoped (NOT therapist-scoped) so all treating therapists see the same.
 model Insight {
-  id                 String         @id @default(cuid())
-  patientId          String
-  patient            User           @relation("InsightPatient", fields: [patientId], references: [id], onDelete: Cascade)
-  signalType         String         // matches InsightRule.signalType
-  urgency            InsightUrgency
-  title              String
-  suggestion         String
-  triggerData        Json           // explainability payload — what data triggered this
-  exerciseId         String?
-  exercise           Exercise?      @relation(fields: [exerciseId], references: [id])
-  status             InsightStatus  @default(OPEN)
-  statusChangedById  String?
-  statusChangedBy    User?          @relation("InsightStatusChanger", fields: [statusChangedById], references: [id])
-  statusChangedAt    DateTime?
-  snoozedUntil       DateTime?
-  createdAt          DateTime       @default(now())
-  expiresAt          DateTime
+  id                String         @id @default(cuid())
+  patientId         String
+  patient           User           @relation("InsightPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  signalType        String // matches InsightRule.signalType
+  urgency           InsightUrgency
+  title             String
+  suggestion        String
+  triggerData       Json // explainability payload — what data triggered this
+  exerciseId        String?
+  exercise          Exercise?      @relation(fields: [exerciseId], references: [id])
+  status            InsightStatus  @default(OPEN)
+  statusChangedById String?
+  statusChangedBy   User?          @relation("InsightStatusChanger", fields: [statusChangedById], references: [id])
+  statusChangedAt   DateTime?
+  snoozedUntil      DateTime?
+  createdAt         DateTime       @default(now())
+  expiresAt         DateTime
 
-  actions            InsightAction[]
+  actions InsightAction[]
 
   @@index([patientId, status, urgency, createdAt])
   @@index([patientId, createdAt])
@@ -960,27 +983,27 @@ model InsightAction {
 
 /// Per-therapist CIE config: which signals, custom thresholds, quiet hours.
 model TherapistInsightPref {
-  therapistId        String   @id
-  therapist          User     @relation(fields: [therapistId], references: [id], onDelete: Cascade)
-  signalsEnabled     Json     @default("{}")  // { pain_flare: true, plateau: false, ... }
-  customThresholds   Json     @default("{}")  // { pain_flare: { delta: 2 }, ... }
-  notificationPrefs  Json     @default("{}")  // { critical: ["email","push"], high: ["digest"] }
-  quietHoursStart    Int?                     // 0-23 local hour
-  quietHoursEnd      Int?                     // 0-23 local hour
-  updatedAt          DateTime @updatedAt
+  therapistId       String   @id
+  therapist         User     @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  signalsEnabled    Json     @default("{}") // { pain_flare: true, plateau: false, ... }
+  customThresholds  Json     @default("{}") // { pain_flare: { delta: 2 }, ... }
+  notificationPrefs Json     @default("{}") // { critical: ["email","push"], high: ["digest"] }
+  quietHoursStart   Int? // 0-23 local hour
+  quietHoursEnd     Int? // 0-23 local hour
+  updatedAt         DateTime @updatedAt
 
   @@map("therapist_insight_prefs")
 }
 
 /// Rule catalog — seeded with 6 rules for v1. Therapists override via TherapistInsightPref.
 model InsightRule {
-  signalType       String         @id
-  category         String         // "pain" | "progression" | "adherence" | "pattern"
-  defaultUrgency   InsightUrgency
-  defaultConfig    Json
-  evidenceRefs     String[]
-  enabledGlobally  Boolean        @default(true)
-  updatedAt        DateTime       @updatedAt
+  signalType      String         @id
+  category        String // "pain" | "progression" | "adherence" | "pattern"
+  defaultUrgency  InsightUrgency
+  defaultConfig   Json
+  evidenceRefs    String[]
+  enabledGlobally Boolean        @default(true)
+  updatedAt       DateTime       @updatedAt
 
   @@map("insight_rules")
 }
@@ -992,38 +1015,38 @@ model InsightRule {
 
 /// Admin-beheerd protocol uit een evidence-based bron (bv Melbourne VKB 2.0).
 model RehabProtocol {
-  id              String       @id @default(cuid())
-  key             String       @unique // stabiele seed-key, bv "melbourne-acl-2"
+  id              String   @id @default(cuid())
+  key             String   @unique // stabiele seed-key, bv "melbourne-acl-2"
   name            String
   description     String?
-  specialty       String       // "knee_acl", "meniscus", "shoulder"...
-  sourceReference String?      // bv "Cooper & Hughes (2024). Melbourne VKB Protocol 2.0"
-  isActive        Boolean      @default(true)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  specialty       String // "knee_acl", "meniscus", "shoulder"...
+  sourceReference String? // bv "Cooper & Hughes (2024). Melbourne VKB Protocol 2.0"
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  phases          RehabPhase[]
-  trackers        PatientRehabTracker[]
+  phases   RehabPhase[]
+  trackers PatientRehabTracker[]
 
   @@map("rehab_protocols")
 }
 
 /// E\u00e9n fase binnen een protocol (bv "Fase 2 \u2014 Kracht en Neuromusculaire Controle").
 model RehabPhase {
-  id                String            @id @default(cuid())
-  protocolId        String
-  protocol          RehabProtocol     @relation(fields: [protocolId], references: [id], onDelete: Cascade)
-  order             Int               // 0 = pre-op, 1..N = reguliere fases
-  shortName         String            // bv "Pre-op", "Fase 1"
-  name              String            // volledige naam
-  description       String?
-  keyGoals          String[]          // 3 belangrijkste doelen als bullets
+  id               String        @id @default(cuid())
+  protocolId       String
+  protocol         RehabProtocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+  order            Int // 0 = pre-op, 1..N = reguliere fases
+  shortName        String // bv "Pre-op", "Fase 1"
+  name             String // volledige naam
+  description      String?
+  keyGoals         String[] // 3 belangrijkste doelen als bullets
   // Indicatieve tijdlijn t.o.v. operatie (weken). Negatieve waarde = pre-op.
   // null = niet van toepassing / doorlopend.
-  typicalStartWeek  Int?
-  typicalEndWeek    Int?
+  typicalStartWeek Int?
+  typicalEndWeek   Int?
 
-  criteria          RehabCriterion[]
+  criteria RehabCriterion[]
 
   @@unique([protocolId, order])
   @@map("rehab_phases")
@@ -1035,11 +1058,11 @@ model RehabCriterion {
   phaseId         String
   phase           RehabPhase              @relation(fields: [phaseId], references: [id], onDelete: Cascade)
   order           Int
-  name            String                  // bv "Passieve Knie Flexie"
-  testDescription String                  // hoe de test uit te voeren
-  reference       String?                 // bv "Norkin & White, 1995"
-  targetValue     String                  // doel als tekst, bv ">125\u00b0" of "90% vs contralateral"
-  targetUnit      String?                 // "\u00b0", "%", "reps", "seconden"
+  name            String // bv "Passieve Knie Flexie"
+  testDescription String // hoe de test uit te voeren
+  reference       String? // bv "Norkin & White, 1995"
+  targetValue     String // doel als tekst, bv ">125\u00b0" of "90% vs contralateral"
+  targetUnit      String? // "\u00b0", "%", "reps", "seconden"
   inputType       RehabCriterionInputType @default(NUMERIC)
   isBonus         Boolean                 @default(false)
 
@@ -1050,13 +1073,13 @@ model RehabCriterion {
   //   * lsiMinGreen        \u2192 minimum LSI% (min/max * 100) voor GROEN (typisch 90)
   //   * lsiMinOrange       \u2192 minimum LSI% voor ORANJE (typisch 80)
   // Status wordt GROEN als BEIDE N\u2265Green \u00e9n LSI\u2265Green. ORANJE als N\u2265Orange + LSI\u2265Orange.
-  isBilateral       Boolean @default(false)
-  newtonMinGreen    Int?
-  newtonMinOrange   Int?
-  lsiMinGreen       Int?
-  lsiMinOrange      Int?
+  isBilateral     Boolean @default(false)
+  newtonMinGreen  Int?
+  newtonMinOrange Int?
+  lsiMinGreen     Int?
+  lsiMinOrange    Int?
 
-  statuses        RehabCriterionStatus[]
+  statuses RehabCriterionStatus[]
 
   @@unique([phaseId, order])
   @@map("rehab_criteria")
@@ -1064,38 +1087,38 @@ model RehabCriterion {
 
 /// Per-patient activation van \u00e9\u00e9n protocol tegelijk (toggle + dropdown).
 model PatientRehabTracker {
-  patientId      String        @id
-  patient        User          @relation("RehabTrackerPatient", fields: [patientId], references: [id], onDelete: Cascade)
-  protocolId     String
-  protocol       RehabProtocol @relation(fields: [protocolId], references: [id])
-  activatedById  String
-  activatedBy    User          @relation("RehabTrackerActivator", fields: [activatedById], references: [id])
-  activatedAt    DateTime      @default(now())
-  deactivatedAt  DateTime?
+  patientId     String        @id
+  patient       User          @relation("RehabTrackerPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  protocolId    String
+  protocol      RehabProtocol @relation(fields: [protocolId], references: [id])
+  activatedById String
+  activatedBy   User          @relation("RehabTrackerActivator", fields: [activatedById], references: [id])
+  activatedAt   DateTime      @default(now())
+  deactivatedAt DateTime?
   // Operatiedatum: basis voor indicatieve fase-berekening (week-based).
-  surgeryDate    DateTime?
+  surgeryDate   DateTime?
   // Optioneel: datum van blessure (voor pre-op contextualisering).
-  injuryDate     DateTime?
-  notes          String?
-  updatedAt      DateTime      @updatedAt
+  injuryDate    DateTime?
+  notes         String?
+  updatedAt     DateTime      @updatedAt
 
   @@map("patient_rehab_trackers")
 }
 
 /// Per patient \u00d7 criterium de R/O/G status + meetwaarde + datum.
 model RehabCriterionStatus {
-  id                String                    @id @default(cuid())
-  patientId         String
-  criterionId       String
-  criterion         RehabCriterion            @relation(fields: [criterionId], references: [id], onDelete: Cascade)
-  status            RehabCriterionStatusValue @default(NOT_MET)
-  measurementValue  String?                   // vrije tekst: "128\u00b0", "95%", "22 reps"
-  measurementDate   DateTime?
-  notes             String?
-  updatedById       String
-  updatedBy         User                      @relation("RehabStatusUpdater", fields: [updatedById], references: [id])
-  createdAt         DateTime                  @default(now())
-  updatedAt         DateTime                  @updatedAt
+  id               String                    @id @default(cuid())
+  patientId        String
+  criterionId      String
+  criterion        RehabCriterion            @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+  status           RehabCriterionStatusValue @default(NOT_MET)
+  measurementValue String? // vrije tekst: "128\u00b0", "95%", "22 reps"
+  measurementDate  DateTime?
+  notes            String?
+  updatedById      String
+  updatedBy        User                      @relation("RehabStatusUpdater", fields: [updatedById], references: [id])
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
 
   @@unique([patientId, criterionId])
   @@index([patientId])
@@ -1109,16 +1132,16 @@ model RehabCriterionStatus {
 
 /// Catalog: \u00e9\u00e9n test-definitie (archetype + type + beschrijving + criteria).
 model AssessmentTest {
-  id             String              @id @default(cuid())
-  key            String              @unique
-  archetype      AssessmentArchetype
-  testType       AssessmentTestType
-  name           String
-  description    String              // hoe de test uit te voeren
-  criteria       String              // wat pass eruit ziet (bullets joined met \\n\u2022 )
-  order          Int                 // sort-order binnen archetype
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  id          String              @id @default(cuid())
+  key         String              @unique
+  archetype   AssessmentArchetype
+  testType    AssessmentTestType
+  name        String
+  description String // hoe de test uit te voeren
+  criteria    String // wat pass eruit ziet (bullets joined met \\n\u2022 )
+  order       Int // sort-order binnen archetype
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 
   suggestedMobilizations AssessmentTestMobilization[]
   scores                 AssessmentTestScore[]
@@ -1134,7 +1157,7 @@ model AssessmentTestMobilization {
   test       AssessmentTest @relation(fields: [testId], references: [id], onDelete: Cascade)
   exerciseId String
   exercise   Exercise       @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
-  order      Int            // 0, 1, 2
+  order      Int // 0, 1, 2
 
   @@unique([testId, order])
   @@map("assessment_test_mobilizations")
@@ -1161,15 +1184,15 @@ model PatientAssessment {
 
 /// Score per test binnen een assessment-sessie.
 model AssessmentTestScore {
-  id           String              @id @default(cuid())
+  id           String            @id @default(cuid())
   assessmentId String
-  assessment   PatientAssessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  assessment   PatientAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
   testId       String
-  test         AssessmentTest      @relation(fields: [testId], references: [id])
-  score        AssessmentScore     @default(NOT_TESTED)
+  test         AssessmentTest    @relation(fields: [testId], references: [id])
+  score        AssessmentScore   @default(NOT_TESTED)
   notes        String?
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 
   @@unique([assessmentId, testId])
   @@index([assessmentId])
@@ -1178,20 +1201,114 @@ model AssessmentTestScore {
 
 /// Per-archetype samenvatting + programming template binnen een assessment.
 model AssessmentArchetypeSummary {
-  id                         String              @id @default(cuid())
-  assessmentId               String
-  assessment                 PatientAssessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  archetype                  AssessmentArchetype
-  compensationStrategy       String?
-  primaryTissue              TissueLimitation?
+  id                        String              @id @default(cuid())
+  assessmentId              String
+  assessment                PatientAssessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  archetype                 AssessmentArchetype
+  compensationStrategy      String?
+  primaryTissue             TissueLimitation?
   // Programming Template — vrije tekst
-  mobilityJoint              String?
-  mobilitySlidingSurface     String?
-  mobilityLoadedEndRange     String?
-  motorSkillTransfer         String?
-  motorMovementModification  String?
-  updatedAt                  DateTime            @updatedAt
+  mobilityJoint             String?
+  mobilitySlidingSurface    String?
+  mobilityLoadedEndRange    String?
+  motorSkillTransfer        String?
+  motorMovementModification String?
+  updatedAt                 DateTime            @updatedAt
 
   @@unique([assessmentId, archetype])
   @@map("assessment_archetype_summaries")
+}
+
+// ─── Clinical Tests library ──────────────────────────────────────────────────
+// Eigenstandig model parallel aan RehabProtocol/RehabCriterion. Een test kan
+// los aan een patient worden toegewezen via PatientTestAssignment, of (later)
+// als criterium binnen een protocol-fase gebruikt worden. Library wordt
+// geseed uit `scripts/clinical-tests-data.ts` (idempotent op `key`).
+
+/// Eén klinische test in de library. Global — niet per practice gescoped.
+model ClinicalTest {
+  id               String        @id @default(cuid())
+  /// Stabiele kebab-case slug, gebruikt als seed-key en URL-segment.
+  key              String        @unique
+  name             String
+  alternativeNames String[] // eponymen, varianten — voor zoek
+  bodyRegion       BodyRegion[] // primaire + secundaire regio's
+  /// Vrije-tekst tags voor sub-regio's niet in de BodyRegion-enum
+  /// (bv "SI_JOINT", "GROIN", "CORE"). Enum-uitbreiding zou te veel
+  /// downstream-code raken; tags zijn flexibel genoeg voor filtering.
+  tags             String[]
+  construct        TestConstruct
+  /// Wat de test meet (1 zin).
+  shortGoal        String
+  /// Hoe uitvoeren — concreet voor therapeut.
+  execution        String
+  /// Cut-off / benchmark / interpretatie als vrije tekst.
+  benchmark        String
+  /// Pathologieën / situaties waar test toegepast wordt.
+  applicableTo     String[]
+  /// Fase-codes 1–5 waarin test typisch wordt ingezet.
+  phases           Int[]
+  /// PubMed IDs van primaire bronnen.
+  sourcePmids      String[]
+  /// Level of Evidence (Oxford CEBM) 1–5.
+  loE              Int
+  /// Materiaal benodigd (optioneel).
+  materialRequired String[]
+  /// Geschatte test-tijd in minuten.
+  estimatedTimeMin Int?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  assignments PatientTestAssignment[]
+
+  @@index([construct])
+  @@map("clinical_tests")
+}
+
+/// Eén losse test toegewezen aan een patient (los van program/protocol).
+/// Een test kan meerdere keren toegewezen worden (longitudinaal hertest);
+/// `assignedAt` maakt elke toewijzing uniek.
+model PatientTestAssignment {
+  id             String       @id @default(cuid())
+  patientId      String
+  patient        User         @relation("ClinicalTestPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  clinicalTestId String
+  clinicalTest   ClinicalTest @relation(fields: [clinicalTestId], references: [id], onDelete: Cascade)
+  assignedById   String
+  assignedBy     User         @relation("ClinicalTestAssigner", fields: [assignedById], references: [id])
+  assignedAt     DateTime     @default(now())
+  dueDate        DateTime?
+  notes          String?
+
+  results PatientTestResult[]
+
+  @@unique([patientId, clinicalTestId, assignedAt])
+  @@index([patientId])
+  @@index([clinicalTestId])
+  @@map("patient_test_assignments")
+}
+
+/// Meetwaarden van één uitvoering van een toegewezen test.
+/// Bilaterale tests vullen `leftValue` + `rightValue` en optioneel `lsi`.
+/// Unilaterale of categoriale tests gebruiken het vrije-tekstveld `value`.
+model PatientTestResult {
+  id            String                @id @default(cuid())
+  assignmentId  String
+  assignment    PatientTestAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  performedAt   DateTime              @default(now())
+  performedById String
+  performedBy   User                  @relation("ClinicalTestResultPerformer", fields: [performedById], references: [id])
+  /// Vrije tekst, bv "128°", "95%", "22 reps", "graad 2+", "Pass".
+  value         String?
+  leftValue     Float?
+  rightValue    Float?
+  /// Limb-Symmetry Index (min/max × 100). Mag client-side berekend
+  /// of door therapeut overruled worden.
+  lsi           Float?
+  painScore     Int?
+  notes         String?
+  createdAt     DateTime              @default(now())
+
+  @@index([assignmentId])
+  @@map("patient_test_results")
 }

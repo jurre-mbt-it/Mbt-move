@@ -25,6 +25,7 @@ import { InsightActivationToggle } from '@/components/insights/InsightActivation
 import { InsightTimeline } from '@/components/insights/InsightTimeline'
 import { RehabActivationToggle } from '@/components/rehab/RehabActivationToggle'
 import { RehabTracker } from '@/components/rehab/RehabTracker'
+import { PatientClinicalTests } from '@/components/clinical-tests/PatientClinicalTests'
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
   ACTIVE:    { label: 'Actief',    bg: 'rgba(232,122,85,0.14)', text: P.lime },
@@ -347,13 +348,14 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         {/* Tabs */}
         <Tabs defaultValue="profiel" className="space-y-4">
           <TabsList
-            className="w-full grid grid-cols-6 rounded-xl"
+            className="w-full grid grid-cols-7 rounded-xl"
             style={{ background: P.surface, border: `1px solid ${P.line}` }}
           >
             <TabsTrigger value="profiel" className="text-xs px-1">Profiel</TabsTrigger>
             <TabsTrigger value="programmas" className="text-xs px-1">Progr.</TabsTrigger>
             <TabsTrigger value="geschiedenis" className="text-xs px-1">Historie</TabsTrigger>
             <TabsTrigger value="revalidatie" className="text-xs px-1">Revalidatie</TabsTrigger>
+            <TabsTrigger value="tests" className="text-xs px-1">Tests</TabsTrigger>
             <TabsTrigger value="signalen" className="text-xs px-1">Signalen</TabsTrigger>
             <TabsTrigger value="voortgang" className="text-xs px-1">Voortgang</TabsTrigger>
           </TabsList>
@@ -714,6 +716,11 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           <TabsContent value="revalidatie" className="space-y-4">
             <RehabActivationToggle patientId={patient.id} patientName={patient.name} />
             <RehabTracker patientId={patient.id} />
+          </TabsContent>
+
+          {/* ── TAB: Tests (losse klinische tests) ────────────────── */}
+          <TabsContent value="tests" className="space-y-4">
+            <PatientClinicalTests patientId={patient.id} />
           </TabsContent>
 
           {/* ── TAB: Signalen (CIE) ───────────────────────────────── */}

@@ -8,7 +8,6 @@ import {
   ClipboardList,
   Dumbbell,
   CalendarDays,
-  Library,
   AlertCircle,
   Activity,
   BarChart3,
@@ -16,6 +15,7 @@ import {
   Settings,
   LogOut,
   Sparkles,
+  Stethoscope,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -29,7 +29,7 @@ const navItems = [
   { href: '/therapist/programs', label: "Programma's", icon: ClipboardList },
   { href: '/therapist/week-planner', label: 'Weekschema', icon: CalendarDays },
   { href: '/therapist/exercises', label: 'Oefeningen', icon: Dumbbell },
-  { href: '/therapist/programs/library', label: "Schema's", icon: Library },
+  { href: '/therapist/tests', label: 'Tests', icon: Stethoscope },
   { href: '/therapist/cohort', label: 'Cohort', icon: BarChart3 },
   { href: '/therapist/dpa', label: 'DPA-status', icon: Shield },
 ]
