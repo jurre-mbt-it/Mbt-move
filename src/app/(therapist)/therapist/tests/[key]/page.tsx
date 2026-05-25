@@ -135,7 +135,13 @@ export default function ClinicalTestDetailPage({
           <StatTile label="LoE (Oxford)" value={String(test.loE)} tint={P.lime} />
           <StatTile
             label="Fases"
-            value={test.phases.length > 0 ? test.phases.join(', ') : '—'}
+            value={
+              test.phases.length === 0
+                ? 'Screening'
+                : test.phases.includes(0)
+                  ? `Pre-OK${test.phases.filter(p => p > 0).length ? ' · ' + test.phases.filter(p => p > 0).join(', ') : ''}`
+                  : test.phases.join(', ')
+            }
             tint={P.ice}
           />
           <StatTile
@@ -223,9 +229,9 @@ export default function ClinicalTestDetailPage({
                         marginRight: 8,
                       }}
                     >
-                      FASE {p}
+                      {p === 0 ? 'PRE-OK' : `FASE ${p}`}
                     </span>
-                    {PHASE_LABEL[p] ?? ''}
+                    {p === 0 ? '' : (PHASE_LABEL[p] ?? '')}
                   </li>
                 ))}
               </ul>

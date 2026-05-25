@@ -78,7 +78,7 @@ export const clinicalTestsRouter = createTRPCRouter({
         .object({
           bodyRegion: z.array(BodyRegionEnum).optional(),
           construct: TestConstructEnum.optional(),
-          phase: z.number().int().min(1).max(5).optional(),
+          phase: z.number().int().min(0).max(5).optional(),
           search: z.string().optional(),
           tag: z.string().optional(),
         })
@@ -91,7 +91,7 @@ export const clinicalTestsRouter = createTRPCRouter({
           ? { bodyRegion: { hasSome: input.bodyRegion as BodyRegion[] } }
           : {}),
         ...(input?.construct ? { construct: input.construct as TestConstruct } : {}),
-        ...(input?.phase ? { phases: { has: input.phase } } : {}),
+        ...(input?.phase !== undefined ? { phases: { has: input.phase } } : {}),
         ...(input?.tag ? { tags: { has: input.tag } } : {}),
         ...(search
           ? {

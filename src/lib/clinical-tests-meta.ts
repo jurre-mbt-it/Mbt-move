@@ -133,8 +133,12 @@ export function pubmedUrl(pmid: string): string {
   return `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`
 }
 
-/** Fase-codes 1–5 → korte humane omschrijving (consistent met seed-data). */
+/** Fase-codes 0–5 → korte humane omschrijving (consistent met seed-data).
+ *  Fase 0 = pre-operatieve rehab (Pre-OK), bv. weken voor ACLR/TKA/THA.
+ *  Pure screening-tests (DVJ/LESS/FMS) hebben geen fase — hun screening-context
+ *  staat in applicableTo (bv. "team-screening", "ACL preventie/RTS"). */
 export const PHASE_LABEL: Record<number, string> = {
+  0: 'Pre-OK',
   1: 'Acuut / bescherming',
   2: 'ROM / basisfunctie',
   3: 'Kracht / neuromusc.',

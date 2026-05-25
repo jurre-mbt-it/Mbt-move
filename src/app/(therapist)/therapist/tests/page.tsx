@@ -127,12 +127,12 @@ export default function TestsLibraryPage() {
               onClick={() => setPhase('ALL')}
               label="Alle"
             />
-            {[1, 2, 3, 4, 5].map(n => (
+            {[0, 1, 2, 3, 4, 5].map(n => (
               <FilterChip
                 key={n}
                 active={phase === n}
                 onClick={() => setPhase(n)}
-                label={`Fase ${n} · ${PHASE_LABEL[n]}`}
+                label={n === 0 ? `${PHASE_LABEL[n]}` : `Fase ${n} · ${PHASE_LABEL[n]}`}
               />
             ))}
           </div>
@@ -309,7 +309,13 @@ function TestCard({
             className="athletic-mono flex items-center gap-3 mt-2 flex-wrap"
             style={{ color: P.inkDim, fontSize: 10, letterSpacing: '0.08em' }}
           >
-            <span>Fase {test.phases.length > 0 ? test.phases.join(',') : '—'}</span>
+            <span>
+              {test.phases.length === 0
+                ? 'Screening'
+                : test.phases.includes(0)
+                  ? `Pre-OK · ${test.phases.filter(p => p > 0).join(',') || '—'}`
+                  : `Fase ${test.phases.join(',')}`}
+            </span>
             <span>LoE {test.loE}</span>
             {test.estimatedTimeMin != null && <span>{test.estimatedTimeMin} min</span>}
           </div>
