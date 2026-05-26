@@ -166,14 +166,26 @@ export const patientRouter = createTRPCRouter({
       if (ctx.user.role !== 'THERAPIST' && ctx.user.role !== 'ADMIN') {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
-      const relation = await ctx.prisma.patientTherapist.findFirst({
+      // Toegang = directe PatientTherapist-relatie OF zelfde praktijk.
+      const me = ctx.user
+      const ok = await ctx.prisma.user.findFirst({
         where: {
-          therapistId: ctx.user.id,
-          patientId: input.patientId,
-          isActive: true, status: 'APPROVED',
+          id: input.patientId,
+          OR: [
+            {
+              patientTherapists: {
+                some: {
+                  therapistId: me.id,
+                  isActive: true, status: 'APPROVED',
+                },
+              },
+            },
+            ...(me.practiceId ? [{ practiceId: me.practiceId }] : []),
+          ],
         },
+        select: { id: true },
       })
-      if (!relation && ctx.user.role !== 'ADMIN') {
+      if (!ok && me.role !== 'ADMIN') {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
       targetPatientId = input.patientId
@@ -593,14 +605,26 @@ export const patientRouter = createTRPCRouter({
         if (ctx.user!.role !== 'THERAPIST' && ctx.user!.role !== 'ADMIN') {
           throw new TRPCError({ code: 'FORBIDDEN' })
         }
-        const relation = await ctx.prisma.patientTherapist.findFirst({
+        // Toegang = directe PatientTherapist-relatie OF zelfde praktijk.
+        const me = ctx.user!
+        const ok = await ctx.prisma.user.findFirst({
           where: {
-            therapistId: ctx.user!.id,
-            patientId: input.patientId,
-            isActive: true, status: 'APPROVED',
+            id: input.patientId,
+            OR: [
+              {
+                patientTherapists: {
+                  some: {
+                    therapistId: me.id,
+                    isActive: true, status: 'APPROVED',
+                  },
+                },
+              },
+              ...(me.practiceId ? [{ practiceId: me.practiceId }] : []),
+            ],
           },
+          select: { id: true },
         })
-        if (!relation && ctx.user!.role !== 'ADMIN') {
+        if (!ok && me.role !== 'ADMIN') {
           throw new TRPCError({ code: 'FORBIDDEN' })
         }
         targetId = input.patientId

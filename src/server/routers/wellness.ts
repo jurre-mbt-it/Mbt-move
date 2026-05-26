@@ -64,19 +64,31 @@ export const wellnessRouter = createTRPCRouter({
   forPatient: protectedProcedure
     .input(z.object({ patientId: z.string() }))
     .query(async ({ ctx, input }) => {
-      // Check therapist-patient relatie
+      // Check therapist-patient relatie (directe koppeling OF zelfde praktijk).
       if (ctx.user!.role !== 'THERAPIST' && ctx.user!.role !== 'ADMIN') {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
-      const relation = await ctx.prisma.patientTherapist.findFirst({
-        where: {
-          therapistId: ctx.user!.id,
-          patientId: input.patientId,
-          isActive: true, status: { in: ['APPROVED', 'PENDING'] },
-        },
-      })
-      if (!relation && ctx.user!.role !== 'ADMIN') {
-        throw new TRPCError({ code: 'FORBIDDEN' })
+      if (ctx.user!.role !== 'ADMIN') {
+        const me = ctx.user!
+        const ok = await ctx.prisma.user.findFirst({
+          where: {
+            id: input.patientId,
+            OR: [
+              {
+                patientTherapists: {
+                  some: {
+                    therapistId: me.id,
+                    isActive: true,
+                    status: { in: ['APPROVED', 'PENDING'] },
+                  },
+                },
+              },
+              ...(me.practiceId ? [{ practiceId: me.practiceId }] : []),
+            ],
+          },
+          select: { id: true },
+        })
+        if (!ok) throw new TRPCError({ code: 'FORBIDDEN' })
       }
       const since = new Date()
       since.setDate(since.getDate() - 30)

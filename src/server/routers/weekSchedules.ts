@@ -12,16 +12,28 @@ const createId = () => crypto.randomUUID()
  */
 async function assertPatientLink(
   prisma: PrismaClient,
-  user: { id: string; role: string },
+  user: { id: string; role: string; practiceId: string | null },
   patientId: string | null | undefined,
 ) {
   if (!patientId) return
   if (user.role === 'ADMIN') return
   if (patientId === user.id) return
-  const relation = await prisma.patientTherapist.findFirst({
-    where: { therapistId: user.id, patientId, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
+  // Toegang = directe PatientTherapist-relatie OF zelfde praktijk.
+  const ok = await prisma.user.findFirst({
+    where: {
+      id: patientId,
+      OR: [
+        {
+          patientTherapists: {
+            some: { therapistId: user.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
+          },
+        },
+        ...(user.practiceId ? [{ practiceId: user.practiceId }] : []),
+      ],
+    },
+    select: { id: true },
   })
-  if (!relation) {
+  if (!ok) {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'Geen actieve koppeling met deze patiënt',
@@ -605,13 +617,8 @@ export const weekSchedulesRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
 
-      // Check dat patient gekoppeld is aan deze therapist
-      const relation = await ctx.prisma.patientTherapist.findFirst({
-        where: { therapistId: ctx.user.id, patientId: input.patientId, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
-      })
-      if (!relation) {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Patient is niet aan jou gekoppeld' })
-      }
+      // Check dat patient gekoppeld is (eigen relatie OF zelfde praktijk).
+      await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
 
       const patient = await ctx.prisma.user.findUnique({
         where: { id: input.patientId },

@@ -18,13 +18,23 @@ opzettelijk; documenteer hier áls je het wijzigt:
   patiënt + treating-therapeuten.
 - **Week-schedules** — owner is creator, maar collega-therapeuten in
   dezelfde praktijk kunnen ze lezen.
-
-Wat *wél* per-therapeut/per-patient is afgeschermd:
-
 - **Patiënt-data** (sessions, wellness, pain entries, assessments,
-  rehab-trackers) — alleen behandelend therapeut + admin via
-  `PatientTherapist`-relatie.
-- **Insights / signalen** — gekoppeld aan patient × treating-therapist.
+  rehab-trackers, programma-toewijzing, dashboard, voortgang, insights) —
+  toegang via directe `PatientTherapist`-relatie **OF** zelfde
+  `practiceId` als de patiënt. Dit laat collega-therapeuten binnen één
+  praktijk elkaars patiënten behandelen en sessies loggen zonder aparte
+  invite/koppeling. Audit-trail (`SessionLog.therapistId`) legt vast wie
+  wat heeft gedaan. Patroon: `hasPatientAccess()` in `patients.ts` of
+  inline `OR: [{ patientTherapists: { some: ... } }, { practiceId: user.practiceId }]`.
+
+Wat *wél* per-therapeut afgeschermd blijft:
+
+- **Therapist-notities op `PatientTherapist`** — privé per relatie, niet
+  zichtbaar voor collega's (`patients.update` raakt alleen eigen relatie).
+- **Koppelingsbeheer** (`patients.delete`, `patients.resendInvite`,
+  patient-side `respondToTherapistAccess`/`revokeTherapistAccess`) —
+  alleen eigen `PatientTherapist`-rij; collega's kunnen jouw koppeling
+  niet verwijderen of opnieuw verzenden.
 - **Audit-logs** — alleen admin.
 
 Soft-delete (`User.deletedAt`) wordt automatisch afgedwongen op reads via

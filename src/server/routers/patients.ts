@@ -330,11 +330,8 @@ export const patientsRouter = createTRPCRouter({
       role: z.enum(['PATIENT', 'ATHLETE']),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Verify this is a patient of the current therapist
-      const relation = await ctx.prisma.patientTherapist.findFirst({
-        where: { therapistId: ctx.user.id, patientId: input.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
-      })
-      if (!relation && ctx.user.role !== 'ADMIN') {
+      // Patient van eigen koppeling OF zelfde praktijk.
+      if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.id))) {
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Patiënt niet gevonden' })
       }
 
@@ -417,16 +414,11 @@ export const patientsRouter = createTRPCRouter({
             message: 'Dit e-mailadres hoort bij een bestaand therapeut- of admin-account.',
           })
         }
-        if (ctx.user.role !== 'ADMIN') {
-          const relation = await ctx.prisma.patientTherapist.findFirst({
-            where: { therapistId: ctx.user.id, patientId: existingDbUser.id },
+        if (!(await hasPatientAccess(ctx.prisma, ctx.user, existingDbUser.id))) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Deze gebruiker is al bekend en niet aan jou of jouw praktijk gekoppeld.',
           })
-          if (!relation) {
-            throw new TRPCError({
-              code: 'FORBIDDEN',
-              message: 'Deze gebruiker is al bekend en niet aan jou gekoppeld.',
-            })
-          }
         }
       }
 
@@ -621,17 +613,10 @@ export const patientsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const relation = await ctx.prisma.patientTherapist.findFirst({
-        where: {
-          therapistId: ctx.user.id,
-          patientId: input.patientId,
-          isActive: true, status: { in: ['APPROVED', 'PENDING'] },
-        },
-      })
-      if (!relation && ctx.user.role !== 'ADMIN') {
+      if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.patientId))) {
         throw new TRPCError({
           code: 'FORBIDDEN',
-          message: 'Patient is niet aan jou gekoppeld',
+          message: 'Patient is niet aan jou of jouw praktijk gekoppeld',
         })
       }
 
