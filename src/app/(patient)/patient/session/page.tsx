@@ -1398,7 +1398,7 @@ function SessionPageInner() {
             {e.videoUrl && (
               <div className="rounded-2xl overflow-hidden bg-black aspect-video">
                 <ReactPlayer
-                  url={e.videoUrl}
+                  src={e.videoUrl}
                   width="100%"
                   height="100%"
                   controls
