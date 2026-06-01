@@ -5,7 +5,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { trpc } from '@/lib/trpc/client'
 import {
-  Search, X, Plus, Play,
+  Search, X, Plus, Play, Heart,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import {
@@ -24,8 +24,13 @@ type DbExercise = {
   id: string
   name: string
   category: string
+  videoUrl?: string | null
+  isFavorite?: boolean
   [key: string]: unknown
 }
+
+// Item uit patient.mostUsedExercises — DbExercise + gebruiks-teller.
+type UsedExercise = DbExercise & { count: number }
 
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
 
@@ -67,7 +72,28 @@ export default function AthleteSessionPage() {
   // Cast naar lokaal shallow type; tRPC inference is te diep voor TS (TS2589).
   const dbExercisesQuery = trpc.exercises.list.useQuery(undefined, { staleTime: 60_000 })
   const dbExercises: DbExercise[] = (dbExercisesQuery.data as DbExercise[] | undefined) ?? []
+  // Meest gebruikte oefeningen van de atleet zelf (eigen historie).
+  const mostUsedQuery = trpc.patient.mostUsedExercises.useQuery(undefined, { staleTime: 60_000 })
+  const mostUsed: UsedExercise[] = (mostUsedQuery.data as UsedExercise[] | undefined) ?? []
+  const toggleFavorite = trpc.exercises.toggleFavorite.useMutation()
   const logSession = trpc.patient.logSession.useMutation()
+
+  // Favorieten = oefeningen met de isFavorite-vlag uit exercises.list.
+  const favorites: DbExercise[] = dbExercises.filter(e => e.isFavorite === true)
+
+  // Optimistisch hart togglen: pas de gecachete lijst direct aan zodat de
+  // favorieten-sectie meteen meebeweegt; draai terug bij een fout.
+  function toggleFav(id: string) {
+    const flip = (old: unknown) =>
+      ((old as DbExercise[] | undefined)?.map(e =>
+        e.id === id ? { ...e, isFavorite: !e.isFavorite } : e
+      )) as never
+    utils.exercises.list.setData(undefined, flip)
+    toggleFavorite.mutate(
+      { exerciseId: id },
+      { onError: () => utils.exercises.list.setData(undefined, flip) }
+    )
+  }
 
   // Quick mode detection
   const [isQuickMode, setIsQuickMode] = useState(false)
@@ -395,8 +421,11 @@ export default function AthleteSessionPage() {
             query={addExerciseQuery}
             onQueryChange={setAddExerciseQuery}
             filtered={filteredLibrary}
+            favorites={favorites}
+            mostUsed={mostUsed}
             added={extraExercises}
             onAdd={addExercise}
+            onToggleFavorite={toggleFav}
             onClose={() => { setShowAddExercise(false); setAddExerciseQuery('') }}
           />
         )}
@@ -710,8 +739,11 @@ export default function AthleteSessionPage() {
           query={addExerciseQuery}
           onQueryChange={setAddExerciseQuery}
           filtered={filteredLibrary}
+          favorites={favorites}
+          mostUsed={mostUsed}
           added={extraExercises}
           onAdd={addExercise}
+          onToggleFavorite={toggleFav}
           onClose={() => { setShowAddExercise(false); setAddExerciseQuery('') }}
         />
       )}
@@ -804,23 +836,113 @@ function VideoModal({
   )
 }
 
+// ─── Add-exercise bottom sheet (favorieten · meest gebruikt · alle) ──────────
+
+// Eén rij in de picker — klikbaar om toe te voegen, met een los hart-knopje
+// rechts om te favorieten. `badge` vervangt de standaard "3 × 10 REPS"-regel
+// (gebruikt voor de "× gebruikt"-teller in de meest-gebruikt sectie).
+function ExerciseRow({
+  ex,
+  added,
+  onAdd,
+  onToggleFavorite,
+  badge,
+}: {
+  ex: DbExercise
+  added: LiveExercise[]
+  onAdd: (ex: DbExercise) => void
+  onToggleFavorite: (id: string) => void
+  badge?: string
+}) {
+  const alreadyAdded = added.some(ae => ae.exerciseId === ex.id)
+  const isFav = ex.isFavorite === true
+  return (
+    <div
+      className="w-full flex items-center gap-2 rounded-xl"
+      style={{
+        background: alreadyAdded ? 'rgba(232,122,85,0.10)' : P.surfaceLow,
+        border: `1px solid ${alreadyAdded ? P.lime : P.line}`,
+        padding: '8px 10px 8px 14px',
+      }}
+    >
+      <button
+        type="button"
+        className="flex items-center gap-3 flex-1 min-w-0 text-left transition-all active:scale-[0.98]"
+        onClick={() => onAdd(ex)}
+      >
+        <div
+          className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+          style={{
+            background: alreadyAdded ? P.lime : P.surfaceHi,
+            color: alreadyAdded ? P.bg : P.ink,
+            fontWeight: 900,
+            fontSize: 13,
+          }}
+        >
+          {alreadyAdded ? '✓' : ex.name[0]?.toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p
+            className="truncate"
+            style={{ color: P.ink, fontSize: 13, fontWeight: 800, letterSpacing: '-0.01em' }}
+          >
+            {ex.name}
+          </p>
+          <div
+            style={{
+              fontFamily: mono,
+              fontSize: 10,
+              letterSpacing: '0.14em',
+              fontWeight: 700,
+              color: P.inkMuted,
+              marginTop: 3,
+              textTransform: 'uppercase',
+            }}
+          >
+            {ex.category} · {badge ?? '3 × 10 REPS'}
+          </div>
+        </div>
+      </button>
+      <button
+        type="button"
+        onClick={() => onToggleFavorite(ex.id)}
+        className="shrink-0 p-2 rounded-lg transition-all active:scale-90"
+        aria-label={isFav ? 'Verwijder uit favorieten' : 'Voeg toe aan favorieten'}
+      >
+        <Heart
+          className="w-4 h-4"
+          style={{ color: isFav ? '#f87171' : P.inkMuted, fill: isFav ? '#f87171' : 'transparent' }}
+        />
+      </button>
+      {!alreadyAdded && <Plus className="w-4 h-4 shrink-0" style={{ color: P.inkMuted }} />}
+    </div>
+  )
+}
+
 // ─── Reusable add-exercise bottom sheet ──────────────────────────────────────
 
 function AddExerciseSheet({
   query,
   onQueryChange,
   filtered,
+  favorites,
+  mostUsed,
   added,
   onAdd,
+  onToggleFavorite,
   onClose,
 }: {
   query: string
   onQueryChange: (q: string) => void
   filtered: DbExercise[]
+  favorites: DbExercise[]
+  mostUsed: UsedExercise[]
   added: LiveExercise[]
   onAdd: (ex: DbExercise) => void
+  onToggleFavorite: (id: string) => void
   onClose: () => void
 }) {
+  const searching = query.trim().length > 0
   return (
     <div className="fixed inset-0 z-50 flex items-end">
       <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={onClose} />
@@ -875,69 +997,81 @@ function AddExerciseSheet({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 pb-8 space-y-2">
-          {filtered.length === 0 ? (
-            <div className="text-center py-6">
-              <MetaLabel>GEEN OEFENINGEN GEVONDEN</MetaLabel>
-            </div>
+        <div className="flex-1 overflow-y-auto px-5 pb-8 space-y-5">
+          {searching ? (
+            // Zoekmodus: platte gefilterde lijst (oud gedrag).
+            filtered.length === 0 ? (
+              <div className="text-center py-6">
+                <MetaLabel>GEEN OEFENINGEN GEVONDEN</MetaLabel>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filtered.map(ex => (
+                  <ExerciseRow
+                    key={ex.id}
+                    ex={ex}
+                    added={added}
+                    onAdd={onAdd}
+                    onToggleFavorite={onToggleFavorite}
+                  />
+                ))}
+              </div>
+            )
           ) : (
-            filtered.map(ex => {
-              const alreadyAdded = added.some(ae => ae.exerciseId === ex.id)
-              return (
-                <button
-                  key={ex.id}
-                  type="button"
-                  className="w-full flex items-center gap-3 rounded-xl text-left transition-all active:scale-[0.98]"
-                  style={{
-                    background: alreadyAdded ? 'rgba(232,122,85,0.10)' : P.surfaceLow,
-                    border: `1px solid ${alreadyAdded ? P.lime : P.line}`,
-                    padding: '12px 14px',
-                  }}
-                  onClick={() => onAdd(ex)}
-                >
-                  <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                    style={{
-                      background: alreadyAdded ? P.lime : P.surfaceHi,
-                      color: alreadyAdded ? P.bg : P.ink,
-                      fontWeight: 900,
-                      fontSize: 13,
-                    }}
-                  >
-                    {alreadyAdded ? '✓' : ex.name[0]?.toUpperCase()}
+            // Bladermodus: snelkoppelingen bovenaan, dan de hele bibliotheek.
+            <>
+              {favorites.length > 0 && (
+                <div className="space-y-2">
+                  <MetaLabel>★ FAVORIETEN</MetaLabel>
+                  {favorites.map(ex => (
+                    <ExerciseRow
+                      key={`fav-${ex.id}`}
+                      ex={ex}
+                      added={added}
+                      onAdd={onAdd}
+                      onToggleFavorite={onToggleFavorite}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {mostUsed.length > 0 && (
+                <div className="space-y-2">
+                  <MetaLabel>↻ MEEST GEBRUIKT</MetaLabel>
+                  {mostUsed.map(ex => (
+                    <ExerciseRow
+                      key={`mu-${ex.id}`}
+                      ex={ex}
+                      added={added}
+                      onAdd={onAdd}
+                      onToggleFavorite={onToggleFavorite}
+                      badge={`${ex.count}× GEBRUIKT`}
+                    />
+                  ))}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {(favorites.length > 0 || mostUsed.length > 0) && (
+                  <MetaLabel>ALLE OEFENINGEN</MetaLabel>
+                )}
+                {filtered.length === 0 ? (
+                  <div className="text-center py-6">
+                    <MetaLabel>GEEN OEFENINGEN GEVONDEN</MetaLabel>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className="truncate"
-                      style={{
-                        color: P.ink,
-                        fontSize: 13,
-                        fontWeight: 800,
-                        letterSpacing: '-0.01em',
-                      }}
-                    >
-                      {ex.name}
-                    </p>
-                    <div
-                      style={{
-                        fontFamily: mono,
-                        fontSize: 10,
-                        letterSpacing: '0.14em',
-                        fontWeight: 700,
-                        color: P.inkMuted,
-                        marginTop: 3,
-                        textTransform: 'uppercase',
-                      }}
-                    >
-                      {ex.category} · 3 × 10 REPS
-                    </div>
-                  </div>
-                  {!alreadyAdded && (
-                    <Plus className="w-4 h-4 shrink-0" style={{ color: P.inkMuted }} />
-                  )}
-                </button>
-              )
-            })
+                ) : (
+                  filtered.map(ex => (
+                    <ExerciseRow
+                      key={ex.id}
+                      ex={ex}
+                      added={added}
+                      onAdd={onAdd}
+                      onToggleFavorite={onToggleFavorite}
+                    />
+                  ))
+                )}
+              </div>
+            </>
           )}
         </div>
       </div>

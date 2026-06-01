@@ -383,6 +383,53 @@ export const patientRouter = createTRPCRouter({
       return sessionLog
     }),
 
+  // ── Meest gebruikte oefeningen van de atleet zelf ────────────────────────
+  // Voor de Quick Workout-picker: telt de eigen ExerciseLogs uit gelogde
+  // sessies en geeft de vaakst gebruikte oefeningen terug, zodat de atleet ze
+  // snel terugvindt zonder door de hele bibliotheek te scrollen. Alleen eigen
+  // data (patientId = ctx.user.id) → geen toegangscontrole nodig.
+  mostUsedExercises: protectedProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(20).optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const take = input?.limit ?? 8
+      const since = new Date()
+      since.setDate(since.getDate() - 120) // 120d historie
+
+      const sessions = await ctx.prisma.sessionLog.findMany({
+        where: {
+          patientId: ctx.user.id,
+          status: 'COMPLETED',
+          completedAt: { gte: since },
+        },
+        select: { exerciseLogs: { select: { exerciseId: true } } },
+      })
+
+      const counts = new Map<string, number>()
+      for (const s of sessions) {
+        for (const el of s.exerciseLogs) {
+          counts.set(el.exerciseId, (counts.get(el.exerciseId) ?? 0) + 1)
+        }
+      }
+      const topIds = Array.from(counts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, take)
+        .map(([id]) => id)
+      if (topIds.length === 0) return []
+
+      // Alleen oefeningen die nog bestaan; behoud de count-volgorde.
+      const exercises = await ctx.prisma.exercise.findMany({
+        where: { id: { in: topIds } },
+        select: { id: true, name: true, category: true, videoUrl: true },
+      })
+      return topIds
+        .map((id) => {
+          const ex = exercises.find((e) => e.id === id)
+          if (!ex) return null
+          return { ...ex, count: counts.get(id) ?? 0 }
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null)
+    }),
+
   // ── Log a completed cardio session ───────────────────────────────────────
 
   logCardioSession: protectedProcedure

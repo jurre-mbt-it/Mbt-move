@@ -192,13 +192,20 @@ export const exercisesRouter = createTRPCRouter({
         return { isFavorite: false }
       }
 
-      // Check dat de oefening bestaat en zichtbaar is voor deze user
+      // Check dat de oefening bestaat en zichtbaar is voor deze user. Zelfde
+      // zichtbaarheidsregel als exercises.list: public OF eigen OF zelfde
+      // praktijk — anders kan een atleet een praktijk-oefening die hij wél in
+      // de lijst ziet niet favorieten.
       const exercise = await ctx.prisma.exercise.findUnique({
         where: { id: input.exerciseId },
-        select: { id: true, isPublic: true, createdById: true },
+        select: { id: true, isPublic: true, createdById: true, practiceId: true },
       })
       if (!exercise) throw new TRPCError({ code: 'NOT_FOUND' })
-      if (!exercise.isPublic && exercise.createdById !== ctx.user!.id) {
+      const visible =
+        exercise.isPublic ||
+        exercise.createdById === ctx.user!.id ||
+        (exercise.practiceId != null && exercise.practiceId === ctx.user!.practiceId)
+      if (!visible) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
 
