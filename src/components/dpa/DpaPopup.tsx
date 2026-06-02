@@ -45,7 +45,7 @@ export function DpaPopup() {
   return (
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent
-        className="max-w-sm mx-auto p-0 overflow-hidden"
+        className="max-w-sm mx-auto p-0 max-h-[90dvh] overflow-y-auto overflow-x-hidden"
         style={{ borderRadius: '20px' }}
         // Patiënt moet actief kiezen — geen sluiten via klik buiten of Escape
         onPointerDownOutside={e => e.preventDefault()}

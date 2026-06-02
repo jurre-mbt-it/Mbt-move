@@ -42,7 +42,7 @@ export function ConsentPopup() {
   return (
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent
-        className="max-w-sm mx-auto p-0 overflow-hidden"
+        className="max-w-sm mx-auto p-0 max-h-[90dvh] overflow-y-auto overflow-x-hidden"
         style={{ borderRadius: '20px' }}
         // Prevent closing by clicking outside — patient must make an active choice
         onPointerDownOutside={e => e.preventDefault()}
