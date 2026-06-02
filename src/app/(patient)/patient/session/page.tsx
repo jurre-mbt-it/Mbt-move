@@ -811,9 +811,26 @@ function SessionPageInner() {
   const catchUpDay = Number(searchParams.get('day')) || undefined
   const isCatchUp = catchUpWeek !== undefined && catchUpDay !== undefined
 
-  const { data: sessionData, isLoading } = trpc.patient.getTodayExercises.useQuery(
-    isCatchUp ? { week: catchUpWeek, day: catchUpDay } : undefined,
-  )
+  // Meerdere actieve programma's → patient kiest welk programma ze doet.
+  // ?programId=… selecteert er één; zonder param én >1 programma tonen we
+  // eerst een keuzescherm.
+  const programId = searchParams.get('programId') || undefined
+  const { data: activePrograms } = trpc.patient.getActivePrograms.useQuery(undefined, {
+    staleTime: 60_000,
+  })
+  const needsProgramChoice = !programId && (activePrograms?.length ?? 0) > 1
+
+  const queryInput =
+    isCatchUp || programId
+      ? {
+          ...(isCatchUp ? { week: catchUpWeek, day: catchUpDay } : {}),
+          ...(programId ? { programId } : {}),
+        }
+      : undefined
+
+  const { data: sessionData, isLoading } = trpc.patient.getTodayExercises.useQuery(queryInput, {
+    enabled: !needsProgramChoice,
+  })
   const logSession = trpc.patient.logSession.useMutation()
 
   const exercises: SessionExercise[] = sessionData?.exercises ?? []
@@ -1178,6 +1195,60 @@ function SessionPageInner() {
 
     router.push('/patient/dashboard')
   }, [sessionData, feedback, elapsed, exercises, setsCompleted, extraReps, logSession, router, utils, draftKey])
+
+  // Keuzescherm: patient heeft meerdere actieve programma's en moet kiezen
+  // welk programma ze vandaag wil doen. Selectie zet ?programId=… in de URL.
+  if (needsProgramChoice && activePrograms) {
+    return (
+      <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+        <div className="max-w-lg w-full mx-auto px-4 pt-10 pb-8 space-y-4">
+          <div>
+            <Kicker>KIES PROGRAMMA</Kicker>
+            <h1
+              className="athletic-display"
+              style={{
+                color: P.ink,
+                fontWeight: 900,
+                letterSpacing: '-0.03em',
+                fontSize: 'clamp(32px, 8vw, 48px)',
+                textTransform: 'uppercase',
+                margin: '4px 0 2px',
+              }}
+            >
+              Wat ga je doen?
+            </h1>
+            <MetaLabel style={{ textTransform: 'none', fontWeight: 500 }}>
+              Je hebt {activePrograms.length} actieve programma&apos;s
+            </MetaLabel>
+          </div>
+          <div className="flex flex-col gap-3">
+            {activePrograms.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => router.replace(`/patient/session?programId=${p.id}`)}
+                className="athletic-tap w-full text-left rounded-2xl px-4 py-4 flex items-center gap-3"
+                style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+              >
+                <span className="w-1 self-stretch rounded-full" style={{ background: P.brand }} />
+                <span className="flex-1 min-w-0">
+                  <span className="block truncate" style={{ color: P.ink, fontSize: 15, fontWeight: 800 }}>
+                    {p.name}
+                  </span>
+                  <span className="athletic-mono block mt-0.5" style={{ color: P.inkMuted, fontSize: 11 }}>
+                    WEEK {p.currentWeek}/{p.weeks} · {p.daysPerWeek}×/WK
+                  </span>
+                </span>
+                <ChevronRight className="w-5 h-5 shrink-0" style={{ color: P.inkMuted }} />
+              </button>
+            ))}
+          </div>
+          <DarkButton variant="secondary" onClick={() => router.push('/patient/dashboard')}>
+            Terug naar dashboard
+          </DarkButton>
+        </div>
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (

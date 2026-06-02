@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useParams, useRouter } from 'next/navigation'
 import { trpc } from '@/lib/trpc/client'
 import { cn } from '@/lib/utils'
 import { DAY_LABELS } from '@/lib/program-constants'
@@ -29,7 +30,19 @@ const VARIANTS: Record<string, { easier?: string; harder?: string }> = {
 }
 
 export default function PatientProgramPage() {
-  const { data: program, isLoading } = trpc.patient.getActiveProgram.useQuery(undefined, { staleTime: 60_000 })
+  const router = useRouter()
+  const params = useParams<{ id: string }>()
+  const routeId = typeof params?.id === 'string' ? params.id : undefined
+  // Respecteer de URL: laad exact het programma uit de route i.p.v. willekeurig
+  // het eerste actieve programma.
+  const { data: program, isLoading } = trpc.patient.getActiveProgram.useQuery(
+    routeId ? { programId: routeId } : undefined,
+    { staleTime: 60_000 },
+  )
+  // Alle actieve programma's — voedt de switcher bovenaan bij meerdere.
+  const { data: activePrograms } = trpc.patient.getActivePrograms.useQuery(undefined, {
+    staleTime: 60_000,
+  })
   const [activeWeek, setActiveWeek] = useState(1)
   const [modalExercise, setModalExercise] = useState<ExerciseForModal | null>(null)
 
@@ -119,6 +132,34 @@ export default function PatientProgramPage() {
             {program.weeks} WEKEN · {program.daysPerWeek}×/WEEK
           </MetaLabel>
         </div>
+
+        {/* Programma-switcher — alleen bij meerdere actieve programma's */}
+        {activePrograms && activePrograms.length > 1 && (
+          <div>
+            <Kicker style={{ marginBottom: 6 }}>PROGRAMMA</Kicker>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {activePrograms.map(pr => {
+                const active = pr.id === program.id
+                return (
+                  <button
+                    key={pr.id}
+                    onClick={() => router.replace(`/patient/program/${pr.id}`)}
+                    className="athletic-tap shrink-0 px-4 py-1.5 rounded-full transition-colors max-w-[220px] truncate"
+                    style={{
+                      background: active ? P.brand : P.surface,
+                      color: active ? P.bg : P.ink,
+                      border: `1px solid ${active ? P.brand : P.line}`,
+                      fontSize: 12,
+                      fontWeight: 800,
+                    }}
+                  >
+                    {pr.name}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Week tabs */}
         <div className="flex gap-2 overflow-x-auto pb-1">

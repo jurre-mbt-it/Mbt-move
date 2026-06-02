@@ -98,9 +98,18 @@ export const patientRouter = createTRPCRouter({
 
   // ── Active program (full, for schedule / program detail) ─────────────────
 
-  getActiveProgram: protectedProcedure.query(async ({ ctx }) => {
+  getActiveProgram: protectedProcedure
+    .input(z.object({ programId: z.string().optional() }).optional())
+    .query(async ({ ctx, input }) => {
     const program = await ctx.prisma.program.findFirst({
-      where: { patientId: ctx.user.id, status: 'ACTIVE' },
+      where: {
+        patientId: ctx.user.id,
+        status: 'ACTIVE',
+        ...(input?.programId ? { id: input.programId } : {}),
+      },
+      // Deterministische default als de patient meerdere actieve programma's
+      // heeft en er geen specifieke wordt opgevraagd: oudste eerst.
+      orderBy: { createdAt: 'asc' },
       include: {
         exercises: {
           include: {
@@ -173,6 +182,46 @@ export const patientRouter = createTRPCRouter({
     }
   }),
 
+  // ── Active programs (lichtgewicht lijst — voor de keuze bij meerdere) ─────
+  // Geeft álle actieve, niet-template programma's van de patient terug zodat
+  // de app een keuzescherm kan tonen wanneer er meer dan één is.
+
+  getActivePrograms: protectedProcedure.query(async ({ ctx }) => {
+    const programs = await ctx.prisma.program.findMany({
+      where: { patientId: ctx.user.id, status: 'ACTIVE', isTemplate: false },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        type: true,
+        weeks: true,
+        daysPerWeek: true,
+        startDate: true,
+        flexibleSchedule: true,
+        weeklyTarget: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    })
+
+    const now = Date.now()
+    return programs.map(p => {
+      const start = p.startDate?.getTime() ?? now
+      const daysSince = Math.max(0, Math.floor((now - start) / 86_400_000))
+      const currentWeek = Math.min(Math.floor(daysSince / 7) + 1, p.weeks)
+      return {
+        id: p.id,
+        name: p.name,
+        description: p.description ?? null,
+        type: p.type,
+        weeks: p.weeks,
+        daysPerWeek: p.daysPerWeek,
+        currentWeek,
+        flexibleSchedule: p.flexibleSchedule,
+        weeklyTarget: p.weeklyTarget ?? null,
+      }
+    })
+  }),
+
   // ── Today's exercises (for session page) ─────────────────────────────────
 
   getTodayExercises: protectedProcedure
@@ -180,6 +229,10 @@ export const patientRouter = createTRPCRouter({
       z
         .object({
           patientId: z.string().optional(),
+          // Specifiek programma opvragen wanneer de patient meerdere actieve
+          // programma's heeft (keuze bij start). Leeg = deterministische
+          // default (oudste actieve programma).
+          programId: z.string().optional(),
           // Catch-up: laat patient een gemiste dag inhalen door specifiek
           // week/day op te vragen i.p.v. computeCurrentWeekDay.
           week: z.number().int().min(1).optional(),
@@ -221,7 +274,13 @@ export const patientRouter = createTRPCRouter({
     }
 
     const program = await ctx.prisma.program.findFirst({
-      where: { patientId: targetPatientId, status: 'ACTIVE' },
+      where: {
+        patientId: targetPatientId,
+        status: 'ACTIVE',
+        ...(input?.programId ? { id: input.programId } : {}),
+      },
+      // Deterministische default bij meerdere actieve programma's: oudste eerst.
+      orderBy: { createdAt: 'asc' },
       include: {
         exercises: {
           include: {
