@@ -16,6 +16,7 @@ import {
   LogOut,
   Sparkles,
   Stethoscope,
+  Blocks,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -27,6 +28,7 @@ const navItems = [
   { href: '/therapist/patients', label: 'Patiënten', icon: Users },
   { href: '/therapist/signals', label: 'Signalen', icon: AlertCircle },
   { href: '/therapist/programs', label: "Programma's", icon: ClipboardList },
+  { href: '/therapist/programs/new', label: 'Builder', icon: Blocks },
   { href: '/therapist/week-planner', label: 'Weekschema', icon: CalendarDays },
   { href: '/therapist/exercises', label: 'Oefeningen', icon: Dumbbell },
   { href: '/therapist/tests', label: 'Tests', icon: Stethoscope },
@@ -80,8 +82,15 @@ export function TherapistSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 p-3 flex flex-col gap-1">
-        {navItems.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + '/')
+        {(() => {
+          // Langste matchende href wint, zodat op /therapist/programs/new
+          // alleen "Builder" oplicht en niet ook "Programma's".
+          const matchedHref = navItems
+            .map(i => i.href)
+            .filter(h => pathname === h || pathname.startsWith(h + '/'))
+            .sort((a, b) => b.length - a.length)[0]
+          return navItems.map(({ href, label, icon: Icon }) => {
+          const active = href === matchedHref
           return (
             <Link
               key={href}
@@ -102,7 +111,8 @@ export function TherapistSidebar() {
               {label}
             </Link>
           )
-        })}
+          })
+        })()}
         {canUseAssessment && (
           <Link
             href="/therapist/assessments"
