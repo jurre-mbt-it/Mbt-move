@@ -54,6 +54,14 @@ const ProgramExerciseInput = z.object({
   notes: z.string().nullable().optional(),
 })
 
+// Educatie-blok (de "Leer"-items) gekoppeld aan een dag/week van het programma.
+const ProgramResourceInput = z.object({
+  resourceId: z.string(),
+  week: z.number().int().min(1).default(1),
+  day: z.number().int().min(1).default(1),
+  order: z.number().int().default(0),
+})
+
 export const programsRouter = createTRPCRouter({
   list: creatorProcedure
     .input(z.object({
@@ -139,6 +147,10 @@ export const programsRouter = createTRPCRouter({
             },
             orderBy: [{ week: 'asc' }, { day: 'asc' }, { order: 'asc' }],
           },
+          resources: {
+            include: { resource: true },
+            orderBy: [{ week: 'asc' }, { day: 'asc' }, { order: 'asc' }],
+          },
           patient: { select: { id: true, name: true, email: true } },
         },
       })
@@ -213,11 +225,12 @@ export const programsRouter = createTRPCRouter({
       startDate: z.string().nullable().optional(),
       endDate: z.string().nullable().optional(),
       exercises: z.array(ProgramExerciseInput).optional(),
+      resources: z.array(ProgramResourceInput).optional(),
       flexibleSchedule: z.boolean().optional(),
       weeklyTarget: z.number().int().min(1).max(14).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const { id, exercises, startDate, endDate, ...data } = input
+      const { id, exercises, resources, startDate, endDate, ...data } = input
 
       const existing = await ctx.prisma.program.findUnique({ where: { id } })
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
@@ -256,6 +269,20 @@ export const programsRouter = createTRPCRouter({
         }
       }
 
+      if (resources !== undefined) {
+        // Replace all educatie-blokken
+        await ctx.prisma.programResource.deleteMany({ where: { programId: id } })
+        updateData.resources = {
+          create: resources.map((r, i) => ({
+            id: createId(),
+            resourceId: r.resourceId,
+            week: r.week,
+            day: r.day,
+            order: r.order ?? i,
+          })),
+        }
+      }
+
       const saved = await ctx.prisma.program.update({
         where: { id },
         data: updateData,
@@ -285,7 +312,7 @@ export const programsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const source = await ctx.prisma.program.findUnique({
         where: { id: input.id },
-        include: { exercises: true },
+        include: { exercises: true, resources: true },
       })
       if (!source) throw new TRPCError({ code: 'NOT_FOUND' })
       if (source.creatorId !== ctx.user!.id && ctx.user!.role !== 'ADMIN') {
@@ -324,6 +351,15 @@ export const programsRouter = createTRPCRouter({
               supersetGroup: ex.supersetGroup,
               supersetOrder: ex.supersetOrder,
               notes: ex.notes,
+            })),
+          },
+          resources: {
+            create: source.resources.map(r => ({
+              id: createId(),
+              resourceId: r.resourceId,
+              week: r.week,
+              day: r.day,
+              order: r.order,
             })),
           },
         },

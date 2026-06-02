@@ -68,6 +68,19 @@ export interface CustomParameter {
   order: number
 }
 
+/** Een educatie-blok ("Leer") gekoppeld aan een dag/week van het programma.
+ *  Parallel aan BuilderExercise, maar zonder oefening-parameters. */
+export interface BuilderResource {
+  uid: string // unieke instance-id in het programma
+  resourceId: string
+  title: string
+  format: 'VIDEO' | 'PDF'
+  videoUrl?: string | null
+  thumbnailUrl?: string | null
+  day: number // 1-based
+  week: number // 1-based
+}
+
 export interface ProgramState {
   name: string
   description: string
@@ -77,6 +90,7 @@ export interface ProgramState {
   currentWeek: number
   currentDay: number
   exercises: BuilderExercise[]
+  resources: BuilderResource[]
   isTemplate: boolean
   tendinopathyMode: boolean
   trackOneRepMax: boolean

@@ -4,7 +4,7 @@ import { use, Suspense } from 'react'
 import { ProgramBuilder } from '@/components/programs/ProgramBuilder'
 import { trpc } from '@/lib/trpc/client'
 import { notFound } from 'next/navigation'
-import type { BuilderExercise } from '@/components/programs/types'
+import type { BuilderExercise, BuilderResource } from '@/components/programs/types'
 import { P } from '@/components/dark-ui'
 
 interface Props {
@@ -46,6 +46,18 @@ type EditProgram = {
   status: 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED'
   updatedAt: string | Date
   exercises: EditExercise[]
+  resources?: {
+    id: string
+    resourceId: string
+    week: number
+    day: number
+    resource: {
+      title: string
+      format: 'VIDEO' | 'PDF'
+      videoUrl: string | null
+      thumbnailUrl: string | null
+    }
+  }[]
   // Builder-toggles — moeten meekomen van server anders worden ze bij elke
   // remount (na autosave) terug naar default false gezet.
   tendinopathyMode?: boolean
@@ -116,6 +128,17 @@ export default function EditProgramPage({ params }: Props) {
     week: pe.week,
   }))
 
+  const resources: BuilderResource[] = (program.resources ?? []).map(pr => ({
+    uid: pr.id,
+    resourceId: pr.resourceId,
+    title: pr.resource.title,
+    format: pr.resource.format,
+    videoUrl: pr.resource.videoUrl ?? null,
+    thumbnailUrl: pr.resource.thumbnailUrl ?? null,
+    day: pr.day,
+    week: pr.week,
+  }))
+
   // Key op updatedAt zodat de builder remount wanneer onderliggende data
   // verandert (bv. via programs.changeDay vanuit week-planner).
   const builderKey = typeof program.updatedAt === 'string'
@@ -140,6 +163,7 @@ export default function EditProgramPage({ params }: Props) {
           flexibleSchedule: program.flexibleSchedule ?? false,
           weeklyTarget: program.weeklyTarget ?? null,
           exercises,
+          resources,
         }}
       />
     </Suspense>

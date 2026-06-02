@@ -1,15 +1,18 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
-import { createTRPCRouter, adminProcedure } from '@/server/trpc'
+import {
+  createTRPCRouter,
+  adminProcedure,
+  therapistProcedure,
+} from '@/server/trpc'
 import { signEducationFile, removeEducationFile } from '@/lib/education/storage'
 
 /**
  * Educatie-content (admin-beheerd, globaal zichtbaar).
  *
- * VOORLOPIG ALLEEN ADMIN: enkel admin-CRUD is geëxposed. De therapeut-
- * leesbibliotheek en de patiënt-surfacing (`forPatient`) volgen in Phase 2,
- * samen met de "Leer"-tab in de program-builder. Tot die tijd bouwen admins
- * eerst de content-catalogus op.
+ * - Admin: volledige CRUD (`admin*`).
+ * - Therapeut: leesbibliotheek (`list`) voor de "Leer"-tab in de program-
+ *   builder. Content blijft admin-gecureerd; therapeuten lezen alleen.
  *
  * PDF's liggen in een privé-bucket; we leveren ze als tijdelijke signed URL
  * (`fileUrl`) mee in de output. Video's gebruiken `videoUrl` direct.
@@ -149,5 +152,26 @@ export const educationRouter = createTRPCRouter({
       await ctx.prisma.educationalResource.delete({ where: { id: input.id } })
       await removeEducationFile(existing.filePath)
       return { ok: true }
+    }),
+
+  // ── Therapeut/admin: leesbibliotheek (alleen actief) ────────────────────
+  // Voedt de "Leer"-tab in de program-builder.
+  list: therapistProcedure
+    .input(z.object({
+      specialty: z.string().optional(),
+      search: z.string().trim().max(80).optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      const rows = await ctx.prisma.educationalResource.findMany({
+        where: {
+          isActive: true,
+          ...(input?.specialty ? { specialty: input.specialty } : {}),
+          ...(input?.search
+            ? { title: { contains: input.search, mode: 'insensitive' } }
+            : {}),
+        },
+        orderBy: [{ specialty: 'asc' }, { order: 'asc' }, { createdAt: 'desc' }],
+      })
+      return Promise.all(rows.map(withFileUrl))
     }),
 })

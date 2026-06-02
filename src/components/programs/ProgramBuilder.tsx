@@ -30,7 +30,7 @@ import { ProgramExerciseBlock } from './ProgramExerciseBlock'
 import { SupersetGroupBlock } from './SupersetGroupBlock'
 import { MuscleBalancePanel } from './MuscleBalancePanel'
 import { IncompletePracticeBanner } from '@/components/practice/IncompletePracticeBanner'
-import type { BuilderExercise, ProgramState } from './types'
+import type { BuilderExercise, BuilderResource, ProgramState } from './types'
 import { SUPERSET_LETTERS, DAY_LABELS } from '@/lib/program-constants'
 import { EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
 import { trpc } from '@/lib/trpc/client'
@@ -120,6 +120,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
     flexibleSchedule: (initialState as Partial<ProgramState> | undefined)?.flexibleSchedule ?? false,
     weeklyTarget: (initialState as Partial<ProgramState> | undefined)?.weeklyTarget ?? null,
     exercises: initialState?.exercises ?? [],
+    resources: (initialState as Partial<ProgramState> | undefined)?.resources ?? [],
   }))
   // Houdt bij of de gebruiker zelf de naam heeft aangeraakt. Zo niet, mag de
   // auto-suggestie de naam blijven bijwerken als patient/oefeningen wijzigen.
@@ -131,6 +132,10 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
   })
   const [exercises, setExercises] = useState<BuilderExercise[]>(
     initialState?.exercises ?? []
+  )
+  // Educatie-blokken ("Leer") — parallel aan exercises, per dag/week.
+  const [resources, setResources] = useState<BuilderResource[]>(
+    (initialState as Partial<ProgramState> | undefined)?.resources ?? []
   )
   const [activeId, setActiveId] = useState<string | null>(null)
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false)
@@ -225,6 +230,15 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
     [exercises, program.currentDay, program.currentWeek, program.flexibleSchedule]
   )
 
+  // Educatie-blokken voor de huidige dag/week (zelfde pool-logica als oefeningen).
+  const dayResources = useMemo(() =>
+    resources.filter(r =>
+      r.week === program.currentWeek
+      && (program.flexibleSchedule ? true : r.day === program.currentDay)
+    ),
+    [resources, program.currentDay, program.currentWeek, program.flexibleSchedule]
+  )
+
   const selectedUids = exercises.filter(e => e.selected).map(e => e.uid)
 
   const supersetGroups = useMemo(() => {
@@ -280,6 +294,28 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
 
   const removeEx = useCallback((uid: string) => {
     setExercises(prev => prev.filter(e => e.uid !== uid))
+  }, [])
+
+  // ── Educatie-blokken ("Leer") ───────────────────────────────────────────────
+  const addResourceFromLibrary = useCallback((r: {
+    id: string; title: string; format: 'VIDEO' | 'PDF';
+    videoUrl?: string | null; thumbnailUrl?: string | null;
+  }) => {
+    const newRes: BuilderResource = {
+      uid: `res-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      resourceId: r.id,
+      title: r.title,
+      format: r.format,
+      videoUrl: r.videoUrl ?? null,
+      thumbnailUrl: r.thumbnailUrl ?? null,
+      day: program.currentDay,
+      week: program.currentWeek,
+    }
+    setResources(prev => [...prev, newRes])
+  }, [program.currentDay, program.currentWeek])
+
+  const removeResource = useCallback((uid: string) => {
+    setResources(prev => prev.filter(r => r.uid !== uid))
   }, [])
 
   const toggleSelect = useCallback((uid: string) => {
@@ -541,6 +577,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       weeklyTarget: number | null
     }
     exercises: BuilderExercise[]
+    resources: BuilderResource[]
   }
   const formValue: AutosaveValue = useMemo(() => ({
     program: {
@@ -556,7 +593,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       weeklyTarget: program.weeklyTarget ?? null,
     },
     exercises,
-  }), [program, exercises])
+    resources,
+  }), [program, exercises, resources])
 
   // ── Quick-add via URL: één-malig de gevraagde oefening toevoegen zodra
   // de bibliotheek geladen is.
@@ -647,6 +685,12 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       supersetOrder: ex.supersetOrder,
       notes: ex.notes?.trim() ? ex.notes : null,
     }))
+    const resourcePayload = val.resources.map((r, i) => ({
+      resourceId: r.resourceId,
+      week: r.week,
+      day: r.day,
+      order: i,
+    }))
     // Bibliotheek-save mag geen patientId houden, anders staat een template
     // gekoppeld aan een patiënt in de lijst.
     const patientIdForSave = val.program.isTemplate ? null : val.program.patientId || undefined
@@ -662,6 +706,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         flexibleSchedule: val.program.flexibleSchedule,
         weeklyTarget: val.program.flexibleSchedule ? val.program.weeklyTarget : null,
         exercises: exercisePayload,
+        resources: resourcePayload,
       })
     } else {
       const created = await createProgram.mutateAsync({
@@ -674,8 +719,12 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         flexibleSchedule: val.program.flexibleSchedule,
         weeklyTarget: val.program.flexibleSchedule ? val.program.weeklyTarget : null,
       })
-      if (val.exercises.length > 0) {
-        await saveProgram.mutateAsync({ id: created.id, exercises: exercisePayload })
+      if (val.exercises.length > 0 || val.resources.length > 0) {
+        await saveProgram.mutateAsync({
+          id: created.id,
+          exercises: exercisePayload,
+          resources: resourcePayload,
+        })
       }
       setCurrentProgramId(created.id)
       // Doorsturen naar de edit-pagina zodat de URL op /edit/{id} landt en
@@ -893,6 +942,9 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       supersetGroup: ex.supersetGroup ?? null,
       supersetOrder: ex.supersetOrder, notes: null,
     }))
+    const resourcePayload = resources.map((r, i) => ({
+      resourceId: r.resourceId, week: r.week, day: r.day, order: i,
+    }))
     setTemplateSaving(true)
     try {
       if (currentProgramId) {
@@ -910,8 +962,12 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           weeks: program.weeks, daysPerWeek: program.daysPerWeek,
           isTemplate: true, patientId: null,
         })
-        if (exercises.length > 0) {
-          await saveProgram.mutateAsync({ id: created.id, exercises: exercisePayload })
+        if (exercises.length > 0 || resources.length > 0) {
+          await saveProgram.mutateAsync({
+            id: created.id,
+            exercises: exercisePayload,
+            resources: resourcePayload,
+          })
         }
       }
       toast.success('Opgeslagen als template in de bibliotheek')
@@ -969,6 +1025,17 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         day: pe.day,
         week: pe.week,
       }))
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mappedResources: BuilderResource[] = ((tpl as any).resources ?? []).map((pr: any) => ({
+        uid: pr.id,
+        resourceId: pr.resourceId,
+        title: pr.resource?.title ?? 'Educatie',
+        format: (pr.resource?.format as 'VIDEO' | 'PDF') ?? 'PDF',
+        videoUrl: pr.resource?.videoUrl ?? null,
+        thumbnailUrl: pr.resource?.thumbnailUrl ?? null,
+        day: pr.day,
+        week: pr.week,
+      }))
       setProgram(p => ({
         ...p,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -979,6 +1046,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         daysPerWeek: (tpl as any).daysPerWeek,
       }))
       setExercises(mapped)
+      setResources(mappedResources)
       setImportDialogOpen(false)
       setImportQuery('')
       toast.success(`Template geladen — ${mapped.length} oefeningen overgenomen.`)
@@ -1431,7 +1499,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
 
           {/* LEFT: library — desktop only */}
           <div className="hidden md:flex w-56 shrink-0 border-r overflow-hidden flex-col">
-            <ExerciseLibraryPanel onAdd={addFromLibrary} exercises={libraryExercises.length > 0 ? libraryExercises as never : undefined} />
+            <ExerciseLibraryPanel onAdd={addFromLibrary} onAddResource={addResourceFromLibrary} exercises={libraryExercises.length > 0 ? libraryExercises as never : undefined} />
           </div>
 
           {/* CENTER: canvas */}
@@ -1585,6 +1653,41 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                   </div>
                 </SortableContext>
               </DayDropZone>
+
+              {/* Educatie-blokken voor deze dag ("Leer") */}
+              {dayResources.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
+                    Educatie
+                  </p>
+                  {dayResources.map(r => (
+                    <div
+                      key={r.uid}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-[#141A1B]"
+                    >
+                      <div
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ background: r.format === 'PDF' ? '#60a5fa' : '#e87a55' }}
+                      />
+                      <span className="flex-1 truncate text-sm font-medium">{r.title}</span>
+                      <span
+                        className="text-[9px] font-bold tracking-wider shrink-0"
+                        style={{ color: r.format === 'PDF' ? '#60a5fa' : '#e87a55' }}
+                      >
+                        {r.format}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeResource(r.uid)}
+                        aria-label={`Verwijder ${r.title}`}
+                        className="text-muted-foreground hover:text-destructive shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Mobile: floating add button */}

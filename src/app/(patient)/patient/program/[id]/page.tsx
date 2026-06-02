@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
+import { cn } from '@/lib/utils'
 import { DAY_LABELS } from '@/lib/program-constants'
 import { ExerciseVideoModal, type ExerciseForModal } from '@/components/exercises/ExerciseVideoModal'
 import { ChevronLeft, Play, CheckCircle2, Lock } from 'lucide-react'
@@ -56,7 +57,14 @@ export default function PatientProgramPage() {
   type ProgramExercise = typeof programExercises[number]
 
   const weekData = program.byWeekDay as Record<number, Record<number, ProgramExercise[]>>
-  const daysWithExercises = Object.keys(weekData[activeWeek] ?? {}).map(Number).sort()
+  // Educatie-blokken ("Leer") per week/dag — optioneel (oudere queries zonder).
+  type ProgramRes = NonNullable<typeof program.resources>[number]
+  const resourceData = (program.resourcesByWeekDay ?? {}) as Record<number, Record<number, ProgramRes[]>>
+  // Dagen met oefeningen OF educatie (een dag met alléén educatie telt ook mee).
+  const daysWithExercises = Array.from(new Set([
+    ...Object.keys(weekData[activeWeek] ?? {}),
+    ...Object.keys(resourceData[activeWeek] ?? {}),
+  ].map(Number))).sort((a, b) => a - b)
 
   const isCurrentWeek = activeWeek === program.currentWeek
   const isFutureWeek = activeWeek > program.currentWeek
@@ -235,6 +243,40 @@ export default function PatientProgramPage() {
                     </button>
                   ))}
                 </div>
+
+                {/* Educatie ("Leer") voor deze dag */}
+                {(resourceData[activeWeek]?.[dayNum]?.length ?? 0) > 0 && (
+                  <div className="mt-3 pt-3 space-y-1.5" style={{ borderTop: `1px solid ${P.line}` }}>
+                    <MetaLabel>Uitleg &amp; achtergrond</MetaLabel>
+                    {(resourceData[activeWeek]?.[dayNum] ?? []).map(r => {
+                      const href = r.fileUrl ?? r.videoUrl
+                      const color = r.format === 'PDF' ? P.ice : P.brand
+                      return (
+                        <a
+                          key={r.uid}
+                          href={href ?? undefined}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={cn(
+                            'w-full flex items-center gap-2 rounded-lg px-2 py-1.5 transition-all',
+                            (isFutureWeek || !href) ? 'pointer-events-none opacity-60' : 'athletic-tap',
+                          )}
+                        >
+                          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
+                          <span className="flex-1 truncate" style={{ color: P.ink, fontSize: 13 }}>
+                            {r.title}
+                          </span>
+                          <span
+                            className="athletic-mono shrink-0"
+                            style={{ color, fontSize: 9, fontWeight: 800, letterSpacing: '0.1em' }}
+                          >
+                            {r.format}
+                          </span>
+                        </a>
+                      )
+                    })}
+                  </div>
+                )}
               </Tile>
             )
           })}

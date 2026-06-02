@@ -639,6 +639,7 @@ model Program {
   practiceId String?
 
   exercises            ProgramExercise[]
+  resources            ProgramResource[]
   sessionLogs          SessionLog[]
   weekScheduleDays     WeekScheduleDay[]
   weekScheduleDayItems WeekScheduleDayItem[] @relation("ProgramWeekScheduleItems")
@@ -1163,9 +1164,28 @@ model EducationalResource {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
+  programItems ProgramResource[]
+
   @@index([specialty])
   @@index([isActive])
   @@map("educational_resources")
+}
+
+/// Koppeling van een educatie-resource aan een specifieke dag/week van een
+/// programma (de "Leer"-blokken in de builder). Parallel aan ProgramExercise,
+/// maar zonder oefening-parameters — alleen positie + ordening.
+model ProgramResource {
+  id         String              @id @default(cuid())
+  program    Program             @relation(fields: [programId], references: [id], onDelete: Cascade)
+  programId  String
+  resource   EducationalResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  resourceId String
+  week       Int                 @default(1)
+  day        Int                 @default(1)
+  order      Int                 @default(0)
+
+  @@index([programId])
+  @@map("program_resources")
 }
 
 // ─── Mobility Assessment (The Ready State methodology) ───────────────────────

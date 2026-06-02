@@ -16,6 +16,7 @@ import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { muscleLoadsRecord } from '@/server/lib/muscle-loads'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { auditLog } from '@/server/audit'
+import { signEducationFile } from '@/lib/education/storage'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -107,12 +108,30 @@ export const patientRouter = createTRPCRouter({
           },
           orderBy: [{ week: 'asc' }, { day: 'asc' }, { order: 'asc' }],
         },
+        resources: {
+          include: { resource: true },
+          orderBy: [{ week: 'asc' }, { day: 'asc' }, { order: 'asc' }],
+        },
       },
     })
 
     if (!program) return null
 
     const exercises = program.exercises.map(mapProgramExercise)
+
+    // Educatie-blokken — PDF's krijgen een tijdelijke signed URL.
+    const resources = await Promise.all(program.resources.map(async pr => ({
+      uid: pr.id,
+      resourceId: pr.resourceId,
+      title: pr.resource.title,
+      description: pr.resource.description ?? null,
+      format: pr.resource.format as 'VIDEO' | 'PDF',
+      videoUrl: pr.resource.videoUrl ?? null,
+      thumbnailUrl: pr.resource.thumbnailUrl ?? null,
+      fileUrl: pr.resource.format === 'PDF' ? await signEducationFile(pr.resource.filePath) : null,
+      week: pr.week,
+      day: pr.day,
+    })))
 
     // Group by week → day
     const byWeekDay: Record<number, Record<number, typeof exercises>> = {}
@@ -121,6 +140,14 @@ export const patientRouter = createTRPCRouter({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (!(byWeekDay[ex.week] as any)[ex.day]) (byWeekDay[ex.week] as Record<number, typeof exercises>)[ex.day] = []
       ;(byWeekDay[ex.week] as Record<number, typeof exercises>)[ex.day].push(ex)
+    }
+
+    const resourcesByWeekDay: Record<number, Record<number, typeof resources>> = {}
+    for (const r of resources) {
+      if (!resourcesByWeekDay[r.week]) resourcesByWeekDay[r.week] = {}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (!(resourcesByWeekDay[r.week] as any)[r.day]) (resourcesByWeekDay[r.week] as Record<number, typeof resources>)[r.day] = []
+      ;(resourcesByWeekDay[r.week] as Record<number, typeof resources>)[r.day].push(r)
     }
 
     const { week: currentWeek, day: currentDay } = computeCurrentWeekDay(
@@ -141,6 +168,8 @@ export const patientRouter = createTRPCRouter({
       currentDay,
       exercises,
       byWeekDay,
+      resources,
+      resourcesByWeekDay,
     }
   }),
 

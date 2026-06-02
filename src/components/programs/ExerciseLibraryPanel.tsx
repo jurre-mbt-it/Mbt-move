@@ -87,19 +87,71 @@ function DraggableLibraryItem({
   )
 }
 
+export interface LibraryResource {
+  id: string
+  title: string
+  format: 'VIDEO' | 'PDF'
+  videoUrl?: string | null
+  thumbnailUrl?: string | null
+}
+
+function ResourceLibraryItem({
+  resource,
+  onAdd,
+}: {
+  resource: LibraryResource
+  onAdd: (r: LibraryResource) => void
+}) {
+  const color = resource.format === 'PDF' ? '#60a5fa' : '#e87a55'
+  return (
+    <div className="group flex items-center gap-2 px-2 py-2 rounded-lg border bg-[#141A1B] text-sm hover:border-[rgba(255,255,255,0.16)] hover:bg-[#1C2425]">
+      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+      <span className="flex-1 truncate font-medium text-xs">{resource.title}</span>
+      <span className="text-[9px] font-bold tracking-wider shrink-0" style={{ color }}>
+        {resource.format}
+      </span>
+      <button
+        type="button"
+        aria-label={`Voeg ${resource.title} toe aan programma`}
+        onClick={() => onAdd(resource)}
+        className="w-6 h-6 rounded-full flex items-center justify-center transition-colors shrink-0 hover:bg-[#e87a55] hover:text-[#0A0E0F]"
+        style={{ background: 'rgba(232,122,85,0.12)', color: '#e87a55', border: '1px solid rgba(232,122,85,0.30)' }}
+      >
+        <Plus className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  )
+}
+
 interface ExerciseLibraryPanelProps {
   onAdd: (ex: LibraryExercise) => void
   exercises?: LibraryExercise[]
+  /** Optioneel: educatie toevoegen via de "Leer"-tab. Zonder deze prop
+   *  verschijnt de tab niet (backwards-compatible). */
+  onAddResource?: (r: LibraryResource) => void
 }
 
-export function ExerciseLibraryPanel({ onAdd, exercises: propExercises }: ExerciseLibraryPanelProps) {
+export function ExerciseLibraryPanel({ onAdd, exercises: propExercises, onAddResource }: ExerciseLibraryPanelProps) {
+  const [tab, setTab] = useState<'move' | 'learn'>('move')
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<string | null>(null)
   const [quickAddCategory, setQuickAddCategory] = useState<string | null>(null)
+  const [resourceQuery, setResourceQuery] = useState('')
   const utils = trpc.useUtils()
   const createExercise = trpc.exercises.create.useMutation({
     onSuccess: () => utils.exercises.list.invalidate(),
   })
+
+  // Educatie-bibliotheek (alleen ophalen wanneer de Leer-tab actief is).
+  const resourcesQuery = trpc.education.list.useQuery(undefined, {
+    enabled: tab === 'learn' && !!onAddResource,
+  })
+  const filteredResources = useMemo(() => {
+    const all = resourcesQuery.data ?? []
+    if (!resourceQuery.trim()) return all
+    const q = resourceQuery.toLowerCase()
+    return all.filter(r => r.title.toLowerCase().includes(q))
+  }, [resourcesQuery.data, resourceQuery])
 
   const allExercises = (propExercises ?? []) as LibraryExercise[]
 
@@ -112,6 +164,67 @@ export function ExerciseLibraryPanel({ onAdd, exercises: propExercises }: Exerci
 
   return (
     <div className="flex flex-col h-full">
+      {/* Beweeg / Leer tab-strip (Leer alleen als onAddResource is meegegeven) */}
+      {onAddResource && (
+        <div className="flex gap-1 px-3 pt-3 shrink-0">
+          {([['move', 'Exercise'], ['learn', 'Educatie']] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setTab(key)}
+              className={cn(
+                'flex-1 px-2 py-1.5 rounded-lg text-xs font-bold transition-colors border',
+                tab === key
+                  ? 'text-[#0A0E0F] border-transparent'
+                  : 'border-[rgba(255,255,255,0.12)] text-muted-foreground hover:border-[rgba(255,255,255,0.2)] bg-[#141A1B]',
+              )}
+              style={tab === key ? { background: '#e87a55' } : {}}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {onAddResource && tab === 'learn' ? (
+        <>
+          <div className="px-3 pt-2 pb-2 border-b space-y-2 shrink-0">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Educatie</p>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Zoeken..."
+                value={resourceQuery}
+                onChange={e => setResourceQuery(e.target.value)}
+                className="pl-7 h-7 text-xs"
+              />
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
+            {resourcesQuery.isLoading ? (
+              <p className="text-xs text-muted-foreground text-center py-6">Laden…</p>
+            ) : filteredResources.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-6">
+                Geen educatie-content. Een admin voegt deze toe via Admin → Educatie.
+              </p>
+            ) : (
+              filteredResources.map(r => (
+                <ResourceLibraryItem
+                  key={r.id}
+                  resource={{ id: r.id, title: r.title, format: r.format, videoUrl: r.videoUrl, thumbnailUrl: r.thumbnailUrl }}
+                  onAdd={onAddResource}
+                />
+              ))
+            )}
+          </div>
+          <div className="px-3 py-2 border-t shrink-0">
+            <p className="text-xs text-muted-foreground">
+              Klik <Plus className="w-3 h-3 inline" /> om aan de huidige dag toe te voegen
+            </p>
+          </div>
+        </>
+      ) : (
+      <>
       <div className="px-3 pt-3 pb-2 border-b space-y-2 shrink-0">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Oefeningen</p>
         <div className="relative">
@@ -249,6 +362,8 @@ export function ExerciseLibraryPanel({ onAdd, exercises: propExercises }: Exerci
           Sleep of klik <Plus className="w-3 h-3 inline" /> om toe te voegen
         </p>
       </div>
+      </>
+      )}
     </div>
   )
 }
