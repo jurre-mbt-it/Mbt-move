@@ -21,6 +21,7 @@ import {
   patientTestAssignmentsRouter,
   patientTestResultsRouter,
 } from './clinicalTests'
+import { educationRouter } from './education'
 
 export const appRouter = createTRPCRouter({
   auth: authRouter,
@@ -43,6 +44,7 @@ export const appRouter = createTRPCRouter({
   clinicalTests: clinicalTestsRouter,
   patientTestAssignments: patientTestAssignmentsRouter,
   patientTestResults: patientTestResultsRouter,
+  education: educationRouter,
 })
 
 export type AppRouter = typeof appRouter

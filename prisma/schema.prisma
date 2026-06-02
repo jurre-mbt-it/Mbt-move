@@ -327,6 +327,9 @@ model User {
   rehabTrackersActivated PatientRehabTracker[]  @relation("RehabTrackerActivator")
   rehabStatusUpdates     RehabCriterionStatus[] @relation("RehabStatusUpdater")
 
+  // Educatie-content (admin-beheerd)
+  educationalResources EducationalResource[] @relation("EducationalResourceCreator")
+
   // Mobility assessment relations
   assessmentsAsPatient   PatientAssessment[] @relation("AssessmentPatient")
   assessmentsAsTherapist PatientAssessment[] @relation("AssessmentTherapist")
@@ -1123,6 +1126,46 @@ model RehabCriterionStatus {
   @@unique([patientId, criterionId])
   @@index([patientId])
   @@map("rehab_criterion_status")
+}
+
+// ─── Educatie-content ────────────────────────────────────────────────────────
+// Gecureerde patiënt-educatie: video's (extern of upload) en PDF-documenten,
+// bv. een uitleg van het volledige ACL-traject om door te lezen. Admin-beheerd
+// en globaal zichtbaar (geen practiceId). Optioneel gekoppeld aan een rehab-
+// `specialty` (zelfde vocabulaire als RehabProtocol.specialty) zodat content
+// automatisch bij de juiste patiënten verschijnt; specialty=null = algemeen.
+
+enum EducationFormat {
+  VIDEO
+  PDF
+}
+
+model EducationalResource {
+  id          String          @id @default(cuid())
+  title       String
+  description String?
+  format      EducationFormat
+  // VIDEO: mediaType + videoUrl, zelfde conventie als Exercise.
+  mediaType   MediaType?
+  videoUrl    String?
+  // PDF: object-pad binnen de privé-bucket `educational-resources`. Niet
+  // publiek leesbaar — serveren via een server-side signed URL.
+  filePath     String?
+  thumbnailUrl String?
+  // Matcht RehabProtocol.specialty ("knee_acl", "shoulder", …). null = algemeen.
+  specialty   String?
+  bodyRegion  BodyRegion[]
+  tags        String[]
+  isActive    Boolean         @default(true)
+  order       Int             @default(0)
+  createdBy   User            @relation("EducationalResourceCreator", fields: [createdById], references: [id])
+  createdById String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([specialty])
+  @@index([isActive])
+  @@map("educational_resources")
 }
 
 // ─── Mobility Assessment (The Ready State methodology) ───────────────────────
