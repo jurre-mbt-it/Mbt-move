@@ -561,25 +561,41 @@ export const exercisesRouter = createTRPCRouter({
         }))
     }),
 
-  // Laatste gebruikte parameters per oefening (globaal voor deze therapeut,
-  // ongeacht patiënt). Vult de live-behandeling-rij voor met de waarden die
-  // de therapeut de vorige keer voor deze oefening invulde, zodat hij niet
-  // elke keer Tempo / Band kleur / sets-reps opnieuw hoeft in te tikken.
+  // Laatste gebruikte parameters per oefening, gescoped op één patiënt.
+  // Vult de live-behandeling-rij voor met de waarden die deze patiënt de
+  // vorige keer voor deze oefening deed (gewicht, Tempo, Band kleur,
+  // sets-reps), zodat de therapeut niet elke keer alles opnieuw hoeft in te
+  // tikken. Bewust per-patiënt: 40 kg bij patiënt A betekent niets voor de
+  // beginwaarde bij patiënt B.
   lastUsedParams: therapistProcedure
-    .input(z.object({ exerciseIds: z.array(z.string()).min(1).max(100) }))
+    .input(
+      z.object({
+        exerciseIds: z.array(z.string()).min(1).max(100),
+        patientId: z.string(),
+      }),
+    )
     .query(async ({ ctx, input }) => {
       // Pak alle ExerciseLogs voor deze exerciseIds binnen COMPLETED sessies
-      // van patiënten die aan deze therapeut gekoppeld zijn. Sorteer recent
-      // → oud, en hou per exerciseId de eerste (= nieuwste) entry.
+      // van DEZE patiënt — mits de therapeut toegang tot de patiënt heeft
+      // (directe koppeling óf zelfde praktijk, conform multi-tenant scope).
+      // Sorteer recent → oud, en hou per exerciseId de eerste (= nieuwste).
       const logs = await ctx.prisma.exerciseLog.findMany({
         where: {
           exerciseId: { in: input.exerciseIds },
           session: {
             status: 'COMPLETED',
+            patientId: input.patientId,
             patient: {
-              patientTherapists: {
-                some: { therapistId: ctx.user!.id, isActive: true },
-              },
+              OR: [
+                {
+                  patientTherapists: {
+                    some: { therapistId: ctx.user!.id, isActive: true },
+                  },
+                },
+                ...(ctx.user!.practiceId
+                  ? [{ practiceId: ctx.user!.practiceId }]
+                  : []),
+              ],
             },
           },
         },

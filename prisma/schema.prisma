@@ -60,6 +60,10 @@ enum MediaType {
   UPLOAD
   YOUTUBE
   VIMEO
+  // Gated/beveiligde hosting voor betaalde shop-content (signed playback).
+  // videoUrl bevat dan de Mux playbackId resp. Cloudflare Stream UID.
+  MUX
+  CLOUDFLARE_STREAM
 }
 
 enum LoadType {
@@ -338,6 +342,9 @@ model User {
   clinicalTestAssignments   PatientTestAssignment[] @relation("ClinicalTestPatient")
   clinicalTestsAssignedByMe PatientTestAssignment[] @relation("ClinicalTestAssigner")
   clinicalTestResultsLogged PatientTestResult[]     @relation("ClinicalTestResultPerformer")
+
+  // Consumenten-shop: programma's waarvoor deze therapeut credit krijgt (omzetverdeling).
+  shopProductsCredited ShopProduct[] @relation("ShopProductTherapist")
 
   @@index([deletedAt])
   @@map("users")
@@ -644,6 +651,8 @@ model Program {
   weekScheduleDays     WeekScheduleDay[]
   weekScheduleDayItems WeekScheduleDayItem[] @relation("ProgramWeekScheduleItems")
   cardioLogs           CardioLog[]
+  // Consumenten-shop: dit template kan als betaald product worden verkocht.
+  shopProducts         ShopProduct[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1374,4 +1383,251 @@ model PatientTestResult {
 
   @@index([assignmentId])
   @@map("patient_test_results")
+}
+
+// ============================================================================
+// CONSUMENTEN-SHOP / E-COMMERCE
+// ----------------------------------------------------------------------------
+// Losse oefenschema's verkopen aan consumenten + AI-intake. Deelt bewust de
+// content-database (Exercise/Program), maar houdt PERSOONSDATA van kopers
+// strikt gescheiden van klinische PHI: een koper is een ShopCustomer, GEEN
+// patiënt — geen behandelrelatie, geen dossier, geen DPA-gating.
+// Alle tabellen: RLS + default_deny in de bijbehorende SQL-migratie (anon-key
+// zit in de browserbundle — zie AGENTS.md).
+// ============================================================================
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  EXPIRED
+  CANCELED
+  REFUNDED
+}
+
+enum IntakeStatus {
+  IN_PROGRESS
+  COMPLETED
+  RED_FLAGGED
+}
+
+/// Soort verkoopbaar product in de catalogus.
+///  - PROGRAM  = digitaal trainingsschema (koppelt aan een Program-template).
+///  - PHYSICAL = tastbaar artikel (merchandise): voorraad + verzending.
+///  - SERVICE  = dienst, bv. hardloopanalyse of consult: boeking i.p.v. levering.
+enum ProductKind {
+  PROGRAM
+  PHYSICAL
+  SERVICE
+}
+
+/// Afhandelstatus voor fysieke bestellingen. NONE voor digitale producten.
+enum FulfillmentStatus {
+  NONE
+  PENDING
+  SHIPPED
+  DELIVERED
+}
+
+/// Een koper. Los van het klinische User-model. Auth loopt via Supabase (OTP)
+/// maar resolved naar dit model, niet naar User.
+model ShopCustomer {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  supabaseUserId String?  @unique
+  name           String?
+  marketingOptIn Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  orders         ShopOrder[]
+  entitlements   ShopEntitlement[]
+  intakeSessions ShopIntakeSession[]
+
+  @@map("shop_customers")
+}
+
+/// Een verkoopbaar product in de catalogus. `kind` bepaalt het soort: een
+/// digitaal schema (PROGRAM, wrapt een Program-template), een fysiek artikel
+/// (PHYSICAL, met voorraad + verzending) of een dienst (SERVICE, bv. een
+/// hardloopanalyse). Zichtbaarheid in de shop wordt bepaald door `status`
+/// (NIET door Exercise.isPublic, dat iets anders betekent).
+model ShopProduct {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  name        String
+  tagline     String?
+  description String?
+  kind        ProductKind   @default(PROGRAM)
+  status      ProductStatus @default(DRAFT)
+
+  // PROGRAM: wat de koper verkrijgt is toegang tot dit Program-template
+  // (gedeelde db). Leeg voor PHYSICAL/SERVICE.
+  program   Program? @relation(fields: [programId], references: [id], onDelete: SetNull)
+  programId String?
+
+  // Therapeut die credit krijgt voor dit programma — basis voor omzetverdeling.
+  therapist   User?   @relation("ShopProductTherapist", fields: [therapistId], references: [id], onDelete: SetNull)
+  therapistId String?
+
+  // Prijs in centen (EUR); btw apart zodat we netto/bruto kunnen tonen.
+  priceCents Int
+  currency   String @default("EUR")
+  vatRate    Int    @default(21)
+
+  // Verkooppresentatie
+  level           Difficulty?
+  durationWeeks   Int?
+  bodyRegion      BodyRegion[]
+  heroImageUrl    String?
+  previewVideoUrl String?
+  highlights      String[]
+
+  // Grounding voor de AI-intake matcher (vrije tags, bv "hardlopen","beginner").
+  intakeTags String[]
+
+  // PHYSICAL: tastbaar artikel. stockQty null = voorraad niet bijgehouden.
+  sku              String?
+  stockQty         Int?
+  requiresShipping Boolean @default(false)
+  weightGrams      Int?
+
+  // SERVICE: dienst (bv. hardloopanalyse). Boeking i.p.v. levering.
+  bookingUrl String?
+
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  variants       ShopProductVariant[]
+  orderItems     ShopOrderItem[]
+  entitlements   ShopEntitlement[]
+  intakeSessions ShopIntakeSession[] @relation("IntakeRecommendedProduct")
+
+  @@index([status])
+  @@index([kind])
+  @@map("shop_products")
+}
+
+/// Variant van een (meestal fysiek) product: maat, sterkte of kleur. priceCents
+/// en stockQty null = neem de waarde van het product. Klaar voor gebruik; de
+/// admin-editor vult dit in een vervolgstap.
+model ShopProductVariant {
+  id         String      @id @default(cuid())
+  product    ShopProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId  String
+  label      String
+  sku        String?
+  priceCents Int?
+  stockQty   Int?
+  sortOrder  Int         @default(0)
+
+  orderItems ShopOrderItem[]
+
+  @@index([productId])
+  @@map("shop_product_variants")
+}
+
+/// Een bestelling. Eén Mollie-betaling, één of meer items.
+model ShopOrder {
+  id          String       @id @default(cuid())
+  customer    ShopCustomer @relation(fields: [customerId], references: [id])
+  customerId  String
+  email       String
+  status      OrderStatus  @default(PENDING)
+  amountCents Int
+  currency    String       @default("EUR")
+
+  molliePaymentId String? @unique
+
+  // Naam van de koper (voor op de factuur).
+  buyerName String?
+
+  // Factuur: opvolgend nummer + moment van uitgifte (gezet bij betaling).
+  invoiceNumber String?   @unique
+  invoicedAt    DateTime?
+
+  // Verzending (alleen relevant bij fysieke items). NONE voor puur digitale orders.
+  shippingName       String?
+  shippingAddress    String?
+  shippingPostalCode String?
+  shippingCity       String?
+  shippingCountry    String?
+  shippingCents      Int               @default(0)
+  fulfillmentStatus  FulfillmentStatus @default(NONE)
+  trackingUrl        String?
+
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  items        ShopOrderItem[]
+  entitlements ShopEntitlement[]
+
+  @@index([customerId])
+  @@index([status])
+  @@map("shop_orders")
+}
+
+model ShopOrderItem {
+  id           String              @id @default(cuid())
+  order        ShopOrder           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId      String
+  product      ShopProduct         @relation(fields: [productId], references: [id])
+  productId    String
+  variant      ShopProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  variantId    String?
+  quantity     Int                 @default(1)
+  // Snapshots op moment van aankoop (prijs/naam kunnen later wijzigen).
+  priceCents   Int
+  nameSnapshot String
+
+  @@index([orderId])
+  @@map("shop_order_items")
+}
+
+/// Toegangsrecht: deze klant mag dit product/programma gebruiken.
+model ShopEntitlement {
+  id         String       @id @default(cuid())
+  customer   ShopCustomer @relation(fields: [customerId], references: [id])
+  customerId String
+  product    ShopProduct  @relation(fields: [productId], references: [id])
+  productId  String
+  order      ShopOrder?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  orderId    String?
+  grantedAt  DateTime     @default(now())
+  revokedAt  DateTime?
+
+  @@unique([customerId, productId])
+  @@index([customerId])
+  @@map("shop_entitlements")
+}
+
+/// AI-intake sessie. Kan anoniem starten; rode-vlaggen-screening vóór advies.
+/// AVG: `answers` kan gezondheidsdata bevatten (art. 9) — alleen met
+/// toestemming bewaren; retentie/anonimisering nog te bepalen.
+model ShopIntakeSession {
+  id         String        @id @default(cuid())
+  customer   ShopCustomer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerId String?
+
+  status       IntakeStatus @default(IN_PROGRESS)
+  answers      Json         @default("{}")
+  redFlagged   Boolean      @default(false)
+  consentGiven Boolean      @default(false)
+
+  recommendedProduct   ShopProduct? @relation("IntakeRecommendedProduct", fields: [recommendedProductId], references: [id], onDelete: SetNull)
+  recommendedProductId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([customerId])
+  @@map("shop_intake_sessions")
 }

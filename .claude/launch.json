@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "mbt-move",
+      "name": "mbt-gym",
       "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["/Users/eva/mbt-move/dev-main.sh"],
+      "runtimeArgs": ["/Users/eva/mbt-gym/dev-main.sh"],
       "port": 3000,
       "autoPort": true
     }

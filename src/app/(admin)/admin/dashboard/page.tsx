@@ -13,6 +13,7 @@ const quickLinks = [
   { href: '/therapist/exercises', label: 'Oefeningen', description: 'Oefeningenbibliotheek beheren', bar: P.gold },
   { href: '/therapist/programs', label: "Programma's", description: "Revalidatieprogramma's beheren", bar: P.ice },
   { href: '/admin/research', label: 'Research data', description: 'Geanonimiseerde onderzoeksdata & export', bar: P.danger },
+  { href: '/admin/shop', label: 'Shop', description: "Consumenten-producten: schema's verkopen + publiceren", bar: P.gold },
 ]
 
 export default function AdminDashboard() {

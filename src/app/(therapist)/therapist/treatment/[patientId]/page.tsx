@@ -264,7 +264,7 @@ export default function TreatmentPage({
       const ids = Array.from(new Set(initialRows.map((r) => r.exerciseId)))
       if (ids.length > 0) {
         utils.exercises.lastUsedParams
-          .fetch({ exerciseIds: ids })
+          .fetch({ exerciseIds: ids, patientId })
           .then((memory) => {
             setRows((prev) =>
               prev.map((r) => applyMemoryToRow(r, memory[r.exerciseId], { fillSetsReps: false })),
@@ -391,10 +391,10 @@ export default function TreatmentPage({
       return [...prev, newRow]
     })
     // Memory-fetch: pak de laatst gebruikte parameters van deze oefening
-    // (globaal voor deze therapeut) en vul de net toegevoegde rij voor.
+    // voor déze patiënt en vul de net toegevoegde rij voor.
     // Faalt stil — een lege memory is altijd OK, je krijgt dan gewoon defaults.
     utils.exercises.lastUsedParams
-      .fetch({ exerciseIds: [ex.id] })
+      .fetch({ exerciseIds: [ex.id], patientId })
       .then((memory) => {
         const mem = memory[ex.id]
         if (!mem) return

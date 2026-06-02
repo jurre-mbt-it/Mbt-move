@@ -45,3 +45,29 @@ Escape-hatch: `where: { deletedAt: undefined }` (geen filter) of
 DPA-acceptance is verplicht voor PATIENT/ATHLETE vóór ze patient-data
 endpoints raken, server-side afgedwongen in
 [`src/lib/auth/require-role.ts`](src/lib/auth/require-role.ts).
+
+# RLS verplicht op ELKE nieuwe public-tabel
+
+De anon-key (`NEXT_PUBLIC_SUPABASE_ANON_KEY`) zit in de browserbundle. Een
+`public`-tabel zónder RLS is daarmee rechtstreeks leesbaar/schrijfbaar via
+de Supabase REST-API, buiten de app om. Supabase-linter flagt dit als
+`rls_disabled_in_public`.
+
+**Regel: wie een tabel toevoegt, zet in dezelfde migratie RLS aan.** Niet
+los laten en "later de force-migratie draaien" — dat is precies hoe
+`pain_entries` en de clinical-tests-tabellen (`clinical_tests`,
+`patient_test_assignments`, `patient_test_results`) door de mazen vielen.
+
+Minimaal (Prisma draait als owner en bypasst RLS, dus deny-all volstaat):
+
+```sql
+ALTER TABLE public.<tabel> ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "default_deny" ON public.<tabel>
+  FOR ALL TO public USING (false) WITH CHECK (false);
+```
+
+`prisma db push` zet GEEN RLS — na een push die een tabel toevoegt altijd
+de RLS-migratie meesturen. Vangnet bij drift:
+`supabase/migrations/20260521_force_rls_all_public.sql` is idempotent en
+zet RLS + `default_deny` op elke tabel die het mist (geen DROP). Check de
+staat met een query op `pg_class.relrowsecurity` voor `public`-tabellen.
