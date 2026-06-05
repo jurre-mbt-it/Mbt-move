@@ -68,15 +68,31 @@ function shell(opts: { heading: string; bodyHtml: string; ctaUrl?: string; ctaLa
 
 export function buildConfirmationEmail(order: OrderForEmail): { subject: string; html: string } {
   const first = escapeHtml((order.buyerName ?? '').split(' ')[0] || 'sporter')
-  const programNames = order.items.map((i) => escapeHtml(i.nameSnapshot)).join(', ')
-  const subject = `Je programma staat klaar · ${order.items.map((i) => i.nameSnapshot).join(', ')}`
-  const html = shell({
-    heading: `Hallo ${first}`,
-    bodyHtml: `Bedankt voor je aankoop. Je programma <strong style="color:${BRAND.ink};">${programNames}</strong> staat voor je klaar. Log in om aan de slag te gaan; je volgt het op je eigen tempo, op web en mobiel.`,
-    ctaUrl: `${getAppUrl()}/mijn-programmas`,
-    ctaLabel: 'Programma openen →',
-  })
-  return { subject, html }
+  const names = order.items.map((i) => escapeHtml(i.nameSnapshot)).join(', ')
+  const rawNames = order.items.map((i) => i.nameSnapshot).join(', ')
+  const hasProgram = order.items.some((i) => i.kind === 'PROGRAM')
+
+  // Fysiek artikel / dienst zonder programma: geen "programma staat klaar" en
+  // geen login-CTA. De koper neemt het artikel mee uit de praktijk.
+  if (!hasProgram) {
+    return {
+      subject: `Bedankt voor je bestelling · ${rawNames}`,
+      html: shell({
+        heading: `Hallo ${first}`,
+        bodyHtml: `Bedankt voor je aankoop van <strong style="color:${BRAND.ink};">${names}</strong>. Je neemt 'm mee uit onze praktijk. De factuur ontvang je apart per e-mail.`,
+      }),
+    }
+  }
+
+  return {
+    subject: `Je programma staat klaar · ${rawNames}`,
+    html: shell({
+      heading: `Hallo ${first}`,
+      bodyHtml: `Bedankt voor je aankoop. Je programma <strong style="color:${BRAND.ink};">${names}</strong> staat voor je klaar. Log in om aan de slag te gaan; je volgt het op je eigen tempo, op web en mobiel.`,
+      ctaUrl: `${getAppUrl()}/mijn-programmas`,
+      ctaLabel: 'Programma openen →',
+    }),
+  }
 }
 
 export function buildInvoiceEmail(order: OrderForEmail): { subject: string; html: string } {

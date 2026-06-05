@@ -196,7 +196,7 @@ export default async function ProductDetailPage({
                 ? ['Direct toegang na aankoop', 'Volg het op web en mobiel', 'Door fysiotherapeuten samengesteld']
                 : isPhysical
                   ? [
-                      product.requiresShipping ? 'Wordt naar je opgestuurd' : 'Direct beschikbaar',
+                      product.requiresShipping ? 'Wordt naar je opgestuurd' : 'Direct mee te nemen in onze praktijk',
                       'Door onze fysiotherapeuten geselecteerd',
                     ]
                   : ['Bij een van onze fysiotherapeuten', 'Door fysiotherapeuten uitgevoerd']

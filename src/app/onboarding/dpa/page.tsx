@@ -45,7 +45,11 @@ export default function OnboardingDpaPage() {
   }, [status?.accepted, supabase, router])
 
   // Detecteer of de hele tekst gescrolld is.
+  // Let op: pas koppelen wanneer de inhoud écht gerenderd is (niet tijdens
+  // het laad-scherm), anders is bottomRef nog null en wordt de observer
+  // nooit gekoppeld → knop blijft permanent disabled.
   useEffect(() => {
+    if (isLoading) return
     const sentinel = bottomRef.current
     if (!sentinel) return
     const observer = new IntersectionObserver(
@@ -59,7 +63,7 @@ export default function OnboardingDpaPage() {
     )
     observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [])
+  }, [isLoading])
 
   if (isLoading) {
     return (

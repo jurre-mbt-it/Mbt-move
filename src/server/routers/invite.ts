@@ -475,7 +475,8 @@ export const inviteRouter = createTRPCRouter({
         throw new TRPCError({
           code: 'UNAUTHORIZED',
           message:
-            'We kunnen geen invite vinden met deze gegevens. Klopt je e-mail en geboortejaar?',
+            'We kunnen geen actieve uitnodiging vinden. Klopt je e-mail en geboortejaar? ' +
+            'Heb je al eerder ingelogd? Dan log je in met alleen je e-mail via "Al een account?" hieronder.',
         })
       }
 

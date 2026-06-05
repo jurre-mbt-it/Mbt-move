@@ -24,8 +24,11 @@ function estimateMinutes(
 export default function PatientTrainingOverview() {
   const { data: sessionData, isLoading } = trpc.patient.getTodayExercises.useQuery()
   const { data: activeProgram } = trpc.patient.getActiveProgram.useQuery()
+  const { data: activePrograms } = trpc.patient.getActivePrograms.useQuery()
   const { data: sessionHistory } = trpc.patient.getSessionHistory.useQuery({ limit: 20 })
   const { data: todayWellness } = trpc.wellness.today.useQuery()
+
+  const multiProgram = (activePrograms?.length ?? 0) > 1
 
   const program = sessionData?.program ?? null
   const exercises = sessionData?.exercises ?? []
@@ -90,6 +93,8 @@ export default function PatientTrainingOverview() {
         {/* Hoofd-tegel */}
         <SessionTile
           state={tileState}
+          multiProgram={multiProgram}
+          programCount={activePrograms?.length ?? 0}
           programName={program?.name ?? null}
           currentWeek={program?.currentWeek ?? null}
           totalWeeks={program?.weeks ?? null}
@@ -127,6 +132,8 @@ export default function PatientTrainingOverview() {
 
 function SessionTile({
   state,
+  multiProgram,
+  programCount,
   programName,
   currentWeek,
   totalWeeks,
@@ -134,6 +141,8 @@ function SessionTile({
   estimatedMinutes,
 }: {
   state: 'loading' | 'klaar' | 'open' | 'rust' | 'leeg'
+  multiProgram: boolean
+  programCount: number
   programName: string | null
   currentWeek: number | null
   totalWeeks: number | null
@@ -144,6 +153,49 @@ function SessionTile({
     return (
       <Tile>
         <MetaLabel>Laden…</MetaLabel>
+      </Tile>
+    )
+  }
+
+  // Meerdere actieve programma's → laat de patient kiezen welk programma ze
+  // doet; de keuze volgt op de sessiepagina.
+  if (multiProgram) {
+    return (
+      <Tile accentBar={P.brand} style={{ padding: 20 }}>
+        <Kicker style={{ color: P.brand }}>Meerdere programma&apos;s</Kicker>
+        <h2
+          className="athletic-display"
+          style={{
+            color: P.ink,
+            fontSize: 24,
+            lineHeight: '28px',
+            fontWeight: 900,
+            letterSpacing: '-0.02em',
+            marginTop: 8,
+            textTransform: 'uppercase',
+          }}
+        >
+          {programCount} programma&apos;s actief
+        </h2>
+        <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 6 }}>
+          Kies bij het starten welk programma je vandaag doet.
+        </p>
+        <Link
+          href="/patient/session"
+          className="athletic-tap athletic-mono w-full mt-5 inline-flex items-center justify-center rounded-xl"
+          style={{
+            background: P.brand,
+            color: P.bg,
+            padding: '16px 20px',
+            fontSize: 13,
+            fontWeight: 900,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            textDecoration: 'none',
+          }}
+        >
+          Kies &amp; start →
+        </Link>
       </Tile>
     )
   }
