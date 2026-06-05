@@ -54,6 +54,7 @@ export default function AthleteDashboard() {
   const { data: sessionHistory } = trpc.patient.getSessionHistory.useQuery({
     limit: 20,
   })
+  const { data: rehabTracker } = trpc.rehab.getMyTracker.useQuery()
 
   const todayExercises = sessionData?.exercises ?? []
   const lastSession = sessionHistory?.[0] ?? null
@@ -269,6 +270,15 @@ export default function AthleteDashboard() {
         {/* ── Quick actions ─────────────────────────────── */}
         <div className="pt-2">
           <Kicker style={{ marginBottom: 8 }}>ACTIES</Kicker>
+          {/* Revalidatie — alleen tonen als een therapeut een tracker heeft geactiveerd */}
+          {rehabTracker && (
+            <ActionTile
+              label="MIJN REVALIDATIE"
+              sub={`${rehabTracker.protocol.name} · ${rehabTracker.progress.pct}% behaald`}
+              href="/athlete/rehab"
+              bar={P.lime}
+            />
+          )}
           <ActionTile
             label="PROGRAMMA"
             sub="Eigen schema maken"
