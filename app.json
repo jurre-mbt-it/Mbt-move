@@ -1,3 +1,15 @@
 {
-  "expo": {}
+  "expo": {
+    "backgroundColor": "#0A0E0F",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0A0E0F"
+    },
+    "ios": {
+      "backgroundColor": "#0A0E0F"
+    },
+    "android": {
+      "backgroundColor": "#0A0E0F"
+    }
+  }
 }
