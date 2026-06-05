@@ -22,7 +22,10 @@ const DAY_LABELS = ['MA', 'DI', 'WO', 'DO', 'VR', 'ZA', 'ZO']
 export default function PatientDashboard() {
   const { data: sessionData } = trpc.patient.getTodayExercises.useQuery()
   const { data: activeProgram } = trpc.patient.getActiveProgram.useQuery()
+  const { data: activePrograms } = trpc.patient.getActivePrograms.useQuery()
   const { data: sessionHistory } = trpc.patient.getSessionHistory.useQuery({ limit: 20 })
+
+  const multiProgram = (activePrograms?.length ?? 0) > 1
   const { data: todayWellness } = trpc.wellness.today.useQuery()
   const { data: rehabTracker } = trpc.rehab.getMyTracker.useQuery()
 
@@ -88,54 +91,71 @@ export default function PatientDashboard() {
       <div className="px-4 pt-6 pb-3 flex flex-col gap-1">
         <Kicker>{greeting}</Kicker>
         <Display size="md">HOI</Display>
-        {program && (
+        {multiProgram ? (
+          <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
+            {activePrograms!.length} actieve programma&apos;s
+          </MetaLabel>
+        ) : program ? (
           <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
             {program.name}
           </MetaLabel>
-        )}
+        ) : null}
       </div>
 
       <div className="px-4 pb-24 flex flex-col gap-4">
         {/* Today card */}
-        <Tile accentBar={completedToday ? P.lime : P.gold}>
+        <Tile accentBar={completedToday && !multiProgram ? P.lime : P.gold}>
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <MetaLabel>Vandaag</MetaLabel>
               <Display
                 size="md"
-                color={completedToday ? P.lime : P.ink}
+                color={completedToday && !multiProgram ? P.lime : P.ink}
                 style={{ marginTop: 4 }}
               >
-                {completedToday ? 'KLAAR' : `${todayExercises.length} OEFENINGEN`}
+                {multiProgram
+                  ? `${activePrograms!.length} PROGRAMMA'S`
+                  : completedToday
+                    ? 'KLAAR'
+                    : `${todayExercises.length} OEFENINGEN`}
               </Display>
-              {!completedToday && todayExercises.length > 0 && (
-                <div className="flex flex-col gap-1.5 mt-3">
-                  {todayExercises.slice(0, 3).map((e) => (
-                    <div key={e.uid} className="flex items-center gap-2">
-                      <span
-                        className="w-1.5 h-1.5 rounded-full"
-                        style={{ backgroundColor: P.brand }}
-                      />
-                      <span style={{ color: P.ink, fontSize: 13 }} className="truncate">
-                        {e.name}
+              {multiProgram ? (
+                <span
+                  className="block mt-2"
+                  style={{ color: P.inkMuted, fontSize: 13 }}
+                >
+                  Kies bij het starten welk programma je doet.
+                </span>
+              ) : (
+                !completedToday && todayExercises.length > 0 && (
+                  <div className="flex flex-col gap-1.5 mt-3">
+                    {todayExercises.slice(0, 3).map((e) => (
+                      <div key={e.uid} className="flex items-center gap-2">
+                        <span
+                          className="w-1.5 h-1.5 rounded-full"
+                          style={{ backgroundColor: P.brand }}
+                        />
+                        <span style={{ color: P.ink, fontSize: 13 }} className="truncate">
+                          {e.name}
+                        </span>
+                        <span
+                          className="athletic-mono"
+                          style={{ color: P.inkMuted, fontSize: 11 }}
+                        >
+                          {e.sets}×{e.reps}
+                        </span>
+                      </div>
+                    ))}
+                    {todayExercises.length > 3 && (
+                      <span style={{ color: P.inkMuted, fontSize: 12 }}>
+                        +{todayExercises.length - 3} meer
                       </span>
-                      <span
-                        className="athletic-mono"
-                        style={{ color: P.inkMuted, fontSize: 11 }}
-                      >
-                        {e.sets}×{e.reps}
-                      </span>
-                    </div>
-                  ))}
-                  {todayExercises.length > 3 && (
-                    <span style={{ color: P.inkMuted, fontSize: 12 }}>
-                      +{todayExercises.length - 3} meer
-                    </span>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )
               )}
             </div>
-            {!completedToday && todayExercises.length > 0 && (
+            {(multiProgram || (!completedToday && todayExercises.length > 0)) && (
               <Link
                 href="/patient/session"
                 className="athletic-tap athletic-mono rounded-xl px-4 py-3 flex items-center gap-1"
@@ -246,13 +266,8 @@ export default function PatientDashboard() {
           />
         )}
 
-        {/* Cardio + pain quick actions */}
-        <ActionTile
-          href="/patient/cardio-session"
-          label="Cardio sessie"
-          sub="Walk-run, zone 2, intervallen"
-          bar={P.lime}
-        />
+        {/* Pijn rapporteren — cardio is alleen voor sporters/atleten en
+            staat daarom niet in de patiënt-app. */}
         <ActionTile
           href="/patient/pain"
           label="Pijn rapporteren"

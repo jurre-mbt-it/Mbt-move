@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { AppLoader } from '@/components/AppLoader'
 
 export default function RootPage() {
   const router = useRouter()
@@ -40,9 +41,5 @@ export default function RootPage() {
     checkAuth()
   }, [router])
 
-  return (
-    <div className="athletic-dark min-h-screen flex items-center justify-center" style={{ background: '#0A0E0F' }}>
-      <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#e87a55', borderTopColor: 'transparent' }} />
-    </div>
-  )
+  return <AppLoader />
 }

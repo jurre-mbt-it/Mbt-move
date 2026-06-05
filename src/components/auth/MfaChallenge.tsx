@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,7 +9,6 @@ import { createClient } from '@/lib/supabase/client'
 import { resolvePostLoginRedirect } from '@/lib/auth/post-login-redirect'
 
 export function MfaChallenge() {
-  const router = useRouter()
   const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -52,8 +50,10 @@ export function MfaChallenge() {
       }
 
       const next = await resolvePostLoginRedirect(supabase)
-      router.push(next)
-      router.refresh()
+      // Harde navigatie: in de iOS-webview-wrapper herrendert een soft
+      // router.push+refresh de role-layouts niet altijd na MFA, waardoor het
+      // scherm "bevriest". Een volledige document-load lost dit op.
+      window.location.assign(next)
     } catch {
       setError('Verification failed. Please try again.')
     } finally {

@@ -39,7 +39,7 @@ type QuickAction = {
 const QUICK_ACTIONS: QuickAction[] = [
   { href: '/patient/wellness', label: 'Wellness check', sub: 'Slaap, energie, stemming', icon: Activity, color: P.ice },
   { href: '/patient/pain', label: 'Pijn rapporteren', sub: 'Los van een sessie', icon: Heart, color: P.danger },
-  { href: '/patient/cardio-session', label: 'Cardio sessie', sub: 'Walk-run, zone 2', icon: Dumbbell, color: P.lime },
+  // Cardio is alleen voor sporters/atleten — niet in de patiënt-quicklog.
   { href: '/patient/follow-up', label: '24u follow-up', sub: 'Pijn na sessie checken', icon: Clock, color: P.gold, tendinopathyOnly: true },
 ]
 

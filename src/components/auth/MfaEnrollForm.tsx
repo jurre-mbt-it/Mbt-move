@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { trpc } from '@/lib/trpc/client'
 import { DarkButton, Kicker, MetaLabel, P, Tile } from '@/components/dark-ui'
@@ -18,7 +18,6 @@ interface FactorData {
 }
 
 export function MfaEnrollForm() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const required = searchParams.get('required') === '1'
   const [factorData, setFactorData] = useState<FactorData | null>(null)
@@ -87,13 +86,15 @@ export function MfaEnrollForm() {
 
       // Wanneer dit een verplichte enroll vanuit login is, gate verder
       // afhandelen (DPA / dashboard). Anders: terug naar security-settings.
+      // Harde navigatie: in de iOS-webview-wrapper herrendert een soft
+      // router.push+refresh de role-layouts niet altijd, waardoor het scherm
+      // "bevriest". Een volledige document-load lost dit op.
       if (required) {
         const next = await resolvePostLoginRedirect(supabase)
-        router.push(next)
+        window.location.assign(next)
       } else {
-        router.push('/therapist/settings/security')
+        window.location.assign('/therapist/settings/security')
       }
-      router.refresh()
     } catch {
       setError('Verificatie mislukt. Probeer opnieuw.')
     } finally {

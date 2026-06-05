@@ -727,6 +727,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           <TabsContent value="signalen" className="space-y-4">
             <InsightActivationToggle patientId={patient.id} patientName={patient.name} />
             <InsightTimeline patientId={patient.id} />
+            <PainReports patientId={patient.id} />
           </TabsContent>
 
           {/* ── TAB: Voortgang ───────────────────────────────────── */}
@@ -762,6 +763,100 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         </Tabs>
       </div>
     </div>
+  )
+}
+
+const PAIN_CONTEXT_LABELS: Record<string, string> = {
+  rest: 'In rust',
+  movement: 'Bij bewegen',
+  exercise: 'Tijdens oefening',
+  after: 'Na inspanning',
+  always: 'Continu',
+}
+
+/**
+ * Patiënt-gerapporteerde pijn-meldingen (los van een sessie). Voorheen werden
+ * deze wél opgeslagen maar nergens getoond; dit maakt ze zichtbaar voor de
+ * behandelaar tussen de signalen.
+ */
+function PainReports({ patientId }: { patientId: string }) {
+  const { data: entries = [], isLoading } = trpc.patients.getPainEntries.useQuery({
+    patientId,
+  })
+
+  return (
+    <Tile>
+      <div className="flex items-center justify-between">
+        <MetaLabel>Pijn-meldingen</MetaLabel>
+        {entries.length > 0 && (
+          <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11 }}>
+            laatste {entries.length}
+          </span>
+        )}
+      </div>
+
+      {isLoading ? (
+        <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 12, marginTop: 10 }}>
+          Laden…
+        </p>
+      ) : entries.length === 0 ? (
+        <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>
+          Nog geen losse pijn-meldingen. Meldingen die de patiënt via{' '}
+          &laquo;Pijn rapporteren&raquo; instuurt verschijnen hier.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-2" style={{ marginTop: 12 }}>
+          {entries.map((e) => {
+            const high = e.nrs >= 6
+            return (
+              <div
+                key={e.id}
+                className="rounded-xl px-3 py-2.5"
+                style={{
+                  background: P.surfaceLow,
+                  borderLeft: `3px solid ${high ? P.danger : P.gold}`,
+                }}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span style={{ color: P.ink, fontSize: 14, fontWeight: 700 }}>
+                    {e.location}
+                  </span>
+                  <span
+                    className="athletic-mono rounded-md px-2 py-0.5"
+                    style={{
+                      background: high ? 'rgba(248,113,113,0.15)' : 'rgba(244,194,97,0.14)',
+                      color: high ? P.danger : P.gold,
+                      fontSize: 11,
+                      fontWeight: 800,
+                    }}
+                  >
+                    NRS {e.nrs}
+                  </span>
+                </div>
+                <div
+                  className="athletic-mono"
+                  style={{ color: P.inkMuted, fontSize: 11, marginTop: 4, letterSpacing: '0.03em' }}
+                >
+                  {PAIN_CONTEXT_LABELS[e.context] ?? e.context}
+                  {' · '}
+                  {new Date(e.reportedAt).toLocaleDateString('nl-NL', {
+                    day: 'numeric',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </div>
+                {e.notes && (
+                  <p style={{ color: P.ink, fontSize: 13, marginTop: 6, lineHeight: 1.45 }}>
+                    {e.notes}
+                  </p>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </Tile>
   )
 }
 

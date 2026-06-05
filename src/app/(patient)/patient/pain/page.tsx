@@ -94,7 +94,7 @@ export default function PainReportPage() {
         {nrs !== null && nrs >= 7 && (
           <Tile accentBar={P.danger} style={{ maxWidth: '20rem' }}>
             <p style={{ color: P.danger, fontSize: 13, textAlign: 'center' }}>
-              <strong>Hoge pijnscore</strong> — Je therapeut wordt op de hoogte gesteld.
+              <strong>Hoge pijnscore</strong> — dit wordt duidelijk in je dossier gemarkeerd. Neem bij aanhoudende of toenemende pijn zelf direct contact op met je therapeut.
             </p>
           </Tile>
         )}

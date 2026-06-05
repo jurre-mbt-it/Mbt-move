@@ -904,6 +904,47 @@ export const patientsRouter = createTRPCRouter({
       }
     }),
 
+  // ── Losse pijn-meldingen (patiënt-gerapporteerd, los van een sessie) ─────
+  // De patiënt kan via "Pijn rapporteren" een NRS-melding insturen. Die werd
+  // wél opgeslagen (PainEntry) maar nergens aan de therapeut getoond — dit is
+  // het lees-pad zodat de melding daadwerkelijk bij de behandelaar landt.
+  getPainEntries: therapistProcedure
+    .input(
+      z.object({
+        patientId: z.string(),
+        limit: z.number().int().min(1).max(100).default(30),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.patientId))) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+
+      await auditLog({
+        event: 'PATIENT_VIEWED',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        resource: 'User',
+        resourceId: input.patientId,
+        metadata: { route: 'patients.getPainEntries' },
+        req: ctx.req,
+      })
+
+      return ctx.prisma.painEntry.findMany({
+        where: { userId: input.patientId },
+        orderBy: { reportedAt: 'desc' },
+        take: input.limit,
+        select: {
+          id: true,
+          nrs: true,
+          location: true,
+          context: true,
+          notes: true,
+          reportedAt: true,
+        },
+      })
+    }),
+
   // ── Voortgangsdata voor therapist ────────────────────────────────────────
   getProgress: therapistProcedure
     .input(z.object({ patientId: z.string() }))

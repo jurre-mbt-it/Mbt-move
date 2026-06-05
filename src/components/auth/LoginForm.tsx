@@ -1,14 +1,12 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Mail, KeyRound, Sparkles } from 'lucide-react'
 import { P, DarkButton, DarkInput, Kicker, MetaLabel } from '@/components/dark-ui'
 import { resolvePostLoginRedirect } from '@/lib/auth/post-login-redirect'
 
 export function LoginForm() {
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -70,8 +68,10 @@ export function LoginForm() {
       }
 
       const next = await resolvePostLoginRedirect(supabase)
-      router.push(next)
-      router.refresh()
+      // Harde navigatie i.p.v. router.push+refresh: in de iOS-webview-wrapper
+      // herrendert een soft RSC-navigatie de role-layouts niet altijd, waardoor
+      // het scherm na inloggen "bevriest" tot de app handmatig herstart wordt.
+      window.location.assign(next)
     } catch {
       setError('Er is een onverwachte fout opgetreden.')
     } finally {

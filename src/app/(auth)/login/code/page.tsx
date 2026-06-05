@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
 import { createClient } from '@/lib/supabase/client'
@@ -17,7 +17,6 @@ export default function AccessCodePage() {
 }
 
 function AccessCodeInner() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const prefillEmail = searchParams.get('email') ?? ''
 
@@ -105,7 +104,11 @@ function AccessCodeInner() {
 
       // Gate beslist volgende stap (DPA voor patiënt/athlete, MFA voor staff).
       const dest = await resolvePostLoginRedirect(supabase)
-      router.replace(dest)
+      // Harde navigatie i.p.v. router.replace: in de iOS-webview-wrapper
+      // herrendert een soft RSC-navigatie de role-layouts niet altijd, waardoor
+      // het scherm "bevriest" tot de app handmatig herstart wordt. Een volledige
+      // document-load leest de nieuwe sessie-cookies en rendert alles opnieuw.
+      window.location.replace(dest)
     } catch (err) {
       setError(
         err instanceof Error
@@ -293,7 +296,14 @@ function AccessCodeInner() {
           )}
         </div>
 
-        <div className="text-center">
+        <div className="text-center flex flex-col gap-2.5">
+          <Link
+            href="/login"
+            className="athletic-mono"
+            style={{ color: P.brand, fontSize: 11, letterSpacing: '0.16em' }}
+          >
+            AL EEN ACCOUNT? LOG IN MET JE E-MAIL
+          </Link>
           <Link
             href="/login"
             className="athletic-mono"
