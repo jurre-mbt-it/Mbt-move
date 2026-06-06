@@ -158,6 +158,19 @@ export default function AssessmentsPage() {
           </DarkDialog>
         </div>
 
+        {/* Andere assessment-types */}
+        <Tile accentBar={P.brand} href="/therapist/assessments/hardloopanalyse">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <MetaLabel style={{ color: P.brand }}>Looptechniek · 2D videoanalyse</MetaLabel>
+              <p style={{ color: P.ink, fontSize: 15, fontWeight: 800, marginTop: 2 }}>Hardloopanalyse →</p>
+              <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 2 }}>
+                Achteraanzicht, zijaanzicht & loopmetrics met AI-concept en PDF
+              </p>
+            </div>
+          </div>
+        </Tile>
+
         {/* Patient-selector voor historie */}
         <Tile>
           <MetaLabel>Historie per patiënt</MetaLabel>

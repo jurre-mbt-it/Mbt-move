@@ -349,6 +349,10 @@ model User {
   testReportsAsPatient   TestReport[] @relation("TestReportPatient")
   testReportsAsTherapist TestReport[] @relation("TestReportTherapist")
 
+  // Hardloopanalyse relations
+  runningAnalysesAsPatient   RunningAnalysis[] @relation("RunningAnalysisPatient")
+  runningAnalysesAsTherapist RunningAnalysis[] @relation("RunningAnalysisTherapist")
+
   @@index([deletedAt])
   @@map("users")
 }
@@ -1820,4 +1824,94 @@ model TestReportAdvice {
 
   @@index([reportId])
   @@map("test_report_advice")
+}
+
+// ─── Hardloopanalyse (2D videoanalyse) ───────────────────────────────────────
+// Tweede assessment-type naast de Mobility Assessment. Vast standaardformulier:
+// 6 achteraanzicht-beoordelingen (score 0-100, paren L/R), 6 zijaanzicht-
+// hoekmetingen (ideale range met groene band) en 6 loopmetrics. Opmerkingen +
+// vervolgadvies worden (AI-)concept geschreven en geredigeerd. Items worden bij
+// aanmaken aangemaakt uit de vaste catalogus in `src/lib/running-analysis/catalog.ts`.
+// Rendert naar PDF via `src/lib/pdf/runningAnalysis.ts`.
+
+enum RunningViewSection {
+  REAR // achteraanzicht — score 0-100, hoger is beter
+  SIDE // zijaanzicht — hoekmeting binnen ideale range
+}
+
+enum RunningAnalysisStatus {
+  DRAFT
+  FINAL
+}
+
+model RunningAnalysis {
+  id          String   @id @default(cuid())
+  patientId   String
+  patient     User     @relation("RunningAnalysisPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  therapistId String
+  therapist   User     @relation("RunningAnalysisTherapist", fields: [therapistId], references: [id])
+  performedAt DateTime @default(now())
+  // Kop
+  goal        String? // "Blessurevrij 10 km"
+  location    String?
+  subtitle    String? // "Beoordeling van houding, beweging en loopmetrics"
+  viewLabel   String? // "Achteraanzicht & zijaanzicht"
+  // Loopmetrics (vaste 6 — gemiddelde over de analyse)
+  cadence       Float? // stappen/min
+  strideLength  Float? // paslengte, meter
+  stepLength    Float? // staplengte, meter (stride)
+  groundContact Float? // seconde
+  flightTime    Float? // seconde
+  dutyFactor    Float? // ratio
+  // Slottekst
+  therapistComments String?
+  nextMoment        String? // "Over 6 weken · medio juli 2026"
+  status            RunningAnalysisStatus @default(DRAFT)
+  notes             String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  items  RunningAnalysisItem[]
+  advice RunningAnalysisAdvice[]
+
+  @@index([patientId, performedAt])
+  @@map("running_analyses")
+}
+
+/// Eén beoordeeld item binnen een analyse (achter- of zijaanzicht).
+/// REAR: `value` = score 0-100. SIDE: `value` = hoek in graden, met
+/// idealMin/idealMax (groene band) + axisMin/axisMax voor de balk.
+model RunningAnalysisItem {
+  id         String             @id @default(cuid())
+  analysisId String
+  analysis   RunningAnalysis    @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  section    RunningViewSection
+  key        String // "linker-heup", "overstride", ...
+  label      String
+  value      Float?
+  comment    String?
+  // Alleen SIDE: ideale range + as (gekopieerd uit de catalogus bij aanmaken).
+  idealMin Float?
+  idealMax Float?
+  axisMin  Float?
+  axisMax  Float?
+  unit     String?
+  order    Int     @default(0)
+
+  @@unique([analysisId, key])
+  @@index([analysisId])
+  @@map("running_analysis_items")
+}
+
+/// Eén vervolg-bullet (vette aanhef + tekst).
+model RunningAnalysisAdvice {
+  id         String          @id @default(cuid())
+  analysisId String
+  analysis   RunningAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  order      Int             @default(0)
+  title      String
+  body       String
+
+  @@index([analysisId])
+  @@map("running_analysis_advice")
 }
