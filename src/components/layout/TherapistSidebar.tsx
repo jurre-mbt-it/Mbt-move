@@ -83,7 +83,7 @@ export function TherapistSidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-3 flex flex-col gap-1">
+      <nav className="flex-1 p-3 flex flex-col gap-1 mbt-stagger">
         {(() => {
           // Langste matchende href wint, zodat op /therapist/programs/new
           // alleen "Builder" oplicht en niet ook "Programma's".
@@ -99,10 +99,10 @@ export function TherapistSidebar() {
               href={href}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors',
-                'athletic-tap',
+                'athletic-tap mbt-nav-hover',
               )}
               style={{
-                backgroundColor: active ? P.surfaceHi : 'transparent',
+                backgroundColor: active ? P.surfaceHi : undefined,
                 color: active ? P.brand : P.inkMuted,
                 fontWeight: active ? 800 : 600,
                 letterSpacing: active ? '0.04em' : undefined,
@@ -120,10 +120,10 @@ export function TherapistSidebar() {
             href="/therapist/assessments"
             className={cn(
               'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors',
-              'athletic-tap',
+              'athletic-tap mbt-nav-hover',
             )}
             style={{
-              backgroundColor: pathname.startsWith('/therapist/assessments') ? P.surfaceHi : 'transparent',
+              backgroundColor: pathname.startsWith('/therapist/assessments') ? P.surfaceHi : undefined,
               color: pathname.startsWith('/therapist/assessments') ? P.brand : P.inkMuted,
               fontWeight: pathname.startsWith('/therapist/assessments') ? 800 : 600,
               letterSpacing: pathname.startsWith('/therapist/assessments') ? '0.04em' : undefined,

@@ -218,7 +218,7 @@ export function Tile({
       {...wrapperProps}
       className={cn(
         'relative block overflow-hidden rounded-2xl text-left w-full',
-        (href || onClick) && 'athletic-tap cursor-pointer',
+        (href || onClick) && 'athletic-tap mbt-card-hover cursor-pointer',
         className,
       )}
       style={{
@@ -426,7 +426,7 @@ export function DarkButton({
   const fontSize = size === 'sm' ? 13 : 15
 
   const baseClass = cn(
-    'athletic-tap inline-flex items-center justify-center rounded-xl font-extrabold',
+    'athletic-tap mbt-btn-hover inline-flex items-center justify-center rounded-xl font-extrabold',
     (disabled || loading) && 'opacity-50 pointer-events-none',
     className,
   )

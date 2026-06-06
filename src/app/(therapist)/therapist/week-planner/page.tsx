@@ -14,7 +14,7 @@
  *   via weekNumber-offset binnen één patient's chain.
  */
 
-import { Suspense, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
@@ -319,27 +319,57 @@ const STATUS_TONE: Record<SessionDetail['status'], string> = {
   SKIPPED: '#F87171',
 }
 
-function SessionDetailModal({
-  open, onClose, sessionId,
-}: { open: boolean; onClose: () => void; sessionId: string | null }) {
+/** Responsive helper: true vanaf de opgegeven breakpoint (desktop). */
+function useIsDesktop(breakpoint = 1024): boolean {
+  const [isDesktop, setIsDesktop] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia(`(min-width: ${breakpoint}px)`)
+    const update = () => setIsDesktop(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [breakpoint])
+  return isDesktop
+}
+
+/**
+ * Inhoud van het sessie-detail. Herbruikt in twee schillen: een centrale modal
+ * (mobiel) en een zij-paneel (desktop) waarnaast de kalender mee-krimpt.
+ */
+function SessionDetailContent({
+  sessionId, onClose, showClose = false,
+}: { sessionId: string | null; onClose: () => void; showClose?: boolean }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, isLoading, error } = (trpc.weekSchedules.sessionDetails.useQuery as any)(
     { sessionId: sessionId ?? '' },
-    { enabled: open && !!sessionId, staleTime: 30_000 },
+    { enabled: !!sessionId, staleTime: 30_000 },
   ) as { data: SessionDetail | null | undefined; isLoading: boolean; error: { message: string } | null }
 
   const sched = data?.scheduledAt ? new Date(data.scheduledAt) : null
   const completed = data?.completedAt ? new Date(data.completedAt) : null
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
-          <DialogTitle>
-            {data?.program?.name ?? 'Sessie-details'}
-          </DialogTitle>
-        </DialogHeader>
-
+    <div className="flex flex-col h-full min-h-0">
+      <div
+        className="flex items-center justify-between gap-2 px-4 py-3 border-b shrink-0"
+        style={{ borderColor: P.lineStrong }}
+      >
+        <h2 className="font-bold truncate" style={{ color: P.ink, fontSize: 15 }}>
+          {data?.program?.name ?? 'Sessie-details'}
+        </h2>
+        {showClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Sluiten"
+            className="athletic-tap shrink-0 w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ color: P.inkMuted }}
+          >
+            ✕
+          </button>
+        )}
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 min-h-0">
         {isLoading && (
           <p className="text-sm py-4 text-center" style={{ color: P.inkMuted }}>Laden…</p>
         )}
@@ -349,7 +379,7 @@ function SessionDetailModal({
           </p>
         )}
         {data && (
-          <div className="space-y-3 mt-2">
+          <div className="space-y-3">
             {/* Status + datum + duur */}
             <div className="flex items-center flex-wrap gap-2 text-xs">
               <span
@@ -442,6 +472,23 @@ function SessionDetailModal({
             )}
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+function SessionDetailModal({
+  open, onClose, sessionId,
+}: { open: boolean; onClose: () => void; sessionId: string | null }) {
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-xl p-0 overflow-hidden">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Sessie-details</DialogTitle>
+        </DialogHeader>
+        <div className="max-h-[80vh] flex flex-col">
+          <SessionDetailContent sessionId={open ? sessionId : null} onClose={onClose} />
+        </div>
       </DialogContent>
     </Dialog>
   )
@@ -929,6 +976,7 @@ function WeekPlannerContent() {
   // ─ Add modal ─
   const [addOpen, setAddOpen] = useState(false)
   const [detailSessionId, setDetailSessionId] = useState<string | null>(null)
+  const isDesktop = useIsDesktop()
   const [addDayDate, setAddDayDate] = useState<Date | null>(null)
   const [addDayId, setAddDayId] = useState<string | null>(null)
 
@@ -1004,7 +1052,8 @@ function WeekPlannerContent() {
   const monthLabel = `${MONTH_LABELS_NL[month0]} ${year}`
 
   return (
-    <div className="max-w-[1400px] w-full flex flex-col gap-3">
+    <div className="max-w-[1400px] w-full flex flex-col lg:flex-row lg:items-start gap-3 lg:gap-4">
+      <div className="flex-1 min-w-0 w-full flex flex-col gap-3">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
@@ -1180,20 +1229,39 @@ function WeekPlannerContent() {
         </div>
       )}
 
-      <AddItemModal
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        dayId={addDayId}
-        dayLabel={addDayDate ? addDayDate.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' }) : ''}
-        programs={programs}
-        onSubmit={handleAddSubmit}
-      />
+        <AddItemModal
+          open={addOpen}
+          onClose={() => setAddOpen(false)}
+          dayId={addDayId}
+          dayLabel={addDayDate ? addDayDate.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' }) : ''}
+          programs={programs}
+          onSubmit={handleAddSubmit}
+        />
+      </div>
+      {/* /kalender-kolom — krimpt mee via flex-1 wanneer het paneel opent */}
 
-      <SessionDetailModal
-        open={!!detailSessionId}
-        onClose={() => setDetailSessionId(null)}
-        sessionId={detailSessionId}
-      />
+      {/* Desktop: sessie-detail als zij-paneel naast de (gekrompen) kalender */}
+      {detailSessionId && isDesktop && (
+        <aside
+          className="hidden lg:flex flex-col w-[360px] xl:w-[420px] shrink-0 rounded-2xl overflow-hidden sticky top-4 max-h-[calc(100vh-2rem)] animate-in fade-in-0 slide-in-from-right-4 duration-300 ease-out"
+          style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+        >
+          <SessionDetailContent
+            sessionId={detailSessionId}
+            onClose={() => setDetailSessionId(null)}
+            showClose
+          />
+        </aside>
+      )}
+
+      {/* Mobiel: sessie-detail als centrale modal */}
+      {!isDesktop && (
+        <SessionDetailModal
+          open={!!detailSessionId}
+          onClose={() => setDetailSessionId(null)}
+          sessionId={detailSessionId}
+        />
+      )}
     </div>
   )
 }
