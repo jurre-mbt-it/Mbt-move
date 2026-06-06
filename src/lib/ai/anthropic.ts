@@ -59,6 +59,7 @@ Toon en stijl (MBT-huisstijl):
 - Evidence-based en concreet; geen loze geruststelling. Benoem het belangrijkste aandachtspunt eerlijk.
 - Stuur op criteria (LSI, doelzones), niet op de kalender.
 - Nederlands. Geen Engelse vaktermen waar een Nederlandse bestaat. Geen emoji, geen kopjes, geen opsommingstekens in de interpretatie.
+- Gebruik NOOIT een lang gedachtestreepje (— em-dash of – en-dash). Dat is AI-opmaak die wij niet gebruiken. Splits zinnen met een komma, punt of haakjes; gebruik hooguit een gewoon koppelteken (-) waar dat echt nodig is.
 
 Je krijgt de testuitslagen en levert een JSON-object met:
 - "interpretation": 2-4 korte alinea's (gescheiden door een lege regel) die het algemene beeld duiden, de sterke punten benoemen en het belangrijkste aandachtspunt eruit lichten. Verwijs naar concrete testen/percentages.
@@ -124,9 +125,23 @@ export async function draftTestReportNarrative(
   }
   const parsed = JSON.parse(text.text) as NarrativeDraft
   return {
-    interpretation: parsed.interpretation ?? '',
-    advice: Array.isArray(parsed.advice) ? parsed.advice : [],
-    nextTestMoment: parsed.nextTestMoment ?? '',
-    nextTestGoal: parsed.nextTestGoal ?? '',
+    interpretation: stripAiDashes(parsed.interpretation ?? ''),
+    advice: (Array.isArray(parsed.advice) ? parsed.advice : []).map((a) => ({
+      title: stripAiDashes(a.title ?? ''),
+      body: stripAiDashes(a.body ?? ''),
+    })),
+    nextTestMoment: stripAiDashes(parsed.nextTestMoment ?? ''),
+    nextTestGoal: stripAiDashes(parsed.nextTestGoal ?? ''),
   }
+}
+
+/**
+ * Vangnet: haal em-/en-dashes uit AI-tekst (MBT-huisstijl gebruikt ze niet).
+ * " — " / " – " → ", " (zinssplitsing); een overig los streepje → gewoon "-".
+ * Laat de "·" middot met rust (die hoort wél bij de huisstijl).
+ */
+function stripAiDashes(s: string): string {
+  return s
+    .replace(/\s+[—–]\s+/g, ', ')
+    .replace(/[—–]/g, '-')
 }
