@@ -9,6 +9,12 @@ export type ShellOpts = {
   headerTag: string
   /** Datum die naast headerTag verschijnt (Date of ISO string). */
   headerDate: Date | string
+  /**
+   * Subtitel onder het MBT-wordmark linksboven. Default = de brand-tagline;
+   * het Testrapport zet 'm op "Sportfysiotherapie · Amsterdam" om het
+   * papieren template te volgen. Andere PDF's laten 'm leeg → default.
+   */
+  brandTag?: string
   /** Rendered body HTML (zonder <html> shell). */
   contentHtml: string
   /**
@@ -62,7 +68,7 @@ export function renderPdfDocument(opts: ShellOpts): string {
         <img src="${logoUri}" alt="MBT" />
         <div class="pdf-header__wordmark">
           <span class="pdf-header__name">Movement Based Therapy</span>
-          <span class="pdf-header__tag">Performance Driven Recovery</span>
+          <span class="pdf-header__tag">${esc(opts.brandTag ?? 'Performance Driven Recovery')}</span>
         </div>
       </div>
       <div class="pdf-header__meta">

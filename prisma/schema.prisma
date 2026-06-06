@@ -339,6 +339,10 @@ model User {
   clinicalTestsAssignedByMe PatientTestAssignment[] @relation("ClinicalTestAssigner")
   clinicalTestResultsLogged PatientTestResult[]     @relation("ClinicalTestResultPerformer")
 
+  // Testrapport relations
+  testReportsAsPatient   TestReport[] @relation("TestReportPatient")
+  testReportsAsTherapist TestReport[] @relation("TestReportTherapist")
+
   @@index([deletedAt])
   @@map("users")
 }
@@ -1374,4 +1378,191 @@ model PatientTestResult {
 
   @@index([assignmentId])
   @@map("patient_test_results")
+}
+
+// ─── Testrapport (Return to Sport / voortgangsmeting) ────────────────────────
+// Een momentopname-rapport dat de behandelaar samenstelt uit losse tests met
+// links/rechts-waarden, een doelzone-balk (rood/oranje/groen) en een marker.
+// Catalogus = herbruikbare test-definities (vooraf as/zones/eenheid); een test
+// kan via een batterij in één keer worden toegevoegd. Per rapport-entry zijn
+// alle velden overschrijfbaar. Interpretatie + vervolgadvies worden (AI-)concept
+// geschreven en door de behandelaar geredigeerd. Rendert naar PDF via
+// `src/lib/pdf/testReport.ts`. Zone-logica leeft in `src/lib/test-report/compute.ts`.
+
+/// BILATERAL = links + rechts ingevuld (LSI mogelijk). SINGLE = één waarde.
+enum TestKind {
+  BILATERAL
+  SINGLE
+}
+
+/// Welke waarde op de doelzone-balk geplot wordt.
+///   LSI   → min/max × 100 (symmetrie-index, plot-eenheid %)
+///   RIGHT → de rechterwaarde zelf (bv geopereerde zijde, of ratio)
+///   LEFT  → de linkerwaarde zelf
+///   VALUE → de enkelvoudige waarde (SINGLE tests)
+enum PlotMetric {
+  LSI
+  RIGHT
+  LEFT
+  VALUE
+}
+
+/// Doelzone waarin de geplotte waarde valt.
+enum TestZone {
+  RED
+  ORANGE
+  GREEN
+}
+
+enum TestReportStatus {
+  DRAFT
+  FINAL
+}
+
+/// Herbruikbare test-definitie met as + zone-drempels + eenheden.
+/// Global library (niet practice-gescoped, net als ClinicalTest/AssessmentTest);
+/// reads via service_role in de backend. Geseed uit scripts/test-catalog-data.ts.
+model TestCatalogItem {
+  id            String     @id @default(cuid())
+  /// Stabiele kebab-case slug — idempotente seed-key.
+  key           String?    @unique
+  category      String // "Kracht", "Power", "Mobiliteit"
+  categoryOrder Int        @default(0)
+  name          String // "Quadriceps"
+  subtitle      String? // "isometrisch"
+  source        String? // "KINVENT K-PULL · ISOMETRISCH"
+  kind          TestKind   @default(BILATERAL)
+  metric        PlotMetric @default(LSI)
+  unitPrimary   String? // "kg", "cm", "sec", "reps", "°"
+  unitSecondary String? // "Nm/kg" (optionele tweede eenheid per zijde)
+  plotUnit      String     @default("%") // eenheid van de geplotte waarde
+  axisMin       Float      @default(60)
+  axisMax       Float      @default(100)
+  zoneOrangeMin Float      @default(80) // ≥ → minimaal oranje
+  zoneGreenMin  Float      @default(90) // ≥ → groen
+  higherIsBetter Boolean   @default(true)
+  order         Int        @default(0)
+  isActive      Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  batteryItems TestBatteryItem[]
+  reportEntries TestReportEntry[]
+
+  @@index([category, order])
+  @@map("test_catalog_items")
+}
+
+/// Test-batterij: een benoemde set tests om in één keer aan een rapport toe te
+/// voegen (bv "Return to Sport · VKB"). Global library.
+model TestBattery {
+  id          String   @id @default(cuid())
+  key         String?  @unique
+  name        String
+  description String?
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items TestBatteryItem[]
+
+  @@map("test_batteries")
+}
+
+model TestBatteryItem {
+  id            String          @id @default(cuid())
+  batteryId     String
+  battery       TestBattery     @relation(fields: [batteryId], references: [id], onDelete: Cascade)
+  catalogItemId String
+  catalogItem   TestCatalogItem @relation(fields: [catalogItemId], references: [id], onDelete: Cascade)
+  order         Int             @default(0)
+
+  @@unique([batteryId, catalogItemId])
+  @@map("test_battery_items")
+}
+
+/// Eén testrapport (momentopname) voor een patient.
+model TestReport {
+  id                String           @id @default(cuid())
+  patientId         String
+  patient           User             @relation("TestReportPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  therapistId       String
+  therapist         User             @relation("TestReportTherapist", fields: [therapistId], references: [id])
+  performedAt       DateTime         @default(now())
+  // Kop-velden (vrije tekst per rapport)
+  measurementNumber Int? // 3 → "Meting 03"
+  subtitle          String? // "Objectieve meting van kracht, power en mobiliteit"
+  trajectLabel      String? // "van revalidatietraject"
+  location          String? // "NDSM"
+  injuryGoal        String? // "VKB-reconstructie rechts · hamstringpees · terug naar voetbal"
+  rehabPhaseLabel   String? // "Fase 3 · kracht & power · maand 5"
+  // Slottekst
+  interpretation    String? // vrije prozatekst (alinea's met \n\n)
+  nextTestMoment    String? // "Over 6 weken · medio juli 2026 (maand 6,5)"
+  nextTestGoal      String? // "LSI > 90% op alle krachttesten"
+  status            TestReportStatus @default(DRAFT)
+  notes             String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  entries TestReportEntry[]
+  advice  TestReportAdvice[]
+
+  @@index([patientId, performedAt])
+  @@map("test_reports")
+}
+
+/// Eén test (met waarden) binnen een rapport. Spec-velden zijn gekopieerd uit
+/// de catalogus bij toevoegen en daarna vrij overschrijfbaar.
+model TestReportEntry {
+  id            String           @id @default(cuid())
+  reportId      String
+  report        TestReport       @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  catalogItemId String? // herkomst (nullable: vrije entry)
+  catalogItem   TestCatalogItem? @relation(fields: [catalogItemId], references: [id], onDelete: SetNull)
+  // Spec
+  category       String
+  categoryOrder  Int        @default(0)
+  name           String
+  subtitle       String?
+  source         String?
+  kind           TestKind   @default(BILATERAL)
+  metric         PlotMetric @default(LSI)
+  unitPrimary    String?
+  unitSecondary  String?
+  plotUnit       String     @default("%")
+  axisMin        Float      @default(60)
+  axisMax        Float      @default(100)
+  zoneOrangeMin  Float      @default(80)
+  zoneGreenMin   Float      @default(90)
+  higherIsBetter Boolean    @default(true)
+  // Waarden
+  leftPrimary    Float?
+  rightPrimary   Float?
+  leftSecondary  Float?
+  rightSecondary Float?
+  singleValue    Float?
+  textValue      String? // categoriaal/vrij (niet geplot)
+  // Overrides (null = automatisch berekend)
+  plottedValueOverride Float?
+  zoneOverride         TestZone?
+  notes                String?
+  order                Int      @default(0)
+
+  @@index([reportId])
+  @@map("test_report_entries")
+}
+
+/// Eén vervolgadvies-bullet (vette aanhef + tekst).
+model TestReportAdvice {
+  id       String     @id @default(cuid())
+  reportId String
+  report   TestReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  order    Int        @default(0)
+  title    String // "Quadriceps zwaarder belasten."
+  body     String
+
+  @@index([reportId])
+  @@map("test_report_advice")
 }
