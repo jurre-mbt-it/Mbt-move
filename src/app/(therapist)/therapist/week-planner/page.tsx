@@ -145,7 +145,7 @@ function PatientPicker({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors"
+          className="mbt-btn-hover inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors"
           style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
         >
           <span>{current ? (current.name ?? current.email ?? 'Patiënt') : 'Kies patiënt…'}</span>
