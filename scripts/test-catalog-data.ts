@@ -38,14 +38,14 @@ export const TEST_CATALOG: CatalogSeed[] = [
   {
     key: 'quadriceps-iso', category: 'Kracht', categoryOrder: 1,
     name: 'Quadriceps', subtitle: 'isometrisch', source: KRACHT,
-    kind: 'BILATERAL', metric: 'LSI', unitPrimary: 'kg', unitSecondary: 'Nm/kg',
+    kind: 'BILATERAL', metric: 'LSI', unitPrimary: 'N', unitSecondary: 'Nm/kg',
     plotUnit: '%', axisMin: 60, axisMax: 100, zoneOrangeMin: 80, zoneGreenMin: 90,
     higherIsBetter: true, order: 0,
   },
   {
     key: 'hamstrings-iso', category: 'Kracht', categoryOrder: 1,
     name: 'Hamstrings', subtitle: 'isometrisch', source: KRACHT,
-    kind: 'BILATERAL', metric: 'LSI', unitPrimary: 'kg', unitSecondary: 'Nm/kg',
+    kind: 'BILATERAL', metric: 'LSI', unitPrimary: 'N', unitSecondary: 'Nm/kg',
     plotUnit: '%', axisMin: 60, axisMax: 100, zoneOrangeMin: 80, zoneGreenMin: 90,
     higherIsBetter: true, order: 1,
   },
@@ -59,7 +59,7 @@ export const TEST_CATALOG: CatalogSeed[] = [
   {
     key: 'calf-iso', category: 'Kracht', categoryOrder: 1,
     name: 'Kuit', subtitle: 'plantairflexie isometrisch', source: KRACHT,
-    kind: 'BILATERAL', metric: 'LSI', unitPrimary: 'kg', unitSecondary: 'Nm/kg',
+    kind: 'BILATERAL', metric: 'LSI', unitPrimary: 'N', unitSecondary: 'Nm/kg',
     plotUnit: '%', axisMin: 60, axisMax: 100, zoneOrangeMin: 80, zoneGreenMin: 90,
     higherIsBetter: true, order: 3,
   },
