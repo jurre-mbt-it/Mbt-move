@@ -17,7 +17,7 @@ import {
   DarkDialogTitle,
   DarkDialogTrigger,
   DarkInput,
-  DarkSelect,
+  DarkMenuSelect,
   Display,
   Kicker,
   MetaLabel,
@@ -100,12 +100,12 @@ export default function HardloopanalyseListPage() {
               <div className="flex flex-col gap-3">
                 <div>
                   <MetaLabel>Patiënt</MetaLabel>
-                  <DarkSelect value={newPatientId} onChange={(e) => setNewPatientId(e.target.value)}>
-                    <option value="">— kies patiënt —</option>
-                    {patientOptions.map((p) => (
-                      <option key={p.id} value={p.id}>{p.label}</option>
-                    ))}
-                  </DarkSelect>
+                  <DarkMenuSelect
+                    value={newPatientId}
+                    onValueChange={setNewPatientId}
+                    placeholder="— kies patiënt —"
+                    options={patientOptions.map((p) => ({ value: p.id, label: p.label }))}
+                  />
                 </div>
                 <div className="flex gap-3">
                   <div className="flex-1">
@@ -135,12 +135,13 @@ export default function HardloopanalyseListPage() {
 
         <Tile>
           <MetaLabel>Historie per patiënt</MetaLabel>
-          <DarkSelect className="mt-2" value={selectedPatientId} onChange={(e) => setSelectedPatientId(e.target.value)}>
-            <option value="">— kies patiënt —</option>
-            {patientOptions.map((p) => (
-              <option key={p.id} value={p.id}>{p.label}</option>
-            ))}
-          </DarkSelect>
+          <DarkMenuSelect
+            className="mt-2"
+            value={selectedPatientId}
+            onValueChange={setSelectedPatientId}
+            placeholder="— kies patiënt —"
+            options={patientOptions.map((p) => ({ value: p.id, label: p.label }))}
+          />
         </Tile>
 
         {selectedPatientId && (

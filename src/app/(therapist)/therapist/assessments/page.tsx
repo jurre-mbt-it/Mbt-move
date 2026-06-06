@@ -17,7 +17,7 @@ import {
   DarkDialogTitle,
   DarkDialogTrigger,
   DarkInput,
-  DarkSelect,
+  DarkMenuSelect,
   DarkTextarea,
   Display,
   Kicker,
@@ -105,17 +105,12 @@ export default function AssessmentsPage() {
               <div className="flex flex-col gap-3">
                 <div>
                   <MetaLabel>Patiënt</MetaLabel>
-                  <DarkSelect
+                  <DarkMenuSelect
                     value={newPatientId}
-                    onChange={(e) => setNewPatientId(e.target.value)}
-                  >
-                    <option value="">— kies patiënt —</option>
-                    {patientOptions.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </DarkSelect>
+                    onValueChange={setNewPatientId}
+                    placeholder="— kies patiënt —"
+                    options={patientOptions.map((p) => ({ value: p.id, label: p.label }))}
+                  />
                 </div>
                 <div>
                   <MetaLabel>Datum</MetaLabel>
@@ -174,18 +169,13 @@ export default function AssessmentsPage() {
         {/* Patient-selector voor historie */}
         <Tile>
           <MetaLabel>Historie per patiënt</MetaLabel>
-          <DarkSelect
+          <DarkMenuSelect
             className="mt-2"
             value={selectedPatientId}
-            onChange={(e) => setSelectedPatientId(e.target.value)}
-          >
-            <option value="">— kies patiënt —</option>
-            {patientOptions.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </DarkSelect>
+            onValueChange={setSelectedPatientId}
+            placeholder="— kies patiënt —"
+            options={patientOptions.map((p) => ({ value: p.id, label: p.label }))}
+          />
         </Tile>
 
         {selectedPatientId && (

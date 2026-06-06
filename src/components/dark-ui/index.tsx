@@ -11,6 +11,8 @@ import * as React from 'react'
 import Link from 'next/link'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
+import * as SelectPrimitive from '@radix-ui/react-select'
+import { Check, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // Palette constants — synchroon met globals.css `:root --p-*` en `constants/theme.ts` in mbt-gym
@@ -1055,5 +1057,73 @@ export function DarkChartTooltip({
         ))}
       </div>
     </div>
+  )
+}
+
+// ── DarkMenuSelect — gestylede dropdown (Radix) i.p.v. native <select> ───────
+// Drop-in voor patiënt-kiezers e.d.: geef `options` + `value`/`onValueChange`.
+// Modern, on-brand, met hover-highlight + open-animatie (respecteert
+// prefers-reduced-motion via globals). Native <select> (DarkSelect) blijft
+// bestaan voor plekken die op onChange/onBlur leunen.
+export function DarkMenuSelect({
+  value,
+  onValueChange,
+  options,
+  placeholder = '— kies —',
+  className,
+  disabled,
+  ariaLabel,
+}: {
+  value: string
+  onValueChange: (value: string) => void
+  options: Array<{ value: string; label: string }>
+  placeholder?: string
+  className?: string
+  disabled?: boolean
+  ariaLabel?: string
+}) {
+  return (
+    <SelectPrimitive.Root
+      value={value || undefined}
+      onValueChange={onValueChange}
+      disabled={disabled}
+    >
+      <SelectPrimitive.Trigger
+        aria-label={ariaLabel}
+        className={cn(
+          'mbt-btn-hover inline-flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm outline-none transition-colors focus:ring-2 focus:ring-[#e87a55]/40 disabled:opacity-50 disabled:pointer-events-none data-[placeholder]:text-[#7B8889]',
+          className,
+        )}
+        style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
+      >
+        <SelectPrimitive.Value placeholder={placeholder} />
+        <SelectPrimitive.Icon asChild>
+          <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
+        </SelectPrimitive.Icon>
+      </SelectPrimitive.Trigger>
+      <SelectPrimitive.Portal>
+        <SelectPrimitive.Content
+          position="popper"
+          sideOffset={6}
+          className="z-50 max-h-72 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl border shadow-xl duration-300 ease-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
+          style={{ background: P.surfaceHi, borderColor: P.lineStrong, color: P.ink }}
+        >
+          <SelectPrimitive.Viewport className="p-1 max-h-72 overflow-y-auto">
+            {options.map((o) => (
+              <SelectPrimitive.Item
+                key={o.value}
+                value={o.value}
+                className="relative flex cursor-pointer select-none items-center rounded-lg py-2 pl-3 pr-8 text-sm outline-none transition-[background-color,transform] duration-150 ease-out data-[highlighted]:bg-[rgba(232,122,85,0.16)] data-[highlighted]:translate-x-0.5 data-[disabled]:opacity-50"
+              >
+                <SelectPrimitive.ItemText>{o.label}</SelectPrimitive.ItemText>
+                <SelectPrimitive.ItemIndicator className="absolute right-2 inline-flex">
+                  <Check className="h-4 w-4" style={{ color: P.brand }} />
+                </SelectPrimitive.ItemIndicator>
+              </SelectPrimitive.Item>
+            ))}
+          </SelectPrimitive.Viewport>
+        </SelectPrimitive.Content>
+      </SelectPrimitive.Portal>
+    </SelectPrimitive.Root>
   )
 }
