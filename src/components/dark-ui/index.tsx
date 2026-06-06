@@ -218,7 +218,7 @@ export function Tile({
       {...wrapperProps}
       className={cn(
         'relative block overflow-hidden rounded-2xl text-left w-full',
-        (href || onClick) && 'athletic-tap mbt-card-hover cursor-pointer',
+        (href || onClick) && 'group athletic-tap mbt-card-hover cursor-pointer',
         className,
       )}
       style={{
@@ -242,6 +242,13 @@ export function Tile({
         />
       )}
       {children}
+      {(href || onClick) && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100"
+          style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
+        />
+      )}
     </Wrapper>
   )
 }
@@ -273,7 +280,7 @@ export function ActionTile({
     <Wrapper
       {...wrapperProps}
       className={cn(
-        'athletic-tap w-full flex items-center gap-3 rounded-xl text-left',
+        'athletic-tap mbt-card-hover w-full flex items-center gap-3 rounded-xl text-left',
         disabled && 'opacity-50 pointer-events-none',
         className,
       )}
@@ -357,7 +364,7 @@ export function MetricTile({
       {...wrapperProps}
       className={cn(
         'rounded-2xl flex flex-col gap-2 text-left w-full',
-        interactive && 'athletic-tap cursor-pointer',
+        interactive && 'athletic-tap mbt-card-hover cursor-pointer',
         className,
       )}
       style={{ backgroundColor: P.surface, padding: 16, ...style }}

@@ -65,7 +65,10 @@ export function AthleteBottomNav() {
             </button>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-1">
+        <div
+          key={drawerOpen ? 'open' : 'closed'}
+          className="flex-1 overflow-y-auto p-3 flex flex-col gap-1 mbt-stagger"
+        >
           {DRAWER_ITEMS.map((item) => {
             const active = pathname.startsWith(item.href)
             const Icon = item.icon
@@ -74,9 +77,9 @@ export function AthleteBottomNav() {
                 key={item.href}
                 href={item.href}
                 onClick={() => setDrawerOpen(false)}
-                className="athletic-tap flex items-center gap-3 px-3 py-3 rounded-xl transition-colors"
+                className="athletic-tap mbt-nav-hover flex items-center gap-3 px-3 py-3 rounded-xl transition-colors"
                 style={{
-                  background: active ? P.surfaceHi : 'transparent',
+                  background: active ? P.surfaceHi : undefined,
                   color: active ? P.brand : P.ink,
                 }}
               >
