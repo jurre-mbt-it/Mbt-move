@@ -9,7 +9,25 @@ import { auditLog } from '@/server/audit'
 
 const BACKUP_CODES_COUNT = 10
 const MFA_REQUIRED_ROLES = ['THERAPIST', 'ADMIN'] as const
-const MFA_BACKUP_SALT = process.env.MFA_BACKUP_SALT ?? 'mbt-move-mfa-backup-dev'
+
+/**
+ * HMAC-sleutel voor het hashen van MFA-backupcodes. In productie VERPLICHT via
+ * env-var — geen hardcoded fallback, anders worden codes met een publiek
+ * bekende sleutel gehasht en is een offline brute-force na een DB-lek mogelijk
+ * (AVG art. 32). Lazy opgehaald zodat alleen de MFA-paden falen als de var
+ * ontbreekt, niet het hele serverproces bij import. De dev-fallback geldt
+ * uitsluitend buiten productie.
+ */
+function getBackupSalt(): string {
+  const salt = process.env.MFA_BACKUP_SALT
+  if (salt) return salt
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'MFA_BACKUP_SALT ontbreekt — vereist in productie voor MFA-backupcodes.',
+    )
+  }
+  return 'mbt-move-mfa-backup-dev'
+}
 
 /** Genereer een leesbare 10-char backup-code (XXXX-XXXXX). */
 function generateBackupCode(): string {
@@ -25,7 +43,7 @@ function generateBackupCode(): string {
 
 function hashBackupCode(code: string): string {
   return crypto
-    .createHmac('sha256', MFA_BACKUP_SALT)
+    .createHmac('sha256', getBackupSalt())
     .update(code.toUpperCase().replace(/\s+/g, ''))
     .digest('hex')
 }
