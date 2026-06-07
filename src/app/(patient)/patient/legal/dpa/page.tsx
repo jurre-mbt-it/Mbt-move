@@ -16,10 +16,10 @@ import {
   Tile,
 } from '@/components/dark-ui'
 
-const EFFECTIVE_DATE = '1 april 2025'
+const EFFECTIVE_DATE = '7 juni 2026'
 const CONTROLLER = 'Movement Based Therapy'
 const CONTROLLER_ADDRESS = 'Jacob Bontiusplaats 40, 1018LL Amsterdam, Nederland'
-const CONTROLLER_KVK = '12345678'
+const CONTROLLER_KVK = '99220334'
 const CONTROLLER_EMAIL = 'info@movementbasedtherapy.nl'
 const AP_URL = 'https://www.autoriteitpersoonsgegevens.nl'
 
@@ -236,9 +236,9 @@ export default function DpaPage() {
 
         <Section title="5. Bewaartermijn">
           <p>
-            Op grond van de Wet op de Geneeskundige Behandelingsovereenkomst (WGBO) bewaren wij uw
-            dossier gedurende <strong>15 jaar</strong> na het einde van de behandelrelatie, of
-            zoveel langer als nodig is voor een goede zorgverlening.
+            Op grond van de Wet op de Geneeskundige Behandelingsovereenkomst (WGBO, art. 7:454 BW)
+            bewaren wij uw dossier gedurende <strong>20 jaar</strong> na het einde van de
+            behandelrelatie, of zoveel langer als nodig is voor een goede zorgverlening.
           </p>
           <p className="mt-2" style={{ color: P.inkMuted }}>
             Na het verstrijken van de bewaartermijn worden uw gegevens veilig vernietigd.
@@ -315,15 +315,27 @@ export default function DpaPage() {
           <div className="mt-2 flex flex-col gap-2">
             <SubprocessorCard
               name="Supabase Inc."
-              purpose="Hosting van database en authenticatie"
-              location="EU — Frankfurt (AWS eu-central-1)"
+              purpose="Hosting van database, authenticatie en opslag"
+              location="EU/VK — Londen (AWS eu-west-2, adequaatheidsbesluit)"
               safeguard="Standard Contractual Clauses (SCC)"
             />
             <SubprocessorCard
               name="Resend Inc."
-              purpose="Transactionele e-mailverwerking"
-              location="VS — SCC van toepassing"
+              purpose="Transactionele e-mailverwerking (uitnodigingen, herinneringen)"
+              location="VS"
               safeguard="Standard Contractual Clauses (SCC)"
+            />
+            <SubprocessorCard
+              name="Anthropic PBC"
+              purpose="AI-ondersteunde conceptteksten bij test- en hardloopanalyse-rapporten — uitsluitend gepseudonimiseerde gegevens (géén naam of geboortejaar); de behandelaar controleert elk concept"
+              location="VS"
+              safeguard="Standard Contractual Clauses (SCC) + zero data retention"
+            />
+            <SubprocessorCard
+              name="Mollie B.V."
+              purpose="Betalingsverwerking — uitsluitend voor aankopen in de shop, géén medische gegevens"
+              location="EU — Nederland"
+              safeguard="Verwerkersovereenkomst; geen doorgifte buiten de EER"
             />
           </div>
         </Section>
