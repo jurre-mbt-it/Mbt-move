@@ -55,12 +55,12 @@ export function PatientBottomNav() {
       {/* Quick-log sheet */}
       {sheetOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center"
+          className="mbt-backdrop fixed inset-0 z-50 flex items-end justify-center"
           onClick={() => setSheetOpen(false)}
           style={{ background: 'rgba(0,0,0,0.6)' }}
         >
           <div
-            className="w-full max-w-lg rounded-t-3xl px-4 pt-4 pb-8"
+            className="mbt-sheet w-full max-w-lg rounded-t-3xl px-4 pt-4 pb-8"
             style={{
               background: P.surface,
               borderTop: `1px solid ${P.lineStrong}`,
@@ -88,13 +88,13 @@ export function PatientBottomNav() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="mbt-stagger flex flex-col gap-2">
               {quickActions.map(({ href, label, sub, icon: Icon, color }) => (
                 <Link
                   key={href}
                   href={href}
                   onClick={() => setSheetOpen(false)}
-                  className="athletic-tap flex items-center gap-3 rounded-2xl px-4 py-3"
+                  className="athletic-tap mbt-nav-hover flex items-center gap-3 rounded-2xl px-4 py-3"
                   style={{
                     background: P.surfaceHi,
                     borderLeft: `3px solid ${color}`,
@@ -126,7 +126,7 @@ export function PatientBottomNav() {
         className="fixed bottom-0 left-0 right-0 z-40 border-t"
         style={{ background: P.bg, borderColor: P.lineStrong }}
       >
-        <div className="grid grid-cols-5 items-center h-16 max-w-lg mx-auto px-2">
+        <div className="mbt-stagger grid grid-cols-5 items-center h-16 max-w-lg mx-auto px-2">
           {/* First two tabs */}
           {NAV_ITEMS.slice(0, 2).map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + '/')
@@ -134,7 +134,7 @@ export function PatientBottomNav() {
               <Link
                 key={href}
                 href={href}
-                className={cn('flex flex-col items-center gap-1 py-2 transition-colors')}
+                className={cn('athletic-tap flex flex-col items-center gap-1 py-2 transition-colors')}
                 style={{ color: active ? P.brand : P.inkMuted }}
               >
                 <Icon className="w-5 h-5" />
@@ -192,7 +192,7 @@ export function PatientBottomNav() {
               <Link
                 key={href}
                 href={href}
-                className={cn('flex flex-col items-center gap-1 py-2 transition-colors')}
+                className={cn('athletic-tap flex flex-col items-center gap-1 py-2 transition-colors')}
                 style={{ color: active ? P.brand : P.inkMuted }}
               >
                 <Icon className="w-5 h-5" />
