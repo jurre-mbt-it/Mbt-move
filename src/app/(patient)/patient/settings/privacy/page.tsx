@@ -28,7 +28,7 @@ export default function PrivacySettingsPage() {
 
   const utils = trpc.useUtils()
   const { data, isLoading } = trpc.research.getConsentStatus.useQuery()
-  const { data: cohortStatus } = trpc.cohort.getMyOptOut.useQuery()
+  const { data: cohortStatus } = trpc.cohort.getMyOptIn.useQuery()
 
   const setConsent = trpc.research.setConsent.useMutation({
     onSuccess: (result) => {
@@ -42,13 +42,13 @@ export default function PrivacySettingsPage() {
     onError: () => toast.error('Er is iets misgegaan. Probeer opnieuw.'),
   })
 
-  const setCohort = trpc.cohort.setMyOptOut.useMutation({
-    onSuccess: ({ optOut }) => {
-      utils.cohort.getMyOptOut.invalidate()
+  const setCohort = trpc.cohort.setMyOptIn.useMutation({
+    onSuccess: ({ optIn }) => {
+      utils.cohort.getMyOptIn.invalidate()
       toast.success(
-        optOut
-          ? 'Je doet niet meer mee aan de aggregaten van je therapeut.'
-          : 'Je telt weer mee in de overzichten van je therapeut.',
+        optIn
+          ? 'Je telt mee in de overzichten van je therapeut.'
+          : 'Je doet niet mee aan de aggregaten van je therapeut.',
       )
     },
     onError: () => toast.error('Er is iets misgegaan. Probeer opnieuw.'),
@@ -155,8 +155,8 @@ export default function PrivacySettingsPage() {
           </div>
         </Tile>
 
-        {/* Cohort analytics opt-out */}
-        <Tile accentBar={cohortStatus?.optOut ? P.danger : P.lime}>
+        {/* Cohort analytics opt-in (AVG art. 9 — default niet meedoen) */}
+        <Tile accentBar={cohortStatus?.optIn ? P.lime : P.inkDim}>
           <div className="flex items-start gap-4">
             <div className="flex-1 min-w-0">
               <p
@@ -174,25 +174,12 @@ export default function PrivacySettingsPage() {
                 Je therapeut (en bij Movement Based Therapy de admin) ziet
                 gemiddelden en trends over alle patiënten — bijvoorbeeld
                 gemiddelde pijn over 30 dagen. Jouw individuele data is altijd
-                herkenbaar voor jouw therapeut, maar je kunt jezelf uitsluiten
-                van deze aggregaten.
+                herkenbaar voor jouw therapeut. Je kunt zelf kiezen om
+                jouw geanonimiseerde data toe te voegen aan deze aggregaten.
+                Standaard doe je niet mee.
               </p>
               <div className="mt-3">
-                {cohortStatus?.optOut ? (
-                  <span
-                    className="athletic-mono px-2 py-1 rounded-full"
-                    style={{
-                      backgroundColor: P.surfaceHi,
-                      color: P.danger,
-                      fontSize: 10,
-                      fontWeight: 900,
-                      letterSpacing: '0.08em',
-                      border: `1px solid ${P.danger}`,
-                    }}
-                  >
-                    UITGESLOTEN
-                  </span>
-                ) : (
+                {cohortStatus?.optIn ? (
                   <span
                     className="athletic-mono px-2 py-1 rounded-full"
                     style={{
@@ -206,12 +193,26 @@ export default function PrivacySettingsPage() {
                   >
                     DOET MEE
                   </span>
+                ) : (
+                  <span
+                    className="athletic-mono px-2 py-1 rounded-full"
+                    style={{
+                      backgroundColor: P.surfaceHi,
+                      color: P.inkMuted,
+                      fontSize: 10,
+                      fontWeight: 900,
+                      letterSpacing: '0.08em',
+                      border: `1px solid ${P.line}`,
+                    }}
+                  >
+                    NIET INGESCHAKELD
+                  </span>
                 )}
               </div>
             </div>
             <Switch
-              checked={!(cohortStatus?.optOut ?? false)}
-              onCheckedChange={(checked) => setCohort.mutate({ optOut: !checked })}
+              checked={cohortStatus?.optIn ?? false}
+              onCheckedChange={(checked) => setCohort.mutate({ optIn: checked })}
               disabled={setCohort.isPending}
             />
           </div>

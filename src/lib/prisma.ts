@@ -11,19 +11,29 @@ function createPrismaClient(): PrismaClient {
   // dus we vallen terug op DIRECT_URL als DATABASE_URL ontbreekt.
   const connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL
   if (!connectionString || connectionString.includes('placeholder') || connectionString.includes('localhost')) {
-    // Lazy stub: throwt pas bij eerste DB-call. Voorkomt dat `next build` crasht
-    // tijdens "Collecting page data" als env vars in de build-sandbox missen.
-    // In productie bestaat dit pad niet (DATABASE_URL altijd gezet); dit is
-    // puur build-time vangnet sinds Prisma v7 een lege `new PrismaClient()`
-    // niet meer toestaat.
-    return new Proxy({} as PrismaClient, {
+    // Lazy stub: throwt pas bij een echte model-call. Voorkomt dat `next build`
+    // crasht tijdens "Collecting page data" als env vars in de build-sandbox
+    // missen. In productie bestaat dit pad niet (DATABASE_URL altijd gezet);
+    // dit is puur build-time vangnet sinds Prisma v7 een lege
+    // `new PrismaClient()` niet meer toestaat.
+    //
+    // BELANGRIJK: `$extends` wordt hieronder al bij module-load aangeroepen,
+    // en de Promise-runtime kan `then` proben. Die mogen NIET gooien, anders
+    // crasht het importeren van deze module al (precies de bug die we hier
+    // voorkomen). We geven `$extends` een chainbare stub terug en gooien pas
+    // bij toegang tot een echte model-property (bv. `prisma.user`) op request-
+    // time.
+    const stub: PrismaClient = new Proxy({} as PrismaClient, {
       get(_target, prop) {
+        if (prop === '$extends') return () => stub
+        if (prop === 'then' || typeof prop === 'symbol') return undefined
         throw new Error(
           `[prisma] DATABASE_URL/DIRECT_URL ontbreekt — kan ${String(prop)} niet uitvoeren. ` +
           `Stel de env var in via Vercel project settings of .env.local.`
         )
       },
     })
+    return stub
   }
 
   // Supabase PgBouncer (transaction mode) vereist pgbouncer=true

@@ -7,8 +7,9 @@
  * - adminOverview: aggregates over álle patiënten in de praktijk (alleen
  *   ADMIN). Voor cross-practice gebruik bestaat aparte research-router.
  *
- * Beide queries respecteren `cohortAnalyticsOptOut` op de User: opt-out users
- * worden NIET meegenomen in tellingen, gemiddelden of trends.
+ * Beide queries respecteren `cohortAnalyticsOptIn` op de User: alleen users
+ * die expliciet hebben aangevinkt tellen mee in tellingen/gemiddelden/trends.
+ * AVG art. 9 vereist expliciete toestemming voor bijzondere persoonsgegevens.
  */
 
 import { z } from 'zod'
@@ -31,8 +32,8 @@ const round1 = (n: number | null) =>
 
 export const cohortRouter = createTRPCRouter({
   /**
-   * Aggregaten over de eigen patiënten van de therapeut. Patiënten met
-   * cohortAnalyticsOptOut=true tellen NIET mee.
+   * Aggregaten over de eigen patiënten van de therapeut. Alleen patiënten met
+   * cohortAnalyticsOptIn=true tellen mee.
    */
   therapistOverview: therapistProcedure
     .input(
@@ -50,7 +51,7 @@ export const cohortRouter = createTRPCRouter({
       const patients = await ctx.prisma.user.findMany({
         where: {
           role: 'PATIENT',
-          cohortAnalyticsOptOut: false,
+          cohortAnalyticsOptIn: true,
           deletedAt: null,
           patientTherapists: {
             some: {
@@ -191,7 +192,7 @@ export const cohortRouter = createTRPCRouter({
 
   /**
    * Platform-wide aggregaten — alleen voor ADMIN.
-   * Net als therapistOverview filteren we op cohortAnalyticsOptOut=false.
+   * Net als therapistOverview filteren we op cohortAnalyticsOptIn=true.
    */
   adminOverview: adminProcedure
     .input(
@@ -208,7 +209,7 @@ export const cohortRouter = createTRPCRouter({
 
       const userFilter = {
         role: { in: ['PATIENT', 'ATHLETE'] as ('PATIENT' | 'ATHLETE')[] },
-        cohortAnalyticsOptOut: false,
+        cohortAnalyticsOptIn: true,
         deletedAt: null,
         ...(input?.practiceId !== undefined
           ? { practiceId: input.practiceId }
@@ -349,27 +350,26 @@ export const cohortRouter = createTRPCRouter({
 
   /**
    * Toggle voor patient/athlete: zelf in/uit cohort-aggregates stappen.
-   * Default = meedoen; door op true te zetten wordt de gebruiker uitgesloten
-   * van álle therapist-/admin-aggregates.
+   * Default = NIET meedoen; gebruiker moet expliciet aanvinken (AVG art. 9).
    */
-  setMyOptOut: protectedProcedure
-    .input(z.object({ optOut: z.boolean() }))
+  setMyOptIn: protectedProcedure
+    .input(z.object({ optIn: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.prisma.user.update({
         where: { id: ctx.user.id },
-        data: { cohortAnalyticsOptOut: input.optOut },
+        data: { cohortAnalyticsOptIn: input.optIn },
       })
-      return { ok: true, optOut: input.optOut }
+      return { ok: true, optIn: input.optIn }
     }),
 
   /**
    * Lees-eigen-status (voor de toggle in settings).
    */
-  getMyOptOut: protectedProcedure.query(async ({ ctx }) => {
+  getMyOptIn: protectedProcedure.query(async ({ ctx }) => {
     const user = await ctx.prisma.user.findUnique({
       where: { id: ctx.user.id },
-      select: { cohortAnalyticsOptOut: true },
+      select: { cohortAnalyticsOptIn: true },
     })
-    return { optOut: user?.cohortAnalyticsOptOut ?? false }
+    return { optIn: user?.cohortAnalyticsOptIn ?? false }
   }),
 })

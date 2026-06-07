@@ -38,7 +38,7 @@ export default function AdminCohortPage() {
           PLATFORM AGGREGATEN
         </h1>
         <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
-          Anonieme aggregaten over alle gebruikers. Gebruikers met opt-out tellen niet mee.
+          Anonieme aggregaten. Alleen gebruikers die in hun privacy-instellingen expliciet hebben aangevinkt mee te doen, tellen mee (AVG art. 9 — opt-in vereist).
         </MetaLabel>
       </div>
 
@@ -254,7 +254,7 @@ export default function AdminCohortPage() {
             </p>
             <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>
               Mogelijke oorzaak: nog geen patiënten/atleten op het platform, of
-              alle gebruikers in deze praktijk hebben opt-out aangezet.
+              niemand in deze praktijk heeft zich expliciet aangemeld voor cohort-analytics.
             </p>
           </div>
         </Tile>
@@ -264,10 +264,11 @@ export default function AdminCohortPage() {
       <Tile>
         <MetaLabel>Privacy</MetaLabel>
         <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>
-          Deze cijfers zijn aggregaten — geen individuele records. Gebruikers
-          die in hun privacy-instellingen "uitgesloten" hebben gekozen tellen
-          niet mee. Voor onderzoeksdata-export naar derden zie de aparte
-          research-pagina (vereist expliciete consent per gebruiker).
+          Deze cijfers zijn aggregaten — geen individuele records. Alleen
+          gebruikers die in hun privacy-instellingen expliciet hebben aangevinkt
+          mee te doen, tellen mee (AVG art. 9 — opt-in vereist voor bijzondere
+          persoonsgegevens). Voor onderzoeksdata-export naar derden zie de aparte
+          research-pagina (vereist apart consent per gebruiker).
         </p>
       </Tile>
     </div>

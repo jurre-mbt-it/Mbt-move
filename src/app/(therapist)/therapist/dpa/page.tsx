@@ -190,7 +190,7 @@ export default function AdminDpaPage() {
 
       <p style={{ color: P.inkDim, fontSize: 11, lineHeight: 1.5 }}>
         Dit overzicht toont uitsluitend patiënten die aan uw account zijn gekoppeld.
-        Bewaar deze export conform de bewaartermijn van 15 jaar (WGBO).
+        Bewaar deze export conform de bewaartermijn van 20 jaar (WGBO).
       </p>
     </div>
   )
