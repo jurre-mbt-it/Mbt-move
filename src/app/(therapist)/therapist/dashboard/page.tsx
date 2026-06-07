@@ -1,15 +1,16 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
 import {
   ActionTile,
-  DarkButton,
   Display,
   Kicker,
   MetaLabel,
   MetricTile,
   P,
+  SkeletonList,
   Tile,
 } from '@/components/dark-ui'
 
@@ -17,14 +18,19 @@ export default function TherapistDashboard() {
   const { data: patients = [], isLoading: patientsLoading } = trpc.patients.list.useQuery()
   const { data: programsRaw = [], isLoading: programsLoading } = trpc.programs.list.useQuery()
   const { data: me } = trpc.auth.getMe.useQuery()
+  const utils = trpc.useUtils()
   const programs = programsRaw as Array<{ status: string; isTemplate: boolean }>
 
   const activePatients = patients.filter((p) => p.programStatus === 'ACTIVE')
   const activePrograms = programs.filter((p) => p.status === 'ACTIVE' && !p.isTemplate)
 
+  // "Nu" één keer vastleggen bij mount (lazy initializer) i.p.v. Date.now() in
+  // de render — houdt de render puur (react-hooks/purity) en het weeknummer
+  // stabiel terwijl het dashboard openstaat.
+  const [now] = useState(() => Date.now())
   function weeksCurrent(startDate: Date | string | null | undefined): number {
     if (!startDate) return 1
-    const diff = Date.now() - new Date(startDate).getTime()
+    const diff = now - new Date(startDate).getTime()
     return Math.max(1, Math.ceil(diff / (7 * 24 * 60 * 60 * 1000)))
   }
 
@@ -134,11 +140,7 @@ export default function TherapistDashboard() {
           </Link>
         </div>
         <div className="flex flex-col gap-2">
-          {isLoading && (
-            <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11, padding: 8 }}>
-              LADEN…
-            </span>
-          )}
+          {isLoading && <SkeletonList count={4} accent={P.brand} />}
           {!isLoading && activePatients.length === 0 && (
             <Tile>
               <p style={{ color: P.inkMuted, fontSize: 13, textAlign: 'center', padding: 12 }}>
@@ -151,7 +153,11 @@ export default function TherapistDashboard() {
             const total = p.weeksTotal || 1
             const pct = Math.min(100, (Math.min(current, total) / total) * 100)
             return (
-              <Tile key={p.id} href={`/therapist/patients/${p.id}`}>
+              <Tile
+                key={p.id}
+                href={`/therapist/patients/${p.id}`}
+                prefetch={() => utils.patients.get.prefetch({ id: p.id })}
+              >
                 <div className="flex items-center gap-3">
                   <div
                     className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 athletic-mono"

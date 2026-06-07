@@ -21,6 +21,25 @@ export const LAST_SEEN_RELEASE_KEY = 'mbt-last-seen-release'
 
 export const releaseNotes: ReleaseNote[] = [
   {
+    id: '2026-06-07-interactieve-weekplanner',
+    date: '2026-06-07',
+    title: 'Interactieve week-planner, workouts met inhoud + snellere app',
+    highlight: 'De week-planner is nu volledig interactief: sleep workouts, kopieer dagen, en bouw per workout oefeningen of cardio op vanuit een zijpaneel.',
+    items: [
+      'Workouts verslepen: pak een workout in de kalender en sleep \'m naar een andere dag — hij springt direct mee en wordt meteen opgeslagen.',
+      'De "+"-knop in een dag opent een menu: Workout toevoegen, Vanuit sjabloon, of Kopieer dag.',
+      'Meerdere dagen tegelijk kopiëren: houd de muis ingedrukt en sleep over meerdere dagen om ze te selecteren, en sleep dat blok daarna naar een doeldag.',
+      'Klik een workout aan en er schuift rechts een paneel open met de inhoud — de kalender krimpt netjes mee.',
+      'Oefeningen toevoegen aan een workout: in het paneel kies je oefeningen uit de bibliotheek, automatisch voorgefilterd op het type van de workout (kracht, mobiliteit, plyo, stabiliteit) — die filter kun je altijd uitklikken. Per oefening stel je sets × reps in.',
+      'Cardio-workouts krijgen een eigen parametervenster: type (hardlopen, fietsen, roeien, …), duur, afstand, hartslagzone en intervallen.',
+      'Een workout opslaan als schema (komt in je praktijk-programma\'s) of kopiëren naar dezelfde dag, rechtstreeks vanuit het paneel.',
+      'Notitie-veld bij het toevoegen van een workout, zodat je een aandachtspunt of instructie per dag kunt meegeven.',
+      'Programma\'s: nieuwe knop "Nieuw Cardio" vervangt de losse Walk-Run- en Workout Builder-knoppen. De walk-run opbouwschema\'s met templates per klacht blijven bereikbaar bovenaan het cardio-aanmaakscherm.',
+      'Assessment opent nu met een keuze tussen Mobility Assessment en Hardloopanalyse.',
+      'Snellere app: pagina\'s tonen tijdens het laden nette skeletons in plaats van een lege pagina, en worden alvast voorgeladen wanneer je over een link of patiënt hovert.',
+    ],
+  },
+  {
     id: '2026-05-14-rehab-view-en-exercise-defaults',
     date: '2026-05-14',
     title: 'Read-only revalidatie voor patiënten + slimmere oefening-defaults',

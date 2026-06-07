@@ -26,6 +26,7 @@ import {
 
 export default function TestReportsPage() {
   const router = useRouter()
+  const utils = trpc.useUtils()
   const { data: patients = [] } = trpc.patients.list.useQuery()
 
   const [selectedPatientId, setSelectedPatientId] = useState('')
@@ -151,6 +152,7 @@ export default function TestReportsPage() {
                 key={r.id}
                 accentBar={r.status === 'FINAL' ? P.lime : P.brand}
                 href={`/therapist/test-reports/${r.id}`}
+                prefetch={() => utils.testReports.get.prefetch({ id: r.id })}
               >
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex-1 min-w-0">

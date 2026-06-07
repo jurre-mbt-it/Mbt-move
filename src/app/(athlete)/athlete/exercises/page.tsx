@@ -25,6 +25,7 @@ function categoryColor(cat: string): string {
 export default function AthleteExercisesPage() {
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
+  const utils = trpc.useUtils()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: exercises = [], isLoading } = (trpc.exercises.list.useQuery as any)(
@@ -155,6 +156,8 @@ export default function AthleteExercisesPage() {
                 <Link
                   key={ex.id}
                   href={`/athlete/exercises/${ex.id}`}
+                  onPointerEnter={() => utils.exercises.get.prefetch({ id: ex.id })}
+                  onFocus={() => utils.exercises.get.prefetch({ id: ex.id })}
                   className="athletic-tap flex items-center gap-3 rounded-xl"
                   style={{
                     background: P.surface,

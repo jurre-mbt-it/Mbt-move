@@ -200,6 +200,7 @@ export function Tile({
   onClick,
   href,
   accentBar,
+  prefetch,
 }: {
   children: React.ReactNode
   className?: string
@@ -207,6 +208,9 @@ export function Tile({
   onClick?: () => void
   href?: string
   accentBar?: string
+  /** Wordt op hover + focus aangeroepen — gebruik om de doelpagina (route +
+   *  data) alvast te warmen vóór de klik. Ontkoppeld van tRPC. */
+  prefetch?: () => void
 }) {
   const Wrapper: React.ElementType = href ? Link : onClick ? 'button' : 'div'
   const wrapperProps: Record<string, unknown> = href
@@ -214,6 +218,10 @@ export function Tile({
     : onClick
       ? { type: 'button', onClick }
       : {}
+  if (prefetch) {
+    wrapperProps.onPointerEnter = prefetch
+    wrapperProps.onFocus = prefetch
+  }
 
   return (
     <Wrapper
@@ -252,6 +260,108 @@ export function Tile({
         />
       )}
     </Wrapper>
+  )
+}
+
+// ─── Skeletons ───────────────────────────────────────────────────────────────
+// Placeholders in de VORM van de inhoud tijdens het laden. Shimmer-CSS leeft in
+// globals.css (`.mbt-skeleton`, + uit onder prefers-reduced-motion). Vervangt de
+// kale "LADEN…"-tekst → voelt sneller en oogt on-brand zonder druk te worden.
+
+export function Skeleton({
+  w = '100%',
+  h = 12,
+  radius = 8,
+  className,
+  style,
+}: {
+  /** breedte: number (px) of CSS-string ('60%') */
+  w?: number | string
+  /** hoogte: number (px) of CSS-string */
+  h?: number | string
+  radius?: number
+  className?: string
+  style?: React.CSSProperties
+}) {
+  return (
+    <div
+      aria-hidden
+      className={cn('mbt-skeleton', className)}
+      style={{ width: w, height: h, borderRadius: radius, ...style }}
+    />
+  )
+}
+
+export function SkeletonText({
+  lines = 3,
+  className,
+}: {
+  lines?: number
+  className?: string
+}) {
+  // Laatste regel korter zodat het op echte tekst lijkt.
+  return (
+    <div className={cn('space-y-2', className)}>
+      {Array.from({ length: lines }).map((_, i) => (
+        <Skeleton key={i} h={10} w={i === lines - 1 ? '55%' : '100%'} />
+      ))}
+    </div>
+  )
+}
+
+export function SkeletonTile({
+  accent,
+  lines = 2,
+  className,
+}: {
+  /** kleur van de accent-balk links (zoals Tile's accentBar) */
+  accent?: string
+  lines?: number
+  className?: string
+}) {
+  return (
+    <div
+      aria-hidden
+      className={cn('relative overflow-hidden rounded-2xl', className)}
+      style={{
+        backgroundColor: P.surface,
+        padding: 16,
+        paddingLeft: accent ? 20 : 16,
+      }}
+    >
+      {accent && (
+        <span
+          aria-hidden
+          style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: accent }}
+        />
+      )}
+      <div className="space-y-3">
+        <Skeleton h={14} w="42%" />
+        <SkeletonText lines={lines} />
+      </div>
+    </div>
+  )
+}
+
+export function SkeletonList({
+  count = 5,
+  accent,
+  className,
+}: {
+  count?: number
+  accent?: string
+  className?: string
+}) {
+  return (
+    <div
+      role="status"
+      aria-label="Laden"
+      className={cn('mbt-stagger space-y-3', className)}
+    >
+      {Array.from({ length: count }).map((_, i) => (
+        <SkeletonTile key={i} accent={accent} />
+      ))}
+    </div>
   )
 }
 
@@ -403,6 +513,7 @@ export function DarkButton({
   className,
   style,
   size = 'md',
+  prefetch,
 }: {
   children: React.ReactNode
   onClick?: () => void
@@ -414,6 +525,8 @@ export function DarkButton({
   className?: string
   style?: React.CSSProperties
   size?: 'sm' | 'md' | 'lg'
+  /** Op hover + focus aangeroepen — warm de doelpagina (route + data). */
+  prefetch?: () => void
 }) {
   const bg =
     variant === 'primary'
@@ -452,7 +565,13 @@ export function DarkButton({
 
   if (href && !disabled && !loading) {
     return (
-      <Link href={href} className={baseClass} style={baseStyle}>
+      <Link
+        href={href}
+        className={baseClass}
+        style={baseStyle}
+        onPointerEnter={prefetch}
+        onFocus={prefetch}
+      >
         {loading ? '…' : children}
       </Link>
     )
@@ -463,6 +582,8 @@ export function DarkButton({
       type={type}
       disabled={disabled || loading}
       onClick={onClick}
+      onPointerEnter={prefetch}
+      onFocus={prefetch}
       className={baseClass}
       style={baseStyle}
     >

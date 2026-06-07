@@ -18,7 +18,15 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
+            // 60s "vers": revisits binnen een minuut komen direct uit cache,
+            // geen refetch. gcTime houdt de cache 5 min in leven zodat heen-en-
+            // weer navigeren snel blijft, ook ná het vers-venster.
             staleTime: 60 * 1000,
+            gcTime: 5 * 60 * 1000,
+            // Geen verrassende reload als je terugklikt naar het tabblad.
+            refetchOnWindowFocus: false,
+            // Faal sneller bij een échte fout i.p.v. 3× opnieuw proberen.
+            retry: 1,
           },
         },
       })
