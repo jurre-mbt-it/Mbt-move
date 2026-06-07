@@ -1,16 +1,50 @@
 import type { NextConfig } from "next";
 
 /**
- * Security headers — toegepast op alle routes. Bewust géén Content-Security-Policy
- * hier omdat Next.js + Supabase + Vercel Analytics inline scripts gebruiken; een
- * verkeerde CSP breekt productie zonder waarschuwing. CSP later los toevoegen
- * via een report-only fase.
+ * Content-Security-Policy — voorlopig in REPORT-ONLY modus (M2 uit de privacy-
+ * audit). Report-only blokkeert niets en breekt dus geen productie; de browser
+ * rapporteert alleen overtredingen (zichtbaar in de console, of via een
+ * report endpoint als je dat later koppelt). Zo kunnen we de policy aanscherpen
+ * op basis van echte violations vóór we 'm afdwingend maken.
+ *
+ * Aanpak om afdwingend te worden:
+ *   1. Draai dit een tijd in productie, verzamel violations.
+ *   2. Vervang per directive de brede waarden (bv. 'unsafe-inline'/'unsafe-eval'
+ *      voor scripts) door nonces/hashes — vereist waarschijnlijk middleware.
+ *   3. Hernoem de header naar `Content-Security-Policy` (zonder -Report-Only).
+ *
+ * 'unsafe-inline'/'unsafe-eval' staan nu toe omdat Next.js inline/eval-scripts
+ * injecteert; connect-src dekt Supabase (REST + realtime wss), Sentry en Vercel
+ * Analytics; frame-src/media-src dekken de video-embeds (YouTube/Vimeo/Mux/CF).
+ */
+const contentSecurityPolicyReportOnly = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://vitals.vercel-insights.com",
+  "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://iframe.mediadelivery.net https://*.mux.com",
+  "media-src 'self' blob: https:",
+  "worker-src 'self' blob:",
+].join('; ');
+
+/**
+ * Security headers — toegepast op alle routes.
  *
  * HSTS: 2 jaar + subdomains + preload — Vercel serveert ook standaard HSTS op
  * *.vercel.app, dit is explicit voor het custom domein. Pas op met preload op
  * subdomains die niet allemaal HTTPS spreken.
  */
 const securityHeaders = [
+  {
+    key: 'Content-Security-Policy-Report-Only',
+    value: contentSecurityPolicyReportOnly,
+  },
   {
     key: 'Strict-Transport-Security',
     value: 'max-age=63072000; includeSubDomains; preload',
