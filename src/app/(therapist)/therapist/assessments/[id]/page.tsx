@@ -119,7 +119,7 @@ export default function AssessmentDetailPage({ params }: { params: Promise<{ id:
   const deleteMutation = trpc.assessments.delete.useMutation({
     onSuccess: () => {
       toast.success('Assessment verwijderd')
-      router.push('/therapist/assessments')
+      router.push('/therapist/assessments/mobility')
     },
     onError: (e) => toast.error(e.message),
   })
@@ -155,7 +155,7 @@ export default function AssessmentDetailPage({ params }: { params: Promise<{ id:
   if (isLoading) {
     return (
       <DarkScreen>
-        <DarkHeader title="Assessment" backHref="/therapist/assessments" />
+        <DarkHeader title="Assessment" backHref="/therapist/assessments/mobility" />
         <div className="p-6">
           <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.14em' }}>
             LADEN…
@@ -167,7 +167,7 @@ export default function AssessmentDetailPage({ params }: { params: Promise<{ id:
   if (!assessment) {
     return (
       <DarkScreen>
-        <DarkHeader title="Niet gevonden" backHref="/therapist/assessments" />
+        <DarkHeader title="Niet gevonden" backHref="/therapist/assessments/mobility" />
       </DarkScreen>
     )
   }
@@ -180,7 +180,7 @@ export default function AssessmentDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <DarkScreen>
-      <DarkHeader title="Assessment" backHref="/therapist/assessments" />
+      <DarkHeader title="Assessment" backHref="/therapist/assessments/mobility" />
       <div className="max-w-5xl w-full mx-auto px-4 py-4 space-y-5">
         <Tile>
           <div className="flex items-start justify-between gap-4 flex-wrap">

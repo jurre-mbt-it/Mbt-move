@@ -461,8 +461,8 @@ function WorkoutBuilderContent() {
             ← TERUG
           </Link>
           <div className="flex-1 flex flex-col gap-1">
-            <Kicker>Workout Builder · Stap {step} van 2</Kicker>
-            <Display size="sm">NIEUWE WORKOUT</Display>
+            <Kicker>Nieuw cardio · Stap {step} van 2</Kicker>
+            <Display size="sm">NIEUWE CARDIO</Display>
           </div>
           <div className="flex gap-1">
             {([1, 2] as const).map(s => (
@@ -478,6 +478,20 @@ function WorkoutBuilderContent() {
         {/* Stap 1: Basis */}
         {step === 1 && (
           <div className="space-y-4">
+            {/* Walk-run opbouwschema's (incl. klachten/blessure-templates) als aparte ingang */}
+            <Link
+              href="/therapist/programs/new/walk-run"
+              className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 mbt-card-hover"
+              style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+            >
+              <div>
+                <p style={{ color: P.ink, fontSize: 13, fontWeight: 700 }}>Walk-run opbouwschema</p>
+                <p style={{ color: P.inkMuted, fontSize: 11, marginTop: 1 }}>
+                  Wekelijkse loop/wandel-progressie met templates per klacht/blessure
+                </p>
+              </div>
+              <span className="athletic-mono shrink-0" style={{ color: P.brand, fontSize: 11, letterSpacing: '0.12em' }}>OPENEN →</span>
+            </Link>
             <Tile>
               <div className="space-y-4">
                 <MetaLabel>Basisinformatie</MetaLabel>

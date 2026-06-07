@@ -16,6 +16,7 @@ import {
   Kicker,
   MetaLabel,
   P,
+  SkeletonList,
   Tile,
 } from '@/components/dark-ui'
 
@@ -57,6 +58,7 @@ function PatientsPageInner() {
   } | null>(null)
 
   const { data: patients = [], isLoading } = trpc.patients.list.useQuery()
+  const utils = trpc.useUtils()
   const createInvite = trpc.invite.create.useMutation()
 
   function resetInviteForm() {
@@ -187,14 +189,8 @@ function PatientsPageInner() {
           onChange={e => setSearch(e.target.value)}
         />
 
-        {/* Loading state */}
-        {isLoading && (
-          <div className="flex items-center justify-center py-16">
-            <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.12em' }}>
-              LADEN…
-            </span>
-          </div>
-        )}
+        {/* Loading state — skeleton in de vorm van de patiëntenlijst */}
+        {isLoading && <SkeletonList count={6} />}
 
         {/* Patient list */}
         {!isLoading && (
@@ -211,6 +207,10 @@ function PatientsPageInner() {
                   key={patient.id}
                   accentBar={accent}
                   onClick={() => router.push(`/therapist/patients/${patient.id}`)}
+                  prefetch={() => {
+                    router.prefetch(`/therapist/patients/${patient.id}`)
+                    utils.patients.get.prefetch({ id: patient.id })
+                  }}
                 >
                   <div className="flex items-start gap-3">
                     {/* Avatar */}
@@ -337,6 +337,10 @@ function PatientsPageInner() {
                           variant="secondary"
                           size="sm"
                           onClick={() => router.push(`/therapist/programs/${patient.programId}/edit`)}
+                          prefetch={() => {
+                            router.prefetch(`/therapist/programs/${patient.programId}/edit`)
+                            if (patient.programId) utils.programs.get.prefetch({ id: patient.programId })
+                          }}
                         >
                           Programma
                         </DarkButton>

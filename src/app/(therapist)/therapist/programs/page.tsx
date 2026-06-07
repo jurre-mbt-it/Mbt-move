@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
-import { IconRunning, IconCardio } from '@/components/icons'
+import { IconCardio } from '@/components/icons'
 import {
   DarkButton,
   DarkDialog as Dialog,
@@ -22,6 +22,9 @@ import {
   Kicker,
   MetaLabel,
   P,
+  Skeleton,
+  SkeletonList,
+  SkeletonText,
   Tile,
 } from '@/components/dark-ui'
 
@@ -69,12 +72,8 @@ function ProgramsPageFallback() {
   return (
     <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
       <div className="max-w-5xl mx-auto px-4 pt-10 pb-8 space-y-6">
-        <div className="h-8 w-48 rounded animate-pulse" style={{ background: P.surfaceHi }} />
-        <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-24 rounded-xl animate-pulse" style={{ background: P.surfaceHi }} />
-          ))}
-        </div>
+        <Skeleton h={32} w={192} />
+        <SkeletonList count={3} />
       </div>
     </div>
   )
@@ -105,14 +104,9 @@ function ProgramsPageInner() {
             </MetaLabel>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <DarkButton variant="secondary" size="sm" href="/therapist/programs/new/walk-run">
-              <span className="inline-flex items-center gap-1.5">
-                <IconRunning size={14} /> Walk-Run
-              </span>
-            </DarkButton>
             <DarkButton variant="secondary" size="sm" href="/therapist/programs/new/workout">
               <span className="inline-flex items-center gap-1.5">
-                <IconCardio size={14} /> Workout Builder
+                <IconCardio size={14} /> Nieuw Cardio
               </span>
             </DarkButton>
             <DarkButton variant="primary" size="sm" href="/therapist/programs/new">
@@ -190,13 +184,7 @@ function ActiveProgramsPanel() {
   }
 
   if (isLoading) {
-    return (
-      <div className="space-y-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-24 rounded-xl animate-pulse" style={{ background: P.surfaceHi }} />
-        ))}
-      </div>
-    )
+    return <SkeletonList count={3} />
   }
 
   return (
@@ -289,6 +277,7 @@ function ProgramCard({
 }) {
   const status = STATUS_COLORS[program.status] ?? STATUS_COLORS.DRAFT
   const [expanded, setExpanded] = useState(false)
+  const utils = trpc.useUtils()
 
   return (
     <Tile accentBar={status.accent}>
@@ -364,6 +353,7 @@ function ProgramCard({
             variant="secondary"
             size="sm"
             href={`/therapist/programs/${program.id}/edit`}
+            prefetch={() => utils.programs.get.prefetch({ id: program.id })}
           >
             Wijzig
           </DarkButton>
@@ -419,11 +409,7 @@ function ProgramExercisePreview({ programId }: { programId: string }) {
   })
 
   if (isLoading) {
-    return (
-      <p className="athletic-mono" style={{ color: P.inkDim, fontSize: 11, letterSpacing: '0.05em' }}>
-        Laden...
-      </p>
-    )
+    return <SkeletonText lines={4} />
   }
   if (!data || data.exercises.length === 0) {
     return (
@@ -764,6 +750,7 @@ function LibraryCard({ program, onCopy }: { program: Program; onCopy: () => void
     ? program.name.slice(categoryMatch[0].length).trim()
     : program.name
   const [expanded, setExpanded] = useState(false)
+  const utils = trpc.useUtils()
 
   return (
     <Tile accentBar={P.brand}>
@@ -839,6 +826,7 @@ function LibraryCard({ program, onCopy }: { program: Program; onCopy: () => void
             variant="secondary"
             size="sm"
             href={`/therapist/programs/${program.id}/edit`}
+            prefetch={() => utils.programs.get.prefetch({ id: program.id })}
           >
             ✎
           </DarkButton>
@@ -861,11 +849,7 @@ function SchemaExercisePreview({ programId }: { programId: string }) {
   const data = rawData as { exercises: PreviewExercise[] } | undefined
 
   if (isLoading) {
-    return (
-      <p className="athletic-mono" style={{ color: P.inkDim, fontSize: 11, letterSpacing: '0.05em' }}>
-        Laden...
-      </p>
-    )
+    return <SkeletonText lines={4} />
   }
   if (!data || data.exercises.length === 0) {
     return (

@@ -20,6 +20,7 @@ import {
   Kicker,
   MetaLabel,
   P,
+  SkeletonTile,
   Tile,
 } from '@/components/dark-ui'
 
@@ -434,9 +435,9 @@ export default function ExercisesPage() {
 
         {/* Exercise grid / list */}
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="mbt-stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-40 rounded-xl animate-pulse" style={{ background: P.surfaceHi }} />
+              <SkeletonTile key={i} lines={3} />
             ))}
           </div>
         ) : filtered.length === 0 ? (
@@ -560,6 +561,8 @@ export default function ExercisesPage() {
                   <Link
                     href={`/therapist/exercises/${ex.id}/edit`}
                     onClick={e => e.stopPropagation()}
+                    onPointerEnter={() => utils.exercises.get.prefetch({ id: ex.id })}
+                    onFocus={() => utils.exercises.get.prefetch({ id: ex.id })}
                     className="p-1.5 rounded-lg shrink-0 athletic-mono"
                     style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.12em' }}
                   >

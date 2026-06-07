@@ -1,12 +1,13 @@
 /**
- * Hardloopanalyse — overzicht (binnen de Assessment-sectie).
- * Behandelaar start een nieuwe analyse + ziet historie per patiënt.
+ * Mobility Assessment overzicht.
+ * Therapeut kan nieuwe assessment starten + historie zien.
+ * Bereikbaar via de assessment-keuzepagina (/therapist/assessments).
  */
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { trpc } from '@/lib/trpc/client'
 import {
@@ -18,6 +19,7 @@ import {
   DarkDialogTrigger,
   DarkInput,
   DarkMenuSelect,
+  DarkTextarea,
   Display,
   Kicker,
   MetaLabel,
@@ -25,7 +27,7 @@ import {
   Tile,
 } from '@/components/dark-ui'
 
-export default function HardloopanalyseListPage() {
+export default function MobilityAssessmentPage() {
   const router = useRouter()
   const utils = trpc.useUtils()
   const { data: access, isLoading: accessLoading } = trpc.assessments.hasAccess.useQuery()
@@ -34,30 +36,35 @@ export default function HardloopanalyseListPage() {
   })
 
   const [selectedPatientId, setSelectedPatientId] = useState('')
-  const { data: analyses = [] } = trpc.runningAnalysis.listForPatient.useQuery(
+  const { data: patientAssessments = [] } = trpc.assessments.listForPatient.useQuery(
     { patientId: selectedPatientId },
-    { enabled: !!selectedPatientId && access?.hasAccess === true },
+    { enabled: !!selectedPatientId },
   )
 
   const [createOpen, setCreateOpen] = useState(false)
   const [newPatientId, setNewPatientId] = useState('')
   const [newPerformedAt, setNewPerformedAt] = useState(new Date().toISOString().slice(0, 10))
-  const [newGoal, setNewGoal] = useState('')
+  const [newNotes, setNewNotes] = useState('')
 
-  const create = trpc.runningAnalysis.create.useMutation({
+  const create = trpc.assessments.create.useMutation({
     onSuccess: (res) => {
-      toast.success('Hardloopanalyse aangemaakt')
-      router.push(`/therapist/assessments/hardloopanalyse/${res.id}`)
+      toast.success('Assessment aangemaakt')
+      router.push(`/therapist/assessments/${res.id}`)
     },
     onError: (e) => toast.error(e.message),
   })
 
-  const patientOptions = useMemo(() => patients.map((p) => ({ id: p.id, label: p.name })), [patients])
+  const patientOptions = useMemo(
+    () => patients.map((p) => ({ id: p.id, label: p.name, accessStatus: p.accessStatus })),
+    [patients],
+  )
 
   if (accessLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: P.bg }}>
-        <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.14em' }}>LADEN…</span>
+        <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.14em' }}>
+          LADEN…
+        </span>
       </div>
     )
   }
@@ -67,9 +74,9 @@ export default function HardloopanalyseListPage() {
       <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
         <div className="max-w-lg mx-auto px-4 pt-20 text-center space-y-4">
           <Kicker>Toegang vereist</Kicker>
-          <Display size="md">HARDLOOPANALYSE</Display>
+          <Display size="md">MOBILITY ASSESSMENT</Display>
           <p style={{ color: P.inkMuted, fontSize: 14, lineHeight: 1.55 }}>
-            Deze functie is niet geactiveerd voor jouw account. Neem contact op met een admin.
+            Deze functie is niet geactiveerd voor jouw account. Neem contact op met een admin om Mobility Assessment in te schakelen.
           </p>
         </div>
       </div>
@@ -84,19 +91,21 @@ export default function HardloopanalyseListPage() {
             <Link href="/therapist/assessments" className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.12em' }}>
               ← ASSESSMENT
             </Link>
-            <Kicker>Looptechniek · 2D videoanalyse</Kicker>
-            <Display size="md">HARDLOOPANALYSE</Display>
+            <Kicker>Ready State methodology</Kicker>
+            <Display size="md">MOBILITY ASSESSMENT</Display>
             <MetaLabel style={{ textTransform: 'none', fontWeight: 500, marginTop: 2 }}>
-              Houding, beweging en loopmetrics → PDF
+              9 archetypes · 42 tests · stoplicht-scoring + programming template
             </MetaLabel>
           </div>
           <DarkDialog open={createOpen} onOpenChange={setCreateOpen}>
             <DarkDialogTrigger asChild>
-              <DarkButton variant="primary" onClick={() => setCreateOpen(true)}>+ Nieuwe analyse</DarkButton>
+              <DarkButton variant="primary" onClick={() => setCreateOpen(true)}>
+                + Nieuwe assessment
+              </DarkButton>
             </DarkDialogTrigger>
             <DarkDialogContent>
               <DarkDialogHeader>
-                <DarkDialogTitle>Nieuwe hardloopanalyse</DarkDialogTitle>
+                <DarkDialogTitle>Nieuwe assessment starten</DarkDialogTitle>
               </DarkDialogHeader>
               <div className="flex flex-col gap-3">
                 <div>
@@ -108,24 +117,39 @@ export default function HardloopanalyseListPage() {
                     options={patientOptions.map((p) => ({ value: p.id, label: p.label }))}
                   />
                 </div>
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <MetaLabel>Analysedatum</MetaLabel>
-                    <DarkInput type="date" value={newPerformedAt} onChange={(e) => setNewPerformedAt(e.target.value)} />
-                  </div>
+                <div>
+                  <MetaLabel>Datum</MetaLabel>
+                  <DarkInput
+                    type="date"
+                    value={newPerformedAt}
+                    onChange={(e) => setNewPerformedAt(e.target.value)}
+                  />
                 </div>
                 <div>
-                  <MetaLabel>Doel (optioneel)</MetaLabel>
-                  <DarkInput value={newGoal} onChange={(e) => setNewGoal(e.target.value)} placeholder="Blessurevrij 10 km" />
+                  <MetaLabel>Notitie (optioneel)</MetaLabel>
+                  <DarkTextarea
+                    rows={2}
+                    value={newNotes}
+                    onChange={(e) => setNewNotes(e.target.value)}
+                    placeholder="Reden van assessment, klinische context"
+                  />
                 </div>
               </div>
               <div className="flex justify-end gap-2 mt-5">
-                <DarkButton variant="ghost" size="sm" onClick={() => setCreateOpen(false)}>Annuleren</DarkButton>
+                <DarkButton variant="ghost" size="sm" onClick={() => setCreateOpen(false)}>
+                  Annuleren
+                </DarkButton>
                 <DarkButton
                   variant="primary"
                   size="sm"
                   disabled={!newPatientId || create.isPending}
-                  onClick={() => create.mutate({ patientId: newPatientId, performedAt: newPerformedAt, goal: newGoal || undefined })}
+                  onClick={() =>
+                    create.mutate({
+                      patientId: newPatientId,
+                      performedAt: newPerformedAt,
+                      notes: newNotes || undefined,
+                    })
+                  }
                 >
                   Start
                 </DarkButton>
@@ -134,6 +158,7 @@ export default function HardloopanalyseListPage() {
           </DarkDialog>
         </div>
 
+        {/* Patient-selector voor historie */}
         <Tile>
           <MetaLabel>Historie per patiënt</MetaLabel>
           <DarkMenuSelect
@@ -147,43 +172,64 @@ export default function HardloopanalyseListPage() {
 
         {selectedPatientId && (
           <div className="flex flex-col gap-2">
-            {analyses.length === 0 && (
+            {patientAssessments.length === 0 && (
               <Tile>
                 <p style={{ color: P.inkMuted, fontSize: 13, textAlign: 'center', padding: 12 }}>
-                  Nog geen hardloopanalyses voor deze patiënt.
+                  Nog geen assessments voor deze patiënt.
                 </p>
               </Tile>
             )}
-            {analyses.map((a) => {
-              const accent = a.rearTotal == null ? P.inkMuted : a.rearTotal >= 85 ? P.lime : a.rearTotal >= 70 ? P.brand : P.danger
+            {patientAssessments.map((a) => {
+              const ratio = a.totalScored > 0 ? Math.round((a.pass / a.totalScored) * 100) : 0
+              const accent = ratio >= 75 ? P.lime : ratio >= 40 ? P.gold : P.danger
               return (
                 <Tile
                   key={a.id}
                   accentBar={accent}
-                  href={`/therapist/assessments/hardloopanalyse/${a.id}`}
-                  prefetch={() => utils.runningAnalysis.get.prefetch({ id: a.id })}
+                  href={`/therapist/assessments/${a.id}`}
+                  prefetch={() => utils.assessments.get.prefetch({ id: a.id })}
                 >
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div className="flex-1 min-w-0">
                       <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.14em' }}>
-                        {new Date(a.performedAt).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()}
+                        {new Date(a.performedAt).toLocaleDateString('nl-NL', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        }).toUpperCase()}
                       </p>
-                      <p style={{ color: P.ink, fontSize: 14, fontWeight: 700, marginTop: 3 }}>{a.goal ?? 'Hardloopanalyse'}</p>
+                      <p style={{ color: P.ink, fontSize: 14, fontWeight: 700, marginTop: 3 }}>
+                        {a.totalScored} tests gescoord — {a.pass} pass · {a.partial} partial · {a.fail} fail
+                      </p>
                       <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, marginTop: 2, letterSpacing: '0.06em' }}>
                         door {a.therapistName}
                       </p>
+                      {a.notes && (
+                        <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 4 }}>{a.notes}</p>
+                      )}
                     </div>
                     <div className="text-right shrink-0">
                       <p className="athletic-display" style={{ color: accent, fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em' }}>
-                        {a.rearTotal == null ? '—' : `${a.rearTotal}%`}
+                        {ratio}%
                       </p>
-                      <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 9, letterSpacing: '0.12em', marginTop: -2 }}>ACHTER</p>
+                      <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 9, letterSpacing: '0.12em', marginTop: -2 }}>
+                        PASS
+                      </p>
                     </div>
                   </div>
                 </Tile>
               )
             })}
           </div>
+        )}
+
+        {/* Tip-tile */}
+        {!selectedPatientId && (
+          <Tile>
+            <p style={{ color: P.inkMuted, fontSize: 12, lineHeight: 1.5 }}>
+              Selecteer een patiënt hierboven om historische assessments te bekijken, of klik <strong style={{ color: P.ink }}>+ Nieuwe assessment</strong> om een nieuwe test-sessie te starten. Elke assessment kun je opbouwen uit 42 tests verdeeld over 9 archetypes (lumbar spine, squat/hinge, pistol, lunge, thoracic spine, overhead, front rack, press, hang) plus 4 breathing tests.
+            </p>
+          </Tile>
         )}
       </div>
     </div>
