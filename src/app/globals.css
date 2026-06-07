@@ -364,6 +364,26 @@ body {
 .mbt-menu[data-state="open"] > *:nth-child(5) { animation-delay: 180ms; }
 .mbt-menu[data-state="open"] > *:nth-child(n + 6) { animation-delay: 210ms; }
 
+/* Mobiel: bottom-sheets & drawers. Touch heeft geen hover, dus de hover-effecten
+   hierboven vuren niet op een telefoon — daar geven we feedback via tap-scale
+   (`.athletic-tap`) + staggered reveal (`.mbt-stagger`) op de items. De sheet
+   zelf glijdt omhoog (ease-out ~300ms) en de backdrop fadet mee. Alles killt
+   netjes onder prefers-reduced-motion via het `*`-blok onderaan. */
+@keyframes mbt-sheet-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.mbt-sheet {
+  animation: mbt-sheet-up 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes mbt-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.mbt-backdrop {
+  animation: mbt-fade-in 220ms ease-out both;
+}
+
 /* Skeleton-shimmer — toont de VORM van de inhoud tijdens het laden i.p.v. een
    kale "LADEN…". Subtiele veeg in huisstijl (surfaceHi-basis + lichte highlight),
    bewust rustig. Killt netjes onder prefers-reduced-motion (blok hieronder).

@@ -30,7 +30,7 @@ export function AthleteBottomNav() {
       {/* Overlay */}
       {drawerOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+          className="mbt-backdrop fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
           onClick={() => setDrawerOpen(false)}
         />
       )}
@@ -108,14 +108,14 @@ export function AthleteBottomNav() {
         className="fixed bottom-0 left-0 right-0 z-30 border-t"
         style={{ background: P.bg, borderColor: P.lineStrong }}
       >
-        <div className="grid grid-cols-6 items-center h-16 max-w-lg mx-auto px-2">
+        <div className="mbt-stagger grid grid-cols-6 items-center h-16 max-w-lg mx-auto px-2">
           {MAIN_NAV.slice(0, 2).map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + '/')
             return (
               <Link
                 key={href}
                 href={href}
-                className={cn('flex flex-col items-center gap-1 py-2 athletic-mono transition-colors')}
+                className={cn('athletic-tap flex flex-col items-center gap-1 py-2 athletic-mono transition-colors')}
                 style={{
                   color: active ? P.brand : P.inkMuted,
                   fontSize: 9,
@@ -167,7 +167,7 @@ export function AthleteBottomNav() {
               <Link
                 key={href}
                 href={href}
-                className={cn('flex flex-col items-center gap-1 py-2 athletic-mono transition-colors')}
+                className={cn('athletic-tap flex flex-col items-center gap-1 py-2 athletic-mono transition-colors')}
                 style={{
                   color: active ? P.brand : P.inkMuted,
                   fontSize: 9,
@@ -181,7 +181,7 @@ export function AthleteBottomNav() {
           })}
           <button
             onClick={() => setDrawerOpen(true)}
-            className="flex flex-col items-center gap-1 py-2 athletic-mono transition-colors"
+            className="athletic-tap flex flex-col items-center gap-1 py-2 athletic-mono transition-colors"
             style={{ color: P.inkMuted, fontSize: 9, letterSpacing: '0.14em' }}
             type="button"
           >
