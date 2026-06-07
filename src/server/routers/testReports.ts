@@ -406,7 +406,8 @@ export const testReportsRouter = createTRPCRouter({
         }
       })
 
-      // Sturen van geanonimiseerde testdata naar de externe AI loggen (AVG).
+      // Doorgifte van pseudonieme testdata (geen naam/identifier, zie
+      // anthropic.ts) naar de externe AI loggen (AVG art. 30/32).
       await auditLog({
         event: 'DATA_EXPORTED',
         userId: ctx.user.id,
@@ -418,7 +419,6 @@ export const testReportsRouter = createTRPCRouter({
       })
 
       const draft = await draftTestReportNarrative({
-        patientName: report.patient.name ?? 'de patiënt',
         injuryGoal: report.injuryGoal,
         rehabPhaseLabel: report.rehabPhaseLabel,
         measurementNumber: report.measurementNumber,

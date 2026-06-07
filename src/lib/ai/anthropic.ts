@@ -35,8 +35,11 @@ export type NarrativeTestLine = {
   zone: string
 }
 
+// AVG-dataminimalisatie (art. 5(1)(c)): we sturen BEWUST geen patiëntnaam of
+// ander direct identificerend gegeven naar de externe AI. Het model schrijft in
+// de "je"-vorm en heeft de naam niet nodig; wat overblijft is pseudonieme
+// klinische context (blessure/doel + testwaarden).
 export type NarrativeInput = {
-  patientName: string
   injuryGoal?: string | null
   rehabPhaseLabel?: string | null
   measurementNumber?: number | null
@@ -97,7 +100,6 @@ function buildUserPrompt(input: NarrativeInput): string {
     )
     .join('\n')
   const ctx = [
-    `Patiënt: ${input.patientName}`,
     input.injuryGoal ? `Blessure/doel: ${input.injuryGoal}` : null,
     input.rehabPhaseLabel ? `Fase: ${input.rehabPhaseLabel}` : null,
     input.measurementNumber ? `Meting nummer: ${input.measurementNumber}` : null,
@@ -147,8 +149,8 @@ function stripAiDashes(s: string): string {
 }
 
 // ── Hardloopanalyse ────────────────────────────────────────────────────────
+// Zie NarrativeInput: geen naam/identifier naar de externe AI (dataminimalisatie).
 export type RunningNarrativeInput = {
-  patientName: string
   goal?: string | null
   rearTotal?: number | null
   rear: Array<{ label: string; score: number | null; status: string }>
@@ -207,7 +209,6 @@ function buildRunningPrompt(i: RunningNarrativeInput): string {
     .map((m) => `- ${m.label}: ${m.value ?? '—'} ${m.unit}`)
     .join('\n')
   return [
-    `Hardloper: ${i.patientName}`,
     i.goal ? `Doel: ${i.goal}` : null,
     i.rearTotal != null ? `Totaalscore achteraanzicht: ${i.rearTotal}%` : null,
     '',

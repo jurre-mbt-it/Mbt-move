@@ -270,7 +270,6 @@ export const runningAnalysisRouter = createTRPCRouter({
       })
 
       return draftRunningAnalysisNarrative({
-        patientName: a.patient.name ?? 'de hardloper',
         goal: a.goal,
         rearTotal: rearTotal(rearItems.map((i) => i.value)),
         rear,
