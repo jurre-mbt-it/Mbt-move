@@ -1,9 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { trpc } from '@/lib/trpc/client'
+import { computeHrZones } from '@/lib/cardio-zones'
 import { Switch } from '@/components/ui/switch'
 import {
   P,
@@ -193,10 +195,107 @@ export default function AthleteProfilePage() {
           </div>
         </Tile>
 
+        {/* HR-profiel — voedt de auto-berekende cardio-zones */}
+        <HrProfileCard />
+
         <DarkButton variant="secondary" onClick={handleSignOut} className="w-full">
           UITLOGGEN
         </DarkButton>
       </div>
     </div>
+  )
+}
+
+// ───────────────────────── HR-profiel ─────────────────────────
+
+const hrInputStyle: React.CSSProperties = {
+  background: P.surfaceHi,
+  border: `1px solid ${P.lineStrong}`,
+  color: P.ink,
+  fontSize: 16,
+  fontWeight: 800,
+  borderRadius: 10,
+  height: 48,
+  width: '100%',
+  textAlign: 'center',
+  outline: 'none',
+}
+
+function HrProfileCard() {
+  const utils = trpc.useUtils()
+  const { data: me } = trpc.auth.getMe.useQuery()
+  const update = trpc.auth.updateProfile.useMutation({
+    onSuccess: () => {
+      utils.auth.getMe.invalidate()
+      toast.success('Hartslagprofiel opgeslagen.')
+    },
+    onError: () => toast.error('Opslaan mislukt. Probeer opnieuw.'),
+  })
+
+  // Lokale edits zijn null tot de atleet iets typt; tot dan tonen we de
+  // server-waarde. Zo vermijden we een setState-in-effect hydratie-stap.
+  const [maxHrEdit, setMaxHr] = useState<string | null>(null)
+  const [restHrEdit, setRestHr] = useState<string | null>(null)
+  const [lthrEdit, setLthr] = useState<string | null>(null)
+
+  const maxHr = maxHrEdit ?? (me?.maxHeartRate != null ? String(me.maxHeartRate) : '')
+  const restHr = restHrEdit ?? (me?.restingHeartRate != null ? String(me.restingHeartRate) : '')
+  const lthr = lthrEdit ?? (me?.lthr != null ? String(me.lthr) : '')
+
+  const preview = computeHrZones({
+    maxHeartRate: maxHr ? parseInt(maxHr, 10) : null,
+    restingHeartRate: restHr ? parseInt(restHr, 10) : null,
+    dateOfBirth: me?.dateOfBirth ?? null,
+  })
+
+  return (
+    <Tile>
+      <Kicker style={{ marginBottom: 4 }}>HARTSLAGPROFIEL</Kicker>
+      <p style={{ color: P.inkMuted, fontSize: 12, marginBottom: 12, lineHeight: '17px' }}>
+        Vul je max-hartslag in voor nauwkeurige trainingszones. Met je rust-hartslag
+        rekenen we via Karvonen (preciezer). Leeg laten? Dan schatten we op leeftijd.
+      </p>
+      <div className="flex gap-3">
+        <div className="flex-1">
+          <MetaLabel style={{ marginBottom: 4 }}>MAX HR</MetaLabel>
+          <input type="number" min={100} max={230} placeholder="190" value={maxHr} onChange={(e) => setMaxHr(e.target.value)} style={hrInputStyle} />
+        </div>
+        <div className="flex-1">
+          <MetaLabel style={{ marginBottom: 4 }}>RUST HR</MetaLabel>
+          <input type="number" min={30} max={120} placeholder="55" value={restHr} onChange={(e) => setRestHr(e.target.value)} style={hrInputStyle} />
+        </div>
+        <div className="flex-1">
+          <MetaLabel style={{ marginBottom: 4 }}>DREMPEL (LTHR)</MetaLabel>
+          <input type="number" min={80} max={220} placeholder="opt." value={lthr} onChange={(e) => setLthr(e.target.value)} style={hrInputStyle} />
+        </div>
+      </div>
+
+      {preview && (
+        <div className="mt-3 flex gap-1.5">
+          {preview.zones.map((z) => (
+            <div key={z.zone} className="flex-1 rounded-lg text-center py-1.5" style={{ background: z.color + '22', border: `1px solid ${z.color}55` }}>
+              <div className="athletic-mono" style={{ fontSize: 10, fontWeight: 900, color: z.color }}>Z{z.zone}</div>
+              <div className="athletic-mono" style={{ fontSize: 10, color: P.inkMuted, marginTop: 2 }}>{z.minBpm}-{z.maxBpm}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-4">
+        <DarkButton
+          onClick={() =>
+            update.mutate({
+              maxHeartRate: maxHr ? parseInt(maxHr, 10) : null,
+              restingHeartRate: restHr ? parseInt(restHr, 10) : null,
+              lthr: lthr ? parseInt(lthr, 10) : null,
+            })
+          }
+          loading={update.isPending}
+          className="w-full"
+        >
+          PROFIEL OPSLAAN
+        </DarkButton>
+      </div>
+    </Tile>
   )
 }

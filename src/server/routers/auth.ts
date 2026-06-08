@@ -75,6 +75,10 @@ export const authRouter = createTRPCRouter({
         bio: true,
         injuryInfo: true,
         injuryVisibleToTherapist: true,
+        dateOfBirth: true,
+        maxHeartRate: true,
+        restingHeartRate: true,
+        lthr: true,
         mfaEnabled: true,
         createdAt: true,
         practiceId: true,
@@ -143,6 +147,10 @@ export const authRouter = createTRPCRouter({
         bio: z.string().nullable().optional(),
         injuryInfo: z.string().nullable().optional(),
         injuryVisibleToTherapist: z.boolean().optional(),
+        // Cardio HR-profiel — voor auto-berekende hartslagzones.
+        maxHeartRate: z.number().int().min(100).max(230).nullable().optional(),
+        restingHeartRate: z.number().int().min(30).max(120).nullable().optional(),
+        lthr: z.number().int().min(80).max(220).nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

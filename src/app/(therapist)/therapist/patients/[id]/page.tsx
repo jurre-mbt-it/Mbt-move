@@ -26,6 +26,8 @@ import { InsightTimeline } from '@/components/insights/InsightTimeline'
 import { RehabActivationToggle } from '@/components/rehab/RehabActivationToggle'
 import { RehabTracker } from '@/components/rehab/RehabTracker'
 import { PatientClinicalTests } from '@/components/clinical-tests/PatientClinicalTests'
+import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, type CardioActivityKey, type CardioProtocolKey } from '@/lib/cardio-constants'
+import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
   ACTIVE:    { label: 'Actief',    bg: 'rgba(232,122,85,0.14)', text: P.lime },
@@ -51,6 +53,29 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     limit: historyLimit,
     performedBy: historyPerformer,
   })
+  const { data: cardioSessionsRaw = [] } = trpc.patients.recentCardioSessions.useQuery({
+    patientId: id,
+    limit: 10,
+  })
+  // Shallow cast — zelfde TS2589 inference-depth reden als recentSessions.
+  type CardioSession = {
+    id: string
+    completedAt: Date | string
+    activity: string
+    protocol: string
+    durationSec: number
+    distanceM: number | null
+    avgPaceSecPerKm: number | null
+    avgHeartRate: number | null
+    maxHeartRate: number | null
+    zone: number | null
+    targetZone: number | null
+    rpe: number | null
+    painLevel: number | null
+    notes: string | null
+    programName: string | null
+  }
+  const cardioSessions = cardioSessionsRaw as CardioSession[]
   // Shallow cast — tRPC inference depth is te diep voor TS2589 nadat extra velden
   // (weightsPerSet/extraParams/...) zijn toegevoegd in recentSessions.
   type RecentSession = {
@@ -568,6 +593,63 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
           {/* ── TAB: Geschiedenis ─────────────────────────────────── */}
           <TabsContent value="geschiedenis" className="space-y-3">
+            {cardioSessions.length > 0 && (
+              <div className="space-y-2">
+                <MetaLabel>CARDIO · LAATSTE {cardioSessions.length}</MetaLabel>
+                {cardioSessions.map((c) => {
+                  const act = CARDIO_ACTIVITIES[c.activity as CardioActivityKey]
+                  const proto = CARDIO_PROTOCOLS[c.protocol as CardioProtocolKey]
+                  const pace = formatPaceFromSecPerKm(c.activity as CardioActivityKey, c.avgPaceSecPerKm)
+                  return (
+                    <Tile key={c.id} accentBar={c.painLevel != null && c.painLevel >= 6 ? P.danger : P.ice}>
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <div>
+                          <p className="athletic-mono" style={{ color: P.ink, fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                            {act?.icon} {act?.label ?? c.activity}
+                          </p>
+                          <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11, marginTop: 2 }}>
+                            {new Date(c.completedAt).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            {' · '}{proto?.label ?? c.protocol}
+                            {c.programName ? ` · ${c.programName}` : ''}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap justify-end">
+                          <span className="athletic-mono" style={{ color: P.ice, fontSize: 11, letterSpacing: '0.08em' }}>
+                            {Math.round(c.durationSec / 60)} MIN
+                          </span>
+                          {c.distanceM != null && (
+                            <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11 }}>
+                              {(c.distanceM / 1000).toFixed(2)} KM
+                            </span>
+                          )}
+                          {pace && (
+                            <span className="athletic-mono" style={{ color: P.lime, fontSize: 11 }}>{pace}</span>
+                          )}
+                          {c.avgHeartRate != null && (
+                            <span className="athletic-mono" style={{ color: P.danger, fontSize: 11 }}>{c.avgHeartRate} bpm</span>
+                          )}
+                          {c.zone != null && (
+                            <span className="athletic-mono" style={{ color: P.gold, fontSize: 10, letterSpacing: '0.06em' }}>Z{c.zone}</span>
+                          )}
+                          {c.rpe != null && (
+                            <span className="athletic-mono" style={{ color: P.gold, fontSize: 10, letterSpacing: '0.06em' }}>RPE {c.rpe}</span>
+                          )}
+                          {c.painLevel != null && (
+                            <span className="athletic-mono" style={{ background: c.painLevel >= 6 ? 'rgba(248,113,113,0.15)' : 'rgba(232,122,85,0.14)', color: c.painLevel >= 6 ? P.danger : P.lime, fontSize: 10, padding: '2px 8px', borderRadius: 999, fontWeight: 800 }}>
+                              NRS {c.painLevel}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {c.notes && (
+                        <p className="pt-2 mt-2 border-t" style={{ color: P.inkMuted, fontSize: 12, whiteSpace: 'pre-wrap', borderColor: P.line }}>{c.notes}</p>
+                      )}
+                    </Tile>
+                  )
+                })}
+                <div style={{ height: 1, background: P.line, margin: '8px 0' }} />
+              </div>
+            )}
             <PerformerToggle
               value={historyPerformer}
               onChange={(v) => {

@@ -201,6 +201,9 @@ export const patientsRouter = createTRPCRouter({
           createdAt: true,
           injuryInfo: true,
           injuryVisibleToTherapist: true,
+          maxHeartRate: true,
+          restingHeartRate: true,
+          lthr: true,
           patientPrograms: {
             orderBy: { createdAt: 'desc' },
             select: {
@@ -258,6 +261,9 @@ export const patientsRouter = createTRPCRouter({
         avatarInitials: initials,
         dateOfBirth: p.dateOfBirth,
         createdAt: p.createdAt,
+        maxHeartRate: p.maxHeartRate,
+        restingHeartRate: p.restingHeartRate,
+        lthr: p.lthr,
         // Alleen tonen als patient ermee instemt
         injuryInfo: p.injuryVisibleToTherapist ? p.injuryInfo : null,
         notes: myRel?.notes ?? null,
@@ -963,74 +969,9 @@ export const patientsRouter = createTRPCRouter({
         req: ctx.req,
       })
 
-      // Sessions (last 90 days)
-      const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
-      const sessions = await ctx.prisma.sessionLog.findMany({
-        where: { patientId: input.patientId, status: 'COMPLETED', completedAt: { gte: since } },
-        orderBy: { completedAt: 'asc' },
-        select: {
-          id: true, completedAt: true, duration: true,
-          painLevel: true, exertionLevel: true, notes: true,
-        },
-      })
-
-      // Exercise logs met gewicht/1RM (laatste 60 sessies)
-      const exerciseLogs = await ctx.prisma.exerciseLog.findMany({
-        where: {
-          session: { patientId: input.patientId, status: 'COMPLETED' },
-          weight: { not: null },
-        },
-        orderBy: { session: { completedAt: 'asc' } },
-        select: {
-          exerciseId: true, weight: true, estimatedOneRepMax: true,
-          setsCompleted: true, repsCompleted: true,
-          session: { select: { completedAt: true } },
-        },
-        take: 500,
-      })
-
-      // Exercise namen
-      const exerciseIds = [...new Set(exerciseLogs.map(l => l.exerciseId))]
-      const exercises = await ctx.prisma.exercise.findMany({
-        where: { id: { in: exerciseIds } },
-        select: { id: true, name: true },
-      })
-      const exerciseMap = Object.fromEntries(exercises.map(e => [e.id, e.name]))
-
-      // Groepeer 1RM per oefening over tijd
-      const oneRmByExercise: Record<string, { date: string; oneRm: number }[]> = {}
-      for (const log of exerciseLogs) {
-        if (!log.estimatedOneRepMax || !log.session.completedAt) continue
-        const name = exerciseMap[log.exerciseId] ?? log.exerciseId
-        if (!oneRmByExercise[name]) oneRmByExercise[name] = []
-        oneRmByExercise[name].push({
-          date: log.session.completedAt.toISOString().slice(0, 10),
-          oneRm: Math.round(log.estimatedOneRepMax),
-        })
-      }
-
-      return {
-        sessions: sessions.map(s => ({
-          id: s.id,
-          date: s.completedAt?.toISOString() ?? '',
-          durationMinutes: s.duration ? Math.round(s.duration / 60) : 0,
-          painLevel: s.painLevel ?? null,
-          exertionLevel: s.exertionLevel ?? null,
-          notes: s.notes ?? null,
-        })),
-        oneRmByExercise,
-        totalSessions: sessions.length,
-        avgPain: sessions.filter(s => s.painLevel !== null).length
-          ? Math.round(sessions.filter(s => s.painLevel !== null)
-              .reduce((s, l) => s + (l.painLevel ?? 0), 0) /
-              sessions.filter(s => s.painLevel !== null).length * 10) / 10
-          : null,
-        avgExertion: sessions.filter(s => s.exertionLevel !== null).length
-          ? Math.round(sessions.filter(s => s.exertionLevel !== null)
-              .reduce((s, l) => s + (l.exertionLevel ?? 0), 0) /
-              sessions.filter(s => s.exertionLevel !== null).length * 10) / 10
-          : null,
-      }
+      // Bron-of-truth (incl. cardio) gedeeld met PDF-export + mobiel.
+      const { getPatientProgressData } = await import('@/lib/progress-data')
+      return getPatientProgressData(ctx.prisma, input.patientId, 90)
     }),
 
   /**
@@ -1196,6 +1137,47 @@ export const patientsRouter = createTRPCRouter({
           painDuring: el.painDuring,
           notes: el.notes,
         })),
+      }))
+    }),
+
+  /**
+   * Recent gelogde cardio-sessies van een patiënt/atleet. Aparte query van
+   * recentSessions omdat cardio in een eigen tabel (CardioLog) zit met een
+   * andere shape (tijd/afstand/tempo/HR/zone i.p.v. sets/reps/gewicht).
+   */
+  recentCardioSessions: therapistProcedure
+    .input(z.object({
+      patientId: z.string(),
+      limit: z.number().int().min(1).max(50).default(10),
+    }))
+    .query(async ({ ctx, input }) => {
+      if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.patientId))) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+      const logs = await ctx.prisma.cardioLog.findMany({
+        where: { patientId: input.patientId },
+        orderBy: { completedAt: 'desc' },
+        take: input.limit,
+        include: { program: { select: { id: true, name: true } } },
+      })
+      return logs.map((l) => ({
+        id: l.id,
+        completedAt: l.completedAt,
+        activity: l.activity,
+        protocol: l.protocol,
+        durationSec: l.durationSec,
+        distanceM: l.distanceM,
+        avgPaceSecPerKm: l.avgPaceSecPerKm,
+        avgHeartRate: l.avgHeartRate,
+        maxHeartRate: l.maxHeartRate,
+        zone: l.zone,
+        targetZone: l.targetZone,
+        timeInZones: l.timeInZones,
+        rpe: l.rpe,
+        painLevel: l.painLevel,
+        notes: l.notes,
+        programName: l.program?.name ?? null,
+        intervals: l.intervals,
       }))
     }),
 

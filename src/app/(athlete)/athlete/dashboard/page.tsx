@@ -303,6 +303,12 @@ export default function AthleteDashboard() {
             href="/athlete/session?mode=quick"
             bar={P.gold}
           />
+          <ActionTile
+            label="CARDIO LOGGEN"
+            sub="Hardlopen · fietsen · roeien · zwemmen"
+            href="/athlete/cardio/new"
+            bar={P.ice}
+          />
         </div>
 
         {/* ── Wekelijkse trend (RPE + pijn) ─────────────── */}

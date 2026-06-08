@@ -7,6 +7,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { trpc } from '@/lib/trpc/client'
+import { HR_ZONES, type HRZone, CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
+import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
 import {
   DARK_CHART_STYLES,
   DarkButton,
@@ -180,6 +182,26 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
     '1RM (kg)': p.oneRm,
   })) : []
 
+  // ── Cardio ──
+  const cardio = progress?.cardio
+  const cardioSessions = cardio?.sessions ?? []
+  const cardioCount = cardio?.totalSessions ?? 0
+  const cardioChartData = cardioSessions.map(s => ({
+    date: new Date(s.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }),
+    Afstand: s.distanceKm,
+    RPE: s.rpe,
+    // Tempo als decimale minuten/km (5:00 → 5.0) zodat Recharts er een lijn van maakt.
+    Tempo: s.avgPaceSecPerKm != null ? Math.round((s.avgPaceSecPerKm / 60) * 100) / 100 : null,
+  }))
+  const zoneEntries = Object.entries(cardio?.timeInZonesSec ?? {})
+    .map(([z, sec]) => ({ zone: Number(z) as HRZone, minutes: Math.round(sec / 60) }))
+    .filter(e => e.zone >= 1 && e.zone <= 5 && e.minutes > 0)
+    .sort((a, b) => a.zone - b.zone)
+  const zoneTotalMin = zoneEntries.reduce((s, e) => s + e.minutes, 0)
+
+  const hasAnyData = sessions.length > 0 || cardioCount > 0
+  const defaultTab = sessions.length > 0 ? 'sessies' : 'cardio'
+
   if (isLoading) {
     return (
       <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
@@ -211,7 +233,7 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
             <Kicker>Voortgang</Kicker>
             <Display size="md">RAPPORT</Display>
             <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
-              Laatste 90 dagen · {sessions.length} sessies
+              Laatste 90 dagen · {sessions.length} kracht · {cardioCount} cardio
             </MetaLabel>
           </div>
           {sessions.length > 0 && (
@@ -290,7 +312,7 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
           <StatChip label="Oefeningen" value={exerciseNames.length} sub="met 1RM" tint={P.ice} />
         </div>
 
-        {sessions.length === 0 ? (
+        {!hasAnyData ? (
           <Tile>
             <div className="py-12 text-center">
               <p style={{ color: P.ink, fontSize: 14, fontWeight: 700 }}>Nog geen sessies</p>
@@ -300,12 +322,13 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
             </div>
           </Tile>
         ) : (
-          <Tabs defaultValue="sessies" className="space-y-4">
+          <Tabs defaultValue={defaultTab} className="space-y-4">
             <TabsList
-              className="w-full grid grid-cols-3 rounded-xl"
+              className="w-full grid grid-cols-4 rounded-xl"
               style={{ background: P.surface, border: `1px solid ${P.line}` }}
             >
               <TabsTrigger value="sessies" className="text-xs">Sessies</TabsTrigger>
+              <TabsTrigger value="cardio" className="text-xs">Cardio</TabsTrigger>
               <TabsTrigger value="kalender" className="text-xs">Kalender</TabsTrigger>
               <TabsTrigger value="krachtopbouw" className="text-xs">1RM</TabsTrigger>
             </TabsList>
@@ -349,6 +372,123 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
                   </BarChart>
                 </ResponsiveContainer>
               </ChartCard>
+            </TabsContent>
+
+            {/* ── Cardio tab ── */}
+            <TabsContent value="cardio" className="space-y-4">
+              {cardioCount === 0 ? (
+                <Tile>
+                  <div className="py-8 text-center">
+                    <p style={{ color: P.inkMuted, fontSize: 13 }}>Nog geen cardio gelogd</p>
+                  </div>
+                </Tile>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <StatChip label="Cardio sessies" value={cardioCount} tint={P.ice} />
+                    <StatChip label="Totaal min." value={cardio?.totalMinutes ?? 0} tint={P.lime} />
+                    <StatChip label="Afstand" value={`${cardio?.totalDistanceKm ?? 0} km`} tint={P.brand} />
+                    <StatChip label="Gem. RPE" value={cardio?.avgRpe != null ? `${cardio.avgRpe}/10` : '—'} tint={P.gold} />
+                  </div>
+
+                  {/* Tijd-in-zone verdeling */}
+                  {zoneTotalMin > 0 && (
+                    <ChartCard title="Tijd in hartslagzone (totaal)">
+                      <div className="space-y-2">
+                        <div className="flex w-full h-3 rounded-full overflow-hidden" style={{ background: P.surfaceHi }}>
+                          {zoneEntries.map(e => (
+                            <div
+                              key={e.zone}
+                              style={{ width: `${(e.minutes / zoneTotalMin) * 100}%`, background: HR_ZONES[e.zone].color }}
+                              title={`Zone ${e.zone}: ${e.minutes} min`}
+                            />
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-5 gap-1.5 mt-2">
+                          {([1, 2, 3, 4, 5] as HRZone[]).map(z => {
+                            const m = zoneEntries.find(e => e.zone === z)?.minutes ?? 0
+                            return (
+                              <div key={z} className="text-center rounded-lg py-1.5" style={{ background: HR_ZONES[z].color + '18', border: `1px solid ${HR_ZONES[z].color}44` }}>
+                                <div className="athletic-mono" style={{ fontSize: 11, fontWeight: 900, color: HR_ZONES[z].color }}>Z{z}</div>
+                                <div className="athletic-mono" style={{ fontSize: 11, color: P.inkMuted, marginTop: 2 }}>{m}m</div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </ChartCard>
+                  )}
+
+                  {/* Tempo-trend */}
+                  {cardioChartData.some(s => s.Tempo !== null) && (
+                    <ChartCard title="Tempo per sessie (min/km — lager = sneller)">
+                      <ResponsiveContainer width="100%" height={180}>
+                        <LineChart data={cardioChartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                          <CartesianGrid {...DARK_CHART_STYLES.grid} />
+                          <XAxis dataKey="date" {...DARK_CHART_STYLES.axis} interval="preserveStartEnd" />
+                          <YAxis {...DARK_CHART_STYLES.axis} reversed domain={['auto', 'auto']} />
+                          <Tooltip content={<DarkChartTooltip />} />
+                          <Line type="monotone" dataKey="Tempo" stroke={P.brand} strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  )}
+
+                  {/* Afstand per sessie */}
+                  {cardioChartData.some(s => s.Afstand != null) && (
+                    <ChartCard title="Afstand per sessie (km)">
+                      <ResponsiveContainer width="100%" height={160}>
+                        <BarChart data={cardioChartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                          <CartesianGrid {...DARK_CHART_STYLES.grid} />
+                          <XAxis dataKey="date" {...DARK_CHART_STYLES.axis} interval="preserveStartEnd" />
+                          <YAxis {...DARK_CHART_STYLES.axis} />
+                          <Tooltip content={<DarkChartTooltip />} />
+                          <Bar dataKey="Afstand" fill={P.ice} radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  )}
+
+                  {/* RPE-trend */}
+                  {cardioChartData.some(s => s.RPE != null) && (
+                    <ChartCard title="Inspanning per cardio-sessie (RPE 0–10)">
+                      <ResponsiveContainer width="100%" height={160}>
+                        <LineChart data={cardioChartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                          <CartesianGrid {...DARK_CHART_STYLES.grid} />
+                          <XAxis dataKey="date" {...DARK_CHART_STYLES.axis} interval="preserveStartEnd" />
+                          <YAxis domain={[0, 10]} {...DARK_CHART_STYLES.axis} />
+                          <Tooltip content={<DarkChartTooltip />} />
+                          <Line type="monotone" dataKey="RPE" stroke={P.gold} strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  )}
+
+                  {/* Recente cardio-lijst met tempo */}
+                  <ChartCard title="Recente cardio-sessies">
+                    <div className="space-y-2">
+                      {cardioSessions.slice(-8).reverse().map(s => {
+                        const act = CARDIO_ACTIVITIES[s.activity as CardioActivityKey]
+                        const pace = formatPaceFromSecPerKm(s.activity as CardioActivityKey, s.avgPaceSecPerKm)
+                        return (
+                          <div key={s.id} className="flex items-center justify-between gap-2 py-1.5" style={{ borderBottom: `1px solid ${P.line}` }}>
+                            <span style={{ color: P.ink, fontSize: 12, fontWeight: 700 }}>
+                              {act?.icon} {act?.label ?? s.activity}
+                            </span>
+                            <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11 }}>
+                              {new Date(s.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                              {' · '}{s.durationMinutes}m
+                              {s.distanceKm != null ? ` · ${s.distanceKm}km` : ''}
+                              {pace ? ` · ${pace}` : ''}
+                              {s.rpe != null ? ` · RPE ${s.rpe}` : ''}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </ChartCard>
+                </>
+              )}
             </TabsContent>
 
             {/* ── Kalender tab ── */}
