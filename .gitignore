@@ -50,3 +50,6 @@ next-env.d.ts
 dev-main.sh
 scripts/apply-practices-rls.mjs
 supabase/.temp/
+
+# AVG/compliance-docs met PII — lokaal houden, nooit committen of deployen
+compliance/

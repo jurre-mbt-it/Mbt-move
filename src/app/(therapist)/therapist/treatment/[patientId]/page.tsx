@@ -95,7 +95,7 @@ type LastUsedMemoryItem = {
 function applyMemoryToRow(
   r: LogRow,
   mem: LastUsedMemoryItem | undefined,
-  opts: { fillSetsReps: boolean },
+  opts: { fillSetsReps: boolean; fillWeights?: boolean },
 ): LogRow {
   if (!mem) return r
   const next: LogRow = { ...r }
@@ -107,10 +107,19 @@ function applyMemoryToRow(
     if (mem.setsCompleted != null) next.setsCompleted = String(mem.setsCompleted)
     if (mem.repsCompleted != null) next.repsCompleted = String(mem.repsCompleted)
     if (mem.repUnit) next.repUnit = mem.repUnit
-    if (Array.isArray(mem.weightsPerSet) && mem.weightsPerSet.length > 0) {
-      const strs = (mem.weightsPerSet as unknown[]).map((w) => (w == null ? '' : String(w)))
-      next.weightsPerSet = strs
-    }
+  }
+  // Gewicht voorvullen met wat DEZE patiënt de vorige keer voor deze oefening
+  // deed — als startpunt voor progressie. Losgekoppeld van sets/reps zodat we
+  // bij "volg programma" de programma-sets/reps aanhouden maar tóch het laatste
+  // gewicht tonen. Schaal naar het aantal sets van de rij zodat de grid klopt.
+  if (
+    (opts.fillSetsReps || opts.fillWeights) &&
+    Array.isArray(mem.weightsPerSet) &&
+    mem.weightsPerSet.length > 0
+  ) {
+    const strs = (mem.weightsPerSet as unknown[]).map((w) => (w == null ? '' : String(w)))
+    const setCount = Math.max(1, Number(next.setsCompleted) || strs.length)
+    next.weightsPerSet = resizeWeights(strs, setCount)
   }
   return next
 }
@@ -258,16 +267,19 @@ export default function TreatmentPage({
         visible: { weight: true, pain: true },
       }))
       setRows(initialRows)
-      // Memory: vul Tempo / Band kleur / RPE etc. voor uit laatste sessie,
-      // maar respecteer sets/reps/repUnit van het programma (dat is doelbewust
-      // zo geprogrammeerd).
+      // Memory: vul Tempo / Band kleur / RPE én het laatst gebruikte gewicht
+      // van deze patiënt voor, maar respecteer sets/reps/repUnit van het
+      // programma (dat is doelbewust zo geprogrammeerd). Gewicht dient als
+      // startpunt voor progressie en mag de therapeut vandaag aanpassen.
       const ids = Array.from(new Set(initialRows.map((r) => r.exerciseId)))
       if (ids.length > 0) {
         utils.exercises.lastUsedParams
           .fetch({ exerciseIds: ids, patientId })
           .then((memory) => {
             setRows((prev) =>
-              prev.map((r) => applyMemoryToRow(r, memory[r.exerciseId], { fillSetsReps: false })),
+              prev.map((r) =>
+                applyMemoryToRow(r, memory[r.exerciseId], { fillSetsReps: false, fillWeights: true }),
+              ),
             )
           })
           .catch(() => {})
@@ -276,13 +288,23 @@ export default function TreatmentPage({
   }, [mode, todayData, dirty, rows.length, utils])
 
   // Bij "Vorige sessie" → laad de oefeningen uit de laatste sessie als startpunt.
-  // Sets/reps/superset/extra params worden overgenomen; weight-velden + pijn
-  // worden bewust leeg gezet — dat moet vandaag opnieuw worden ingevuld.
+  // Sets/reps/superset/extra params én de toen gebruikte gewichten worden
+  // overgenomen als startpunt voor progressie (de therapeut past ze vandaag
+  // aan). Pijn wordt bewust leeg gezet — dat moet vandaag opnieuw worden
+  // ingevuld.
   useEffect(() => {
     if (mode === 'previous' && previousSession && !dirty && rows.length === 0) {
       setRows(
         previousSession.exercises.map((e, idx) => {
           const sets = Math.max(1, e.sets ?? 1)
+          // Gewicht uit de vorige sessie als startpunt; schaal naar het aantal
+          // sets zodat de grid klopt. Valt terug op het legacy single-weight
+          // veld als er geen per-set array is.
+          const prevWeights = Array.isArray(e.weightsPerSet) && e.weightsPerSet.length > 0
+            ? (e.weightsPerSet as unknown[]).map((w) => (typeof w === 'number' && !Number.isNaN(w) ? String(w) : ''))
+            : typeof e.weight === 'number' && !Number.isNaN(e.weight)
+              ? [String(e.weight)]
+              : []
           return {
             uid: `prev-${Date.now()}-${idx}-${e.id}`,
             exerciseId: e.exerciseId,
@@ -293,7 +315,7 @@ export default function TreatmentPage({
             repUnit: 'reps',
             setsCompleted: e.sets != null ? String(e.sets) : '',
             repsCompleted: e.reps != null ? String(e.reps) : '',
-            weightsPerSet: Array(sets).fill(''),
+            weightsPerSet: prevWeights.length > 0 ? resizeWeights(prevWeights, sets) : Array(sets).fill(''),
             extraParams: clonePresetParams(e.extraParams),
             supersetGroup: e.supersetGroup ?? null,
             phase: ((e as { phase?: SessionPhase | null }).phase ?? 'MAIN') as SessionPhase,
