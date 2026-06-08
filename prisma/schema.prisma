@@ -265,6 +265,14 @@ model User {
   injuryInfo               String?
   injuryVisibleToTherapist Boolean @default(false)
 
+  // Cardio HR-profiel — voor het auto-berekenen van hartslagzones (1-5) als
+  // bpm-bereiken. maxHeartRate ontbreekt → fallback op leeftijd (208 - 0.7·jaar)
+  // via dateOfBirth. restingHeartRate aanwezig → Karvonen (HRR), anders %HRmax.
+  // lthr (lactaatdrempel-HR) optioneel, voor drempel-/zone-4-training.
+  maxHeartRate     Int?
+  restingHeartRate Int?
+  lthr             Int?
+
   // DPA (Verwerkingsovereenkomst — AVG verplicht)
   dpaAcceptedVersion String?
   dpaAcceptedAt      DateTime?
@@ -683,12 +691,17 @@ model CardioLog {
   distanceM    Int? // meters
   avgHeartRate Int?
   maxHeartRate Int?
-  zone         Int? // 1-5
+  zone         Int? // 1-5 (behaalde gemiddelde zone)
+  targetZone   Int? // 1-5 (voorgeschreven doel-zone, los van behaalde `zone`)
   calories     Int?
   rpe          Int? // 1-10
   painLevel    Int? // 0-10
   notes        String?
-  intervals    Json? // interval details JSONB
+  intervals    Json? // werkelijk gelogde interval-breakdown [{ label, type, durationSec, distanceM?, avgHeartRate? }]
+  // Tijd-in-zone (seconden per HR-zone): { "1": sec, "2": sec, ... }. Afgeleid
+  // uit gemeten HR + het HR-profiel van de patiënt op moment van loggen.
+  timeInZones     Json?
+  avgPaceSecPerKm Int? // gemiddeld tempo in s/km (afgeleid uit distanceM/durationSec, opgeslagen voor trends)
   completedAt  DateTime       @default(now())
   createdAt    DateTime       @default(now())
 

@@ -6,9 +6,10 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import {
-  CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, HR_ZONES,
+  CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, HR_ZONES, SELECTABLE_CARDIO_ACTIVITIES,
   CARDIO_TEMPLATES, CardioActivityKey, CardioProtocolKey, HRZone, CardioInterval,
 } from '@/lib/cardio-constants'
+import { computeHrZones } from '@/lib/cardio-zones'
 import { trpc } from '@/lib/trpc/client'
 import { CARDIO_ICON_MAP } from '@/components/icons'
 import {
@@ -38,6 +39,8 @@ interface CardioFormState {
   targetDistanceKm: string
   targetZone: HRZone | null
   targetRpe: number | null
+  /** Doel-tempo in min/km als "m:ss" of leeg. */
+  targetPace: string
   intervals: CardioInterval[]
 }
 
@@ -53,7 +56,19 @@ const DEFAULT_STATE: CardioFormState = {
   targetDistanceKm: '',
   targetZone: 2,
   targetRpe: null,
+  targetPace: '',
   intervals: [],
+}
+
+/** Parse "m:ss" of "m.ss"/"m" min/km naar seconden per km. Leeg/ongeldig → null. */
+function parsePaceToSecPerKm(pace: string): number | null {
+  const t = pace.trim()
+  if (!t) return null
+  const m = t.match(/^(\d{1,2})[:.](\d{1,2})$/)
+  if (m) return parseInt(m[1], 10) * 60 + parseInt(m[2], 10)
+  const justMin = t.match(/^(\d{1,2})$/)
+  if (justMin) return parseInt(justMin[1], 10) * 60
+  return null
 }
 
 function zoneColor(zone: HRZone): string {
@@ -399,6 +414,16 @@ function WorkoutBuilderContent() {
   const protocolInfo = CARDIO_PROTOCOLS[form.protocol]
   const activityInfo = CARDIO_ACTIVITIES[form.activity]
 
+  // HR-profiel van de gekoppelde patiënt → toon doelzone als concreet bpm-bereik.
+  const { data: selectedPatient } = trpc.patients.get.useQuery(
+    { id: form.patientId },
+    { enabled: !!form.patientId },
+  )
+  const prescribedZones = selectedPatient ? computeHrZones(selectedPatient) : null
+  const targetZoneBpm = form.targetZone && prescribedZones
+    ? prescribedZones.zones.find((z) => z.zone === form.targetZone) ?? null
+    : null
+
   const applyTemplate = (tpl: typeof CARDIO_TEMPLATES[0]) => {
     setForm(f => ({
       ...f,
@@ -437,6 +462,7 @@ function WorkoutBuilderContent() {
             : null,
           targetZone: form.targetZone,
           targetRpe: form.targetRpe,
+          targetPaceSecPerKm: parsePaceToSecPerKm(form.targetPace),
           intervals: form.intervals,
         },
       })
@@ -604,7 +630,9 @@ function WorkoutBuilderContent() {
               <div className="space-y-3">
                 <MetaLabel>Activiteit</MetaLabel>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {(Object.entries(CARDIO_ACTIVITIES) as [CardioActivityKey, typeof CARDIO_ACTIVITIES[CardioActivityKey]][]).map(([key, act]) => (
+                  {SELECTABLE_CARDIO_ACTIVITIES.map((key) => {
+                    const act = CARDIO_ACTIVITIES[key]
+                    return (
                     <button
                       key={key}
                       onClick={() => set('activity', key)}
@@ -623,7 +651,8 @@ function WorkoutBuilderContent() {
                         {act.label}
                       </span>
                     </button>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             </Tile>
@@ -750,9 +779,33 @@ function WorkoutBuilderContent() {
                         {' — '}{HR_ZONES[form.targetZone].description}
                         <br />
                         {HR_ZONES[form.targetZone].rpeFeel}
+                        {targetZoneBpm && (
+                          <>
+                            <br />
+                            <span style={{ color: zoneColor(form.targetZone), fontWeight: 800 }}>
+                              {targetZoneBpm.minBpm}–{targetZoneBpm.maxBpm} bpm
+                            </span>
+                            {' '}voor {selectedPatient?.name}
+                          </>
+                        )}
                       </div>
                     </div>
                   )}
+                  {form.targetZone && form.patientId && !targetZoneBpm && (
+                    <p className="athletic-mono" style={{ color: P.inkDim, fontSize: 10, letterSpacing: '0.03em' }}>
+                      Geen HR-profiel bij deze patiënt — zones tonen alleen als percentage. Laat ze max-HR invullen voor bpm-bereiken.
+                    </p>
+                  )}
+                </div>
+
+                {/* Doel-tempo */}
+                <div className="space-y-1.5">
+                  <MetaLabel>Doeltempo (min/km, optioneel)</MetaLabel>
+                  <DarkInput
+                    placeholder="bijv. 5:30"
+                    value={form.targetPace}
+                    onChange={e => set('targetPace', e.target.value)}
+                  />
                 </div>
 
                 {/* RPE target */}

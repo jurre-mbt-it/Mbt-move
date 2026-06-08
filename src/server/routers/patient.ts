@@ -17,6 +17,7 @@ import { muscleLoadsRecord } from '@/server/lib/muscle-loads'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { auditLog } from '@/server/audit'
 import { signEducationFile } from '@/lib/education/storage'
+import { paceSecPerKm } from '@/lib/cardio-zones'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -537,9 +538,25 @@ export const patientRouter = createTRPCRouter({
         avgHeartRate: z.number().int().min(40).max(220).nullable().optional(),
         maxHeartRate: z.number().int().min(40).max(220).nullable().optional(),
         zone: z.number().int().min(1).max(5).nullable().optional(),
+        targetZone: z.number().int().min(1).max(5).nullable().optional(),
         rpe: z.number().int().min(1).max(10).nullable().optional(),
         painLevel: z.number().int().min(0).max(10).nullable().optional(),
         notes: z.string().max(1000).nullable().optional(),
+        // Werkelijk gelogde interval-breakdown.
+        intervals: z
+          .array(
+            z.object({
+              label: z.string().max(60).optional(),
+              type: z.string().max(20).optional(),
+              durationSec: z.number().int().min(0),
+              distanceM: z.number().int().min(0).nullable().optional(),
+              avgHeartRate: z.number().int().min(40).max(220).nullable().optional(),
+            }),
+          )
+          .nullable()
+          .optional(),
+        // Tijd-in-zone (seconden per HR-zone): { "1": sec, ... }.
+        timeInZones: z.record(z.string(), z.number().int().min(0)).nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -547,6 +564,7 @@ export const patientRouter = createTRPCRouter({
       if (!rl.ok) {
         throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
       }
+      const avgPaceSecPerKm = paceSecPerKm(input.distanceM, input.durationSec)
       const log = await ctx.prisma.cardioLog.create({
         data: {
           patientId: ctx.user.id,
@@ -558,9 +576,13 @@ export const patientRouter = createTRPCRouter({
           avgHeartRate: input.avgHeartRate ?? null,
           maxHeartRate: input.maxHeartRate ?? null,
           zone: input.zone ?? null,
+          targetZone: input.targetZone ?? null,
           rpe: input.rpe ?? null,
           painLevel: input.painLevel ?? null,
           notes: input.notes ?? null,
+          avgPaceSecPerKm,
+          intervals: input.intervals ?? undefined,
+          timeInZones: input.timeInZones ?? undefined,
         },
         select: { id: true },
       })
@@ -632,6 +654,7 @@ export const patientRouter = createTRPCRouter({
         session: 1,
         targetDurationMin: Math.round(intervals.reduce((s, i) => s + i.durationSec, 0) / 60),
         targetZone: 2 as const,
+        targetPaceSecPerKm: null as number | null,
         intervals,
       }
     }
@@ -684,6 +707,8 @@ export const patientRouter = createTRPCRouter({
       targetDurationMin:
         typeof params.targetDurationMin === 'number' ? params.targetDurationMin : 30,
       targetZone,
+      targetPaceSecPerKm:
+        typeof params.targetPaceSecPerKm === 'number' ? params.targetPaceSecPerKm : null,
       intervals: flatIntervals,
     }
   }),

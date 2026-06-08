@@ -62,6 +62,20 @@ export async function buildPatientAggregates(
     exerciseLogs: s.exerciseLogs,
   }))
 
+  // Cardio telt mee voor adherence/recency (de patiënt heeft getraind), maar
+  // NIET voor pijn-/plateau-/per-oefening-logica — die blijft kracht-gebaseerd
+  // (cardio heeft geen exerciseLogs/gewicht). We nemen alleen de datums mee.
+  const cardioLogs = await prisma.cardioLog.findMany({
+    where: { patientId, completedAt: { gte: windowStart } },
+    select: { completedAt: true },
+  })
+  const trainingDates = [
+    ...mappedSessions.map((s) => s.completedAt),
+    ...cardioLogs.map((c) => c.completedAt),
+  ]
+    .filter((d): d is Date => d != null)
+    .sort((a, b) => b.getTime() - a.getTime())
+
   // Recent vs baseline split
   const recent = mappedSessions.slice(0, RECENT_SESSIONS_COUNT)
   const baselineCutoff = new Date(now.getTime() - BASELINE_WINDOW_DAYS * 24 * 3600 * 1000)
@@ -72,25 +86,20 @@ export async function buildPatientAggregates(
   const recentNRSVals = recent.map((s) => s.painLevel).filter((v): v is number => v != null)
   const baselineNRSVals = baseline.map((s) => s.painLevel).filter((v): v is number => v != null)
 
-  // Adherence
+  // Adherence — kracht + cardio gecombineerd.
   const recent7dCutoff = new Date(now.getTime() - 7 * 24 * 3600 * 1000)
   const prior14dStart = new Date(now.getTime() - 21 * 24 * 3600 * 1000)
-  const recentCount7d = mappedSessions.filter(
-    (s) => s.completedAt != null && s.completedAt >= recent7dCutoff,
-  ).length
-  const priorCount14d = mappedSessions.filter(
-    (s) =>
-      s.completedAt != null &&
-      s.completedAt >= prior14dStart &&
-      s.completedAt < recent7dCutoff,
+  const recentCount7d = trainingDates.filter((d) => d >= recent7dCutoff).length
+  const priorCount14d = trainingDates.filter(
+    (d) => d >= prior14dStart && d < recent7dCutoff,
   ).length
   const priorCount7dScaled = priorCount14d / 2
   const adherenceRatio = priorCount7dScaled > 0 ? recentCount7d / priorCount7dScaled : null
 
-  // Days since last session
-  const lastSession = mappedSessions[0]
-  const daysSinceLastSession = lastSession?.completedAt
-    ? Math.floor((now.getTime() - lastSession.completedAt.getTime()) / (24 * 3600 * 1000))
+  // Days since last training (kracht óf cardio)
+  const lastTrainingDate = trainingDates[0] ?? null
+  const daysSinceLastSession = lastTrainingDate
+    ? Math.floor((now.getTime() - lastTrainingDate.getTime()) / (24 * 3600 * 1000))
     : null
 
   // Days since change (pain/exertion/weight)
@@ -121,10 +130,11 @@ export async function buildPatientAggregates(
         break
       }
     }
-    if (daysSinceChange == null && lastSession?.completedAt) {
+    const lastStrengthSession = mappedSessions[0]
+    if (daysSinceChange == null && lastStrengthSession?.completedAt) {
       // No change found = plateau for the entire window
       daysSinceChange = Math.floor(
-        (now.getTime() - lastSession.completedAt.getTime()) / (24 * 3600 * 1000),
+        (now.getTime() - lastStrengthSession.completedAt.getTime()) / (24 * 3600 * 1000),
       )
     }
   }

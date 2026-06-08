@@ -28,6 +28,15 @@ export const CARDIO_ACTIVITIES: Record<CardioActivityKey, {
   OTHER:         { label: 'Overig',         icon: '🏋️', unit: 'min', description: 'Andere activiteit' },
 }
 
+/**
+ * Activiteiten die in de UI getoond worden (voorschrijven + zelf loggen). De
+ * overige enum-waarden blijven bestaan voor legacy-data, maar nieuwe sessies
+ * kiezen uit deze vijf.
+ */
+export const SELECTABLE_CARDIO_ACTIVITIES: CardioActivityKey[] = [
+  'RUNNING', 'CYCLING', 'ROWING', 'SWIMMING', 'OTHER',
+]
+
 // ── Protocollen ───────────────────────────────────────────────────────────────
 
 export type CardioProtocolKey =

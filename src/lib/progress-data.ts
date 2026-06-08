@@ -15,6 +15,27 @@ export type ProgressDataResult = {
   totalSessions: number
   avgPain: number | null
   avgExertion: number | null
+  cardio: {
+    sessions: Array<{
+      id: string
+      date: string
+      activity: string
+      protocol: string
+      durationMinutes: number
+      distanceKm: number | null
+      avgPaceSecPerKm: number | null
+      avgHeartRate: number | null
+      zone: number | null
+      rpe: number | null
+      painLevel: number | null
+    }>
+    totalSessions: number
+    totalMinutes: number
+    totalDistanceKm: number
+    avgRpe: number | null
+    /** Seconden per HR-zone (1-5) opgeteld over het venster. */
+    timeInZonesSec: Record<string, number>
+  }
   windowDays: number
 }
 
@@ -86,6 +107,38 @@ export async function getPatientProgressData(
   const painLogs = sessions.filter((s) => s.painLevel !== null)
   const exertionLogs = sessions.filter((s) => s.exertionLevel !== null)
 
+  // ── Cardio ────────────────────────────────────────────────────────────────
+  const cardioLogs = await prisma.cardioLog.findMany({
+    where: { patientId, completedAt: { gte: since } },
+    orderBy: { completedAt: 'asc' },
+    select: {
+      id: true,
+      completedAt: true,
+      activity: true,
+      protocol: true,
+      durationSec: true,
+      distanceM: true,
+      avgPaceSecPerKm: true,
+      avgHeartRate: true,
+      zone: true,
+      rpe: true,
+      painLevel: true,
+      timeInZones: true,
+    },
+    take: 500,
+  })
+
+  const cardioRpeLogs = cardioLogs.filter((c) => c.rpe !== null)
+  const timeInZonesSec: Record<string, number> = {}
+  for (const c of cardioLogs) {
+    const tiz = c.timeInZones as Record<string, number> | null
+    if (tiz && typeof tiz === 'object') {
+      for (const [zone, sec] of Object.entries(tiz)) {
+        if (typeof sec === 'number') timeInZonesSec[zone] = (timeInZonesSec[zone] ?? 0) + sec
+      }
+    }
+  }
+
   return {
     sessions: sessions.map((s) => ({
       id: s.id,
@@ -111,6 +164,32 @@ export async function getPatientProgressData(
               10,
           ) / 10
         : null,
+    cardio: {
+      sessions: cardioLogs.map((c) => ({
+        id: c.id,
+        date: c.completedAt.toISOString(),
+        activity: c.activity,
+        protocol: c.protocol,
+        durationMinutes: Math.round(c.durationSec / 60),
+        distanceKm: c.distanceM != null ? Math.round(c.distanceM / 10) / 100 : null,
+        avgPaceSecPerKm: c.avgPaceSecPerKm,
+        avgHeartRate: c.avgHeartRate,
+        zone: c.zone,
+        rpe: c.rpe,
+        painLevel: c.painLevel,
+      })),
+      totalSessions: cardioLogs.length,
+      totalMinutes: Math.round(cardioLogs.reduce((sum, c) => sum + c.durationSec, 0) / 60),
+      totalDistanceKm:
+        Math.round(cardioLogs.reduce((sum, c) => sum + (c.distanceM ?? 0), 0) / 10) / 100,
+      avgRpe:
+        cardioRpeLogs.length > 0
+          ? Math.round(
+              (cardioRpeLogs.reduce((sum, c) => sum + (c.rpe ?? 0), 0) / cardioRpeLogs.length) * 10,
+            ) / 10
+          : null,
+      timeInZonesSec,
+    },
     windowDays,
   }
 }
