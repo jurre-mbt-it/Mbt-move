@@ -10,9 +10,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Bell, Settings, LogOut, User, UserCog, Activity } from 'lucide-react'
+import { Bell, Settings, LogOut, User, Dumbbell } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { setPersonalMode } from '@/lib/personal-mode-client'
 import Link from 'next/link'
 import { P } from '@/components/dark-ui'
 
@@ -28,11 +29,20 @@ export function Header({ title, userName, userEmail, userAvatar, settingsBase = 
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
+  // Header rendert alléén in de therapeut- en admin-shell, dus iedereen die hem
+  // ziet is THERAPIST/ADMIN. De persoonlijke-modus-switch tonen we daarom op
+  // padbasis (geen extra getMe-call nodig — dat scheelt een race bij hydratie).
   const isInTherapist = pathname?.startsWith('/therapist') ?? false
 
   async function handleSignOut() {
     await supabase.auth.signOut()
     router.push('/login')
+    router.refresh()
+  }
+
+  async function enterPersonalMode() {
+    await setPersonalMode(true)
+    router.push('/athlete/dashboard')
     router.refresh()
   }
 
@@ -113,17 +123,20 @@ export function Header({ title, userName, userEmail, userAvatar, settingsBase = 
               <p className="font-medium">{userName || 'User'}</p>
               {userEmail && <p className="text-xs" style={{ color: P.inkMuted }}>{userEmail}</p>}
             </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {/* Role-switch: therapeut kan eigen patient-view bekijken en andersom. */}
-            <DropdownMenuItem asChild>
-              <Link
-                href={isInTherapist ? '/patient/dashboard' : '/therapist/dashboard'}
-                className="flex items-center gap-2 cursor-pointer"
-              >
-                {isInTherapist ? <Activity className="w-4 h-4" /> : <UserCog className="w-4 h-4" />}
-                {isInTherapist ? 'Bekijk als patient' : 'Bekijk als therapeut'}
-              </Link>
-            </DropdownMenuItem>
+            {/* Persoonlijke trainingsmodus: therapeut traint als zichzelf in de
+                atleet-shell. Alleen binnen de therapeut-shell. */}
+            {isInTherapist && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={enterPersonalMode}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <Dumbbell className="w-4 h-4" />
+                  Persoonlijke training
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link href={`${settingsBase}/profile`} className="flex items-center gap-2 cursor-pointer">

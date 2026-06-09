@@ -1,22 +1,25 @@
 import { AthleteBottomNav } from '@/components/layout/AthleteBottomNav'
 import { PageTransition } from '@/components/layout/PageTransition'
 import { BetaDisclaimer } from '@/components/system/BetaDisclaimer'
-import { requireRole } from '@/lib/auth/require-role'
+import { PersonalModeBanner } from '@/components/layout/PersonalModeBanner'
+import { requireAthleteAccess } from '@/lib/auth/require-role'
 
 export default async function AthleteLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  await requireRole('ATHLETE')
+  // Laat echte ATHLETE-users binnen, én THERAPIST/ADMIN in persoonlijke modus.
+  const session = await requireAthleteAccess()
 
   return (
     <div
       className="athletic-dark min-h-screen pb-16 overflow-x-hidden w-full"
       style={{ background: '#0A0E0F', color: '#F5F7F6' }}
     >
+      {session.isTherapistPersonalMode && <PersonalModeBanner />}
       <main className="w-full overflow-x-hidden"><PageTransition>{children}</PageTransition></main>
-      <AthleteBottomNav />
+      <AthleteBottomNav personalMode={session.isTherapistPersonalMode} />
       <BetaDisclaimer />
     </div>
   )

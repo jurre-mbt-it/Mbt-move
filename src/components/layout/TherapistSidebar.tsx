@@ -22,6 +22,7 @@ import {
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { trpc } from '@/lib/trpc/client'
+import { setPersonalMode } from '@/lib/personal-mode-client'
 import { P } from '@/components/dark-ui'
 
 const navItems = [
@@ -50,6 +51,12 @@ export function TherapistSidebar() {
   async function handleSignOut() {
     await supabase.auth.signOut()
     router.push('/login')
+    router.refresh()
+  }
+
+  async function enterPersonalMode() {
+    await setPersonalMode(true)
+    router.push('/athlete/dashboard')
     router.refresh()
   }
 
@@ -151,6 +158,26 @@ export function TherapistSidebar() {
           >
             <Shield className="w-4.5 h-4.5 shrink-0" />
             Admin
+          </Link>
+        )}
+        {/* Mijn training: therapeut kan zijn eigen schema's loggen en plannen. */}
+        <button
+          type="button"
+          onClick={enterPersonalMode}
+          className="athletic-tap mbt-nav-hover w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors"
+          style={{ color: P.ink, fontWeight: 700 }}
+        >
+          <Dumbbell className="w-4.5 h-4.5 shrink-0" style={{ color: P.brand }} />
+          Persoonlijke training
+        </button>
+        {me?.id && (
+          <Link
+            href={`/therapist/programs/new?patientId=${me.id}`}
+            className="athletic-tap mbt-nav-hover flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors"
+            style={{ color: P.inkMuted }}
+          >
+            <Blocks className="w-4.5 h-4.5 shrink-0" />
+            Nieuw schema voor mezelf
           </Link>
         )}
         <Link

@@ -186,12 +186,27 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
   ) as { data: Array<{ id: string; name: string; weeks: number; daysPerWeek: number; _count: { exercises: number } }> }
   // Patiënten van deze therapeut — voor pill in header en deploy-picker.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: patientsList = [] } = (trpc.patients.list.useQuery as any)(undefined, { staleTime: 60_000 }) as { data: Array<{
+  const { data: patientsRaw = [] } = (trpc.patients.list.useQuery as any)(undefined, { staleTime: 60_000 }) as { data: Array<{
     id: string
     name: string | null
     email: string | null
     avatarUrl: string | null
   }> }
+  // Therapeut/admin kan ook een schema voor zichzelf bouwen (persoonlijke
+  // training). De eigen User zit niet in patients.list (gefilterd op
+  // PATIENT/ATHLETE), dus prependen we een synthetische "mezelf"-entry zodat
+  // de picker een naam toont en currentPatient/deploy correct resolven.
+  const { data: me } = trpc.auth.getMe.useQuery()
+  const patientsList = useMemo(() => {
+    if (!me || (me.role !== 'THERAPIST' && me.role !== 'ADMIN')) return patientsRaw
+    const self = {
+      id: me.id,
+      name: me.name ? `${me.name} (mezelf)` : 'Mezelf (eigen training)',
+      email: me.email ?? null,
+      avatarUrl: me.avatarUrl ?? null,
+    }
+    return [self, ...patientsRaw.filter(p => p.id !== me.id)]
+  }, [me, patientsRaw])
   const currentPatient = patientsList.find(p => p.id === program.patientId) ?? null
   const currentPatientFirstName = currentPatient?.name?.trim().split(/\s+/)[0] ?? null
 

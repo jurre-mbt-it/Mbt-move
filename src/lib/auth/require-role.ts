@@ -22,6 +22,7 @@ import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { DPA_VERSION } from '@/lib/dpa-constants'
+import { isPersonalModeEnabled } from './personal-mode'
 
 export type RequiredRole = 'THERAPIST' | 'ADMIN' | 'PATIENT' | 'ATHLETE'
 
@@ -106,4 +107,40 @@ export async function requireRole(
   }
 
   return user
+}
+
+export type AthleteAccess = SessionUser & {
+  /** True wanneer een THERAPIST/ADMIN de atleet-shell gebruikt voor zijn
+   *  eigen training (persoonlijke modus), i.p.v. een echte ATHLETE. */
+  isTherapistPersonalMode: boolean
+}
+
+/**
+ * Guard voor de atleet-shell. Naast echte ATHLETE-users laat deze ook
+ * THERAPIST/ADMIN binnen wanneer de persoonlijke-trainingsmodus aan staat
+ * (cookie). Zo kan een therapeut zijn eigen schema's loggen en bekijken
+ * zonder tweede account — alle queries draaien op `ctx.user.id`.
+ *
+ *  - Niet ingelogd                         → /login
+ *  - ATHLETE zonder DPA                     → /onboarding/dpa
+ *  - THERAPIST/ADMIN zonder modus-cookie    → /therapist/dashboard
+ *  - PATIENT of overige                     → eigen dashboard
+ */
+export async function requireAthleteAccess(): Promise<AthleteAccess> {
+  const user = await getServerUser()
+  if (!user) redirect('/login')
+
+  if (user.role === 'ATHLETE') {
+    if (user.dpaAcceptedVersion !== DPA_VERSION) redirect('/onboarding/dpa')
+    return { ...user, isTherapistPersonalMode: false }
+  }
+
+  if (user.role === 'THERAPIST' || user.role === 'ADMIN') {
+    if (await isPersonalModeEnabled()) {
+      return { ...user, isTherapistPersonalMode: true }
+    }
+    redirect('/therapist/dashboard')
+  }
+
+  redirect(ROLE_HOME[user.role])
 }

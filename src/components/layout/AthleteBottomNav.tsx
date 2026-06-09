@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { Home, CalendarDays, Zap, User, Menu, X, Dumbbell, ChevronRight, Plus } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { Home, CalendarDays, Zap, User, Menu, X, Dumbbell, ChevronRight, Plus, Stethoscope, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { setPersonalMode } from '@/lib/personal-mode-client'
 import { P } from '@/components/dark-ui'
 
 // 5 cells: 2 left tabs, center FAB (quick workout), 2 right tabs.
@@ -21,9 +22,18 @@ const DRAWER_ITEMS = [
   { href: '/athlete/exercises', label: 'Oefeningen', icon: Dumbbell, description: 'Oefeningen bibliotheek' },
 ]
 
-export function AthleteBottomNav() {
+export function AthleteBottomNav({ personalMode = false }: { personalMode?: boolean }) {
   const pathname = usePathname()
+  const router = useRouter()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+
+  async function exitPersonalMode() {
+    setLeaving(true)
+    await setPersonalMode(false)
+    router.push('/therapist/dashboard')
+    router.refresh()
+  }
 
   return (
     <>
@@ -100,6 +110,31 @@ export function AthleteBottomNav() {
               </Link>
             )
           })}
+
+          {/* Persoonlijke modus: terug naar de therapeut-shell. */}
+          {personalMode && (
+            <button
+              type="button"
+              onClick={exitPersonalMode}
+              disabled={leaving}
+              className="athletic-tap mbt-nav-hover mt-1 flex items-center gap-3 px-3 py-3 rounded-xl transition-colors disabled:opacity-60"
+              style={{ color: P.ink }}
+            >
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center"
+                style={{ background: P.bg }}
+              >
+                {leaving
+                  ? <Loader2 className="w-4.5 h-4.5 animate-spin" style={{ color: P.brand }} />
+                  : <Stethoscope className="w-4.5 h-4.5" style={{ color: P.brand }} />}
+              </div>
+              <div className="flex-1 text-left">
+                <p style={{ fontSize: 14, fontWeight: 700 }}>Therapeut-modus</p>
+                <p style={{ color: P.inkMuted, fontSize: 11 }}>Terug naar je therapeut-account</p>
+              </div>
+              <ChevronRight className="w-4 h-4" style={{ color: P.inkDim }} />
+            </button>
+          )}
         </div>
       </div>
 
