@@ -58,6 +58,9 @@ function renderCriticalEmail(insight: Insight, patientName: string): {
       <p style="color:${BRAND.inkMuted};font-size:12px;margin:0 0 20px 0;">
         Patiënt: <strong style="color:${BRAND.ink};">${safePatientName}</strong>
       </p>
+      <p style="color:${BRAND.inkMuted};font-size:12px;line-height:1.55;margin:0 0 20px 0;padding:10px 14px;border-left:3px solid ${BRAND.inkMuted};background:${BRAND.surface};border-radius:6px;">
+        Dit is een geautomatiseerd attentiesignaal op basis van vaste regels, geen diagnose of behandeladvies. Je eigen klinische oordeel als behandelaar prevaleert altijd.
+      </p>
       <a href="${dashboardUrl}" style="display:inline-block;background:${BRAND.lime};color:${BRAND.bg};padding:12px 20px;border-radius:8px;font-weight:900;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;text-decoration:none;">
         Bekijk in dashboard →
       </a>
@@ -73,6 +76,8 @@ function renderCriticalEmail(insight: Insight, patientName: string): {
 ${insight.suggestion}
 
 Patiënt: ${patientName}
+
+Let op: dit is een geautomatiseerd attentiesignaal op basis van vaste regels, geen diagnose of behandeladvies. Je eigen klinische oordeel als behandelaar prevaleert altijd.
 
 Bekijk in dashboard: ${dashboardUrl}
 
