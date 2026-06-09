@@ -7,8 +7,12 @@ import type { NextConfig } from "next";
  * report endpoint als je dat later koppelt). Zo kunnen we de policy aanscherpen
  * op basis van echte violations vóór we 'm afdwingend maken.
  *
+ * Violations worden verzameld op `/api/csp-report` (via `report-uri` + de
+ * moderne `report-to`/`Reporting-Endpoints`). Bekijk ze in de Vercel-logs op
+ * prefix `[csp-report]`.
+ *
  * Aanpak om afdwingend te worden:
- *   1. Draai dit een tijd in productie, verzamel violations.
+ *   1. Draai dit een tijd in productie, verzamel violations (sink staat live).
  *   2. Vervang per directive de brede waarden (bv. 'unsafe-inline'/'unsafe-eval'
  *      voor scripts) door nonces/hashes — vereist waarschijnlijk middleware.
  *   3. Hernoem de header naar `Content-Security-Policy` (zonder -Report-Only).
@@ -31,6 +35,10 @@ const contentSecurityPolicyReportOnly = [
   "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://iframe.mediadelivery.net https://*.mux.com",
   "media-src 'self' blob: https:",
   "worker-src 'self' blob:",
+  // Violations verzamelen: legacy `report-uri` + moderne `report-to`-groep
+  // (gedefinieerd via de `Reporting-Endpoints`-header hieronder).
+  "report-uri /api/csp-report",
+  "report-to csp-endpoint",
 ].join('; ');
 
 /**
@@ -44,6 +52,12 @@ const securityHeaders = [
   {
     key: 'Content-Security-Policy-Report-Only',
     value: contentSecurityPolicyReportOnly,
+  },
+  // Moderne Reporting API — definieert de `csp-endpoint`-groep waar de
+  // `report-to`-directive naar verwijst. Same-origin route.
+  {
+    key: 'Reporting-Endpoints',
+    value: 'csp-endpoint="/api/csp-report"',
   },
   {
     key: 'Strict-Transport-Security',
