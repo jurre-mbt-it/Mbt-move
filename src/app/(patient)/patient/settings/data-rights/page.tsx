@@ -23,6 +23,7 @@ export default function DataRightsPage() {
   const [deleteReason, setDeleteReason] = useState('')
 
   const exportMutation = trpc.gdpr.exportMyData.useMutation()
+  const { data: accessLog } = trpc.gdpr.getMyAccessLog.useQuery()
   const requestDeleteMutation = trpc.gdpr.requestDeletion.useMutation()
   const cancelDeleteMutation = trpc.gdpr.cancelDeletion.useMutation()
   const { data: status, refetch: refetchStatus } =
@@ -49,6 +50,28 @@ export default function DataRightsPage() {
     } finally {
       setExporting(false)
     }
+  }
+
+  function handleDownloadAccessLog() {
+    if (!accessLog) return
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      format: 'mbt-move:access-log:v1',
+      law: 'Wabvpz art. 15j — inzage toegangslogboek',
+      entries: accessLog,
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json',
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `mbt-gym-toegangslogboek-${new Date().toISOString().slice(0, 10)}.json`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+    toast.success('Download gestart — check je Downloads-map.')
   }
 
   async function handleDeleteConfirm() {
@@ -155,6 +178,90 @@ export default function DataRightsPage() {
           >
             {exporting ? 'Bezig met exporteren…' : 'Download mijn data (JSON)'}
           </DarkButton>
+        </Tile>
+
+        {/* Toegangslogboek tile — Wabvpz art. 15j */}
+        <Tile accentBar={P.purple}>
+          <Kicker>INZAGE · WABVPZ 15J</Kicker>
+          <h2
+            style={{
+              color: P.ink,
+              fontSize: 20,
+              fontWeight: 900,
+              letterSpacing: '-0.01em',
+              marginTop: 8,
+            }}
+          >
+            Wie heeft mijn dossier ingezien
+          </h2>
+          <p
+            style={{
+              color: P.inkMuted,
+              fontSize: 13,
+              marginTop: 6,
+              lineHeight: 1.5,
+            }}
+          >
+            Een overzicht van behandelaren die jouw dossier hebben geraadpleegd,
+            met datum en tijd. Je hebt hier wettelijk recht op (Wabvpz art. 15j).
+          </p>
+
+          {accessLog === undefined ? (
+            <p style={{ color: P.inkDim, fontSize: 12, marginTop: 12 }}>
+              Logboek laden…
+            </p>
+          ) : accessLog.length === 0 ? (
+            <p style={{ color: P.inkDim, fontSize: 12, marginTop: 12 }}>
+              Nog geen registraties — er heeft (nog) geen behandelaar je dossier
+              ingezien sinds het loggen actief is.
+            </p>
+          ) : (
+            <>
+              <ul className="mt-3 flex flex-col gap-1.5">
+                {accessLog.slice(0, 8).map((entry) => (
+                  <li
+                    key={entry.id}
+                    className="flex items-baseline justify-between gap-3"
+                    style={{ fontSize: 12, lineHeight: 1.4 }}
+                  >
+                    <span style={{ color: P.ink, minWidth: 0 }}>
+                      <strong style={{ fontWeight: 700 }}>
+                        {entry.actorName ?? entry.actorEmail ?? 'Onbekende behandelaar'}
+                      </strong>
+                      <span style={{ color: P.inkMuted }}> · {entry.action}</span>
+                    </span>
+                    <span
+                      style={{ color: P.inkDim, whiteSpace: 'nowrap' }}
+                      className="athletic-mono"
+                    >
+                      {new Date(entry.at).toLocaleDateString('nl-NL', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: '2-digit',
+                      })}{' '}
+                      {new Date(entry.at).toLocaleTimeString('nl-NL', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {accessLog.length > 8 && (
+                <p style={{ color: P.inkDim, fontSize: 11, marginTop: 8 }}>
+                  + {accessLog.length - 8} eerdere registratie
+                  {accessLog.length - 8 === 1 ? '' : 's'} — download voor het volledige logboek.
+                </p>
+              )}
+              <DarkButton
+                variant="secondary"
+                onClick={handleDownloadAccessLog}
+                className="mt-4"
+              >
+                Download volledig logboek (JSON)
+              </DarkButton>
+            </>
+          )}
         </Tile>
 
         {/* Deletion tile */}

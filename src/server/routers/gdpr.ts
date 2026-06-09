@@ -166,6 +166,51 @@ export const gdprRouter = createTRPCRouter({
   }),
 
   /**
+   * Wabvpz art. 15j — inzage in het toegangslogboek van het eigen dossier:
+   * "wie heeft mijn dossier wanneer geraadpleegd?".
+   *
+   * We tonen audit-rijen waar de patiënt het *doelwit* is (`resourceId = ik`),
+   * niet waar 'ie zelf de actor is. Bewust beperkt tot de drie inzage-events die
+   * gegarandeerd `resourceId = patientId` zetten (zie `patients.ts`); mutatie-
+   * events hebben een andere resourceId-semantiek en horen hier niet thuis.
+   * De actor (therapeut) wordt via de `user`-relatie opgehaald voor naam/e-mail.
+   */
+  getMyAccessLog: protectedProcedure.query(async ({ ctx }) => {
+    const userId = ctx.user!.id
+    const ACCESS_EVENTS = ['PATIENT_VIEWED', 'PROGRAM_VIEWED', 'SESSION_LOG_VIEWED']
+    const ACTION_LABELS: Record<string, string> = {
+      PATIENT_VIEWED: 'Dossier ingezien',
+      PROGRAM_VIEWED: 'Programma bekeken',
+      SESSION_LOG_VIEWED: 'Sessie-log bekeken',
+    }
+
+    const rows = await ctx.prisma.auditLog.findMany({
+      where: { resourceId: userId, event: { in: ACCESS_EVENTS } },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+      select: {
+        id: true,
+        event: true,
+        createdAt: true,
+        actorEmail: true,
+        user: { select: { name: true, email: true, specialty: true } },
+      },
+    })
+
+    return rows.map((r) => ({
+      id: r.id,
+      at: r.createdAt.toISOString(),
+      event: r.event,
+      action: ACTION_LABELS[r.event] ?? r.event,
+      // Actor = de therapeut die toegang had. IP/userAgent bewust niet getoond
+      // aan de patiënt (dat is locatie-info van de behandelaar).
+      actorName: r.user?.name ?? null,
+      actorEmail: r.user?.email ?? r.actorEmail ?? null,
+      actorSpecialty: r.user?.specialty ?? null,
+    }))
+  }),
+
+  /**
    * Art. 17 — patiënt verzoekt zijn account te verwijderen.
    * Soft-markeert met 30-dagen grace period.
    */
