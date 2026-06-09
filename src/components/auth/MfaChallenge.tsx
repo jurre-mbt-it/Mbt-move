@@ -22,29 +22,38 @@ export function MfaChallenge() {
 
     try {
       const { data: factors } = await supabase.auth.mfa.listFactors()
-      const totpFactor = factors?.totp?.[0]
+      const totpFactors = factors?.totp ?? []
 
-      if (!totpFactor) {
+      if (totpFactors.length === 0) {
         setError('No MFA factor found. Please re-enroll.')
         return
       }
 
-      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
-        factorId: totpFactor.id,
-      })
+      // Een account kan meerdere geverifieerde TOTP-factoren hebben (bijv. door
+      // herhaalde enroll). De volgorde van listFactors() is niet gegarandeerd,
+      // dus blind `totp[0]` pakken faalde willekeurig ("eerst ongeldig, dan
+      // wel"). We proberen elke factor: de code matcht er precies één, en één
+      // geslaagde verify is genoeg voor aal2. Een mislukte verify verbruikt de
+      // code niet, dus dit is veilig.
+      let verified = false
+      for (const factor of totpFactors) {
+        const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+          factorId: factor.id,
+        })
+        if (challengeError || !challengeData) continue
 
-      if (challengeError) {
-        setError(challengeError.message)
-        return
+        const { error: verifyError } = await supabase.auth.mfa.verify({
+          factorId: factor.id,
+          challengeId: challengeData.id,
+          code,
+        })
+        if (!verifyError) {
+          verified = true
+          break
+        }
       }
 
-      const { error: verifyError } = await supabase.auth.mfa.verify({
-        factorId: totpFactor.id,
-        challengeId: challengeData.id,
-        code,
-      })
-
-      if (verifyError) {
+      if (!verified) {
         setError('Invalid code. Please try again.')
         return
       }

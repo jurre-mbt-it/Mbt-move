@@ -32,6 +32,23 @@ export function MfaEnrollForm() {
   useEffect(() => {
     async function enrollMfa() {
       try {
+        // Ruim onverifieerde leftover-factoren op vóór een nieuwe enroll. Zonder
+        // dit stapelt elke (afgebroken) enroll een extra TOTP-factor op, wat het
+        // inloggen later onbetrouwbaar maakt. Verifieerde factoren laten we met
+        // rust — die verwijderen is een bewuste beveiligingsactie van de user.
+        try {
+          const { data: existing } = await supabase.auth.mfa.listFactors()
+          const stale = (existing?.all ?? []).filter(
+            (f: { factor_type: string; status: string }) =>
+              f.factor_type === 'totp' && f.status === 'unverified',
+          )
+          for (const f of stale) {
+            await supabase.auth.mfa.unenroll({ factorId: f.id })
+          }
+        } catch {
+          /* best-effort opruimen; enroll gaat sowieso door */
+        }
+
         const { data, error } = await supabase.auth.mfa.enroll({
           factorType: 'totp',
           friendlyName: 'MBT Gym Authenticator',
