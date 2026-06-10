@@ -250,6 +250,12 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           >
             ✉ Stuur invite-link
           </DarkButton>
+          <DarkButton
+            variant="secondary"
+            href={`/therapist/week-planner?patientId=${patient.id}`}
+          >
+            🗓 Weekschema
+          </DarkButton>
           {patient.programId ? (
             <DarkButton
               variant="secondary"
