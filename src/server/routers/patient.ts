@@ -412,6 +412,8 @@ export const patientRouter = createTRPCRouter({
         durationSeconds: z.number().int().min(0),
         painLevel: z.number().int().min(0).max(10).nullable(),
         exertionLevel: z.number().int().min(0).max(10).nullable(),
+        // False = eerder gestopt: niet alle oefeningen afgevinkt bij afronden.
+        completedAll: z.boolean().optional(),
         exercises: z.array(
           z.object({
             exerciseId: z.string(),
@@ -440,6 +442,7 @@ export const patientRouter = createTRPCRouter({
           scheduledAt: new Date(input.scheduledAt),
           completedAt: new Date(input.completedAt),
           status: 'COMPLETED',
+          completedAll: input.completedAll ?? true,
           duration: input.durationSeconds,
           painLevel: input.painLevel,
           exertionLevel: input.exertionLevel,

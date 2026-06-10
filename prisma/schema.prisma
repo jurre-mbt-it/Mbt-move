@@ -853,6 +853,10 @@ model SessionLog {
   status        SessionStatus @default(PENDING)
   scheduledAt   DateTime
   completedAt   DateTime?
+  // False = patiënt is eerder gestopt (niet alle oefeningen afgevinkt bij
+  // afronden). Status blijft COMPLETED zodat workload/historie-queries de
+  // sessie blijven meetellen; de week-planner kleurt 'm oranje (deels).
+  completedAll  Boolean       @default(true)
   duration      Int? // seconds
   notes         String?
   painLevel     Int? // 0-10

@@ -219,19 +219,31 @@ type ScheduleItem = {
   cardioParams?: PlannerCardioParams | null
 }
 
-type ItemStatus = 'scheduled' | 'completed' | 'missed' | 'in_progress'
+type ItemStatus = 'scheduled' | 'completed' | 'partial' | 'missed' | 'in_progress'
 
+// Status leidt de tile-kleur: gepland = neutraal/wit, voltooid = groen,
+// deels (eerder gestopt) = oranje, gemist (verleden + niet gedaan) = rood.
+// Categorie blijft herkenbaar via het icoon.
 const STATUS_COLORS: Record<ItemStatus, string> = {
-  scheduled: 'transparent',           // geen extra accent — categorie-kleur leidt
-  completed: 'rgba(232,122,85,0.18)', // lime tint
-  missed:    'rgba(248,113,113,0.20)', // danger red tint
-  in_progress: 'rgba(244,194,97,0.20)', // gold/amber tint
+  scheduled: 'rgba(255,255,255,0.06)',
+  completed: 'rgba(190,242,100,0.14)',  // lime tint
+  partial:   'rgba(249,115,22,0.16)',   // orange tint
+  missed:    'rgba(248,113,113,0.14)',  // danger red tint
+  in_progress: 'rgba(244,194,97,0.16)', // gold/amber tint
 }
 const STATUS_BORDER: Record<ItemStatus, string> = {
-  scheduled: '',
-  completed: '#e87a55',
-  missed:    '#F87171',
-  in_progress: '#F4C261',
+  scheduled: 'rgba(255,255,255,0.35)',
+  completed: P.lime,
+  partial:   P.orange,
+  missed:    P.danger,
+  in_progress: P.gold,
+}
+const STATUS_TITLES: Record<ItemStatus, string | undefined> = {
+  scheduled: undefined,
+  completed: 'Voltooid — klik voor details',
+  partial:   'Deels voltooid — eerder gestopt',
+  missed:    'Gemist — niet gedaan',
+  in_progress: 'Bezig',
 }
 
 function ItemTile({
@@ -251,10 +263,10 @@ function ItemTile({
   const name = item.programId ? (item.program?.name ?? 'Programma') : (item.quickName ?? 'Workout')
   const duration = item.quickDurationSec ? fmtDuration(item.quickDurationSec) : null
 
-  // Status overlay: extra strookje bovenaan voor done/missed/in-progress.
-  // Categorie-kleur blijft links als anchor zodat type direct herkenbaar is.
+  // Status leidt de kleur (border + tint); categorie-icoon blijft als anchor
+  // zodat het type direct herkenbaar is.
   const statusBg = STATUS_COLORS[status]
-  const showStatusStripe = status !== 'scheduled'
+  const statusBorder = STATUS_BORDER[status]
   const isClickable = !!onClick
 
   // Compacte inhoud-preview onder de titel: oefeningen of cardio-samenvatting.
@@ -289,27 +301,13 @@ function ItemTile({
         isClickable ? 'cursor-pointer hover:brightness-110 transition-[filter]' : 'cursor-default',
       )}
       style={{
-        background: `${color}15`,
-        borderLeft: `3px solid ${color}`,
+        background: statusBg,
+        borderLeft: `3px solid ${statusBorder}`,
         color: P.ink,
       }}
-      title={
-        status === 'completed' ? 'Voltooid — klik voor details'
-        : status === 'missed' ? 'Gemist'
-        : status === 'in_progress' ? 'Bezig'
-        : undefined
-      }
+      title={STATUS_TITLES[status]}
     >
-      {showStatusStripe && (
-        <div
-          className="absolute inset-x-0 top-0 h-[3px]"
-          style={{ background: STATUS_BORDER[status] }}
-        />
-      )}
-      <div
-        className="flex items-center gap-1.5 px-2 py-1"
-        style={{ background: statusBg }}
-      >
+      <div className="flex items-center gap-1.5 px-2 py-1">
         <span style={{ color }} className="shrink-0"><CategoryIcon category={category} size={11} /></span>
         {!isOpen && <span className="min-w-0 flex-1 truncate">{name}</span>}
         {duration && <span className="text-[10px] opacity-70 shrink-0">{duration}</span>}
@@ -325,7 +323,7 @@ function ItemTile({
         )}
       </div>
       {previewLine && (
-        <div className="px-2 pb-1 pt-0.5 min-w-0" style={{ background: statusBg }}>
+        <div className="px-2 pb-1 pt-0.5 min-w-0">
           <div className="text-[9px] leading-tight truncate" style={{ color: P.inkMuted }}>{previewLine}</div>
         </div>
       )}
@@ -439,14 +437,19 @@ function DayCell({
         {items.map(item => {
           const sId = sessionIdFor(date, item)
           const status = statusFor(date, item)
-          const realItem = !item.id.startsWith('legacy-') && !item.id.startsWith('sessionlog-')
+          const realItem = !item.id.startsWith('legacy-')
+            && !item.id.startsWith('sessionlog-')
+            && !item.id.startsWith('cardiolog-')
+          // Cardiolog-tiles hebben geen detailpaneel (CardioLog ≠ SessionLog)
+          // en geen onderliggend planner-item → niet klikbaar, niet verwijderbaar.
+          const isCardioLog = item.id.startsWith('cardiolog-')
           const tile = (
             <ItemTile
               item={item}
               status={status}
               onRemove={() => onRemoveItem(item, dayId)}
-              onClick={() => onItemClick(item, date, dayId, sId)}
-              readOnly={item.id.startsWith('sessionlog-')}
+              onClick={isCardioLog ? undefined : () => onItemClick(item, date, dayId, sId)}
+              readOnly={item.id.startsWith('sessionlog-') || isCardioLog}
               isOpen={item.id === openItemId}
             />
           )
@@ -1107,7 +1110,7 @@ function AddItemModal({
                 disabled={busy}
               />
             </div>
-            <div className="max-h-72 overflow-y-auto space-y-1 pr-1">
+            <div className="max-h-72 overflow-y-auto space-y-1 pr-1 mbt-stagger">
               {filtered.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-3 text-center">Geen programma&apos;s gevonden.</p>
               ) : (
@@ -1117,7 +1120,7 @@ function AddItemModal({
                     type="button"
                     onClick={() => handleProgramPick(p.id)}
                     disabled={busy}
-                    className="w-full text-left px-3 py-2 rounded-lg transition-colors hover:bg-[#1C2425] flex items-center gap-2"
+                    className="w-full text-left px-3 py-2 rounded-lg mbt-card-hover athletic-tap flex items-center gap-2"
                     style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
                   >
                     <span className="flex-1 truncate text-sm">{p.name}</span>
@@ -1402,14 +1405,37 @@ function WeekPlannerContent() {
     scheduledAt: string | Date
     completedAt: string | Date | null
     status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED'
+    completedAll: boolean
     duration: number | null
     programId: string | null
     programName: string | null
   }> }
-  // Map (programId, dateISO) → { status, sessionId }. Quick workouts (geen
-  // programId) krijgen geen status — blijven 'scheduled'. sessionId wordt
+  // CardioLogs in hetzelfde bereik — cardio wordt apart gelogd (CardioLog
+  // i.p.v. SessionLog) en moet geplande cardio-items kunnen afvinken.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: cardioRaw = [] } = (trpc.weekSchedules.cardioInRange.useQuery as any)(
+    { patientId: selectedPatientId, ...sessionRange },
+    { enabled: !!selectedPatientId, staleTime: 10_000 },
+  ) as { data: Array<{
+    id: string
+    completedAt: string | Date
+    activity: string
+    protocol: string
+    durationSec: number
+    distanceM: number | null
+    zone: number | null
+    rpe: number | null
+    programId: string | null
+  }> }
+
+  /** Status van een afgeronde SessionLog: deels (eerder gestopt) of voltooid. */
+  function doneStatus(s: { completedAll: boolean }): ItemStatus {
+    return s.completedAll === false ? 'partial' : 'completed'
+  }
+
+  // Map (programId, dateISO) → { status, sessionId }. sessionId wordt
   // gebruikt voor de session-detail modal wanneer therapeut op een tile klikt.
-  type SessionMatch = { status: ItemStatus; sessionId: string }
+  type SessionMatch = { status: ItemStatus; sessionId: string | null }
   const sessionByKey = useMemo(() => {
     const todayStart = startOfDay(new Date())
     const map = new Map<string, SessionMatch>()
@@ -1419,7 +1445,7 @@ function WeekPlannerContent() {
       const key = `${s.programId}|${isoDate(sched)}`
       let status: ItemStatus
       if (s.completedAt) {
-        status = 'completed'
+        status = doneStatus(s)
       } else if (s.status === 'IN_PROGRESS') {
         status = 'in_progress'
       } else if (s.status === 'SKIPPED' || sched < todayStart) {
@@ -1428,9 +1454,9 @@ function WeekPlannerContent() {
         status = 'scheduled'
       }
       // Als er meerdere sessies op dezelfde sleutel zijn (re-schedule etc),
-      // kies de "best status": completed > in_progress > scheduled > missed.
+      // kies de "best status": completed > partial > in_progress > scheduled > missed.
       const prev = map.get(key)
-      const prio: Record<ItemStatus, number> = { completed: 4, in_progress: 3, scheduled: 2, missed: 1 }
+      const prio: Record<ItemStatus, number> = { completed: 5, partial: 4, in_progress: 3, scheduled: 2, missed: 1 }
       if (!prev || prio[status] > prio[prev.status]) {
         map.set(key, { status, sessionId: s.id })
       }
@@ -1439,8 +1465,22 @@ function WeekPlannerContent() {
   }, [sessionsRaw])
 
   function statusFor(date: Date, item: ScheduleItem): ItemStatus {
-    if (!item.programId) return 'scheduled'
-    return sessionByKey.get(`${item.programId}|${isoDate(date)}`)?.status ?? 'scheduled'
+    // Synthetische tiles dragen hun eigen status: een cardiolog-tile ís een
+    // gelogde workout, een sessionlog-tile leest zijn eigen SessionLog terug.
+    if (item.id.startsWith('cardiolog-')) return 'completed'
+    if (item.id.startsWith('sessionlog-')) {
+      const sid = item.id.slice('sessionlog-'.length)
+      const s = sessionsRaw.find(x => x.id === sid)
+      if (s?.completedAt) return doneStatus(s)
+      if (s?.status === 'IN_PROGRESS') return 'in_progress'
+      // PENDING/SKIPPED historie valt door naar de verleden-check hieronder.
+    }
+    const match = item.programId
+      ? sessionByKey.get(`${item.programId}|${isoDate(date)}`)
+      : adhocStatusById.get(item.id)
+    if (match) return match.status
+    // Geen log gevonden: in het verleden = gemist, anders gewoon gepland.
+    return startOfDay(date) < startOfDay(new Date()) ? 'missed' : 'scheduled'
   }
 
   /** Geef het bijbehorende SessionLog-id terug zodat klikken op een gedane
@@ -1450,7 +1490,7 @@ function WeekPlannerContent() {
     if (item.id.startsWith('sessionlog-')) {
       return item.id.slice('sessionlog-'.length)
     }
-    if (!item.programId) return null
+    if (!item.programId) return adhocStatusById.get(item.id)?.sessionId ?? null
     return sessionByKey.get(`${item.programId}|${isoDate(date)}`)?.sessionId ?? null
   }
 
@@ -1461,8 +1501,11 @@ function WeekPlannerContent() {
     weekNumber: number | null
     items: ScheduleItem[]
   }
-  const dateMap = useMemo(() => {
+  const { dateMap, adhocStatusById } = useMemo(() => {
     const map = new Map<string, DayCellInfo>()
+    // Status per quick-item-id (geen programId → geen sessionByKey-match):
+    // gevuld door cardio- en losse-sessie-matching hieronder.
+    const adhocStatusById = new Map<string, SessionMatch>()
 
     // ── 1. WeekSchedule-items (geplande workouts) ──
     if (schedules.length > 0) {
@@ -1532,12 +1575,61 @@ function WeekPlannerContent() {
       }
     }
 
-    // ── 2. SessionLog-historie samenvoegen ──
+    // ── 2. Quick-items matchen aan logs ──
+    // Quick workouts hebben geen programId, dus de programId|datum-sleutel
+    // werkt niet. Match per dag: CARDIO-items aan CardioLogs (zelfde activiteit
+    // eerst), overige quick-items greedy aan losse SessionLogs (programId null).
+    const consumedSessionIds = new Set<string>()
+    const consumedCardioIds = new Set<string>()
+
+    const looseSessionsByIso = new Map<string, typeof sessionsRaw>()
+    for (const s of sessionsRaw) {
+      if (s.programId || !s.completedAt) continue
+      const iso = isoDate(new Date(s.scheduledAt))
+      looseSessionsByIso.set(iso, [...(looseSessionsByIso.get(iso) ?? []), s])
+    }
+    const cardioByIso = new Map<string, typeof cardioRaw>()
+    for (const c of cardioRaw) {
+      const iso = isoDate(new Date(c.completedAt))
+      cardioByIso.set(iso, [...(cardioByIso.get(iso) ?? []), c])
+    }
+
+    for (const [iso, info] of map) {
+      const cardioLogs = cardioByIso.get(iso) ?? []
+      const looseSessions = looseSessionsByIso.get(iso) ?? []
+      for (const item of info.items) {
+        if (item.programId) continue
+        if (item.quickCategory === 'CARDIO') {
+          const plannedActivity = item.cardioParams?.activity
+          const log =
+            cardioLogs.find(c => !consumedCardioIds.has(c.id) && c.activity === plannedActivity)
+            ?? cardioLogs.find(c => !consumedCardioIds.has(c.id))
+          if (!log) continue
+          consumedCardioIds.add(log.id)
+          // "Eerder gestopt" bij cardio: werkelijke duur duidelijk korter dan
+          // gepland (de cardio-speler logt de echte verstreken tijd).
+          const plannedSec = item.cardioParams?.durationSec ?? item.quickDurationSec
+          const partial = !!plannedSec && log.durationSec < plannedSec * 0.8
+          adhocStatusById.set(item.id, { status: partial ? 'partial' : 'completed', sessionId: null })
+        } else {
+          const log = looseSessions.find(s => !consumedSessionIds.has(s.id))
+          if (!log) continue
+          consumedSessionIds.add(log.id)
+          adhocStatusById.set(item.id, {
+            status: log.completedAll === false ? 'partial' : 'completed',
+            sessionId: log.id,
+          })
+        }
+      }
+    }
+
+    // ── 3. SessionLog-historie samenvoegen ──
     // Voor alle SessionLogs die NIET al via items[] gerepresenteerd worden,
     // voeg een synthetisch item toe. Dit toont historische sessies
     // (voltooid + ingepland-maar-niet-gepland-via-WeekPlanner) als read-only
     // tile in de juiste dag-cel.
     for (const session of sessionsRaw) {
+      if (consumedSessionIds.has(session.id)) continue
       const date = startOfDay(new Date(session.scheduledAt))
       const iso = isoDate(date)
       const existing = map.get(iso)
@@ -1576,8 +1668,32 @@ function WeekPlannerContent() {
       }
     }
 
-    return map
-  }, [schedules, sessionsRaw, contentsByItem])
+    // ── 4. Ad-hoc CardioLogs als read-only tile ──
+    // Cardio die de patiënt zelf logde zonder gepland item, zodat de
+    // therapeut ook ongeplande cardio-workouts in de kalender ziet.
+    for (const c of cardioRaw) {
+      if (consumedCardioIds.has(c.id)) continue
+      const iso = isoDate(startOfDay(new Date(c.completedAt)))
+      const synthetic: ScheduleItem = {
+        id: `cardiolog-${c.id}`,
+        order: 999,
+        programId: null,
+        program: null,
+        quickCategory: 'CARDIO',
+        quickName: CARDIO_ACTIVITIES[c.activity as CardioActivityKey]?.label ?? 'Cardio',
+        quickDurationSec: c.durationSec,
+        notes: null,
+      }
+      const existing = map.get(iso)
+      if (existing) {
+        existing.items = [...existing.items, synthetic]
+      } else {
+        map.set(iso, { dayId: null, weekScheduleId: null, weekNumber: null, items: [synthetic] })
+      }
+    }
+
+    return { dateMap: map, adhocStatusById }
+  }, [schedules, sessionsRaw, cardioRaw, contentsByItem])
 
   // ─ Add modal + detailpaneel ─
   const [addOpen, setAddOpen] = useState(false)
@@ -1741,7 +1857,7 @@ function WeekPlannerContent() {
   // ─ Detailpaneel-acties ─
   function handleSaveTemplate() {
     if (!detailItem) return
-    if (detailItem.item.id.startsWith('legacy-') || detailItem.item.id.startsWith('sessionlog-')) {
+    if (detailItem.item.id.startsWith('legacy-') || detailItem.item.id.startsWith('sessionlog-') || detailItem.item.id.startsWith('cardiolog-')) {
       toast.error('Dit item kan niet als schema worden opgeslagen')
       return
     }
@@ -1861,6 +1977,23 @@ function WeekPlannerContent() {
           >
             <ChevronRight className="w-4 h-4" />
           </button>
+        </div>
+        {/* Status-legenda */}
+        <div className="hidden sm:flex items-center gap-3 flex-wrap">
+          {([
+            ['scheduled', 'Gepland'],
+            ['completed', 'Voltooid'],
+            ['partial', 'Deels'],
+            ['missed', 'Gemist'],
+          ] as const).map(([s, label]) => (
+            <span key={s} className="flex items-center gap-1.5 text-[11px]" style={{ color: P.inkMuted }}>
+              <span
+                className="inline-block w-2.5 h-2.5 rounded-[3px]"
+                style={{ background: STATUS_BORDER[s] }}
+              />
+              {label}
+            </span>
+          ))}
         </div>
       </div>
 

@@ -1150,6 +1150,9 @@ function SessionPageInner() {
         durationSeconds,
         painLevel,
         exertionLevel,
+        // Eerder gestopt = niet alle oefeningen afgevinkt → therapeut ziet
+        // de sessie als "deels voltooid" (oranje) in de week-planner.
+        completedAll: doneRef.current.size >= exercises.length,
         exercises: exercises.map(e => {
           const weights = setWeights[e.uid] ?? []
           const lastSetWeight = weights.filter(w => w > 0).slice(-1)[0] ?? null

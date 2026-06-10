@@ -475,6 +475,7 @@ export const weekSchedulesRouter = createTRPCRouter({
           scheduledAt: true,
           completedAt: true,
           status: true,
+          completedAll: true,
           duration: true,
           programId: true,
           program: { select: { id: true, name: true } },
@@ -490,12 +491,47 @@ export const weekSchedulesRouter = createTRPCRouter({
           scheduledAt: s.scheduledAt,
           completedAt: s.completedAt,
           status: s.status,
+          completedAll: s.completedAll,
           duration: s.duration,
           programId: s.programId,
           programName: s.program?.name ?? null,
           weekdayIndex,
         }
       })
+    }),
+
+  /**
+   * Alle CardioLogs binnen een datum-range. Cardio wordt apart gelogd
+   * (CardioLog i.p.v. SessionLog) — de week-planner gebruikt dit om geplande
+   * cardio-items af te vinken en ad-hoc cardio als tile te tonen.
+   */
+  cardioInRange: therapistProcedure
+    .input(z.object({
+      patientId: z.string(),
+      from: z.string(), // ISO timestamp — inclusief
+      to: z.string(),   // ISO timestamp — exclusief
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
+      const logs = await ctx.prisma.cardioLog.findMany({
+        where: {
+          patientId: input.patientId,
+          completedAt: { gte: new Date(input.from), lt: new Date(input.to) },
+        },
+        select: {
+          id: true,
+          completedAt: true,
+          activity: true,
+          protocol: true,
+          durationSec: true,
+          distanceM: true,
+          zone: true,
+          rpe: true,
+          programId: true,
+        },
+        orderBy: { completedAt: 'asc' },
+      })
+      return logs
     }),
 
   /**
