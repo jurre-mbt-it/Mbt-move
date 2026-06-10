@@ -1,6 +1,6 @@
 'use client'
 
-import { useSyncExternalStore } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -40,10 +40,14 @@ const navItems = [
   { href: '/therapist/dpa', label: 'DPA-status', icon: Shield },
 ]
 
-// Voorkeursleutel: ingeklapt blijft ingeklapt over pagina's/sessies heen.
-// localStorage als externe store via useSyncExternalStore — SSR rendert
-// uitgeklapt (server-snapshot), client pakt de opgeslagen voorkeur op
-// zonder hydration-mismatch of setState-in-effect.
+// Ingeklapt-voorkeur als externe store (localStorage) via
+// useSyncExternalStore — SSR rendert uitgeklapt (server-snapshot), client
+// pakt de opgeslagen stand op zonder hydration-mismatch.
+//
+// Interactie-model:
+//   • klik ergens in de CONTENT (buiten de zijbalk) → balk klapt in
+//   • klik op een icoon in de INGEKLAPTE balk → balk klapt uit (navigeert
+//     niet — eerste klik opent het menu, daarna kies je)
 const COLLAPSE_KEY = 'mbt-sidebar-collapsed'
 const collapseListeners = new Set<() => void>()
 function subscribeCollapsed(cb: () => void) {
@@ -54,6 +58,7 @@ function getCollapsedSnapshot() {
   return localStorage.getItem(COLLAPSE_KEY) === '1'
 }
 function storeCollapsed(v: boolean) {
+  if (getCollapsedSnapshot() === v) return
   localStorage.setItem(COLLAPSE_KEY, v ? '1' : '0')
   collapseListeners.forEach(l => l())
 }
@@ -62,16 +67,31 @@ export function TherapistSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  const asideRef = useRef<HTMLElement>(null)
   const { data: me } = trpc.auth.getMe.useQuery()
   const { data: assessmentAccess } = trpc.assessments.hasAccess.useQuery()
   const isAdmin = me?.role === 'ADMIN'
   const canUseAssessment = !!assessmentAccess?.hasAccess
 
-  // Ingeklapt = alleen iconen. Toggle door op het logo te KLIKKEN (bewust
-  // geen hover-gedrag).
   const collapsed = useSyncExternalStore(subscribeCollapsed, getCollapsedSnapshot, () => false)
-  function toggleCollapsed() {
-    storeCollapsed(!collapsed)
+
+  // Auto-inklappen zodra je iets in de content aanklikt (buiten de zijbalk).
+  useEffect(() => {
+    function onPointerDown(e: PointerEvent) {
+      if (!asideRef.current) return
+      if (asideRef.current.contains(e.target as Node)) return
+      storeCollapsed(true)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [])
+
+  /** Ingeklapt: eerste klik op een item klapt alleen het menu uit. */
+  function expandGuard(e: React.MouseEvent): boolean {
+    if (!collapsed) return false
+    e.preventDefault()
+    storeCollapsed(false)
+    return true
   }
 
   async function handleSignOut() {
@@ -98,6 +118,7 @@ export function TherapistSidebar() {
 
   return (
     <aside
+      ref={asideRef}
       className="min-h-screen flex flex-col shrink-0 border-r transition-[width] duration-300"
       style={{
         width: collapsed ? 64 : 256,
@@ -106,29 +127,27 @@ export function TherapistSidebar() {
         borderColor: P.lineStrong,
       }}
     >
-      {/* Logo — klik om het menu in/uit te klappen */}
+      {/* Logo — ingeklapt blijft alleen MBT over; klik klapt dan uit */}
       <button
         type="button"
-        onClick={toggleCollapsed}
-        className={cn('athletic-tap w-full border-b text-left cursor-pointer', collapsed ? 'px-0 py-5' : 'px-6 py-5')}
+        onClick={(e) => { expandGuard(e) }}
+        className={cn(
+          'w-full border-b text-left',
+          collapsed ? 'athletic-tap px-0 py-5 cursor-pointer' : 'px-6 py-5 cursor-default',
+        )}
         style={{ borderColor: P.lineStrong }}
-        title={collapsed ? 'Menu uitklappen' : 'Menu inklappen'}
+        title={collapsed ? 'Menu uitklappen' : undefined}
         aria-expanded={!collapsed}
-        aria-label={collapsed ? 'Menu uitklappen' : 'Menu inklappen'}
+        aria-label={collapsed ? 'Menu uitklappen' : 'MBT Gym'}
+        tabIndex={collapsed ? 0 : -1}
       >
         {collapsed ? (
-          <div className="flex justify-center items-baseline">
+          <div className="flex justify-center">
             <span
               className="athletic-display"
-              style={{ color: P.ink, fontSize: 20, letterSpacing: '-0.04em', fontWeight: 900 }}
+              style={{ color: P.ink, fontSize: 15, letterSpacing: '-0.03em', fontWeight: 900 }}
             >
-              M
-            </span>
-            <span
-              className="athletic-mono"
-              style={{ color: P.brand, fontSize: 11, fontWeight: 900 }}
-            >
-              G
+              MBT
             </span>
           </div>
         ) : (
@@ -172,6 +191,7 @@ export function TherapistSidebar() {
             <Link
               key={href}
               href={href}
+              onClick={expandGuard}
               className={rowClass()}
               title={collapsed ? label : undefined}
               style={{
@@ -191,6 +211,7 @@ export function TherapistSidebar() {
         {canUseAssessment && (
           <Link
             href="/therapist/assessments"
+            onClick={expandGuard}
             className={rowClass()}
             title={collapsed ? 'Assessment' : undefined}
             style={{
@@ -217,6 +238,7 @@ export function TherapistSidebar() {
         {isAdmin && (
           <Link
             href="/admin/dashboard"
+            onClick={expandGuard}
             className={rowClass()}
             title={collapsed ? 'Admin' : undefined}
             style={{ color: P.brand, fontWeight: 700 }}
@@ -228,7 +250,7 @@ export function TherapistSidebar() {
         {/* Mijn training: therapeut kan zijn eigen schema's loggen en plannen. */}
         <button
           type="button"
-          onClick={enterPersonalMode}
+          onClick={(e) => { if (!expandGuard(e)) enterPersonalMode() }}
           className={cn(rowClass(), 'w-full')}
           title={collapsed ? 'Persoonlijke training' : undefined}
           style={{ color: P.ink, fontWeight: 700 }}
@@ -239,6 +261,7 @@ export function TherapistSidebar() {
         {me?.id && (
           <Link
             href={`/therapist/programs/new?patientId=${me.id}`}
+            onClick={expandGuard}
             className={rowClass()}
             title={collapsed ? 'Nieuw schema voor mezelf' : undefined}
             style={{ color: P.inkMuted }}
@@ -249,6 +272,7 @@ export function TherapistSidebar() {
         )}
         <Link
           href="/therapist/release-notes"
+          onClick={expandGuard}
           className={rowClass()}
           title={collapsed ? 'Wat is nieuw' : undefined}
           style={{ color: P.inkMuted }}
@@ -258,6 +282,7 @@ export function TherapistSidebar() {
         </Link>
         <Link
           href="/therapist/settings"
+          onClick={expandGuard}
           className={rowClass()}
           title={collapsed ? 'Instellingen' : undefined}
           style={{ color: P.inkMuted }}
@@ -267,7 +292,7 @@ export function TherapistSidebar() {
         </Link>
         <button
           type="button"
-          onClick={handleSignOut}
+          onClick={(e) => { if (!expandGuard(e)) handleSignOut() }}
           className={cn(rowClass(), 'w-full')}
           title={collapsed ? 'Uitloggen' : undefined}
           style={{ color: P.inkMuted }}
