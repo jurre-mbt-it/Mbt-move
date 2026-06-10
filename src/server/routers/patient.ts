@@ -1105,6 +1105,172 @@ export const patientRouter = createTRPCRouter({
       }))
     }),
 
+  // ── Eigen kalender: gepland + gelogd binnen een datum-range ──────────────
+  // Voor de atleet-kalender (maandweergave): alle eigen SessionLogs en
+  // CardioLogs in de range, plus de week-schedules met items zodat de client
+  // geplande workouts op datum kan mappen (zelfde anchoring als de
+  // therapeut-week-planner: startDate = maandag van die week).
+
+  calendarRange: protectedProcedure
+    .input(z.object({
+      from: z.string(), // ISO timestamp — inclusief
+      to: z.string(),   // ISO timestamp — exclusief
+    }))
+    .query(async ({ ctx, input }) => {
+      const fromDate = new Date(input.from)
+      const toDate = new Date(input.to)
+      const [sessions, cardio, schedules] = await Promise.all([
+        ctx.prisma.sessionLog.findMany({
+          where: { patientId: ctx.user.id, scheduledAt: { gte: fromDate, lt: toDate } },
+          select: {
+            id: true,
+            scheduledAt: true,
+            completedAt: true,
+            status: true,
+            completedAll: true,
+            duration: true,
+            programId: true,
+            painLevel: true,
+            exertionLevel: true,
+            program: { select: { name: true } },
+            _count: { select: { exerciseLogs: true } },
+          },
+          orderBy: { scheduledAt: 'asc' },
+        }),
+        ctx.prisma.cardioLog.findMany({
+          where: { patientId: ctx.user.id, completedAt: { gte: fromDate, lt: toDate } },
+          select: {
+            id: true,
+            completedAt: true,
+            activity: true,
+            protocol: true,
+            durationSec: true,
+            distanceM: true,
+            avgHeartRate: true,
+            zone: true,
+            rpe: true,
+            painLevel: true,
+            avgPaceSecPerKm: true,
+            notes: true,
+          },
+          orderBy: { completedAt: 'asc' },
+        }),
+        ctx.prisma.weekSchedule.findMany({
+          where: { patientId: ctx.user.id, isTemplate: false },
+          select: {
+            id: true,
+            weekNumber: true,
+            startDate: true,
+            createdAt: true,
+            days: {
+              select: {
+                id: true,
+                dayOfWeek: true,
+                programId: true,
+                program: { select: { id: true, name: true } },
+                items: {
+                  orderBy: { order: 'asc' },
+                  select: {
+                    id: true,
+                    order: true,
+                    programId: true,
+                    program: { select: { id: true, name: true } },
+                    quickCategory: true,
+                    quickName: true,
+                    quickDurationSec: true,
+                    notes: true,
+                  },
+                },
+              },
+            },
+          },
+        }),
+      ])
+      return {
+        sessions: sessions.map(s => ({
+          id: s.id,
+          scheduledAt: s.scheduledAt,
+          completedAt: s.completedAt,
+          status: s.status,
+          completedAll: s.completedAll,
+          duration: s.duration,
+          programId: s.programId,
+          programName: s.program?.name ?? null,
+          painLevel: s.painLevel,
+          exertionLevel: s.exertionLevel,
+          exerciseCount: s._count.exerciseLogs,
+        })),
+        cardio,
+        schedules,
+      }
+    }),
+
+  // ── Detail van één eigen sessie (voor de kalender-detailsheet) ───────────
+
+  sessionDetail: protectedProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const session = await ctx.prisma.sessionLog.findFirst({
+        where: { id: input.sessionId, patientId: ctx.user.id },
+        select: {
+          id: true,
+          scheduledAt: true,
+          completedAt: true,
+          completedAll: true,
+          duration: true,
+          painLevel: true,
+          exertionLevel: true,
+          notes: true,
+          program: { select: { name: true } },
+          exerciseLogs: {
+            select: {
+              id: true,
+              exerciseId: true,
+              setsCompleted: true,
+              repsCompleted: true,
+              weight: true,
+              painLevel: true,
+              painDuring: true,
+              supersetGroup: true,
+            },
+          },
+        },
+      })
+      if (!session) throw new TRPCError({ code: 'NOT_FOUND' })
+
+      const exerciseIds = [...new Set(session.exerciseLogs.map(l => l.exerciseId))]
+      const exercises = exerciseIds.length > 0
+        ? await ctx.prisma.exercise.findMany({
+            where: { id: { in: exerciseIds } },
+            select: { id: true, name: true, category: true },
+          })
+        : []
+      const exerciseById = new Map(exercises.map(e => [e.id, e]))
+
+      return {
+        id: session.id,
+        scheduledAt: session.scheduledAt,
+        completedAt: session.completedAt,
+        completedAll: session.completedAll,
+        duration: session.duration,
+        painLevel: session.painLevel,
+        exertionLevel: session.exertionLevel,
+        notes: session.notes,
+        programName: session.program?.name ?? null,
+        exerciseLogs: session.exerciseLogs.map(l => ({
+          id: l.id,
+          name: exerciseById.get(l.exerciseId)?.name ?? 'Oefening',
+          category: exerciseById.get(l.exerciseId)?.category ?? null,
+          setsCompleted: l.setsCompleted,
+          repsCompleted: l.repsCompleted,
+          weight: l.weight,
+          painLevel: l.painLevel,
+          painDuring: l.painDuring,
+          supersetGroup: l.supersetGroup,
+        })),
+      }
+    }),
+
   // ── Workload sessions for ACWR (SessionWorkload[]) ────────────────────────
 
   getWorkloadSessions: protectedProcedure.query(async ({ ctx }) => {
