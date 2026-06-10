@@ -1,5 +1,6 @@
 'use client'
 
+import { useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -39,6 +40,24 @@ const navItems = [
   { href: '/therapist/dpa', label: 'DPA-status', icon: Shield },
 ]
 
+// Voorkeursleutel: ingeklapt blijft ingeklapt over pagina's/sessies heen.
+// localStorage als externe store via useSyncExternalStore — SSR rendert
+// uitgeklapt (server-snapshot), client pakt de opgeslagen voorkeur op
+// zonder hydration-mismatch of setState-in-effect.
+const COLLAPSE_KEY = 'mbt-sidebar-collapsed'
+const collapseListeners = new Set<() => void>()
+function subscribeCollapsed(cb: () => void) {
+  collapseListeners.add(cb)
+  return () => { collapseListeners.delete(cb) }
+}
+function getCollapsedSnapshot() {
+  return localStorage.getItem(COLLAPSE_KEY) === '1'
+}
+function storeCollapsed(v: boolean) {
+  localStorage.setItem(COLLAPSE_KEY, v ? '1' : '0')
+  collapseListeners.forEach(l => l())
+}
+
 export function TherapistSidebar() {
   const pathname = usePathname()
   const router = useRouter()
@@ -47,6 +66,13 @@ export function TherapistSidebar() {
   const { data: assessmentAccess } = trpc.assessments.hasAccess.useQuery()
   const isAdmin = me?.role === 'ADMIN'
   const canUseAssessment = !!assessmentAccess?.hasAccess
+
+  // Ingeklapt = alleen iconen. Toggle door op het logo te KLIKKEN (bewust
+  // geen hover-gedrag).
+  const collapsed = useSyncExternalStore(subscribeCollapsed, getCollapsedSnapshot, () => false)
+  function toggleCollapsed() {
+    storeCollapsed(!collapsed)
+  }
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -60,37 +86,79 @@ export function TherapistSidebar() {
     router.refresh()
   }
 
+  // Gedeelde stijl voor één nav-rij; ingeklapt → alleen gecentreerd icoon
+  // met de label als title-tooltip.
+  function rowClass() {
+    return cn(
+      'flex items-center gap-3 py-2.5 rounded-lg text-sm transition-colors',
+      'athletic-tap mbt-nav-hover',
+      collapsed ? 'justify-center px-0' : 'px-3',
+    )
+  }
+
   return (
     <aside
-      className="w-64 min-h-screen flex flex-col shrink-0 border-r"
-      style={{ background: P.bg, color: P.ink, borderColor: P.lineStrong }}
+      className="min-h-screen flex flex-col shrink-0 border-r transition-[width] duration-300"
+      style={{
+        width: collapsed ? 64 : 256,
+        background: P.bg,
+        color: P.ink,
+        borderColor: P.lineStrong,
+      }}
     >
-      {/* Logo */}
-      <div className="px-6 py-5 border-b" style={{ borderColor: P.lineStrong }}>
-        <div className="flex items-baseline gap-2">
-          <span
-            className="athletic-display"
-            style={{ color: P.ink, fontSize: 22, letterSpacing: '-0.04em', fontWeight: 900 }}
-          >
-            MBT
-          </span>
-          <span
-            className="athletic-mono"
-            style={{ color: P.brand, fontSize: 13, fontWeight: 900, letterSpacing: '0.2em' }}
-          >
-            GYM
-          </span>
-        </div>
-        <p
-          className="athletic-mono mt-2"
-          style={{ color: P.inkDim, fontSize: 10, letterSpacing: '0.2em' }}
-        >
-          CLINICIAN PORTAL
-        </p>
-      </div>
+      {/* Logo — klik om het menu in/uit te klappen */}
+      <button
+        type="button"
+        onClick={toggleCollapsed}
+        className={cn('athletic-tap w-full border-b text-left cursor-pointer', collapsed ? 'px-0 py-5' : 'px-6 py-5')}
+        style={{ borderColor: P.lineStrong }}
+        title={collapsed ? 'Menu uitklappen' : 'Menu inklappen'}
+        aria-expanded={!collapsed}
+        aria-label={collapsed ? 'Menu uitklappen' : 'Menu inklappen'}
+      >
+        {collapsed ? (
+          <div className="flex justify-center items-baseline">
+            <span
+              className="athletic-display"
+              style={{ color: P.ink, fontSize: 20, letterSpacing: '-0.04em', fontWeight: 900 }}
+            >
+              M
+            </span>
+            <span
+              className="athletic-mono"
+              style={{ color: P.brand, fontSize: 11, fontWeight: 900 }}
+            >
+              G
+            </span>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-baseline gap-2">
+              <span
+                className="athletic-display"
+                style={{ color: P.ink, fontSize: 22, letterSpacing: '-0.04em', fontWeight: 900 }}
+              >
+                MBT
+              </span>
+              <span
+                className="athletic-mono"
+                style={{ color: P.brand, fontSize: 13, fontWeight: 900, letterSpacing: '0.2em' }}
+              >
+                GYM
+              </span>
+            </div>
+            <p
+              className="athletic-mono mt-2"
+              style={{ color: P.inkDim, fontSize: 10, letterSpacing: '0.2em' }}
+            >
+              CLINICIAN PORTAL
+            </p>
+          </>
+        )}
+      </button>
 
       {/* Navigation */}
-      <nav className="flex-1 p-3 flex flex-col gap-1 mbt-stagger">
+      <nav className={cn('flex-1 p-3 flex flex-col gap-1 mbt-stagger', collapsed && 'px-2')}>
         {(() => {
           // Langste matchende href wint, zodat op /therapist/programs/new
           // alleen "Builder" oplicht en niet ook "Programma's".
@@ -104,20 +172,18 @@ export function TherapistSidebar() {
             <Link
               key={href}
               href={href}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors',
-                'athletic-tap mbt-nav-hover',
-              )}
+              className={rowClass()}
+              title={collapsed ? label : undefined}
               style={{
                 backgroundColor: active ? P.surfaceHi : undefined,
                 color: active ? P.brand : P.inkMuted,
                 fontWeight: active ? 800 : 600,
-                letterSpacing: active ? '0.04em' : undefined,
+                letterSpacing: active && !collapsed ? '0.04em' : undefined,
                 borderLeft: active ? `2px solid ${P.brand}` : '2px solid transparent',
               }}
             >
               <Icon className="w-4.5 h-4.5 shrink-0" />
-              {label}
+              {!collapsed && label}
             </Link>
           )
           })
@@ -125,85 +191,89 @@ export function TherapistSidebar() {
         {canUseAssessment && (
           <Link
             href="/therapist/assessments"
-            className={cn(
-              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors',
-              'athletic-tap mbt-nav-hover',
-            )}
+            className={rowClass()}
+            title={collapsed ? 'Assessment' : undefined}
             style={{
               backgroundColor: pathname.startsWith('/therapist/assessments') ? P.surfaceHi : undefined,
               color: pathname.startsWith('/therapist/assessments') ? P.brand : P.inkMuted,
               fontWeight: pathname.startsWith('/therapist/assessments') ? 800 : 600,
-              letterSpacing: pathname.startsWith('/therapist/assessments') ? '0.04em' : undefined,
+              letterSpacing: pathname.startsWith('/therapist/assessments') && !collapsed ? '0.04em' : undefined,
               borderLeft: pathname.startsWith('/therapist/assessments')
                 ? `2px solid ${P.brand}`
                 : '2px solid transparent',
             }}
           >
             <Activity className="w-4.5 h-4.5 shrink-0" />
-            Assessment
+            {!collapsed && 'Assessment'}
           </Link>
         )}
       </nav>
 
       {/* Footer */}
       <div
-        className="p-3 flex flex-col gap-1 border-t"
+        className={cn('p-3 flex flex-col gap-1 border-t', collapsed && 'px-2')}
         style={{ borderColor: P.lineStrong }}
       >
         {isAdmin && (
           <Link
             href="/admin/dashboard"
-            className="athletic-tap flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors"
+            className={rowClass()}
+            title={collapsed ? 'Admin' : undefined}
             style={{ color: P.brand, fontWeight: 700 }}
           >
             <Shield className="w-4.5 h-4.5 shrink-0" />
-            Admin
+            {!collapsed && 'Admin'}
           </Link>
         )}
         {/* Mijn training: therapeut kan zijn eigen schema's loggen en plannen. */}
         <button
           type="button"
           onClick={enterPersonalMode}
-          className="athletic-tap mbt-nav-hover w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors"
+          className={cn(rowClass(), 'w-full')}
+          title={collapsed ? 'Persoonlijke training' : undefined}
           style={{ color: P.ink, fontWeight: 700 }}
         >
           <Dumbbell className="w-4.5 h-4.5 shrink-0" style={{ color: P.brand }} />
-          Persoonlijke training
+          {!collapsed && 'Persoonlijke training'}
         </button>
         {me?.id && (
           <Link
             href={`/therapist/programs/new?patientId=${me.id}`}
-            className="athletic-tap mbt-nav-hover flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors"
+            className={rowClass()}
+            title={collapsed ? 'Nieuw schema voor mezelf' : undefined}
             style={{ color: P.inkMuted }}
           >
             <Blocks className="w-4.5 h-4.5 shrink-0" />
-            Nieuw schema voor mezelf
+            {!collapsed && 'Nieuw schema voor mezelf'}
           </Link>
         )}
         <Link
           href="/therapist/release-notes"
-          className="athletic-tap flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors"
+          className={rowClass()}
+          title={collapsed ? 'Wat is nieuw' : undefined}
           style={{ color: P.inkMuted }}
         >
           <Sparkles className="w-4.5 h-4.5 shrink-0" />
-          Wat is nieuw
+          {!collapsed && 'Wat is nieuw'}
         </Link>
         <Link
           href="/therapist/settings"
-          className="athletic-tap flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors"
+          className={rowClass()}
+          title={collapsed ? 'Instellingen' : undefined}
           style={{ color: P.inkMuted }}
         >
           <Settings className="w-4.5 h-4.5 shrink-0" />
-          Instellingen
+          {!collapsed && 'Instellingen'}
         </Link>
         <button
           type="button"
           onClick={handleSignOut}
-          className="athletic-tap w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors"
+          className={cn(rowClass(), 'w-full')}
+          title={collapsed ? 'Uitloggen' : undefined}
           style={{ color: P.inkMuted }}
         >
           <LogOut className="w-4.5 h-4.5 shrink-0" />
-          Uitloggen
+          {!collapsed && 'Uitloggen'}
         </button>
       </div>
     </aside>

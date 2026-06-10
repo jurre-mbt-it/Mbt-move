@@ -225,14 +225,14 @@ type ItemStatus = 'scheduled' | 'completed' | 'partial' | 'missed' | 'in_progres
 // deels (eerder gestopt) = oranje, gemist (verleden + niet gedaan) = rood.
 // Categorie blijft herkenbaar via het icoon.
 const STATUS_COLORS: Record<ItemStatus, string> = {
-  scheduled: 'rgba(255,255,255,0.06)',
+  scheduled: 'rgba(255,255,255,0.09)',
   completed: 'rgba(190,242,100,0.14)',  // lime tint
   partial:   'rgba(249,115,22,0.16)',   // orange tint
   missed:    'rgba(248,113,113,0.14)',  // danger red tint
   in_progress: 'rgba(244,194,97,0.16)', // gold/amber tint
 }
 const STATUS_BORDER: Record<ItemStatus, string> = {
-  scheduled: 'rgba(255,255,255,0.35)',
+  scheduled: 'rgba(255,255,255,0.5)',
   completed: P.lime,
   partial:   P.orange,
   missed:    P.danger,
@@ -426,7 +426,15 @@ function DayCell({
       onPointerEnter={inMonth ? () => onSelectEnter(iso) : undefined}
     >
       <div className="flex items-center justify-between">
-        <span className={cn('text-xs', isToday && 'font-bold')} style={{ color: isToday ? P.brand : P.inkMuted }}>
+        {/* Dagnummer in brand-oranje als warm accent; vandaag als gevulde chip
+            zodat die ondanks de oranje nummers blijft opvallen. */}
+        <span
+          className={cn('text-xs athletic-mono font-bold', isToday && 'px-1.5 py-px rounded-md')}
+          style={{
+            color: isToday ? P.bg : inMonth ? P.brand : P.inkMuted,
+            background: isToday ? P.brand : undefined,
+          }}
+        >
           {date.getDate()}
         </span>
         {weekLabel != null && (
@@ -464,8 +472,8 @@ function DayCell({
             <button
               type="button"
               data-noselect
-              className="opacity-60 group-hover/cell:opacity-100 transition-opacity self-start text-[10px] flex items-center gap-1 px-1.5 py-0.5 rounded border cursor-pointer mbt-btn-hover"
-              style={{ color: P.inkMuted, borderColor: P.lineStrong, background: P.surface }}
+              className="opacity-70 group-hover/cell:opacity-100 transition-opacity self-start text-[10px] flex items-center gap-1 px-1.5 py-0.5 rounded border cursor-pointer mbt-btn-hover"
+              style={{ color: P.brand, borderColor: 'rgba(232,122,85,0.4)', background: 'rgba(232,122,85,0.08)' }}
               title="Toevoegen / kopiëren"
             >
               <Plus className="w-3 h-3" /> Workout
