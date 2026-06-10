@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, CalendarDays, Zap, User, Menu, X, Dumbbell, ChevronRight, Plus, Stethoscope, Loader2, Smile, Activity } from 'lucide-react'
+import { Home, CalendarDays, Zap, User, Menu, X, Dumbbell, ChevronRight, Plus, Stethoscope, Loader2, Smile, Activity, TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { setPersonalMode } from '@/lib/personal-mode-client'
 import { IconStrength, IconCardio } from '@/components/icons'
@@ -49,6 +49,7 @@ const QUICK_ACTIONS = [
 ]
 
 const DRAWER_ITEMS = [
+  { href: '/athlete/progress', label: 'Voortgang', icon: TrendingUp, description: 'Belasting-curve & 1RM-progressie' },
   { href: '/athlete/workouts', label: 'Mijn workouts', icon: Zap, description: 'Opgeslagen workouts & templates' },
   { href: '/athlete/exercises', label: 'Oefeningen', icon: Dumbbell, description: 'Oefeningen bibliotheek' },
 ]

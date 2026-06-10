@@ -277,6 +277,20 @@ export const patientsRouter = createTRPCRouter({
       }
     }),
 
+  // ── Belasting-curve van een patiënt (fitness-fatigue, kracht + cardio) ───
+  loadCurve: therapistProcedure
+    .input(z.object({
+      patientId: z.string(),
+      days: z.number().int().min(28).max(365).default(120),
+    }))
+    .query(async ({ ctx, input }) => {
+      if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.patientId))) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Patiënt niet gevonden of geen toegang.' })
+      }
+      const { computeLoadCurve } = await import('@/server/load-curve')
+      return computeLoadCurve(ctx.prisma, input.patientId, input.days)
+    }),
+
   /**
    * Bewerk basisgegevens van een patiënt (naam, telefoon, geboortedatum) +
    * private notities van de behandelend therapeut. Toegankelijk voor de

@@ -9,6 +9,7 @@ import {
 import { trpc } from '@/lib/trpc/client'
 import { HR_ZONES, type HRZone, CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
 import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
+import { LoadCurveChart } from '@/components/workload/LoadCurveChart'
 import {
   DARK_CHART_STYLES,
   DarkButton,
@@ -144,6 +145,7 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
   const { id } = use(params)
   const { data: patient } = trpc.patients.get.useQuery({ id })
   const { data: progress, isLoading } = trpc.patients.getProgress.useQuery({ patientId: id })
+  const { data: loadCurve } = trpc.patients.loadCurve.useQuery({ patientId: id, days: 120 })
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null)
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false)
   const [pdfNote, setPdfNote] = useState('')
@@ -200,7 +202,7 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
   const zoneTotalMin = zoneEntries.reduce((s, e) => s + e.minutes, 0)
 
   const hasAnyData = sessions.length > 0 || cardioCount > 0
-  const defaultTab = sessions.length > 0 ? 'sessies' : 'cardio'
+  const defaultTab = 'belasting'
 
   if (isLoading) {
     return (
@@ -324,14 +326,28 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
         ) : (
           <Tabs defaultValue={defaultTab} className="space-y-4">
             <TabsList
-              className="w-full grid grid-cols-4 rounded-xl"
+              className="w-full grid grid-cols-5 rounded-xl"
               style={{ background: P.surface, border: `1px solid ${P.line}` }}
             >
+              <TabsTrigger value="belasting" className="text-xs">Belasting</TabsTrigger>
               <TabsTrigger value="sessies" className="text-xs">Sessies</TabsTrigger>
               <TabsTrigger value="cardio" className="text-xs">Cardio</TabsTrigger>
               <TabsTrigger value="kalender" className="text-xs">Kalender</TabsTrigger>
               <TabsTrigger value="krachtopbouw" className="text-xs">1RM</TabsTrigger>
             </TabsList>
+
+            {/* ── Belasting tab: fitness-fatigue curve (kracht + cardio) ── */}
+            <TabsContent value="belasting" className="space-y-4">
+              {loadCurve ? (
+                <LoadCurveChart data={loadCurve} />
+              ) : (
+                <Tile>
+                  <div className="py-8 text-center">
+                    <MetaLabel>BELASTING LADEN…</MetaLabel>
+                  </div>
+                </Tile>
+              )}
+            </TabsContent>
 
             {/* ── Sessies tab ── */}
             <TabsContent value="sessies" className="space-y-4">

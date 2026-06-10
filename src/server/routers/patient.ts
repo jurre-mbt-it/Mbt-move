@@ -1271,6 +1271,19 @@ export const patientRouter = createTRPCRouter({
       }
     }),
 
+  // ── Belasting-curve: fitness-fatigue model over kracht + cardio ──────────
+  // Zie src/lib/training-load.ts voor het model (Banister CTL/ATL/TSB +
+  // EWMA-ACWR als secundaire indicator).
+
+  loadCurve: protectedProcedure
+    .input(z.object({
+      days: z.number().int().min(28).max(365).default(120),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      const { computeLoadCurve } = await import('@/server/load-curve')
+      return computeLoadCurve(ctx.prisma, ctx.user.id, input?.days ?? 120)
+    }),
+
   // ── Workload sessions for ACWR (SessionWorkload[]) ────────────────────────
 
   getWorkloadSessions: protectedProcedure.query(async ({ ctx }) => {

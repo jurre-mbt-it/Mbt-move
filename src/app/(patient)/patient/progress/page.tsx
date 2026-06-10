@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
+import { LoadCurveChart } from '@/components/workload/LoadCurveChart'
 import {
   DarkScreen,
   Display,
@@ -18,6 +19,7 @@ export default function ProgressPage() {
   const { data: sessions } = trpc.patient.getSessionHistory.useQuery({ limit: 50 })
   const { data: program } = trpc.patient.getActiveProgram.useQuery()
   const { data: oneRmData = [] } = trpc.patient.getOneRmProgression.useQuery()
+  const { data: loadCurve } = trpc.patient.loadCurve.useQuery({ days: 90 })
   const { data: tendinopathyData = [] } = trpc.patient.getTendinopathyTrend.useQuery()
 
   const history = sessions ?? []
@@ -115,6 +117,11 @@ export default function ProgressPage() {
           <MetricTile label="Streak" value={streak} unit="dagen" tint={P.gold} />
           <MetricTile label="Voltooid" value={history.length} unit="sessies" tint={P.lime} />
         </div>
+
+        {/* Belasting: fitness-fatigue curve over kracht + cardio */}
+        {loadCurve && loadCurve.sessionCount > 0 && (
+          <LoadCurveChart data={loadCurve} compact />
+        )}
 
         {/* Adherence */}
         {totalSessionsPlanned > 0 && (
