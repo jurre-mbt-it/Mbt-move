@@ -482,15 +482,18 @@ function AthleteSessionPageInner() {
             </button>
           )}
 
-          <DarkButton
-            variant="primary"
-            size="lg"
-            disabled={exercises.length === 0}
-            onClick={() => setState('active')}
-            className="w-full"
-          >
-            {exercises.length === 0 ? 'KIES EERST OEFENINGEN' : '▶ START SESSIE'}
-          </DarkButton>
+          {/* Startknop pas tonen zodra er iets te starten valt — in de lege
+              quick-staat is de grote CTA hierboven de enige actie */}
+          {exercises.length > 0 && (
+            <DarkButton
+              variant="primary"
+              size="lg"
+              onClick={() => setState('active')}
+              className="w-full"
+            >
+              ▶ START SESSIE
+            </DarkButton>
+          )}
         </div>
 
         {/* Add exercise bottom sheet */}
@@ -1066,7 +1069,9 @@ function AddExerciseSheet({
           border: `1px solid ${P.line}`,
           maxWidth: 480,
           margin: '0 auto',
-          maxHeight: '80vh',
+          // dvh i.p.v. vh: rekent de iOS Safari-toolbar mee, anders steekt de
+          // sheet onder de zichtbare viewport uit.
+          maxHeight: '80dvh',
         }}
       >
         <div className="flex-none px-5 pt-4 pb-3">
@@ -1103,14 +1108,16 @@ function AddExerciseSheet({
                 border: `1px solid ${P.lineStrong}`,
                 color: P.ink,
                 padding: '10px 14px 10px 40px',
-                fontSize: 14,
+                // ≥16px: voorkomt dat iOS Safari inzoomt bij focus (waardoor
+                // de hele sheet buiten beeld schoof). Geen autoFocus om
+                // dezelfde reden — het toetsenbord klapte direct open.
+                fontSize: 16,
               }}
-              autoFocus
             />
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 pb-8 space-y-5">
+        <div className="flex-1 overflow-y-auto px-5 pb-[max(env(safe-area-inset-bottom),32px)] space-y-5">
           {searching ? (
             // Zoekmodus: platte gefilterde lijst (oud gedrag).
             filtered.length === 0 ? (

@@ -735,7 +735,9 @@ export const DarkInput = React.forwardRef<
       ref={ref}
       {...props}
       className={cn(
-        'w-full rounded-xl px-4 py-3 text-[15px] outline-none transition-colors',
+        // 16px op mobiel: <16px laat iOS Safari inzoomen bij focus, waardoor
+        // het hele scherm verschuift. Vanaf sm de gewenste 15px.
+        'w-full rounded-xl px-4 py-3 text-[16px] sm:text-[15px] outline-none transition-colors',
         'focus:border-[color:var(--p-brand)]',
         className,
       )}
@@ -758,7 +760,8 @@ export const DarkTextarea = React.forwardRef<
       ref={ref}
       {...props}
       className={cn(
-        'w-full rounded-xl px-4 py-3 text-[15px] outline-none transition-colors',
+        // 16px op mobiel — zie DarkInput (iOS focus-zoom)
+        'w-full rounded-xl px-4 py-3 text-[16px] sm:text-[15px] outline-none transition-colors',
         'focus:border-[color:var(--p-brand)]',
         className,
       )}
