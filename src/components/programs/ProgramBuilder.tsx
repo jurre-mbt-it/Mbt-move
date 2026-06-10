@@ -95,9 +95,13 @@ interface ProgramBuilderProps {
   /** Quick-add: id van een oefening die direct na laden van de bibliotheek aan
    *  het programma wordt toegevoegd (wordt door /programs/new uit query gelezen). */
   initialAddExerciseId?: string
+  /** Waar de terug-pijl in de top-bar naartoe gaat. Default is de
+   *  therapeut-programmalijst; de athlete-pagina geeft hier het eigen
+   *  dashboard mee. */
+  backHref?: string
 }
 
-export function ProgramBuilder({ initialState, programId, initialStatus, initialAddExerciseId }: ProgramBuilderProps) {
+export function ProgramBuilder({ initialState, programId, initialStatus, initialAddExerciseId, backHref = '/therapist/programs' }: ProgramBuilderProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   // Na opslaan doorsturen naar een oorspronkelijke pagina (bv week-planner).
@@ -1102,7 +1106,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
 
         {/* ── Top bar ── */}
         <div className="flex items-center gap-2 px-3 md:px-4 py-2.5 border-b bg-[#141A1B] shrink-0">
-          <button onClick={() => router.push('/therapist/programs')} className="text-muted-foreground hover:text-foreground shrink-0">
+          <button onClick={() => router.push(backHref)} className="text-muted-foreground hover:text-foreground shrink-0">
             <ChevronLeft className="w-5 h-5" />
           </button>
           <Input
@@ -1809,7 +1813,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                     className={cn(
                       'w-full flex items-center gap-3 px-3 py-3 rounded-xl border text-left transition-all',
                       selected
-                        ? 'border-[#e87a55] bg-[#f0fdfa]'
+                        ? 'border-[#e87a55] bg-[rgba(232,122,85,0.12)]'
                         : 'border-[rgba(255,255,255,0.06)] bg-[#141A1B] hover:border-[rgba(255,255,255,0.12)]'
                     )}
                   >

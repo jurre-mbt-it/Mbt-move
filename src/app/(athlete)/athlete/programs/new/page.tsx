@@ -1,52 +1,23 @@
 'use client'
 
 import { Suspense } from 'react'
-import Link from 'next/link'
-import { P, Kicker } from '@/components/dark-ui'
 import { ProgramBuilder } from '@/components/programs/ProgramBuilder'
 
 export default function AthleteNewProgramPage() {
+  // De builder is een fullscreen-component met eigen top-bar en interne
+  // scroll-panelen (h-full + overflow-y-auto). Die interne scroll werkt
+  // alleen als de container een vaste hoogte heeft — anders groeit de
+  // oefeningenlijst eindeloos door op mobile. We geven 'm hier daarom de
+  // volledige viewport minus de bottom-nav (h-16) en laten de builder met
+  // -m-4/-m-6 uit de padding breken, net als de therapeut-shell.
   return (
-    <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
-      <div className="max-w-lg mx-auto px-4 pt-10 pb-8 space-y-4">
-        <Link
-          href="/athlete/dashboard"
-          className="inline-flex items-center gap-1"
-          style={{
-            fontFamily:
-              'ui-monospace, Menlo, "SF Mono", "Cascadia Code", monospace',
-            fontSize: 11,
-            letterSpacing: '0.16em',
-            fontWeight: 800,
-            color: P.inkMuted,
-            textTransform: 'uppercase',
-          }}
-        >
-          ← TERUG NAAR DASHBOARD
-        </Link>
-
-        {/* Hero */}
-        <div>
-          <Kicker>PROGRAMMA · NIEUW</Kicker>
-          <h1
-            className="athletic-display"
-            style={{
-              color: P.ink,
-              fontWeight: 900,
-              letterSpacing: '-0.04em',
-              lineHeight: 1.02,
-              fontSize: 'clamp(44px, 12vw, 80px)',
-              paddingTop: 4,
-              textTransform: 'uppercase',
-              margin: 0,
-            }}
-          >
-            PROGRAMMA
-          </h1>
-        </div>
-
+    <div
+      className="athletic-dark flex flex-col overflow-hidden"
+      style={{ height: 'calc(100dvh - 4rem)', background: '#0A0E0F', color: '#F5F7F6' }}
+    >
+      <div className="flex-1 overflow-hidden p-4 md:p-6">
         <Suspense>
-          <ProgramBuilder />
+          <ProgramBuilder backHref="/athlete/dashboard" />
         </Suspense>
       </div>
     </div>

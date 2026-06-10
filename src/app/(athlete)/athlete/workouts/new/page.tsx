@@ -268,7 +268,8 @@ function NewWorkoutPageInner() {
             </h1>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            {WORKOUT_TYPES.map(type => {
+            {/* Cardio loopt via de aparte cardio-log (/athlete/cardio/new), niet via quick workout */}
+            {WORKOUT_TYPES.filter(type => type.value !== 'CARDIO').map(type => {
               const Icon = WORKOUT_ICON_MAP[type.value]
               return (
                 <Tile
@@ -891,7 +892,9 @@ function ExercisePickerView({
     },
     { staleTime: 30_000 }
   )
-  const allExercises: RealExercise[] = (exercisesQuery.data as RealExercise[] | undefined) ?? []
+  // Cardio loopt via de aparte cardio-log, niet via quick workout — weren uit de bibliotheek-picker
+  const allExercises: RealExercise[] = ((exercisesQuery.data as RealExercise[] | undefined) ?? [])
+    .filter(ex => ex.category !== 'CARDIO')
   const isLoading = exercisesQuery.isLoading
 
   const addedIds = new Set(exercises.map(e => e.exerciseId))
@@ -974,7 +977,7 @@ function ExercisePickerView({
           >
             ALLES
           </button>
-          {EXERCISE_CATEGORIES.map(cat => {
+          {EXERCISE_CATEGORIES.filter(cat => cat.value !== 'CARDIO').map(cat => {
             const active = categoryFilter === cat.value
             const color = categoryColor(cat.value)
             return (
