@@ -29,23 +29,28 @@ export async function GET() {
       return NextResponse.json({ role: null }, { status: 401 })
     }
 
-    // DB is authoritative — match op supabaseUserId (kan afwijken van prisma.user.id
-    // voor legacy rows), fallback op email.
-    const dbUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { supabaseUserId: user.id },
-          ...(user.email ? [{ email: user.email }] : []),
-        ],
-      },
-      select: {
-        role: true,
-        name: true,
-        mfaEnabled: true,
-        dpaAcceptedVersion: true,
-        dpaAcceptedAt: true,
-      },
+    // DB is authoritative. Zelfde precedentie als resolveUser in src/server/trpc.ts:
+    // eerst op supabaseUserId; email-fallback alleen voor legacy rows die nog
+    // niet aan een (andere) Supabase-account gebonden zijn — anders zou een
+    // email-change op Supabase-niveau hier andermans rol/metadata opleveren.
+    const select = {
+      role: true,
+      name: true,
+      mfaEnabled: true,
+      dpaAcceptedVersion: true,
+      dpaAcceptedAt: true,
+      supabaseUserId: true,
+    } as const
+    let dbUser = await prisma.user.findUnique({
+      where: { supabaseUserId: user.id },
+      select,
     })
+    if (!dbUser && user.email) {
+      const byEmail = await prisma.user.findUnique({ where: { email: user.email }, select })
+      if (byEmail && (!byEmail.supabaseUserId || byEmail.supabaseUserId === user.id)) {
+        dbUser = byEmail
+      }
+    }
 
     // Self-heal: als user_metadata.role afwijkt van DB, sync 'm bij.
     // Zo blijven proxy/middleware en LoginForm (die user_metadata lezen)

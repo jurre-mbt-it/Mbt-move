@@ -6,6 +6,7 @@ import { TRPCError } from '@trpc/server'
 import { matchSlug, LABELS, type IntakeAnswers } from '@/lib/shop/intake/flow'
 import { sendOrderEmails as sendOrderEmailsLib } from '@/lib/shop/email/order-emails'
 import { isShopPublic } from '@/lib/shop/access'
+import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { createPayment, isMollieConfigured } from '@/lib/shop/mollie'
 import { syncOrderWithMollie } from '@/lib/shop/fulfillment'
 import { getAppUrl } from '@/lib/app-url'
@@ -151,6 +152,18 @@ export const shopRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      // Publiek endpoint dat een betaalde AI-call + DB-write doet: gate op de
+      // launch-flag (zoals checkout/previewProgram) en throttle per IP.
+      if (!isShopPublic() && ctx.user?.role !== 'ADMIN') {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+      const ip =
+        ctx.req?.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+        ctx.req?.headers.get('x-real-ip') ??
+        'unknown'
+      const rl = await rateLimit('shop.intakeRecommend', ip, RATE_LIMITS.shopIntake)
+      if (!rl.ok) throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
+
       const realFlags = input.redFlags.filter((f) => f && f !== 'none')
 
       // Verplichte veiligheidscheck: bij een alarmsignaal geen programma adviseren.

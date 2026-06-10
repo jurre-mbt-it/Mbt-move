@@ -2,8 +2,9 @@
  * Rate-limit helper.
  *
  * Gebruikt Upstash Redis wanneer `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`
- * gezet zijn. Anders valt het terug op een in-memory store — goed genoeg voor dev
- * en voor single-instance serverless (Vercel). Niet geschikt voor multi-region.
+ * (of de Vercel-Marketplace-namen `KV_REST_API_URL` + `KV_REST_API_TOKEN`) gezet
+ * zijn. Anders valt het terug op een in-memory store — goed genoeg voor dev, maar
+ * op Vercel is dat per-instance en dus NIET betrouwbaar als security-grens.
  *
  * Gebruik in een tRPC procedure:
  * ```ts
@@ -34,8 +35,10 @@ async function getUpstash(): Promise<UpstashClient> {
   if (upstashInitAttempted) return upstash
   upstashInitAttempted = true
 
-  const url = process.env.UPSTASH_REDIS_REST_URL
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN
+  // KV_REST_API_* zijn de namen die de Vercel Marketplace Upstash-KV
+  // integratie provisiont; UPSTASH_REDIS_REST_* de namen van Upstash zelf.
+  const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN
   if (!url || !token) return null
 
   try {
@@ -135,4 +138,5 @@ export const RATE_LIMITS = {
   accountDeletion:    { max: 3,  windowSec: 86400, message: 'Max 3 verwijder-verzoeken per dag.' },
   consentChange:      { max: 10, windowSec: 3600, message: 'Max 10 consent-wijzigingen per uur.' },
   sessionLog:         { max: 60, windowSec: 3600, message: 'Max 60 sessies per uur gelogd.' },
+  shopIntake:         { max: 5,  windowSec: 600,  message: 'Te veel intakes. Wacht 10 minuten.' },
 } as const
