@@ -1114,14 +1114,15 @@ function AddItemModal({
               {filtered.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-3 text-center">Geen programma&apos;s gevonden.</p>
               ) : (
+                // bg/border via classes, niet inline — inline styles zouden de
+                // hover-tint van .mbt-card-hover overschrijven
                 filtered.map(p => (
                   <button
                     key={p.id}
                     type="button"
                     onClick={() => handleProgramPick(p.id)}
                     disabled={busy}
-                    className="w-full text-left px-3 py-2 rounded-lg mbt-card-hover athletic-tap flex items-center gap-2"
-                    style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+                    className="w-full text-left px-3 py-2 rounded-lg mbt-card-hover athletic-tap flex items-center gap-2 bg-[#141A1B] border border-[rgba(255,255,255,0.12)]"
                   >
                     <span className="flex-1 truncate text-sm">{p.name}</span>
                     {p.isTemplate && (
