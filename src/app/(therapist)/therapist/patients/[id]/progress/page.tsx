@@ -64,80 +64,61 @@ function StatChip({ label, value, sub, tint }: {
   )
 }
 
-// Adherence calendar based on real sessions
-function SessionCalendar({ sessions }: { sessions: { date: string }[] }) {
-  const sessionDates = new Set(sessions.map(s => s.date.slice(0, 10)))
-  const today = new Date()
-  const days = Array.from({ length: 56 }, (_, i) => {
-    const d = new Date(today)
-    d.setDate(d.getDate() - 55 + i)
-    const key = d.toISOString().slice(0, 10)
-    const isFuture = d > today
-    return { date: d, key, completed: sessionDates.has(key), isFuture }
-  })
-
-  const firstDow = days[0].date.getDay()
-  const mondayOffset = firstDow === 0 ? 6 : firstDow - 1
-  const padded: (typeof days[0] | null)[] = [...Array(mondayOffset).fill(null), ...days]
-  const rem = padded.length % 7
-  if (rem > 0) for (let i = 0; i < 7 - rem; i++) padded.push(null)
-  const weekRows: (typeof days[0] | null)[][] = []
-  for (let i = 0; i < padded.length; i += 7) weekRows.push(padded.slice(i, i + 7))
-
-  const dayLabels = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
+/**
+ * Subjectief herstel (wellness check-ins, 5 items × 1-5 → 5-25) als strip van
+ * dag-balkjes naast de objectieve belasting-curve. Lime ≥ 18, goud 13-17,
+ * rood < 13 — zelfde drempels als de patiënt-check-in.
+ */
+function WellnessReadinessStrip({ checks }: {
+  checks: Array<{ date: string | Date; sleep: number; soreness: number; fatigue: number; mood: number; stress: number }>
+}) {
+  const days = [...checks]
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .slice(-14)
+  const latest = days[days.length - 1]
+  const latestTotal = latest
+    ? latest.sleep + latest.soreness + latest.fatigue + latest.mood + latest.stress
+    : null
 
   return (
-    <div>
-      <div className="grid grid-cols-7 gap-1.5 mb-1.5">
-        {dayLabels.map(d => (
-          <div
-            key={d}
-            className="athletic-mono text-center"
-            style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.1em', fontWeight: 700 }}
-          >
-            {d.toUpperCase()}
-          </div>
-        ))}
-      </div>
-      {weekRows.map((row, ri) => (
-        <div key={ri} className="grid grid-cols-7 gap-1.5 mb-1.5">
-          {row.map((day, di) => {
-            if (!day) return <div key={di} className="aspect-square rounded-md" />
-            const bg = day.isFuture ? P.surfaceLow
-              : day.completed ? 'rgba(232,122,85,0.18)' : P.surfaceHi
-            const border = day.isFuture ? P.line
-              : day.completed ? P.lime : P.inkDim
+    <Tile>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <MetaLabel>WELLNESS · SUBJECTIEF HERSTEL</MetaLabel>
+          {latestTotal !== null && (
+            <span
+              className="athletic-mono"
+              style={{
+                color: latestTotal >= 18 ? P.lime : latestTotal >= 13 ? P.gold : P.danger,
+                fontSize: 13,
+                fontWeight: 900,
+              }}
+            >
+              {latestTotal}/25
+            </span>
+          )}
+        </div>
+        <div className="flex items-end gap-1" style={{ height: 56 }}>
+          {days.map((d) => {
+            const total = d.sleep + d.soreness + d.fatigue + d.mood + d.stress
+            const pct = ((total - 5) / 20) * 100
+            const color = total >= 18 ? P.lime : total >= 13 ? P.gold : P.danger
             return (
               <div
-                key={di}
-                className="aspect-square rounded-md"
-                style={{ background: bg, border: `2px solid ${border}` }}
-                title={`${day.date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}${day.completed ? ': Sessie' : ''}`}
+                key={String(d.date)}
+                className="flex-1 rounded-t-sm"
+                style={{ height: `${Math.max(pct, 6)}%`, background: `${color}cc` }}
+                title={`${new Date(d.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}: ${total}/25`}
               />
             )
           })}
         </div>
-      ))}
-      <div className="flex items-center gap-4 mt-3">
-        {[
-          { color: 'rgba(232,122,85,0.18)', border: P.lime,   label: 'Sessie' },
-          { color: P.surfaceHi,               border: P.inkDim, label: 'Geen sessie' },
-        ].map(({ color, border, label }) => (
-          <div key={label} className="flex items-center gap-1.5">
-            <div
-              className="w-3.5 h-3.5 rounded"
-              style={{ background: color, border: `2px solid ${border}` }}
-            />
-            <span
-              className="athletic-mono"
-              style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.08em' }}
-            >
-              {label}
-            </span>
-          </div>
-        ))}
+        <p style={{ color: P.inkDim, fontSize: 11, lineHeight: 1.5 }}>
+          Dagelijkse check-ins (slaap, spierpijn, vermoeidheid, stemming, stress) van de laatste
+          14 ingevulde dagen. Lage scores bij een diepe vorm-dip versterken het overbelasting-signaal.
+        </p>
       </div>
-    </div>
+    </Tile>
   )
 }
 
@@ -146,6 +127,7 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
   const { data: patient } = trpc.patients.get.useQuery({ id })
   const { data: progress, isLoading } = trpc.patients.getProgress.useQuery({ patientId: id })
   const { data: loadCurve } = trpc.patients.loadCurve.useQuery({ patientId: id, days: 120 })
+  const { data: wellness } = trpc.wellness.forPatient.useQuery({ patientId: id })
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null)
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false)
   const [pdfNote, setPdfNote] = useState('')
@@ -326,13 +308,12 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
         ) : (
           <Tabs defaultValue={defaultTab} className="space-y-4">
             <TabsList
-              className="w-full grid grid-cols-5 rounded-xl"
+              className="w-full grid grid-cols-4 rounded-xl"
               style={{ background: P.surface, border: `1px solid ${P.line}` }}
             >
               <TabsTrigger value="belasting" className="text-xs">Belasting</TabsTrigger>
               <TabsTrigger value="sessies" className="text-xs">Sessies</TabsTrigger>
               <TabsTrigger value="cardio" className="text-xs">Cardio</TabsTrigger>
-              <TabsTrigger value="kalender" className="text-xs">Kalender</TabsTrigger>
               <TabsTrigger value="krachtopbouw" className="text-xs">1RM</TabsTrigger>
             </TabsList>
 
@@ -346,6 +327,10 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
                     <MetaLabel>BELASTING LADEN…</MetaLabel>
                   </div>
                 </Tile>
+              )}
+              {/* Subjectief herstel naast de objectieve belasting */}
+              {wellness && wellness.length > 0 && (
+                <WellnessReadinessStrip checks={wellness} />
               )}
             </TabsContent>
 
@@ -505,48 +490,6 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
                   </ChartCard>
                 </>
               )}
-            </TabsContent>
-
-            {/* ── Kalender tab ── */}
-            <TabsContent value="kalender">
-              <Tile>
-                <div className="space-y-4">
-                  <MetaLabel>Sessie-aanwezigheid (laatste 8 weken)</MetaLabel>
-                  <SessionCalendar sessions={sessions} />
-                  <div
-                    className="mt-4 pt-4 grid grid-cols-3 gap-3 text-center"
-                    style={{ borderTop: `1px solid ${P.line}` }}
-                  >
-                    <div>
-                      <p
-                        className="athletic-display"
-                        style={{ color: P.ink, fontSize: 22, lineHeight: '26px' }}
-                      >
-                        {sessions.length}
-                      </p>
-                      <MetaLabel>Sessies</MetaLabel>
-                    </div>
-                    <div>
-                      <p
-                        className="athletic-display"
-                        style={{ color: P.ink, fontSize: 22, lineHeight: '26px' }}
-                      >
-                        {sessions.filter(s => s.durationMinutes > 0).reduce((s, l) => s + l.durationMinutes, 0)}
-                      </p>
-                      <MetaLabel>Totaal min.</MetaLabel>
-                    </div>
-                    <div>
-                      <p
-                        className="athletic-display"
-                        style={{ color: P.ink, fontSize: 22, lineHeight: '26px' }}
-                      >
-                        {progress?.avgExertion !== null && progress?.avgExertion !== undefined ? progress.avgExertion : '—'}
-                      </p>
-                      <MetaLabel>Gem. RPE</MetaLabel>
-                    </div>
-                  </div>
-                </div>
-              </Tile>
             </TabsContent>
 
             {/* ── 1RM tab ── */}

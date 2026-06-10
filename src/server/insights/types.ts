@@ -42,6 +42,10 @@ export interface PatientAggregates {
   }>
   /** Average painLevel across ALL exerciseLogs (for exercise_specific_pain comparison). */
   overallAvgExercisePain: number | null
+  /** Vorm (fitheid − vermoeidheid, fitness-fatigue model) laatste 14 dagen, oudste eerst. */
+  loadFormHistory: number[]
+  /** EWMA-ACWR (7d/28d) op vandaag — null bij te weinig historie. */
+  loadAcwr: number | null
 }
 
 export interface RuleDefinition {

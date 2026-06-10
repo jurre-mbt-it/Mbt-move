@@ -3,6 +3,7 @@
  * Pure function of Prisma client + patientId — no side effects.
  */
 import type { PrismaClient } from '@prisma/client'
+import { computeLoadCurve } from '@/server/load-curve'
 import type { PatientAggregates } from './types'
 
 const SESSIONS_WINDOW_DAYS = 60
@@ -161,6 +162,9 @@ export async function buildPatientAggregates(
     avgPainLevel: mean(agg.painLevels),
   }))
 
+  // Belasting (fitness-fatigue): vorm-historie + ACWR voor de overload-regel.
+  const loadCurve = await computeLoadCurve(prisma, patientId, 14)
+
   return {
     patientId,
     patientName: patient.name ?? patient.email,
@@ -175,5 +179,7 @@ export async function buildPatientAggregates(
     daysSinceChange,
     exerciseAggregates,
     overallAvgExercisePain: mean(allExercisePainLevels),
+    loadFormHistory: loadCurve.points.map((p) => p.form),
+    loadAcwr: loadCurve.acwr,
   }
 }

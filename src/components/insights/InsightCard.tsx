@@ -19,6 +19,8 @@ const SIGNAL_LABEL: Record<string, string> = {
   plateau: 'Plateau',
   adherence_drop: 'Adherence-dip',
   exercise_specific_pain: 'Oefening-pijn',
+  deload_needed: 'Deload nodig',
+  overload_risk: 'Overbelasting-risico',
 }
 
 export interface InsightCardData {

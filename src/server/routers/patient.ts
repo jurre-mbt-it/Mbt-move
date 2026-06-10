@@ -18,6 +18,7 @@ import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { auditLog } from '@/server/audit'
 import { signEducationFile } from '@/lib/education/storage'
 import { paceSecPerKm } from '@/lib/cardio-zones'
+import { estimateOneRepMax } from '@/lib/one-rep-max'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -453,7 +454,12 @@ export const patientRouter = createTRPCRouter({
               repsCompleted: ex.repsCompleted ?? null,
               painLevel: ex.painLevel ?? null,
               weight: ex.weight ?? null,
-              estimatedOneRepMax: ex.estimatedOneRepMax ?? null,
+              // Epley-fallback server-side: vóór deze fix werd 1RM alleen
+              // client-side berekend als program.trackOneRepMax aanstond —
+              // die vlag staat vrijwel nergens aan, dus 1RM-data bleef leeg
+              // terwijl gewicht + reps wél gelogd werden.
+              estimatedOneRepMax: ex.estimatedOneRepMax
+                ?? estimateOneRepMax(ex.weight, ex.repsCompleted),
               painDuring: ex.painDuring ?? null,
             })),
           },

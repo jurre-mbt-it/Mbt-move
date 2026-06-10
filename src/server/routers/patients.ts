@@ -4,6 +4,7 @@ import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js
 import type { PrismaClient } from '@prisma/client'
 import { createTRPCRouter, therapistProcedure, mfaTherapistProcedure } from '@/server/trpc'
 import { auditLog } from '@/server/audit'
+import { estimateOneRepMax } from '@/lib/one-rep-max'
 
 const createId = () => crypto.randomUUID()
 
@@ -667,7 +668,9 @@ export const patientsRouter = createTRPCRouter({
               extraParams: ex.extraParams ?? undefined,
               supersetGroup: ex.supersetGroup ?? null,
               phase: ex.phase ?? null,
-              estimatedOneRepMax: ex.estimatedOneRepMax ?? null,
+              // Epley-fallback server-side — zie src/lib/one-rep-max.ts
+              estimatedOneRepMax: ex.estimatedOneRepMax
+                ?? estimateOneRepMax(ex.weight, ex.repsCompleted),
               painDuring: ex.painDuring ?? null,
             })),
           },
