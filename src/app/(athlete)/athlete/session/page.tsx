@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { trpc } from '@/lib/trpc/client'
 import {
   Search, X, Plus, Play, Heart,
 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   P,
   Kicker,
@@ -33,6 +33,14 @@ type DbExercise = {
 type UsedExercise = DbExercise & { count: number }
 
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
+
+const CATEGORY_LABELS_NL: Record<string, string> = {
+  STRENGTH: 'KRACHT',
+  MOBILITY: 'MOBILITEIT',
+  PLYOMETRICS: 'PLYOMETRIE',
+  CARDIO: 'CARDIO',
+  STABILITY: 'STABILITEIT',
+}
 
 const mono =
   'ui-monospace, Menlo, "SF Mono", "Cascadia Code", "Source Code Pro", monospace'
@@ -66,6 +74,21 @@ function dbExerciseToLive(ex: DbExercise): LiveExercise {
 }
 
 export default function AthleteSessionPage() {
+  // useSearchParams vereist een Suspense-boundary (zelfde patroon als
+  // workouts/new); voorkomt ook de flash van programma-oefeningen in quick
+  // mode die de oude useEffect-detectie gaf.
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen" style={{ background: P.bg, color: P.ink }} />
+      }
+    >
+      <AthleteSessionPageInner />
+    </Suspense>
+  )
+}
+
+function AthleteSessionPageInner() {
   const router = useRouter()
   const utils = trpc.useUtils()
   const { data: sessionData, isLoading } = trpc.patient.getTodayExercises.useQuery()
@@ -95,12 +118,9 @@ export default function AthleteSessionPage() {
     )
   }
 
-  // Quick mode detection
-  const [isQuickMode, setIsQuickMode] = useState(false)
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    setIsQuickMode(params.get('mode') === 'quick')
-  }, [])
+  // Quick mode detection — direct uit de URL, geen effect-flash
+  const searchParams = useSearchParams()
+  const isQuickMode = searchParams.get('mode') === 'quick'
 
   const programExercises: LiveExercise[] = (sessionData?.exercises ?? []).map(e => ({
     uid: e.uid,
@@ -235,9 +255,10 @@ export default function AthleteSessionPage() {
   if (state === 'ready') {
     return (
       <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
-        <div className="max-w-lg mx-auto px-4 pt-10 pb-8 space-y-4">
+        <div className="max-w-lg mx-auto px-4 pt-10 pb-8 space-y-4 mbt-stagger">
           <Link
             href="/athlete/dashboard"
+            className="athletic-tap inline-flex"
             style={{
               fontFamily: mono,
               fontSize: 11,
@@ -277,17 +298,49 @@ export default function AthleteSessionPage() {
             )}
           </div>
 
+          {/* Workout-samenvatting: oefeningen · sets · richttijd */}
+          {exercises.length > 0 && (
+            <div
+              className="rounded-xl flex items-center px-4 py-3"
+              style={{
+                background: P.surface,
+                borderLeft: `3px solid ${P.brand}`,
+                border: `1px solid ${P.line}`,
+              }}
+            >
+              <span
+                className="athletic-mono"
+                style={{ color: P.ink, fontSize: 12, fontWeight: 900, letterSpacing: '0.12em' }}
+              >
+                {exercises.length} OEFENING{exercises.length > 1 ? 'EN' : ''}
+                <span style={{ color: P.inkDim }}> · </span>
+                {exercises.reduce((a, e) => a + e.sets, 0)} SETS
+                <span style={{ color: P.inkDim }}> · </span>
+                <span style={{ color: P.brand }}>
+                  ±{Math.max(5, Math.round(exercises.reduce((a, e) => a + e.sets * (e.restTime + 45), 0) / 60 / 5) * 5)} MIN
+                </span>
+              </span>
+            </div>
+          )}
+
           {/* Exercise list */}
           {exercises.length === 0 && isQuickMode ? (
-            <div
-              className="flex flex-col items-center justify-center py-12 rounded-2xl text-center gap-3"
+            <button
+              type="button"
+              onClick={() => setShowAddExercise(true)}
+              className="athletic-tap w-full flex flex-col items-center justify-center py-12 rounded-2xl text-center gap-3"
               style={{
                 background: 'rgba(232,122,85,0.06)',
                 border: `2px dashed ${P.brand}`,
               }}
             >
-              <IconStrength size={40} />
-              <p
+              <span
+                className="flex items-center justify-center rounded-full"
+                style={{ width: 64, height: 64, background: 'rgba(232,122,85,0.14)', color: P.brand }}
+              >
+                <IconStrength size={32} />
+              </span>
+              <span
                 style={{
                   color: P.brand,
                   fontWeight: 900,
@@ -296,9 +349,9 @@ export default function AthleteSessionPage() {
                   textTransform: 'uppercase',
                 }}
               >
-                VOEG JE EERSTE OEFENING TOE
-              </p>
-              <p
+                TIK OM OEFENINGEN TE KIEZEN
+              </span>
+              <span
                 style={{
                   color: P.inkMuted,
                   fontSize: 12,
@@ -306,9 +359,9 @@ export default function AthleteSessionPage() {
                   maxWidth: 240,
                 }}
               >
-                Kies oefeningen uit de bibliotheek en begin met trainen.
-              </p>
-            </div>
+                Kies uit favorieten, meest gebruikt of de hele bibliotheek — en start direct.
+              </span>
+            </button>
           ) : (
             <div className="space-y-2 mbt-stagger">
               {exercises.map((e, i) => {
@@ -371,7 +424,7 @@ export default function AthleteSessionPage() {
                             textTransform: 'uppercase',
                           }}
                         >
-                          {e.sets} × {e.reps} {e.repUnit}
+                          {CATEGORY_LABELS_NL[e.category] ?? e.category} · {e.sets} × {e.reps} {e.repUnit}
                         </div>
                       </div>
                       {clickable && (
@@ -406,26 +459,28 @@ export default function AthleteSessionPage() {
             </div>
           )}
 
-          {/* Add exercise button */}
-          <button
-            type="button"
-            onClick={() => setShowAddExercise(true)}
-            className="athletic-tap mbt-btn-hover w-full flex items-center justify-center gap-2 rounded-xl"
-            style={{
-              padding: '14px 16px',
-              border: `2px dashed ${P.brand}`,
-              color: P.brand,
-              background: 'transparent',
-              fontFamily: mono,
-              fontSize: 12,
-              fontWeight: 900,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-            }}
-          >
-            <Plus className="w-4 h-4" />
-            OEFENING TOEVOEGEN
-          </button>
+          {/* Add exercise button — niet tonen naast de grote lege-staat-CTA */}
+          {!(exercises.length === 0 && isQuickMode) && (
+            <button
+              type="button"
+              onClick={() => setShowAddExercise(true)}
+              className="athletic-tap mbt-btn-hover w-full flex items-center justify-center gap-2 rounded-xl"
+              style={{
+                padding: '14px 16px',
+                border: `2px dashed ${P.brand}`,
+                color: P.brand,
+                background: 'transparent',
+                fontFamily: mono,
+                fontSize: 12,
+                fontWeight: 900,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+              }}
+            >
+              <Plus className="w-4 h-4" />
+              OEFENING TOEVOEGEN
+            </button>
+          )}
 
           <DarkButton
             variant="primary"
@@ -434,7 +489,7 @@ export default function AthleteSessionPage() {
             onClick={() => setState('active')}
             className="w-full"
           >
-            ▶ START SESSIE
+            {exercises.length === 0 ? 'KIES EERST OEFENINGEN' : '▶ START SESSIE'}
           </DarkButton>
         </div>
 
@@ -467,7 +522,7 @@ export default function AthleteSessionPage() {
   if (state === 'done') {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: P.bg, color: P.ink }}>
-        <div className="max-w-lg w-full mx-auto px-4 space-y-4 text-center">
+        <div className="max-w-lg w-full mx-auto px-4 space-y-4 text-center mbt-stagger">
           <div
             className="w-16 h-16 rounded-full flex items-center justify-center mx-auto"
             style={{
@@ -647,6 +702,25 @@ export default function AthleteSessionPage() {
               {currentIndex + 1}/{exercises.length}
             </span>
           </div>
+        </div>
+
+        {/* Voortgangsbalk: afgeronde oefeningen */}
+        <div
+          className="h-1.5 rounded-full overflow-hidden"
+          style={{ background: P.surfaceHi }}
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={exercises.length}
+          aria-valuenow={completed.size}
+        >
+          <div
+            className="h-full rounded-full"
+            style={{
+              background: P.lime,
+              width: `${exercises.length > 0 ? Math.round((completed.size / exercises.length) * 100) : 0}%`,
+              transition: 'width 360ms cubic-bezier(0.22, 1, 0.36, 1)',
+            }}
+          />
         </div>
 
         {/* Hero: current exercise — klikbaar als er een video is */}
