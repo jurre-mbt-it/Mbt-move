@@ -154,6 +154,12 @@ export default function AthleteSessionPage() {
     setAddExerciseQuery('')
   }
 
+  // Alleen zelf toegevoegde oefeningen zijn verwijderbaar (vóór de start);
+  // programma-oefeningen blijven staan.
+  function removeExercise(uid: string) {
+    setExtraExercises(prev => prev.filter(e => e.uid !== uid))
+  }
+
   const filteredLibrary = addExerciseQuery
     ? dbExercises.filter(e =>
         e.name.toLowerCase().includes(addExerciseQuery.toLowerCase()) ||
@@ -180,6 +186,7 @@ export default function AthleteSessionPage() {
         durationSeconds: Math.max(elapsed, 1),
         painLevel: sessionPain,
         exertionLevel: sessionRpe,
+        completedAll: completed.size >= exercises.length,
         exercises: exercises.map(e => ({
           exerciseId: e.exerciseId,
           setsCompleted: e.sets,
@@ -303,81 +310,97 @@ export default function AthleteSessionPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 mbt-stagger">
               {exercises.map((e, i) => {
                 const clickable = !!e.videoUrl
-                const Wrapper = clickable ? 'button' : 'div'
+                const removable = extraExercises.some(x => x.uid === e.uid)
+                const Inner = clickable ? 'button' : 'div'
                 return (
-                  <Wrapper
+                  <div
                     key={e.uid}
-                    type={clickable ? 'button' : undefined}
-                    onClick={
-                      clickable
-                        ? () => setVideoModal({ url: e.videoUrl!, name: e.name })
-                        : undefined
-                    }
-                    className={`flex items-center gap-3 rounded-xl w-full text-left ${clickable ? 'athletic-tap' : ''}`}
+                    className={`flex items-center gap-0 rounded-xl w-full overflow-hidden ${clickable ? 'mbt-card-hover' : ''}`}
                     style={{
                       background: P.surface,
-                      padding: '12px 14px',
                       borderLeft: `3px solid ${P.brand}`,
                       border: `1px solid ${P.line}`,
                     }}
                   >
-                    <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                      style={{
-                        background: P.surfaceHi,
-                        border: `1px solid ${P.line}`,
-                        color: P.brand,
-                        fontFamily: mono,
-                        fontSize: 14,
-                        fontWeight: 900,
-                      }}
+                    <Inner
+                      type={clickable ? 'button' : undefined}
+                      onClick={
+                        clickable
+                          ? () => setVideoModal({ url: e.videoUrl!, name: e.name })
+                          : undefined
+                      }
+                      className={`flex items-center gap-3 flex-1 min-w-0 text-left ${clickable ? 'athletic-tap' : ''}`}
+                      style={{ padding: '12px 14px' }}
                     >
-                      {i + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className="truncate"
-                        style={{
-                          color: P.ink,
-                          fontSize: 14,
-                          fontWeight: 800,
-                          letterSpacing: '-0.01em',
-                        }}
-                      >
-                        {e.name}
-                      </p>
                       <div
+                        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
                         style={{
-                          fontFamily: mono,
-                          fontSize: 10,
-                          letterSpacing: '0.14em',
-                          fontWeight: 700,
-                          color: P.inkMuted,
-                          marginTop: 3,
-                          textTransform: 'uppercase',
-                        }}
-                      >
-                        {e.sets} × {e.reps} {e.repUnit}
-                      </div>
-                    </div>
-                    {clickable && (
-                      <span
-                        aria-hidden
-                        className="inline-flex items-center justify-center rounded-full shrink-0"
-                        style={{
-                          width: 28,
-                          height: 28,
-                          background: 'rgba(232,122,85,0.15)',
+                          background: P.surfaceHi,
+                          border: `1px solid ${P.line}`,
                           color: P.brand,
+                          fontFamily: mono,
+                          fontSize: 14,
+                          fontWeight: 900,
                         }}
                       >
-                        <Play className="w-3.5 h-3.5" style={{ marginLeft: 1 }} fill="currentColor" />
-                      </span>
+                        {i + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className="truncate"
+                          style={{
+                            color: P.ink,
+                            fontSize: 14,
+                            fontWeight: 800,
+                            letterSpacing: '-0.01em',
+                          }}
+                        >
+                          {e.name}
+                        </p>
+                        <div
+                          style={{
+                            fontFamily: mono,
+                            fontSize: 10,
+                            letterSpacing: '0.14em',
+                            fontWeight: 700,
+                            color: P.inkMuted,
+                            marginTop: 3,
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          {e.sets} × {e.reps} {e.repUnit}
+                        </div>
+                      </div>
+                      {clickable && (
+                        <span
+                          aria-hidden
+                          className="inline-flex items-center justify-center rounded-full shrink-0"
+                          style={{
+                            width: 28,
+                            height: 28,
+                            background: 'rgba(232,122,85,0.15)',
+                            color: P.brand,
+                          }}
+                        >
+                          <Play className="w-3.5 h-3.5" style={{ marginLeft: 1 }} fill="currentColor" />
+                        </span>
+                      )}
+                    </Inner>
+                    {removable && (
+                      <button
+                        type="button"
+                        onClick={() => removeExercise(e.uid)}
+                        className="athletic-tap self-stretch px-3 transition-colors"
+                        style={{ color: P.inkDim }}
+                        aria-label={`Verwijder ${e.name}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
                     )}
-                  </Wrapper>
+                  </div>
                 )
               })}
             </div>
@@ -387,7 +410,7 @@ export default function AthleteSessionPage() {
           <button
             type="button"
             onClick={() => setShowAddExercise(true)}
-            className="w-full flex items-center justify-center gap-2 rounded-xl transition-all active:scale-[0.98]"
+            className="athletic-tap mbt-btn-hover w-full flex items-center justify-center gap-2 rounded-xl"
             style={{
               padding: '14px 16px',
               border: `2px dashed ${P.brand}`,
@@ -698,7 +721,7 @@ export default function AthleteSessionPage() {
         <button
           type="button"
           onClick={() => setShowAddExercise(true)}
-          className="w-full flex items-center justify-center gap-2 rounded-xl transition-all active:scale-[0.98]"
+          className="athletic-tap mbt-btn-hover w-full flex items-center justify-center gap-2 rounded-xl"
           style={{
             padding: '12px 16px',
             border: `1px dashed ${P.brand}`,
@@ -858,7 +881,7 @@ function ExerciseRow({
   const isFav = ex.isFavorite === true
   return (
     <div
-      className="w-full flex items-center gap-2 rounded-xl"
+      className="mbt-card-hover w-full flex items-center gap-2 rounded-xl"
       style={{
         background: alreadyAdded ? 'rgba(232,122,85,0.10)' : P.surfaceLow,
         border: `1px solid ${alreadyAdded ? P.lime : P.line}`,
@@ -943,11 +966,27 @@ function AddExerciseSheet({
   onClose: () => void
 }) {
   const searching = query.trim().length > 0
+
+  // Escape sluit de sheet; scroll-lock zolang die open is (zelfde gedrag als
+  // de VideoModal).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prev
+    }
+  }, [onClose])
+
   return (
     <div className="fixed inset-0 z-50 flex items-end">
-      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={onClose} />
+      <div className="mbt-backdrop absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={onClose} />
       <div
-        className="relative w-full rounded-t-3xl flex flex-col"
+        className="mbt-sheet relative w-full rounded-t-3xl flex flex-col"
         style={{
           background: P.surface,
           border: `1px solid ${P.line}`,
@@ -1005,7 +1044,7 @@ function AddExerciseSheet({
                 <MetaLabel>GEEN OEFENINGEN GEVONDEN</MetaLabel>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2 mbt-stagger">
                 {filtered.map(ex => (
                   <ExerciseRow
                     key={ex.id}
@@ -1021,7 +1060,7 @@ function AddExerciseSheet({
             // Bladermodus: snelkoppelingen bovenaan, dan de hele bibliotheek.
             <>
               {favorites.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-2 mbt-stagger">
                   <MetaLabel>★ FAVORIETEN</MetaLabel>
                   {favorites.map(ex => (
                     <ExerciseRow
@@ -1036,7 +1075,7 @@ function AddExerciseSheet({
               )}
 
               {mostUsed.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-2 mbt-stagger">
                   <MetaLabel>↻ MEEST GEBRUIKT</MetaLabel>
                   {mostUsed.map(ex => (
                     <ExerciseRow
@@ -1051,7 +1090,7 @@ function AddExerciseSheet({
                 </div>
               )}
 
-              <div className="space-y-2">
+              <div className="space-y-2 mbt-stagger">
                 {(favorites.length > 0 || mostUsed.length > 0) && (
                   <MetaLabel>ALLE OEFENINGEN</MetaLabel>
                 )}

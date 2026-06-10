@@ -3,22 +3,53 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, CalendarDays, Zap, User, Menu, X, Dumbbell, ChevronRight, Plus, Stethoscope, Loader2 } from 'lucide-react'
+import { Home, CalendarDays, Zap, User, Menu, X, Dumbbell, ChevronRight, Plus, Stethoscope, Loader2, Smile, Activity } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { setPersonalMode } from '@/lib/personal-mode-client'
+import { IconStrength, IconCardio } from '@/components/icons'
 import { P } from '@/components/dark-ui'
 
-// 5 cells: 2 left tabs, center FAB (quick workout), 2 right tabs.
+// 5 cells: 2 left tabs, center FAB (actie-sheet), 1 right tab, MEER drawer.
 const MAIN_NAV = [
   { href: '/athlete/dashboard', label: 'HOME', icon: Home },
   { href: '/athlete/schedule', label: 'SCHEMA', icon: CalendarDays },
-  { href: '/athlete/workouts', label: 'TRAINING', icon: Zap },
   { href: '/athlete/profile', label: 'PROFIEL', icon: User },
 ]
 
-const QUICK_WORKOUT_HREF = '/athlete/session?mode=quick'
+// Acties achter de centrale +: trainen of een check-in loggen.
+const QUICK_ACTIONS = [
+  {
+    href: '/athlete/session?mode=quick',
+    label: 'Snelle training',
+    description: 'Stel zelf je workout samen en start direct',
+    color: P.brand,
+    icon: <IconStrength size={20} />,
+  },
+  {
+    href: '/athlete/cardio/new',
+    label: 'Cardio loggen',
+    description: 'Hardlopen, fietsen, roeien — tijd, tempo & zones',
+    color: P.ice,
+    icon: <IconCardio size={20} />,
+  },
+  {
+    href: '/athlete/wellness',
+    label: 'Welzijn-check',
+    description: 'Hoe voel je je vandaag? 5 korte vragen',
+    color: P.lime,
+    icon: <Smile className="w-5 h-5" />,
+  },
+  {
+    href: '/athlete/pain',
+    label: 'Pijn melden',
+    description: 'Registreer pijn voor je therapeut',
+    color: P.danger,
+    icon: <Activity className="w-5 h-5" />,
+  },
+]
 
 const DRAWER_ITEMS = [
+  { href: '/athlete/workouts', label: 'Mijn workouts', icon: Zap, description: 'Opgeslagen workouts & templates' },
   { href: '/athlete/exercises', label: 'Oefeningen', icon: Dumbbell, description: 'Oefeningen bibliotheek' },
 ]
 
@@ -26,6 +57,7 @@ export function AthleteBottomNav({ personalMode = false }: { personalMode?: bool
   const pathname = usePathname()
   const router = useRouter()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [quickOpen, setQuickOpen] = useState(false)
   const [leaving, setLeaving] = useState(false)
 
   async function exitPersonalMode() {
@@ -138,12 +170,82 @@ export function AthleteBottomNav({ personalMode = false }: { personalMode?: bool
         </div>
       </div>
 
-      {/* Bottom nav — 6 cells: 2 left tabs, center FAB, 2 right tabs, MEER drawer */}
+      {/* Actie-sheet achter de centrale + (trainen / cardio / welzijn / pijn) */}
+      {quickOpen && (
+        <div className="fixed inset-0 z-50 flex items-end" role="dialog" aria-label="Snel loggen">
+          <div
+            className="mbt-backdrop absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setQuickOpen(false)}
+          />
+          <div
+            className="mbt-sheet relative w-full rounded-t-3xl pb-[max(env(safe-area-inset-bottom),16px)]"
+            style={{
+              background: P.surface,
+              borderTop: `1px solid ${P.lineStrong}`,
+              maxWidth: 480,
+              margin: '0 auto',
+            }}
+          >
+            <div className="px-5 pt-4 pb-2">
+              <div
+                className="w-10 h-1 rounded-full mx-auto mb-3"
+                style={{ background: P.lineStrong }}
+              />
+              <div className="flex items-center justify-between">
+                <p
+                  className="athletic-mono"
+                  style={{ color: P.ink, fontSize: 13, fontWeight: 900, letterSpacing: '0.16em' }}
+                >
+                  SNEL LOGGEN
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setQuickOpen(false)}
+                  className="athletic-tap p-1 rounded-lg"
+                  style={{ color: P.inkMuted }}
+                  aria-label="Sluiten"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="mbt-stagger px-3 pt-1 flex flex-col gap-1">
+              {QUICK_ACTIONS.map((action) => (
+                <Link
+                  key={action.href}
+                  href={action.href}
+                  onClick={() => setQuickOpen(false)}
+                  className="athletic-tap mbt-nav-hover flex items-center gap-3 px-3 py-3 rounded-xl"
+                  style={{ color: P.ink }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                    style={{
+                      background: `${action.color}1A`,
+                      border: `1px solid ${action.color}40`,
+                      color: action.color,
+                    }}
+                  >
+                    {action.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p style={{ fontSize: 14, fontWeight: 800 }}>{action.label}</p>
+                    <p style={{ color: P.inkMuted, fontSize: 11, marginTop: 1 }}>{action.description}</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 shrink-0" style={{ color: P.inkDim }} />
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom nav — 5 cells: 2 left tabs, center FAB, 1 right tab, MEER drawer */}
       <nav
         className="fixed bottom-0 left-0 right-0 z-30 border-t"
         style={{ background: P.bg, borderColor: P.lineStrong }}
       >
-        <div className="mbt-stagger grid grid-cols-6 items-center h-16 max-w-lg mx-auto px-2">
+        <div className="mbt-stagger grid grid-cols-5 items-center h-16 max-w-lg mx-auto px-2">
           {MAIN_NAV.slice(0, 2).map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + '/')
             return (
@@ -163,11 +265,13 @@ export function AthleteBottomNav({ personalMode = false }: { personalMode?: bool
             )
           })}
 
-          {/* Center + button — direct naar quick workout */}
-          <Link
-            href={QUICK_WORKOUT_HREF}
+          {/* Center + button — opent de actie-sheet */}
+          <button
+            type="button"
+            onClick={() => setQuickOpen(o => !o)}
             className="athletic-tap flex flex-col items-center justify-center"
-            aria-label="Snelle workout"
+            aria-label="Snel loggen"
+            aria-expanded={quickOpen}
           >
             <span
               className="flex items-center justify-center rounded-full"
@@ -178,6 +282,8 @@ export function AthleteBottomNav({ personalMode = false }: { personalMode?: bool
                 height: 44,
                 marginTop: -10,
                 boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                transform: quickOpen ? 'rotate(45deg)' : 'rotate(0deg)',
+                transition: 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
               }}
             >
               <Plus className="w-6 h-6" strokeWidth={3} />
@@ -194,7 +300,7 @@ export function AthleteBottomNav({ personalMode = false }: { personalMode?: bool
             >
               SNEL
             </span>
-          </Link>
+          </button>
 
           {MAIN_NAV.slice(2).map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + '/')
