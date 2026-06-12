@@ -2,8 +2,7 @@
  * Mapping van data-keys naar custom fitness iconen
  * Gebruik: const Icon = WORKOUT_ICON_MAP['STRENGTH']; <Icon size={20} />
  */
-import type { ComponentType } from 'react'
-import type { IconProps } from './FitnessIcons'
+import type { LucideIcon } from 'lucide-react'
 import {
   IconStrength, IconMobility, IconPlyometrics, IconCardio, IconCore,
   IconSquat, IconLunge, IconHinge, IconPushHorizontal, IconPushVertical,
@@ -14,11 +13,13 @@ import {
   IconWalking, IconSkiErg, IconAssaultBike, IconWattbike, IconStairclimber,
   IconOtherCardio,
   IconRest, IconMovement, IconExercise, IconAfterExertion, IconAlways,
-} from './FitnessIcons'
+  IconMoon, IconStrength as IconSoreness, IconLightning, IconSun, IconMobility as IconStress,
+  IconMoodVeryLow, IconMoodLow, IconMoodNeutral, IconMoodGood, IconMoodGreat,
+} from './lucide-icons'
 
 // ── Workout types ───────────────────────────────────────────────────────────
 
-export const WORKOUT_ICON_MAP: Record<string, ComponentType<IconProps>> = {
+export const WORKOUT_ICON_MAP: Record<string, LucideIcon> = {
   STRENGTH: IconStrength,
   MOBILITY: IconMobility,
   PLYOMETRICS: IconPlyometrics,
@@ -28,7 +29,7 @@ export const WORKOUT_ICON_MAP: Record<string, ComponentType<IconProps>> = {
 
 // ── Movement patterns ───────────────────────────────────────────────────────
 
-export const MOVEMENT_ICON_MAP: Record<string, ComponentType<IconProps>> = {
+export const MOVEMENT_ICON_MAP: Record<string, LucideIcon> = {
   SQUAT: IconSquat,
   LUNGE: IconLunge,
   HINGE: IconHinge,
@@ -48,7 +49,7 @@ export const MOVEMENT_ICON_MAP: Record<string, ComponentType<IconProps>> = {
 
 // ── Cardio activities ───────────────────────────────────────────────────────
 
-export const CARDIO_ICON_MAP: Record<string, ComponentType<IconProps>> = {
+export const CARDIO_ICON_MAP: Record<string, LucideIcon> = {
   RUNNING: IconRunning,
   CYCLING: IconCycling,
   ROWING: IconRowing,
@@ -64,13 +65,33 @@ export const CARDIO_ICON_MAP: Record<string, ComponentType<IconProps>> = {
 
 // ── Pain contexts ───────────────────────────────────────────────────────────
 
-export const PAIN_CONTEXT_ICON_MAP: Record<string, ComponentType<IconProps>> = {
+export const PAIN_CONTEXT_ICON_MAP: Record<string, LucideIcon> = {
   rest: IconRest,
   movement: IconMovement,
   exercise: IconExercise,
   after: IconAfterExertion,
   always: IconAlways,
 }
+
+// ── Wellness check-items ────────────────────────────────────────────────────
+
+export const WELLNESS_ICON_MAP: Record<string, LucideIcon> = {
+  sleep: IconMoon,
+  soreness: IconSoreness,
+  fatigue: IconLightning,
+  mood: IconSun,
+  stress: IconStress,
+}
+
+// ── Stemming-schaal (1 = slecht … 5 = top), index 0-based ───────────────────
+
+export const MOOD_SCALE: LucideIcon[] = [
+  IconMoodVeryLow,
+  IconMoodLow,
+  IconMoodNeutral,
+  IconMoodGood,
+  IconMoodGreat,
+]
 
 // ── Helper: render icon by key + map ────────────────────────────────────────
 
@@ -80,7 +101,7 @@ export function FitnessIcon({
   size = 24,
   className,
 }: {
-  map: Record<string, ComponentType<IconProps>>
+  map: Record<string, LucideIcon>
   value: string
   size?: number
   className?: string

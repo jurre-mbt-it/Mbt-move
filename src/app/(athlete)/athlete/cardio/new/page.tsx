@@ -15,6 +15,7 @@ import {
   type CardioActivityKey,
   type CardioProtocolKey,
 } from '@/lib/cardio-constants'
+import { CARDIO_ICON_MAP } from '@/components/icons'
 import {
   computeHrZones, bpmToZone, formatPace,
 } from '@/lib/cardio-zones'
@@ -159,7 +160,7 @@ export default function AthleteCardioLogPage() {
                     border: `2px solid ${active ? P.brand : P.line}`,
                   }}
                 >
-                  <span style={{ fontSize: 20 }}>{info.icon}</span>
+                  <span style={{ color: active ? P.brand : P.ink }}>{(() => { const Icon = CARDIO_ICON_MAP[key]; return Icon ? <Icon size={22} /> : info.icon })()}</span>
                   <span className="athletic-mono" style={{ fontSize: 9, fontWeight: 800, color: active ? P.brand : P.inkMuted, letterSpacing: '0.04em' }}>
                     {info.label}
                   </span>

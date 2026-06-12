@@ -23,7 +23,7 @@ import {
   DarkButton,
 } from '@/components/dark-ui'
 import {
-  IconStrength, IconMobility, IconPlyometrics, IconCardio, IconCore,
+  IconStrength, IconMobility, IconPlyometrics, IconCardio, IconCore, IconSleep,
 } from '@/components/icons'
 import { CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
 
@@ -519,7 +519,7 @@ export default function AthleteSchedulePage() {
           </Tile>
         ) : selectedEvents.length === 0 ? (
           <Tile style={{ padding: 28, textAlign: 'center' }}>
-            <div style={{ fontSize: 32, marginBottom: 6 }}>🌙</div>
+            <div style={{ marginBottom: 6, color: P.ink, display: 'flex', justifyContent: 'center' }}><IconSleep size={32} /></div>
             <Kicker>RUSTDAG</Kicker>
             <p style={{ marginTop: 8, color: P.inkMuted, fontSize: 13, lineHeight: 1.5 }}>
               Geen trainingen op deze dag.

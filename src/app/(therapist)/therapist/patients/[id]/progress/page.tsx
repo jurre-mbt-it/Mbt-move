@@ -10,6 +10,7 @@ import { trpc } from '@/lib/trpc/client'
 import { HR_ZONES, type HRZone, CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
 import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
 import { LoadCurveChart } from '@/components/workload/LoadCurveChart'
+import { CARDIO_ICON_MAP } from '@/components/icons'
 import {
   DARK_CHART_STYLES,
   DarkButton,
@@ -474,7 +475,7 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
                         return (
                           <div key={s.id} className="flex items-center justify-between gap-2 py-1.5" style={{ borderBottom: `1px solid ${P.line}` }}>
                             <span style={{ color: P.ink, fontSize: 12, fontWeight: 700 }}>
-                              {act?.icon} {act?.label ?? s.activity}
+                              {(() => { const Icon = CARDIO_ICON_MAP[s.activity as CardioActivityKey]; return Icon ? <Icon size={13} /> : act?.icon })()} {act?.label ?? s.activity}
                             </span>
                             <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11 }}>
                               {new Date(s.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}

@@ -11,6 +11,7 @@ import {
   TrendingUp, TrendingDown, CheckCircle2, SkipForward, Minus, Plus, Trophy, Bell, RotateCcw,
 } from 'lucide-react'
 import { P, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-ui'
+import { MOOD_SCALE, IconCelebration, IconBeach, IconStop, IconWarning } from '@/components/icons'
 import { useDraftBackup, loadDraft, clearStoredDraft } from '@/hooks/useAutosave'
 import {
   useBoolPref,
@@ -103,9 +104,13 @@ function painLabel(pain: number, isTendinopathy = false): string {
   return 'Stop'
 }
 
-const SMILIES = ['😫', '😕', '😐', '🙂', '😄']
 const SMILEY_LABELS = ['Zwaar', 'Moeilijk', 'Oké', 'Goed', 'Super']
 const SMILEY_COLORS = [P.danger, P.orange, P.gold, P.limeDeep, P.lime]
+
+function MoodFace({ idx, size = 24 }: { idx: number; size?: number }) {
+  const Icon = MOOD_SCALE[idx]
+  return Icon ? <Icon size={size} /> : null
+}
 
 // ─── Circular Timer SVG ───────────────────────────────────────────────────────
 
@@ -193,7 +198,7 @@ function FeedbackModal({
 
         {/* Smilies */}
         <div className="flex gap-2 justify-between">
-          {SMILIES.map((emoji, i) => {
+          {SMILEY_LABELS.map((_label, i) => {
             const val = i + 1
             const selected = feedback.smiley === val
             return (
@@ -207,7 +212,7 @@ function FeedbackModal({
                   minHeight: 44,
                 }}
               >
-                <span className="text-2xl">{emoji}</span>
+                <MoodFace idx={i} size={26} />
                 <span
                   className="athletic-mono"
                   style={{ color: selected ? SMILEY_COLORS[i] : P.inkMuted, fontSize: 10, fontWeight: 700, letterSpacing: '0.06em' }}
@@ -269,8 +274,8 @@ function FeedbackModal({
                 }}
               >
                 {(feedback.painDuring ?? 0) > 7
-                  ? '⛔ Pijn te hoog — stop en consult de therapeut.'
-                  : '⚠️ Verhoogde pijn. Noteer dit en monitor de volgende sessies.'}
+                  ? <span className="inline-flex items-start gap-1.5"><IconStop size={14} className="mt-px shrink-0" /> Pijn te hoog — stop en consult de therapeut.</span>
+                  : <span className="inline-flex items-start gap-1.5"><IconWarning size={14} className="mt-px shrink-0" /> Verhoogde pijn. Noteer dit en monitor de volgende sessies.</span>}
               </div>
             )}
             <p style={{ color: P.inkMuted, fontSize: 10, marginTop: 6 }}>
@@ -508,7 +513,7 @@ function SessionSummary({
       <div className="max-w-lg w-full mx-auto px-4 pt-10 pb-8 space-y-4">
         {/* Hero */}
         <div className="text-center">
-          <div className="text-5xl mb-3">🎉</div>
+          <div className="mb-3 flex justify-center"><IconCelebration size={48} /></div>
           <Kicker>SESSIE VOLTOOID</Kicker>
           <h1
             className="athletic-display"
@@ -554,7 +559,7 @@ function SessionSummary({
         {avgSmileyIdx !== null && (
           <Tile>
             <div className="flex items-center gap-3">
-              <div className="text-3xl">{SMILIES[avgSmileyIdx]}</div>
+              <div className="text-3xl"><MoodFace idx={avgSmileyIdx} size={30} /></div>
               <div>
                 <p style={{ color: P.ink, fontSize: 14, fontWeight: 800 }}>Gemiddeld gevoel</p>
                 <MetaLabel style={{ textTransform: 'none', fontWeight: 500 }}>
@@ -574,7 +579,7 @@ function SessionSummary({
                 className="athletic-mono"
                 style={{ color: P.lime, fontSize: 13, fontWeight: 900, letterSpacing: '0.12em' }}
               >
-                NIEUW(E) 1RM PR(S)! 🎉
+                NIEUW(E) 1RM PR(S)! <IconCelebration size={14} className="inline-block align-[-2px]" />
               </p>
             </div>
             <div className="space-y-1">
@@ -606,7 +611,7 @@ function SessionSummary({
                     className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-lg"
                     style={{ background: fb?.smiley ? SMILEY_COLORS[(fb.smiley - 1)] + '22' : P.surfaceHi }}
                   >
-                    {fb?.smiley ? SMILIES[fb.smiley - 1] : '—'}
+                    {fb?.smiley ? <MoodFace idx={fb.smiley - 1} size={20} /> : '—'}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="truncate" style={{ color: P.ink, fontSize: 13, fontWeight: 600 }}>{e.name}</p>
@@ -665,7 +670,7 @@ function SessionSummary({
           <p style={{ color: P.ink, fontSize: 14, fontWeight: 800 }}>Hoe voelt je lichaam nu?</p>
           <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>Totale sessie gevoel</MetaLabel>
           <div className="flex gap-2 justify-between mt-3">
-            {SMILIES.map((emoji, i) => {
+            {SMILEY_LABELS.map((_label, i) => {
               const val = i + 1
               const selected = sessionSmiley === val
               return (
@@ -679,7 +684,7 @@ function SessionSummary({
                     border: selected ? `2px solid ${SMILEY_COLORS[i]}` : `2px solid ${P.line}`,
                   }}
                 >
-                  <span className="text-2xl">{emoji}</span>
+                  <MoodFace idx={i} size={26} />
                   <span
                     className="athletic-mono"
                     style={{ color: selected ? SMILEY_COLORS[i] : P.inkMuted, fontSize: 10, fontWeight: 700 }}
@@ -1269,7 +1274,7 @@ function SessionPageInner() {
   if (flexProg?.flexibleSchedule && flexProg?.weeklyTargetReached) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: P.bg, color: P.ink }}>
-        <div className="text-6xl">🎉</div>
+        <div className="flex justify-center"><IconCelebration size={56} /></div>
         <p style={{ color: P.lime, fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em' }}>
           Goed gedaan!
         </p>
@@ -1302,7 +1307,7 @@ function SessionPageInner() {
   if (!sessionData?.program || exercises.length === 0) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: P.bg, color: P.ink }}>
-        <div className="text-5xl">🏖️</div>
+        <div className="flex justify-center"><IconBeach size={48} /></div>
         <p style={{ color: P.ink, fontSize: 18, fontWeight: 800 }}>Geen sessie vandaag</p>
         <p style={{ color: P.inkMuted, fontSize: 13 }}>Je hebt vandaag geen oefeningen gepland. Geniet van je rustdag!</p>
         <DarkButton variant="secondary" onClick={() => router.push('/patient/dashboard')}>
@@ -1447,7 +1452,7 @@ function SessionPageInner() {
               </div>
               {fb && (fb.smiley !== null || fb.pain !== null) && (
                 <div className="flex items-center gap-3 px-1">
-                  {fb.smiley !== null && <span className="text-2xl">{SMILIES[fb.smiley - 1]}</span>}
+                  {fb.smiley !== null && <span className="inline-flex"><MoodFace idx={fb.smiley - 1} size={22} /></span>}
                   <span style={{ color: P.inkMuted, fontSize: 11 }}>
                     {fb.smiley !== null && SMILEY_LABELS[fb.smiley - 1]}
                     {fb.pain !== null && `${fb.smiley !== null ? ' · ' : ''}Pijn ${fb.pain}/10`}
@@ -1623,7 +1628,7 @@ function SessionPageInner() {
                       className="athletic-mono animate-bounce px-2 py-0.5 rounded-full"
                       style={{ background: P.lime, color: P.bg, fontSize: 10, fontWeight: 900, letterSpacing: '0.06em' }}
                     >
-                      NIEUW PR! 🎉
+                      NIEUW PR! <IconCelebration size={11} className="inline-block align-[-1px]" />
                     </span>
                   )}
                 </div>
@@ -1964,7 +1969,7 @@ function SessionPageInner() {
                   size="lg"
                   variant={doneCount === exercises.length ? 'primary' : 'secondary'}
                 >
-                  {doneCount === exercises.length ? 'AFRONDEN 🎉' : 'AFRONDEN'}
+                  {doneCount === exercises.length ? <span className="inline-flex items-center gap-1.5">AFRONDEN <IconCelebration size={14} /></span> : 'AFRONDEN'}
                 </DarkButton>
               ) : (
                 <button
@@ -1999,7 +2004,7 @@ function SessionPageInner() {
                   variant={doneCount === exercises.length ? 'primary' : 'secondary'}
                 >
                   {doneCount === exercises.length
-                    ? 'SESSIE AFRONDEN 🎉'
+                    ? <span className="inline-flex items-center gap-1.5">SESSIE AFRONDEN <IconCelebration size={14} /></span>
                     : `DOORGAAN (${doneCount}/${exercises.length})`}
                 </DarkButton>
               </div>

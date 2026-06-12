@@ -20,6 +20,7 @@ import {
   MetaLabel,
   P,
 } from '@/components/dark-ui'
+import { WELLNESS_ICON_MAP } from '@/components/icons'
 import { trpc } from '@/lib/trpc/client'
 import { cn } from '@/lib/utils'
 
@@ -227,11 +228,14 @@ function ItemRow({
     <div className="rounded-xl flex flex-col gap-3 p-3" style={{ backgroundColor: P.surface }}>
       <div className="flex items-center gap-3">
         <div
-          className="w-10 h-10 rounded-[10px] flex items-center justify-center text-[18px]"
-          style={{ backgroundColor: P.surfaceHi, border: `1px solid ${color}` }}
+          className="w-10 h-10 rounded-[10px] flex items-center justify-center"
+          style={{ backgroundColor: P.surfaceHi, border: `1px solid ${color}`, color: P.ink }}
           aria-hidden
         >
-          {item.emoji}
+          {(() => {
+            const Icon = WELLNESS_ICON_MAP[item.key]
+            return Icon ? <Icon size={20} /> : item.emoji
+          })()}
         </div>
         <div className="flex-1 min-w-0">
           <div

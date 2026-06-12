@@ -607,7 +607,7 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
               <option value="">Selecteer patroon...</option>
               {MOVEMENT_PATTERN_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>
-                  {opt.emoji} {opt.label}
+                  {opt.label}
                 </option>
               ))}
             </select>

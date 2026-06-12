@@ -29,6 +29,7 @@ import {
 } from '@dnd-kit/core'
 import {
   IconStrength, IconMobility, IconPlyometrics, IconCardio, IconCore,
+  IconScale, CARDIO_ICON_MAP,
 } from '@/components/icons'
 import {
   CARDIO_ACTIVITIES, HR_ZONES,
@@ -708,7 +709,7 @@ function QuickCardioForm({
             <button key={k} type="button" onClick={() => setActivity(a => a === k ? '' : k)}
               className="px-2 py-1 rounded-lg text-xs font-semibold"
               style={{ background: activity === k ? P.brand : P.surface, color: activity === k ? P.bg : P.inkMuted, border: `1px solid ${activity === k ? P.brand : P.lineStrong}` }}>
-              {CARDIO_ACTIVITIES[k].icon} {CARDIO_ACTIVITIES[k].label}
+              {(() => { const Icon = CARDIO_ICON_MAP[k]; return Icon ? <Icon size={13} /> : CARDIO_ACTIVITIES[k].icon })()} {CARDIO_ACTIVITIES[k].label}
             </button>
           ))}
         </div>
@@ -987,7 +988,7 @@ function ItemDetailContent({
                         <span className="athletic-mono font-bold" style={{ color: P.ink, fontSize: 11 }}>{setLine}</span>
                       </div>
                       <div className="flex flex-wrap gap-3 mt-1.5" style={{ color: P.inkMuted, fontSize: 10 }}>
-                        {log.weight ? <span>⚖ {log.weight}kg</span> : null}
+                        {log.weight ? <span className="inline-flex items-center gap-1"><IconScale size={11} /> {log.weight}kg</span> : null}
                         {log.painLevel != null ? <span>NRS pijn: {log.painLevel}/10</span> : null}
                       </div>
                     </div>

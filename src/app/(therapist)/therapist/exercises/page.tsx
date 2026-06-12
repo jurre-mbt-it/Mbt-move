@@ -12,6 +12,7 @@ import {
   DIFFICULTIES,
 } from '@/lib/exercise-constants'
 import { trpc } from '@/lib/trpc/client'
+import { IconFolder } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import {
   CATEGORY_COLORS,
@@ -249,7 +250,7 @@ export default function ExercisesPage() {
               variant="secondary"
             >
               <span className="hidden sm:inline">Collecties</span>
-              <span className="sm:hidden">📁</span>
+              <span className="sm:hidden inline-flex"><IconFolder size={16} /></span>
             </DarkButton>
             <DarkButton href="/therapist/exercises/new" size="sm">
               + <span className="hidden sm:inline ml-1">Nieuwe oefening</span>

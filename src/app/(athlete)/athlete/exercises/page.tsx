@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
 import { Search } from 'lucide-react'
 import { EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
+import { IconStrength } from '@/components/icons'
 import {
   P,
   Kicker,
@@ -222,7 +223,7 @@ export default function AthleteExercisesPage() {
 
             {exercises.length === 0 && (
               <Tile style={{ padding: 32, textAlign: 'center' }}>
-                <div style={{ fontSize: 36, marginBottom: 8 }}>💪</div>
+                <div style={{ marginBottom: 8, color: P.ink, display: 'flex', justifyContent: 'center' }}><IconStrength size={36} /></div>
                 <MetaLabel>GEEN OEFENINGEN GEVONDEN</MetaLabel>
               </Tile>
             )}

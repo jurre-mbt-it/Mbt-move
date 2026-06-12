@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Label } from '@/components/ui/label'
 import { useCustomParams } from '@/hooks/useCustomParams'
 import { useAutosave, loadDraft } from '@/hooks/useAutosave'
+import { IconWarning } from '@/components/icons'
 import {
   DndContext, DragOverlay, closestCenter, PointerSensor,
   useSensor, useSensors, type DragEndEvent, type DragOverEvent,
@@ -1897,7 +1898,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             </div>
             {exercises.length > 0 && (
               <p className="text-[11px] text-amber-500/90">
-                ⚠ Huidige oefeningen worden vervangen door de template.
+                <IconWarning size={13} className="inline-block mr-1 align-[-2px]" /> Huidige oefeningen worden vervangen door de template.
               </p>
             )}
           </div>

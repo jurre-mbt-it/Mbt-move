@@ -11,7 +11,7 @@ import {
   type WorkoutSet,
 } from '@/lib/workout-constants'
 import { EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
-import { WORKOUT_ICON_MAP } from '@/components/icons'
+import { WORKOUT_ICON_MAP, IconFinishFlag } from '@/components/icons'
 import { trpc } from '@/lib/trpc/client'
 import {
   X, Plus, Search, Check,
@@ -346,7 +346,7 @@ function NewWorkoutPageInner() {
               {workoutName}
             </h1>
             <div className="flex items-center gap-2 mt-2">
-              <span style={{ fontSize: 18 }}>{typeInfo?.icon}</span>
+              {(() => { const I = typeInfo ? WORKOUT_ICON_MAP[typeInfo.value] : null; return I ? <I size={20} /> : <span style={{ fontSize: 18 }}>{typeInfo?.icon}</span> })()}
               <MetaLabel>{typeInfo?.label?.toUpperCase()}</MetaLabel>
             </div>
           </div>
@@ -634,7 +634,7 @@ function NewWorkoutPageInner() {
 
           {exercises.length === 0 && (
             <Tile style={{ padding: 32, textAlign: 'center' }}>
-              <div style={{ fontSize: 36, marginBottom: 8 }}>🏁</div>
+              <div style={{ marginBottom: 8, color: P.ink, display: 'flex', justifyContent: 'center' }}><IconFinishFlag size={36} /></div>
               <Kicker>DE STARTLIJN</Kicker>
               <p
                 style={{

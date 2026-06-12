@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { trpc } from '@/lib/trpc/client'
+import { IconSparkle } from '@/components/icons'
 import { DarkButton, DarkInput, DarkSelect, DarkTextarea, Kicker, MetaLabel, P, Tile } from '@/components/dark-ui'
 import { METRICS } from '@/lib/running-analysis/catalog'
 import {
@@ -187,7 +188,7 @@ export default function HardloopanalyseEditorPage({ params }: { params: Promise<
           <div className="flex items-center justify-between gap-2">
             <MetaLabel>Opmerkingen therapeut & vervolg</MetaLabel>
             <DarkButton variant="ghost" size="sm" disabled={aiDraft.isPending} onClick={() => aiDraft.mutate({ id })}>
-              {aiDraft.isPending ? 'AI schrijft…' : '✨ AI-concept'}
+              {aiDraft.isPending ? 'AI schrijft…' : <span className="inline-flex items-center gap-1.5"><IconSparkle size={14} /> AI-concept</span>}
             </DarkButton>
           </div>
           <div className="mt-3 space-y-3">

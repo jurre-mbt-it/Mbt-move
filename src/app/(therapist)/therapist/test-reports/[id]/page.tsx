@@ -10,6 +10,7 @@ import { use, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { trpc } from '@/lib/trpc/client'
+import { IconSparkle } from '@/components/icons'
 import {
   DarkButton,
   DarkInput,
@@ -276,7 +277,7 @@ export default function TestReportEditorPage({
               disabled={aiDraft.isPending || report.entries.length === 0}
               onClick={() => aiDraft.mutate({ reportId: id })}
             >
-              {aiDraft.isPending ? 'AI schrijft…' : '✨ AI-concept'}
+              {aiDraft.isPending ? 'AI schrijft…' : <span className="inline-flex items-center gap-1.5"><IconSparkle size={14} /> AI-concept</span>}
             </DarkButton>
           </div>
           <div className="mt-3 space-y-3">

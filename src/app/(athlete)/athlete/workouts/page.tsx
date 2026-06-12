@@ -16,7 +16,7 @@ import {
   WORKOUT_TYPES,
 } from '@/lib/workout-constants'
 import { Search, Trash2, Clock } from 'lucide-react'
-import { WORKOUT_ICON_MAP } from '@/components/icons'
+import { WORKOUT_ICON_MAP, IconStrength, IconLightning } from '@/components/icons'
 
 export default function MyWorkoutsPage() {
   const [workouts, setWorkouts] = useState<Workout[]>([])
@@ -95,15 +95,8 @@ export default function MyWorkoutsPage() {
                 border: `1px solid ${P.lineStrong}`,
               }}
             >
-              <span
-                style={{
-                  fontSize: 22,
-                  fontWeight: 900,
-                  color: P.brand,
-                  lineHeight: 1,
-                }}
-              >
-                ⚡
+              <span style={{ color: P.brand, lineHeight: 1 }}>
+                <IconLightning size={22} />
               </span>
             </div>
             <div className="flex-1 min-w-0">
@@ -153,7 +146,7 @@ export default function MyWorkoutsPage() {
         {/* Empty */}
         {workouts.length === 0 && (
           <Tile style={{ padding: 32, textAlign: 'center' }}>
-            <div style={{ fontSize: 40, marginBottom: 8 }}>💪</div>
+            <div style={{ marginBottom: 8, color: P.ink, display: 'flex', justifyContent: 'center' }}><IconStrength size={40} /></div>
             <Kicker>NOG GEEN WORKOUTS</Kicker>
             <p
               style={{

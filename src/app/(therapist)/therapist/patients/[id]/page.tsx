@@ -28,6 +28,7 @@ import { RehabTracker } from '@/components/rehab/RehabTracker'
 import { PatientClinicalTests } from '@/components/clinical-tests/PatientClinicalTests'
 import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, type CardioActivityKey, type CardioProtocolKey } from '@/lib/cardio-constants'
 import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
+import { CARDIO_ICON_MAP, IconMail, IconCalendar, IconClipboard } from '@/components/icons'
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
   ACTIVE:    { label: 'Actief',    bg: 'rgba(232,122,85,0.14)', text: P.lime },
@@ -248,13 +249,13 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             loading={resendInvite.isPending}
             onClick={() => resendInvite.mutate({ patientId: patient.id })}
           >
-            ✉ Stuur invite-link
+            <span className="inline-flex items-center gap-1.5"><IconMail size={15} /> Stuur invite-link</span>
           </DarkButton>
           <DarkButton
             variant="secondary"
             href={`/therapist/week-planner?patientId=${patient.id}`}
           >
-            🗓 Weekschema
+            <span className="inline-flex items-center gap-1.5"><IconCalendar size={15} /> Weekschema</span>
           </DarkButton>
           {patient.programId ? (
             <DarkButton
@@ -269,7 +270,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                 variant="secondary"
                 onClick={() => setAssignTemplateOpen(true)}
               >
-                📋 Vanaf template
+                <span className="inline-flex items-center gap-1.5"><IconClipboard size={15} /> Vanaf template</span>
               </DarkButton>
               <DarkButton
                 variant="secondary"
@@ -611,7 +612,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                       <div className="flex items-start justify-between gap-3 flex-wrap">
                         <div>
                           <p className="athletic-mono" style={{ color: P.ink, fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                            {act?.icon} {act?.label ?? c.activity}
+                            {(() => { const Icon = CARDIO_ICON_MAP[c.activity as CardioActivityKey]; return Icon ? <Icon size={13} /> : act?.icon })()} {act?.label ?? c.activity}
                           </p>
                           <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11, marginTop: 2 }}>
                             {new Date(c.completedAt).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}

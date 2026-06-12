@@ -9,6 +9,7 @@
 import { use, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { IconHeart, IconLightning } from '@/components/icons'
 import {
   DndContext, closestCenter, PointerSensor,
   useSensor, useSensors, type DragEndEvent,
@@ -919,7 +920,7 @@ export default function TreatmentPage({
                 className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
                 style={{ background: 'rgba(248,113,113,0.12)', color: P.danger, fontSize: 14 }}
               >
-                ♥
+                <IconHeart size={14} />
               </span>
               <MetaLabel style={{ color: P.danger }}>PIJN /10</MetaLabel>
             </div>
@@ -935,7 +936,7 @@ export default function TreatmentPage({
                 className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
                 style={{ background: 'rgba(244,194,97,0.12)', color: P.gold, fontSize: 14 }}
               >
-                ⚡
+                <IconLightning size={14} />
               </span>
               <MetaLabel style={{ color: P.gold }}>RPE (inspanning) /10</MetaLabel>
             </div>

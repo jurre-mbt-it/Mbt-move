@@ -7,6 +7,7 @@ import { trpc } from '@/lib/trpc/client'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Building2, Upload, Trash2, Smartphone, Monitor, Info } from 'lucide-react'
+import { IconWarning } from '@/components/icons'
 
 type PracticeForm = {
   name: string
@@ -555,7 +556,7 @@ function buildPreviewHtml(footer: string): string {
               ? `<tr><td style="padding:18px 24px 24px 24px;">${footer}</td></tr>`
               : `<tr><td style="padding:20px 24px 24px 24px;">
                   <div style="background:rgba(245,158,11,0.10);border:1px solid rgba(245,158,11,0.30);border-radius:8px;padding:12px;font-size:12px;color:#F59E0B;line-height:1.5;">
-                    ⚠ Geen footer — vul minimaal praktijknaam, adres, plaats en telefoon óf email in.
+                    <IconWarning size={13} className="inline-block mr-1 align-[-2px]" /> Geen footer — vul minimaal praktijknaam, adres, plaats en telefoon óf email in.
                   </div>
                 </td></tr>`
             }

@@ -721,3 +721,154 @@ export function IconAlways({ size = 24, className }: IconProps) {
     </svg>
   )
 }
+
+// ─── Wellness / mood / misc UI ──────────────────────────────────────────────
+
+export const IconMoon = IconSleep
+
+export function IconSun({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="12" cy="12" r="4.5" fill={M} stroke={D} strokeWidth="1.5" />
+      <path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5" stroke={D} strokeWidth="2" strokeLinecap="round" />
+      <path d="M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8" stroke={L} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function IconLightning({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M13 2L5 13h5l-1 9 9-12h-5l1-8z" fill={M} stroke={D} strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+export function IconSparkle({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M12 3l1.8 5.4L19 10l-5.2 1.6L12 17l-1.8-5.4L5 10l5.2-1.6L12 3z" fill={M} stroke={D} strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M19 14l.6 1.8 1.9.7-1.9.7-.6 1.8-.6-1.8-1.9-.7 1.9-.7z" fill={L} />
+    </svg>
+  )
+}
+
+export function IconHeart({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M12 20s-7-5.5-7-10a4.5 4.5 0 0 1 7-3.5A4.5 4.5 0 0 1 19 10c0 4.5-7 10-7 10z" fill={D} />
+    </svg>
+  )
+}
+
+export function IconCalendar({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <rect x="4" y="5" width="16" height="16" rx="2" stroke={D} strokeWidth="2" />
+      <line x1="4" y1="9.5" x2="20" y2="9.5" stroke={D} strokeWidth="1.5" />
+      <path d="M8 3v3M16 3v3" stroke={M} strokeWidth="2" strokeLinecap="round" />
+      <circle cx="8" cy="13" r="0.9" fill={L} />
+      <circle cx="12" cy="13" r="0.9" fill={L} />
+      <circle cx="16" cy="13" r="0.9" fill={L} />
+      <circle cx="8" cy="17" r="0.9" fill={L} />
+      <circle cx="12" cy="17" r="0.9" fill={L} />
+    </svg>
+  )
+}
+
+export function IconFolder({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h6a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" fill={M} stroke={D} strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M3 10h18" stroke={D} strokeWidth="1.5" />
+    </svg>
+  )
+}
+
+export function IconScale({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M12 5.5v14M7 19.5h10" stroke={D} strokeWidth="2" strokeLinecap="round" />
+      <path d="M6 7.5h12" stroke={M} strokeWidth="2" strokeLinecap="round" />
+      <path d="M6 7.5l-3 6h6l-3-6zM18 7.5l-3 6h6l-3-6z" stroke={L} strokeWidth="1.5" strokeLinejoin="round" />
+      <circle cx="12" cy="5" r="1.5" fill={D} />
+    </svg>
+  )
+}
+
+export function IconBeach({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="8" cy="8" r="3" fill={M} stroke={D} strokeWidth="1.5" />
+      <path d="M8 2.5v1.5M3.5 8H2M3.9 3.9l1 1M3.9 12.1l1-1" stroke={L} strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M2 17c2-1.5 4-1.5 6 0s4 1.5 6 0 4-1.5 6 0" stroke={D} strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M2 20.5c2-1.5 4-1.5 6 0s4 1.5 6 0 4-1.5 6 0" stroke={M} strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function IconMail({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <rect x="3" y="5" width="18" height="14" rx="2" stroke={D} strokeWidth="2" />
+      <path d="M4 7l8 6 8-6" stroke={M} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+// ─── Mood faces (1 = slecht … 5 = top) ──────────────────────────────────────
+
+export function IconMoodVeryLow({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="12" cy="12" r="9" stroke={D} strokeWidth="2" />
+      <circle cx="9" cy="10" r="1" fill={M} />
+      <circle cx="15" cy="10" r="1" fill={M} />
+      <path d="M8.5 17c1-1.7 2-2.4 3.5-2.4s2.5.7 3.5 2.4" stroke={D} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function IconMoodLow({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="12" cy="12" r="9" stroke={D} strokeWidth="2" />
+      <circle cx="9" cy="10.5" r="1" fill={M} />
+      <circle cx="15" cy="10.5" r="1" fill={M} />
+      <path d="M9 16.4c.9-1.1 1.9-1.6 3-1.6s2.1.5 3 1.6" stroke={D} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function IconMoodNeutral({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="12" cy="12" r="9" stroke={D} strokeWidth="2" />
+      <circle cx="9" cy="10.5" r="1" fill={M} />
+      <circle cx="15" cy="10.5" r="1" fill={M} />
+      <path d="M9 15.5h6" stroke={D} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function IconMoodGood({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="12" cy="12" r="9" stroke={D} strokeWidth="2" />
+      <circle cx="9" cy="10.5" r="1" fill={M} />
+      <circle cx="15" cy="10.5" r="1" fill={M} />
+      <path d="M8.5 14.6c.9 1.4 2 2.1 3.5 2.1s2.6-.7 3.5-2.1" stroke={D} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function IconMoodGreat({ size = 24, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <circle cx="12" cy="12" r="9" stroke={D} strokeWidth="2" />
+      <circle cx="9" cy="10" r="1" fill={M} />
+      <circle cx="15" cy="10" r="1" fill={M} />
+      <path d="M7.5 14c1.2 2 2.7 3 4.5 3s3.3-1 4.5-3z" fill={M} stroke={D} strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  )
+}

@@ -702,7 +702,7 @@ function WorkoutBuilderContent() {
             <Tile>
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <span style={{ fontSize: 20 }}>{activityInfo.icon}</span>
+                  <span style={{ color: P.ink }}>{(() => { const Icon = CARDIO_ICON_MAP[form.activity]; return Icon ? <Icon size={22} /> : activityInfo.icon })()}</span>
                   <div>
                     <p
                       className="athletic-mono"
@@ -858,7 +858,7 @@ function WorkoutBuilderContent() {
                 >
                   <p>
                     <span style={{ color: P.ink, fontWeight: 700 }}>
-                      {activityInfo.icon} {activityInfo.label}
+                      {(() => { const Icon = CARDIO_ICON_MAP[form.activity]; return Icon ? <Icon size={14} /> : activityInfo.icon })()} {activityInfo.label}
                     </span>
                     {' — '}{protocolInfo.label}
                   </p>
