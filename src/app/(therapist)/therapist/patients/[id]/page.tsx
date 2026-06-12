@@ -26,6 +26,8 @@ import { InsightTimeline } from '@/components/insights/InsightTimeline'
 import { RehabActivationToggle } from '@/components/rehab/RehabActivationToggle'
 import { RehabTracker } from '@/components/rehab/RehabTracker'
 import { PatientClinicalTests } from '@/components/clinical-tests/PatientClinicalTests'
+import { PatientWearablesTab } from '@/components/wearables/PatientWearablesTab'
+import { wearablesEnabledForRole } from '@/lib/wearables-access'
 import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, type CardioActivityKey, type CardioProtocolKey } from '@/lib/cardio-constants'
 import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
 import { CARDIO_ICON_MAP, IconMail, IconCalendar, IconClipboard } from '@/components/icons'
@@ -42,7 +44,7 @@ const STATUS_ACCENT: Record<string, string> = {
   COMPLETED: P.inkDim,
 }
 
-const TAB_VALUES = ['profiel', 'programmas', 'geschiedenis', 'revalidatie', 'tests', 'signalen', 'voortgang'] as const
+const TAB_VALUES = ['profiel', 'programmas', 'geschiedenis', 'revalidatie', 'tests', 'signalen', 'voortgang', 'wearables'] as const
 
 export default function PatientDetailPage({
   params,
@@ -58,6 +60,9 @@ export default function PatientDetailPage({
   const initialTab = TAB_VALUES.includes(tab as (typeof TAB_VALUES)[number]) ? tab : 'profiel'
   const router = useRouter()
   const { data: patient, isLoading } = trpc.patients.get.useQuery({ id })
+  // Wearable-tab voorlopig alleen voor de admin (zie wearables-access.ts).
+  const { data: me } = trpc.auth.getMe.useQuery()
+  const showWearables = wearablesEnabledForRole(me?.role)
   const { data: programsRaw = [] } = trpc.programs.list.useQuery({ patientId: id })
   const [historyLimit, setHistoryLimit] = useState(5)
   const [historyPerformer, setHistoryPerformer] = useState<PerformerFilter>('all')
@@ -392,7 +397,7 @@ export default function PatientDetailPage({
         {/* Tabs */}
         <Tabs defaultValue={initialTab} className="space-y-4">
           <TabsList
-            className="w-full grid grid-cols-7 rounded-xl"
+            className={`w-full grid ${showWearables ? 'grid-cols-8' : 'grid-cols-7'} rounded-xl`}
             style={{ background: P.surface, border: `1px solid ${P.line}` }}
           >
             <TabsTrigger value="profiel" className="text-xs px-1">Profiel</TabsTrigger>
@@ -402,6 +407,7 @@ export default function PatientDetailPage({
             <TabsTrigger value="tests" className="text-xs px-1">Tests</TabsTrigger>
             <TabsTrigger value="signalen" className="text-xs px-1">Signalen</TabsTrigger>
             <TabsTrigger value="voortgang" className="text-xs px-1">Voortgang</TabsTrigger>
+            {showWearables && <TabsTrigger value="wearables" className="text-xs px-1">Watch</TabsTrigger>}
           </TabsList>
 
           {/* ── TAB: Profiel ─────────────────────────────────────── */}
@@ -861,6 +867,13 @@ export default function PatientDetailPage({
               </div>
             </Tile>
           </TabsContent>
+
+          {/* ── TAB: Wearable (Apple Watch) — alleen admin ────────── */}
+          {showWearables && (
+            <TabsContent value="wearables" className="space-y-3">
+              <PatientWearablesTab patientId={patient.id} />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </div>

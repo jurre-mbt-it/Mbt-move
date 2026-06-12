@@ -19,7 +19,10 @@ opzettelijk; documenteer hier áls je het wijzigt:
 - **Week-schedules** — owner is creator, maar collega-therapeuten in
   dezelfde praktijk kunnen ze lezen.
 - **Patiënt-data** (sessions, wellness, pain entries, assessments,
-  rehab-trackers, programma-toewijzing, dashboard, voortgang, insights) —
+  rehab-trackers, programma-toewijzing, dashboard, voortgang, insights,
+  **wearable-data** — `SleepEntry`, `VitalsEntry`, `ReadinessSnapshot`,
+  `WearableConnection` plus de van de watch gesyncte `CardioLog`-rijen
+  (`source = APPLE_WATCH`), gelezen via `wearables.forPatient`) —
   toegang via directe `PatientTherapist`-relatie **OF** zelfde
   `practiceId` als de patiënt. Dit laat collega-therapeuten binnen één
   praktijk elkaars patiënten behandelen en sessies loggen zonder aparte
