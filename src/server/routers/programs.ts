@@ -334,7 +334,10 @@ export const programsRouter = createTRPCRouter({
           ...(targetPatientId ? { patientId: targetPatientId } : {}),
           creatorId: ctx.user!.id,
           practiceId: ctx.user!.practiceId ?? null,
-          status: 'DRAFT',
+          // Kopie die direct aan een patiënt wordt toegewezen is meteen
+          // ACTIVE (zichtbaar voor de patiënt), net als `create`. Alleen een
+          // template/los concept blijft DRAFT.
+          status: targetPatientId ? 'ACTIVE' : 'DRAFT',
           exercises: {
             create: source.exercises.map(ex => ({
               id: createId(),
