@@ -10,6 +10,7 @@ import { createTRPCContext } from '@/server/trpc'
 import { ingestWearableData } from '@/server/wearables/ingest'
 import { computeAndStoreReadiness } from '@/server/readiness'
 import { mockSyncPayload } from '@/lib/wearable-mock'
+import { wearablesEnabledForRole } from '@/lib/wearables-access'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -21,6 +22,9 @@ export async function GET(req: NextRequest) {
   const ctx = await createTRPCContext({ req })
   if (!ctx.user) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  }
+  if (!wearablesEnabledForRole(ctx.user.role)) {
+    return NextResponse.json({ error: 'not_enabled' }, { status: 403 })
   }
   const days = Math.min(90, Math.max(7, Number(req.nextUrl.searchParams.get('days')) || 30))
   const payload = mockSyncPayload(days)

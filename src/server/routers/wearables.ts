@@ -3,6 +3,18 @@ import { TRPCError } from '@trpc/server'
 import type { PrismaClient } from '@prisma/client'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { computeReadinessFor } from '@/server/readiness'
+import { wearablesEnabledForRole } from '@/lib/wearables-access'
+
+/**
+ * Uitrol-gate: wearables is voorlopig alleen voor de admin (zie
+ * src/lib/wearables-access.ts). Verbreden = die helper aanpassen, niet hier.
+ */
+const wearablesProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (!wearablesEnabledForRole(ctx.user!.role)) {
+    throw new TRPCError({ code: 'FORBIDDEN' })
+  }
+  return next({ ctx })
+})
 
 /**
  * Wearables-router: leest de gesyncte Apple-Watch-data (slaap, vitals,
@@ -150,13 +162,13 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
 
 export const wearablesRouter = createTRPCRouter({
   /** Volledig wearable-overzicht voor de ingelogde gebruiker. */
-  overview: protectedProcedure.query(({ ctx }) => buildOverview(ctx.prisma, ctx.user!.id)),
+  overview: wearablesProcedure.query(({ ctx }) => buildOverview(ctx.prisma, ctx.user!.id)),
 
   /** Alleen de readiness van vandaag (lichter, voor dashboard-tegel). */
-  readiness: protectedProcedure.query(({ ctx }) => computeReadinessFor(ctx.prisma, ctx.user!.id)),
+  readiness: wearablesProcedure.query(({ ctx }) => computeReadinessFor(ctx.prisma, ctx.user!.id)),
 
   /** Verbindingsstatus (voor de instellingen / connect-flow). */
-  connection: protectedProcedure.query(async ({ ctx }) => {
+  connection: wearablesProcedure.query(async ({ ctx }) => {
     const c = await ctx.prisma.wearableConnection.findUnique({
       where: { userId_provider: { userId: ctx.user!.id, provider: 'APPLE_HEALTH' } },
       select: { provider: true, deviceModel: true, enabled: true, lastSyncAt: true, connectedAt: true },
@@ -165,7 +177,7 @@ export const wearablesRouter = createTRPCRouter({
   }),
 
   /** Verbinding aan/uit zetten of loskoppelen (patient-side beheer). */
-  setEnabled: protectedProcedure
+  setEnabled: wearablesProcedure
     .input(z.object({ enabled: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.prisma.wearableConnection.updateMany({
@@ -176,7 +188,7 @@ export const wearablesRouter = createTRPCRouter({
     }),
 
   /** Therapeut/admin: wearable-overzicht van een patiënt (na toegangscheck). */
-  forPatient: protectedProcedure
+  forPatient: wearablesProcedure
     .input(z.object({ patientId: z.string() }))
     .query(async ({ ctx, input }) => {
       if (!(await hasPatientAccess(ctx.prisma as PrismaClient, ctx.user!, input.patientId))) {

@@ -16,6 +16,7 @@ import { createTRPCContext } from '@/server/trpc'
 import { DPA_VERSION } from '@/lib/dpa-constants'
 import { ingestWearableData, syncPayloadSchema } from '@/server/wearables/ingest'
 import { computeAndStoreReadiness } from '@/server/readiness'
+import { wearablesEnabledForRole } from '@/lib/wearables-access'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -27,6 +28,11 @@ export async function POST(req: NextRequest) {
   const ctx = await createTRPCContext({ req })
   if (!ctx.user) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  }
+
+  // Uitrol-gate: voorlopig alleen admin (zie src/lib/wearables-access.ts).
+  if (!wearablesEnabledForRole(ctx.user.role)) {
+    return NextResponse.json({ error: 'not_enabled' }, { status: 403 })
   }
 
   // DPA-gate voor patiënt/atleet (therapeut/admin tekenen buiten de app om).

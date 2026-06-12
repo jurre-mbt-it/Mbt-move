@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
+import { wearablesEnabledForRole } from '@/lib/wearables-access'
 import {
   ActionTile,
   DarkScreen,
@@ -28,6 +29,7 @@ export default function PatientDashboard() {
   const multiProgram = (activePrograms?.length ?? 0) > 1
   const { data: todayWellness } = trpc.wellness.today.useQuery()
   const { data: rehabTracker } = trpc.rehab.getMyTracker.useQuery()
+  const { data: me } = trpc.auth.getMe.useQuery()
 
 
   const todayExercises = sessionData?.exercises ?? []
@@ -246,13 +248,16 @@ export default function PatientDashboard() {
           bar={todayWellness ? P.lime : P.ice}
         />
 
-        {/* Apple Watch — readiness, slaap & herstel */}
-        <ActionTile
-          href="/patient/wearables"
-          label="Apple Watch"
-          sub="Readiness, slaap & herstel uit je watch"
-          bar={P.brand}
-        />
+        {/* Apple Watch — readiness, slaap & herstel.
+            Voorlopig alleen voor de admin (zie wearables-access.ts). */}
+        {wearablesEnabledForRole(me?.role) && (
+          <ActionTile
+            href="/patient/wearables"
+            label="Apple Watch"
+            sub="Readiness, slaap & herstel uit je watch"
+            bar={P.brand}
+          />
+        )}
 
         {/* Active program detail */}
         {activeProgram?.id && (

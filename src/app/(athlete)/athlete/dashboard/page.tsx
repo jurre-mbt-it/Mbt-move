@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
+import { wearablesEnabledForRole } from '@/lib/wearables-access'
 import { createClient } from '@/lib/supabase/client'
 import { WeeklyTrendChart } from '@/components/charts/WeeklyTrendChart'
 import {
@@ -55,6 +56,7 @@ export default function AthleteDashboard() {
     limit: 20,
   })
   const { data: rehabTracker } = trpc.rehab.getMyTracker.useQuery()
+  const { data: me } = trpc.auth.getMe.useQuery()
 
   const todayExercises = sessionData?.exercises ?? []
   const lastSession = sessionHistory?.[0] ?? null
@@ -309,12 +311,16 @@ export default function AthleteDashboard() {
             href="/athlete/cardio/new"
             bar={P.ice}
           />
-          <ActionTile
-            label="APPLE WATCH"
-            sub="Readiness, slaap & herstel uit je watch"
-            href="/athlete/wearables"
-            bar={P.brand}
-          />
+          {/* Voorlopig alleen voor de admin (zie wearables-access.ts) —
+              admin gebruikt de atleet-shell via personal mode. */}
+          {wearablesEnabledForRole(me?.role) && (
+            <ActionTile
+              label="APPLE WATCH"
+              sub="Readiness, slaap & herstel uit je watch"
+              href="/athlete/wearables"
+              bar={P.brand}
+            />
+          )}
         </div>
 
         {/* ── Wekelijkse trend (RPE + pijn) ─────────────── */}
