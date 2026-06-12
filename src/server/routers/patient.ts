@@ -566,12 +566,28 @@ export const patientRouter = createTRPCRouter({
           .optional(),
         // Tijd-in-zone (seconden per HR-zone): { "1": sec, ... }.
         timeInZones: z.record(z.string(), z.number().int().min(0)).nullable().optional(),
+        // Wanneer de sessie is uitgevoerd. Leeg = nu (server-tijd). Laat de
+        // patiënt een sessie van een eerdere dag achteraf loggen.
+        completedAt: z.string().datetime().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const rl = await rateLimit('patient.logCardioSession', ctx.user.id, RATE_LIMITS.sessionLog)
       if (!rl.ok) {
         throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
+      }
+      // Achteraf loggen mag, maar niet in de toekomst en niet absurd ver terug.
+      let completedAt: Date | undefined
+      if (input.completedAt) {
+        const d = new Date(input.completedAt)
+        const now = Date.now()
+        if (d.getTime() > now + 60_000) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Datum mag niet in de toekomst liggen.' })
+        }
+        if (d.getTime() < now - 366 * 86_400_000) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Datum ligt te ver in het verleden (max. 1 jaar).' })
+        }
+        completedAt = d
       }
       const avgPaceSecPerKm = paceSecPerKm(input.distanceM, input.durationSec)
       const log = await ctx.prisma.cardioLog.create({
@@ -592,6 +608,8 @@ export const patientRouter = createTRPCRouter({
           avgPaceSecPerKm,
           intervals: input.intervals ?? undefined,
           timeInZones: input.timeInZones ?? undefined,
+          // Undefined → DB-default now(). Gezet bij achteraf loggen.
+          completedAt,
         },
         select: { id: true },
       })

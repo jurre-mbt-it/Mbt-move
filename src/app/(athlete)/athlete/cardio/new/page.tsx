@@ -28,6 +28,20 @@ const SELECTABLE_PROTOCOLS: CardioProtocolKey[] = [
   'STEADY_STATE', 'INTERVALS', 'TEMPO', 'ZONE_TRAINING', 'THRESHOLD', 'LONG_SLOW_DISTANCE',
 ]
 
+// Lokale YYYY-MM-DD (geen UTC-shift) voor de datum-input.
+function ymd(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function addDays(base: Date, n: number): Date {
+  const d = new Date(base)
+  d.setDate(d.getDate() + n)
+  return d
+}
+
 const numInputStyle: React.CSSProperties = {
   background: P.surfaceHi,
   border: `1px solid ${P.lineStrong}`,
@@ -51,6 +65,9 @@ export default function AthleteCardioLogPage() {
   const [protocol, setProtocol] = useState<CardioProtocolKey>('STEADY_STATE')
   const [useIntervals, setUseIntervals] = useState(false)
   const [blocks, setBlocks] = useState<IntervalBlock[]>([emptyInterval()])
+
+  const todayStr = ymd(new Date())
+  const [dateStr, setDateStr] = useState(todayStr)
 
   const [durMin, setDurMin] = useState('')
   const [durSec, setDurSec] = useState('')
@@ -97,6 +114,11 @@ export default function AthleteCardioLogPage() {
           ),
         )
       : undefined
+    // Combineer de gekozen dag met de huidige kloktijd: vandaag ≈ nu, een
+    // eerdere dag krijgt die datum op het huidige tijdstip (sorteert netjes).
+    const now = new Date()
+    const [yy, mm, dd] = dateStr.split('-').map(Number)
+    const completedAt = new Date(yy, mm - 1, dd, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString()
     try {
       await logCardio.mutateAsync({
         programId: null,
@@ -112,6 +134,7 @@ export default function AthleteCardioLogPage() {
         notes: notes.trim() || null,
         intervals: intervalsPayload,
         timeInZones,
+        completedAt,
       })
       await Promise.all([
         utils.patient.getSessionHistory.invalidate(),
@@ -142,6 +165,52 @@ export default function AthleteCardioLogPage() {
             </h1>
           </div>
         </div>
+
+        {/* Wanneer — standaard vandaag, maar achteraf loggen kan ook */}
+        <Tile>
+          <Kicker style={{ marginBottom: 10 }}>WANNEER</Kicker>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {[
+              { label: 'Vandaag', value: todayStr },
+              { label: 'Gisteren', value: ymd(addDays(new Date(), -1)) },
+              { label: 'Eergisteren', value: ymd(addDays(new Date(), -2)) },
+            ].map((opt) => {
+              const active = dateStr === opt.value
+              return (
+                <button
+                  key={opt.label}
+                  onClick={() => setDateStr(opt.value)}
+                  className="athletic-tap rounded-full px-3 py-2"
+                  style={{
+                    background: active ? P.brand + '22' : P.surfaceHi,
+                    border: `1px solid ${active ? P.brand : P.line}`,
+                    color: active ? P.brand : P.inkMuted,
+                    fontSize: 12, fontWeight: 800,
+                  }}
+                >
+                  {opt.label}
+                </button>
+              )
+            })}
+          </div>
+          <MetaLabel style={{ marginBottom: 4 }}>OF KIES EEN DATUM</MetaLabel>
+          <input
+            type="date"
+            value={dateStr}
+            max={todayStr}
+            onChange={(e) => { if (e.target.value) setDateStr(e.target.value) }}
+            style={{ ...numInputStyle, textAlign: 'left', padding: '0 12px', colorScheme: 'dark' }}
+          />
+          {dateStr !== todayStr && (
+            <MetaLabel style={{ marginTop: 8, textTransform: 'none', fontWeight: 500, color: P.gold }}>
+              Je logt deze sessie op{' '}
+              {new Date(`${dateStr}T00:00:00`).toLocaleDateString('nl-NL', {
+                weekday: 'long', day: 'numeric', month: 'long',
+              })}
+              .
+            </MetaLabel>
+          )}
+        </Tile>
 
         {/* Activiteit */}
         <Tile>
