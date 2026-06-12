@@ -309,6 +309,12 @@ export default function AthleteDashboard() {
             href="/athlete/cardio/new"
             bar={P.ice}
           />
+          <ActionTile
+            label="APPLE WATCH"
+            sub="Readiness, slaap & herstel uit je watch"
+            href="/athlete/wearables"
+            bar={P.brand}
+          />
         </div>
 
         {/* ── Wekelijkse trend (RPE + pijn) ─────────────── */}

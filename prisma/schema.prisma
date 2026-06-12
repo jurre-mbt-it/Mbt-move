@@ -353,14 +353,20 @@ model User {
   clinicalTestResultsLogged PatientTestResult[]     @relation("ClinicalTestResultPerformer")
 
   // Consumenten-shop: programma's waarvoor deze therapeut credit krijgt (omzetverdeling).
-  shopProductsCredited ShopProduct[] @relation("ShopProductTherapist")
+  shopProductsCredited   ShopProduct[] @relation("ShopProductTherapist")
   // Testrapport relations
-  testReportsAsPatient   TestReport[] @relation("TestReportPatient")
-  testReportsAsTherapist TestReport[] @relation("TestReportTherapist")
+  testReportsAsPatient   TestReport[]  @relation("TestReportPatient")
+  testReportsAsTherapist TestReport[]  @relation("TestReportTherapist")
 
   // Hardloopanalyse relations
   runningAnalysesAsPatient   RunningAnalysis[] @relation("RunningAnalysisPatient")
   runningAnalysesAsTherapist RunningAnalysis[] @relation("RunningAnalysisTherapist")
+
+  // Wearables (Apple Watch / HealthKit)
+  wearableConnections WearableConnection[]
+  sleepEntries        SleepEntry[]
+  vitalsEntries       VitalsEntry[]
+  readinessSnapshots  ReadinessSnapshot[]
 
   @@index([deletedAt])
   @@map("users")
@@ -483,11 +489,11 @@ model Exercise {
   harderVariant   Exercise?  @relation("ProgressionHarder", fields: [harderVariantId], references: [id])
   harderOf        Exercise[] @relation("ProgressionHarder")
 
-  programExercises        ProgramExercise[]
-  collectionItems         ExerciseCollectionItem[]
-  favoritedBy             FavoriteExercise[]
-  insights                Insight[]
-  assessmentMobilizations AssessmentTestMobilization[]
+  programExercises          ProgramExercise[]
+  collectionItems           ExerciseCollectionItem[]
+  favoritedBy               FavoriteExercise[]
+  insights                  Insight[]
+  assessmentMobilizations   AssessmentTestMobilization[]
   weekScheduleItemExercises WeekScheduleDayItemExercise[]
 
   // Multi-tenant: oefening is zichtbaar binnen deze praktijk. null = globaal
@@ -680,31 +686,38 @@ model Program {
 }
 
 model CardioLog {
-  id           String         @id @default(cuid())
-  program      Program?       @relation(fields: [programId], references: [id], onDelete: SetNull)
-  programId    String?
-  patient      User           @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  patientId    String
-  activity     CardioActivity
-  protocol     CardioProtocol
-  durationSec  Int // seconds
-  distanceM    Int? // meters
-  avgHeartRate Int?
-  maxHeartRate Int?
-  zone         Int? // 1-5 (behaalde gemiddelde zone)
-  targetZone   Int? // 1-5 (voorgeschreven doel-zone, los van behaalde `zone`)
-  calories     Int?
-  rpe          Int? // 1-10
-  painLevel    Int? // 0-10
-  notes        String?
-  intervals    Json? // werkelijk gelogde interval-breakdown [{ label, type, durationSec, distanceM?, avgHeartRate? }]
+  id              String         @id @default(cuid())
+  program         Program?       @relation(fields: [programId], references: [id], onDelete: SetNull)
+  programId       String?
+  patient         User           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId       String
+  activity        CardioActivity
+  protocol        CardioProtocol
+  durationSec     Int // seconds
+  distanceM       Int? // meters
+  avgHeartRate    Int?
+  maxHeartRate    Int?
+  zone            Int? // 1-5 (behaalde gemiddelde zone)
+  targetZone      Int? // 1-5 (voorgeschreven doel-zone, los van behaalde `zone`)
+  calories        Int?
+  rpe             Int? // 1-10
+  painLevel       Int? // 0-10
+  notes           String?
+  intervals       Json? // werkelijk gelogde interval-breakdown [{ label, type, durationSec, distanceM?, avgHeartRate? }]
   // Tijd-in-zone (seconden per HR-zone): { "1": sec, "2": sec, ... }. Afgeleid
   // uit gemeten HR + het HR-profiel van de patiënt op moment van loggen.
   timeInZones     Json?
   avgPaceSecPerKm Int? // gemiddeld tempo in s/km (afgeleid uit distanceM/durationSec, opgeslagen voor trends)
-  completedAt  DateTime       @default(now())
-  createdAt    DateTime       @default(now())
+  // Bron van de sessie: handmatig gelogd of gesynct vanuit een wearable.
+  // `externalId` = HealthKit-workout-UUID; uniek zodat overlappende sync-
+  // batches (na anchor-reset / herinstallatie) niet dubbel landen, en zodat
+  // een handmatig gelogde sessie niet dubbelt met dezelfde watch-workout.
+  source          WorkoutSource  @default(MANUAL)
+  externalId      String?        @unique
+  completedAt     DateTime       @default(now())
+  createdAt       DateTime       @default(now())
 
+  @@index([patientId, completedAt])
   @@map("cardio_logs")
 }
 
@@ -794,10 +807,10 @@ model WeekScheduleDayItem {
 // ProgramExercise zodat een planner-workout lichtgewicht oefeningen kan dragen
 // zonder een volledig Program aan te maken.
 model WeekScheduleDayItemExercise {
-  id     String              @id @default(cuid())
-  item   WeekScheduleDayItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  itemId String
-  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  id         String              @id @default(cuid())
+  item       WeekScheduleDayItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  itemId     String
+  exercise   Exercise            @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
   exerciseId String
 
   order    Int     @default(0)
@@ -1208,27 +1221,27 @@ enum EducationFormat {
 }
 
 model EducationalResource {
-  id          String          @id @default(cuid())
-  title       String
-  description String?
-  format      EducationFormat
+  id           String          @id @default(cuid())
+  title        String
+  description  String?
+  format       EducationFormat
   // VIDEO: mediaType + videoUrl, zelfde conventie als Exercise.
-  mediaType   MediaType?
-  videoUrl    String?
+  mediaType    MediaType?
+  videoUrl     String?
   // PDF: object-pad binnen de privé-bucket `educational-resources`. Niet
   // publiek leesbaar — serveren via een server-side signed URL.
   filePath     String?
   thumbnailUrl String?
   // Matcht RehabProtocol.specialty ("knee_acl", "shoulder", …). null = algemeen.
-  specialty   String?
-  bodyRegion  BodyRegion[]
-  tags        String[]
-  isActive    Boolean         @default(true)
-  order       Int             @default(0)
-  createdBy   User            @relation("EducationalResourceCreator", fields: [createdById], references: [id])
-  createdById String
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  specialty    String?
+  bodyRegion   BodyRegion[]
+  tags         String[]
+  isActive     Boolean         @default(true)
+  order        Int             @default(0)
+  createdBy    User            @relation("EducationalResourceCreator", fields: [createdById], references: [id])
+  createdById  String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
   programItems ProgramResource[]
 
@@ -1565,7 +1578,7 @@ model ShopProduct {
   variants       ShopProductVariant[]
   orderItems     ShopOrderItem[]
   entitlements   ShopEntitlement[]
-  intakeSessions ShopIntakeSession[] @relation("IntakeRecommendedProduct")
+  intakeSessions ShopIntakeSession[]  @relation("IntakeRecommendedProduct")
 
   @@index([status])
   @@index([kind])
@@ -1732,30 +1745,30 @@ enum TestReportStatus {
 /// Global library (niet practice-gescoped, net als ClinicalTest/AssessmentTest);
 /// reads via service_role in de backend. Geseed uit scripts/test-catalog-data.ts.
 model TestCatalogItem {
-  id            String     @id @default(cuid())
+  id             String     @id @default(cuid())
   /// Stabiele kebab-case slug — idempotente seed-key.
-  key           String?    @unique
-  category      String // "Kracht", "Power", "Mobiliteit"
-  categoryOrder Int        @default(0)
-  name          String // "Quadriceps"
-  subtitle      String? // "isometrisch"
-  source        String? // "KINVENT K-PULL · ISOMETRISCH"
-  kind          TestKind   @default(BILATERAL)
-  metric        PlotMetric @default(LSI)
-  unitPrimary   String? // "kg", "cm", "sec", "reps", "°"
-  unitSecondary String? // "Nm/kg" (optionele tweede eenheid per zijde)
-  plotUnit      String     @default("%") // eenheid van de geplotte waarde
-  axisMin       Float      @default(60)
-  axisMax       Float      @default(100)
-  zoneOrangeMin Float      @default(80) // ≥ → minimaal oranje
-  zoneGreenMin  Float      @default(90) // ≥ → groen
-  higherIsBetter Boolean   @default(true)
-  order         Int        @default(0)
-  isActive      Boolean    @default(true)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  key            String?    @unique
+  category       String // "Kracht", "Power", "Mobiliteit"
+  categoryOrder  Int        @default(0)
+  name           String // "Quadriceps"
+  subtitle       String? // "isometrisch"
+  source         String? // "KINVENT K-PULL · ISOMETRISCH"
+  kind           TestKind   @default(BILATERAL)
+  metric         PlotMetric @default(LSI)
+  unitPrimary    String? // "kg", "cm", "sec", "reps", "°"
+  unitSecondary  String? // "Nm/kg" (optionele tweede eenheid per zijde)
+  plotUnit       String     @default("%") // eenheid van de geplotte waarde
+  axisMin        Float      @default(60)
+  axisMax        Float      @default(100)
+  zoneOrangeMin  Float      @default(80) // ≥ → minimaal oranje
+  zoneGreenMin   Float      @default(90) // ≥ → groen
+  higherIsBetter Boolean    @default(true)
+  order          Int        @default(0)
+  isActive       Boolean    @default(true)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
-  batteryItems TestBatteryItem[]
+  batteryItems  TestBatteryItem[]
   reportEntries TestReportEntry[]
 
   @@index([category, order])
@@ -1825,39 +1838,39 @@ model TestReport {
 /// Eén test (met waarden) binnen een rapport. Spec-velden zijn gekopieerd uit
 /// de catalogus bij toevoegen en daarna vrij overschrijfbaar.
 model TestReportEntry {
-  id            String           @id @default(cuid())
-  reportId      String
-  report        TestReport       @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  catalogItemId String? // herkomst (nullable: vrije entry)
-  catalogItem   TestCatalogItem? @relation(fields: [catalogItemId], references: [id], onDelete: SetNull)
+  id                   String           @id @default(cuid())
+  reportId             String
+  report               TestReport       @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  catalogItemId        String? // herkomst (nullable: vrije entry)
+  catalogItem          TestCatalogItem? @relation(fields: [catalogItemId], references: [id], onDelete: SetNull)
   // Spec
-  category       String
-  categoryOrder  Int        @default(0)
-  name           String
-  subtitle       String?
-  source         String?
-  kind           TestKind   @default(BILATERAL)
-  metric         PlotMetric @default(LSI)
-  unitPrimary    String?
-  unitSecondary  String?
-  plotUnit       String     @default("%")
-  axisMin        Float      @default(60)
-  axisMax        Float      @default(100)
-  zoneOrangeMin  Float      @default(80)
-  zoneGreenMin   Float      @default(90)
-  higherIsBetter Boolean    @default(true)
+  category             String
+  categoryOrder        Int              @default(0)
+  name                 String
+  subtitle             String?
+  source               String?
+  kind                 TestKind         @default(BILATERAL)
+  metric               PlotMetric       @default(LSI)
+  unitPrimary          String?
+  unitSecondary        String?
+  plotUnit             String           @default("%")
+  axisMin              Float            @default(60)
+  axisMax              Float            @default(100)
+  zoneOrangeMin        Float            @default(80)
+  zoneGreenMin         Float            @default(90)
+  higherIsBetter       Boolean          @default(true)
   // Waarden
-  leftPrimary    Float?
-  rightPrimary   Float?
-  leftSecondary  Float?
-  rightSecondary Float?
-  singleValue    Float?
-  textValue      String? // categoriaal/vrij (niet geplot)
+  leftPrimary          Float?
+  rightPrimary         Float?
+  leftSecondary        Float?
+  rightSecondary       Float?
+  singleValue          Float?
+  textValue            String? // categoriaal/vrij (niet geplot)
   // Overrides (null = automatisch berekend)
   plottedValueOverride Float?
   zoneOverride         TestZone?
   notes                String?
-  order                Int      @default(0)
+  order                Int              @default(0)
 
   @@index([reportId])
   @@map("test_report_entries")
@@ -1895,24 +1908,24 @@ enum RunningAnalysisStatus {
 }
 
 model RunningAnalysis {
-  id          String   @id @default(cuid())
-  patientId   String
-  patient     User     @relation("RunningAnalysisPatient", fields: [patientId], references: [id], onDelete: Cascade)
-  therapistId String
-  therapist   User     @relation("RunningAnalysisTherapist", fields: [therapistId], references: [id])
-  performedAt DateTime @default(now())
+  id                String                @id @default(cuid())
+  patientId         String
+  patient           User                  @relation("RunningAnalysisPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  therapistId       String
+  therapist         User                  @relation("RunningAnalysisTherapist", fields: [therapistId], references: [id])
+  performedAt       DateTime              @default(now())
   // Kop
-  goal        String? // "Blessurevrij 10 km"
-  location    String?
-  subtitle    String? // "Beoordeling van houding, beweging en loopmetrics"
-  viewLabel   String? // "Achteraanzicht & zijaanzicht"
+  goal              String? // "Blessurevrij 10 km"
+  location          String?
+  subtitle          String? // "Beoordeling van houding, beweging en loopmetrics"
+  viewLabel         String? // "Achteraanzicht & zijaanzicht"
   // Loopmetrics (vaste 6 — gemiddelde over de analyse)
-  cadence       Float? // stappen/min
-  strideLength  Float? // paslengte, meter
-  stepLength    Float? // staplengte, meter (stride)
-  groundContact Float? // seconde
-  flightTime    Float? // seconde
-  dutyFactor    Float? // ratio
+  cadence           Float? // stappen/min
+  strideLength      Float? // paslengte, meter
+  stepLength        Float? // staplengte, meter (stride)
+  groundContact     Float? // seconde
+  flightTime        Float? // seconde
+  dutyFactor        Float? // ratio
   // Slottekst
   therapistComments String?
   nextMoment        String? // "Over 6 weken · medio juli 2026"
@@ -1941,12 +1954,12 @@ model RunningAnalysisItem {
   value      Float?
   comment    String?
   // Alleen SIDE: ideale range + as (gekopieerd uit de catalogus bij aanmaken).
-  idealMin Float?
-  idealMax Float?
-  axisMin  Float?
-  axisMax  Float?
-  unit     String?
-  order    Int     @default(0)
+  idealMin   Float?
+  idealMax   Float?
+  axisMin    Float?
+  axisMax    Float?
+  unit       String?
+  order      Int                @default(0)
 
   @@unique([analysisId, key])
   @@index([analysisId])
@@ -1964,4 +1977,127 @@ model RunningAnalysisAdvice {
 
   @@index([analysisId])
   @@map("running_analysis_advice")
+}
+
+// ─── Wearables (Apple Watch / HealthKit) ─────────────────────────────────────
+//
+// De iOS-app (Expo dev-client) leest HealthKit met anchored queries en POST't
+// batches naar /api/wearable/sync. Alles is idempotent op de HealthKit-sample-
+// UUID (`externalId`) zodat overlappende batches — na anchor-reset of
+// herinstallatie — niet dubbel landen.
+//
+// HRV-let op: Apple meet SDNN, andere wearables RMSSD; die zijn NIET
+// vergelijkbaar. We bewaren daarom altijd `hrvType` en vergelijken uitsluitend
+// binnen-persoon/binnen-device-trends t.o.v. een eigen baseline.
+
+enum WearableProvider {
+  APPLE_HEALTH
+}
+
+enum WorkoutSource {
+  MANUAL // handmatig gelogd in de app
+  APPLE_WATCH // gesynct vanuit HealthKit
+}
+
+enum HrvType {
+  SDNN // Apple Watch
+  RMSSD // Garmin / Whoop / Oura (toekomst)
+}
+
+enum ReadinessBand {
+  GREEN // klaar voor (zware) training
+  AMBER // onderhoud, niet opbouwen
+  RED // deload / actief herstel
+  LEARNING // < baseline-drempel aan nachten — nog niet betrouwbaar
+}
+
+/// Verbinding van een gebruiker met een wearable-bron. Eén rij per
+/// (user, provider). `anchors` bewaart per HealthKit-type de laatste
+/// incrementele anchor (opaque), zodat de native bridge incrementeel synct.
+model WearableConnection {
+  id          String           @id @default(cuid())
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  provider    WearableProvider @default(APPLE_HEALTH)
+  enabled     Boolean          @default(true)
+  deviceModel String? // bv. "Apple Watch Series 9"
+  anchors     Json? // { "workouts": "...", "sleep": "...", "hrv": "...", ... }
+  connectedAt DateTime         @default(now())
+  lastSyncAt  DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([userId, provider])
+  @@index([userId])
+  @@map("wearable_connections")
+}
+
+/// Eén nacht slaap, geaggregeerd uit HealthKit sleep-analysis-segmenten.
+/// `date` = start-of-day van de ochtend (1 per user per nacht).
+model SleepEntry {
+  id           String        @id @default(cuid())
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  date         DateTime
+  startAt      DateTime // bedtijd (eerste segment)
+  endAt        DateTime // ontwaaktijd (laatste segment)
+  inBedMin     Int? // totaal in bed
+  asleepMin    Int // totale slaaptijd (TST)
+  awakeMin     Int           @default(0) // WASO + wakker na inslapen
+  lightMin     Int           @default(0)
+  deepMin      Int           @default(0)
+  remMin       Int           @default(0)
+  efficiency   Float? // 0-1 = asleep / inBed
+  latencyMin   Int? // inslaaptijd
+  // Transparante 0-100 score (Fitbit-stijl: 50% duur, 25% herstellend
+  // deep+REM, 25% efficiëntie). Opgeslagen voor trends, herberekenbaar.
+  qualityScore Int?
+  stages       Json? // hypnogram-segmenten: [{ stage, startAt, endAt }]
+  source       WorkoutSource @default(APPLE_WATCH)
+  externalId   String?       @unique
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("sleep_entries")
+}
+
+/// Dagelijkse fysiologische metingen (meestal nachtmeting). 1 per user per dag.
+model VitalsEntry {
+  id                 String        @id @default(cuid())
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId             String
+  date               DateTime
+  restingHeartRate   Int? // bpm
+  hrv                Float? // ms
+  hrvType            HrvType? // SDNN (Apple) vs RMSSD — nooit cross-device vergelijken
+  respiratoryRate    Float? // ademhalingen/min (nachtelijk)
+  wristTempDeviation Float? // °C afwijking van persoonlijke baseline (Series 8+)
+  source             WorkoutSource @default(APPLE_WATCH)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("vitals_entries")
+}
+
+/// Dagelijkse momentopname van de hybride readiness-score. Bewaard voor trend
+/// + cohort-aggregaten. `contributors` = breakdown per signaal met status
+/// (above/within/below) en bijdrage.
+model ReadinessSnapshot {
+  id           String        @id @default(cuid())
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  date         DateTime
+  score        Int // 0-100
+  band         ReadinessBand
+  contributors Json
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("readiness_snapshots")
 }

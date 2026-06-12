@@ -1,0 +1,105 @@
+/**
+ * Server-helper voor readiness v2: haalt vitals + slaap + wellness van een
+ * gebruiker op, draait het hybride model uit src/lib/readiness.ts en bewaart
+ * een dagelijkse momentopname (ReadinessSnapshot) voor trends/cohort.
+ *
+ * Gedeeld door de sync-route (na ingestie), de wearables-router (on-the-fly)
+ * en de cron.
+ */
+import type { PrismaClient } from '@prisma/client'
+import {
+  computeReadiness,
+  type ReadinessResult,
+  type SleepDay,
+  type VitalsDay,
+} from '@/lib/readiness'
+
+type Db = Pick<PrismaClient, 'vitalsEntry' | 'sleepEntry' | 'wellnessCheck' | 'readinessSnapshot'>
+
+const HISTORY_DAYS = 70 // genoeg voor de 60-daagse normaal-band + marge
+
+function isoDay(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function startOfDay(d = new Date()): Date {
+  const r = new Date(d)
+  r.setHours(0, 0, 0, 0)
+  return r
+}
+
+/** Bereken readiness voor `date` (default vandaag) zonder op te slaan. */
+export async function computeReadinessFor(
+  prisma: Db,
+  userId: string,
+  date: Date = new Date(),
+): Promise<ReadinessResult> {
+  const target = startOfDay(date)
+  const since = new Date(target)
+  since.setDate(since.getDate() - HISTORY_DAYS)
+
+  const [vitalsRows, sleepRows, wellness] = await Promise.all([
+    prisma.vitalsEntry.findMany({
+      where: { userId, date: { gte: since, lte: target } },
+      orderBy: { date: 'asc' },
+      select: {
+        date: true, hrv: true, restingHeartRate: true,
+        respiratoryRate: true, wristTempDeviation: true,
+      },
+    }),
+    prisma.sleepEntry.findMany({
+      where: { userId, date: { gte: since, lte: target } },
+      orderBy: { date: 'asc' },
+      select: { date: true, qualityScore: true },
+    }),
+    prisma.wellnessCheck.findUnique({
+      where: { userId_date: { userId, date: target } },
+      select: { sleep: true, soreness: true, fatigue: true, mood: true, stress: true },
+    }),
+  ])
+
+  const vitals: VitalsDay[] = vitalsRows.map(v => ({
+    date: isoDay(v.date),
+    hrv: v.hrv,
+    restingHeartRate: v.restingHeartRate,
+    respiratoryRate: v.respiratoryRate,
+    wristTempDeviation: v.wristTempDeviation,
+  }))
+  const sleep: SleepDay[] = sleepRows.map(s => ({ date: isoDay(s.date), qualityScore: s.qualityScore }))
+
+  return computeReadiness(vitals, sleep, wellness, isoDay(target))
+}
+
+/** Bereken én bewaar de momentopname voor `date`. Idempotent (upsert op dag). */
+export async function computeAndStoreReadiness(
+  prisma: Db,
+  userId: string,
+  date: Date = new Date(),
+): Promise<ReadinessResult> {
+  const result = await computeReadinessFor(prisma, userId, date)
+  const target = startOfDay(date)
+
+  // LEARNING-dagen hebben geen score; sla ze niet op als snapshot (anders
+  // vervuilt het cohort-aggregaat met null-scores).
+  if (result.score == null) return result
+
+  await prisma.readinessSnapshot.upsert({
+    where: { userId_date: { userId, date: target } },
+    update: {
+      score: result.score,
+      band: result.band,
+      contributors: result.contributors as unknown as object,
+    },
+    create: {
+      userId,
+      date: target,
+      score: result.score,
+      band: result.band,
+      contributors: result.contributors as unknown as object,
+    },
+  })
+  return result
+}

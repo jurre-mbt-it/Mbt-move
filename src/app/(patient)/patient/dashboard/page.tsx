@@ -246,6 +246,14 @@ export default function PatientDashboard() {
           bar={todayWellness ? P.lime : P.ice}
         />
 
+        {/* Apple Watch — readiness, slaap & herstel */}
+        <ActionTile
+          href="/patient/wearables"
+          label="Apple Watch"
+          sub="Readiness, slaap & herstel uit je watch"
+          bar={P.brand}
+        />
+
         {/* Active program detail */}
         {activeProgram?.id && (
           <ActionTile
