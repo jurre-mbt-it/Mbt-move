@@ -12,7 +12,7 @@ import Link from 'next/link'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
 import * as SelectPrimitive from '@radix-ui/react-select'
-import { Check, ChevronDown } from 'lucide-react'
+import { Check, ChevronDown, Search, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // Palette constants — synchroon met globals.css `:root --p-*` en `constants/theme.ts` in mbt-gym
@@ -1197,6 +1197,8 @@ export function DarkMenuSelect({
   className,
   disabled,
   ariaLabel,
+  searchable,
+  searchPlaceholder = 'Zoek…',
 }: {
   value: string
   onValueChange: (value: string) => void
@@ -1205,7 +1207,27 @@ export function DarkMenuSelect({
   className?: string
   disabled?: boolean
   ariaLabel?: string
+  /** Toon een zoekveld bovenin. Standaard automatisch aan bij lange lijsten (>8). */
+  searchable?: boolean
+  searchPlaceholder?: string
 }) {
+  // Lange lijsten (patiënt-kiezers e.d.) krijgen automatisch een zoekveld,
+  // zodat je niet eindeloos hoeft te scrollen. Korte lijsten blijven kaal.
+  const enableSearch = searchable ?? options.length > 8
+  if (enableSearch) {
+    return (
+      <DarkSearchSelect
+        value={value}
+        onValueChange={onValueChange}
+        options={options}
+        placeholder={placeholder}
+        className={className}
+        disabled={disabled}
+        ariaLabel={ariaLabel}
+        searchPlaceholder={searchPlaceholder}
+      />
+    )
+  }
   return (
     <SelectPrimitive.Root
       value={value || undefined}
@@ -1249,5 +1271,201 @@ export function DarkMenuSelect({
         </SelectPrimitive.Content>
       </SelectPrimitive.Portal>
     </SelectPrimitive.Root>
+  )
+}
+
+// ── DarkSearchSelect — DarkMenuSelect met zoekveld voor lange lijsten ─────────
+// Zelfde trigger-look als DarkMenuSelect, maar opent een paneel met een
+// zoekveld zodat je een patiënt kunt typen i.p.v. eindeloos scrollen.
+// Bewust geen Radix Select: die kaapt focus/typeahead, wat een ingebed
+// zoekveld onbruikbaar maakt. Eigen toetsenbord-navigatie + outside-click.
+function DarkSearchSelect({
+  value,
+  onValueChange,
+  options,
+  placeholder,
+  className,
+  disabled,
+  ariaLabel,
+  searchPlaceholder,
+}: {
+  value: string
+  onValueChange: (value: string) => void
+  options: Array<{ value: string; label: string }>
+  placeholder?: string
+  className?: string
+  disabled?: boolean
+  ariaLabel?: string
+  searchPlaceholder?: string
+}) {
+  const [open, setOpen] = React.useState(false)
+  const [query, setQuery] = React.useState('')
+  const [activeIndex, setActiveIndex] = React.useState(0)
+  const rootRef = React.useRef<HTMLDivElement>(null)
+  const inputRef = React.useRef<HTMLInputElement>(null)
+  const listRef = React.useRef<HTMLDivElement>(null)
+
+  const selected = options.find((o) => o.value === value) ?? null
+
+  const filtered = React.useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return options
+    return options.filter((o) => o.label.toLowerCase().includes(q))
+  }, [options, query])
+
+  // Outside-click + Escape sluiten het paneel.
+  React.useEffect(() => {
+    if (!open) return
+    function onPointer(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onPointer)
+    return () => document.removeEventListener('mousedown', onPointer)
+  }, [open])
+
+  // Bij openen: reset zoekterm en focus het zoekveld.
+  React.useEffect(() => {
+    if (!open) return
+    setQuery('')
+    setActiveIndex(0)
+    const t = window.setTimeout(() => inputRef.current?.focus(), 0)
+    return () => window.clearTimeout(t)
+  }, [open])
+
+  // Houd actieve index binnen bereik bij filteren.
+  React.useEffect(() => {
+    setActiveIndex((i) => Math.min(i, Math.max(filtered.length - 1, 0)))
+  }, [filtered.length])
+
+  // Scroll de actieve optie in beeld.
+  React.useEffect(() => {
+    if (!open) return
+    const el = listRef.current?.querySelector<HTMLElement>(`[data-idx="${activeIndex}"]`)
+    el?.scrollIntoView({ block: 'nearest' })
+  }, [activeIndex, open])
+
+  function commit(val: string) {
+    onValueChange(val)
+    setOpen(false)
+  }
+
+  function onTriggerKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      setOpen(true)
+    }
+  }
+
+  function onInputKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setActiveIndex((i) => Math.min(i + 1, filtered.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setActiveIndex((i) => Math.max(i - 1, 0))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      const o = filtered[activeIndex]
+      if (o) commit(o.value)
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      setOpen(false)
+    }
+  }
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={onTriggerKeyDown}
+        className={cn(
+          'mbt-btn-hover inline-flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm outline-none transition-colors focus:ring-2 focus:ring-[#e87a55]/40 disabled:opacity-50 disabled:pointer-events-none',
+          className,
+        )}
+        style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
+      >
+        <span className={cn('truncate', !selected && 'text-[#7B8889]')}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 right-0 z-50 mt-1.5 overflow-hidden rounded-xl border shadow-xl duration-150 ease-out animate-in fade-in-0 zoom-in-95 slide-in-from-top-1"
+          style={{ background: P.surfaceHi, borderColor: P.lineStrong, color: P.ink }}
+        >
+          <div
+            className="flex items-center gap-2 px-3 py-2"
+            style={{ borderBottom: `1px solid ${P.line}` }}
+          >
+            <Search className="h-4 w-4 shrink-0 opacity-50" />
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={onInputKeyDown}
+              placeholder={searchPlaceholder}
+              className="w-full bg-transparent text-sm outline-none placeholder:text-[#7B8889]"
+              style={{ color: P.ink }}
+            />
+            {query && (
+              <button
+                type="button"
+                aria-label="Zoekterm wissen"
+                onClick={() => {
+                  setQuery('')
+                  inputRef.current?.focus()
+                }}
+                className="mbt-btn-hover shrink-0 rounded-md p-0.5 opacity-60 hover:opacity-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          <div ref={listRef} role="listbox" className="max-h-64 overflow-y-auto p-1">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-6 text-center text-sm" style={{ color: P.inkMuted }}>
+                Geen resultaten
+              </div>
+            ) : (
+              filtered.map((o, idx) => {
+                const isSelected = o.value === value
+                const isActive = idx === activeIndex
+                return (
+                  <div
+                    key={o.value}
+                    role="option"
+                    aria-selected={isSelected}
+                    data-idx={idx}
+                    onMouseEnter={() => setActiveIndex(idx)}
+                    onClick={() => commit(o.value)}
+                    className={cn(
+                      'relative flex cursor-pointer select-none items-center rounded-lg py-2 pl-3 pr-8 text-sm outline-none transition-[background-color,transform] duration-150 ease-out',
+                      isActive && 'translate-x-0.5 bg-[rgba(232,122,85,0.16)]',
+                    )}
+                  >
+                    <span className="truncate">{o.label}</span>
+                    {isSelected && (
+                      <span className="absolute right-2 inline-flex">
+                        <Check className="h-4 w-4" style={{ color: P.brand }} />
+                      </span>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
