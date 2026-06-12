@@ -894,6 +894,60 @@ export const DarkDialogContent = React.forwardRef<
   )
 })
 
+// ── Drawer (zijbalk-variant van DarkDialog, schuift van rechts in) ───────────
+// Voor detail-peeks zoals de activiteiten-feed op het dashboard: context
+// bekijken zonder de pagina te verlaten. Zelfde Radix Dialog onder water,
+// dus focus-trap + Escape + overlay-klik werken hetzelfde.
+
+export const DarkDrawer = DialogPrimitive.Root
+export const DarkDrawerTrigger = DialogPrimitive.Trigger
+export const DarkDrawerClose = DialogPrimitive.Close
+
+export const DarkDrawerContent = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
+>(function DarkDrawerContent({ className, children, style, ...props }, ref) {
+  return (
+    <DarkDialogPortal>
+      <DarkDialogOverlay />
+      <DialogPrimitive.Content
+        ref={ref}
+        className={cn(
+          'athletic-dark fixed inset-y-0 right-0 z-50 w-full max-w-md flex flex-col',
+          'duration-300 ease-out data-[state=open]:animate-in data-[state=closed]:animate-out',
+          'data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right',
+          className,
+        )}
+        style={{
+          backgroundColor: P.surface,
+          borderLeft: `1px solid ${P.lineStrong}`,
+          color: P.ink,
+          boxShadow: '-30px 0 60px -20px rgba(0,0,0,0.7)',
+          ...style,
+        }}
+        {...props}
+      >
+        <div className="flex-1 overflow-y-auto" style={{ padding: 20 }}>
+          {children}
+        </div>
+        <DialogPrimitive.Close
+          className="athletic-tap absolute right-4 top-4 flex items-center justify-center rounded-md transition-colors"
+          style={{
+            width: 28,
+            height: 28,
+            color: P.inkMuted,
+            background: P.surfaceHi,
+            border: `1px solid ${P.line}`,
+          }}
+          aria-label="Sluiten"
+        >
+          <span aria-hidden style={{ fontSize: 16, lineHeight: 1, fontWeight: 700 }}>×</span>
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </DarkDialogPortal>
+  )
+})
+
 export function DarkDialogHeader({
   className,
   children,

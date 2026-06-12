@@ -5,15 +5,22 @@ import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
 import {
   ActionTile,
+  DarkButton,
+  DarkDialogTitle,
+  DarkDrawer,
+  DarkDrawerContent,
   Display,
   Kicker,
   MetaLabel,
   MetricTile,
   P,
+  SkeletonText,
   SkeletonTile,
   Tile,
 } from '@/components/dark-ui'
 import { IconCardio, IconSleep, IconStrength, IconWarning } from '@/components/icons'
+import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, type CardioActivityKey, type CardioProtocolKey } from '@/lib/cardio-constants'
+import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
 
 const URGENCY_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
   CRITICAL: { color: P.danger, bg: 'rgba(248,113,113,0.18)', label: 'Kritiek' },
@@ -64,6 +71,127 @@ function activityHref(a: { type: ActivityType; patientId: string }): string {
   }
 }
 
+type ActivityDetailBase = {
+  patientId: string
+  patientName: string
+  completedAt: Date | string | null
+  notes: string | null
+}
+type ActivityDetail = ActivityDetailBase &
+  (
+    | {
+        type: 'strength'
+        programName: string | null
+        therapistId: string | null
+        therapistName: string | null
+        durationMinutes: number | null
+        painLevel: number | null
+        exertionLevel: number | null
+        exercises: Array<{
+          id: string
+          name: string
+          sets: number | null
+          reps: number | null
+          weight: number | null
+          weightsPerSet: unknown
+          painLevel: number | null
+          notes: string | null
+        }>
+      }
+    | {
+        type: 'cardio'
+        programName: string | null
+        activity: string
+        protocol: string
+        durationSec: number
+        distanceM: number | null
+        avgPaceSecPerKm: number | null
+        avgHeartRate: number | null
+        maxHeartRate: number | null
+        zone: number | null
+        targetZone: number | null
+        rpe: number | null
+        painLevel: number | null
+      }
+    | {
+        type: 'wellness'
+        date: Date | string
+        sleep: number
+        soreness: number
+        fatigue: number
+        mood: number
+        stress: number
+      }
+    | {
+        type: 'pain'
+        nrs: number
+        location: string
+        context: string
+      }
+  )
+
+const WELLNESS_ROWS = [
+  { key: 'sleep', label: 'Slaap' },
+  { key: 'soreness', label: 'Spierpijn' },
+  { key: 'fatigue', label: 'Vermoeidheid' },
+  { key: 'mood', label: 'Stemming' },
+  { key: 'stress', label: 'Stress' },
+] as const
+
+const PAIN_CONTEXT_LABELS: Record<string, string> = {
+  rest: 'In rust',
+  movement: 'Bij beweging',
+  exercise: 'Tijdens oefening',
+  after: 'Na inspanning',
+  always: 'Continu',
+}
+
+function fmtDateTime(d: Date | string | null): string {
+  if (!d) return '—'
+  const date = new Date(d)
+  return `${date.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })} · ${date.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}`
+}
+
+function weightLabel(ex: { weight: number | null; weightsPerSet: unknown }): string | null {
+  // Alleen tonen als er écht gewichten gelogd zijn — bodyweight-oefeningen
+  // hebben vaak een array vol nulls en dan is "— / — / — kg" alleen ruis.
+  if (Array.isArray(ex.weightsPerSet) && ex.weightsPerSet.some((w) => w != null)) {
+    return `${ex.weightsPerSet.map((w) => w ?? '—').join(' / ')} kg`
+  }
+  if (ex.weight != null) return `${ex.weight} kg`
+  return null
+}
+
+function StatBlock({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-xl" style={{ background: P.surfaceHi, padding: 12 }}>
+      <MetaLabel>{label}</MetaLabel>
+      <p style={{ color: P.ink, fontSize: 16, fontWeight: 800, marginTop: 4 }}>{value}</p>
+    </div>
+  )
+}
+
+/** 1–5 score als segmentjes; 5 = goed (lime), laag = aandacht (danger). */
+function ScoreDots({ value }: { value: number }) {
+  const color = value >= 4 ? P.lime : value === 3 ? P.gold : P.danger
+  return (
+    <div className="flex gap-1" aria-label={`${value} van 5`}>
+      {Array.from({ length: 5 }, (_, i) => (
+        <span
+          key={i}
+          style={{
+            width: 16,
+            height: 6,
+            borderRadius: 2,
+            background: i < value ? color : P.surfaceHi,
+            display: 'inline-block',
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 function timeAgo(d: Date | string, now: number): string {
   const t = new Date(d).getTime()
   const min = Math.round((now - t) / 60000)
@@ -96,6 +224,21 @@ export default function TherapistDashboard() {
   })
   const { data: me } = trpc.auth.getMe.useQuery()
   const utils = trpc.useUtils()
+
+  // Feed-item aangeklikt → detail in de zijbalk i.p.v. navigeren.
+  const [selectedActivity, setSelectedActivity] = useState<{
+    type: ActivityType
+    id: string
+    patientId: string
+    patientName: string
+  } | null>(null)
+  const { data: detailRaw, isLoading: detailLoading } = trpc.patients.activityDetail.useQuery(
+    { type: selectedActivity?.type ?? 'strength', id: selectedActivity?.id ?? '' },
+    { enabled: !!selectedActivity },
+  )
+  // Shallow cast — tRPC inference depth te diep (TS2589), zelfde reden als
+  // recentSessions op de patiëntpagina.
+  const detail = detailRaw as ActivityDetail | undefined
 
   const insights = (signalsData?.insights ?? []) as Array<{
     id: string
@@ -416,14 +559,27 @@ export default function TherapistDashboard() {
                 {activity.map((a, idx) => {
                   const cfg = ACTIVITY_CONFIG[a.type as ActivityType] ?? ACTIVITY_CONFIG.strength
                   return (
-                    <Link
+                    <button
                       key={`${a.type}-${a.id}`}
-                      href={activityHref(a as { type: ActivityType; patientId: string })}
-                      className="athletic-tap flex items-center gap-3 py-2.5"
+                      type="button"
+                      onClick={() =>
+                        setSelectedActivity({
+                          type: a.type as ActivityType,
+                          id: a.id,
+                          patientId: a.patientId,
+                          patientName: a.patientName,
+                        })
+                      }
+                      className="athletic-tap flex items-center gap-3 py-2.5 w-full text-left"
                       style={{
                         borderTop: idx > 0 ? `1px solid ${P.line}` : 'none',
                       }}
-                      onPointerEnter={() => utils.patients.get.prefetch({ id: a.patientId })}
+                      onPointerEnter={() =>
+                        utils.patients.activityDetail.prefetch({
+                          type: a.type as ActivityType,
+                          id: a.id,
+                        })
+                      }
                     >
                       <span
                         aria-hidden
@@ -461,7 +617,7 @@ export default function TherapistDashboard() {
                       >
                         {timeAgo(a.at, now)}
                       </span>
-                    </Link>
+                    </button>
                   )
                 })}
               </div>
@@ -499,6 +655,220 @@ export default function TherapistDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Detail-zijbalk voor een feed-item — bekijken zonder de pagina te
+          verlaten; doorklikken naar het dossier kan onderin. */}
+      <DarkDrawer
+        open={!!selectedActivity}
+        onOpenChange={(open) => {
+          if (!open) setSelectedActivity(null)
+        }}
+      >
+        <DarkDrawerContent>
+          {selectedActivity && (
+            <div className="flex flex-col gap-5">
+              <div className="pr-8">
+                <Kicker style={{ color: ACTIVITY_CONFIG[selectedActivity.type].tint }}>
+                  {ACTIVITY_CONFIG[selectedActivity.type].label}
+                </Kicker>
+                <DarkDialogTitle style={{ marginTop: 4 }}>
+                  {selectedActivity.patientName}
+                </DarkDialogTitle>
+                <MetaLabel style={{ marginTop: 6, textTransform: 'none', fontWeight: 500 }}>
+                  {detail ? fmtDateTime(detail.completedAt) : ' '}
+                </MetaLabel>
+              </div>
+
+              {detailLoading && <SkeletonText lines={6} />}
+
+              {detail?.type === 'strength' && (
+                <>
+                  <div className="grid grid-cols-3 gap-2">
+                    <StatBlock
+                      label="Duur"
+                      value={detail.durationMinutes != null ? `${detail.durationMinutes}m` : '—'}
+                    />
+                    <StatBlock
+                      label="RPE"
+                      value={detail.exertionLevel != null ? `${detail.exertionLevel}/10` : '—'}
+                    />
+                    <StatBlock
+                      label="Pijn"
+                      value={detail.painLevel != null ? `${detail.painLevel}/10` : '—'}
+                    />
+                  </div>
+                  <div>
+                    <MetaLabel style={{ marginBottom: 6 }}>
+                      {detail.programName ?? 'Losse krachtsessie'}
+                      {detail.therapistId && detail.therapistId !== detail.patientId
+                        ? ` · gelogd door ${detail.therapistName ?? 'therapeut'}`
+                        : ''}
+                    </MetaLabel>
+                    <div className="flex flex-col">
+                      {detail.exercises.length === 0 && (
+                        <p style={{ color: P.inkMuted, fontSize: 13 }}>Geen oefeningen gelogd</p>
+                      )}
+                      {detail.exercises.map((ex, idx) => (
+                        <div
+                          key={ex.id}
+                          className="py-2.5"
+                          style={{ borderTop: idx > 0 ? `1px solid ${P.line}` : 'none' }}
+                        >
+                          <div className="flex items-baseline justify-between gap-3">
+                            <p style={{ color: P.ink, fontSize: 14, fontWeight: 700 }}>
+                              {ex.name}
+                            </p>
+                            <span
+                              className="athletic-mono shrink-0"
+                              style={{ color: P.inkMuted, fontSize: 12, letterSpacing: '0.04em' }}
+                            >
+                              {ex.sets ?? '—'}×{ex.reps ?? '—'}
+                              {weightLabel(ex) ? ` · ${weightLabel(ex)}` : ''}
+                            </span>
+                          </div>
+                          {ex.painLevel != null && ex.painLevel > 0 && (
+                            <p
+                              className="athletic-mono"
+                              style={{ color: P.gold, fontSize: 11, marginTop: 2 }}
+                            >
+                              Pijn {ex.painLevel}/10
+                            </p>
+                          )}
+                          {ex.notes && (
+                            <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 2 }}>
+                              {ex.notes}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {detail?.type === 'cardio' && (
+                <>
+                  <MetaLabel>
+                    {CARDIO_ACTIVITIES[detail.activity as CardioActivityKey]?.label ?? detail.activity}
+                    {' · '}
+                    {CARDIO_PROTOCOLS[detail.protocol as CardioProtocolKey]?.label ?? detail.protocol}
+                    {detail.programName ? ` · ${detail.programName}` : ''}
+                  </MetaLabel>
+                  <div className="grid grid-cols-2 gap-2">
+                    <StatBlock label="Duur" value={`${Math.round(detail.durationSec / 60)} min`} />
+                    <StatBlock
+                      label="Afstand"
+                      value={detail.distanceM != null ? `${(detail.distanceM / 1000).toFixed(2)} km` : '—'}
+                    />
+                    <StatBlock
+                      label="Tempo"
+                      value={
+                        formatPaceFromSecPerKm(
+                          detail.activity as CardioActivityKey,
+                          detail.avgPaceSecPerKm,
+                        ) ?? '—'
+                      }
+                    />
+                    <StatBlock
+                      label="Hartslag"
+                      value={
+                        detail.avgHeartRate != null
+                          ? `${detail.avgHeartRate}${detail.maxHeartRate != null ? ` / ${detail.maxHeartRate}` : ''}`
+                          : '—'
+                      }
+                    />
+                    <StatBlock
+                      label="Zone"
+                      value={
+                        detail.zone != null
+                          ? `Z${detail.zone}${detail.targetZone != null ? ` (doel Z${detail.targetZone})` : ''}`
+                          : detail.targetZone != null
+                            ? `doel Z${detail.targetZone}`
+                            : '—'
+                      }
+                    />
+                    <StatBlock
+                      label="RPE"
+                      value={detail.rpe != null ? `${detail.rpe}/10` : '—'}
+                    />
+                  </div>
+                  {detail.painLevel != null && detail.painLevel > 0 && (
+                    <p className="athletic-mono" style={{ color: P.gold, fontSize: 12 }}>
+                      Pijn tijdens sessie: {detail.painLevel}/10
+                    </p>
+                  )}
+                </>
+              )}
+
+              {detail?.type === 'wellness' && (
+                <div className="flex flex-col gap-3">
+                  {WELLNESS_ROWS.map((row) => (
+                    <div key={row.key} className="flex items-center justify-between gap-3">
+                      <span style={{ color: P.ink, fontSize: 14, fontWeight: 700 }}>
+                        {row.label}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <ScoreDots value={detail[row.key]} />
+                        <span
+                          className="athletic-mono"
+                          style={{ color: P.inkMuted, fontSize: 11, width: 26, textAlign: 'right' }}
+                        >
+                          {detail[row.key]}/5
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {detail?.type === 'pain' && (
+                <>
+                  <div className="flex items-baseline gap-2">
+                    <span
+                      className="athletic-display"
+                      style={{
+                        color: detail.nrs >= 7 ? P.danger : detail.nrs >= 4 ? P.gold : P.lime,
+                        fontSize: 48,
+                        lineHeight: '52px',
+                      }}
+                    >
+                      {detail.nrs}
+                    </span>
+                    <MetaLabel>/ 10 NRS</MetaLabel>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <StatBlock label="Locatie" value={detail.location} />
+                    <StatBlock
+                      label="Wanneer"
+                      value={PAIN_CONTEXT_LABELS[detail.context] ?? detail.context}
+                    />
+                  </div>
+                </>
+              )}
+
+              {detail?.notes && (
+                <div>
+                  <MetaLabel style={{ marginBottom: 4 }}>Notities</MetaLabel>
+                  <p style={{ color: P.inkMuted, fontSize: 13, lineHeight: 1.5 }}>
+                    {detail.notes}
+                  </p>
+                </div>
+              )}
+
+              <div className="pt-2" style={{ borderTop: `1px solid ${P.line}` }}>
+                <DarkButton
+                  variant="secondary"
+                  size="sm"
+                  href={activityHref(selectedActivity)}
+                  prefetch={() => utils.patients.get.prefetch({ id: selectedActivity.patientId })}
+                >
+                  Open patiëntdossier →
+                </DarkButton>
+              </div>
+            </div>
+          )}
+        </DarkDrawerContent>
+      </DarkDrawer>
     </div>
   )
 }

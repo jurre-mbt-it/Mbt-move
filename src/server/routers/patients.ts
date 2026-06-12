@@ -561,6 +561,161 @@ export const patientsRouter = createTRPCRouter({
     }),
 
   /**
+   * Detail van één feed-item uit therapistDashboard.recentActivity — voor de
+   * zijbalk op het dashboard. Discriminated union op `type`, zelfde shapes
+   * als recentSessions/recentCardioSessions zodat de UI-weergave matcht.
+   */
+  activityDetail: therapistProcedure
+    .input(z.object({
+      type: z.enum(['strength', 'cardio', 'wellness', 'pain']),
+      id: z.string(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const notFound = () =>
+        new TRPCError({ code: 'NOT_FOUND', message: 'Activiteit niet gevonden of geen toegang.' })
+
+      const guard = async (patientId: string) => {
+        if (!(await hasPatientAccess(ctx.prisma, ctx.user, patientId))) throw notFound()
+        // Dossier-inzage door therapeut → Wabvpz-audit, net als recentSessions.
+        await auditLog({
+          event: 'SESSION_LOG_VIEWED',
+          userId: ctx.user.id,
+          actorEmail: ctx.user.email,
+          resource: 'User',
+          resourceId: patientId,
+          metadata: { route: 'patients.activityDetail', type: input.type, id: input.id },
+          req: ctx.req,
+        })
+      }
+
+      if (input.type === 'strength') {
+        const s = await ctx.prisma.sessionLog.findUnique({
+          where: { id: input.id },
+          include: {
+            patient: { select: { id: true, name: true, email: true } },
+            program: { select: { name: true } },
+            therapist: { select: { id: true, name: true } },
+            exerciseLogs: {
+              select: {
+                id: true,
+                exerciseId: true,
+                setsCompleted: true,
+                repsCompleted: true,
+                painLevel: true,
+                weight: true,
+                weightsPerSet: true,
+                notes: true,
+              },
+            },
+          },
+        })
+        if (!s) throw notFound()
+        await guard(s.patientId)
+        const exerciseIds = Array.from(new Set(s.exerciseLogs.map((el) => el.exerciseId)))
+        const exercises = exerciseIds.length
+          ? await ctx.prisma.exercise.findMany({
+              where: { id: { in: exerciseIds } },
+              select: { id: true, name: true },
+            })
+          : []
+        const nameById = new Map(exercises.map((e) => [e.id, e.name]))
+        return {
+          type: 'strength' as const,
+          patientId: s.patientId,
+          patientName: s.patient.name ?? s.patient.email,
+          completedAt: s.completedAt,
+          programName: s.program?.name ?? null,
+          therapistId: s.therapistId,
+          therapistName: s.therapist?.name ?? null,
+          durationMinutes: s.duration ? Math.round(s.duration / 60) : null,
+          painLevel: s.painLevel,
+          exertionLevel: s.exertionLevel,
+          notes: s.notes,
+          exercises: s.exerciseLogs.map((el) => ({
+            id: el.id,
+            name: nameById.get(el.exerciseId) ?? 'Oefening',
+            sets: el.setsCompleted,
+            reps: el.repsCompleted,
+            weight: el.weight,
+            weightsPerSet: el.weightsPerSet,
+            painLevel: el.painLevel,
+            notes: el.notes,
+          })),
+        }
+      }
+
+      if (input.type === 'cardio') {
+        const c = await ctx.prisma.cardioLog.findUnique({
+          where: { id: input.id },
+          include: {
+            patient: { select: { id: true, name: true, email: true } },
+            program: { select: { name: true } },
+          },
+        })
+        if (!c) throw notFound()
+        await guard(c.patientId)
+        return {
+          type: 'cardio' as const,
+          patientId: c.patientId,
+          patientName: c.patient.name ?? c.patient.email,
+          completedAt: c.completedAt,
+          programName: c.program?.name ?? null,
+          activity: c.activity,
+          protocol: c.protocol,
+          durationSec: c.durationSec,
+          distanceM: c.distanceM,
+          avgPaceSecPerKm: c.avgPaceSecPerKm,
+          avgHeartRate: c.avgHeartRate,
+          maxHeartRate: c.maxHeartRate,
+          zone: c.zone,
+          targetZone: c.targetZone,
+          rpe: c.rpe,
+          painLevel: c.painLevel,
+          notes: c.notes,
+        }
+      }
+
+      if (input.type === 'wellness') {
+        const w = await ctx.prisma.wellnessCheck.findUnique({
+          where: { id: input.id },
+          include: { user: { select: { id: true, name: true, email: true } } },
+        })
+        if (!w) throw notFound()
+        await guard(w.userId)
+        return {
+          type: 'wellness' as const,
+          patientId: w.userId,
+          patientName: w.user.name ?? w.user.email,
+          completedAt: w.createdAt,
+          date: w.date,
+          sleep: w.sleep,
+          soreness: w.soreness,
+          fatigue: w.fatigue,
+          mood: w.mood,
+          stress: w.stress,
+          notes: w.notes,
+        }
+      }
+
+      const p = await ctx.prisma.painEntry.findUnique({
+        where: { id: input.id },
+        include: { user: { select: { id: true, name: true, email: true } } },
+      })
+      if (!p) throw notFound()
+      await guard(p.userId)
+      return {
+        type: 'pain' as const,
+        patientId: p.userId,
+        patientName: p.user.name ?? p.user.email,
+        completedAt: p.reportedAt,
+        nrs: p.nrs,
+        location: p.location,
+        context: p.context,
+        notes: p.notes,
+      }
+    }),
+
+  /**
    * Bewerk basisgegevens van een patiënt (naam, telefoon, geboortedatum) +
    * private notities van de behandelend therapeut. Toegankelijk voor de
    * gekoppelde therapeut of een collega binnen dezelfde praktijk.
