@@ -293,6 +293,274 @@ export const patientsRouter = createTRPCRouter({
     }),
 
   /**
+   * Aggregaat voor het therapeuten-dashboard: vandaag geplande sessies,
+   * cross-patiënt activiteiten-feed, week-teller en stille patiënten — in
+   * één call i.p.v. N per-patiënt queries. Scope = zelfde als patients.list
+   * (directe koppeling OF zelfde praktijk).
+   */
+  therapistDashboard: therapistProcedure
+    .input(z.object({
+      // Lokale grenzen van de client — server doet geen tijdzone-aannames
+      // (zelfde patroon als weekSchedules.sessionsInRange).
+      dayStart: z.string(),  // ISO — vandaag 00:00 local
+      weekStart: z.string(), // ISO — maandag 00:00 local
+    }))
+    .query(async ({ ctx, input }) => {
+      const me = ctx.user
+      const DAY = 24 * 60 * 60 * 1000
+      const dayStart = new Date(input.dayStart)
+      const weekStart = new Date(input.weekStart)
+      if (Number.isNaN(dayStart.getTime()) || Number.isNaN(weekStart.getTime())) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Ongeldige datumgrens.' })
+      }
+      const dayEnd = new Date(dayStart.getTime() + DAY)
+      const weekEnd = new Date(weekStart.getTime() + 7 * DAY)
+      const prevWeekStart = new Date(weekStart.getTime() - 7 * DAY)
+      const SILENT_DAYS = 7
+      const silentSince = new Date(Date.now() - SILENT_DAYS * DAY)
+
+      const patients = await ctx.prisma.user.findMany({
+        where: {
+          role: { in: ['PATIENT', 'ATHLETE'] },
+          OR: [
+            {
+              patientTherapists: {
+                some: {
+                  therapistId: me.id,
+                  isActive: true,
+                  status: { in: ['APPROVED', 'PENDING'] },
+                },
+              },
+            },
+            ...(me.practiceId ? [{ practiceId: me.practiceId }] : []),
+          ],
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          patientPrograms: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { status: true },
+          },
+        },
+      })
+      const ids = patients.map(p => p.id)
+      if (ids.length === 0) {
+        return {
+          todayPlanned: [],
+          recentActivity: [],
+          weekSessions: 0,
+          prevWeekSessions: 0,
+          silentPatients: [],
+        }
+      }
+      const nameById = new Map(ids.map(id => {
+        const p = patients.find(x => x.id === id)!
+        return [id, p.name ?? p.email] as const
+      }))
+
+      const FEED_TAKE = 8
+      const [
+        todayPlannedRaw,
+        weekStrength, weekCardio, prevStrength, prevCardio,
+        feedStrength, feedCardio, feedWellness, feedPain,
+        lastStrength, lastCardio, lastWellness, lastPain,
+      ] = await Promise.all([
+        ctx.prisma.sessionLog.findMany({
+          where: { patientId: { in: ids }, scheduledAt: { gte: dayStart, lt: dayEnd } },
+          select: {
+            id: true,
+            patientId: true,
+            scheduledAt: true,
+            completedAt: true,
+            completedAll: true,
+            program: { select: { name: true } },
+          },
+          orderBy: { scheduledAt: 'asc' },
+        }),
+        ctx.prisma.sessionLog.count({
+          where: { patientId: { in: ids }, completedAt: { gte: weekStart, lt: weekEnd } },
+        }),
+        ctx.prisma.cardioLog.count({
+          where: { patientId: { in: ids }, completedAt: { gte: weekStart, lt: weekEnd } },
+        }),
+        ctx.prisma.sessionLog.count({
+          where: { patientId: { in: ids }, completedAt: { gte: prevWeekStart, lt: weekStart } },
+        }),
+        ctx.prisma.cardioLog.count({
+          where: { patientId: { in: ids }, completedAt: { gte: prevWeekStart, lt: weekStart } },
+        }),
+        ctx.prisma.sessionLog.findMany({
+          where: { patientId: { in: ids }, completedAt: { not: null } },
+          select: {
+            id: true,
+            patientId: true,
+            completedAt: true,
+            exertionLevel: true,
+            painLevel: true,
+            program: { select: { name: true } },
+          },
+          orderBy: { completedAt: 'desc' },
+          take: FEED_TAKE,
+        }),
+        ctx.prisma.cardioLog.findMany({
+          where: { patientId: { in: ids } },
+          select: {
+            id: true,
+            patientId: true,
+            completedAt: true,
+            activity: true,
+            durationSec: true,
+            rpe: true,
+          },
+          orderBy: { completedAt: 'desc' },
+          take: FEED_TAKE,
+        }),
+        ctx.prisma.wellnessCheck.findMany({
+          where: { userId: { in: ids } },
+          select: {
+            id: true,
+            userId: true,
+            createdAt: true,
+            sleep: true,
+            fatigue: true,
+            stress: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: FEED_TAKE,
+        }),
+        ctx.prisma.painEntry.findMany({
+          where: { userId: { in: ids } },
+          select: {
+            id: true,
+            userId: true,
+            reportedAt: true,
+            nrs: true,
+            location: true,
+          },
+          orderBy: { reportedAt: 'desc' },
+          take: FEED_TAKE,
+        }),
+        ctx.prisma.sessionLog.groupBy({
+          by: ['patientId'],
+          where: { patientId: { in: ids }, completedAt: { not: null } },
+          _max: { completedAt: true },
+        }),
+        ctx.prisma.cardioLog.groupBy({
+          by: ['patientId'],
+          where: { patientId: { in: ids } },
+          _max: { completedAt: true },
+        }),
+        ctx.prisma.wellnessCheck.groupBy({
+          by: ['userId'],
+          where: { userId: { in: ids } },
+          _max: { createdAt: true },
+        }),
+        ctx.prisma.painEntry.groupBy({
+          by: ['userId'],
+          where: { userId: { in: ids } },
+          _max: { reportedAt: true },
+        }),
+      ])
+
+      type FeedItem = {
+        id: string
+        type: 'strength' | 'cardio' | 'wellness' | 'pain'
+        at: Date
+        patientId: string
+        patientName: string
+        detail: string
+      }
+      const fmtDuration = (sec: number) => `${Math.round(sec / 60)} min`
+      const feed: FeedItem[] = [
+        ...feedStrength.map((s): FeedItem => ({
+          id: s.id,
+          type: 'strength',
+          at: s.completedAt!,
+          patientId: s.patientId,
+          patientName: nameById.get(s.patientId) ?? '—',
+          detail: [
+            s.program?.name ?? 'Losse krachtsessie',
+            s.exertionLevel != null ? `RPE ${s.exertionLevel}` : null,
+            s.painLevel != null && s.painLevel > 0 ? `pijn ${s.painLevel}/10` : null,
+          ].filter(Boolean).join(' · '),
+        })),
+        ...feedCardio.map((c): FeedItem => ({
+          id: c.id,
+          type: 'cardio',
+          at: c.completedAt,
+          patientId: c.patientId,
+          patientName: nameById.get(c.patientId) ?? '—',
+          detail: [
+            c.activity.toLowerCase(),
+            fmtDuration(c.durationSec),
+            c.rpe != null ? `RPE ${c.rpe}` : null,
+          ].filter(Boolean).join(' · '),
+        })),
+        ...feedWellness.map((w): FeedItem => ({
+          id: w.id,
+          type: 'wellness',
+          at: w.createdAt,
+          patientId: w.userId,
+          patientName: nameById.get(w.userId) ?? '—',
+          detail: `slaap ${w.sleep}/5 · vermoeidheid ${w.fatigue}/5 · stress ${w.stress}/5`,
+        })),
+        ...feedPain.map((p): FeedItem => ({
+          id: p.id,
+          type: 'pain',
+          at: p.reportedAt,
+          patientId: p.userId,
+          patientName: nameById.get(p.userId) ?? '—',
+          detail: `${p.location} · ${p.nrs}/10`,
+        })),
+      ]
+        .sort((a, b) => b.at.getTime() - a.at.getTime())
+        .slice(0, FEED_TAKE)
+
+      // Stil = actief programma maar al ≥ 7 dagen niets gelogd (sessie,
+      // cardio, wellness of pijn). Patiënten zonder actief programma horen
+      // hier niet — die zijn bewust niet in behandeling.
+      const lastById = new Map<string, number>()
+      const bump = (id: string, d: Date | null) => {
+        if (!d) return
+        const t = d.getTime()
+        if (t > (lastById.get(id) ?? 0)) lastById.set(id, t)
+      }
+      for (const r of lastStrength) bump(r.patientId, r._max.completedAt)
+      for (const r of lastCardio) bump(r.patientId, r._max.completedAt)
+      for (const r of lastWellness) bump(r.userId, r._max.createdAt)
+      for (const r of lastPain) bump(r.userId, r._max.reportedAt)
+
+      const silentPatients = patients
+        .filter(p => p.patientPrograms[0]?.status === 'ACTIVE')
+        .map(p => ({
+          patientId: p.id,
+          name: p.name ?? p.email,
+          lastActivityAt: lastById.has(p.id) ? new Date(lastById.get(p.id)!) : null,
+        }))
+        .filter(p => !p.lastActivityAt || p.lastActivityAt < silentSince)
+        .sort((a, b) => (a.lastActivityAt?.getTime() ?? 0) - (b.lastActivityAt?.getTime() ?? 0))
+
+      return {
+        todayPlanned: todayPlannedRaw.map(s => ({
+          id: s.id,
+          patientId: s.patientId,
+          patientName: nameById.get(s.patientId) ?? '—',
+          scheduledAt: s.scheduledAt,
+          completedAt: s.completedAt,
+          completedAll: s.completedAll,
+          programName: s.program?.name ?? null,
+        })),
+        recentActivity: feed,
+        weekSessions: weekStrength + weekCardio,
+        prevWeekSessions: prevStrength + prevCardio,
+        silentPatients,
+      }
+    }),
+
+  /**
    * Bewerk basisgegevens van een patiënt (naam, telefoon, geboortedatum) +
    * private notities van de behandelend therapeut. Toegankelijk voor de
    * gekoppelde therapeut of een collega binnen dezelfde praktijk.

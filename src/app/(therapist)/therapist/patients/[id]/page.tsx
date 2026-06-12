@@ -42,8 +42,20 @@ const STATUS_ACCENT: Record<string, string> = {
   COMPLETED: P.inkDim,
 }
 
-export default function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
+const TAB_VALUES = ['profiel', 'programmas', 'geschiedenis', 'revalidatie', 'tests', 'signalen', 'voortgang'] as const
+
+export default function PatientDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ tab?: string }>
+}) {
   const { id } = use(params)
+  // Deep-link vanaf het dashboard: /patients/[id]?tab=signalen opent direct
+  // de juiste tab. Ongeldige waardes vallen terug op 'profiel'.
+  const { tab } = use(searchParams)
+  const initialTab = TAB_VALUES.includes(tab as (typeof TAB_VALUES)[number]) ? tab : 'profiel'
   const router = useRouter()
   const { data: patient, isLoading } = trpc.patients.get.useQuery({ id })
   const { data: programsRaw = [] } = trpc.programs.list.useQuery({ patientId: id })
@@ -378,7 +390,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="profiel" className="space-y-4">
+        <Tabs defaultValue={initialTab} className="space-y-4">
           <TabsList
             className="w-full grid grid-cols-7 rounded-xl"
             style={{ background: P.surface, border: `1px solid ${P.line}` }}
