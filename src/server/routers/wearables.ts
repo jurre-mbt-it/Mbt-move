@@ -4,6 +4,7 @@ import type { PrismaClient } from '@prisma/client'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { computeReadinessFor } from '@/server/readiness'
 import { wearablesEnabledForRole } from '@/lib/wearables-access'
+import { auditLog } from '@/server/audit'
 
 /**
  * Uitrol-gate: wearables is voorlopig alleen voor de admin (zie
@@ -193,6 +194,18 @@ export const wearablesRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       if (!(await hasPatientAccess(ctx.prisma as PrismaClient, ctx.user!, input.patientId))) {
         throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+      // Inzage in andermans wearable-/gezondheidsdata → Wabvpz-audit.
+      if (input.patientId !== ctx.user!.id) {
+        await auditLog({
+          event: 'PATIENT_VIEWED',
+          userId: ctx.user!.id,
+          actorEmail: ctx.user!.email,
+          resource: 'User',
+          resourceId: input.patientId,
+          metadata: { route: 'wearables.forPatient' },
+          req: ctx.req,
+        })
       }
       return buildOverview(ctx.prisma as PrismaClient, input.patientId)
     }),

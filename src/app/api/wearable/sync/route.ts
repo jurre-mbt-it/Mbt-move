@@ -17,6 +17,7 @@ import { DPA_VERSION } from '@/lib/dpa-constants'
 import { ingestWearableData, syncPayloadSchema } from '@/server/wearables/ingest'
 import { computeAndStoreReadiness } from '@/server/readiness'
 import { wearablesEnabledForRole } from '@/lib/wearables-access'
+import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -33,6 +34,12 @@ export async function POST(req: NextRequest) {
   // Uitrol-gate: voorlopig alleen admin (zie src/lib/wearables-access.ts).
   if (!wearablesEnabledForRole(ctx.user.role)) {
     return NextResponse.json({ error: 'not_enabled' }, { status: 403 })
+  }
+
+  // Per-user rate-limit: begrenst sync-frequentie (anti-abuse / amplificatie).
+  const rl = await rateLimit('wearable.sync', ctx.user.id, RATE_LIMITS.wearableSync)
+  if (!rl.ok) {
+    return NextResponse.json({ error: 'rate_limited', message: rl.message }, { status: 429 })
   }
 
   // DPA-gate voor patiënt/atleet (therapeut/admin tekenen buiten de app om).
@@ -78,8 +85,9 @@ export async function POST(req: NextRequest) {
       },
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
+    // Detail blijft server-side; client krijgt een generieke melding (geen
+    // info-disclosure van Prisma-/interne foutstrings).
     console.error('[wearable/sync] failed', err)
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    return NextResponse.json({ ok: false, error: 'sync_failed' }, { status: 500 })
   }
 }

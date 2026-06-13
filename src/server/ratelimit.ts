@@ -139,4 +139,5 @@ export const RATE_LIMITS = {
   consentChange:      { max: 10, windowSec: 3600, message: 'Max 10 consent-wijzigingen per uur.' },
   sessionLog:         { max: 60, windowSec: 3600, message: 'Max 60 sessies per uur gelogd.' },
   shopIntake:         { max: 5,  windowSec: 600,  message: 'Te veel intakes. Wacht 10 minuten.' },
+  wearableSync:       { max: 60, windowSec: 3600, message: 'Te veel sync-verzoeken. Probeer het later opnieuw.' },
 } as const

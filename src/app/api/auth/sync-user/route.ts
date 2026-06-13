@@ -39,9 +39,19 @@ export async function POST(request: Request) {
     // Bestaande row laten staan — voorkomt role-overwrite via deze route.
     // Wel even supabaseUserId backfillen als die nog leeg is en de row van
     // dezelfde Supabase-user is (matcht email + nog geen andere binding).
-    const existing = await prisma.user.findUnique({ where: { email: authUser.email } })
+    const existing = await prisma.user.findUnique({
+      where: { email: authUser.email },
+      select: { id: true, role: true, supabaseUserId: true },
+    })
     if (existing) {
-      if (!existing.supabaseUserId) {
+      // Defense-in-depth, identiek aan resolveUser (src/server/trpc.ts): voor
+      // high-value rollen NOOIT via deze publieke signup-route de binding
+      // backfillen. Anders kan iemand die een Supabase-account met een
+      // therapist/admin-email registreert vóór de bulk-backfill-SQL draait,
+      // die identiteit claimen (account-takeover). THERAPIST/ADMIN-rows moeten
+      // hun supabaseUserId al via de bulk-backfill hebben.
+      const isHighValue = existing.role === 'THERAPIST' || existing.role === 'ADMIN'
+      if (!existing.supabaseUserId && !isHighValue) {
         try {
           await prisma.user.update({
             where: { id: existing.id },

@@ -3,6 +3,14 @@ import { TRPCProvider } from '@/lib/trpc/Provider'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
+// Nonce-based CSP (zie src/proxy.ts) vereist dat ELKE pagina dynamisch rendert:
+// een statisch geprerenderde pagina krijgt build-time geen nonce, waardoor haar
+// scripts in productie door `script-src 'strict-dynamic'` geblokkeerd worden
+// (kapotte login/MFA/landing). Dit forceert alle routes dynamisch — bewuste
+// trade-off van de afdwingende CSP (geen static/CDN-caching). Cascade vanuit de
+// root-layout dekt ook toekomstige pagina's.
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: {
     template: '%s – MBT Gym',

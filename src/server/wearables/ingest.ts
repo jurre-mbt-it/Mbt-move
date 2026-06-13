@@ -88,12 +88,19 @@ const vitalsSchema = z.object({
   wristTempDeviation: z.number().min(-10).max(10).optional(),
 })
 
+// Hard caps per batch: de native bridge stuurt incrementele anchored queries,
+// dus een normale sync is klein. De caps begrenzen de werk-amplificatie (DB-
+// writes + readiness-hercompute per dag) van een kwaadaardige/kapotte payload.
+const MAX_WORKOUTS = 500
+const MAX_SLEEP = 200
+const MAX_VITALS = 200
+
 export const syncPayloadSchema = z.object({
   device: z.object({ model: z.string().optional() }).optional(),
   anchors: z.record(z.string(), z.string()).optional(),
-  workouts: z.array(workoutSchema).default([]),
-  sleep: z.array(sleepNightSchema).default([]),
-  vitals: z.array(vitalsSchema).default([]),
+  workouts: z.array(workoutSchema).max(MAX_WORKOUTS).default([]),
+  sleep: z.array(sleepNightSchema).max(MAX_SLEEP).default([]),
+  vitals: z.array(vitalsSchema).max(MAX_VITALS).default([]),
 })
 
 export type SyncPayload = z.infer<typeof syncPayloadSchema>
@@ -170,7 +177,9 @@ export async function ingestWearableData(
     }
 
     await prisma.cardioLog.upsert({
-      where: { externalId: w.externalId },
+      // Key op (patientId, externalId): een door de client aangeleverde
+      // HealthKit-UUID kan zo nooit de cardio-rij van een ándere patiënt raken.
+      where: { patientId_externalId: { patientId: userId, externalId: w.externalId } },
       update: data,
       create: { id: createId(), patientId: userId, externalId: w.externalId, ...data },
     })
