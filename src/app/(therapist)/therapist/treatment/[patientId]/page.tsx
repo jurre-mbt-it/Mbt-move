@@ -9,7 +9,15 @@
 import { use, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { IconHeart, IconLightning } from '@/components/icons'
+import {
+  IconHeart,
+  IconLightning,
+  IconMoodVeryLow,
+  IconMoodLow,
+  IconMoodNeutral,
+  IconMoodGood,
+  IconMoodGreat,
+} from '@/components/icons'
 import {
   DndContext, closestCenter, PointerSensor,
   useSensor, useSensors, type DragEndEvent,
@@ -35,6 +43,7 @@ import { trpc } from '@/lib/trpc/client'
 import { useDraftBackup, loadDraft, clearStoredDraft } from '@/hooks/useAutosave'
 import { PerformerToggle, type PerformerFilter } from '@/components/patients/PerformerToggle'
 import {
+  REP_UNITS,
   STANDARD_PARAMS,
   SUPERSET_COLORS,
   SUPERSET_LETTERS,
@@ -204,8 +213,15 @@ export default function TreatmentPage({
   const [dirty, setDirty] = useState(false) // gebruiker heeft lijst aangepast; niet meer auto-repoppen
   const [painLevel, setPainLevel] = useState<number | null>(null)
   const [exertionLevel, setExertionLevel] = useState<number | null>(null)
+  const [feelScore, setFeelScore] = useState<number | null>(null)
   const [notes, setNotes] = useState('')
   const [nowTick, setNowTick] = useState(Date.now())
+  // Afrond-popup: RPE/gevoel/pijn/duur/notities worden hier ingevuld i.p.v. inline.
+  const [finishOpen, setFinishOpen] = useState(false)
+  // Pijn is optioneel: pas zichtbaar na klikken. Niet aangeklikt → pijn = 0.
+  const [painEnabled, setPainEnabled] = useState(false)
+  // Voorgestelde duur (minuten) = live-getelde tijd; handmatig aanpasbaar.
+  const [durationMinInput, setDurationMinInput] = useState('')
 
   // Live sessie-data wordt op elke wijziging in localStorage geback-upt zodat
   // tab-close / refresh midden in een behandeling de sets niet kwijt maakt.
@@ -215,6 +231,7 @@ export default function TreatmentPage({
     rows: LogRow[]
     painLevel: number | null
     exertionLevel: number | null
+    feelScore: number | null
     notes: string
     dirty: boolean
     startedAt?: string
@@ -226,6 +243,7 @@ export default function TreatmentPage({
     setRows(draft.rows)
     setPainLevel(draft.painLevel)
     setExertionLevel(draft.exertionLevel)
+    setFeelScore(draft.feelScore ?? null)
     setNotes(draft.notes)
     setDirty(draft.dirty)
     if (draft.startedAt) {
@@ -237,7 +255,7 @@ export default function TreatmentPage({
   }, [])
   useDraftBackup<DraftShape>({
     key: draftKey,
-    value: { mode, rows, painLevel, exertionLevel, notes, dirty, startedAt: startedAt.toISOString() },
+    value: { mode, rows, painLevel, exertionLevel, feelScore, notes, dirty, startedAt: startedAt.toISOString() },
     enabled: mode !== 'choose' || rows.length > 0 || notes.length > 0,
   })
 
@@ -313,7 +331,8 @@ export default function TreatmentPage({
             hasProgramTarget: false,
             targetSets: 0,
             targetReps: 0,
-            repUnit: 'reps',
+            // Eenheid van de vorige sessie overnemen (onthouden); val terug op reps.
+            repUnit: e.repUnit ?? 'reps',
             setsCompleted: e.sets != null ? String(e.sets) : '',
             repsCompleted: e.reps != null ? String(e.reps) : '',
             weightsPerSet: prevWeights.length > 0 ? resizeWeights(prevWeights, sets) : Array(sets).fill(''),
@@ -423,6 +442,46 @@ export default function TreatmentPage({
         if (!mem) return
         setRows((prev) =>
           prev.map((r) => (r.uid === newUid ? applyMemoryToRow(r, mem, { fillSetsReps: true }) : r)),
+        )
+      })
+      .catch(() => {})
+  }
+
+  // Vervang de oefening op een bestaande rij zonder positie te verliezen: zo
+  // hoeft de therapeut niet naar onder te scrollen, toevoegen en terugslepen.
+  // uid/positie/fase/superset blijven; sets/reps/gewicht/extra params resetten
+  // (andere oefening = andere natuurlijke waarden) en worden daarna voorgevuld
+  // met de memory van de nieuwe oefening voor deze patiënt.
+  const replaceRow = (uid: string, ex: { id: string; name: string }) => {
+    setDirty(true)
+    setRows((prev) =>
+      prev.map((r) =>
+        r.uid !== uid
+          ? r
+          : {
+              ...r,
+              exerciseId: ex.id,
+              name: ex.name,
+              hasProgramTarget: false,
+              targetSets: 0,
+              targetReps: 0,
+              repUnit: 'reps',
+              setsCompleted: '',
+              repsCompleted: '',
+              weightsPerSet: [''],
+              extraParams: [],
+              painDuring: '',
+            },
+      ),
+    )
+    // Zelfde memory-prefill als addRow, maar op de bestaande rij.
+    utils.exercises.lastUsedParams
+      .fetch({ exerciseIds: [ex.id], patientId })
+      .then((memory) => {
+        const mem = memory[ex.id]
+        if (!mem) return
+        setRows((prev) =>
+          prev.map((r) => (r.uid === uid ? applyMemoryToRow(r, mem, { fillSetsReps: true }) : r)),
         )
       })
       .catch(() => {})
@@ -573,14 +632,22 @@ export default function TreatmentPage({
 
   function handleSubmit() {
     const now = new Date()
+    // Duur: handmatig ingevulde waarde uit de popup, met de live-getelde tijd
+    // als fallback. Minimaal 1 minuut. scheduledAt schuift mee zodat de
+    // sessie-span overeenkomt met de (eventueel aangepaste) duur.
+    const minutes = Math.max(1, Math.round(Number(durationMinInput) || durationMin))
+    const durationSeconds = minutes * 60
+    const scheduledAt = new Date(now.getTime() - durationSeconds * 1000)
     logMutation.mutate({
       patientId,
       programId: todayData?.program?.id ?? undefined,
-      scheduledAt: startedAt.toISOString(),
+      scheduledAt: scheduledAt.toISOString(),
       completedAt: now.toISOString(),
-      durationSeconds: Math.max(60, Math.round((now.getTime() - startedAt.getTime()) / 1000)),
-      painLevel,
+      durationSeconds,
+      // Pijn niet aangeklikt → de patiënt had geen pijn deze sessie → 0.
+      painLevel: painEnabled ? (painLevel ?? 0) : 0,
       exertionLevel,
+      feelScore,
       notes: notes.trim() || undefined,
       exercises: rows.map((r) => {
         const weights = r.visible.weight
@@ -592,6 +659,7 @@ export default function TreatmentPage({
           exerciseId: r.exerciseId,
           setsCompleted: r.setsCompleted ? Number(r.setsCompleted) : undefined,
           repsCompleted: r.repsCompleted ? Number(r.repsCompleted) : undefined,
+          repUnit: r.repUnit,
           weight: lastFilled,
           weightsPerSet: weights,
           extraParams: r.extraParams.length ? r.extraParams : null,
@@ -796,6 +864,7 @@ export default function TreatmentPage({
                       dragHandle={dragHandle}
                       onUpdate={updateRow}
                       onRemove={removeRow}
+                      onReplace={replaceRow}
                       onToggleVisible={toggleVisible}
                       onAddParam={addExtraParam}
                       onUpdateParam={updateExtraParam}
@@ -841,6 +910,7 @@ export default function TreatmentPage({
                         supersetLabel={`${item.group}${idx + 1}`}
                         onUpdate={updateRow}
                         onRemove={removeRow}
+                        onReplace={replaceRow}
                         onToggleVisible={toggleVisible}
                         onAddParam={addExtraParam}
                         onUpdateParam={updateExtraParam}
@@ -910,60 +980,41 @@ export default function TreatmentPage({
           )
         })()}
 
-        {/* Overall pain + RPE — visueel onderscheiden met kleur-accenten */}
+        {/* Afronden → opent de popup met RPE / gevoel / pijn / duur / notities. */}
         {mode !== 'choose' && (
-        <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Tile accentBar={P.danger}>
-            <div className="flex items-center gap-2">
-              <span
-                aria-hidden
-                className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
-                style={{ background: 'rgba(248,113,113,0.12)', color: P.danger, fontSize: 14 }}
-              >
-                <IconHeart size={14} />
-              </span>
-              <MetaLabel style={{ color: P.danger }}>PIJN /10</MetaLabel>
-            </div>
-            <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, marginTop: 4, letterSpacing: '0.04em' }}>
-              0 = geen pijn · 10 = ondraaglijk
-            </p>
-            <ScalePicker value={painLevel} onChange={setPainLevel} colorHigh={P.danger} />
-          </Tile>
-          <Tile accentBar={P.gold}>
-            <div className="flex items-center gap-2">
-              <span
-                aria-hidden
-                className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
-                style={{ background: 'rgba(244,194,97,0.12)', color: P.gold, fontSize: 14 }}
-              >
-                <IconLightning size={14} />
-              </span>
-              <MetaLabel style={{ color: P.gold }}>RPE (inspanning) /10</MetaLabel>
-            </div>
-            <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, marginTop: 4, letterSpacing: '0.04em' }}>
-              0 = rust · 10 = maximale inspanning
-            </p>
-            <ScalePicker value={exertionLevel} onChange={setExertionLevel} colorHigh={P.gold} />
-          </Tile>
-        </section>
-        )}
-
-        {/* Notes */}
-        {mode !== 'choose' && (
-        <section className="flex flex-col gap-2">
-          <MetaLabel>Notities</MetaLabel>
-          <DarkTextarea value={notes} onChange={(e) => setNotes(e.target.value)}
-            placeholder="Bevindingen, aanpassingen, vervolgplan…" rows={3} />
-        </section>
-        )}
-
-        {mode !== 'choose' && (
-        <DarkButton size="lg" onClick={handleSubmit}
+        <DarkButton size="lg" onClick={() => {
+          // Voorgestelde duur = de live-getelde tijd; pijn-veld dicht tenzij er
+          // al een waarde stond (hersteld concept).
+          setDurationMinInput(String(durationMin))
+          setPainEnabled(painLevel != null)
+          setFinishOpen(true)
+        }}
           disabled={!canSubmit} loading={logMutation.isPending}>
           {logMutation.isPending ? 'OPSLAAN…' : `BEHANDELING AFRONDEN (${durationMin}M)`}
         </DarkButton>
         )}
       </div>
+
+      {finishOpen && (
+        <FinishSessionModal
+          durationMin={durationMin}
+          durationMinInput={durationMinInput}
+          onDurationChange={setDurationMinInput}
+          exertionLevel={exertionLevel}
+          onExertionChange={setExertionLevel}
+          feelScore={feelScore}
+          onFeelChange={setFeelScore}
+          painEnabled={painEnabled}
+          onTogglePain={() => setPainEnabled((v) => !v)}
+          painLevel={painLevel}
+          onPainChange={setPainLevel}
+          notes={notes}
+          onNotesChange={setNotes}
+          loading={logMutation.isPending}
+          onCancel={() => setFinishOpen(false)}
+          onSubmit={handleSubmit}
+        />
+      )}
     </DarkScreen>
   )
 }
@@ -1021,6 +1072,7 @@ function ExerciseTile({
   dragHandle,
   onUpdate,
   onRemove,
+  onReplace,
   onToggleVisible,
   onAddParam,
   onUpdateParam,
@@ -1034,6 +1086,7 @@ function ExerciseTile({
   dragHandle?: DragHandleProps
   onUpdate: (uid: string, patch: Partial<LogRow>) => void
   onRemove: (uid: string) => void
+  onReplace: (uid: string, ex: { id: string; name: string }) => void
   onToggleVisible: (uid: string, field: 'weight' | 'pain') => void
   onAddParam: (uid: string, tpl: typeof STANDARD_PARAMS[number]) => void
   onUpdateParam: (uid: string, paramId: string, value: string | number) => void
@@ -1042,6 +1095,7 @@ function ExerciseTile({
 }) {
   const [paramMenuOpen, setParamMenuOpen] = useState(false)
   const [supersetMenuOpen, setSupersetMenuOpen] = useState(false)
+  const [replaceOpen, setReplaceOpen] = useState(false)
   const setsCount = Math.max(1, Number(r.setsCompleted) || 1)
   const weights = r.weightsPerSet.length === setsCount ? r.weightsPerSet : resizeWeights(r.weightsPerSet, setsCount)
   const availableParams = STANDARD_PARAMS.filter((p) => !r.extraParams.some((ep) => ep.label === p.label))
@@ -1093,6 +1147,24 @@ function ExerciseTile({
           )}
         </div>
         <div className="flex items-center gap-1 relative">
+          <button
+            type="button"
+            onClick={() => {
+              setReplaceOpen((v) => !v)
+              setSupersetMenuOpen(false)
+              setParamMenuOpen(false)
+            }}
+            title="Vervang deze oefening (positie blijft gelijk)"
+            className="athletic-tap athletic-mono"
+            style={{
+              color: replaceOpen ? P.brand : P.inkMuted,
+              fontSize: 11, letterSpacing: '0.1em', padding: '4px 6px',
+              border: `1px solid ${replaceOpen ? P.brand : P.lineStrong}`,
+              borderRadius: 4, fontWeight: 900,
+            }}
+          >
+            VERVANG
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -1159,6 +1231,18 @@ function ExerciseTile({
           </button>
         </div>
       </div>
+
+      {/* Inline oefening-kiezer voor vervangen — positie van de rij blijft. */}
+      {replaceOpen && (
+        <div className="mt-3">
+          <ExercisePicker
+            title={`Vervang "${r.name}"`}
+            onPick={(ex) => { onReplace(r.uid, ex); setReplaceOpen(false) }}
+            onClose={() => setReplaceOpen(false)}
+          />
+        </div>
+      )}
+
       <div
         className="grid gap-2 mt-3"
         style={{ gridTemplateColumns: `repeat(${2 + (r.visible.pain ? 1 : 0)}, minmax(0, 1fr))` }}
@@ -1388,15 +1472,10 @@ function RepsInput({
   value: string
   onChange: (v: string) => void
 }) {
-  const UNITS: Array<{ value: string; label: string }> = [
-    { value: 'reps', label: 'REPS' },
-    { value: 'sec',  label: 'SEC'  },
-    { value: 'min',  label: 'MIN'  },
-  ]
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-0.5">
-        {UNITS.map((u) => {
+        {REP_UNITS.map((u) => {
           const active = unit === u.value
           return (
             <button
@@ -1415,7 +1494,7 @@ function RepsInput({
                 fontWeight: 900,
               }}
             >
-              {u.label}
+              {u.label.toUpperCase()}
             </button>
           )
         })}
@@ -1491,45 +1570,6 @@ function AddExerciseRow({
   accent?: string
 }) {
   const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const [collectionId, setCollectionId] = useState<string | null>(null)
-  const [quickAddCategory, setQuickAddCategory] = useState<string | null>(null)
-  const utils = trpc.useUtils()
-  const createExercise = trpc.exercises.create.useMutation({
-    onSuccess: () => utils.exercises.list.invalidate(),
-  })
-
-  // Collecties voor quick-access chips
-  const { data: collections = [] } = trpc.exercises.listCollections.useQuery(
-    undefined,
-    { enabled: open, staleTime: 60_000 },
-  )
-
-  // Cast naar shallow types; tRPC inference is te diep voor TS (TS2589).
-  type ExerciseRow = { id: string; name: string; category: string }
-  const searchResultsQuery = trpc.exercises.list.useQuery(
-    { query: query || undefined },
-    { enabled: open && !collectionId, staleTime: 30_000 },
-  )
-  const searchResults = (searchResultsQuery.data as ExerciseRow[] | undefined) ?? []
-
-  const collectionExercisesQuery = trpc.exercises.getCollectionExercises.useQuery(
-    { collectionId: collectionId ?? '' },
-    { enabled: open && !!collectionId, staleTime: 30_000 },
-  )
-  const collectionExercises = (collectionExercisesQuery.data as ExerciseRow[] | undefined) ?? []
-
-  const exercises: ExerciseRow[] = collectionId ? collectionExercises : searchResults
-
-  const filtered = collectionId && query.trim()
-    ? exercises.filter((ex) => ex.name.toLowerCase().includes(query.toLowerCase()))
-    : exercises
-
-  const close = () => {
-    setOpen(false)
-    setQuery('')
-    setCollectionId(null)
-  }
 
   if (!open) {
     const color = accent ?? P.brand
@@ -1552,16 +1592,73 @@ function AddExerciseRow({
   }
 
   return (
+    <ExercisePicker
+      onPick={(ex) => { onAdd(ex); setOpen(false) }}
+      onClose={() => setOpen(false)}
+    />
+  )
+}
+
+/**
+ * Herbruikbare oefening-kiezer (zoekveld + collectie-chips + resultatenlijst +
+ * quick-add). Gedeeld door `AddExerciseRow` (toevoegen) en de "Vervang"-knop in
+ * `ExerciseTile`. Roept `onPick` aan met de gekozen/aangemaakte oefening en
+ * sluit zichzelf daarna via `onClose`.
+ */
+function ExercisePicker({
+  onPick,
+  onClose,
+  title = 'Zoek oefening',
+}: {
+  onPick: (ex: { id: string; name: string }) => void
+  onClose: () => void
+  title?: string
+}) {
+  const [query, setQuery] = useState('')
+  const [collectionId, setCollectionId] = useState<string | null>(null)
+  const [quickAddCategory, setQuickAddCategory] = useState<string | null>(null)
+  const utils = trpc.useUtils()
+  const createExercise = trpc.exercises.create.useMutation({
+    onSuccess: () => utils.exercises.list.invalidate(),
+  })
+
+  // Collecties voor quick-access chips
+  const { data: collections = [] } = trpc.exercises.listCollections.useQuery(
+    undefined,
+    { staleTime: 60_000 },
+  )
+
+  // Cast naar shallow types; tRPC inference is te diep voor TS (TS2589).
+  type ExerciseRow = { id: string; name: string; category: string }
+  const searchResultsQuery = trpc.exercises.list.useQuery(
+    { query: query || undefined },
+    { enabled: !collectionId, staleTime: 30_000 },
+  )
+  const searchResults = (searchResultsQuery.data as ExerciseRow[] | undefined) ?? []
+
+  const collectionExercisesQuery = trpc.exercises.getCollectionExercises.useQuery(
+    { collectionId: collectionId ?? '' },
+    { enabled: !!collectionId, staleTime: 30_000 },
+  )
+  const collectionExercises = (collectionExercisesQuery.data as ExerciseRow[] | undefined) ?? []
+
+  const exercises: ExerciseRow[] = collectionId ? collectionExercises : searchResults
+
+  const filtered = collectionId && query.trim()
+    ? exercises.filter((ex) => ex.name.toLowerCase().includes(query.toLowerCase()))
+    : exercises
+
+  return (
     <Tile>
       <div className="flex items-center justify-between gap-2 mb-2">
         <MetaLabel>
           {collectionId
             ? collections.find((c) => c.id === collectionId)?.name ?? 'Collectie'
-            : 'Zoek oefening'}
+            : title}
         </MetaLabel>
         <button
           type="button"
-          onClick={close}
+          onClick={onClose}
           className="athletic-mono"
           style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.14em' }}
         >
@@ -1612,8 +1709,8 @@ function AddExerciseRow({
             key={ex.id}
             type="button"
             onClick={() => {
-              onAdd({ id: ex.id, name: ex.name })
-              close()
+              onPick({ id: ex.id, name: ex.name })
+              onClose()
             }}
             className="athletic-tap text-left rounded-lg px-3 py-2"
             style={{ background: P.surfaceHi }}
@@ -1710,8 +1807,8 @@ function AddExerciseRow({
                         loadType: 'BODYWEIGHT',
                         isUnilateral: false,
                       })
-                      onAdd({ id: created.id, name: created.name })
-                      close()
+                      onPick({ id: created.id, name: created.name })
+                      onClose()
                       toast.success(`Oefening "${created.name}" toegevoegd aan je bibliotheek`)
                     } catch (err) {
                       toast.error(err instanceof Error ? err.message : 'Toevoegen mislukt')
@@ -1776,6 +1873,7 @@ type PreviousExercise = {
   name: string
   sets: number | null
   reps: number | null
+  repUnit: string | null
   painLevel: number | null
   weight: number | null
   weightsPerSet: unknown
@@ -1794,6 +1892,7 @@ type PreviousSession = {
   therapistName: string | null
   painLevel: number | null
   exertionLevel: number | null
+  feelScore: number | null
   notes: string | null
   exercises: PreviousExercise[]
 }
@@ -1899,7 +1998,7 @@ function PreviousSessionPanel({
 
       {open && (
         <div className="mt-3 flex flex-col gap-2">
-          {(session.painLevel !== null || session.exertionLevel !== null) && (
+          {(session.painLevel !== null || session.exertionLevel !== null || session.feelScore !== null) && (
             <div className="flex gap-2 flex-wrap">
               {session.painLevel !== null && (
                 <span
@@ -1925,6 +2024,19 @@ function PreviousSessionPanel({
                   }}
                 >
                   RPE {session.exertionLevel}/10
+                </span>
+              )}
+              {session.feelScore !== null && (
+                <span
+                  className="athletic-mono px-2 py-1 rounded"
+                  style={{
+                    background: 'rgba(132,204,22,0.10)',
+                    color: P.lime,
+                    border: `1px solid rgba(132,204,22,0.30)`,
+                    fontSize: 10, letterSpacing: '0.08em', fontWeight: 800,
+                  }}
+                >
+                  GEVOEL {session.feelScore}/5
                 </span>
               )}
             </div>
@@ -2032,6 +2144,257 @@ function ScalePicker({
           </button>
         )
       })}
+    </div>
+  )
+}
+
+/**
+ * "Hoe voelde het?" — subjectieve gevoelsscore 1-5 met dezelfde mood-iconen als
+ * elders in de app (lucide). 1 = slecht … 5 = top. Hoger is beter, dus de
+ * kleur loopt van danger (laag) naar lime (hoog).
+ */
+const FEEL_OPTIONS: Array<{ value: number; Icon: typeof IconMoodNeutral; label: string; color: string }> = [
+  { value: 1, Icon: IconMoodVeryLow, label: 'Slecht',  color: P.danger },
+  { value: 2, Icon: IconMoodLow,     label: 'Matig',   color: P.danger },
+  { value: 3, Icon: IconMoodNeutral, label: 'Oké',     color: P.gold },
+  { value: 4, Icon: IconMoodGood,    label: 'Goed',    color: P.lime },
+  { value: 5, Icon: IconMoodGreat,   label: 'Top',     color: P.lime },
+]
+
+function FeelPicker({
+  value,
+  onChange,
+}: {
+  value: number | null
+  onChange: (v: number) => void
+}) {
+  return (
+    <div className="grid grid-cols-5 gap-1.5 mt-2">
+      {FEEL_OPTIONS.map(({ value: v, Icon, label, color }) => {
+        const active = value === v
+        return (
+          <button
+            key={v}
+            type="button"
+            onClick={() => onChange(v)}
+            aria-label={label}
+            aria-pressed={active}
+            className="athletic-tap flex flex-col items-center justify-center gap-1 rounded-lg py-2"
+            style={{
+              background: active ? color : P.surfaceHi,
+              color: active ? P.bg : P.inkMuted,
+              border: `1px solid ${active ? color : P.lineStrong}`,
+            }}
+          >
+            <Icon size={22} />
+            <span className="athletic-mono" style={{ fontSize: 9, letterSpacing: '0.08em', fontWeight: 800 }}>
+              {label.toUpperCase()}
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * Afrond-popup. RPE, "Hoe voelde het?", optionele pijn, aanpasbare duur en
+ * notities verhuizen hierheen — zodat het hoofdscherm tijdens de behandeling
+ * rustig blijft en de therapeut bij afronden bewust elke score zet.
+ */
+function FinishSessionModal({
+  durationMin,
+  durationMinInput,
+  onDurationChange,
+  exertionLevel,
+  onExertionChange,
+  feelScore,
+  onFeelChange,
+  painEnabled,
+  onTogglePain,
+  painLevel,
+  onPainChange,
+  notes,
+  onNotesChange,
+  loading,
+  onCancel,
+  onSubmit,
+}: {
+  durationMin: number
+  durationMinInput: string
+  onDurationChange: (v: string) => void
+  exertionLevel: number | null
+  onExertionChange: (v: number) => void
+  feelScore: number | null
+  onFeelChange: (v: number) => void
+  painEnabled: boolean
+  onTogglePain: () => void
+  painLevel: number | null
+  onPainChange: (v: number) => void
+  notes: string
+  onNotesChange: (v: string) => void
+  loading: boolean
+  onCancel: () => void
+  onSubmit: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4"
+      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)' }}
+      onClick={onCancel}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Behandeling afronden"
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl flex flex-col max-h-[92vh]"
+        style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-5 pt-5 pb-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${P.line}` }}>
+          <div className="flex flex-col gap-0.5">
+            <Kicker>Afronden</Kicker>
+            <span className="athletic-display" style={{ fontSize: 20, letterSpacing: '-0.02em', color: P.ink }}>
+              BEHANDELING AFRONDEN
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onCancel}
+            aria-label="Sluiten"
+            className="athletic-tap athletic-mono"
+            style={{ color: P.inkMuted, fontSize: 18, lineHeight: 1, padding: 4 }}
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-4 flex flex-col gap-5 overflow-y-auto">
+          {/* RPE */}
+          <section>
+            <div className="flex items-center gap-2">
+              <span
+                aria-hidden
+                className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
+                style={{ background: 'rgba(244,194,97,0.12)', color: P.gold, fontSize: 14 }}
+              >
+                <IconLightning size={14} />
+              </span>
+              <MetaLabel style={{ color: P.gold }}>RPE (inspanning) /10</MetaLabel>
+            </div>
+            <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, marginTop: 4, letterSpacing: '0.04em' }}>
+              0 = rust · 10 = maximale inspanning
+            </p>
+            <ScalePicker value={exertionLevel} onChange={onExertionChange} colorHigh={P.gold} />
+          </section>
+
+          {/* Hoe voelde het */}
+          <section>
+            <MetaLabel style={{ color: P.lime }}>Hoe voelde het?</MetaLabel>
+            <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, marginTop: 4, letterSpacing: '0.04em' }}>
+              Subjectief gevoel van de patiënt over deze sessie
+            </p>
+            <FeelPicker value={feelScore} onChange={onFeelChange} />
+          </section>
+
+          {/* Pijn — optioneel, standaard verborgen */}
+          <section>
+            {painEnabled ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span
+                      aria-hidden
+                      className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
+                      style={{ background: 'rgba(248,113,113,0.12)', color: P.danger, fontSize: 14 }}
+                    >
+                      <IconHeart size={14} />
+                    </span>
+                    <MetaLabel style={{ color: P.danger }}>PIJN /10</MetaLabel>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onTogglePain}
+                    className="athletic-mono athletic-tap"
+                    style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.12em' }}
+                  >
+                    GEEN PIJN
+                  </button>
+                </div>
+                <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, marginTop: 4, letterSpacing: '0.04em' }}>
+                  0 = geen pijn · 10 = ondraaglijk
+                </p>
+                <ScalePicker value={painLevel} onChange={onPainChange} colorHigh={P.danger} />
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={onTogglePain}
+                className="athletic-mono athletic-tap w-full rounded-lg py-2.5 flex items-center justify-center gap-2"
+                style={{
+                  background: P.surfaceHi,
+                  color: P.danger,
+                  border: `1px dashed ${P.danger}`,
+                  fontSize: 11, letterSpacing: '0.1em', fontWeight: 800,
+                }}
+              >
+                <IconHeart size={13} /> + PIJN TOEVOEGEN
+              </button>
+            )}
+            {!painEnabled && (
+              <p className="athletic-mono" style={{ color: P.inkDim, fontSize: 9, marginTop: 6, letterSpacing: '0.04em' }}>
+                Niet ingevuld = geen pijn (0) deze sessie
+              </p>
+            )}
+          </section>
+
+          {/* Duur */}
+          <section>
+            <MetaLabel>Duur (minuten)</MetaLabel>
+            <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, marginTop: 4, letterSpacing: '0.04em' }}>
+              Voorgesteld op basis van de live-tijd ({durationMin}m) — pas aan indien nodig
+            </p>
+            <DarkInput
+              value={durationMinInput}
+              onChange={(e) => onDurationChange(e.target.value.replace(/[^0-9]/g, ''))}
+              inputMode="numeric"
+              style={{ padding: '10px 12px', fontSize: 16, marginTop: 6, maxWidth: 140 }}
+            />
+          </section>
+
+          {/* Notities */}
+          <section>
+            <MetaLabel>Notities</MetaLabel>
+            <DarkTextarea
+              value={notes}
+              onChange={(e) => onNotesChange(e.target.value)}
+              placeholder="Bevindingen, aanpassingen, vervolgplan…"
+              rows={3}
+              style={{ marginTop: 6 }}
+            />
+          </section>
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 flex items-center gap-3" style={{ borderTop: `1px solid ${P.line}` }}>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={loading}
+            className="athletic-mono athletic-tap rounded-lg px-4 py-3"
+            style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.12em', fontWeight: 800 }}
+          >
+            ANNULEREN
+          </button>
+          <div className="flex-1">
+            <DarkButton size="lg" onClick={onSubmit} disabled={loading} loading={loading}>
+              {loading ? 'OPSLAAN…' : 'OPSLAAN'}
+            </DarkButton>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

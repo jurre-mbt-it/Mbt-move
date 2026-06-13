@@ -1,4 +1,4 @@
-export type RepUnit = 'reps' | 'sec' | 'min'
+export type RepUnit = 'reps' | 'sec' | 'min' | 'm'
 export type ParamType = 'number' | 'text' | 'select' | 'slider'
 
 export interface ExtraParam {

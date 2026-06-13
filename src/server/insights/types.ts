@@ -13,6 +13,7 @@ export interface PatientAggregates {
     completedAt: Date | null
     painLevel: number | null
     exertionLevel: number | null
+    feelScore: number | null
     exerciseLogs: Array<{
       exerciseId: string
       painLevel: number | null
@@ -25,6 +26,10 @@ export interface PatientAggregates {
   baselineMedianNRS: number | null
   /** Average NRS over the most-recent 3 sessions. */
   recentAvgNRS: number | null
+  /** Median feel-score (1-5) over sessions outside the recent-3 window. null = geen data. */
+  baselineMedianFeel: number | null
+  /** Average feel-score (1-5) over the most-recent 3 sessions. null = geen data. */
+  recentAvgFeel: number | null
   /** Completed-session count last 7 days. */
   recentCount7d: number
   /** Completed-session count in the 14 days before that (scaled to 7d: total/2). */

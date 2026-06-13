@@ -874,6 +874,7 @@ model SessionLog {
   notes         String?
   painLevel     Int? // 0-10
   exertionLevel Int? // 0-10 RPE
+  feelScore     Int? // 1-5 subjectief gevoel sessie (1=slecht .. 5=top); null = niet ingevuld
 
   exerciseLogs ExerciseLog[]
 
@@ -891,6 +892,7 @@ model ExerciseLog {
   exerciseId         String
   setsCompleted      Int?
   repsCompleted      Int?
+  repUnit            String? // 'reps' | 'sec' | 'min' | 'm'; null = legacy = reps. Onthoudt de eenheid voor lastUsedParams.
   duration           Int?
   notes              String?
   painLevel          Int?

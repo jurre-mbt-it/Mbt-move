@@ -399,6 +399,19 @@ async function main() {
         'Stone MH et al. Principles of deloading in resistance training. Strength & Conditioning Journal 1982.',
       ],
     },
+    {
+      signalType: 'low_feel',
+      category: 'pattern',
+      defaultUrgency: 'MEDIUM' as const,
+      defaultConfig: {
+        feelBelow: 2, // subjectieve gevoelsscore <= 2 van 5
+        recentSessions: 3, // over de laatste N sessies (met ingevulde score)
+      },
+      evidenceRefs: [
+        'McLean BD et al. Neuromuscular, endocrine, and perceptual fatigue responses. IJSPP 2010 — subjectief welbevinden als herstelmarker.',
+        'Saw AE, Main LC, Gastin PB. Monitoring the athlete training response: subjective self-report measures. BJSM 2016.',
+      ],
+    },
   ]
 
   let rulesCreated = 0

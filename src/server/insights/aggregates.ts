@@ -60,6 +60,7 @@ export async function buildPatientAggregates(
     completedAt: s.completedAt,
     painLevel: s.painLevel,
     exertionLevel: s.exertionLevel,
+    feelScore: s.feelScore,
     exerciseLogs: s.exerciseLogs,
   }))
 
@@ -86,6 +87,11 @@ export async function buildPatientAggregates(
 
   const recentNRSVals = recent.map((s) => s.painLevel).filter((v): v is number => v != null)
   const baselineNRSVals = baseline.map((s) => s.painLevel).filter((v): v is number => v != null)
+
+  // Feel-score (1-5, hoger = beter). Zelfde recent-vs-baseline-opzet als NRS,
+  // voor de low_feel-regel en de feel-versterking in overload_risk.
+  const recentFeelVals = recent.map((s) => s.feelScore).filter((v): v is number => v != null)
+  const baselineFeelVals = baseline.map((s) => s.feelScore).filter((v): v is number => v != null)
 
   // Adherence — kracht + cardio gecombineerd.
   const recent7dCutoff = new Date(now.getTime() - 7 * 24 * 3600 * 1000)
@@ -172,6 +178,8 @@ export async function buildPatientAggregates(
     sessions: mappedSessions,
     baselineMedianNRS: median(baselineNRSVals),
     recentAvgNRS: mean(recentNRSVals),
+    baselineMedianFeel: median(baselineFeelVals),
+    recentAvgFeel: mean(recentFeelVals),
     recentCount7d,
     priorCount7dScaled,
     adherenceRatio,

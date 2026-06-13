@@ -15,6 +15,7 @@ export const REP_UNITS = [
   { value: 'reps', label: 'reps' },
   { value: 'sec',  label: 'sec'  },
   { value: 'min',  label: 'min'  },
+  { value: 'm',    label: 'm'    },
 ]
 
 // Visual colors per superset group letter — athletic-dark palette: subtiele

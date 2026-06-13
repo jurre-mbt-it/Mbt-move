@@ -17,7 +17,9 @@ export const overloadRisk: Evaluator = (agg, rule) => {
     formBelow: number   // bv. -30
     minDays: number     // bv. 5 opeenvolgende dagen
     acwrAbove: number   // bv. 1.5
+    feelLow?: number    // bv. 2.5 — versterkt het signaal als het gevoel ook laag is
   }
+  const feelLow = cfg.feelLow ?? 2.5
 
   const hist = agg.loadFormHistory
   if (!hist || hist.length === 0) return null
@@ -42,6 +44,15 @@ export const overloadRisk: Evaluator = (agg, rule) => {
     reasons.push(`ACWR is ${agg.loadAcwr!.toFixed(2)} (> ${cfg.acwrAbove})`)
   }
 
+  // Feel-versterking: een lage subjectieve gevoelsscore bovenop de hoge load
+  // maakt het overreaching-beeld sterker (slecht verdragen, niet alleen veel).
+  // Geen zelfstandige trigger — alleen versterkend wanneer de load-drempel al
+  // is gehaald. Tilt de urgentie dan naar HIGH.
+  const feelReinforces = agg.recentAvgFeel !== null && agg.recentAvgFeel <= feelLow
+  if (feelReinforces) {
+    reasons.push(`de sessies voelen zwaar (gem. gevoel ${agg.recentAvgFeel!.toFixed(1)}/5)`)
+  }
+
   return {
     title: `${agg.patientName} bouwt mogelijk te snel op`,
     suggestion:
@@ -54,7 +65,9 @@ export const overloadRisk: Evaluator = (agg, rule) => {
       formThreshold: cfg.formBelow,
       acwr: agg.loadAcwr,
       acwrThreshold: cfg.acwrAbove,
+      recentAvgFeel: agg.recentAvgFeel,
+      feelReinforces,
     },
-    urgency: rule.defaultUrgency,
+    urgency: feelReinforces ? 'HIGH' : rule.defaultUrgency,
   }
 }
