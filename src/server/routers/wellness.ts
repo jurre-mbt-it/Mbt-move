@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
+import { auditLog } from '@/server/audit'
 
 const createId = () => crypto.randomUUID()
 
@@ -90,6 +91,16 @@ export const wellnessRouter = createTRPCRouter({
         })
         if (!ok) throw new TRPCError({ code: 'FORBIDDEN' })
       }
+      // Dossier-inzage door therapeut/admin → Wabvpz-audit (net als patients.*).
+      await auditLog({
+        event: 'PATIENT_VIEWED',
+        userId: ctx.user!.id,
+        actorEmail: ctx.user!.email,
+        resource: 'User',
+        resourceId: input.patientId,
+        metadata: { route: 'wellness.forPatient' },
+        req: ctx.req,
+      })
       const since = new Date()
       since.setDate(since.getDate() - 30)
       return ctx.prisma.wellnessCheck.findMany({

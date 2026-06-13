@@ -4,10 +4,58 @@ import { updateSession } from '@/lib/supabase/middleware'
 const protectedPrefixes = ['/therapist', '/patient', '/athlete', '/admin']
 const authRoutes = ['/login', '/register']
 
+/**
+ * Content-Security-Policy — AFDWINGEND, nonce-based (sinds 2026-06-13; was
+ * report-only). Per request een verse nonce; `'strict-dynamic'` op script-src
+ * betekent dat alleen scripts mét de nonce (en wat die laden) mogen draaien —
+ * 'unsafe-inline'/'unsafe-eval' voor scripts zijn weg in productie. Next zet de
+ * nonce automatisch op zijn eigen framework-/bundle-scripts door de
+ * `Content-Security-Policy`-request-header te lezen.
+ *
+ * style-src houdt bewust `'unsafe-inline'`: Radix/sonner zetten inline
+ * style-attributen die anders breken (een style-nonce zou 'unsafe-inline'
+ * juist uitschakelen). Style-injectie is een veel kleiner XSS-risico dan script.
+ *
+ * Let op: nonces forceren dynamic rendering (geen static/CDN-caching, PPR uit).
+ * Violations blijven binnenkomen op /api/csp-report (report-uri + report-to).
+ */
+function buildCsp(nonce: string): string {
+  const isDev = process.env.NODE_ENV === 'development'
+  return [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    // Dev heeft 'unsafe-eval' nodig (React injecteert eval voor debugging).
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ''}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data:",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://vitals.vercel-insights.com",
+    "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://iframe.mediadelivery.net https://*.mux.com",
+    "media-src 'self' blob: https:",
+    "worker-src 'self' blob:",
+    'upgrade-insecure-requests',
+    'report-uri /api/csp-report',
+    'report-to csp-endpoint',
+  ].join('; ')
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  const response = await updateSession(request)
+  // Verse nonce per request + CSP. De nonce gaat als request-header mee zodat
+  // Next 'm tijdens SSR op zijn scripts kan zetten; en als response-header zodat
+  // de browser 'm afdwingt.
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const csp = buildCsp(nonce)
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set('content-security-policy', csp)
+
+  const response = await updateSession(request, requestHeaders)
+  response.headers.set('Content-Security-Policy', csp)
 
   const isProtected = protectedPrefixes.some((prefix) => pathname.startsWith(prefix))
   const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route))
@@ -69,5 +117,17 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|public|auth/callback).*)'],
+  // Draai op alle document-routes, maar NIET op api, static assets, de OAuth-
+  // callback, of `next/link`-prefetches. Prefetches overslaan voorkomt dat een
+  // pagina met een nonce gecachet wordt die bij echte navigatie niet meer matcht
+  // (aanbevolen patroon uit de Next-CSP-docs).
+  matcher: [
+    {
+      source: '/((?!api|_next/static|_next/image|favicon.ico|public|auth/callback).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
+  ],
 }

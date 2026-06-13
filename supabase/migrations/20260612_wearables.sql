@@ -30,7 +30,9 @@ ALTER TABLE "cardio_logs"
   ADD COLUMN IF NOT EXISTS "source" "WorkoutSource" NOT NULL DEFAULT 'MANUAL',
   ADD COLUMN IF NOT EXISTS "externalId" TEXT;
 
-CREATE UNIQUE INDEX IF NOT EXISTS "cardio_logs_externalId_key" ON "cardio_logs"("externalId");
+-- Uniek PER PATIËNT, niet globaal: een door de client aangeleverde HealthKit-UUID
+-- mag nooit de cardio-rij van een ándere patiënt raken (IDOR op writes).
+CREATE UNIQUE INDEX IF NOT EXISTS "cardio_logs_patientId_externalId_key" ON "cardio_logs"("patientId", "externalId");
 CREATE INDEX IF NOT EXISTS "cardio_logs_patientId_completedAt_idx" ON "cardio_logs"("patientId", "completedAt");
 
 -- ── wearable_connections ─────────────────────────────────
@@ -73,7 +75,8 @@ CREATE TABLE IF NOT EXISTS "sleep_entries" (
   "updatedAt"    TIMESTAMP(3) NOT NULL,
   CONSTRAINT "sleep_entries_pkey" PRIMARY KEY ("id")
 );
-CREATE UNIQUE INDEX IF NOT EXISTS "sleep_entries_externalId_key" ON "sleep_entries"("externalId");
+-- Uniek per user (niet globaal): voorkomt cross-user UUID-botsing.
+CREATE UNIQUE INDEX IF NOT EXISTS "sleep_entries_userId_externalId_key" ON "sleep_entries"("userId", "externalId");
 CREATE INDEX IF NOT EXISTS "sleep_entries_userId_date_idx" ON "sleep_entries"("userId", "date");
 CREATE UNIQUE INDEX IF NOT EXISTS "sleep_entries_userId_date_key" ON "sleep_entries"("userId", "date");
 

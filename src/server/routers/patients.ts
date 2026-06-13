@@ -319,6 +319,14 @@ export const patientsRouter = createTRPCRouter({
       const SILENT_DAYS = 7
       const silentSince = new Date(Date.now() - SILENT_DAYS * DAY)
 
+      // Het dashboard toont bewust NIET de hele praktijk (zoals patients.list
+      // doet), maar alleen patiënten waar déze therapeut zelf iets mee heeft
+      // gedaan — een "engagement". Zo blijft het overzicht persoonlijk en
+      // raken collega-patiënten je dashboard niet vol. Engagement =
+      //   1. directe behandelrelatie (PatientTherapist), OF
+      //   2. zelf een sessie voor de patiënt gelogd (SessionLog.therapistId), OF
+      //   3. zelf een programma voor de patiënt gemaakt (Program.creatorId), OF
+      //   4. zelf een weekschema voor de patiënt gemaakt (WeekSchedule.creatorId).
       const patients = await ctx.prisma.user.findMany({
         where: {
           role: { in: ['PATIENT', 'ATHLETE'] },
@@ -332,7 +340,9 @@ export const patientsRouter = createTRPCRouter({
                 },
               },
             },
-            ...(me.practiceId ? [{ practiceId: me.practiceId }] : []),
+            { sessionLogs: { some: { therapistId: me.id } } },
+            { patientPrograms: { some: { creatorId: me.id } } },
+            { patientWeekSchedules: { some: { creatorId: me.id } } },
           ],
         },
         select: {
@@ -647,9 +657,27 @@ export const patientsRouter = createTRPCRouter({
       }
 
       if (input.type === 'cardio') {
+        // Expliciete scalar-select i.p.v. include: de wearables-migratie
+        // (CardioLog.source / WorkoutSource enum) is nog niet op de DB
+        // toegepast, dus een impliciete "alle kolommen"-select knalt op de
+        // ontbrekende `source`-kolom. We hebben `source` hier toch niet nodig.
         const c = await ctx.prisma.cardioLog.findUnique({
           where: { id: input.id },
-          include: {
+          select: {
+            patientId: true,
+            completedAt: true,
+            activity: true,
+            protocol: true,
+            durationSec: true,
+            distanceM: true,
+            avgPaceSecPerKm: true,
+            avgHeartRate: true,
+            maxHeartRate: true,
+            zone: true,
+            targetZone: true,
+            rpe: true,
+            painLevel: true,
+            notes: true,
             patient: { select: { id: true, name: true, email: true } },
             program: { select: { name: true } },
           },
@@ -1603,11 +1631,32 @@ export const patientsRouter = createTRPCRouter({
       if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.patientId))) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
+      // Expliciete scalar-select: de wearables-migratie (CardioLog.source /
+      // WorkoutSource enum) is nog niet op de DB toegepast, dus een impliciete
+      // "alle kolommen"-select knalt op de ontbrekende `source`-kolom.
       const logs = await ctx.prisma.cardioLog.findMany({
         where: { patientId: input.patientId },
         orderBy: { completedAt: 'desc' },
         take: input.limit,
-        include: { program: { select: { id: true, name: true } } },
+        select: {
+          id: true,
+          completedAt: true,
+          activity: true,
+          protocol: true,
+          durationSec: true,
+          distanceM: true,
+          avgPaceSecPerKm: true,
+          avgHeartRate: true,
+          maxHeartRate: true,
+          zone: true,
+          targetZone: true,
+          timeInZones: true,
+          rpe: true,
+          painLevel: true,
+          notes: true,
+          intervals: true,
+          program: { select: { id: true, name: true } },
+        },
       })
       return logs.map((l) => ({
         id: l.id,

@@ -709,14 +709,17 @@ model CardioLog {
   timeInZones     Json?
   avgPaceSecPerKm Int? // gemiddeld tempo in s/km (afgeleid uit distanceM/durationSec, opgeslagen voor trends)
   // Bron van de sessie: handmatig gelogd of gesynct vanuit een wearable.
-  // `externalId` = HealthKit-workout-UUID; uniek zodat overlappende sync-
-  // batches (na anchor-reset / herinstallatie) niet dubbel landen, en zodat
+  // `externalId` = HealthKit-workout-UUID; uniek PER PATIËNT zodat overlappende
+  // sync-batches (na anchor-reset / herinstallatie) niet dubbel landen, en zodat
   // een handmatig gelogde sessie niet dubbelt met dezelfde watch-workout.
+  // Scope = (patientId, externalId), NIET globaal: een door de client
+  // aangeleverde UUID mag nooit de rij van een ándere patiënt raken.
   source          WorkoutSource  @default(MANUAL)
-  externalId      String?        @unique
+  externalId      String?
   completedAt     DateTime       @default(now())
   createdAt       DateTime       @default(now())
 
+  @@unique([patientId, externalId])
   @@index([patientId, completedAt])
   @@map("cardio_logs")
 }
@@ -2056,11 +2059,14 @@ model SleepEntry {
   qualityScore Int?
   stages       Json? // hypnogram-segmenten: [{ stage, startAt, endAt }]
   source       WorkoutSource @default(APPLE_WATCH)
-  externalId   String?       @unique
+  // `externalId` uniek PER USER (niet globaal): voorkomt dat de HealthKit-UUID
+  // van gebruiker A botst met een rij van gebruiker B (unique-constraint-500).
+  externalId   String?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
   @@unique([userId, date])
+  @@unique([userId, externalId])
   @@index([userId, date])
   @@map("sleep_entries")
 }
