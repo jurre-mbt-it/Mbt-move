@@ -319,6 +319,14 @@ export const patientsRouter = createTRPCRouter({
       const SILENT_DAYS = 7
       const silentSince = new Date(Date.now() - SILENT_DAYS * DAY)
 
+      // Het dashboard toont bewust NIET de hele praktijk (zoals patients.list
+      // doet), maar alleen patiënten waar déze therapeut zelf iets mee heeft
+      // gedaan — een "engagement". Zo blijft het overzicht persoonlijk en
+      // raken collega-patiënten je dashboard niet vol. Engagement =
+      //   1. directe behandelrelatie (PatientTherapist), OF
+      //   2. zelf een sessie voor de patiënt gelogd (SessionLog.therapistId), OF
+      //   3. zelf een programma voor de patiënt gemaakt (Program.creatorId), OF
+      //   4. zelf een weekschema voor de patiënt gemaakt (WeekSchedule.creatorId).
       const patients = await ctx.prisma.user.findMany({
         where: {
           role: { in: ['PATIENT', 'ATHLETE'] },
@@ -332,7 +340,9 @@ export const patientsRouter = createTRPCRouter({
                 },
               },
             },
-            ...(me.practiceId ? [{ practiceId: me.practiceId }] : []),
+            { sessionLogs: { some: { therapistId: me.id } } },
+            { patientPrograms: { some: { creatorId: me.id } } },
+            { patientWeekSchedules: { some: { creatorId: me.id } } },
           ],
         },
         select: {
