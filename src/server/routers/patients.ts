@@ -400,6 +400,7 @@ export const patientsRouter = createTRPCRouter({
             completedAt: true,
             exertionLevel: true,
             painLevel: true,
+            feelScore: true,
             program: { select: { name: true } },
           },
           orderBy: { completedAt: 'desc' },
@@ -485,6 +486,7 @@ export const patientsRouter = createTRPCRouter({
             s.program?.name ?? 'Losse krachtsessie',
             s.exertionLevel != null ? `RPE ${s.exertionLevel}` : null,
             s.painLevel != null && s.painLevel > 0 ? `pijn ${s.painLevel}/10` : null,
+            s.feelScore != null ? `gevoel ${s.feelScore}/5` : null,
           ].filter(Boolean).join(' · '),
         })),
         ...feedCardio.map((c): FeedItem => ({
@@ -1029,12 +1031,14 @@ export const patientsRouter = createTRPCRouter({
         durationSeconds: z.number().int().min(0),
         painLevel: z.number().int().min(0).max(10).nullable(),
         exertionLevel: z.number().int().min(0).max(10).nullable(),
+        feelScore: z.number().int().min(1).max(5).nullable().optional(),
         notes: z.string().optional(),
         exercises: z.array(
           z.object({
             exerciseId: z.string(),
             setsCompleted: z.number().int().min(0).optional(),
             repsCompleted: z.number().int().min(0).optional(),
+            repUnit: z.string().optional(),
             painLevel: z.number().int().min(0).max(10).nullable().optional(),
             weight: z.number().nullable().optional(),
             weightsPerSet: z.array(z.number().nullable()).nullable().optional(),
@@ -1078,6 +1082,7 @@ export const patientsRouter = createTRPCRouter({
           duration: input.durationSeconds,
           painLevel: input.painLevel,
           exertionLevel: input.exertionLevel,
+          feelScore: input.feelScore ?? null,
           notes: input.notes ?? undefined,
           exerciseLogs: {
             create: input.exercises.map((ex) => ({
@@ -1085,6 +1090,7 @@ export const patientsRouter = createTRPCRouter({
               exerciseId: ex.exerciseId,
               setsCompleted: ex.setsCompleted ?? null,
               repsCompleted: ex.repsCompleted ?? null,
+              repUnit: ex.repUnit ?? null,
               painLevel: ex.painLevel ?? null,
               weight: ex.weight ?? null,
               weightsPerSet: ex.weightsPerSet ?? undefined,
@@ -1529,6 +1535,7 @@ export const patientsRouter = createTRPCRouter({
               exerciseId: true,
               setsCompleted: true,
               repsCompleted: true,
+              repUnit: true,
               painLevel: true,
               weight: true,
               weightsPerSet: true,
@@ -1562,6 +1569,7 @@ export const patientsRouter = createTRPCRouter({
         therapistName: s.therapist?.name ?? null,
         painLevel: s.painLevel,
         exertionLevel: s.exertionLevel,
+        feelScore: s.feelScore,
         notes: s.notes,
         exercises: s.exerciseLogs.map((el) => ({
           id: el.id,
@@ -1569,6 +1577,7 @@ export const patientsRouter = createTRPCRouter({
           name: exerciseNameById.get(el.exerciseId) ?? 'Oefening',
           sets: el.setsCompleted,
           reps: el.repsCompleted,
+          repUnit: el.repUnit,
           painLevel: el.painLevel,
           weight: el.weight,
           weightsPerSet: el.weightsPerSet,

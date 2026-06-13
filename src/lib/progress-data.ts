@@ -9,12 +9,14 @@ export type ProgressDataResult = {
     durationMinutes: number
     painLevel: number | null
     exertionLevel: number | null
+    feelScore: number | null
     notes: string | null
   }>
   oneRmByExercise: Record<string, { date: string; oneRm: number }[]>
   totalSessions: number
   avgPain: number | null
   avgExertion: number | null
+  avgFeel: number | null
   cardio: {
     sessions: Array<{
       id: string
@@ -65,6 +67,7 @@ export async function getPatientProgressData(
       duration: true,
       painLevel: true,
       exertionLevel: true,
+      feelScore: true,
       notes: true,
     },
   })
@@ -106,6 +109,7 @@ export async function getPatientProgressData(
 
   const painLogs = sessions.filter((s) => s.painLevel !== null)
   const exertionLogs = sessions.filter((s) => s.exertionLevel !== null)
+  const feelLogs = sessions.filter((s) => s.feelScore !== null)
 
   // ── Cardio ────────────────────────────────────────────────────────────────
   const cardioLogs = await prisma.cardioLog.findMany({
@@ -146,6 +150,7 @@ export async function getPatientProgressData(
       durationMinutes: s.duration ? Math.round(s.duration / 60) : 0,
       painLevel: s.painLevel ?? null,
       exertionLevel: s.exertionLevel ?? null,
+      feelScore: s.feelScore ?? null,
       notes: s.notes ?? null,
     })),
     oneRmByExercise,
@@ -162,6 +167,12 @@ export async function getPatientProgressData(
             (exertionLogs.reduce((sum, l) => sum + (l.exertionLevel ?? 0), 0) /
               exertionLogs.length) *
               10,
+          ) / 10
+        : null,
+    avgFeel:
+      feelLogs.length > 0
+        ? Math.round(
+            (feelLogs.reduce((sum, l) => sum + (l.feelScore ?? 0), 0) / feelLogs.length) * 10,
           ) / 10
         : null,
     cardio: {

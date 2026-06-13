@@ -603,6 +603,7 @@ export const exercisesRouter = createTRPCRouter({
           exerciseId: true,
           setsCompleted: true,
           repsCompleted: true,
+          repUnit: true,
           weightsPerSet: true,
           extraParams: true,
           session: { select: { completedAt: true } },
@@ -611,7 +612,9 @@ export const exercisesRouter = createTRPCRouter({
         take: input.exerciseIds.length * 20,
       })
 
-      // Repunit zit niet op ExerciseLog; haal die los op uit Exercise default.
+      // Fallback voor de eenheid wanneer een (oudere) log nog geen repUnit
+      // bewaarde: Exercise.defaultRepUnit. De gelogde repUnit (indien aanwezig)
+      // krijgt voorrang zodat een handmatig gekozen eenheid onthouden wordt.
       const exercises = await ctx.prisma.exercise.findMany({
         where: { id: { in: input.exerciseIds } },
         select: { id: true, defaultRepUnit: true },
@@ -630,7 +633,7 @@ export const exercisesRouter = createTRPCRouter({
         out[log.exerciseId] = {
           setsCompleted: log.setsCompleted,
           repsCompleted: log.repsCompleted,
-          repUnit: defaultRepUnitById.get(log.exerciseId) ?? 'reps',
+          repUnit: log.repUnit ?? defaultRepUnitById.get(log.exerciseId) ?? 'reps',
           weightsPerSet: log.weightsPerSet,
           extraParams: log.extraParams,
         }
