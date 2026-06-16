@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Mail, KeyRound, Sparkles } from 'lucide-react'
 import { P, DarkButton, DarkInput, Kicker, MetaLabel } from '@/components/dark-ui'
-import { resolvePostLoginRedirect } from '@/lib/auth/post-login-redirect'
+import { resolvePostLoginRedirect, reportLoginSuccess } from '@/lib/auth/post-login-redirect'
 
 export function LoginForm() {
   const [email, setEmail] = useState('')
@@ -67,6 +67,7 @@ export function LoginForm() {
         return
       }
 
+      reportLoginSuccess()
       const next = await resolvePostLoginRedirect(supabase)
       // Harde navigatie i.p.v. router.push+refresh: in de iOS-webview-wrapper
       // herrendert een soft RSC-navigatie de role-layouts niet altijd, waardoor

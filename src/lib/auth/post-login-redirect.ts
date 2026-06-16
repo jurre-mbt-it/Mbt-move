@@ -15,6 +15,22 @@ export type PostLoginInfo = {
   dpaAccepted: boolean
 }
 
+/**
+ * Best-effort: legt server-side één geslaagde login vast (`LOGIN_SUCCESS`, met
+ * IP + apparaat) via /api/auth/log-login. `keepalive` zodat de POST de harde
+ * navigatie na login overleeft; faalt stil en blokkeert de login nooit.
+ *
+ * Alleen aanroepen op de echte inlog-momenten (OTP-verify, magic-link-callback),
+ * niet bij MFA/DPA-vervolgstappen. Het endpoint ontdubbelt zelf binnen 2 minuten.
+ */
+export function reportLoginSuccess(): void {
+  try {
+    void fetch('/api/auth/log-login', { method: 'POST', keepalive: true }).catch(() => {})
+  } catch {
+    /* nooit de login breken */
+  }
+}
+
 function roleDashboard(role?: string | null): string {
   if (role === 'PATIENT') return '/patient/dashboard'
   if (role === 'ATHLETE') return '/athlete/dashboard'

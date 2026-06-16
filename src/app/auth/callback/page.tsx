@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2 } from 'lucide-react'
-import { resolvePostLoginRedirect } from '@/lib/auth/post-login-redirect'
+import { resolvePostLoginRedirect, reportLoginSuccess } from '@/lib/auth/post-login-redirect'
 
 function CallbackHandler() {
   const searchParams = useSearchParams()
@@ -50,6 +50,7 @@ function CallbackHandler() {
         return
       }
 
+      reportLoginSuccess()
       const next = await resolvePostLoginRedirect(supabase, { next: searchParams.get('next') })
       // Harde navigatie i.p.v. router.replace: forceert een volledige
       // document-load zodat de iOS-webview de nieuwe sessie oppikt en niet
