@@ -130,6 +130,8 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
   const { data: loadCurve } = trpc.patients.loadCurve.useQuery({ patientId: id, days: 120 })
   const { data: wellness } = trpc.wellness.forPatient.useQuery({ patientId: id })
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null)
+  const [exerciseSearch, setExerciseSearch] = useState('')
+  const [showAllExercises, setShowAllExercises] = useState(false)
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false)
   const [pdfNote, setPdfNote] = useState('')
 
@@ -162,10 +164,31 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
 
   // Active 1RM exercise
   const activeEx = selectedExercise ?? exerciseNames[0] ?? null
-  const oneRmData = activeEx ? (oneRmByExercise[activeEx] ?? []).map(p => ({
+  const activePoints = activeEx ? (oneRmByExercise[activeEx] ?? []) : []
+  const oneRmData = activePoints.map(p => ({
     date: new Date(p.date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }),
     '1RM (kg)': p.oneRm,
-  })) : []
+  }))
+  // Zwaarste set die echt is gedaan + de geschatte 1RM (Epley, beste schatting)
+  // en 3RM (≈ 1RM ÷ 1.1, Epley-inverse voor 3 herhalingen).
+  const heaviestSet = activePoints.reduce<typeof activePoints[number] | null>(
+    (best, p) => (!best || p.weight > best.weight || (p.weight === best.weight && p.oneRm > best.oneRm) ? p : best),
+    null,
+  )
+  const best1Rm = activePoints.reduce((m, p) => Math.max(m, p.oneRm), 0)
+  const est3Rm = best1Rm > 0 ? Math.round(best1Rm / 1.1) : 0
+  const oneRmStart = oneRmData[0]?.['1RM (kg)'] ?? 0
+  const oneRmDiff = best1Rm - oneRmStart
+
+  // Oefening-selector: zoeken + cap met "zie meer" om stapeling te voorkomen.
+  const filteredExerciseNames = exerciseSearch.trim()
+    ? exerciseNames.filter(n => n.toLowerCase().includes(exerciseSearch.trim().toLowerCase()))
+    : exerciseNames
+  const EXERCISE_CAP = 10
+  const isSearching = exerciseSearch.trim().length > 0
+  const visibleExerciseNames =
+    isSearching || showAllExercises ? filteredExerciseNames : filteredExerciseNames.slice(0, EXERCISE_CAP)
+  const hiddenExerciseCount = filteredExerciseNames.length - visibleExerciseNames.length
 
   // ── Cardio ──
   const cardio = progress?.cardio
@@ -503,24 +526,74 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
                 </Tile>
               ) : (
                 <>
-                  {/* Exercise selector */}
-                  <div className="flex gap-2 flex-wrap">
-                    {exerciseNames.map(name => (
-                      <button
-                        key={name}
-                        onClick={() => setSelectedExercise(name)}
-                        className="athletic-tap athletic-mono text-xs px-3 py-1.5 rounded-full font-bold transition-all"
+                  {/* Exercise selector — zoeken + cap met "zie meer" */}
+                  <div className="space-y-2">
+                    {exerciseNames.length > 6 && (
+                      <input
+                        type="text"
+                        value={exerciseSearch}
+                        onChange={e => { setExerciseSearch(e.target.value); setShowAllExercises(false) }}
+                        placeholder="Zoek oefening…"
+                        className="athletic-mono w-full px-3 py-2 rounded-lg text-xs"
                         style={{
-                          background: activeEx === name ? P.brand : P.surfaceHi,
-                          color: activeEx === name ? P.bg : P.inkMuted,
-                          border: `1px solid ${activeEx === name ? P.brand : P.lineStrong}`,
-                          letterSpacing: '0.08em',
-                          textTransform: 'uppercase',
+                          background: P.surfaceHi,
+                          color: P.ink,
+                          border: `1px solid ${P.lineStrong}`,
+                          letterSpacing: '0.04em',
                         }}
-                      >
-                        {name}
-                      </button>
-                    ))}
+                      />
+                    )}
+                    <div className="flex gap-2 flex-wrap">
+                      {visibleExerciseNames.map(name => (
+                        <button
+                          key={name}
+                          onClick={() => setSelectedExercise(name)}
+                          className="athletic-tap athletic-mono text-xs px-3 py-1.5 rounded-full font-bold transition-all"
+                          style={{
+                            background: activeEx === name ? P.brand : P.surfaceHi,
+                            color: activeEx === name ? P.bg : P.inkMuted,
+                            border: `1px solid ${activeEx === name ? P.brand : P.lineStrong}`,
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          {name}
+                        </button>
+                      ))}
+                      {!isSearching && !showAllExercises && hiddenExerciseCount > 0 && (
+                        <button
+                          onClick={() => setShowAllExercises(true)}
+                          className="athletic-tap athletic-mono text-xs px-3 py-1.5 rounded-full font-bold transition-all"
+                          style={{
+                            background: 'transparent',
+                            color: P.brand,
+                            border: `1px dashed ${P.lineStrong}`,
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          + {hiddenExerciseCount} meer
+                        </button>
+                      )}
+                      {!isSearching && showAllExercises && exerciseNames.length > EXERCISE_CAP && (
+                        <button
+                          onClick={() => setShowAllExercises(false)}
+                          className="athletic-tap athletic-mono text-xs px-3 py-1.5 rounded-full font-bold transition-all"
+                          style={{
+                            background: 'transparent',
+                            color: P.inkMuted,
+                            border: `1px dashed ${P.lineStrong}`,
+                            letterSpacing: '0.08em',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          Toon minder
+                        </button>
+                      )}
+                    </div>
+                    {isSearching && filteredExerciseNames.length === 0 && (
+                      <p style={{ color: P.inkMuted, fontSize: 12 }}>Geen oefening gevonden voor &ldquo;{exerciseSearch.trim()}&rdquo;</p>
+                    )}
                   </div>
                   {activeEx && oneRmData.length > 0 && (
                     <ChartCard title={`${activeEx} — Geschat 1RM (kg)`}>
@@ -542,40 +615,39 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
                             className="athletic-display"
                             style={{ color: P.ink, fontSize: 22, lineHeight: '26px' }}
                           >
-                            {oneRmData[0]?.['1RM (kg)'] ?? '—'}
+                            {heaviestSet ? `${heaviestSet.weight}` : '—'}
+                            <span style={{ fontSize: 12, color: P.inkMuted }}> kg</span>
                           </p>
-                          <MetaLabel>Start</MetaLabel>
+                          <MetaLabel>Zwaarst gedaan</MetaLabel>
+                          <p style={{ color: P.inkDim, fontSize: 10, marginTop: 2 }}>
+                            {heaviestSet?.reps ? `× ${heaviestSet.reps} reps` : 'gewicht'}
+                          </p>
+                        </div>
+                        <div>
+                          <p
+                            className="athletic-display"
+                            style={{ color: P.lime, fontSize: 22, lineHeight: '26px' }}
+                          >
+                            {best1Rm > 0 ? `${best1Rm}` : '—'}
+                            <span style={{ fontSize: 12, color: P.inkMuted }}> kg</span>
+                          </p>
+                          <MetaLabel>Geschat 1RM</MetaLabel>
+                          <p
+                            style={{ color: oneRmDiff >= 0 ? P.lime : P.danger, fontSize: 10, marginTop: 2 }}
+                          >
+                            {oneRmDiff >= 0 ? '+' : ''}{oneRmDiff} kg sinds start
+                          </p>
                         </div>
                         <div>
                           <p
                             className="athletic-display"
                             style={{ color: P.ink, fontSize: 22, lineHeight: '26px' }}
                           >
-                            {oneRmData[oneRmData.length - 1]?.['1RM (kg)'] ?? '—'}
+                            {est3Rm > 0 ? `${est3Rm}` : '—'}
+                            <span style={{ fontSize: 12, color: P.inkMuted }}> kg</span>
                           </p>
-                          <MetaLabel>Huidig</MetaLabel>
-                        </div>
-                        <div>
-                          {(() => {
-                            const start = oneRmData[0]?.['1RM (kg)'] ?? 0
-                            const current = oneRmData[oneRmData.length - 1]?.['1RM (kg)'] ?? 0
-                            const diff = current - start
-                            return (
-                              <>
-                                <p
-                                  className="athletic-display"
-                                  style={{
-                                    color: diff >= 0 ? P.lime : P.danger,
-                                    fontSize: 22,
-                                    lineHeight: '26px',
-                                  }}
-                                >
-                                  {diff >= 0 ? '+' : ''}{diff} kg
-                                </p>
-                                <MetaLabel>Verschil</MetaLabel>
-                              </>
-                            )
-                          })()}
+                          <MetaLabel>Geschat 3RM</MetaLabel>
+                          <p style={{ color: P.inkDim, fontSize: 10, marginTop: 2 }}>≈ 1RM ÷ 1.1</p>
                         </div>
                       </div>
                     </ChartCard>

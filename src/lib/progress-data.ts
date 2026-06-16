@@ -12,7 +12,7 @@ export type ProgressDataResult = {
     feelScore: number | null
     notes: string | null
   }>
-  oneRmByExercise: Record<string, { date: string; oneRm: number }[]>
+  oneRmByExercise: Record<string, { date: string; oneRm: number; weight: number; reps: number | null }[]>
   totalSessions: number
   avgPain: number | null
   avgExertion: number | null
@@ -96,7 +96,7 @@ export async function getPatientProgressData(
   })
   const exerciseMap = Object.fromEntries(exercises.map((e) => [e.id, e.name]))
 
-  const oneRmByExercise: Record<string, { date: string; oneRm: number }[]> = {}
+  const oneRmByExercise: Record<string, { date: string; oneRm: number; weight: number; reps: number | null }[]> = {}
   for (const log of exerciseLogs) {
     if (!log.estimatedOneRepMax || !log.session.completedAt) continue
     const name = exerciseMap[log.exerciseId] ?? log.exerciseId
@@ -104,6 +104,8 @@ export async function getPatientProgressData(
     oneRmByExercise[name].push({
       date: log.session.completedAt.toISOString().slice(0, 10),
       oneRm: Math.round(log.estimatedOneRepMax),
+      weight: Math.round(log.weight ?? 0),
+      reps: log.repsCompleted ?? null,
     })
   }
 
