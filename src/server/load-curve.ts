@@ -3,12 +3,24 @@
  * patiënt/atleet op (kracht + cardio), zet ze om naar dagelijkse sRPE-loads
  * en draait het fitness-fatigue model uit src/lib/training-load.ts.
  *
+ * Sinds de kracht/cardio-splitsing geeft hij DRIE curves terug: kracht (alleen
+ * SessionLog), cardio (alleen CardioLog) en gecombineerd (beide). De
+ * gecombineerde curve staat op de top-level velden zodat bestaande consumers
+ * (LoadCurveChart, insights/aggregates) ongewijzigd blijven werken; `strength`
+ * en `cardio` zijn de nieuwe onderverdeling.
+ *
+ * Eenheid van de curves is overal sRPE (Foster), óók cardio — dat is de
+ * gevalideerde gemeenschappelijke munt en blijft continu zonder wearable. De
+ * HR-gebaseerde Edwards-TRIMP komt er als losse cardio-readout (`cardio.trimp`)
+ * bij zodra `CardioLog.timeInZones` gevuld is; hij drijft de curve NIET aan.
+ *
  * Gedeeld door patient.loadCurve (eigen data) en patients.loadCurve
  * (therapeut, na hasPatientAccess-check).
  */
 import type { PrismaClient } from '@prisma/client'
 import {
   buildLoadCurve,
+  edwardsTrimp,
   ewmaAcwr,
   loadStatus,
   sessionLoad,
@@ -19,12 +31,40 @@ import {
 
 const WARMUP_DAYS = 42 // EWMA-inloop vóór het weergavevenster
 
-export type LoadCurveResult = {
+/** Eén modaliteit-curve (kracht of cardio) of de gecombineerde. */
+export type ModalityCurve = {
   points: LoadPoint[]        // alleen het weergavevenster
   acwr: number | null        // EWMA 7d/28d op vandaag
   status: LoadStatus         // o.b.v. vorm vandaag + ACWR
   today: LoadPoint | null
-  sessionCount: number       // aantal gelogde sessies in het venster (kracht + cardio)
+  sessionCount: number       // aantal gelogde sessies in het venster
+}
+
+/** Cardio-curve + optionele HR-gebaseerde load (Edwards TRIMP). */
+export type CardioCurve = ModalityCurve & {
+  /**
+   * Som van Edwards' TRIMP over cardio-sessies mét gemeten HR (tijd-in-zone),
+   * binnen het venster. null zolang er geen wearable-HR is — de curve zelf
+   * blijft dan gewoon op sRPE draaien.
+   */
+  trimp: number | null
+  hrSessionCount: number     // cardio-sessies in het venster met HR-data
+}
+
+export type LoadCurveResult = ModalityCurve & {
+  /**
+   * Vroegste gelogde sessie binnen de opgehaalde periode (incl. warm-up), ISO.
+   * null als er niets gelogd is.
+   */
+  firstSessionAt: string | null
+  /**
+   * Dagen historie = vandaag − eerste log. Server-side berekend (deterministisch,
+   * geen client-klok) voor betrouwbaarheids-drempels in de UI: de ACWR/vorm is
+   * pas zinvol als de chronische basis grotendeels gevuld is.
+   */
+  historyDays: number
+  strength: ModalityCurve    // alleen krachttraining (SessionLog)
+  cardio: CardioCurve        // alleen cardio (CardioLog)
 }
 
 // Prisma-client of transaction-client — alleen de twee findMany's nodig.
@@ -53,35 +93,92 @@ export async function computeLoadCurve(
     }),
     prisma.cardioLog.findMany({
       where: { patientId, completedAt: { gte: from } },
-      select: { completedAt: true, durationSec: true, rpe: true },
+      select: { completedAt: true, durationSec: true, rpe: true, timeInZones: true },
     }),
   ])
 
-  const loads: DailyLoad[] = []
+  const windowStartIso = isoDay(windowStart)
+
+  // ── Kracht: sRPE per krachtsessie ──────────────────────────────────────
+  const strengthLoads: DailyLoad[] = []
   for (const s of sessions) {
     if (!s.completedAt) continue
-    loads.push({
+    strengthLoads.push({
       date: isoDay(s.completedAt),
       load: sessionLoad((s.duration ?? 0) / 60, s.exertionLevel),
     })
   }
+
+  // ── Cardio: sRPE per cardiosessie + losse Edwards-TRIMP waar HR is ──────
+  const cardioLoads: DailyLoad[] = []
+  let cardioTrimp = 0
+  let hrSessionCount = 0
   for (const c of cardio) {
-    loads.push({
-      date: isoDay(c.completedAt),
+    const dateIso = isoDay(c.completedAt)
+    cardioLoads.push({
+      date: dateIso,
       load: sessionLoad(c.durationSec / 60, c.rpe),
     })
+    // TRIMP alleen meetellen voor het zichtbare venster (niet de warm-up).
+    if (dateIso >= windowStartIso) {
+      const t = edwardsTrimp(c.timeInZones as Record<string, number> | null)
+      if (t !== null) {
+        cardioTrimp += t
+        hrSessionCount++
+      }
+    }
   }
 
+  const strengthCount = sessions.filter(
+    (s) => s.completedAt && isoDay(s.completedAt) >= windowStartIso,
+  ).length
+  const cardioCount = cardio.filter((c) => isoDay(c.completedAt) >= windowStartIso).length
+
+  // Vroegste log over beide modaliteiten (volledige fetch, incl. warm-up).
+  let firstSessionAt: string | null = null
+  for (const s of sessions) {
+    if (s.completedAt && (!firstSessionAt || s.completedAt.toISOString() < firstSessionAt)) {
+      firstSessionAt = s.completedAt.toISOString()
+    }
+  }
+  for (const c of cardio) {
+    if (!firstSessionAt || c.completedAt.toISOString() < firstSessionAt) {
+      firstSessionAt = c.completedAt.toISOString()
+    }
+  }
+
+  const strength = buildModality(strengthLoads, from, to, strengthCount)
+  const cardioBase = buildModality(cardioLoads, from, to, cardioCount)
+  const combined = buildModality([...strengthLoads, ...cardioLoads], from, to, strengthCount + cardioCount)
+
+  const historyDays = firstSessionAt
+    ? Math.max(0, Math.floor((to.getTime() - new Date(firstSessionAt).getTime()) / 86_400_000))
+    : 0
+
+  return {
+    ...combined,
+    firstSessionAt,
+    historyDays,
+    strength,
+    cardio: {
+      ...cardioBase,
+      trimp: hrSessionCount > 0 ? cardioTrimp : null,
+      hrSessionCount,
+    },
+  }
+}
+
+/** Draai het fitness-fatigue model + ACWR over één load-stream. */
+function buildModality(
+  loads: DailyLoad[],
+  from: Date,
+  to: Date,
+  sessionCount: number,
+): ModalityCurve {
   const all = buildLoadCurve(loads, from, to)
   const points = all.slice(WARMUP_DAYS) // warm-up wegsnijden
   const today = points[points.length - 1] ?? null
   const acwr = ewmaAcwr(loads, from, to)
-
-  const windowStartIso = isoDay(windowStart)
-  const sessionCount =
-    sessions.filter(s => s.completedAt && isoDay(s.completedAt) >= windowStartIso).length +
-    cardio.filter(c => isoDay(c.completedAt) >= windowStartIso).length
-
   return {
     points,
     acwr,

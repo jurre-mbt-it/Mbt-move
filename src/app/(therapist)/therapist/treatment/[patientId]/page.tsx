@@ -42,6 +42,7 @@ import {
 import { trpc } from '@/lib/trpc/client'
 import { useDraftBackup, loadDraft, clearStoredDraft } from '@/hooks/useAutosave'
 import { PerformerToggle, type PerformerFilter } from '@/components/patients/PerformerToggle'
+import { PatientLoadStrip } from '@/components/workload/PatientLoadStrip'
 import {
   REP_UNITS,
   STANDARD_PARAMS,
@@ -218,6 +219,9 @@ export default function TreatmentPage({
   const [nowTick, setNowTick] = useState(Date.now())
   // Afrond-popup: RPE/gevoel/pijn/duur/notities worden hier ingevuld i.p.v. inline.
   const [finishOpen, setFinishOpen] = useState(false)
+  // Annuleer-popup: gooit de live-sessie weg zonder te loggen (bv. verkeerde
+  // patiënt aangeklikt). Bevestiging vereist zodat één misklik niet wist.
+  const [discardOpen, setDiscardOpen] = useState(false)
   // Pijn is optioneel: pas zichtbaar na klikken. Niet aangeklikt → pijn = 0.
   const [painEnabled, setPainEnabled] = useState(false)
   // Voorgestelde duur (minuten) = live-getelde tijd; handmatig aanpasbaar.
@@ -672,6 +676,15 @@ export default function TreatmentPage({
     })
   }
 
+  // Annuleer de live-sessie: wis het opgeslagen concept zodat hij niet
+  // hervat wordt, en ga terug naar het patiënt-profiel. Niets wordt gelogd.
+  function discardSession() {
+    clearStoredDraft(draftKey)
+    setDiscardOpen(false)
+    toast('Behandeling geannuleerd — niets opgeslagen', { duration: 2500 })
+    router.push(`/therapist/patients/${patientId}`)
+  }
+
   if (patientLoading || todayLoading) {
     return (
       <DarkScreen>
@@ -727,6 +740,10 @@ export default function TreatmentPage({
             </MetaLabel>
           )}
         </div>
+
+        {/* Belasting-status — snel zien hoe de patiënt ervoor staat vóór je de
+            zwaarte van vandaag kiest. Klapt weg zodra de sessie begint. */}
+        {mode === 'choose' && <PatientLoadStrip patientId={patientId} />}
 
         {/* Start-time editor */}
         {editingStart && (
@@ -993,6 +1010,20 @@ export default function TreatmentPage({
           {logMutation.isPending ? 'OPSLAAN…' : `BEHANDELING AFRONDEN (${durationMin}M)`}
         </DarkButton>
         )}
+
+        {/* Annuleren — verkeerde patiënt/sessie gestart? Gooi alles weg zonder
+            te loggen. Bevestiging via popup zodat één misklik niets wist. */}
+        {mode !== 'choose' && (
+          <button
+            type="button"
+            onClick={() => setDiscardOpen(true)}
+            disabled={logMutation.isPending}
+            className="athletic-mono athletic-tap self-center"
+            style={{ color: P.danger, fontSize: 11, letterSpacing: '0.14em', padding: '6px 12px' }}
+          >
+            ANNULEER BEHANDELING
+          </button>
+        )}
       </div>
 
       {finishOpen && (
@@ -1015,7 +1046,67 @@ export default function TreatmentPage({
           onSubmit={handleSubmit}
         />
       )}
+
+      {discardOpen && (
+        <DiscardSessionModal
+          patientName={patient.name ?? patient.email}
+          onKeep={() => setDiscardOpen(false)}
+          onDiscard={discardSession}
+        />
+      )}
     </DarkScreen>
+  )
+}
+
+/**
+ * Bevestiging vóór het weggooien van een live-sessie. Bewust expliciet: de
+ * draft wordt pas gewist als de therapeut hier "Ja, gooi weg" kiest.
+ */
+function DiscardSessionModal({
+  patientName,
+  onKeep,
+  onDiscard,
+}: {
+  patientName: string
+  onKeep: () => void
+  onDiscard: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4"
+      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)' }}
+      onClick={onKeep}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Behandeling annuleren"
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl flex flex-col"
+        style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 pt-5 pb-3 flex flex-col gap-0.5">
+          <Kicker style={{ color: P.danger }}>Annuleren</Kicker>
+          <span className="athletic-display" style={{ fontSize: 20, letterSpacing: '-0.02em', color: P.ink }}>
+            BEHANDELING WEGGOOIEN?
+          </span>
+        </div>
+        <div className="px-5 pb-2">
+          <p style={{ fontSize: 13, color: P.inkMuted, lineHeight: '20px' }}>
+            Deze live-sessie voor <span style={{ color: P.ink, fontWeight: 700 }}>{patientName}</span> wordt
+            niet gelogd en kan daarna niet hersteld worden. Verkeerde patiënt gekozen? Dan is dit veilig.
+          </p>
+        </div>
+        <div className="px-5 py-4 flex flex-col gap-2">
+          <DarkButton variant="danger" size="lg" onClick={onDiscard}>
+            JA, GOOI WEG
+          </DarkButton>
+          <DarkButton variant="ghost" onClick={onKeep}>
+            NEE, GA DOOR
+          </DarkButton>
+        </div>
+      </div>
+    </div>
   )
 }
 

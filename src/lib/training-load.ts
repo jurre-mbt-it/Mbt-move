@@ -53,6 +53,37 @@ export function sessionLoad(durationMinutes: number, rpe: number | null | undefi
 }
 
 /**
+ * Edwards' TRIMP — HR-zone-gewogen interne load voor cardio (gevalideerd,
+ * correleert sterk met sRPE bij aerobe sessies, r≈0.83–0.86). Som over de vijf
+ * HR-zones van (minuten in zone × zonegewicht 1..5).
+ *
+ * Vereist alleen tijd-in-zone, die uit gemeten HR wordt afgeleid en op
+ * `CardioLog.timeInZones` staat. Zolang er geen wearable-HR is, is dit veld
+ * null en geeft de functie null terug — de aanroeper valt dan terug op sRPE,
+ * zodat de curve continu en bruikbaar blijft zonder watch-koppeling.
+ *
+ * BELANGRIJK: TRIMP en sRPE zijn verschillende eenheden. Meng ze NIET in
+ * dezelfde EWMA-reeks (dat geeft een discontinue curve). TRIMP is bedoeld als
+ * losse cardio-readout naast de sRPE-curve, niet als curve-aandrijving.
+ *
+ * @param timeInZonesSec  object { "1": sec, "2": sec, … "5": sec } of null
+ */
+export function edwardsTrimp(
+  timeInZonesSec: Record<string, number> | null | undefined,
+): number | null {
+  if (!timeInZonesSec || typeof timeInZonesSec !== 'object') return null
+  let trimp = 0
+  let any = false
+  for (let zone = 1; zone <= 5; zone++) {
+    const sec = Number(timeInZonesSec[String(zone)] ?? 0)
+    if (!Number.isFinite(sec) || sec <= 0) continue
+    any = true
+    trimp += (sec / 60) * zone
+  }
+  return any ? Math.round(trimp) : null
+}
+
+/**
  * Bouw de dagelijkse curve over [from..to] (inclusief). `loads` mag sparse
  * zijn; dagen zonder training tellen als 0 (verval). Begin `from` ruim vóór
  * het weergavevenster (≥ 42 dagen warm-up) zodat de EWMA's ingelopen zijn.

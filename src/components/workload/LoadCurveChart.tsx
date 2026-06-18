@@ -11,6 +11,7 @@
  * kerngetallen fitheid/vermoeidheid/vorm staan als kaartjes boven de grafiek.
  */
 
+import { useState } from 'react'
 import {
   ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ReferenceLine, ReferenceArea, ReferenceDot, ResponsiveContainer,
@@ -44,7 +45,7 @@ const ZONES: { key: LoadStatusKey; from: number; to: number; color: string; labe
   { key: 'overreaching', from: -Infinity, to: -30, color: P.danger, label: 'Overreaching' },
 ]
 
-export type LoadCurveData = {
+type ModalityCurve = {
   points: LoadPoint[]
   acwr: number | null
   status: LoadStatus
@@ -52,11 +53,32 @@ export type LoadCurveData = {
   sessionCount: number
 }
 
+export type LoadCurveData = ModalityCurve & {
+  // Onderverdeling per modaliteit — optioneel zodat oudere call-sites blijven
+  // werken. Aanwezig sinds computeLoadCurve de kracht/cardio-splitsing geeft.
+  strength?: ModalityCurve
+  cardio?: (ModalityCurve & { trimp: number | null; hrSessionCount: number })
+  firstSessionAt?: string | null
+}
+
+type Modality = 'all' | 'strength' | 'cardio'
+
 export function LoadCurveChart({ data, compact = false }: { data: LoadCurveData; compact?: boolean }) {
-  const { points, acwr, status, today, sessionCount } = data
+  const [modality, setModality] = useState<Modality>('all')
+
+  // Splitsing alleen aanbieden als de onderverdeling meegestuurd is.
+  const hasSplit = Boolean(data.strength && data.cardio)
+  const view: ModalityCurve =
+    modality === 'strength' && data.strength ? data.strength
+    : modality === 'cardio' && data.cardio ? data.cardio
+    : data
+  const cardioTrimp = modality === 'cardio' ? data.cardio?.trimp ?? null : null
+
+  const { points, acwr, status, today, sessionCount } = view
   const statusColor = STATUS_COLORS[status.key]
 
-  if (sessionCount === 0) {
+  // Hele tegel leeg pas als er over ALLE modaliteiten niets gelogd is.
+  if (data.sessionCount === 0) {
     return (
       <Tile>
         <MetaLabel>BELASTING</MetaLabel>
@@ -95,10 +117,44 @@ export function LoadCurveChart({ data, compact = false }: { data: LoadCurveData;
   return (
     <Tile>
       <div className="space-y-3">
+        {/* Modaliteit-toggle — alleen als de onderverdeling beschikbaar is */}
+        {hasSplit && (
+          <div className="inline-flex rounded-lg p-0.5" style={{ background: P.surfaceLow }}>
+            {([
+              ['all', 'Alles'],
+              ['strength', 'Kracht'],
+              ['cardio', 'Cardio'],
+            ] as const).map(([key, label]) => {
+              const active = modality === key
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setModality(key)}
+                  className="athletic-mono athletic-tap rounded-md transition-colors"
+                  style={{
+                    color: active ? P.bg : P.inkMuted,
+                    background: active ? P.ink : 'transparent',
+                    fontSize: 10,
+                    fontWeight: 900,
+                    letterSpacing: '0.1em',
+                    padding: '4px 10px',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         {/* Header: status + kerngetallen */}
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <MetaLabel>BELASTING · KRACHT + CARDIO</MetaLabel>
+            <MetaLabel>
+              BELASTING · {modality === 'strength' ? 'KRACHT' : modality === 'cardio' ? 'CARDIO' : 'KRACHT + CARDIO'}
+            </MetaLabel>
             <div className="flex items-center gap-2 mt-1.5">
               <span
                 className="athletic-mono px-2 py-0.5 rounded-md"
@@ -137,7 +193,26 @@ export function LoadCurveChart({ data, compact = false }: { data: LoadCurveData;
           </div>
         </div>
 
+        {sessionCount === 0 ? (
+          <div className="py-6 text-center">
+            <p style={{ color: P.inkMuted, fontSize: 13 }}>
+              Nog geen {modality === 'cardio' ? 'cardio' : 'krachttraining'} gelogd in deze periode.
+            </p>
+          </div>
+        ) : (
+        <>
         <p style={{ color: P.inkMuted, fontSize: 12, lineHeight: 1.5 }}>{status.description}</p>
+
+        {cardioTrimp !== null && (
+          <p
+            className="athletic-mono"
+            title="Edwards' TRIMP — HR-zone-gewogen cardio-belasting; alleen uit sessies met gemeten hartslag"
+            style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.04em' }}
+          >
+            HR-BELASTING (TRIMP) <span style={{ color: P.ink, fontWeight: 800 }}>{cardioTrimp}</span>
+            {' · '}{data.cardio?.hrSessionCount ?? 0} sessie(s) met hartslag
+          </p>
+        )}
 
         <ResponsiveContainer width="100%" height={compact ? 200 : 260}>
           <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
@@ -186,6 +261,8 @@ export function LoadCurveChart({ data, compact = false }: { data: LoadCurveData;
             overreaching; bovenin betekent fris of juist wegzakkende fitheid. ACWR is een indicatie,
             geen harde voorspeller.
           </p>
+        )}
+        </>
         )}
       </div>
     </Tile>
