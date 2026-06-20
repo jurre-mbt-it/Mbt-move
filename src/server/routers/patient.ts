@@ -413,6 +413,9 @@ export const patientRouter = createTRPCRouter({
         durationSeconds: z.number().int().min(0),
         painLevel: z.number().int().min(0).max(10).nullable(),
         exertionLevel: z.number().int().min(0).max(10).nullable(),
+        // Subjectief gevoel 1-5 (smiley) — zelfde veld als de therapeut-flow.
+        feelScore: z.number().int().min(1).max(5).nullable().optional(),
+        notes: z.string().optional(),
         // False = eerder gestopt: niet alle oefeningen afgevinkt bij afronden.
         completedAll: z.boolean().optional(),
         exercises: z.array(
@@ -420,8 +423,10 @@ export const patientRouter = createTRPCRouter({
             exerciseId: z.string(),
             setsCompleted: z.number().int().min(0).optional(),
             repsCompleted: z.number().int().min(0).optional(),
+            repUnit: z.string().optional(),
             painLevel: z.number().int().min(0).max(10).nullable().optional(),
             weight: z.number().nullable().optional(),
+            weightsPerSet: z.array(z.number().nullable()).nullable().optional(),
             estimatedOneRepMax: z.number().nullable().optional(),
             painDuring: z.number().int().min(0).max(10).nullable().optional(),
           })
@@ -447,13 +452,17 @@ export const patientRouter = createTRPCRouter({
           duration: input.durationSeconds,
           painLevel: input.painLevel,
           exertionLevel: input.exertionLevel,
+          feelScore: input.feelScore ?? null,
+          notes: input.notes ?? undefined,
           exerciseLogs: {
             create: input.exercises.map(ex => ({
               exerciseId: ex.exerciseId,
               setsCompleted: ex.setsCompleted ?? null,
               repsCompleted: ex.repsCompleted ?? null,
+              repUnit: ex.repUnit ?? null,
               painLevel: ex.painLevel ?? null,
               weight: ex.weight ?? null,
+              weightsPerSet: ex.weightsPerSet ?? undefined,
               // Epley-fallback server-side: vóór deze fix werd 1RM alleen
               // client-side berekend als program.trackOneRepMax aanstond —
               // die vlag staat vrijwel nergens aan, dus 1RM-data bleef leeg

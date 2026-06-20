@@ -14,8 +14,19 @@ import {
   MetaLabel,
   Tile,
   DarkButton,
+  DarkInput,
+  DarkTextarea,
 } from '@/components/dark-ui'
-import { IconStrength } from '@/components/icons'
+import {
+  IconStrength,
+  IconLightning,
+  IconHeart,
+  IconMoodVeryLow,
+  IconMoodLow,
+  IconMoodNeutral,
+  IconMoodGood,
+  IconMoodGreat,
+} from '@/components/icons'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ReactPlayer = dynamic(() => import('react-player') as any, { ssr: false }) as any
@@ -57,6 +68,8 @@ type LiveExercise = {
   repUnit: string
   restTime: number
   videoUrl: string | null
+  /** Gewicht (kg) per set als strings — alleen voor de bewerkbare quick-workout. */
+  weights?: string[]
 }
 
 function dbExerciseToLive(ex: DbExercise): LiveExercise {
@@ -70,7 +83,16 @@ function dbExerciseToLive(ex: DbExercise): LiveExercise {
     repUnit: 'reps',
     restTime: 60,
     videoUrl: (ex.videoUrl as string | null | undefined) ?? null,
+    weights: ['', '', ''],
   }
+}
+
+/** Schaal het gewicht-array mee met het aantal sets (zoals het therapeut-scherm). */
+function resizeWeights(current: string[], target: number): string[] {
+  const n = Math.max(1, target)
+  if (current.length === n) return current
+  if (current.length > n) return current.slice(0, n)
+  return [...current, ...Array(n - current.length).fill('')]
 }
 
 export default function AthleteSessionPage() {
@@ -141,6 +163,12 @@ function AthleteSessionPageInner() {
   const [videoModal, setVideoModal] = useState<{ url: string; name: string } | null>(null)
   const [sessionRpe, setSessionRpe] = useState<number | null>(null)
   const [sessionPain, setSessionPain] = useState<number | null>(null)
+  // Quick-workout afrond-popup: feel-score / notities / aanpasbare duur / pijn.
+  const [feelScore, setFeelScore] = useState<number | null>(null)
+  const [notes, setNotes] = useState('')
+  const [durationInput, setDurationInput] = useState('')
+  const [painEnabled, setPainEnabled] = useState(false)
+  const [finishOpen, setFinishOpen] = useState(false)
 
   const baseExercises = isQuickMode ? [] : programExercises
   const exercises: LiveExercise[] = [...baseExercises, ...extraExercises]
@@ -153,15 +181,16 @@ function AthleteSessionPageInner() {
 
   const startTimeRef = useRef<number | null>(null)
 
-  // Start timer when session becomes active
+  // Start timer when session becomes active. In quick-mode is de bewerkbare
+  // lijst zélf de live sessie, dus daar loopt de timer al vanaf binnenkomst.
   useEffect(() => {
-    if (state !== 'active') return
+    if (state !== 'active' && !isQuickMode) return
     if (startTimeRef.current === null) {
       startTimeRef.current = Date.now()
     }
     const t = setInterval(() => setElapsed(Math.floor((Date.now() - startTimeRef.current!) / 1000)), 1000)
     return () => clearInterval(t)
-  }, [state])
+  }, [state, isQuickMode])
 
   const current = exercises[currentIndex]
   const todayDayNum = (() => { const d = new Date().getDay(); return d === 0 ? 7 : d })()
@@ -172,6 +201,19 @@ function AthleteSessionPageInner() {
     setExtraExercises(prev => [...prev, dbExerciseToLive(ex)])
     setShowAddExercise(false)
     setAddExerciseQuery('')
+  }
+
+  // Bewerk een quick-oefening (sets/reps/gewicht). Schaalt het gewicht-array
+  // mee als het aantal sets verandert, zodat de grid blijft kloppen.
+  function updateExtra(uid: string, patch: Partial<LiveExercise>) {
+    setExtraExercises(prev => prev.map(e => {
+      if (e.uid !== uid) return e
+      const merged = { ...e, ...patch }
+      if (patch.sets !== undefined) {
+        merged.weights = resizeWeights(merged.weights ?? [], patch.sets)
+      }
+      return merged
+    }))
   }
 
   // Alleen zelf toegevoegde oefeningen zijn verwijderbaar (vóór de start);
@@ -198,21 +240,38 @@ function AthleteSessionPageInner() {
 
   async function handleFinish() {
     setError(null)
+    // Duur: in quick-mode de (aanpasbare) ingevulde minuten, anders de live tijd.
+    const durationSeconds = isQuickMode
+      ? Math.max(1, Math.round(Number(durationInput) || Math.max(1, Math.round(elapsed / 60)))) * 60
+      : Math.max(elapsed, 1)
+    const painLevel = isQuickMode ? (painEnabled ? (sessionPain ?? 0) : 0) : sessionPain
     try {
       await logSession.mutateAsync({
         programId: isQuickMode ? undefined : sessionData?.program?.id,
         scheduledAt: new Date().toISOString(),
         completedAt: new Date().toISOString(),
-        durationSeconds: Math.max(elapsed, 1),
-        painLevel: sessionPain,
+        durationSeconds,
+        painLevel,
         exertionLevel: sessionRpe,
+        feelScore,
+        notes: notes.trim() || undefined,
         completedAll: completed.size >= exercises.length,
-        exercises: exercises.map(e => ({
-          exerciseId: e.exerciseId,
-          setsCompleted: e.sets,
-          repsCompleted: e.reps,
-          painLevel: sessionPain,
-        })),
+        exercises: exercises.map(e => {
+          // Gewicht per set → getallen; lege velden blijven null.
+          const ws = (e.weights ?? [])
+            .map(w => (w === '' ? null : Number(w)))
+            .filter(n => n === null || !Number.isNaN(n)) as Array<number | null>
+          const lastFilled = ws.length ? ([...ws].reverse().find(n => n !== null) ?? null) : null
+          return {
+            exerciseId: e.exerciseId,
+            setsCompleted: e.sets,
+            repsCompleted: e.reps,
+            repUnit: e.repUnit,
+            weight: lastFilled,
+            weightsPerSet: ws.length ? ws : undefined,
+            painLevel,
+          }
+        }),
       })
       await Promise.all([
         utils.patient.getWorkloadSessions.invalidate(),
@@ -362,6 +421,19 @@ function AthleteSessionPageInner() {
                 Kies uit favorieten, meest gebruikt of de hele bibliotheek — en start direct.
               </span>
             </button>
+          ) : isQuickMode ? (
+            <div className="space-y-2 mbt-stagger">
+              {exercises.map((e, i) => (
+                <QuickEditRow
+                  key={e.uid}
+                  index={i}
+                  ex={e}
+                  onUpdate={updateExtra}
+                  onRemove={removeExercise}
+                  onVideo={() => e.videoUrl && setVideoModal({ url: e.videoUrl, name: e.name })}
+                />
+              ))}
+            </div>
           ) : (
             <div className="space-y-2 mbt-stagger">
               {exercises.map((e, i) => {
@@ -482,19 +554,57 @@ function AthleteSessionPageInner() {
             </button>
           )}
 
-          {/* Startknop pas tonen zodra er iets te starten valt — in de lege
-              quick-staat is de grote CTA hierboven de enige actie */}
+          {/* Actieknop. Quick = direct afronden (de lijst is al de live sessie);
+              programma = focus-modus starten. Pas tonen als er iets is. */}
           {exercises.length > 0 && (
-            <DarkButton
-              variant="primary"
-              size="lg"
-              onClick={() => setState('active')}
-              className="w-full"
-            >
-              ▶ START SESSIE
-            </DarkButton>
+            isQuickMode ? (
+              <DarkButton
+                variant="primary"
+                size="lg"
+                onClick={() => {
+                  setDurationInput(String(Math.max(1, Math.round(elapsed / 60))))
+                  setPainEnabled(sessionPain != null)
+                  setFinishOpen(true)
+                }}
+                className="w-full"
+              >
+                WORKOUT AFRONDEN
+              </DarkButton>
+            ) : (
+              <DarkButton
+                variant="primary"
+                size="lg"
+                onClick={() => setState('active')}
+                className="w-full"
+              >
+                ▶ START SESSIE
+              </DarkButton>
+            )
           )}
         </div>
+
+        {/* Quick-workout afrond-popup met feel-score, RPE, pijn, duur, notities */}
+        {finishOpen && isQuickMode && (
+          <QuickFinishModal
+            durationMin={Math.max(1, Math.round(elapsed / 60))}
+            durationInput={durationInput}
+            onDurationChange={setDurationInput}
+            exertionLevel={sessionRpe}
+            onExertionChange={setSessionRpe}
+            feelScore={feelScore}
+            onFeelChange={setFeelScore}
+            painEnabled={painEnabled}
+            onTogglePain={() => setPainEnabled(v => !v)}
+            painLevel={sessionPain}
+            onPainChange={setSessionPain}
+            notes={notes}
+            onNotesChange={setNotes}
+            error={error}
+            loading={logSession.isPending}
+            onCancel={() => setFinishOpen(false)}
+            onSubmit={handleFinish}
+          />
+        )}
 
         {/* Add exercise bottom sheet */}
         {showAddExercise && (
@@ -1193,6 +1303,398 @@ function AddExerciseSheet({
               </div>
             </>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Quick-workout: bewerkbare oefening-rij (sets/reps/gewicht) ───────────────
+
+function QuickField({
+  label,
+  value,
+  onChange,
+  inputMode = 'numeric',
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  inputMode?: 'numeric' | 'decimal'
+}) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.12em' }}>
+        {label.toUpperCase()}
+      </span>
+      <DarkInput
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        inputMode={inputMode}
+        style={{ padding: '8px 10px', fontSize: 15 }}
+      />
+    </label>
+  )
+}
+
+function QuickEditRow({
+  index,
+  ex,
+  onUpdate,
+  onRemove,
+  onVideo,
+}: {
+  index: number
+  ex: LiveExercise
+  onUpdate: (uid: string, patch: Partial<LiveExercise>) => void
+  onRemove: (uid: string) => void
+  onVideo: () => void
+}) {
+  const setsCount = Math.max(1, ex.sets || 1)
+  const weights = ex.weights && ex.weights.length === setsCount
+    ? ex.weights
+    : resizeWeights(ex.weights ?? [], setsCount)
+
+  return (
+    <div
+      className="rounded-xl"
+      style={{
+        background: P.surface,
+        border: `1px solid ${P.line}`,
+        borderLeft: `3px solid ${P.brand}`,
+        padding: '12px 14px',
+      }}
+    >
+      <div className="flex items-center gap-3">
+        <div
+          className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: P.surfaceHi, border: `1px solid ${P.line}`, color: P.brand, fontFamily: mono, fontSize: 13, fontWeight: 900 }}
+        >
+          {index + 1}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="truncate" style={{ color: P.ink, fontSize: 14, fontWeight: 800, letterSpacing: '-0.01em' }}>
+            {ex.name}
+          </p>
+          <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: '0.12em', fontWeight: 700, color: P.inkMuted, marginTop: 2, textTransform: 'uppercase' }}>
+            {CATEGORY_LABELS_NL[ex.category] ?? ex.category}
+          </div>
+        </div>
+        {ex.videoUrl && (
+          <button
+            type="button"
+            onClick={onVideo}
+            aria-label={`Video ${ex.name}`}
+            className="athletic-tap inline-flex items-center justify-center rounded-full shrink-0"
+            style={{ width: 28, height: 28, background: 'rgba(232,122,85,0.15)', color: P.brand }}
+          >
+            <Play className="w-3.5 h-3.5" style={{ marginLeft: 1 }} fill="currentColor" />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => onRemove(ex.uid)}
+          aria-label={`Verwijder ${ex.name}`}
+          className="athletic-tap shrink-0"
+          style={{ color: P.inkDim, padding: 4 }}
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 mt-3">
+        <QuickField
+          label="Sets"
+          value={ex.sets ? String(ex.sets) : ''}
+          onChange={(v) => onUpdate(ex.uid, { sets: Math.max(1, Number(v) || 1) })}
+        />
+        <QuickField
+          label="Reps"
+          value={ex.reps ? String(ex.reps) : ''}
+          onChange={(v) => onUpdate(ex.uid, { reps: Math.max(0, Number(v) || 0) })}
+        />
+      </div>
+
+      <div className="mt-3">
+        <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.12em' }}>
+          GEWICHT (KG) · PER SET
+        </span>
+        <div
+          className="grid gap-1.5 mt-1.5"
+          style={{ gridTemplateColumns: `repeat(${Math.min(setsCount, 6)}, minmax(0, 1fr))` }}
+        >
+          {weights.map((w, i) => (
+            <div key={i} className="flex flex-col gap-0.5">
+              <span className="athletic-mono" style={{ color: P.inkDim, fontSize: 9, letterSpacing: '0.1em' }}>
+                S{i + 1}
+              </span>
+              <DarkInput
+                value={w}
+                onChange={(e) => {
+                  const next = [...weights]
+                  next[i] = e.target.value
+                  onUpdate(ex.uid, { weights: next })
+                }}
+                inputMode="decimal"
+                style={{ padding: '6px 8px', fontSize: 13 }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Feel-score (1-5 smiley) — zelfde set als het therapeut-scherm ───────────
+
+const FEEL_OPTIONS: Array<{ value: number; Icon: typeof IconMoodNeutral; label: string; color: string }> = [
+  { value: 1, Icon: IconMoodVeryLow, label: 'Slecht', color: P.danger },
+  { value: 2, Icon: IconMoodLow, label: 'Matig', color: P.danger },
+  { value: 3, Icon: IconMoodNeutral, label: 'Oké', color: P.gold },
+  { value: 4, Icon: IconMoodGood, label: 'Goed', color: P.lime },
+  { value: 5, Icon: IconMoodGreat, label: 'Top', color: P.lime },
+]
+
+function FeelPicker({ value, onChange }: { value: number | null; onChange: (v: number) => void }) {
+  return (
+    <div className="grid grid-cols-5 gap-1.5 mt-2">
+      {FEEL_OPTIONS.map(({ value: v, Icon, label, color }) => {
+        const active = value === v
+        return (
+          <button
+            key={v}
+            type="button"
+            onClick={() => onChange(v)}
+            aria-label={label}
+            aria-pressed={active}
+            className="athletic-tap flex flex-col items-center justify-center gap-1 rounded-lg py-2"
+            style={{
+              background: active ? color : P.surfaceHi,
+              color: active ? P.bg : P.inkMuted,
+              border: `1px solid ${active ? color : P.lineStrong}`,
+            }}
+          >
+            <Icon size={22} />
+            <span className="athletic-mono" style={{ fontSize: 9, letterSpacing: '0.08em', fontWeight: 800 }}>
+              {label.toUpperCase()}
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function ScalePicker({
+  value,
+  onChange,
+  min = 0,
+  max = 10,
+  colorHigh,
+}: {
+  value: number | null
+  onChange: (v: number | null) => void
+  min?: number
+  max?: number
+  colorHigh: string
+}) {
+  return (
+    <div className="flex gap-1 mt-2">
+      {Array.from({ length: max - min + 1 }, (_, i) => i + min).map((n) => {
+        const active = value === n
+        return (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange(active ? null : n)}
+            className="athletic-tap flex-1 rounded-lg athletic-mono transition-all"
+            style={{
+              height: 40,
+              background: active ? colorHigh : P.surfaceHi,
+              color: active ? P.bg : P.inkMuted,
+              fontSize: 12,
+              fontWeight: 900,
+            }}
+          >
+            {n}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Quick-workout afrond-popup (RPE / gevoel / pijn / duur / notities) ───────
+
+function QuickFinishModal({
+  durationMin,
+  durationInput,
+  onDurationChange,
+  exertionLevel,
+  onExertionChange,
+  feelScore,
+  onFeelChange,
+  painEnabled,
+  onTogglePain,
+  painLevel,
+  onPainChange,
+  notes,
+  onNotesChange,
+  error,
+  loading,
+  onCancel,
+  onSubmit,
+}: {
+  durationMin: number
+  durationInput: string
+  onDurationChange: (v: string) => void
+  exertionLevel: number | null
+  onExertionChange: (v: number | null) => void
+  feelScore: number | null
+  onFeelChange: (v: number) => void
+  painEnabled: boolean
+  onTogglePain: () => void
+  painLevel: number | null
+  onPainChange: (v: number | null) => void
+  notes: string
+  onNotesChange: (v: string) => void
+  error: string | null
+  loading: boolean
+  onCancel: () => void
+  onSubmit: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4"
+      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(2px)' }}
+      onClick={onCancel}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Workout afronden"
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl flex flex-col max-h-[92vh]"
+        style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 pt-5 pb-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${P.line}` }}>
+          <div className="flex flex-col gap-0.5">
+            <Kicker>Afronden</Kicker>
+            <span className="athletic-display" style={{ fontSize: 20, letterSpacing: '-0.02em', color: P.ink }}>
+              WORKOUT AFRONDEN
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onCancel}
+            aria-label="Sluiten"
+            className="athletic-tap athletic-mono"
+            style={{ color: P.inkMuted, fontSize: 18, lineHeight: 1, padding: 4 }}
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="px-5 py-4 flex flex-col gap-5 overflow-y-auto">
+          <section>
+            <div className="flex items-center gap-2">
+              <span
+                aria-hidden
+                className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
+                style={{ background: 'rgba(244,194,97,0.12)', color: P.gold }}
+              >
+                <IconLightning size={14} />
+              </span>
+              <MetaLabel style={{ color: P.gold }}>Hoe zwaar voelde de sessie? /10</MetaLabel>
+            </div>
+            <ScalePicker value={exertionLevel} onChange={onExertionChange} min={1} max={10} colorHigh={P.gold} />
+          </section>
+
+          <section>
+            <MetaLabel style={{ color: P.lime }}>Hoe voelde het?</MetaLabel>
+            <FeelPicker value={feelScore} onChange={onFeelChange} />
+          </section>
+
+          <section>
+            {painEnabled ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span
+                      aria-hidden
+                      className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
+                      style={{ background: 'rgba(248,113,113,0.12)', color: P.danger }}
+                    >
+                      <IconHeart size={14} />
+                    </span>
+                    <MetaLabel style={{ color: P.danger }}>Pijn /10</MetaLabel>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onTogglePain}
+                    className="athletic-mono athletic-tap"
+                    style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.12em' }}
+                  >
+                    GEEN PIJN
+                  </button>
+                </div>
+                <ScalePicker value={painLevel} onChange={onPainChange} min={0} max={10} colorHigh={P.danger} />
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={onTogglePain}
+                className="athletic-mono athletic-tap w-full rounded-lg py-2.5 flex items-center justify-center gap-2"
+                style={{ background: P.surfaceHi, color: P.danger, border: `1px dashed ${P.danger}`, fontSize: 11, letterSpacing: '0.1em', fontWeight: 800 }}
+              >
+                <IconHeart size={13} /> + PIJN TOEVOEGEN
+              </button>
+            )}
+          </section>
+
+          <section>
+            <MetaLabel>Duur (minuten)</MetaLabel>
+            <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, marginTop: 4, letterSpacing: '0.04em' }}>
+              Voorgesteld op basis van de tijd ({durationMin}m) — pas aan indien nodig
+            </p>
+            <DarkInput
+              value={durationInput}
+              onChange={(e) => onDurationChange(e.target.value.replace(/[^0-9]/g, ''))}
+              inputMode="numeric"
+              style={{ padding: '10px 12px', fontSize: 16, marginTop: 6, maxWidth: 140 }}
+            />
+          </section>
+
+          <section>
+            <MetaLabel>Notities</MetaLabel>
+            <DarkTextarea
+              value={notes}
+              onChange={(e) => onNotesChange(e.target.value)}
+              placeholder="Hoe ging het, bijzonderheden…"
+              rows={3}
+              style={{ marginTop: 6 }}
+            />
+          </section>
+
+          {error && <p style={{ color: P.danger, fontSize: 13 }}>{error}</p>}
+        </div>
+
+        <div className="px-5 py-4 flex items-center gap-3" style={{ borderTop: `1px solid ${P.line}` }}>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={loading}
+            className="athletic-mono athletic-tap rounded-lg px-4 py-3"
+            style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.12em', fontWeight: 800 }}
+          >
+            ANNULEREN
+          </button>
+          <div className="flex-1">
+            <DarkButton size="lg" onClick={onSubmit} disabled={loading} loading={loading}>
+              {loading ? 'OPSLAAN…' : 'OPSLAAN & AFSLUITEN'}
+            </DarkButton>
+          </div>
         </div>
       </div>
     </div>
