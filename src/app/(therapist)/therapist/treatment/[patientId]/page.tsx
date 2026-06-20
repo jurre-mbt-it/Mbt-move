@@ -644,7 +644,10 @@ export default function TreatmentPage({
     const scheduledAt = new Date(now.getTime() - durationSeconds * 1000)
     logMutation.mutate({
       patientId,
-      programId: todayData?.program?.id ?? undefined,
+      // Alleen aan het programma koppelen als je het programma écht volgde.
+      // Bij een vrije workout of "vorige sessie" als startpunt is dit een losse
+      // (gym-)behandeling — die mag niet als programma-sessie gelabeld worden.
+      programId: mode === 'program' ? (todayData?.program?.id ?? undefined) : undefined,
       scheduledAt: scheduledAt.toISOString(),
       completedAt: now.toISOString(),
       durationSeconds,
