@@ -21,6 +21,20 @@ export const LAST_SEEN_RELEASE_KEY = 'mbt-last-seen-release'
 
 export const releaseNotes: ReleaseNote[] = [
   {
+    id: '2026-06-24-meerdere-programmas-en-controle-signaal',
+    date: '2026-06-24',
+    title: "Meerdere programma's per patiënt + controle-signaal bij oude schema's",
+    highlight: "Een patiënt kan nu meerdere programma's tegelijk volgen — bijvoorbeeld dagelijkse iso's én een krachtschema 3×/week — netjes gescheiden. En je krijgt een seintje als een schema te lang ongewijzigd is.",
+    items: [
+      'Meerdere programma\'s naast elkaar: koppel zoveel programma\'s aan een patiënt als nodig. "+ Programma toevoegen" staat altijd klaar op de patiëntpagina, ook als er al een programma loopt — geen overschrijven meer.',
+      'De patiënt ziet ze gescheiden: bij meerdere actieve programma\'s verschijnt bovenaan het schema een kiezer (bv. "Dagelijkse iso\'s" / "Krachtschema") om tussen de schema\'s te wisselen. Je hoeft niet eerst het ene af te ronden voordat het andere zichtbaar wordt.',
+      'Vinkjes kloppen per programma: een afgeronde krachtsessie telt alleen mee bij het krachtschema, niet bij de iso\'s. Op het dashboard staat elk programma als eigen kaart.',
+      'Controle-signaal: blijft een actief schema langer dan 8 weken ongewijzigd, dan krijg je een seintje om te controleren of het nog passend is — op je dashboard ("Schema\'s om te controleren") en als badge op de programmakaart van de patiënt.',
+      'Zelf de looptijd bepalen: bij het maken van een programma stel je in "Controleren na … weken" (leeg = standaard 8). Vul je bijvoorbeeld 12 in, dan komt het seintje pas na 12 weken — jouw waarde overrulet de standaard.',
+      'Schema gecontroleerd en nog goed? Klik "✓ Gecontroleerd" om de teller te resetten zonder iets te wijzigen. Een echte aanpassing aan het schema reset de teller vanzelf.',
+    ],
+  },
+  {
     id: '2026-06-07-interactieve-weekplanner',
     date: '2026-06-07',
     title: 'Interactieve week-planner, workouts met inhoud + snellere app',
