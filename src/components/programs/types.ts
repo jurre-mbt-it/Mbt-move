@@ -98,4 +98,7 @@ export interface ProgramState {
    *  is bereikt binnen een rolling week (Mo-Su). */
   flexibleSchedule?: boolean
   weeklyTarget?: number | null
+  /** Looptijd/controle-interval in weken (leeg = standaard 8). Na afloop
+   *  krijgt de therapeut een controle-signaal. */
+  reviewAfterWeeks?: number | null
 }

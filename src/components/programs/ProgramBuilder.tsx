@@ -124,6 +124,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
     trackOneRepMax: (initialState as Partial<ProgramState> | undefined)?.trackOneRepMax ?? false,
     flexibleSchedule: (initialState as Partial<ProgramState> | undefined)?.flexibleSchedule ?? false,
     weeklyTarget: (initialState as Partial<ProgramState> | undefined)?.weeklyTarget ?? null,
+    reviewAfterWeeks: (initialState as Partial<ProgramState> | undefined)?.reviewAfterWeeks ?? null,
     exercises: initialState?.exercises ?? [],
     resources: (initialState as Partial<ProgramState> | undefined)?.resources ?? [],
   }))
@@ -595,6 +596,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       trackOneRepMax: boolean
       flexibleSchedule: boolean
       weeklyTarget: number | null
+      reviewAfterWeeks: number | null
     }
     exercises: BuilderExercise[]
     resources: BuilderResource[]
@@ -611,6 +613,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       trackOneRepMax: program.trackOneRepMax,
       flexibleSchedule: program.flexibleSchedule ?? false,
       weeklyTarget: program.weeklyTarget ?? null,
+      reviewAfterWeeks: program.reviewAfterWeeks ?? null,
     },
     exercises,
     resources,
@@ -725,6 +728,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         patientId: patientIdForSave,
         flexibleSchedule: val.program.flexibleSchedule,
         weeklyTarget: val.program.flexibleSchedule ? val.program.weeklyTarget : null,
+        reviewAfterWeeks: val.program.reviewAfterWeeks,
         exercises: exercisePayload,
         resources: resourcePayload,
       })
@@ -738,6 +742,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         patientId: patientIdForSave ?? undefined,
         flexibleSchedule: val.program.flexibleSchedule,
         weeklyTarget: val.program.flexibleSchedule ? val.program.weeklyTarget : null,
+        reviewAfterWeeks: val.program.reviewAfterWeeks,
       })
       if (val.exercises.length > 0 || val.resources.length > 0) {
         await saveProgram.mutateAsync({
@@ -1437,6 +1442,33 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               <span className="text-[10px] text-muted-foreground">/ week</span>
             </div>
           )}
+
+          <div className="w-px h-4 bg-[rgba(255,255,255,0.08)] mx-1 hidden sm:block" />
+
+          {/* Controle-interval — na hoeveel weken zónder wijziging de therapeut
+              een controle-signaal krijgt. Leeg = standaard 8 weken. */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Controleren na</span>
+            <input
+              type="number"
+              min={1}
+              max={104}
+              placeholder="8"
+              value={program.reviewAfterWeeks ?? ''}
+              onChange={e => {
+                const v = e.target.value
+                setProgram(p => ({ ...p, reviewAfterWeeks: v === '' ? null : Math.max(1, Math.min(104, Number(v))) }))
+              }}
+              className="w-12 h-6 text-center text-xs font-bold bg-[#1C2425] rounded border border-[rgba(255,255,255,0.10)] focus:outline-none focus:ring-1 focus:ring-[#e87a55]"
+            />
+            <span className="text-[10px] text-muted-foreground">weken</span>
+            <div className="relative group">
+              <Info className="w-3.5 h-3.5 text-[#7B8889] cursor-help" />
+              <div className="absolute left-5 top-0 z-50 w-64 hidden group-hover:block bg-[#e87a55] text-white text-xs rounded-lg px-3 py-2 shadow-xl">
+                Na zoveel weken zonder wijziging krijg je een signaal om het schema te controleren. Leeg = standaard 8 weken. Elke aanpassing reset de teller.
+              </div>
+            </div>
+          </div>
 
           {/* Destination toggle — bepaalt of Opslaan naar deze patiënt of de
               bibliotheek gaat. Zonder patiënt is alleen "Bibliotheek" mogelijk. */}

@@ -3,6 +3,7 @@ import { createTRPCRouter, therapistProcedure, creatorProcedure } from '@/server
 import { TRPCError } from '@trpc/server'
 import type { PrismaClient } from '@prisma/client'
 import { maskMuscleLoadsArray } from '@/server/lib/muscle-loads'
+import { isReviewDue, weeksSince, reviewThresholdWeeks } from '@/lib/program-review'
 
 const createId = () => crypto.randomUUID()
 
@@ -185,6 +186,9 @@ export const programsRouter = createTRPCRouter({
       weeks: z.number().int().min(1).default(4),
       daysPerWeek: z.number().int().min(1).default(3),
       isTemplate: z.boolean().default(false),
+      // Looptijd/controle-interval in weken (leeg = standaard 8). Levert na
+      // afloop een controle-signaal voor de therapeut op.
+      reviewAfterWeeks: z.number().int().min(1).max(104).nullable().optional(),
       type: z.enum(['STRENGTH', 'MOBILITY', 'PLYOMETRICS', 'CARDIO', 'STABILITY', 'MIXED']).optional(),
       // Vrije JSON-blob voor cardio/walk-run protocollen. Geen strikte schema
       // omdat de wizards verschillende velden vastleggen (zone-training,
@@ -221,6 +225,7 @@ export const programsRouter = createTRPCRouter({
       weeks: z.number().int().min(1).optional(),
       daysPerWeek: z.number().int().min(1).optional(),
       isTemplate: z.boolean().optional(),
+      reviewAfterWeeks: z.number().int().min(1).max(104).nullable().optional(),
       patientId: z.string().nullable().optional(),
       startDate: z.string().nullable().optional(),
       endDate: z.string().nullable().optional(),
@@ -425,5 +430,76 @@ export const programsRouter = createTRPCRouter({
       }
 
       return { updated: result.count }
+    }),
+
+  /**
+   * Programma's die toe zijn aan een controle: actief, aan een patiënt
+   * gekoppeld en langer dan de drempel (`reviewAfterWeeks` of standaard 8
+   * weken) ongewijzigd. Scope = eigen programma's + die van praktijk-collega's.
+   * Voedt het therapeut-dashboard en de signalen-melding.
+   */
+  reviewDue: therapistProcedure.query(async ({ ctx }) => {
+    const isAdmin = ctx.user!.role === 'ADMIN'
+    const practiceId = ctx.user!.practiceId
+    const ownership = isAdmin
+      ? {}
+      : practiceId
+        ? { OR: [{ creatorId: ctx.user!.id }, { practiceId }] }
+        : { creatorId: ctx.user!.id }
+
+    const programs = await ctx.prisma.program.findMany({
+      where: {
+        ...ownership,
+        status: 'ACTIVE',
+        isTemplate: false,
+        patientId: { not: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        updatedAt: true,
+        reviewAfterWeeks: true,
+        patient: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { updatedAt: 'asc' },
+    })
+
+    const now = new Date()
+    return programs
+      .filter((p) => isReviewDue(p.updatedAt, p.reviewAfterWeeks, now))
+      .map((p) => ({
+        programId: p.id,
+        programName: p.name,
+        patientId: p.patient?.id ?? null,
+        patientName: p.patient?.name ?? p.patient?.email ?? 'Onbekend',
+        weeksUnchanged: Math.floor(weeksSince(p.updatedAt, now)),
+        thresholdWeeks: reviewThresholdWeeks(p.reviewAfterWeeks),
+      }))
+  }),
+
+  /**
+   * "Markeer als gecontroleerd" — bumpt updatedAt zonder inhoudelijke wijziging
+   * zodat de controle-klok reset en het signaal verdwijnt. Gebruik dit als het
+   * schema na controle ongewijzigd passend blijkt.
+   */
+  markReviewed: creatorProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.prisma.program.findUnique({ where: { id: input.id } })
+      if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
+      const isAdmin = ctx.user!.role === 'ADMIN'
+      const isOwner = existing.creatorId === ctx.user!.id
+      const samePractice =
+        !!ctx.user!.practiceId &&
+        !!existing.practiceId &&
+        existing.practiceId === ctx.user!.practiceId
+      if (!isAdmin && !isOwner && !samePractice) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+      await ctx.prisma.program.update({
+        where: { id: input.id },
+        data: { updatedAt: new Date() },
+      })
+      return { ok: true }
     }),
 })

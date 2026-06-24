@@ -64,6 +64,7 @@ type EditProgram = {
   trackOneRepMax?: boolean
   flexibleSchedule?: boolean
   weeklyTarget?: number | null
+  reviewAfterWeeks?: number | null
 }
 
 export default function EditProgramPage({ params }: Props) {
@@ -162,6 +163,7 @@ export default function EditProgramPage({ params }: Props) {
           trackOneRepMax: program.trackOneRepMax ?? false,
           flexibleSchedule: program.flexibleSchedule ?? false,
           weeklyTarget: program.weeklyTarget ?? null,
+          reviewAfterWeeks: program.reviewAfterWeeks ?? null,
           exercises,
           resources,
         }}

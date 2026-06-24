@@ -28,6 +28,7 @@ import { RehabTracker } from '@/components/rehab/RehabTracker'
 import { PatientClinicalTests } from '@/components/clinical-tests/PatientClinicalTests'
 import { PatientWearablesTab } from '@/components/wearables/PatientWearablesTab'
 import { wearablesEnabledForRole } from '@/lib/wearables-access'
+import { isReviewDue, weeksSince } from '@/lib/program-review'
 import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, type CardioActivityKey, type CardioProtocolKey } from '@/lib/cardio-constants'
 import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
 import { CARDIO_ICON_MAP, IconMail, IconCalendar, IconClipboard } from '@/components/icons'
@@ -178,7 +179,8 @@ export default function PatientDetailPage({
   }, [patient, editing])
   const programs = programsRaw as Array<{
     id: string; name: string; status: string; weeks: number;
-    daysPerWeek: number; startDate: Date | null; endDate: Date | null; isTemplate: boolean
+    daysPerWeek: number; startDate: Date | null; endDate: Date | null; isTemplate: boolean;
+    updatedAt: Date | string; reviewAfterWeeks: number | null
   }>
 
   if (isLoading) {
@@ -274,29 +276,30 @@ export default function PatientDetailPage({
           >
             <span className="inline-flex items-center gap-1.5"><IconCalendar size={15} /> Weekschema</span>
           </DarkButton>
-          {patient.programId ? (
+          {/* Programma's. Een patient kan er meerdere naast elkaar hebben
+              (bv. dagelijkse iso's + 3×/week kracht). "+ Programma" en
+              "Vanaf template" blijven daarom altijd beschikbaar — ook als er
+              al een programma loopt — zodat je makkelijk een 2e/3e toevoegt. */}
+          {patient.programId && (
             <DarkButton
               variant="secondary"
               href={`/therapist/programs/${patient.programId}/edit`}
             >
               Programma
             </DarkButton>
-          ) : (
-            <>
-              <DarkButton
-                variant="secondary"
-                onClick={() => setAssignTemplateOpen(true)}
-              >
-                <span className="inline-flex items-center gap-1.5"><IconClipboard size={15} /> Vanaf template</span>
-              </DarkButton>
-              <DarkButton
-                variant="secondary"
-                href={`/therapist/programs/new?patientId=${patient.id}`}
-              >
-                + Programma
-              </DarkButton>
-            </>
           )}
+          <DarkButton
+            variant="secondary"
+            onClick={() => setAssignTemplateOpen(true)}
+          >
+            <span className="inline-flex items-center gap-1.5"><IconClipboard size={15} /> Vanaf template</span>
+          </DarkButton>
+          <DarkButton
+            variant="secondary"
+            href={`/therapist/programs/new?patientId=${patient.id}`}
+          >
+            + Programma toevoegen
+          </DarkButton>
         </div>
         <AssignFromTemplateDialog
           open={assignTemplateOpen}
@@ -570,8 +573,14 @@ export default function PatientDetailPage({
             {programs.map(prog => {
               const progStatus = STATUS_CONFIG[prog.status] ?? STATUS_CONFIG.DRAFT
               const accent = STATUS_ACCENT[prog.status] ?? P.inkDim
+              // Controle-signaal: actief programma dat langer dan de drempel
+              // (reviewAfterWeeks of standaard 8) ongewijzigd is.
+              const reviewDue =
+                prog.status === 'ACTIVE' && !prog.isTemplate &&
+                isReviewDue(prog.updatedAt, prog.reviewAfterWeeks)
+              const weeksUnchanged = Math.floor(weeksSince(prog.updatedAt))
               return (
-                <Tile key={prog.id} accentBar={accent}>
+                <Tile key={prog.id} accentBar={reviewDue ? P.gold : accent}>
                   <div className="flex items-center gap-3">
                     <Link href={`/therapist/programs/${prog.id}/edit`} className="flex-1 min-w-0 cursor-pointer">
                       <p
@@ -593,6 +602,24 @@ export default function PatientDetailPage({
                         {prog.weeks} weken · {prog.daysPerWeek}×/week
                         {prog.startDate && ` · Start ${new Date(prog.startDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`}
                       </p>
+                      {reviewDue && (
+                        <span
+                          className="inline-flex items-center gap-1.5 mt-2"
+                          style={{
+                            background: 'rgba(244,194,97,0.12)',
+                            color: P.gold,
+                            border: `1px solid ${P.gold}`,
+                            borderRadius: 999,
+                            padding: '2px 8px',
+                            fontSize: 10,
+                            fontWeight: 800,
+                            letterSpacing: '0.04em',
+                          }}
+                        >
+                          ⚠ Controleer schema · {weeksUnchanged} wk ongewijzigd
+                          {prog.reviewAfterWeeks ? ` (ingesteld: ${prog.reviewAfterWeeks})` : ''}
+                        </span>
+                      )}
                     </Link>
                     <span
                       className="athletic-mono shrink-0"
@@ -609,7 +636,7 @@ export default function PatientDetailPage({
                     >
                       {progStatus.label}
                     </span>
-                    <ProgramActions programId={prog.id} status={prog.status} patientId={patient.id} />
+                    <ProgramActions programId={prog.id} status={prog.status} patientId={patient.id} reviewDue={reviewDue} />
                   </div>
                 </Tile>
               )
@@ -987,16 +1014,24 @@ function ProgramActions({
   programId,
   status,
   patientId,
+  reviewDue = false,
 }: {
   programId: string
   status: string
   patientId: string
+  reviewDue?: boolean
 }) {
   const utils = trpc.useUtils()
-  const save = trpc.programs.save.useMutation({
+  const invalidate = () => {
+    utils.programs.list.invalidate()
+    utils.programs.reviewDue.invalidate()
+    utils.patients.get.invalidate({ id: patientId })
+  }
+  const save = trpc.programs.save.useMutation({ onSuccess: invalidate })
+  const markReviewed = trpc.programs.markReviewed.useMutation({
     onSuccess: () => {
-      utils.programs.list.invalidate()
-      utils.patients.get.invalidate({ id: patientId })
+      invalidate()
+      toast.success('Schema gemarkeerd als gecontroleerd')
     },
   })
 
@@ -1004,6 +1039,16 @@ function ProgramActions({
 
   return (
     <div className="flex items-center gap-2 shrink-0">
+      {reviewDue && (
+        <DarkButton
+          variant="secondary"
+          size="sm"
+          disabled={markReviewed.isPending}
+          onClick={() => markReviewed.mutate({ id: programId })}
+        >
+          ✓ Gecontroleerd
+        </DarkButton>
+      )}
       {!isActive && (
         <DarkButton
           variant="primary"

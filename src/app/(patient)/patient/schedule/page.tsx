@@ -22,7 +22,17 @@ type ProgramExercise = {
 }
 
 export default function PatientSchedulePage() {
-  const { data: program, isLoading } = trpc.patient.getActiveProgram.useQuery()
+  // Meerdere actieve programma's → patient kiest welk schema hij bekijkt via
+  // tabs bovenaan. Default = eerste (oudste) actieve programma. Elk programma
+  // wordt los getoond; je hoeft niet eerst het ene af te ronden.
+  const { data: activePrograms } = trpc.patient.getActivePrograms.useQuery()
+  const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null)
+  const effectiveProgramId = selectedProgramId ?? activePrograms?.[0]?.id ?? null
+  const multiProgram = (activePrograms?.length ?? 0) > 1
+
+  const { data: program, isLoading } = trpc.patient.getActiveProgram.useQuery(
+    effectiveProgramId ? { programId: effectiveProgramId } : undefined,
+  )
   const { data: sessionHistory } = trpc.patient.getSessionHistory.useQuery({ limit: 30 })
 
   const today = new Date().getDay()
@@ -70,6 +80,9 @@ export default function PatientSchedulePage() {
   }
   const sessionsThisWeek = (sessionHistory ?? [])
     .filter(s => {
+      // Alleen sessies van dít programma tellen mee voor zijn ✓/gemist-vinkjes.
+      // Een krachtsessie mag niet als "gedaan" verschijnen op het iso-schema.
+      if (s.programId !== program.id) return false
       const d = new Date(s.completedAt)
       const ws = new Date()
       ws.setDate(ws.getDate() - (ws.getDay() === 0 ? 6 : ws.getDay() - 1))
@@ -150,6 +163,34 @@ export default function PatientSchedulePage() {
   return (
     <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
       <div className="max-w-lg mx-auto px-4 pt-10 pb-8 space-y-4">
+        {/* Programma-kiezer — alleen tonen bij meerdere actieve programma's.
+            Elk programma staat los naast elkaar; tabs bovenaan om te wisselen. */}
+        {multiProgram && activePrograms && (
+          <div className="flex gap-2 overflow-x-auto pb-1 -mb-1">
+            {activePrograms.map(p => {
+              const isActive = p.id === effectiveProgramId
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => { setSelectedProgramId(p.id); setSelectedDay(todayDayNum) }}
+                  className="athletic-tap athletic-mono shrink-0 rounded-full px-3.5 py-2 transition-all"
+                  style={{
+                    background: isActive ? P.brand : P.surface,
+                    color: isActive ? P.bg : P.inkMuted,
+                    border: `1.5px solid ${isActive ? P.brand : P.line}`,
+                    fontSize: 11,
+                    fontWeight: 800,
+                    letterSpacing: '0.06em',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {p.name}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         {/* Hero */}
         <div>
           <Kicker>WEEKSCHEMA · WEEK {program.currentWeek}</Kicker>
@@ -272,13 +313,13 @@ export default function PatientSchedulePage() {
               )}
             </div>
             {hasExercises && selectedDayInfo.status !== 'done' && isToday && (
-              <DarkButton href="/patient/session" size="sm" variant="primary">
+              <DarkButton href={`/patient/session?programId=${program.id}`} size="sm" variant="primary">
                 <Play className="w-3 h-3 fill-current mr-1.5" /> START
               </DarkButton>
             )}
             {hasExercises && selectedDayInfo.status !== 'done' && !isToday && (
               <DarkButton
-                href={`/patient/session?week=${program.currentWeek}&day=${selectedDay}`}
+                href={`/patient/session?programId=${program.id}&week=${program.currentWeek}&day=${selectedDay}`}
                 size="sm"
                 variant="secondary"
               >
@@ -321,7 +362,7 @@ export default function PatientSchedulePage() {
               ))}
 
               <Link
-                href={isToday ? '/patient/session' : `/patient/session?week=${program.currentWeek}&day=${selectedDay}`}
+                href={isToday ? `/patient/session?programId=${program.id}` : `/patient/session?programId=${program.id}&week=${program.currentWeek}&day=${selectedDay}`}
                 className="athletic-tap flex items-center justify-center gap-2 py-4 rounded-2xl mt-2"
                 style={{ background: isToday ? P.brand : P.gold, color: P.bg }}
               >

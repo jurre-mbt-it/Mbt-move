@@ -259,15 +259,26 @@ export default function PatientDashboard() {
           />
         )}
 
-        {/* Active program detail */}
-        {activeProgram?.id && (
+        {/* Active program detail — bij meerdere programma's elk los tonen zodat
+            de patient ze gescheiden ziet en direct naar het juiste kan. */}
+        {multiProgram ? (
+          activePrograms!.map((p) => (
+            <ActionTile
+              key={p.id}
+              href={`/patient/program/${p.id}`}
+              label={p.name}
+              sub={`Week ${p.currentWeek}/${p.weeks} · ${p.daysPerWeek}×/week`}
+              bar={P.purple}
+            />
+          ))
+        ) : activeProgram?.id ? (
           <ActionTile
             href={`/patient/program/${activeProgram.id}`}
             label="Mijn programma"
             sub={`${activeProgram.name ?? ''} · alle weken bekijken`}
             bar={P.purple}
           />
-        )}
+        ) : null}
 
         {/* Rehab-protocol — alleen tonen als therapeut een tracker heeft geactiveerd */}
         {rehabTracker && (

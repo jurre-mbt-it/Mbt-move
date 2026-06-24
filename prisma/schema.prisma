@@ -647,6 +647,11 @@ model Program {
   daysPerWeek  Int           @default(3)
   startDate    DateTime?
   endDate      DateTime?
+
+  // Na hoeveel weken zónder wijziging het schema een controle-signaal voor de
+  // therapeut oplevert. Null = standaard (8 weken, zie lib/program-review.ts).
+  // De klok telt vanaf `updatedAt`: elke aanpassing reset 'm.
+  reviewAfterWeeks Int?
   cardioParams Json? // CardioParams JSONB for cardio programs
 
   tendinopathyMode Boolean @default(false)
