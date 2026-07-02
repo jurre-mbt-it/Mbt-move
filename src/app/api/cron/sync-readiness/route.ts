@@ -10,21 +10,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { computeAndStoreReadiness } from '@/server/readiness'
+import { authorizeCron } from '@/server/lib/cron-auth'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-function authorize(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return process.env.NODE_ENV !== 'production'
-  const auth = req.headers.get('authorization')
-  if (!auth?.toLowerCase().startsWith('bearer ')) return false
-  return auth.slice(7) === secret
-}
-
 export async function GET(req: NextRequest) {
-  if (!authorize(req)) {
+  if (!authorizeCron(req, { allowDevFallback: true })) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
   const startedAt = Date.now()

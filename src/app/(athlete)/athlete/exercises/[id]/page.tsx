@@ -72,7 +72,11 @@ function toEmbedUrl(url: string | null): string | null {
     return `https://player.vimeo.com/video/${vm[1]}?playsinline=1`
   }
 
-  return trimmed
+  // Geen herkende YouTube/Vimeo-URL: NIET de rauwe (therapeut-ingevoerde) URL
+  // in een <iframe src> zetten. Anders kan een willekeurige site geframed
+  // worden bij elke atleet die de oefening opent. De CSP frame-src vangt het
+  // al af, maar fail-safe geven we hier null terug (net als VideoPlayer.tsx).
+  return null
 }
 
 interface Props {

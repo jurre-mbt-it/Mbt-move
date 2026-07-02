@@ -82,6 +82,28 @@ export const getServerUser = cache(async (): Promise<SessionUser | null> => {
 })
 
 /**
+ * Staff (THERAPIST/ADMIN) met een geverifieerde tweede factor moeten die deze
+ * sessie ook echt hebben doorlopen (aal2). `post-login-redirect` deed dit al
+ * client-side; dit is het server-side vangnet zodat een aal1-sessie niet
+ * gewoon /therapist/... kan laden door de challenge-pagina over te slaan.
+ *
+ * Belangrijk: `redirect()` mag niet binnen de try/catch — het werkt via een
+ * thrown NEXT_REDIRECT. Daarom geeft deze helper alleen een boolean terug en
+ * redirect de caller. Bij een transiente fout: false (geen lockout-loop; de
+ * tRPC-laag dwingt data-toegang alsnog fail-closed af).
+ */
+async function staffMfaChallengePending(): Promise<boolean> {
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+    if (error || !data) return false
+    return data.nextLevel === 'aal2' && data.currentLevel !== 'aal2'
+  } catch {
+    return false
+  }
+}
+
+/**
  * Eis dat de huidige user een van de toegestane rollen heeft. Anders redirect.
  *  - Niet ingelogd                  → /login
  *  - Wel ingelogd, verkeerde rol    → eigen dashboard (geen access-denied-page)
@@ -101,6 +123,10 @@ export async function requireRole(
 
   const ok = Array.isArray(allowed) ? allowed.includes(user.role) : user.role === allowed
   if (!ok) redirect(ROLE_HOME[user.role])
+
+  if ((user.role === 'THERAPIST' || user.role === 'ADMIN') && (await staffMfaChallengePending())) {
+    redirect('/mfa/challenge')
+  }
 
   if (!options.skipDpa && DPA_REQUIRED_ROLES.has(user.role) && user.dpaAcceptedVersion !== DPA_VERSION) {
     redirect('/onboarding/dpa')
@@ -136,6 +162,7 @@ export async function requireAthleteAccess(): Promise<AthleteAccess> {
   }
 
   if (user.role === 'THERAPIST' || user.role === 'ADMIN') {
+    if (await staffMfaChallengePending()) redirect('/mfa/challenge')
     if (await isPersonalModeEnabled()) {
       return { ...user, isTherapistPersonalMode: true }
     }

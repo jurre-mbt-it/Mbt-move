@@ -14,7 +14,26 @@ export interface Context {
     role: string
     practiceId: string | null
     supabaseUserId: string
+    mfaEnabled: boolean
   } | null
+  /** Assurance level uit de `aal`-claim van de sessie-JWT ('aal1'|'aal2'|null).
+   *  'aal2' = tweede factor (TOTP) is deze sessie daadwerkelijk doorlopen. */
+  aal: string | null
+}
+
+/** Lees de `aal`-claim uit een (reeds vertrouwde) Supabase access-token JWT.
+ *  Geen signature-check nodig: de token is al geverifieerd door getUser/
+ *  getSession voordat we hier komen. */
+function decodeAalClaim(accessToken: string | null | undefined): string | null {
+  if (!accessToken) return null
+  try {
+    const payload = accessToken.split('.')[1]
+    if (!payload) return null
+    const json = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
+    return typeof json.aal === 'string' ? json.aal : null
+  } catch {
+    return null
+  }
 }
 
 // In-memory cache voor user lookups (leeft mee met de serverless instantie)
@@ -37,13 +56,13 @@ const USER_CACHE_TTL = 60_000 // 60 seconden
 async function resolveUser(supabaseUserId: string, email: string) {
   const byUuid = await prisma.user.findUnique({
     where: { supabaseUserId },
-    select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true },
+    select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true, mfaEnabled: true },
   })
   if (byUuid) return byUuid
 
   const byEmail = await prisma.user.findUnique({
     where: { email },
-    select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true },
+    select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true, mfaEnabled: true },
   })
   if (!byEmail) return null
   if (byEmail.supabaseUserId && byEmail.supabaseUserId !== supabaseUserId) {
@@ -63,7 +82,7 @@ async function resolveUser(supabaseUserId: string, email: string) {
       const updated = await prisma.user.update({
         where: { id: byEmail.id },
         data: { supabaseUserId },
-        select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true },
+        select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true, mfaEnabled: true },
       })
       return updated
     } catch {
@@ -76,6 +95,7 @@ async function resolveUser(supabaseUserId: string, email: string) {
 
 export async function createTRPCContext(opts: { req?: NextRequest }): Promise<Context> {
   let user: Context['user'] = null
+  let accessToken: string | null = null
 
   try {
     // Mobile clients sturen de Supabase JWT als Bearer-token; browsers gebruiken cookies.
@@ -93,11 +113,13 @@ export async function createTRPCContext(opts: { req?: NextRequest }): Promise<Co
       )
       const { data } = await supabaseJs.auth.getUser(bearerToken)
       if (data.user) supabaseUser = { id: data.user.id, email: data.user.email }
+      accessToken = bearerToken
     } else {
       const supabase = await createClient()
       // getSession() leest uit cookie — geen netwerkroundtrip naar Supabase
       const { data: { session } } = await supabase.auth.getSession()
       supabaseUser = session?.user
+      accessToken = session?.access_token ?? null
     }
 
     if (supabaseUser?.id && supabaseUser?.email) {
@@ -113,6 +135,7 @@ export async function createTRPCContext(opts: { req?: NextRequest }): Promise<Co
             role: dbUser.role,
             practiceId: dbUser.practiceId,
             supabaseUserId: dbUser.supabaseUserId,
+            mfaEnabled: dbUser.mfaEnabled,
           }
           userCache.set(supabaseUser.id, { user, expiresAt: Date.now() + USER_CACHE_TTL })
         }
@@ -126,6 +149,7 @@ export async function createTRPCContext(opts: { req?: NextRequest }): Promise<Co
     req: opts.req,
     prisma,
     user,
+    aal: decodeAalClaim(accessToken),
   }
 }
 
@@ -157,10 +181,31 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
   })
 })
 
+const MFA_CHALLENGE_MESSAGE =
+  'Voltooi de tweede-factor-verificatie (MFA) om deze actie uit te voeren.'
+
+/**
+ * Dwingt af dat een staff-gebruiker (THERAPIST/ADMIN) met MFA ingeschakeld de
+ * tweede factor deze sessie daadwerkelijk heeft doorlopen (aal2). Voorheen
+ * werd MFA alleen client-side afgedwongen via een redirect naar /mfa/challenge;
+ * een aal1-sessie kon die overslaan en direct tRPC-mutations aanroepen. Deze
+ * check sluit dat server-side. Patiënten/atleten en nog-niet-geënrolde staff
+ * (mfaEnabled=false, sessie blijft aal1) worden niet geraakt.
+ */
+function assertMfaSatisfied(ctx: Context) {
+  const u = ctx.user
+  if (!u) return
+  const isStaff = u.role === 'THERAPIST' || u.role === 'ADMIN'
+  if (isStaff && u.mfaEnabled && ctx.aal !== 'aal2') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: MFA_CHALLENGE_MESSAGE })
+  }
+}
+
 export const therapistProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (ctx.user!.role !== 'THERAPIST' && ctx.user!.role !== 'ADMIN') {
     throw new TRPCError({ code: 'FORBIDDEN' })
   }
+  assertMfaSatisfied(ctx)
   return next({ ctx })
 })
 
@@ -170,6 +215,7 @@ export const creatorProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (role !== 'THERAPIST' && role !== 'ATHLETE' && role !== 'ADMIN') {
     throw new TRPCError({ code: 'FORBIDDEN' })
   }
+  assertMfaSatisfied(ctx)
   return next({ ctx })
 })
 
@@ -177,6 +223,7 @@ export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (ctx.user!.role !== 'ADMIN') {
     throw new TRPCError({ code: 'FORBIDDEN' })
   }
+  assertMfaSatisfied(ctx)
   return next({ ctx })
 })
 
@@ -194,6 +241,7 @@ export const mfaRequiredProcedure = protectedProcedure.use(async ({ ctx, next })
   if (!user?.mfaEnabled) {
     throw new TRPCError({ code: 'FORBIDDEN', message: MFA_REQUIRED_MESSAGE })
   }
+  assertMfaSatisfied(ctx)
   return next({ ctx })
 })
 

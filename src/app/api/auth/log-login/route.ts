@@ -4,6 +4,7 @@ import { createServerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { auditLog } from '@/server/audit'
+import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 
 /**
  * Legt een geslaagde login vast in de audit-log (`LOGIN_SUCCESS`, met IP +
@@ -48,6 +49,12 @@ export async function POST(req: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) return new NextResponse(null, { status: 204 })
+
+    // Per-user rate-limit vóór de DB-lookups: dedup begrenst het aantal rijen,
+    // maar niet de query-amplificatie (user-lookup + dedup-find per POST). Bij
+    // overschrijding stil 204 — audit is best-effort en mag nooit blokkeren.
+    const rl = await rateLimit('auth.logLogin', user.id, RATE_LIMITS.loginLog)
+    if (!rl.ok) return new NextResponse(null, { status: 204 })
 
     // Prisma-gebruiker = actor van de audit-rij. Zelfde precedentie als
     // /api/auth/me: eerst supabaseUserId, daarna email-fallback voor legacy

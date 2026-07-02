@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 
 /**
  * CSP-violation report sink (AVG/security — actie 11 uit de DPIA).
@@ -41,6 +42,13 @@ function pick(v: Violation) {
 
 export async function POST(req: NextRequest) {
   try {
+    // Best-effort IP-throttle tegen log-flooding. Het endpoint is bewust
+    // ongeauthenticeerd (browsers POSTen reports zonder sessie), dus we keyen
+    // op het (spoofbare) client-IP — genoeg om per-bron log-spam te dempen.
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    const rl = await rateLimit('csp.report', ip, RATE_LIMITS.cspReport)
+    if (!rl.ok) return new NextResponse(null, { status: 204 })
+
     const raw = await req.text()
     // Guard tegen lege/oversized bodies (spam/abuse).
     if (!raw || raw.length > 16_000) {
@@ -62,7 +70,9 @@ export async function POST(req: NextRequest) {
       violations = [parsed as Violation]
     }
 
-    for (const v of violations) {
+    // Cap het aantal gelogde violations per request (één report-POST kan een
+    // grote array bevatten) tegen log-amplificatie.
+    for (const v of violations.slice(0, 20)) {
       if (v && typeof v === 'object') {
         console.warn('[csp-report]', JSON.stringify(pick(v)))
       }

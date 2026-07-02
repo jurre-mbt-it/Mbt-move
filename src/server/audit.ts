@@ -95,9 +95,14 @@ function extractRequestMeta(req?: NextRequest | Request | null): {
 } {
   if (!req) return {}
   const headers = req.headers
+  // Voorkeur voor `x-real-ip`: dat zet Vercel's edge-proxy op het echte
+  // client-IP. `x-forwarded-for`.split(',')[0] is de EERSTE waarde en die is
+  // client-supplied (spoofbaar) wanneer het request niet achter de Vercel-proxy
+  // langskomt. Voor een best-effort audit-trail is dit acceptabel, maar het IP
+  // is dus niet forensisch betrouwbaar — behandel het als indicatief.
   const ip =
-    headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    headers.get('x-real-ip') ??
+    headers.get('x-real-ip')?.trim() ||
+    headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     undefined
   const userAgent = headers.get('user-agent') ?? undefined
   return { ip, userAgent }

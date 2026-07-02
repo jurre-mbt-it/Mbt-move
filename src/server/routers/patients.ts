@@ -779,8 +779,11 @@ export const patientsRouter = createTRPCRouter({
       }
 
       if (Object.keys(userData).length > 0) {
-        await ctx.prisma.user.update({
-          where: { id: input.id },
+        // updateMany (niet update) zodat we een target-rol-filter kunnen zetten:
+        // dit endpoint mag alleen patiënt/atleet-profielen bewerken, nooit dat
+        // van een collega-THERAPIST/ADMIN in dezelfde praktijk.
+        await ctx.prisma.user.updateMany({
+          where: { id: input.id, role: { in: ['PATIENT', 'ATHLETE'] } },
           data: userData,
         })
       }
@@ -853,8 +856,12 @@ export const patientsRouter = createTRPCRouter({
   /**
    * Invite a new patient/athlete/therapist. Works for both web (cookie auth) and
    * mobile (Bearer token) — no internal fetch needed.
+   *
+   * MFA vereist: spiegelt `invite.create`. Deze flow kan (bij resend) de
+   * Supabase-auth-user van een bestaande patiënt verwijderen — een gevoelige
+   * actie die niet onder de MFA-drempel uit mag.
    */
-  invite: therapistProcedure
+  invite: mfaTherapistProcedure
     .input(
       z.object({
         email: z.string().email('Ongeldig e-mailadres'),
@@ -972,7 +979,8 @@ export const patientsRouter = createTRPCRouter({
       return { success: true, resent: !!resend, patientId: patient.id }
     }),
 
-  resendInvite: therapistProcedure
+  // MFA vereist: verwijdert de bestaande Supabase-auth-user vóór her-invite.
+  resendInvite: mfaTherapistProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const relation = await ctx.prisma.patientTherapist.findFirst({

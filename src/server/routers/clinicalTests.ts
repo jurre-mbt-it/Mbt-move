@@ -9,6 +9,7 @@ import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import type { Prisma, BodyRegion, TestConstruct } from '@prisma/client'
 import { createTRPCRouter, protectedProcedure, therapistProcedure } from '@/server/trpc'
+import { assertPatientAccess } from '@/server/lib/patient-access'
 
 const BODY_REGIONS = [
   'KNEE',
@@ -45,33 +46,7 @@ const CONSTRUCTS = [
 ] as const
 const TestConstructEnum = z.enum(CONSTRUCTS)
 
-const ACTIVE_LINK = { isActive: true, status: 'APPROVED' as const }
-
-async function assertTreating(
-  prisma: typeof import('@/lib/prisma').prisma,
-  user: { id: string; role: string; practiceId: string | null },
-  patientId: string,
-) {
-  if (user.role === 'ADMIN') return
-  if (patientId === user.id) return
-  // Toegang = directe PatientTherapist-relatie OF zelfde praktijk.
-  const ok = await prisma.user.findFirst({
-    where: {
-      id: patientId,
-      OR: [
-        { patientTherapists: { some: { therapistId: user.id, ...ACTIVE_LINK } } },
-        ...(user.practiceId ? [{ practiceId: user.practiceId }] : []),
-      ],
-    },
-    select: { id: true },
-  })
-  if (!ok) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Geen actieve behandelrelatie met deze patiënt',
-    })
-  }
-}
+const TREATING_MESSAGE = 'Geen actieve behandelrelatie met deze patiënt'
 
 // ─── Library: clinical tests ────────────────────────────────────────────────
 
@@ -162,7 +137,7 @@ export const patientTestAssignmentsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await assertTreating(ctx.prisma, ctx.user, input.patientId)
+      await assertPatientAccess(ctx.prisma, ctx.user, input.patientId, TREATING_MESSAGE)
       const test = await ctx.prisma.clinicalTest.findUnique({
         where: { id: input.clinicalTestId },
         select: { id: true },
@@ -188,12 +163,7 @@ export const patientTestAssignmentsRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ patientId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const isAdmin = ctx.user.role === 'ADMIN'
-      const isSelf = ctx.user.id === input.patientId
-      if (!isAdmin && !isSelf) {
-        // therapeut moet treating-relatie hebben
-        await assertTreating(ctx.prisma, ctx.user, input.patientId)
-      }
+      await assertPatientAccess(ctx.prisma, ctx.user, input.patientId, TREATING_MESSAGE)
       return ctx.prisma.patientTestAssignment.findMany({
         where: { patientId: input.patientId },
         orderBy: { assignedAt: 'desc' },
@@ -235,7 +205,7 @@ export const patientTestAssignmentsRouter = createTRPCRouter({
         select: { patientId: true },
       })
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
-      await assertTreating(ctx.prisma, ctx.user, existing.patientId)
+      await assertPatientAccess(ctx.prisma, ctx.user, existing.patientId, TREATING_MESSAGE)
       await ctx.prisma.patientTestAssignment.delete({ where: { id: input.id } })
       return { success: true }
     }),
@@ -273,7 +243,7 @@ export const patientTestResultsRouter = createTRPCRouter({
         select: { patientId: true },
       })
       if (!assignment) throw new TRPCError({ code: 'NOT_FOUND' })
-      await assertTreating(ctx.prisma, ctx.user, assignment.patientId)
+      await assertPatientAccess(ctx.prisma, ctx.user, assignment.patientId, TREATING_MESSAGE)
 
       const lsi =
         input.lsi !== undefined && input.lsi !== null
@@ -303,11 +273,7 @@ export const patientTestResultsRouter = createTRPCRouter({
         select: { patientId: true },
       })
       if (!assignment) throw new TRPCError({ code: 'NOT_FOUND' })
-      const isAdmin = ctx.user.role === 'ADMIN'
-      const isSelf = ctx.user.id === assignment.patientId
-      if (!isAdmin && !isSelf) {
-        await assertTreating(ctx.prisma, ctx.user, assignment.patientId)
-      }
+      await assertPatientAccess(ctx.prisma, ctx.user, assignment.patientId, TREATING_MESSAGE)
       return ctx.prisma.patientTestResult.findMany({
         where: { assignmentId: input.assignmentId },
         orderBy: { performedAt: 'desc' },

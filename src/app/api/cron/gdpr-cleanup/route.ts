@@ -18,10 +18,10 @@
  *     admin-panel).
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { timingSafeEqual } from 'node:crypto'
 import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
 import { auditLog } from '@/server/audit'
+import { authorizeCron } from '@/server/lib/cron-auth'
 
 const GRACE_PERIOD_DAYS = 30
 
@@ -38,26 +38,10 @@ function getSupabaseAdmin() {
   })
 }
 
-function safeEqual(a: string, b: string): boolean {
-  const ab = Buffer.from(a)
-  const bb = Buffer.from(b)
-  if (ab.length !== bb.length) return false
-  return timingSafeEqual(ab, bb)
-}
-
-function authorize(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET
-  // Deze route verwijdert accounts PERMANENT — fail closed: zonder CRON_SECRET
-  // nooit autoriseren, ook niet in dev/preview. (Overige cron-routes mogen een
-  // dev-fallback houden; deze niet.)
-  if (!secret) return false
-  const auth = req.headers.get('authorization')
-  if (!auth?.toLowerCase().startsWith('bearer ')) return false
-  return safeEqual(auth.slice(7), secret)
-}
-
 export async function GET(req: NextRequest) {
-  if (!authorize(req)) {
+  // Deze route verwijdert accounts PERMANENT — fail closed: geen dev-fallback,
+  // zonder CRON_SECRET nooit autoriseren (ook niet in dev/preview).
+  if (!authorizeCron(req)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 

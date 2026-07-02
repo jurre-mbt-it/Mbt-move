@@ -410,27 +410,30 @@ export const patientRouter = createTRPCRouter({
         programId: z.string().optional(),
         scheduledAt: z.string(),       // ISO date string
         completedAt: z.string(),       // ISO date string
-        durationSeconds: z.number().int().min(0),
+        durationSeconds: z.number().int().min(0).max(86_400),
         painLevel: z.number().int().min(0).max(10).nullable(),
         exertionLevel: z.number().int().min(0).max(10).nullable(),
         // Subjectief gevoel 1-5 (smiley) — zelfde veld als de therapeut-flow.
         feelScore: z.number().int().min(1).max(5).nullable().optional(),
-        notes: z.string().optional(),
+        notes: z.string().max(2000).optional(),
         // False = eerder gestopt: niet alle oefeningen afgevinkt bij afronden.
         completedAll: z.boolean().optional(),
+        // Cap de array-lengte tegen werk-amplificatie; getallen begrensd zodat
+        // een atleet de 1RM/belasting-curve niet met absurde waarden vergiftigt
+        // (weight/1RM ook in Newton voor krachttesten → ruime bovengrens).
         exercises: z.array(
           z.object({
             exerciseId: z.string(),
-            setsCompleted: z.number().int().min(0).optional(),
-            repsCompleted: z.number().int().min(0).optional(),
-            repUnit: z.string().optional(),
+            setsCompleted: z.number().int().min(0).max(1000).optional(),
+            repsCompleted: z.number().int().min(0).max(100_000).optional(),
+            repUnit: z.string().max(20).optional(),
             painLevel: z.number().int().min(0).max(10).nullable().optional(),
-            weight: z.number().nullable().optional(),
-            weightsPerSet: z.array(z.number().nullable()).nullable().optional(),
-            estimatedOneRepMax: z.number().nullable().optional(),
+            weight: z.number().min(0).max(100_000).nullable().optional(),
+            weightsPerSet: z.array(z.number().min(0).max(100_000).nullable()).max(50).nullable().optional(),
+            estimatedOneRepMax: z.number().min(0).max(100_000).nullable().optional(),
             painDuring: z.number().int().min(0).max(10).nullable().optional(),
           })
-        ),
+        ).max(200),
       })
     )
     .mutation(async ({ ctx, input }) => {

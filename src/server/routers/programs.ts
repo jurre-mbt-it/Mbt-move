@@ -3,6 +3,7 @@ import { createTRPCRouter, therapistProcedure, creatorProcedure } from '@/server
 import { TRPCError } from '@trpc/server'
 import type { PrismaClient } from '@prisma/client'
 import { maskMuscleLoadsArray } from '@/server/lib/muscle-loads'
+import { assertPatientAccess } from '@/server/lib/patient-access'
 import { isReviewDue, weeksSince, reviewThresholdWeeks } from '@/lib/program-review'
 
 const createId = () => crypto.randomUUID()
@@ -12,30 +13,9 @@ async function assertCanAssignPatient(
   user: { id: string; role: string; practiceId: string | null },
   patientId: string | null | undefined,
 ) {
+  // Sjabloon/bibliotheek-programma zonder patient: niets toe te wijzen.
   if (!patientId) return
-  if (user.role === 'ADMIN') return
-  if (patientId === user.id) return
-  // Toegang = directe PatientTherapist-relatie OF zelfde praktijk.
-  const ok = await prisma.user.findFirst({
-    where: {
-      id: patientId,
-      OR: [
-        {
-          patientTherapists: {
-            some: { therapistId: user.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
-          },
-        },
-        ...(user.practiceId ? [{ practiceId: user.practiceId }] : []),
-      ],
-    },
-    select: { id: true },
-  })
-  if (!ok) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Geen actieve koppeling met deze patiënt',
-    })
-  }
+  await assertPatientAccess(prisma, user, patientId, 'Geen actieve koppeling met deze patiënt')
 }
 
 const ProgramExerciseInput = z.object({
@@ -82,9 +62,14 @@ export const programsRouter = createTRPCRouter({
       // (practiceId-match). Zonder practiceId: alleen eigen programma's.
       const isAdmin = ctx.user!.role === 'ADMIN'
       const practiceId = ctx.user!.practiceId
+      // Praktijk-brede zichtbaarheid is alleen voor therapeuten/admins. Een
+      // atleet krijgt bij invite dezelfde practiceId; zonder deze rol-gate zou
+      // de praktijk-tak programma's (incl. naam/e-mail) van mede-patiënten
+      // lekken. Atleet ziet daarom enkel zijn eigen aangemaakte programma's.
+      const canSeePractice = !!practiceId && ctx.user!.role === 'THERAPIST'
       const ownership = isAdmin
         ? {}
-        : practiceId
+        : canSeePractice
           ? { OR: [{ creatorId: ctx.user!.id }, { practiceId }] }
           : { creatorId: ctx.user!.id }
       const includeAssigned = input?.includeAssigned ?? (input?.patientId !== undefined)
@@ -405,8 +390,13 @@ export const programsRouter = createTRPCRouter({
       if (!program) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user!.role === 'ADMIN'
       const isOwner = program.creatorId === ctx.user!.id
+      // Praktijk-tak alleen voor therapeuten/admins — anders kan een atleet met
+      // dezelfde practiceId trainingsdagen in andermans programma verschuiven.
       const samePractice =
-        !!ctx.user!.practiceId && !!program.practiceId && program.practiceId === ctx.user!.practiceId
+        !!ctx.user!.practiceId &&
+        !!program.practiceId &&
+        program.practiceId === ctx.user!.practiceId &&
+        (ctx.user!.role === 'THERAPIST' || ctx.user!.role === 'ADMIN')
       if (!isAdmin && !isOwner && !samePractice) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
@@ -489,10 +479,13 @@ export const programsRouter = createTRPCRouter({
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user!.role === 'ADMIN'
       const isOwner = existing.creatorId === ctx.user!.id
+      // Praktijk-tak alleen voor therapeuten/admins — anders kan een atleet met
+      // dezelfde practiceId de controle-klok van andermans programma resetten.
       const samePractice =
         !!ctx.user!.practiceId &&
         !!existing.practiceId &&
-        existing.practiceId === ctx.user!.practiceId
+        existing.practiceId === ctx.user!.practiceId &&
+        (ctx.user!.role === 'THERAPIST' || ctx.user!.role === 'ADMIN')
       if (!isAdmin && !isOwner && !samePractice) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }

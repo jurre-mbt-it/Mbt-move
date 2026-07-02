@@ -22,11 +22,14 @@ import {
   Tile,
   WeekProgress,
 } from '@/components/dark-ui'
+import { notFound } from 'next/navigation'
 import { WeeklyLoadChart } from '@/components/workload/WeeklyLoadChart'
 
 export const metadata = { title: 'Design System' }
 
 export default function DesignSystemPage() {
+  // Interne component-showcase — 404 in productie (zoals /dev/wearables).
+  if (process.env.NODE_ENV === 'production') notFound()
   return (
     <DarkScreen>
       <DarkHeader title="Design System" sub="ATHLETIC-DARK" />

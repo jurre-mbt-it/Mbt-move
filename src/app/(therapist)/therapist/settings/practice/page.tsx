@@ -114,8 +114,10 @@ export default function PracticeSettingsPage() {
       toast.error('Logo is groter dan 2 MB')
       return
     }
-    if (!['image/png', 'image/jpeg', 'image/svg+xml'].includes(file.type)) {
-      toast.error('Alleen PNG, JPG of SVG')
+    // Geen SVG: een SVG kan scripts bevatten en de bucket is public-read.
+    // Alleen raster-formaten (matcht de bucket allowed_mime_types server-side).
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      toast.error('Alleen PNG, JPG of WebP')
       return
     }
     setUploadingLogo(true)
