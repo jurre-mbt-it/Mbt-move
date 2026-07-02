@@ -1,7 +1,7 @@
 /**
  * Bewerk een eerder gelogde sessie. Therapeut komt hier via de 'BEWERK'
- * knop op patient-detail. Editbaar: scheduledAt, duration, painLevel,
- * exertionLevel, notes, en alle per-exercise velden.
+ * knop op patient-detail. Editbaar: scheduledAt (completedAt schuift mee),
+ * duration, painLevel, exertionLevel, notes, en alle per-exercise velden.
  */
 'use client'
 
@@ -198,15 +198,28 @@ export default function EditSessionPage({
   }
 
   function handleSubmit() {
+    if (!session) return
     // Combineer datum + tijd naar ISO
     const [y, m, d] = scheduledDate.split('-').map(Number)
     const [hh, mm] = scheduledTime.split(':').map(Number)
     const scheduled = new Date(y, (m ?? 1) - 1, d ?? 1, hh ?? 0, mm ?? 0, 0)
     const durationSeconds = durationMin ? Math.max(0, Math.round(Number(durationMin) * 60)) : undefined
 
+    // completedAt moet meeschuiven: historie, load-curve en dashboards lezen
+    // completedAt, niet scheduledAt. Finish = start + duur; zonder ingevulde
+    // duur behouden we de oorspronkelijke start→finish-afstand.
+    const originalGapMs = session.completedAt
+      ? Math.max(0, new Date(session.completedAt).getTime() - new Date(session.scheduledAt).getTime())
+      : 0
+    const gapMs = durationSeconds !== undefined ? durationSeconds * 1000 : originalGapMs
+    const completedAt = session.completedAt
+      ? new Date(scheduled.getTime() + gapMs).toISOString()
+      : undefined
+
     updateMutation.mutate({
       sessionId,
       scheduledAt: scheduled.toISOString(),
+      completedAt,
       durationSeconds,
       painLevel,
       exertionLevel,

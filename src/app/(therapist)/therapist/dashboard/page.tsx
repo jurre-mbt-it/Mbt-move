@@ -48,42 +48,6 @@ function signalHref(i: { signalType: string; patientId: string }): string {
   }
 }
 
-/**
- * Korte positieve affirmaties voor de therapeut om de dag mee te starten.
- * Wordt per kalenderdag gekozen (zie dashboard), dus elke dag een ander zinnetje.
- * Toon: direct, "je", warm-professioneel — past bij de MBT-huisstijl.
- */
-const DAILY_AFFIRMATIONS = [
-  "Nieuwe dag, weer belastbaarheid om op te bouwen. Zet 'm op.",
-  "Koffie erbij, schema erbij. Tijd om mensen weer in beweging te krijgen.",
-  "Vandaag buig je weer iemands 'dat kan ik nooit meer' om naar 'huh, dat ging best'.",
-  "Niemand hoeft vandaag perfect te zijn. Gewoon goed kijken en goed luisteren.",
-  "Je behandelt geen knie. Je behandelt een mens met een knie.",
-  "Oorzaak boven symptoom. Jij weet waar je op moet letten.",
-  "Eén scherpe intake-vraag is meer waard dan tien losse oefeningen.",
-  "Vandaag weer mensen de regie teruggeven. Daar doe je het voor.",
-  "Twijfel je? Mooi. Dan denk je na in plaats van op de automaat.",
-  "Belasten om belastbaarder te worden. Geldt ook voor jou vandaag.",
-  "Je hoeft niet harder te werken dan je patiënt. Samen optrekken is het punt.",
-  "Even diep ademhalen. Je hebt dit al honderd keer gedaan.",
-  "Geen quick fix vandaag, wel een stap vooruit. Dat telt.",
-  "De patiënt onthoudt vooral of je echt luisterde. De rest komt daarna.",
-  "Vandaag mag je weer uitleggen dat pijn niet altijd schade is. Plot twist voor velen.",
-  "Maak er een mooie dag van. Voor je patiënten én voor jezelf.",
-  "Klein foutje gisteren? Daar word je vandaag een betere behandelaar van.",
-  "Niet de drukste agenda wint, wel de therapeut die er echt bij is.",
-  "Je doet werk dat er echt toe doet. Vergeet dat niet tussen de afspraken door.",
-  "Vandaag weer twijfelaars omturnen naar mensen die hun lijf weer vertrouwen.",
-  "Vraag door op die ene 'het gaat wel'. Daar zit het echte verhaal.",
-  "Beweging is het medicijn. Jij schrijft het voor.",
-  "Een grapje bij binnenkomst werkt soms beter dan welke techniek dan ook.",
-  "Geniet straks van die ene 'het gaat al stukken beter'.",
-  "Je bent beter voorbereid dan je denkt. Ga ervoor.",
-  "Vandaag niet alles oplossen. Gewoon iemand een stap verder helpen.",
-  "Sterke dag gewenst. Letterlijk, jullie doen aan krachttraining.",
-  "Onthoud waarom je hieraan begon. En zet 'm op vandaag.",
-]
-
 type ActivityType = 'strength' | 'cardio' | 'wellness' | 'pain'
 
 const ACTIVITY_CONFIG: Record<
@@ -319,13 +283,6 @@ export default function TherapistDashboard() {
     (hour < 12 ? 'Goedemorgen' : hour < 18 ? 'Goedemiddag' : 'Goedenavond') +
     (firstName ? `, ${firstName}` : '')
 
-  // Dagelijkse affirmatie: wisselt per kalenderdag (stabiel binnen de dag) zodat
-  // de therapeut elke ochtend met een nieuw zinnetje begint.
-  const dayOfYear = Math.floor(
-    (nowDate.getTime() - new Date(nowDate.getFullYear(), 0, 0).getTime()) / 86_400_000,
-  )
-  const affirmation = DAILY_AFFIRMATIONS[dayOfYear % DAILY_AFFIRMATIONS.length]
-
   return (
     <div className="max-w-5xl w-full flex flex-col gap-6">
       <div className="flex flex-col gap-1">
@@ -334,13 +291,6 @@ export default function TherapistDashboard() {
         <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
           Wat er speelt sinds je laatste login
         </MetaLabel>
-        <p
-          className="flex items-start gap-2"
-          style={{ marginTop: 8, fontSize: 13, color: P.gold, fontStyle: 'italic', lineHeight: '19px' }}
-        >
-          <span aria-hidden style={{ fontStyle: 'normal' }}>✦</span>
-          {affirmation}
-        </p>
       </div>
 
       {/* MFA-enforcement banner — rood zolang MFA nog niet aan staat voor
