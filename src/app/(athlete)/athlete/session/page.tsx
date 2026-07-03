@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef, Suspense } from 'react'
+import { useState, useEffect, useRef, useMemo, Suspense } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { trpc } from '@/lib/trpc/client'
 import {
-  Search, X, Plus, Play, Heart,
+  Search, X, Plus, Play, Heart, Check, SkipForward, RotateCcw,
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -17,6 +17,7 @@ import {
   DarkInput,
   DarkTextarea,
 } from '@/components/dark-ui'
+import { useDraftBackup, loadDraft, clearStoredDraft } from '@/hooks/useAutosave'
 import {
   IconStrength,
   IconLightning,
@@ -95,6 +96,99 @@ function resizeWeights(current: string[], target: number): string[] {
   return [...current, ...Array(n - current.length).fill('')]
 }
 
+// ─── Set-flow: per-set loggen tijdens de actieve programma-sessie ─────────────
+
+/** Eén set in de actieve sessie: kg/reps als string (vrije invoer) + afvink. */
+type SetEntry = { kg: string; reps: string; done: boolean }
+
+/** Laatst gelogde waarden per oefening — uit getTodayExercises.lastLogs. */
+type LastLog = {
+  weight: number | null
+  weightsPerSet: Array<number | null> | null
+  repsPerSet: Array<number | null> | null
+  repsCompleted: number | null
+  setsCompleted: number | null
+  completedAt: string | null
+}
+
+/** Parse "12,5" én "12.5" naar kg; lege of onleesbare invoer → null. */
+function parseKg(v: string): number | null {
+  const t = v.replace(',', '.').trim()
+  if (t === '') return null
+  const n = Number(t)
+  return Number.isFinite(n) && n >= 0 ? n : null
+}
+
+function parseReps(v: string): number | null {
+  const t = v.trim()
+  if (t === '') return null
+  const n = Number(t)
+  return Number.isInteger(n) && n >= 0 ? n : null
+}
+
+/** Toon kg zoals Nederlanders 'm typen: komma als decimaalteken. */
+function fmtKg(n: number): string {
+  return String(Math.round(n * 10) / 10).replace('.', ',')
+}
+
+function seedSets(e: LiveExercise): SetEntry[] {
+  return Array.from({ length: Math.max(1, e.sets) }, () => ({
+    kg: '',
+    reps: e.reps ? String(e.reps) : '',
+    done: false,
+  }))
+}
+
+/** Ghost-waarde voor set i: vorige sessie per set, anders het losse gewicht. */
+function prevKgFor(last: LastLog | undefined, i: number): number | null {
+  if (!last) return null
+  const perSet = last.weightsPerSet?.[i]
+  if (perSet != null) return perSet
+  return last.weight ?? null
+}
+
+function prevRepsFor(last: LastLog | undefined, i: number): number | null {
+  if (!last) return null
+  const perSet = last.repsPerSet?.[i]
+  if (perSet != null) return perSet
+  return last.repsCompleted ?? null
+}
+
+/** Concept in localStorage zodat een refresh/app-wissel de sessie niet wist. */
+type AthleteSessionDraft = {
+  state: SessionState
+  currentIndex: number
+  completed: string[]
+  setLog: Record<string, SetEntry[]>
+  extraExercises: LiveExercise[]
+  startedAt: number | null
+  sessionRpe: number | null
+  sessionPain: number | null
+  feelScore: number | null
+  notes: string
+}
+
+const DRAFT_PREFIX = 'mbt-athlete-session-'
+
+function todayKey(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** Ruim concepten van eerdere dagen op — die zijn niet meer te hervatten. */
+function pruneOldDrafts() {
+  if (typeof window === 'undefined') return
+  try {
+    const today = todayKey()
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i)
+      if (key?.startsWith(DRAFT_PREFIX) && !key.endsWith(today)) {
+        localStorage.removeItem(key)
+      }
+    }
+  } catch {}
+}
+
 export default function AthleteSessionPage() {
   // useSearchParams vereist een Suspense-boundary (zelfde patroon als
   // workouts/new); voorkomt ook de flash van programma-oefeningen in quick
@@ -171,34 +265,151 @@ function AthleteSessionPageInner() {
   const [painEnabled, setPainEnabled] = useState(false)
   const [finishOpen, setFinishOpen] = useState(false)
 
-  // Tijdens de programma-sessie gelogde waarden (gewicht/sets/reps per uid).
-  // Programma-oefeningen worden elke render opnieuw uit de query afgeleid, dus
-  // de invoer leeft hier los van die afleiding en wint bij het samenvoegen.
-  const [logByUid, setLogByUid] = useState<Record<string, Partial<LiveExercise>>>({})
+  // Tijdens de programma-sessie gelogde sets (kg/reps/afgevinkt per set, per
+  // uid). Programma-oefeningen worden elke render opnieuw uit de query
+  // afgeleid, dus de invoer leeft hier los van die afleiding.
+  const [setLog, setSetLog] = useState<Record<string, SetEntry[]>>({})
 
   const baseExercises = isQuickMode ? [] : programExercises
-  const exercises: LiveExercise[] = [...baseExercises, ...extraExercises].map(e =>
-    logByUid[e.uid] ? { ...e, ...logByUid[e.uid] } : e
-  )
+  const exercises: LiveExercise[] = [...baseExercises, ...extraExercises]
+
+  // Vorige-sessie-waarden per exerciseId — ghost/prefill in de set-rijen.
+  const lastLogs: Record<string, LastLog> =
+    (sessionData?.lastLogs as Record<string, LastLog> | undefined) ?? {}
 
   const [state, setState] = useState<SessionState>('ready')
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [completed, setCompleted] = useState<Set<number>>(new Set())
+  const [completed, setCompleted] = useState<Set<string>>(new Set())
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
   const startTimeRef = useRef<number | null>(null)
+  // State-spiegel van de starttijd: refs mogen niet tijdens render gelezen
+  // worden (react-hooks/refs), maar het concept-backup heeft de waarde nodig.
+  const [startedAt, setStartedAt] = useState<number | null>(null)
+
+  // Rusttimer tussen sets — countdown in een bottom-sheet.
+  const [restLeft, setRestLeft] = useState(0)
+  const [restTotal, setRestTotal] = useState(0)
+  const [showRest, setShowRest] = useState(false)
+  const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    if (!showRest) return
+    restTimerRef.current = setInterval(() => {
+      setRestLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(restTimerRef.current!)
+          setShowRest(false)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(restTimerRef.current!)
+  }, [showRest])
+
+  function startRest(seconds: number) {
+    clearInterval(restTimerRef.current!)
+    setRestTotal(seconds)
+    setRestLeft(seconds)
+    setShowRest(true)
+  }
+
+  function skipRest() {
+    clearInterval(restTimerRef.current!)
+    setShowRest(false)
+  }
+
+  function extendRest(seconds: number) {
+    setRestTotal(t => t + seconds)
+    setRestLeft(s => s + seconds)
+  }
 
   // Start timer when session becomes active. In quick-mode is de bewerkbare
   // lijst zélf de live sessie, dus daar loopt de timer al vanaf binnenkomst.
   useEffect(() => {
-    if (state !== 'active' && !isQuickMode) return
+    if (state === 'ready' && !isQuickMode) return
     if (startTimeRef.current === null) {
       startTimeRef.current = Date.now()
+      setStartedAt(startTimeRef.current)
     }
     const t = setInterval(() => setElapsed(Math.floor((Date.now() - startTimeRef.current!) / 1000)), 1000)
     return () => clearInterval(t)
   }, [state, isQuickMode])
+
+  // ── Concept-backup: refresh of app-wissel mag de sessie niet wissen ────────
+  const draftKey = useMemo(() => {
+    const scope = isQuickMode ? 'quick' : (sessionData?.program?.id ?? 'program')
+    return `${DRAFT_PREFIX}${scope}-${todayKey()}`
+  }, [isQuickMode, sessionData?.program?.id])
+
+  const [resumeChecked, setResumeChecked] = useState(false)
+  const [showResumeBanner, setShowResumeBanner] = useState(false)
+
+  useEffect(() => { pruneOldDrafts() }, [])
+
+  // Detecteer een bestaand concept zodra de sessie-data er is.
+  useEffect(() => {
+    if (resumeChecked) return
+    if (!isQuickMode && isLoading) return
+    const draft = loadDraft<AthleteSessionDraft>(draftKey)
+    const hasContent =
+      !!draft &&
+      (draft.completed.length > 0 ||
+        Object.values(draft.setLog ?? {}).some(sets => sets.some(s => s.done || s.kg !== '')) ||
+        draft.extraExercises.length > 0)
+    if (hasContent) {
+      // Bewust synchroon in de effect-body: localStorage is een extern systeem
+      // en dit draait één keer, direct na de eerste data-load.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setShowResumeBanner(true)
+    }
+    setResumeChecked(true)
+  }, [draftKey, resumeChecked, isLoading, isQuickMode])
+
+  function handleResume() {
+    const draft = loadDraft<AthleteSessionDraft>(draftKey)
+    if (draft) {
+      setSetLog(draft.setLog ?? {})
+      setCompleted(new Set(draft.completed ?? []))
+      setExtraExercises(draft.extraExercises ?? [])
+      setCurrentIndex(draft.currentIndex ?? 0)
+      setSessionRpe(draft.sessionRpe ?? null)
+      setSessionPain(draft.sessionPain ?? null)
+      setFeelScore(draft.feelScore ?? null)
+      setNotes(draft.notes ?? '')
+      if (draft.startedAt) {
+        startTimeRef.current = draft.startedAt
+        setStartedAt(draft.startedAt)
+        setElapsed(Math.max(0, Math.floor((Date.now() - draft.startedAt) / 1000)))
+      }
+      if (!isQuickMode && draft.state !== 'ready') setState(draft.state)
+    }
+    setShowResumeBanner(false)
+  }
+
+  function handleResetDraft() {
+    clearStoredDraft(draftKey)
+    setShowResumeBanner(false)
+  }
+
+  useDraftBackup<AthleteSessionDraft>({
+    key: draftKey,
+    value: {
+      state,
+      currentIndex,
+      completed: [...completed],
+      setLog,
+      extraExercises,
+      startedAt,
+      sessionRpe,
+      sessionPain,
+      feelScore,
+      notes,
+    },
+    enabled: !showResumeBanner && resumeChecked,
+  })
 
   const current = exercises[currentIndex]
   const todayDayNum = (() => { const d = new Date().getDay(); return d === 0 ? 7 : d })()
@@ -230,10 +441,54 @@ function AthleteSessionPageInner() {
     setExtraExercises(prev => prev.filter(e => e.uid !== uid))
   }
 
-  // Log-invoer tijdens de actieve programma-sessie (gewicht/sets/reps). Werkt
-  // voor zowel programma- als toegevoegde oefeningen; de override wint.
-  function updateLog(uid: string, patch: Partial<LiveExercise>) {
-    setLogByUid(prev => ({ ...prev, [uid]: { ...(prev[uid] ?? {}), ...patch } }))
+  // ── Set-log helpers (actieve programma-sessie) ─────────────────────────────
+  // `seed` is de default-rij op basis van het programma (sets × reps), zodat
+  // de eerste bewerking altijd op een volledige array werkt.
+
+  function updateSet(uid: string, seed: SetEntry[], idx: number, patch: Partial<SetEntry>) {
+    setSetLog(prev => {
+      const arr = [...(prev[uid] ?? seed)]
+      arr[idx] = { ...arr[idx], ...patch }
+      return { ...prev, [uid]: arr }
+    })
+  }
+
+  function addSet(uid: string, seed: SetEntry[]) {
+    setSetLog(prev => {
+      const arr = [...(prev[uid] ?? seed)]
+      const last = arr[arr.length - 1]
+      arr.push({ kg: last?.kg ?? '', reps: last?.reps ?? '', done: false })
+      return { ...prev, [uid]: arr }
+    })
+  }
+
+  /** Set afvinken → rusttimer starten zolang er nog sets te doen zijn. */
+  function toggleSetDone(ex: LiveExercise, seed: SetEntry[], idx: number) {
+    const entries = setLog[ex.uid] ?? seed
+    const wasDone = entries[idx]?.done ?? false
+    updateSet(ex.uid, seed, idx, { done: !wasDone })
+    if (!wasDone) {
+      const othersLeft = entries.some((s, i) => i !== idx && !s.done)
+      if (othersLeft) startRest(ex.restTime || 60)
+    }
+  }
+
+  /** Neem de gewichten/reps van de vorige sessie over in de open velden. */
+  function takeOverPrevious(ex: LiveExercise, seed: SetEntry[]) {
+    const last = lastLogs[ex.exerciseId]
+    if (!last) return
+    setSetLog(prev => {
+      const arr = (prev[ex.uid] ?? seed).map((s, i) => {
+        const kg = prevKgFor(last, i)
+        const reps = prevRepsFor(last, i)
+        return {
+          ...s,
+          kg: s.kg !== '' ? s.kg : kg != null ? fmtKg(kg) : s.kg,
+          reps: reps != null ? String(reps) : s.reps,
+        }
+      })
+      return { ...prev, [ex.uid]: arr }
+    })
   }
 
   const filteredLibrary = addExerciseQuery
@@ -244,7 +499,9 @@ function AthleteSessionPageInner() {
     : dbExercises
 
   function markDone() {
-    setCompleted(prev => new Set(prev).add(currentIndex))
+    const uid = exercises[currentIndex]?.uid
+    if (uid) setCompleted(prev => new Set(prev).add(uid))
+    skipRest()
     if (currentIndex < exercises.length - 1) {
       setCurrentIndex(currentIndex + 1)
     } else {
@@ -271,10 +528,29 @@ function AthleteSessionPageInner() {
         notes: notes.trim() || undefined,
         completedAll: completed.size >= exercises.length,
         exercises: exercises.map(e => {
-          // Gewicht per set → getallen; lege velden blijven null.
-          const ws = (e.weights ?? [])
-            .map(w => (w === '' ? null : Number(w)))
-            .filter(n => n === null || !Number.isNaN(n)) as Array<number | null>
+          const entries = setLog[e.uid]
+          if (entries && entries.length > 0) {
+            // Set-flow (programma-sessie): kg/reps per set + afvink-status.
+            const ws = entries.map(s => parseKg(s.kg))
+            const rs = entries.map(s => parseReps(s.reps))
+            const doneCount = entries.filter(s => s.done).length
+            const lastFilled = [...ws].reverse().find(n => n !== null) ?? null
+            const firstReps = rs.find(n => n !== null) ?? null
+            return {
+              exerciseId: e.exerciseId,
+              // Niets afgevinkt maar wél ingevuld = alsnog alle sets tellen.
+              setsCompleted: doneCount > 0 ? doneCount : entries.length,
+              repsCompleted: firstReps ?? e.reps,
+              repUnit: e.repUnit,
+              weight: lastFilled,
+              weightsPerSet: ws,
+              repsPerSet: rs,
+              painLevel,
+            }
+          }
+          // Quick-workout: gewichten per set uit de bewerkbare rijen.
+          // parseKg accepteert komma én punt — "12,5" ging eerder verloren.
+          const ws = (e.weights ?? []).map(w => parseKg(w))
           const lastFilled = ws.length ? ([...ws].reverse().find(n => n !== null) ?? null) : null
           return {
             exerciseId: e.exerciseId,
@@ -294,6 +570,8 @@ function AthleteSessionPageInner() {
         utils.patient.getTodayExercises.invalidate(),
         utils.patient.getActiveProgram.invalidate(),
       ])
+      // Concept opruimen — de sessie staat nu in de database.
+      clearStoredDraft(draftKey)
       router.push('/athlete/dashboard')
     } catch (err) {
       console.error('Session save failed:', err)
@@ -309,15 +587,55 @@ function AthleteSessionPageInner() {
     )
   }
 
-  // Non-quick mode with no exercises: show empty state
+  // Non-quick mode with no exercises: lege staat mét uitweg naar een vrije
+  // workout, zodat je hier nooit klem staat.
   if (!isQuickMode && exercises.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: P.bg, color: P.ink }}>
-        <div className="text-center space-y-3 px-4">
+        <div className="text-center space-y-3 px-4 w-full max-w-xs">
           <MetaLabel>GEEN OEFENINGEN VOOR VANDAAG</MetaLabel>
-          <div>
+          <div className="flex flex-col gap-2">
+            <DarkButton href="/athlete/session?mode=quick" variant="primary">
+              START VRIJE WORKOUT
+            </DarkButton>
             <DarkButton href="/athlete/dashboard" variant="secondary">
               TERUG NAAR DASHBOARD
+            </DarkButton>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Concept van eerder vandaag gevonden → eerst vragen of we verdergaan.
+  if (showResumeBanner) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: P.bg, color: P.ink }}>
+        <div
+          className="w-full max-w-sm rounded-2xl p-6 space-y-4"
+          style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+        >
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ background: P.surfaceHi, border: `1px solid ${P.brand}` }}
+          >
+            <RotateCcw className="w-5 h-5" style={{ color: P.brand }} />
+          </div>
+          <div>
+            <Kicker>Open sessie</Kicker>
+            <h2 className="text-lg font-bold mt-1" style={{ color: P.ink }}>
+              Verder waar je was?
+            </h2>
+            <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 4 }}>
+              Je hebt deze workout eerder vandaag gestart maar nog niet opgeslagen.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <DarkButton onClick={handleResume} size="lg">
+              Verder waar je was
+            </DarkButton>
+            <DarkButton variant="secondary" onClick={handleResetDraft}>
+              Opnieuw beginnen
             </DarkButton>
           </div>
         </div>
@@ -681,6 +999,46 @@ function AthleteSessionPageInner() {
             {completed.size}/{exercises.length} OEFENINGEN · {mins}:{secs.toString().padStart(2, '0')}
           </MetaLabel>
 
+          {/* Samenvatting: duur · afgevinkte sets · totaalvolume */}
+          {(() => {
+            let setsDone = 0
+            let setsTotal = 0
+            let volume = 0
+            for (const e of exercises) {
+              const entries = setLog[e.uid] ?? seedSets(e)
+              setsTotal += entries.length
+              for (const s of entries) {
+                if (s.done) setsDone++
+                const kg = parseKg(s.kg)
+                const reps = parseReps(s.reps) ?? e.reps
+                if (kg != null && e.repUnit === 'reps') volume += kg * (reps || 0)
+              }
+            }
+            return (
+              <div className="grid grid-cols-3 gap-2 text-left">
+                {[
+                  { label: 'DUUR', value: String(Math.max(1, Math.round(elapsed / 60))), unit: 'min' },
+                  { label: 'SETS', value: String(setsDone), unit: `/${setsTotal}` },
+                  { label: 'VOLUME', value: Math.round(volume).toLocaleString('nl-NL'), unit: 'kg' },
+                ].map(({ label, value, unit }) => (
+                  <div
+                    key={label}
+                    className="rounded-xl px-3 py-2.5"
+                    style={{ background: P.surface, border: `1px solid ${P.line}` }}
+                  >
+                    <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 9, letterSpacing: '0.16em' }}>
+                      {label}
+                    </span>
+                    <div className="athletic-mono" style={{ color: P.ink, fontSize: 17, fontWeight: 900, marginTop: 4 }}>
+                      {value}
+                      <span style={{ color: P.inkMuted, fontSize: 10, fontWeight: 500, marginLeft: 2 }}>{unit}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
           {/* RPE — verplicht voor workload */}
           <div className="text-left">
             <div className="flex items-baseline justify-between mb-2">
@@ -902,61 +1260,154 @@ function AthleteSessionPageInner() {
           </div>
         </Tile>
 
-        {/* Rest info */}
-        <Tile>
-          <div className="text-center">
-            <MetaLabel>RUST · {current?.restTime ?? 60}S TUSSEN SETS</MetaLabel>
-          </div>
-        </Tile>
+        {/* Set-flow: per set kg/reps loggen en afvinken; rust start vanzelf. */}
+        {current && (() => {
+          const seed = seedSets(current)
+          const entries = setLog[current.uid] ?? seed
+          const last = lastLogs[current.exerciseId]
+          const hasPrev = !!last && (last.weight != null || (last.weightsPerSet?.some(w => w != null) ?? false))
+          const prevSummary = (() => {
+            if (!last || !hasPrev) return null
+            const ws = (last.weightsPerSet ?? []).filter((w): w is number => w != null)
+            const reps = last.repsCompleted
+            if (ws.length === 0) return `${fmtKg(last.weight!)} kg${reps ? ` × ${reps}` : ''}`
+            const unique = [...new Set(ws)]
+            if (unique.length === 1) return `${fmtKg(unique[0])} kg${reps ? ` × ${reps}` : ''}`
+            return ws.map(w => fmtKg(w)).join(' / ') + ' kg'
+          })()
 
-        {/* Loggen: gewicht/sets/reps voor de huidige oefening */}
-        {current && (
-          <Tile style={{ padding: 16 }}>
-            <Kicker>LOGGEN</Kicker>
-            <div className="grid grid-cols-2 gap-2 mt-3">
-              <QuickField
-                label="Sets"
-                value={current.sets ? String(current.sets) : ''}
-                onChange={(v) => {
-                  const n = Math.max(1, Number(v) || 1)
-                  updateLog(current.uid, { sets: n, weights: resizeWeights(current.weights ?? [], n) })
-                }}
-              />
-              <QuickField
-                label="Reps"
-                value={current.reps ? String(current.reps) : ''}
-                onChange={(v) => updateLog(current.uid, { reps: Math.max(0, Number(v) || 0) })}
-              />
-            </div>
-            <div className="mt-3">
-              <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.12em' }}>
-                GEWICHT (KG) · PER SET
-              </span>
-              <div
-                className="grid gap-1.5 mt-1.5"
-                style={{ gridTemplateColumns: `repeat(${Math.min(Math.max(1, current.sets || 1), 6)}, minmax(0, 1fr))` }}
-              >
-                {(current.weights ?? []).map((w, i) => (
-                  <div key={i} className="flex flex-col gap-0.5">
-                    <span className="athletic-mono" style={{ color: P.inkDim, fontSize: 9, letterSpacing: '0.1em' }}>
-                      S{i + 1}
+          return (
+            <>
+              {/* Vorige sessie als anker — één tik neemt de waarden over */}
+              {hasPrev && (
+                <button
+                  type="button"
+                  onClick={() => takeOverPrevious(current, seed)}
+                  className="athletic-tap w-full flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left"
+                  style={{ background: P.surface, border: `1px solid ${P.line}` }}
+                >
+                  <span
+                    aria-hidden
+                    className="w-1.5 h-1.5 rounded-full shrink-0"
+                    style={{ background: P.ice }}
+                  />
+                  <span className="flex-1 min-w-0 truncate" style={{ color: P.inkMuted, fontSize: 12 }}>
+                    Vorige keer{' '}
+                    <span className="athletic-mono" style={{ color: P.ink, fontWeight: 800 }}>
+                      {prevSummary}
                     </span>
-                    <DarkInput
-                      value={w}
-                      onChange={(e) => {
-                        const next = [...(current.weights ?? [])]
-                        next[i] = e.target.value
-                        updateLog(current.uid, { weights: next })
-                      }}
-                      inputMode="decimal"
-                      style={{ padding: '6px 8px', fontSize: 13 }}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Tile>
-        )}
+                  </span>
+                  <span
+                    className="athletic-mono shrink-0"
+                    style={{ color: P.lime, fontSize: 9, letterSpacing: '0.12em', fontWeight: 800 }}
+                  >
+                    NEEM OVER
+                  </span>
+                </button>
+              )}
+
+              <Tile style={{ padding: 16 }}>
+                <div className="flex items-center justify-between">
+                  <Kicker>SETS</Kicker>
+                  <MetaLabel>RUST {current.restTime || 60}S</MetaLabel>
+                </div>
+
+                {/* Kolomkoppen */}
+                <div className="flex items-center gap-2 mt-3 px-3">
+                  <span style={{ width: 26 }} />
+                  <span className="flex-1 athletic-mono" style={{ color: P.inkDim, fontSize: 9, letterSpacing: '0.14em' }}>
+                    KG
+                  </span>
+                  <span className="flex-1 athletic-mono" style={{ color: P.inkDim, fontSize: 9, letterSpacing: '0.14em' }}>
+                    {current.repUnit === 'reps' ? 'REPS' : current.repUnit.toUpperCase()}
+                  </span>
+                  <span style={{ width: 44 }} />
+                </div>
+
+                <div className="space-y-1.5 mt-1.5">
+                  {entries.map((s, i) => {
+                    const pk = prevKgFor(last, i)
+                    const pr = prevRepsFor(last, i)
+                    return (
+                      <div
+                        key={i}
+                        className="flex items-center gap-2 rounded-xl px-3 py-2 transition-colors"
+                        style={{
+                          background: s.done ? 'rgba(190,242,100,0.06)' : P.surfaceLow,
+                          border: `1px solid ${s.done ? 'rgba(190,242,100,0.35)' : P.line}`,
+                        }}
+                      >
+                        <span
+                          className="athletic-mono shrink-0"
+                          style={{ width: 26, color: s.done ? P.lime : P.inkMuted, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em' }}
+                        >
+                          S{i + 1}
+                        </span>
+                        <DarkInput
+                          value={s.kg}
+                          onChange={(ev) =>
+                            updateSet(current.uid, seed, i, { kg: ev.target.value.replace(/[^0-9.,]/g, '') })
+                          }
+                          inputMode="decimal"
+                          placeholder={pk != null ? fmtKg(pk) : undefined}
+                          aria-label={`Gewicht set ${i + 1} (kg)`}
+                          className="flex-1 min-w-0"
+                          style={{ padding: '8px 10px', fontSize: 16 }}
+                        />
+                        <DarkInput
+                          value={s.reps}
+                          onChange={(ev) =>
+                            updateSet(current.uid, seed, i, { reps: ev.target.value.replace(/[^0-9]/g, '') })
+                          }
+                          inputMode="numeric"
+                          placeholder={pr != null ? String(pr) : undefined}
+                          aria-label={`Reps set ${i + 1}`}
+                          className="flex-1 min-w-0"
+                          style={{ padding: '8px 10px', fontSize: 16 }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => toggleSetDone(current, seed, i)}
+                          aria-label={s.done ? `Set ${i + 1} heropenen` : `Set ${i + 1} klaar`}
+                          aria-pressed={s.done}
+                          className="athletic-tap shrink-0 rounded-xl flex items-center justify-center transition-all"
+                          style={{
+                            width: 44,
+                            height: 40,
+                            background: s.done ? P.lime : 'transparent',
+                            border: `1.5px solid ${s.done ? P.lime : P.lineStrong}`,
+                            color: s.done ? P.bg : P.inkDim,
+                          }}
+                        >
+                          <Check className="w-4 h-4" strokeWidth={3} />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => addSet(current.uid, seed)}
+                  className="athletic-tap mt-2 w-full flex items-center justify-center gap-1.5 rounded-xl"
+                  style={{
+                    padding: '9px 12px',
+                    border: `1px dashed ${P.lineStrong}`,
+                    color: P.inkMuted,
+                    background: 'transparent',
+                    fontFamily: mono,
+                    fontSize: 10,
+                    fontWeight: 900,
+                    letterSpacing: '0.14em',
+                  }}
+                >
+                  <Plus className="w-3 h-3" />
+                  SET TOEVOEGEN
+                </button>
+              </Tile>
+            </>
+          )
+        })()}
 
         <DarkButton
           variant="primary"
@@ -990,12 +1441,12 @@ function AthleteSessionPageInner() {
 
         {/* Progress dots */}
         <div className="flex justify-center gap-1.5 flex-wrap pt-2">
-          {exercises.map((_, i) => (
+          {exercises.map((e, i) => (
             <div
-              key={i}
+              key={e.uid}
               className="w-2 h-2 rounded-full"
               style={{
-                background: completed.has(i)
+                background: completed.has(e.uid)
                   ? P.lime
                   : i === currentIndex
                     ? P.gold
@@ -1005,6 +1456,25 @@ function AthleteSessionPageInner() {
           ))}
         </div>
       </div>
+
+      {/* Rusttimer — bottom sheet met countdown, +15s en overslaan */}
+      {showRest && current && (
+        <RestSheet
+          secondsLeft={restLeft}
+          total={restTotal}
+          nextLabel={(() => {
+            const entries = setLog[current.uid] ?? seedSets(current)
+            const nextIdx = entries.findIndex(s => !s.done)
+            if (nextIdx === -1) return 'Volgende oefening'
+            const pk = prevKgFor(lastLogs[current.exerciseId], nextIdx)
+            const pr = prevRepsFor(lastLogs[current.exerciseId], nextIdx)
+            const hint = pk != null ? ` · vorige keer ${fmtKg(pk)} kg${pr ? ` × ${pr}` : ''}` : ''
+            return `Volgende: set ${nextIdx + 1}${hint}`
+          })()}
+          onExtend={() => extendRest(15)}
+          onSkip={skipRest}
+        />
+      )}
 
       {/* Add exercise bottom sheet */}
       {showAddExercise && (
@@ -1028,6 +1498,96 @@ function AthleteSessionPageInner() {
           onClose={() => setVideoModal(null)}
         />
       )}
+    </div>
+  )
+}
+
+// ─── Rusttimer — bottom sheet met aftellende ring ─────────────────────────────
+
+function RestSheet({
+  secondsLeft,
+  total,
+  nextLabel,
+  onExtend,
+  onSkip,
+}: {
+  secondsLeft: number
+  total: number
+  nextLabel: string
+  onExtend: () => void
+  onSkip: () => void
+}) {
+  const r = 52
+  const circ = 2 * Math.PI * r
+  const progress = total > 0 ? secondsLeft / total : 0
+  const offset = circ * (1 - progress)
+  const m = Math.floor(secondsLeft / 60)
+  const s = secondsLeft % 60
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end">
+      <div className="mbt-backdrop absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={onSkip} />
+      <div
+        className="mbt-sheet relative w-full rounded-t-3xl flex flex-col items-center gap-4 px-5 pt-4 pb-[max(env(safe-area-inset-bottom),24px)]"
+        style={{ background: P.surface, border: `1px solid ${P.line}`, maxWidth: 480, margin: '0 auto' }}
+      >
+        <div className="w-10 h-1 rounded-full" style={{ background: P.lineStrong }} />
+        <Kicker>RUST</Kicker>
+        <div className="relative w-32 h-32">
+          <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
+            <circle cx="60" cy="60" r={r} fill="none" stroke={P.surfaceHi} strokeWidth="8" />
+            <circle
+              cx="60" cy="60" r={r} fill="none" stroke={P.brand} strokeWidth="8"
+              strokeLinecap="round"
+              strokeDasharray={circ}
+              strokeDashoffset={offset}
+              style={{ transition: 'stroke-dashoffset 1s linear' }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="athletic-mono" style={{ color: P.ink, fontSize: 28, fontWeight: 900 }}>
+              {m > 0 ? `${m}:${s.toString().padStart(2, '0')}` : s}
+            </span>
+            <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11 }}>
+              {m > 0 ? 'min' : 'sec'}
+            </span>
+          </div>
+        </div>
+        <p style={{ color: P.inkMuted, fontSize: 12.5 }}>{nextLabel}</p>
+        <div className="flex gap-2 w-full">
+          <button
+            type="button"
+            onClick={onExtend}
+            className="athletic-tap athletic-mono flex-1 rounded-xl py-3"
+            style={{
+              background: 'transparent',
+              border: `1px solid ${P.lineStrong}`,
+              color: P.inkMuted,
+              fontSize: 11,
+              letterSpacing: '0.14em',
+              fontWeight: 800,
+            }}
+          >
+            +15S
+          </button>
+          <button
+            type="button"
+            onClick={onSkip}
+            className="athletic-tap athletic-mono flex-1 rounded-xl py-3 flex items-center justify-center gap-1.5"
+            style={{
+              background: P.lime,
+              border: `1px solid ${P.lime}`,
+              color: P.bg,
+              fontSize: 11,
+              letterSpacing: '0.14em',
+              fontWeight: 900,
+            }}
+          >
+            <SkipForward className="w-3.5 h-3.5" />
+            SLA RUST OVER
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -1495,7 +2055,8 @@ function QuickEditRow({
                 value={w}
                 onChange={(e) => {
                   const next = [...weights]
-                  next[i] = e.target.value
+                  // Alleen cijfers/komma/punt — parseKg verwerkt beide notaties.
+                  next[i] = e.target.value.replace(/[^0-9.,]/g, '')
                   onUpdate(ex.uid, { weights: next })
                 }}
                 inputMode="decimal"
