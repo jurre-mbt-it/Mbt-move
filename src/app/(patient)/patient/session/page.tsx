@@ -23,26 +23,6 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ReactPlayer = dynamic(() => import('react-player') as any, { ssr: false }) as any
 
-// ─── Static coaching data ─────────────────────────────────────────────────────
-
-const COACHING_CUES: Record<string, string[]> = {
-  '1': ['Houd de romp recht, borst omhoog', 'Knie over de tweede teen', 'Druk door de hiel van het voorste been', 'Stabiel bekken — niet laten draaien'],
-  '2': ['Gecontroleerde val — niet laten crashen', 'Core strak tijdens de hele beweging', 'Vang jezelf op met de handen bij de bodem', 'Krachtige push terug naar startpositie'],
-  '3': ['Beide zitknobbels in contact met de grond', 'Roteer vanuit de heup, niet de romp', 'Houd de rug recht bij het voorover leunen'],
-  '4': ['Staand been licht gebogen, niet vergrendeld', 'Hinge vanuit de heup — niet buigen vanuit de rug', 'Houd het zwevende been in lijn met de romp', 'Blik naar de grond — neutrale nek'],
-  '5': ['Soft landing — knieën veren mee', 'Land op het midden van de voet', 'Spring omhoog en iets naar voren', 'Stap terug af — spring niet terug'],
-  '6': ['Elleboog gefixeerd tegen het lichaam', 'Langzame gecontroleerde beweging', 'Geen compensatie van de schouder of romp'],
-}
-
-const VARIANTS: Record<string, { easier?: string; harder?: string }> = {
-  '1': { easier: 'Goblet Squat', harder: 'Bulgarian Split Squat + kettlebell' },
-  '2': { easier: 'Lying Leg Curl machine', harder: 'Nordic met weerstandsband' },
-  '3': { easier: 'Liggende heupstretching', harder: 'Hip 90/90 met actieve rotatie' },
-  '4': { easier: 'Romanian Deadlift (bilateral)', harder: 'Single Leg DL + kettlebell' },
-  '5': { easier: 'Step-up op box', harder: 'Box Jump + squat hold landing' },
-  '6': { easier: 'Interne rotatie met band', harder: 'Externe rotatie met dumbbell' },
-}
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type SessionExercise = {
@@ -64,6 +44,23 @@ type SessionExercise = {
   easierVariantId: string | null
   harderVariantId: string | null
   trackOneRepMax?: boolean
+  // Coaching-cues (tips + instructies) en variant-namen uit de
+  // oefening-library — vervangt de oude hardgecodeerde demo-data.
+  instructions?: string[]
+  tips?: string[]
+  easierVariantName?: string | null
+  harderVariantName?: string | null
+}
+
+// Laatst gelogde waarden per oefening — uit getTodayExercises.lastLogs, voor
+// gewicht-prefill (progressive overload).
+type LastLog = {
+  weight: number | null
+  weightsPerSet: Array<number | null> | null
+  repsPerSet: Array<number | null> | null
+  repsCompleted: number | null
+  setsCompleted: number | null
+  completedAt: string | null
 }
 
 type FeedbackEntry = {
@@ -838,7 +835,16 @@ function SessionPageInner() {
   })
   const logSession = trpc.patient.logSession.useMutation()
 
-  const exercises: SessionExercise[] = sessionData?.exercises ?? []
+  const exercisesRaw = sessionData?.exercises
+  const exercises: SessionExercise[] = useMemo(() => exercisesRaw ?? [], [exercisesRaw])
+
+  // Vorige-sessie-waarden per exerciseId — voor gewicht-prefill en de
+  // "vorige keer"-hint per oefening.
+  const lastLogsRaw = sessionData?.lastLogs
+  const lastLogs: Record<string, LastLog> = useMemo(
+    () => (lastLogsRaw as Record<string, LastLog> | undefined) ?? {},
+    [lastLogsRaw],
+  )
 
   const [restTimerEnabled] = useBoolPref(PREF_REST_TIMER_ENABLED, true)
   const [viewModeRaw, setViewMode] = useStringPref(PREF_SESSION_VIEW_MODE, 'focus')
@@ -901,10 +907,8 @@ function SessionPageInner() {
     if (!sessionData?.program?.id) return
     const draft = loadDraft<SessionDraft>(draftKey)
     if (draft && (draft.done?.length || Object.keys(draft.setsCompleted ?? {}).length)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowResumeBanner(true)
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setResumeChecked(true)
   }, [draftKey, resumeChecked, sessionData?.program?.id])
 
@@ -946,6 +950,31 @@ function SessionPageInner() {
     },
     enabled: !showResumeBanner && !!sessionData?.program?.id,
   })
+
+  // Prefill gewichten met de vorige sessie (progressive overload): de stepper
+  // begint dan op je laatste gewicht in plaats van op 0. Loopt pas ná de
+  // resume-keuze en slaat oefeningen over waar al iets is ingevuld (draft).
+  const prefilledRef = useRef(false)
+  useEffect(() => {
+    if (prefilledRef.current) return
+    if (!resumeChecked || showResumeBanner) return
+    if (exercises.length === 0) return
+    prefilledRef.current = true
+    setSetWeights(prev => {
+      const next = { ...prev }
+      for (const e of exercises) {
+        if (next[e.uid]?.some(w => w > 0)) continue
+        const last = lastLogs[e.exerciseId]
+        if (!last) continue
+        const arr = Array.from({ length: e.sets }, (_, i) => {
+          const w = last.weightsPerSet?.[i] ?? last.weight
+          return w != null && w > 0 ? w : 0
+        })
+        if (arr.some(w => w > 0)) next[e.uid] = arr
+      }
+      return next
+    })
+  }, [resumeChecked, showResumeBanner, exercises, lastLogs])
 
   // Step-structuur (alleen welke uids horen bij welke stap) — bewust een
   // memo vóór alle early-returns zodat de hooks-volgorde constant blijft.
@@ -1168,12 +1197,22 @@ function SessionPageInner() {
           const estimated1rm = (programTrack1rm && finalWeight && finalWeight > 0)
             ? calcEpley(finalWeight, reps)
             : null
+          // Volledige per-set gewichten meesturen (niet alleen de laatste):
+          // 0 = niet ingevuld → null, zodat de vorige-sessie-hints kloppen.
+          const weightsPerSet = weights.length
+            ? Array.from({ length: e.sets }, (_, i) => {
+                const w = weights[i]
+                return w != null && w > 0 ? w : null
+              })
+            : undefined
           return {
             exerciseId: e.exerciseId,
             setsCompleted: setsCompleted[e.uid] ?? 0,
             repsCompleted: reps,
+            repUnit: e.repUnit,
             painLevel: tendinopathyMode ? (feedback[e.uid]?.painDuring ?? null) : (feedback[e.uid]?.pain ?? null),
             weight: finalWeight,
+            weightsPerSet,
             estimatedOneRepMax: estimated1rm,
             painDuring: tendinopathyMode ? (feedback[e.uid]?.painDuring ?? null) : null,
           }
@@ -1202,7 +1241,7 @@ function SessionPageInner() {
     clearStoredDraft(draftKey)
 
     router.push('/patient/dashboard')
-  }, [sessionData, feedback, elapsed, exercises, setsCompleted, extraReps, logSession, router, utils, draftKey])
+  }, [sessionData, feedback, exercises, setsCompleted, extraReps, setWeights, logSession, router, utils, draftKey])
 
   // Keuzescherm: patient heeft meerdere actieve programma's en moet kiezen
   // welk programma ze vandaag wil doen. Selectie zet ?programId=… in de URL.
@@ -1279,7 +1318,7 @@ function SessionPageInner() {
           Goed gedaan!
         </p>
         <p style={{ color: P.ink, fontSize: 15, maxWidth: 360, lineHeight: '22px' }}>
-          Je hebt alle programma's voor deze week voltooid — lekker bezig!
+          Je hebt alle programma&apos;s voor deze week voltooid — lekker bezig!
         </p>
         <div
           className="athletic-mono px-3 py-1 rounded-full mt-1"
@@ -1382,8 +1421,10 @@ function SessionPageInner() {
     const isExpanded = expanded === e.uid
     const sets = setsCompleted[e.uid] ?? 0
     const allSetsDone = sets >= e.sets
-    const cues = COACHING_CUES[e.exerciseId] ?? []
-    const variants = VARIANTS[e.exerciseId] ?? {}
+    // Cues uit de library: tips zijn de aandachtspunten; val terug op de
+    // uitvoerings-instructies als er geen tips zijn ingevuld.
+    const cues = (e.tips?.length ? e.tips : e.instructions) ?? []
+    const variants = { easier: e.easierVariantName ?? undefined, harder: e.harderVariantName ?? undefined }
     const showCues = showCuesFor === e.uid
 
     return (
@@ -1524,6 +1565,28 @@ function SessionPageInner() {
               <ParamPill label="Rust" value={`${e.restTime}s`} />
               <ParamPill label="Sets klaar" value={`${sets}/${e.sets}`} highlight />
             </div>
+
+            {/* Vorige sessie als anker — verklaart de voorgevulde gewichten */}
+            {(() => {
+              const last = lastLogs[e.exerciseId]
+              const ws = (last?.weightsPerSet ?? []).filter((w): w is number => w != null && w > 0)
+              const single = last?.weight != null && last.weight > 0 ? last.weight : null
+              if (ws.length === 0 && single === null) return null
+              const uniq = [...new Set(ws.length ? ws : [single!])]
+              const summary = uniq.length === 1
+                ? `${String(uniq[0]).replace('.', ',')} kg`
+                : ws.map(w => String(w).replace('.', ',')).join(' / ') + ' kg'
+              return (
+                <div className="flex items-center gap-2 px-1">
+                  <span aria-hidden className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: P.ice }} />
+                  <span style={{ color: P.inkMuted, fontSize: 11 }}>
+                    Vorige keer{' '}
+                    <span className="athletic-mono" style={{ color: P.ink, fontWeight: 800 }}>{summary}</span>
+                    {last?.repsCompleted ? ` × ${last.repsCompleted}` : ''} — gewichten staan alvast klaar
+                  </span>
+                </div>
+              )
+            })()}
 
             {/* Set buttons — one per set for tactile feedback, with per-set weight */}
             <div className="space-y-2">
