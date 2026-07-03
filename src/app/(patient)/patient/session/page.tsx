@@ -8,9 +8,9 @@ import { trpc } from '@/lib/trpc/client'
 import { SUPERSET_COLORS } from '@/lib/program-constants'
 import {
   ChevronLeft, ChevronRight, Clock, ChevronDown, ChevronUp, Lightbulb, LayoutList, Target,
-  TrendingUp, TrendingDown, CheckCircle2, Check, Plus, Trophy, Bell, RotateCcw,
+  TrendingUp, TrendingDown, CheckCircle2, Trophy, Bell, RotateCcw,
 } from 'lucide-react'
-import { P, Kicker, MetaLabel, Tile, DarkButton, DarkInput } from '@/components/dark-ui'
+import { P, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-ui'
 import {
   type SetEntry,
   type LastLog,
@@ -22,6 +22,7 @@ import {
   prevSummaryFor,
 } from '@/lib/session-sets'
 import { RestSheet } from '@/components/session/RestSheet'
+import { SetRows } from '@/components/session/SetRows'
 import { MOOD_SCALE, IconCelebration, IconBeach, IconStop, IconWarning } from '@/components/icons'
 import { useDraftBackup, loadDraft, clearStoredDraft } from '@/hooks/useAutosave'
 import {
@@ -1546,12 +1547,29 @@ function SessionPageInner() {
               </div>
             )}
 
-            {/* Params grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <ParamPill label="Sets" value={String(entries.length)} />
-              <ParamPill label="Reps" value={`${e.reps} ${e.repUnit}`} />
-              <ParamPill label="Rust" value={`${e.restTime}s`} />
-              <ParamPill label="Sets klaar" value={`${doneSets}/${entries.length}`} highlight />
+            {/* Chips: doel · rust — compact zoals de mockup; voortgang zit al
+                in de header-badge (x/y) */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span
+                className="athletic-mono rounded-full"
+                style={{ padding: '4px 10px', border: `1px solid ${P.lineStrong}`, color: P.inkMuted, fontSize: 9, letterSpacing: '0.14em', fontWeight: 700 }}
+              >
+                {entries.length} SETS · DOEL {e.reps} {e.repUnit.toUpperCase()}
+              </span>
+              <span
+                className="athletic-mono rounded-full"
+                style={{ padding: '4px 10px', border: `1px solid ${P.lineStrong}`, color: P.inkMuted, fontSize: 9, letterSpacing: '0.14em', fontWeight: 700 }}
+              >
+                RUST {e.restTime}S
+              </span>
+              {doneSets > 0 && (
+                <span
+                  className="athletic-mono rounded-full"
+                  style={{ padding: '4px 10px', border: '1px solid rgba(190,242,100,0.35)', color: P.lime, fontSize: 9, letterSpacing: '0.14em', fontWeight: 700 }}
+                >
+                  {doneSets}/{entries.length} KLAAR
+                </span>
+              )}
             </div>
 
             {/* Vorige sessie als anker — één tik neemt de waarden over */}
@@ -1581,96 +1599,14 @@ function SessionPageInner() {
             })()}
 
             {/* Set-rijen: per set kg/reps invullen en afvinken; rust start vanzelf */}
-            <div>
-              <div className="flex items-center gap-2 px-3">
-                <span style={{ width: 26 }} />
-                <span className="flex-1 athletic-mono" style={{ color: P.inkDim, fontSize: 9, letterSpacing: '0.14em' }}>
-                  KG
-                </span>
-                <span className="flex-1 athletic-mono" style={{ color: P.inkDim, fontSize: 9, letterSpacing: '0.14em' }}>
-                  {e.repUnit === 'reps' ? 'REPS' : e.repUnit.toUpperCase()}
-                </span>
-                <span style={{ width: 44 }} />
-              </div>
-              <div className="space-y-1.5 mt-1.5">
-                {entries.map((s, i) => {
-                  const pk = prevKgFor(last, i)
-                  const pr = prevRepsFor(last, i)
-                  return (
-                    <div
-                      key={i}
-                      className="flex items-center gap-2 rounded-xl px-3 py-2 transition-colors"
-                      style={{
-                        background: s.done ? 'rgba(190,242,100,0.06)' : P.surfaceHi,
-                        border: `1px solid ${s.done ? 'rgba(190,242,100,0.35)' : P.line}`,
-                      }}
-                    >
-                      <span
-                        className="athletic-mono shrink-0"
-                        style={{ width: 26, color: s.done ? P.lime : P.inkMuted, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em' }}
-                      >
-                        S{i + 1}
-                      </span>
-                      <DarkInput
-                        value={s.kg}
-                        onChange={(ev) =>
-                          updateSet(e, seed, i, { kg: ev.target.value.replace(/[^0-9.,]/g, '') })
-                        }
-                        inputMode="decimal"
-                        placeholder={pk != null && pk > 0 ? String(pk).replace('.', ',') : undefined}
-                        aria-label={`Gewicht set ${i + 1} (kg)`}
-                        className="flex-1 min-w-0"
-                        style={{ padding: '8px 10px', fontSize: 16 }}
-                      />
-                      <DarkInput
-                        value={s.reps}
-                        onChange={(ev) =>
-                          updateSet(e, seed, i, { reps: ev.target.value.replace(/[^0-9]/g, '') })
-                        }
-                        inputMode="numeric"
-                        placeholder={pr != null ? String(pr) : undefined}
-                        aria-label={`Reps set ${i + 1}`}
-                        className="flex-1 min-w-0"
-                        style={{ padding: '8px 10px', fontSize: 16 }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => toggleSetDone(e, seed, i)}
-                        aria-label={s.done ? `Set ${i + 1} heropenen` : `Set ${i + 1} klaar`}
-                        aria-pressed={s.done}
-                        className="athletic-tap shrink-0 rounded-xl flex items-center justify-center transition-all"
-                        style={{
-                          width: 44,
-                          height: 40,
-                          background: s.done ? P.lime : 'transparent',
-                          border: `1.5px solid ${s.done ? P.lime : P.lineStrong}`,
-                          color: s.done ? P.bg : P.inkDim,
-                        }}
-                      >
-                        <Check className="w-4 h-4" strokeWidth={3} />
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-              <button
-                type="button"
-                onClick={() => addSet(e, seed)}
-                className="athletic-tap athletic-mono mt-2 w-full flex items-center justify-center gap-1.5 rounded-xl"
-                style={{
-                  padding: '9px 12px',
-                  border: `1px dashed ${P.lineStrong}`,
-                  color: P.inkMuted,
-                  background: 'transparent',
-                  fontSize: 10,
-                  fontWeight: 900,
-                  letterSpacing: '0.14em',
-                }}
-              >
-                <Plus className="w-3 h-3" />
-                SET TOEVOEGEN
-              </button>
-            </div>
+            <SetRows
+              entries={entries}
+              last={last}
+              repUnit={e.repUnit}
+              onUpdate={(i, patch) => updateSet(e, seed, i, patch)}
+              onToggle={(i) => toggleSetDone(e, seed, i)}
+              onAdd={() => addSet(e, seed)}
+            />
 
             {/* 1RM indicator */}
             {(sessionData?.program?.trackOneRepMax) && doneSets > 0 && (() => {
@@ -2078,24 +2014,3 @@ function SessionPageInner() {
   )
 }
 
-function ParamPill({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
-  return (
-    <div
-      className="rounded-xl p-2 text-center"
-      style={{ background: highlight ? P.lime + '22' : P.surfaceHi, border: `1px solid ${P.line}` }}
-    >
-      <p
-        className="athletic-mono"
-        style={{ color: P.inkMuted, fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase' }}
-      >
-        {label}
-      </p>
-      <p
-        className="athletic-mono mt-1"
-        style={{ color: highlight ? P.lime : P.ink, fontSize: 13, fontWeight: 900 }}
-      >
-        {value}
-      </p>
-    </div>
-  )
-}

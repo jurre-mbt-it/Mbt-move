@@ -574,6 +574,17 @@ export const patientRouter = createTRPCRouter({
       return sessionLog
     }),
 
+  // ── Laatste log per oefening (vrije selectie) ─────────────────────────────
+  // Voor de quick workout: ghost-waardes/"vorige keer"-hints bij oefeningen
+  // die niet in het programma van vandaag zitten. Alleen eigen data
+  // (patientId = ctx.user.id) → geen toegangscontrole nodig.
+
+  lastExerciseLogs: protectedProcedure
+    .input(z.object({ exerciseIds: z.array(z.string()).min(1).max(50) }))
+    .query(async ({ ctx, input }) =>
+      lastLogsForExercises(ctx.prisma, ctx.user.id, [...new Set(input.exerciseIds)])
+    ),
+
   // ── Meest gebruikte oefeningen van de atleet zelf ────────────────────────
   // Voor de Quick Workout-picker: telt de eigen ExerciseLogs uit gelogde
   // sessies en geeft de vaakst gebruikte oefeningen terug, zodat de atleet ze

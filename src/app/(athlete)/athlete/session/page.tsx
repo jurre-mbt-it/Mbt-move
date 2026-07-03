@@ -5,7 +5,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { trpc } from '@/lib/trpc/client'
 import {
-  Search, X, Plus, Play, Heart, Check, RotateCcw,
+  Search, X, Plus, Play, Heart, RotateCcw,
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -30,6 +30,7 @@ import {
   prevSummaryFor,
 } from '@/lib/session-sets'
 import { RestSheet } from '@/components/session/RestSheet'
+import { SetRows } from '@/components/session/SetRows'
 import {
   IconStrength,
   IconLightning,
@@ -81,8 +82,6 @@ type LiveExercise = {
   repUnit: string
   restTime: number
   videoUrl: string | null
-  /** Gewicht (kg) per set als strings — alleen voor de bewerkbare quick-workout. */
-  weights?: string[]
 }
 
 function dbExerciseToLive(ex: DbExercise): LiveExercise {
@@ -96,16 +95,7 @@ function dbExerciseToLive(ex: DbExercise): LiveExercise {
     repUnit: 'reps',
     restTime: 60,
     videoUrl: (ex.videoUrl as string | null | undefined) ?? null,
-    weights: ['', '', ''],
   }
-}
-
-/** Schaal het gewicht-array mee met het aantal sets (zoals het therapeut-scherm). */
-function resizeWeights(current: string[], target: number): string[] {
-  const n = Math.max(1, target)
-  if (current.length === n) return current
-  if (current.length > n) return current.slice(0, n)
-  return [...current, ...Array(n - current.length).fill('')]
 }
 
 // ─── Set-flow: per-set loggen tijdens de actieve programma-sessie ─────────────
@@ -209,7 +199,6 @@ function AthleteSessionPageInner() {
     repUnit: e.repUnit,
     restTime: e.restTime,
     videoUrl: e.videoUrl ?? null,
-    weights: Array(Math.max(1, e.sets)).fill(''),
   }))
 
   // Extra exercises added during session
@@ -235,8 +224,16 @@ function AthleteSessionPageInner() {
   const exercises: LiveExercise[] = [...baseExercises, ...extraExercises]
 
   // Vorige-sessie-waarden per exerciseId — ghost/prefill in de set-rijen.
-  const lastLogs: Record<string, LastLog> =
-    (sessionData?.lastLogs as Record<string, LastLog> | undefined) ?? {}
+  // Voor zelf toegevoegde oefeningen (quick workout) halen we ze apart op.
+  const extraIds = [...new Set(extraExercises.map(e => e.exerciseId))]
+  const extraLastQuery = trpc.patient.lastExerciseLogs.useQuery(
+    { exerciseIds: extraIds },
+    { enabled: extraIds.length > 0, staleTime: 60_000 },
+  )
+  const lastLogs: Record<string, LastLog> = {
+    ...((extraLastQuery.data as Record<string, LastLog> | undefined) ?? {}),
+    ...((sessionData?.lastLogs as Record<string, LastLog> | undefined) ?? {}),
+  }
 
   const [state, setState] = useState<SessionState>('ready')
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -252,6 +249,7 @@ function AthleteSessionPageInner() {
   // Rusttimer tussen sets — countdown in een bottom-sheet.
   const [restLeft, setRestLeft] = useState(0)
   const [restTotal, setRestTotal] = useState(0)
+  const [restLabel, setRestLabel] = useState('')
   const [showRest, setShowRest] = useState(false)
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -383,19 +381,6 @@ function AthleteSessionPageInner() {
     setAddExerciseQuery('')
   }
 
-  // Bewerk een quick-oefening (sets/reps/gewicht). Schaalt het gewicht-array
-  // mee als het aantal sets verandert, zodat de grid blijft kloppen.
-  function updateExtra(uid: string, patch: Partial<LiveExercise>) {
-    setExtraExercises(prev => prev.map(e => {
-      if (e.uid !== uid) return e
-      const merged = { ...e, ...patch }
-      if (patch.sets !== undefined) {
-        merged.weights = resizeWeights(merged.weights ?? [], patch.sets)
-      }
-      return merged
-    }))
-  }
-
   // Alleen zelf toegevoegde oefeningen zijn verwijderbaar (vóór de start);
   // programma-oefeningen blijven staan.
   function removeExercise(uid: string) {
@@ -429,8 +414,14 @@ function AthleteSessionPageInner() {
     const wasDone = entries[idx]?.done ?? false
     updateSet(ex.uid, seed, idx, { done: !wasDone })
     if (!wasDone) {
-      const othersLeft = entries.some((s, i) => i !== idx && !s.done)
-      if (othersLeft) startRest(ex.restTime || 60)
+      const nextIdx = entries.findIndex((s, i) => i !== idx && !s.done)
+      if (nextIdx !== -1) {
+        const pk = prevKgFor(lastLogs[ex.exerciseId], nextIdx)
+        const pr = prevRepsFor(lastLogs[ex.exerciseId], nextIdx)
+        const hint = pk != null && pk > 0 ? ` · vorige keer ${fmtKg(pk)} kg${pr ? ` × ${pr}` : ''}` : ''
+        setRestLabel(`Volgende: set ${nextIdx + 1}${hint}`)
+        startRest(ex.restTime || 60)
+      }
     }
   }
 
@@ -489,37 +480,23 @@ function AthleteSessionPageInner() {
         notes: notes.trim() || undefined,
         completedAll: completed.size >= exercises.length,
         exercises: exercises.map(e => {
-          const entries = setLog[e.uid]
-          if (entries && entries.length > 0) {
-            // Set-flow (programma-sessie): kg/reps per set + afvink-status.
-            const ws = entries.map(s => parseKg(s.kg))
-            const rs = entries.map(s => parseReps(s.reps))
-            const doneCount = entries.filter(s => s.done).length
-            const lastFilled = [...ws].reverse().find(n => n !== null) ?? null
-            const firstReps = rs.find(n => n !== null) ?? null
-            return {
-              exerciseId: e.exerciseId,
-              // Niets afgevinkt maar wél ingevuld = alsnog alle sets tellen.
-              setsCompleted: doneCount > 0 ? doneCount : entries.length,
-              repsCompleted: firstReps ?? e.reps,
-              repUnit: e.repUnit,
-              weight: lastFilled,
-              weightsPerSet: ws,
-              repsPerSet: rs,
-              painLevel,
-            }
-          }
-          // Quick-workout: gewichten per set uit de bewerkbare rijen.
+          // Set-flow (programma én quick): kg/reps per set + afvink-status.
           // parseKg accepteert komma én punt — "12,5" ging eerder verloren.
-          const ws = (e.weights ?? []).map(w => parseKg(w))
-          const lastFilled = ws.length ? ([...ws].reverse().find(n => n !== null) ?? null) : null
+          const entries = setLog[e.uid] ?? seedSets(e)
+          const ws = entries.map(s => parseKg(s.kg))
+          const rs = entries.map(s => parseReps(s.reps))
+          const doneCount = entries.filter(s => s.done).length
+          const lastFilled = [...ws].reverse().find(n => n !== null) ?? null
+          const firstReps = rs.find(n => n !== null) ?? null
           return {
             exerciseId: e.exerciseId,
-            setsCompleted: e.sets,
-            repsCompleted: e.reps,
+            // Niets afgevinkt maar wél ingevuld = alsnog alle sets tellen.
+            setsCompleted: doneCount > 0 ? doneCount : entries.length,
+            repsCompleted: firstReps ?? e.reps,
             repUnit: e.repUnit,
             weight: lastFilled,
-            weightsPerSet: ws.length ? ws : undefined,
+            weightsPerSet: ws,
+            repsPerSet: rs,
             painLevel,
           }
         }),
@@ -666,10 +643,10 @@ function AthleteSessionPageInner() {
               >
                 {exercises.length} OEFENING{exercises.length > 1 ? 'EN' : ''}
                 <span style={{ color: P.inkDim }}> · </span>
-                {exercises.reduce((a, e) => a + e.sets, 0)} SETS
+                {exercises.reduce((a, e) => a + (setLog[e.uid]?.length ?? e.sets), 0)} SETS
                 <span style={{ color: P.inkDim }}> · </span>
                 <span style={{ color: P.brand }}>
-                  ±{Math.max(5, Math.round(exercises.reduce((a, e) => a + e.sets * (e.restTime + 45), 0) / 60 / 5) * 5)} MIN
+                  ±{Math.max(5, Math.round(exercises.reduce((a, e) => a + (setLog[e.uid]?.length ?? e.sets) * (e.restTime + 45), 0) / 60 / 5) * 5)} MIN
                 </span>
               </span>
             </div>
@@ -721,7 +698,12 @@ function AthleteSessionPageInner() {
                   key={e.uid}
                   index={i}
                   ex={e}
-                  onUpdate={updateExtra}
+                  entries={setLog[e.uid] ?? seedSets(e)}
+                  last={lastLogs[e.exerciseId]}
+                  onUpdateSet={(idx, patch) => updateSet(e.uid, seedSets(e), idx, patch)}
+                  onToggleSet={(idx) => toggleSetDone(e, seedSets(e), idx)}
+                  onAddSet={() => addSet(e.uid, seedSets(e))}
+                  onTakeOver={() => takeOverPrevious(e, seedSets(e))}
                   onRemove={removeExercise}
                   onVideo={() => e.videoUrl && setVideoModal({ url: e.videoUrl, name: e.name })}
                 />
@@ -919,6 +901,17 @@ function AthleteSessionPageInner() {
             url={videoModal.url}
             name={videoModal.name}
             onClose={() => setVideoModal(null)}
+          />
+        )}
+
+        {/* Rusttimer — ook in quick mode: de lijst is daar de live sessie */}
+        {showRest && (
+          <RestSheet
+            secondsLeft={restLeft}
+            total={restTotal}
+            nextLabel={restLabel}
+            onExtend={() => extendRest(15)}
+            onSkip={skipRest}
           />
         )}
       </div>
@@ -1211,14 +1204,32 @@ function AthleteSessionPageInner() {
           >
             {current?.name ?? '—'}
           </div>
-          <div style={{ marginTop: 10 }}>
-            <MetaLabel>
-              {current
-                ? `${current.sets} × ${current.reps} ${current.repUnit.toUpperCase()}`
-                : ''}
-              {current?.videoUrl ? ' · TAP VOOR VIDEO' : ''}
-            </MetaLabel>
-          </div>
+          {/* Chips: doel · rust · video — mockup-stijl */}
+          {current && (
+            <div className="flex items-center gap-1.5 flex-wrap" style={{ marginTop: 12 }}>
+              <span
+                className="athletic-mono rounded-full"
+                style={{ padding: '4px 10px', border: `1px solid ${P.lineStrong}`, color: P.inkMuted, fontSize: 9, letterSpacing: '0.14em', fontWeight: 700 }}
+              >
+                {(setLog[current.uid] ?? seedSets(current)).length} SETS · DOEL {current.reps} {current.repUnit.toUpperCase()}
+              </span>
+              <span
+                className="athletic-mono rounded-full"
+                style={{ padding: '4px 10px', border: `1px solid ${P.lineStrong}`, color: P.inkMuted, fontSize: 9, letterSpacing: '0.14em', fontWeight: 700 }}
+              >
+                RUST {current.restTime || 60}S
+              </span>
+              {current.videoUrl && (
+                <span
+                  className="athletic-mono rounded-full inline-flex items-center gap-1"
+                  style={{ padding: '4px 10px', border: '1px solid rgba(147,197,253,0.35)', color: P.ice, fontSize: 9, letterSpacing: '0.14em', fontWeight: 700 }}
+                >
+                  <Play className="w-2.5 h-2.5" fill="currentColor" />
+                  VIDEO
+                </span>
+              )}
+            </div>
+          )}
         </Tile>
 
         {/* Set-flow: per set kg/reps loggen en afvinken; rust start vanzelf. */}
@@ -1260,103 +1271,17 @@ function AthleteSessionPageInner() {
               )}
 
               <Tile style={{ padding: 16 }}>
-                <div className="flex items-center justify-between">
+                <div style={{ marginBottom: 12 }}>
                   <Kicker>SETS</Kicker>
-                  <MetaLabel>RUST {current.restTime || 60}S</MetaLabel>
                 </div>
-
-                {/* Kolomkoppen */}
-                <div className="flex items-center gap-2 mt-3 px-3">
-                  <span style={{ width: 26 }} />
-                  <span className="flex-1 athletic-mono" style={{ color: P.inkDim, fontSize: 9, letterSpacing: '0.14em' }}>
-                    KG
-                  </span>
-                  <span className="flex-1 athletic-mono" style={{ color: P.inkDim, fontSize: 9, letterSpacing: '0.14em' }}>
-                    {current.repUnit === 'reps' ? 'REPS' : current.repUnit.toUpperCase()}
-                  </span>
-                  <span style={{ width: 44 }} />
-                </div>
-
-                <div className="space-y-1.5 mt-1.5">
-                  {entries.map((s, i) => {
-                    const pk = prevKgFor(last, i)
-                    const pr = prevRepsFor(last, i)
-                    return (
-                      <div
-                        key={i}
-                        className="flex items-center gap-2 rounded-xl px-3 py-2 transition-colors"
-                        style={{
-                          background: s.done ? 'rgba(190,242,100,0.06)' : P.surfaceLow,
-                          border: `1px solid ${s.done ? 'rgba(190,242,100,0.35)' : P.line}`,
-                        }}
-                      >
-                        <span
-                          className="athletic-mono shrink-0"
-                          style={{ width: 26, color: s.done ? P.lime : P.inkMuted, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em' }}
-                        >
-                          S{i + 1}
-                        </span>
-                        <DarkInput
-                          value={s.kg}
-                          onChange={(ev) =>
-                            updateSet(current.uid, seed, i, { kg: ev.target.value.replace(/[^0-9.,]/g, '') })
-                          }
-                          inputMode="decimal"
-                          placeholder={pk != null ? fmtKg(pk) : undefined}
-                          aria-label={`Gewicht set ${i + 1} (kg)`}
-                          className="flex-1 min-w-0"
-                          style={{ padding: '8px 10px', fontSize: 16 }}
-                        />
-                        <DarkInput
-                          value={s.reps}
-                          onChange={(ev) =>
-                            updateSet(current.uid, seed, i, { reps: ev.target.value.replace(/[^0-9]/g, '') })
-                          }
-                          inputMode="numeric"
-                          placeholder={pr != null ? String(pr) : undefined}
-                          aria-label={`Reps set ${i + 1}`}
-                          className="flex-1 min-w-0"
-                          style={{ padding: '8px 10px', fontSize: 16 }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => toggleSetDone(current, seed, i)}
-                          aria-label={s.done ? `Set ${i + 1} heropenen` : `Set ${i + 1} klaar`}
-                          aria-pressed={s.done}
-                          className="athletic-tap shrink-0 rounded-xl flex items-center justify-center transition-all"
-                          style={{
-                            width: 44,
-                            height: 40,
-                            background: s.done ? P.lime : 'transparent',
-                            border: `1.5px solid ${s.done ? P.lime : P.lineStrong}`,
-                            color: s.done ? P.bg : P.inkDim,
-                          }}
-                        >
-                          <Check className="w-4 h-4" strokeWidth={3} />
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => addSet(current.uid, seed)}
-                  className="athletic-tap mt-2 w-full flex items-center justify-center gap-1.5 rounded-xl"
-                  style={{
-                    padding: '9px 12px',
-                    border: `1px dashed ${P.lineStrong}`,
-                    color: P.inkMuted,
-                    background: 'transparent',
-                    fontFamily: mono,
-                    fontSize: 10,
-                    fontWeight: 900,
-                    letterSpacing: '0.14em',
-                  }}
-                >
-                  <Plus className="w-3 h-3" />
-                  SET TOEVOEGEN
-                </button>
+                <SetRows
+                  entries={entries}
+                  last={last}
+                  repUnit={current.repUnit}
+                  onUpdate={(i, patch) => updateSet(current.uid, seed, i, patch)}
+                  onToggle={(i) => toggleSetDone(current, seed, i)}
+                  onAdd={() => addSet(current.uid, seed)}
+                />
               </Tile>
             </>
           )
@@ -1411,19 +1336,11 @@ function AthleteSessionPageInner() {
       </div>
 
       {/* Rusttimer — bottom sheet met countdown, +15s en overslaan */}
-      {showRest && current && (
+      {showRest && (
         <RestSheet
           secondsLeft={restLeft}
           total={restTotal}
-          nextLabel={(() => {
-            const entries = setLog[current.uid] ?? seedSets(current)
-            const nextIdx = entries.findIndex(s => !s.done)
-            if (nextIdx === -1) return 'Volgende oefening'
-            const pk = prevKgFor(lastLogs[current.exerciseId], nextIdx)
-            const pr = prevRepsFor(lastLogs[current.exerciseId], nextIdx)
-            const hint = pk != null ? ` · vorige keer ${fmtKg(pk)} kg${pr ? ` × ${pr}` : ''}` : ''
-            return `Volgende: set ${nextIdx + 1}${hint}`
-          })()}
+          nextLabel={restLabel}
           onExtend={() => extendRest(15)}
           onSkip={skipRest}
         />
@@ -1795,51 +1712,33 @@ function AddExerciseSheet({
   )
 }
 
-// ─── Quick-workout: bewerkbare oefening-rij (sets/reps/gewicht) ───────────────
-
-function QuickField({
-  label,
-  value,
-  onChange,
-  inputMode = 'numeric',
-}: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  inputMode?: 'numeric' | 'decimal'
-}) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.12em' }}>
-        {label.toUpperCase()}
-      </span>
-      <DarkInput
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        inputMode={inputMode}
-        style={{ padding: '8px 10px', fontSize: 15 }}
-      />
-    </label>
-  )
-}
+// ─── Quick-workout: oefening-kaart met dezelfde set-flow als de programma-
+// sessie (set-rijen, ghost-waardes, afvinken → rusttimer) ─────────────────────
 
 function QuickEditRow({
   index,
   ex,
-  onUpdate,
+  entries,
+  last,
+  onUpdateSet,
+  onToggleSet,
+  onAddSet,
+  onTakeOver,
   onRemove,
   onVideo,
 }: {
   index: number
   ex: LiveExercise
-  onUpdate: (uid: string, patch: Partial<LiveExercise>) => void
+  entries: SetEntry[]
+  last?: LastLog
+  onUpdateSet: (idx: number, patch: Partial<SetEntry>) => void
+  onToggleSet: (idx: number) => void
+  onAddSet: () => void
+  onTakeOver: () => void
   onRemove: (uid: string) => void
   onVideo: () => void
 }) {
-  const setsCount = Math.max(1, ex.sets || 1)
-  const weights = ex.weights && ex.weights.length === setsCount
-    ? ex.weights
-    : resizeWeights(ex.weights ?? [], setsCount)
+  const prevSummary = prevSummaryFor(last)
 
   return (
     <div
@@ -1864,6 +1763,8 @@ function QuickEditRow({
           </p>
           <div style={{ fontFamily: mono, fontSize: 10, letterSpacing: '0.12em', fontWeight: 700, color: P.inkMuted, marginTop: 2, textTransform: 'uppercase' }}>
             {CATEGORY_LABELS_NL[ex.category] ?? ex.category}
+            <span style={{ color: P.inkDim }}> · </span>
+            {entries.filter(s => s.done).length}/{entries.length} SETS
           </div>
         </div>
         {ex.videoUrl && (
@@ -1888,46 +1789,37 @@ function QuickEditRow({
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 mt-3">
-        <QuickField
-          label="Sets"
-          value={ex.sets ? String(ex.sets) : ''}
-          onChange={(v) => onUpdate(ex.uid, { sets: Math.max(1, Number(v) || 1) })}
-        />
-        <QuickField
-          label="Reps"
-          value={ex.reps ? String(ex.reps) : ''}
-          onChange={(v) => onUpdate(ex.uid, { reps: Math.max(0, Number(v) || 0) })}
-        />
-      </div>
+      {/* Vorige sessie als anker — één tik neemt de waarden over */}
+      {prevSummary && (
+        <button
+          type="button"
+          onClick={onTakeOver}
+          className="athletic-tap mt-3 w-full flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left"
+          style={{ background: P.surfaceHi, border: `1px solid ${P.line}` }}
+        >
+          <span aria-hidden className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: P.ice }} />
+          <span className="flex-1 min-w-0 truncate" style={{ color: P.inkMuted, fontSize: 12 }}>
+            Vorige keer{' '}
+            <span className="athletic-mono" style={{ color: P.ink, fontWeight: 800 }}>{prevSummary}</span>
+          </span>
+          <span
+            className="athletic-mono shrink-0"
+            style={{ color: P.lime, fontSize: 9, letterSpacing: '0.12em', fontWeight: 800 }}
+          >
+            NEEM OVER
+          </span>
+        </button>
+      )}
 
       <div className="mt-3">
-        <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.12em' }}>
-          GEWICHT (KG) · PER SET
-        </span>
-        <div
-          className="grid gap-1.5 mt-1.5"
-          style={{ gridTemplateColumns: `repeat(${Math.min(setsCount, 6)}, minmax(0, 1fr))` }}
-        >
-          {weights.map((w, i) => (
-            <div key={i} className="flex flex-col gap-0.5">
-              <span className="athletic-mono" style={{ color: P.inkDim, fontSize: 9, letterSpacing: '0.1em' }}>
-                S{i + 1}
-              </span>
-              <DarkInput
-                value={w}
-                onChange={(e) => {
-                  const next = [...weights]
-                  // Alleen cijfers/komma/punt — parseKg verwerkt beide notaties.
-                  next[i] = e.target.value.replace(/[^0-9.,]/g, '')
-                  onUpdate(ex.uid, { weights: next })
-                }}
-                inputMode="decimal"
-                style={{ padding: '6px 8px', fontSize: 13 }}
-              />
-            </div>
-          ))}
-        </div>
+        <SetRows
+          entries={entries}
+          last={last}
+          repUnit={ex.repUnit}
+          onUpdate={onUpdateSet}
+          onToggle={onToggleSet}
+          onAdd={onAddSet}
+        />
       </div>
     </div>
   )
