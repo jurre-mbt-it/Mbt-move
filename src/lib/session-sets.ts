@@ -15,6 +15,77 @@ export type LastLog = {
   repsCompleted: number | null
   setsCompleted: number | null
   completedAt: string | null
+  repUnit?: string | null
+  extraParams?: unknown
+}
+
+/** Extra parameter tijdens de sessie (Tempo, RPE, Band kleur, …) — zelfde
+ *  shape als de program-builder en het therapeut-scherm. */
+export type SessionParam = {
+  id: string
+  label: string
+  type: 'number' | 'text' | 'select' | 'slider'
+  value: string | number
+  unit?: string
+  options?: string[]
+  min?: number
+  max?: number
+}
+
+/** Parse onbekende JSON (defaultExtraParams / gelogde extraParams) naar een
+ *  veilige SessionParam-lijst. Zelfde tolerantie als het therapeut-scherm. */
+export function cloneParams(input: unknown): SessionParam[] {
+  if (!Array.isArray(input)) return []
+  const out: SessionParam[] = []
+  for (const raw of input) {
+    if (!raw || typeof raw !== 'object') continue
+    const p = raw as Record<string, unknown>
+    const label = String(p.label ?? '')
+    if (!label) continue
+    const type: SessionParam['type'] =
+      p.type === 'number' || p.type === 'text' || p.type === 'select' || p.type === 'slider'
+        ? p.type
+        : 'number'
+    out.push({
+      id: `p-${label}-${Math.random().toString(36).slice(2, 7)}`,
+      label,
+      type,
+      value: typeof p.value === 'string' || typeof p.value === 'number' ? p.value : type === 'text' || type === 'select' ? '' : 0,
+      unit: typeof p.unit === 'string' ? p.unit : undefined,
+      options: Array.isArray(p.options) ? p.options.filter((o): o is string => typeof o === 'string') : undefined,
+      min: typeof p.min === 'number' ? p.min : undefined,
+      max: typeof p.max === 'number' ? p.max : undefined,
+    })
+  }
+  return out
+}
+
+/**
+ * Start-parameters voor een oefening: de door de therapeut/library ingestelde
+ * defaults, met de waarden van de vorige sessie eroverheen (match op label).
+ * Zonder defaults (atleet-eigen oefening) tellen de memory-params zelf.
+ */
+export function seedParams(defaults: unknown, memory: unknown, allowMemoryOnly: boolean): SessionParam[] {
+  const base = cloneParams(defaults)
+  const mem = cloneParams(memory)
+  if (base.length === 0) return allowMemoryOnly ? mem : []
+  if (mem.length === 0) return base
+  return base.map(p => {
+    const m = mem.find(x => x.label === p.label)
+    return m ? { ...p, value: m.value } : p
+  })
+}
+
+/** Alleen parameters met een ingevulde waarde — voor de log-payload. */
+export function filledParams(params: SessionParam[] | undefined): Array<{
+  label: string
+  type: string
+  value: string | number
+  unit?: string
+}> {
+  return (params ?? [])
+    .filter(p => (typeof p.value === 'string' ? p.value.trim() !== '' : p.value !== 0))
+    .map(p => ({ label: p.label, type: p.type, value: p.value, unit: p.unit }))
 }
 
 /** Parse "12,5" én "12.5" naar kg; lege of onleesbare invoer → null. */

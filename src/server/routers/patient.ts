@@ -32,6 +32,10 @@ export type LastExerciseLog = {
   repsCompleted: number | null
   setsCompleted: number | null
   completedAt: string | null
+  // Eenheid + extra parameters van de laatste keer — zodat de sessie-runner
+  // sec/min/m en Tempo/RPE/Band kleur kan onthouden (repUnit-memory).
+  repUnit: string | null
+  extraParams: unknown
 }
 
 async function lastLogsForExercises(
@@ -56,6 +60,8 @@ async function lastLogsForExercises(
       repsPerSet: true,
       repsCompleted: true,
       setsCompleted: true,
+      repUnit: true,
+      extraParams: true,
       session: { select: { completedAt: true } },
     },
   })
@@ -73,6 +79,8 @@ async function lastLogsForExercises(
       repsCompleted: log.repsCompleted,
       setsCompleted: log.setsCompleted,
       completedAt: log.session.completedAt?.toISOString() ?? null,
+      repUnit: log.repUnit,
+      extraParams: log.extraParams ?? null,
     }
   }
   return out
@@ -510,6 +518,14 @@ export const patientRouter = createTRPCRouter({
             weight: z.number().min(0).max(100_000).nullable().optional(),
             weightsPerSet: z.array(z.number().min(0).max(100_000).nullable()).max(50).nullable().optional(),
             repsPerSet: z.array(z.number().int().min(0).max(100_000).nullable()).max(50).nullable().optional(),
+            // Extra parameters (Tempo, RPE, Band kleur, …) — zelfde shape als
+            // het therapeut-scherm; begrensd tegen payload-misbruik.
+            extraParams: z.array(z.object({
+              label: z.string().min(1).max(60),
+              type: z.string().max(20).optional(),
+              value: z.union([z.string().max(200), z.number().min(-1_000_000).max(1_000_000)]),
+              unit: z.string().max(20).optional(),
+            })).max(20).nullable().optional(),
             estimatedOneRepMax: z.number().min(0).max(100_000).nullable().optional(),
             painDuring: z.number().int().min(0).max(10).nullable().optional(),
           })
@@ -547,6 +563,7 @@ export const patientRouter = createTRPCRouter({
               weight: ex.weight ?? null,
               weightsPerSet: ex.weightsPerSet ?? undefined,
               repsPerSet: ex.repsPerSet ?? undefined,
+              extraParams: ex.extraParams && ex.extraParams.length > 0 ? ex.extraParams : undefined,
               // Epley-fallback server-side: vóór deze fix werd 1RM alleen
               // client-side berekend als program.trackOneRepMax aanstond —
               // die vlag staat vrijwel nergens aan, dus 1RM-data bleef leeg

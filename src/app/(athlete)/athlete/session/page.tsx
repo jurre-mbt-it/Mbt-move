@@ -21,6 +21,7 @@ import { useDraftBackup, loadDraft, clearStoredDraft } from '@/hooks/useAutosave
 import {
   type SetEntry,
   type LastLog,
+  type SessionParam,
   parseKg,
   parseReps,
   fmtKg,
@@ -28,9 +29,12 @@ import {
   prevKgFor,
   prevRepsFor,
   prevSummaryFor,
+  seedParams,
+  filledParams,
 } from '@/lib/session-sets'
 import { RestSheet } from '@/components/session/RestSheet'
 import { SetRows } from '@/components/session/SetRows'
+import { ExtraParamsEditor, RepUnitPicker } from '@/components/session/ExtraParams'
 import {
   IconStrength,
   IconLightning,
@@ -82,6 +86,8 @@ type LiveExercise = {
   repUnit: string
   restTime: number
   videoUrl: string | null
+  /** Standaard extra parameters uit de oefening-library (ExtraParam[] JSON). */
+  defaultExtraParams?: unknown
 }
 
 function dbExerciseToLive(ex: DbExercise): LiveExercise {
@@ -92,9 +98,11 @@ function dbExerciseToLive(ex: DbExercise): LiveExercise {
     category: ex.category,
     sets: 3,
     reps: 10,
-    repUnit: 'reps',
+    // Library-eenheid van de oefening (bv. 'sec' voor plank) als startpunt.
+    repUnit: typeof ex.defaultRepUnit === 'string' ? ex.defaultRepUnit : 'reps',
     restTime: 60,
     videoUrl: (ex.videoUrl as string | null | undefined) ?? null,
+    defaultExtraParams: ex.defaultExtraParams,
   }
 }
 
@@ -111,6 +119,7 @@ type AthleteSessionDraft = {
   currentIndex: number
   completed: string[]
   setLog: Record<string, SetEntry[]>
+  paramsByUid?: Record<string, SessionParam[]>
   extraExercises: LiveExercise[]
   startedAt: number | null
   sessionRpe: number | null
@@ -199,6 +208,7 @@ function AthleteSessionPageInner() {
     repUnit: e.repUnit,
     restTime: e.restTime,
     videoUrl: e.videoUrl ?? null,
+    defaultExtraParams: e.defaultExtraParams,
   }))
 
   // Extra exercises added during session
@@ -219,6 +229,8 @@ function AthleteSessionPageInner() {
   // uid). Programma-oefeningen worden elke render opnieuw uit de query
   // afgeleid, dus de invoer leeft hier los van die afleiding.
   const [setLog, setSetLog] = useState<Record<string, SetEntry[]>>({})
+  // Extra parameters per oefening (Tempo, RPE, Band kleur, …).
+  const [paramsByUid, setParamsByUid] = useState<Record<string, SessionParam[]>>({})
 
   const baseExercises = isQuickMode ? [] : programExercises
   const exercises: LiveExercise[] = [...baseExercises, ...extraExercises]
@@ -331,6 +343,7 @@ function AthleteSessionPageInner() {
     const draft = loadDraft<AthleteSessionDraft>(draftKey)
     if (draft) {
       setSetLog(draft.setLog ?? {})
+      setParamsByUid(draft.paramsByUid ?? {})
       setCompleted(new Set(draft.completed ?? []))
       setExtraExercises(draft.extraExercises ?? [])
       setCurrentIndex(draft.currentIndex ?? 0)
@@ -360,6 +373,7 @@ function AthleteSessionPageInner() {
       currentIndex,
       completed: [...completed],
       setLog,
+      paramsByUid,
       extraExercises,
       startedAt,
       sessionRpe,
@@ -425,6 +439,24 @@ function AthleteSessionPageInner() {
     }
   }
 
+  /** Start-parameters: library-defaults + waarden van de vorige sessie. Voor
+   *  atleet-eigen oefeningen tellen memory-params ook zonder defaults mee. */
+  function paramsFor(ex: LiveExercise): SessionParam[] {
+    return (
+      paramsByUid[ex.uid] ??
+      seedParams(ex.defaultExtraParams, lastLogs[ex.exerciseId]?.extraParams, true)
+    )
+  }
+
+  function updateParams(uid: string, next: SessionParam[]) {
+    setParamsByUid(prev => ({ ...prev, [uid]: next }))
+  }
+
+  /** Eenheid (reps/sec/min/m) wijzigen — alleen op zelf toegevoegde oefeningen. */
+  function setUnit(uid: string, unit: string) {
+    setExtraExercises(prev => prev.map(e => (e.uid === uid ? { ...e, repUnit: unit } : e)))
+  }
+
   /** Neem de gewichten/reps van de vorige sessie over in de open velden. */
   function takeOverPrevious(ex: LiveExercise, seed: SetEntry[]) {
     const last = lastLogs[ex.exerciseId]
@@ -488,6 +520,8 @@ function AthleteSessionPageInner() {
           const doneCount = entries.filter(s => s.done).length
           const lastFilled = [...ws].reverse().find(n => n !== null) ?? null
           const firstReps = rs.find(n => n !== null) ?? null
+          // WYSIWYG: ook onaangeraakte (geseede) parameterwaarden loggen.
+          const params = filledParams(paramsByUid[e.uid] ?? paramsFor(e))
           return {
             exerciseId: e.exerciseId,
             // Niets afgevinkt maar wél ingevuld = alsnog alle sets tellen.
@@ -497,6 +531,7 @@ function AthleteSessionPageInner() {
             weight: lastFilled,
             weightsPerSet: ws,
             repsPerSet: rs,
+            extraParams: params.length > 0 ? params : undefined,
             painLevel,
           }
         }),
@@ -700,6 +735,9 @@ function AthleteSessionPageInner() {
                   ex={e}
                   entries={setLog[e.uid] ?? seedSets(e)}
                   last={lastLogs[e.exerciseId]}
+                  params={paramsFor(e)}
+                  onParamsChange={(next) => updateParams(e.uid, next)}
+                  onUnitChange={(u) => setUnit(e.uid, u)}
                   onUpdateSet={(idx, patch) => updateSet(e.uid, seedSets(e), idx, patch)}
                   onToggleSet={(idx) => toggleSetDone(e, seedSets(e), idx)}
                   onAddSet={() => addSet(e.uid, seedSets(e))}
@@ -1271,8 +1309,15 @@ function AthleteSessionPageInner() {
               )}
 
               <Tile style={{ padding: 16 }}>
-                <div style={{ marginBottom: 12 }}>
+                <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
                   <Kicker>SETS</Kicker>
+                  {/* Eenheid alleen aanpasbaar op zelf toegevoegde oefeningen */}
+                  {extraExercises.some(x => x.uid === current.uid) && (
+                    <RepUnitPicker
+                      value={current.repUnit}
+                      onChange={(u) => setUnit(current.uid, u)}
+                    />
+                  )}
                 </div>
                 <SetRows
                   entries={entries}
@@ -1282,6 +1327,13 @@ function AthleteSessionPageInner() {
                   onToggle={(i) => toggleSetDone(current, seed, i)}
                   onAdd={() => addSet(current.uid, seed)}
                 />
+                <div className="mt-2">
+                  <ExtraParamsEditor
+                    params={paramsFor(current)}
+                    onChange={(next) => updateParams(current.uid, next)}
+                    addable
+                  />
+                </div>
               </Tile>
             </>
           )
@@ -1720,6 +1772,9 @@ function QuickEditRow({
   ex,
   entries,
   last,
+  params,
+  onParamsChange,
+  onUnitChange,
   onUpdateSet,
   onToggleSet,
   onAddSet,
@@ -1731,6 +1786,9 @@ function QuickEditRow({
   ex: LiveExercise
   entries: SetEntry[]
   last?: LastLog
+  params: SessionParam[]
+  onParamsChange: (next: SessionParam[]) => void
+  onUnitChange: (unit: string) => void
   onUpdateSet: (idx: number, patch: Partial<SetEntry>) => void
   onToggleSet: (idx: number) => void
   onAddSet: () => void
@@ -1811,7 +1869,12 @@ function QuickEditRow({
         </button>
       )}
 
-      <div className="mt-3">
+      {/* Eenheid van de reps-kolom — atleet kiest zelf reps/sec/min/m */}
+      <div className="mt-3 flex justify-end">
+        <RepUnitPicker value={ex.repUnit} onChange={onUnitChange} />
+      </div>
+
+      <div className="mt-2">
         <SetRows
           entries={entries}
           last={last}
@@ -1820,6 +1883,10 @@ function QuickEditRow({
           onToggle={onToggleSet}
           onAdd={onAddSet}
         />
+      </div>
+
+      <div className="mt-2">
+        <ExtraParamsEditor params={params} onChange={onParamsChange} addable />
       </div>
     </div>
   )

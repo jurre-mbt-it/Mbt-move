@@ -14,15 +14,19 @@ import { P, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-ui'
 import {
   type SetEntry,
   type LastLog,
+  type SessionParam,
   parseKg,
   parseReps,
   makeSetEntries,
   prevKgFor,
   prevRepsFor,
   prevSummaryFor,
+  seedParams,
+  filledParams,
 } from '@/lib/session-sets'
 import { RestSheet } from '@/components/session/RestSheet'
 import { SetRows } from '@/components/session/SetRows'
+import { ExtraParamsEditor } from '@/components/session/ExtraParams'
 import { MOOD_SCALE, IconCelebration, IconBeach, IconStop, IconWarning } from '@/components/icons'
 import { useDraftBackup, loadDraft, clearStoredDraft } from '@/hooks/useAutosave'
 import {
@@ -62,6 +66,8 @@ type SessionExercise = {
   tips?: string[]
   easierVariantName?: string | null
   harderVariantName?: string | null
+  /** Door de therapeut/library ingestelde extra parameters (ExtraParam[] JSON). */
+  defaultExtraParams?: unknown
 }
 
 // LastLog (vorige-sessie-waarden) komt uit @/lib/session-sets — gedeeld met
@@ -824,6 +830,9 @@ function SessionPageInner() {
   const [expanded, setExpanded] = useState<string | null>(null)
   // Per-set log (kg/reps/afgevinkt) — zelfde set-flow als het atleet-scherm.
   const [setLog, setSetLog] = useState<Record<string, SetEntry[]>>({})
+  // Extra parameters per oefening — alleen zichtbaar als de therapeut ze op de
+  // oefening heeft ingesteld (defaultExtraParams); de patiënt vult alleen in.
+  const [paramsByUid, setParamsByUid] = useState<Record<string, SessionParam[]>>({})
   const [done, setDone] = useState<Set<string>>(new Set())
   const [feedback, setFeedback] = useState<Record<string, FeedbackEntry>>({})
   const [showFeedbackFor, setShowFeedbackFor] = useState<string | null>(null)
@@ -852,6 +861,7 @@ function SessionPageInner() {
   // Nieuwe key zodat oude (v1) concepten genegeerd worden i.p.v. crashen.
   type SessionDraft = {
     setLog: Record<string, SetEntry[]>
+    paramsByUid?: Record<string, SessionParam[]>
     done: string[]
     feedback: Record<string, FeedbackEntry>
     sessionOneRm: Record<string, number>
@@ -889,6 +899,7 @@ function SessionPageInner() {
     const draft = loadDraft<SessionDraft>(draftKey)
     if (draft) {
       setSetLog(draft.setLog ?? {})
+      setParamsByUid(draft.paramsByUid ?? {})
       setDone(new Set(draft.done ?? []))
       setFeedback(draft.feedback ?? {})
       setSessionOneRm(draft.sessionOneRm ?? {})
@@ -910,6 +921,7 @@ function SessionPageInner() {
     key: draftKey,
     value: {
       setLog,
+      paramsByUid,
       done: [...done],
       feedback,
       sessionOneRm,
@@ -1183,6 +1195,10 @@ function SessionPageInner() {
           const estimated1rm = (programTrack1rm && finalWeight && finalWeight > 0)
             ? calcEpley(finalWeight, reps)
             : null
+          // WYSIWYG: ook onaangeraakte (geseede) parameterwaarden loggen.
+          const params = filledParams(
+            paramsByUid[e.uid] ?? seedParams(e.defaultExtraParams, lastLogs[e.exerciseId]?.extraParams, false),
+          )
           return {
             exerciseId: e.exerciseId,
             setsCompleted: doneCount,
@@ -1192,6 +1208,7 @@ function SessionPageInner() {
             weight: finalWeight,
             weightsPerSet: entries.length ? ws : undefined,
             repsPerSet: entries.length ? rs : undefined,
+            extraParams: params.length > 0 ? params : undefined,
             estimatedOneRepMax: estimated1rm,
             painDuring: tendinopathyMode ? (feedback[e.uid]?.painDuring ?? null) : null,
           }
@@ -1220,7 +1237,7 @@ function SessionPageInner() {
     clearStoredDraft(draftKey)
 
     router.push('/patient/dashboard')
-  }, [sessionData, feedback, exercises, setLog, logSession, router, utils, draftKey])
+  }, [sessionData, feedback, exercises, setLog, paramsByUid, lastLogs, logSession, router, utils, draftKey])
 
   // Keuzescherm: patient heeft meerdere actieve programma's en moet kiezen
   // welk programma ze vandaag wil doen. Selectie zet ?programId=… in de URL.
@@ -1607,6 +1624,21 @@ function SessionPageInner() {
               onToggle={(i) => toggleSetDone(e, seed, i)}
               onAdd={() => addSet(e, seed)}
             />
+
+            {/* Extra parameters — alleen wat de therapeut op de oefening heeft
+                ingesteld; waarden van de vorige sessie staan er alvast in */}
+            {(() => {
+              const params =
+                paramsByUid[e.uid] ?? seedParams(e.defaultExtraParams, last?.extraParams, false)
+              if (params.length === 0) return null
+              return (
+                <ExtraParamsEditor
+                  params={params}
+                  onChange={(next) => setParamsByUid(prev => ({ ...prev, [e.uid]: next }))}
+                  addable={false}
+                />
+              )
+            })()}
 
             {/* 1RM indicator */}
             {(sessionData?.program?.trackOneRepMax) && doneSets > 0 && (() => {
