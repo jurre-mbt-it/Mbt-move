@@ -19,8 +19,64 @@ import { auditLog } from '@/server/audit'
 import { signEducationFile } from '@/lib/education/storage'
 import { paceSecPerKm } from '@/lib/cardio-zones'
 import { estimateOneRepMax } from '@/lib/one-rep-max'
+import type { PrismaClient } from '@prisma/client'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
+
+// Laatst gelogde waarden van een oefening — voor "vorige keer"-hints en
+// prefill in de sessie-runner (progressive overload).
+export type LastExerciseLog = {
+  weight: number | null
+  weightsPerSet: Array<number | null> | null
+  repsPerSet: Array<number | null> | null
+  repsCompleted: number | null
+  setsCompleted: number | null
+  completedAt: string | null
+}
+
+async function lastLogsForExercises(
+  prisma: Pick<PrismaClient, 'exerciseLog'>,
+  patientId: string,
+  exerciseIds: string[],
+): Promise<Record<string, LastExerciseLog>> {
+  if (exerciseIds.length === 0) return {}
+  // Recentste logs eerst; per exerciseId wint de eerste. `take` begrenst de
+  // scan — een sessie-dag heeft zelden >15 oefeningen, dus 300 dekt ruim.
+  const logs = await prisma.exerciseLog.findMany({
+    where: {
+      exerciseId: { in: exerciseIds },
+      session: { patientId, status: 'COMPLETED' },
+    },
+    orderBy: { session: { completedAt: { sort: 'desc', nulls: 'last' } } },
+    take: 300,
+    select: {
+      exerciseId: true,
+      weight: true,
+      weightsPerSet: true,
+      repsPerSet: true,
+      repsCompleted: true,
+      setsCompleted: true,
+      session: { select: { completedAt: true } },
+    },
+  })
+  const out: Record<string, LastExerciseLog> = {}
+  for (const log of logs) {
+    if (out[log.exerciseId]) continue
+    out[log.exerciseId] = {
+      weight: log.weight,
+      weightsPerSet: Array.isArray(log.weightsPerSet)
+        ? (log.weightsPerSet as Array<number | null>)
+        : null,
+      repsPerSet: Array.isArray(log.repsPerSet)
+        ? (log.repsPerSet as Array<number | null>)
+        : null,
+      repsCompleted: log.repsCompleted,
+      setsCompleted: log.setsCompleted,
+      completedAt: log.session.completedAt?.toISOString() ?? null,
+    }
+  }
+  return out
+}
 
 function computeCurrentWeekDay(
   startDate: Date | null,
@@ -63,6 +119,10 @@ function mapProgramExercise(pe: {
     harderVariantId: string | null
     trackOneRepMax?: boolean
     defaultExtraParams?: unknown
+    instructions?: string[]
+    tips?: string[]
+    easierVariant?: { name: string } | null
+    harderVariant?: { name: string } | null
   }
 }) {
   return {
@@ -87,6 +147,12 @@ function mapProgramExercise(pe: {
     notes: pe.notes ?? null,
     easierVariantId: pe.exercise.easierVariantId ?? null,
     harderVariantId: pe.exercise.harderVariantId ?? null,
+    // Coaching-cues uit de oefening-library (instructions + tips) en de namen
+    // van de makkelijker/zwaarder-varianten — voor het sessie-scherm.
+    instructions: pe.exercise.instructions ?? [],
+    tips: pe.exercise.tips ?? [],
+    easierVariantName: pe.exercise.easierVariant?.name ?? null,
+    harderVariantName: pe.exercise.harderVariant?.name ?? null,
     trackOneRepMax: pe.exercise.trackOneRepMax ?? false,
     defaultExtraParams: Array.isArray(pe.exercise.defaultExtraParams)
       ? (pe.exercise.defaultExtraParams as Array<Record<string, unknown>>)
@@ -291,6 +357,9 @@ export const patientRouter = createTRPCRouter({
                 name: true, category: true, difficulty: true, description: true,
                 videoUrl: true, easierVariantId: true, harderVariantId: true,
                 trackOneRepMax: true, defaultExtraParams: true,
+                instructions: true, tips: true,
+                easierVariant: { select: { name: true } },
+                harderVariant: { select: { name: true } },
               },
             },
           },
@@ -299,9 +368,17 @@ export const patientRouter = createTRPCRouter({
       },
     })
 
-    if (!program) return { program: null, exercises: [] }
+    if (!program) return { program: null, exercises: [], lastLogs: {} as Record<string, LastExerciseLog> }
 
     const allExercises = program.exercises.map(mapProgramExercise)
+
+    // Vorige-sessie-hints: meest recente gelogde waarden per oefening, zodat
+    // de sessie-runner "vorige keer 22,5 kg × 10" kan tonen en prefillen.
+    const lastLogs = await lastLogsForExercises(
+      ctx.prisma,
+      targetPatientId,
+      [...new Set(allExercises.map(e => e.exerciseId))],
+    )
 
     // Flexible-schedule modus: patient mag elke dag het hele programma starten;
     // klaar zodra weeklyTarget keer voltooid in de huidige week (Mo-Su).
@@ -364,6 +441,7 @@ export const patientRouter = createTRPCRouter({
         // dezelfde oefeningen opnieuw aanbieden. Web-app gebruikt
         // weeklyTargetReached om de "lekker bezig" boodschap te tonen.
         exercises: targetReached ? [] : exercisesPool,
+        lastLogs,
       }
     }
 
@@ -399,6 +477,7 @@ export const patientRouter = createTRPCRouter({
         weeklyTargetReached: false,
       },
       exercises: todayExercises,
+      lastLogs,
     }
   }),
 
@@ -430,6 +509,7 @@ export const patientRouter = createTRPCRouter({
             painLevel: z.number().int().min(0).max(10).nullable().optional(),
             weight: z.number().min(0).max(100_000).nullable().optional(),
             weightsPerSet: z.array(z.number().min(0).max(100_000).nullable()).max(50).nullable().optional(),
+            repsPerSet: z.array(z.number().int().min(0).max(100_000).nullable()).max(50).nullable().optional(),
             estimatedOneRepMax: z.number().min(0).max(100_000).nullable().optional(),
             painDuring: z.number().int().min(0).max(10).nullable().optional(),
           })
@@ -466,6 +546,7 @@ export const patientRouter = createTRPCRouter({
               painLevel: ex.painLevel ?? null,
               weight: ex.weight ?? null,
               weightsPerSet: ex.weightsPerSet ?? undefined,
+              repsPerSet: ex.repsPerSet ?? undefined,
               // Epley-fallback server-side: vóór deze fix werd 1RM alleen
               // client-side berekend als program.trackOneRepMax aanstond —
               // die vlag staat vrijwel nergens aan, dus 1RM-data bleef leeg

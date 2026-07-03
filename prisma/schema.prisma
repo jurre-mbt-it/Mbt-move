@@ -906,6 +906,7 @@ model ExerciseLog {
   painLevel          Int?
   weight             Float? // kg used in last set (legacy single-weight)
   weightsPerSet      Json? // [number|null, ...] één entry per set
+  repsPerSet         Json? // [number|null, ...] één entry per set; null = legacy = repsCompleted voor elke set
   extraParams        Json? // [{ id, label, type, value, unit?, options?, min?, max? }, ...]
   supersetGroup      String? // 'A'..'F' of null
   phase              String? // 'WARMUP' of 'MAIN' (null = legacy = MAIN)
