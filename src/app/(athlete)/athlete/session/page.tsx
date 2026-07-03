@@ -5,7 +5,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { trpc } from '@/lib/trpc/client'
 import {
-  Search, X, Plus, Play, Heart, Check, SkipForward, RotateCcw,
+  Search, X, Plus, Play, Heart, Check, RotateCcw,
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -18,6 +18,18 @@ import {
   DarkTextarea,
 } from '@/components/dark-ui'
 import { useDraftBackup, loadDraft, clearStoredDraft } from '@/hooks/useAutosave'
+import {
+  type SetEntry,
+  type LastLog,
+  parseKg,
+  parseReps,
+  fmtKg,
+  makeSetEntries,
+  prevKgFor,
+  prevRepsFor,
+  prevSummaryFor,
+} from '@/lib/session-sets'
+import { RestSheet } from '@/components/session/RestSheet'
 import {
   IconStrength,
   IconLightning,
@@ -97,61 +109,10 @@ function resizeWeights(current: string[], target: number): string[] {
 }
 
 // ─── Set-flow: per-set loggen tijdens de actieve programma-sessie ─────────────
-
-/** Eén set in de actieve sessie: kg/reps als string (vrije invoer) + afvink. */
-type SetEntry = { kg: string; reps: string; done: boolean }
-
-/** Laatst gelogde waarden per oefening — uit getTodayExercises.lastLogs. */
-type LastLog = {
-  weight: number | null
-  weightsPerSet: Array<number | null> | null
-  repsPerSet: Array<number | null> | null
-  repsCompleted: number | null
-  setsCompleted: number | null
-  completedAt: string | null
-}
-
-/** Parse "12,5" én "12.5" naar kg; lege of onleesbare invoer → null. */
-function parseKg(v: string): number | null {
-  const t = v.replace(',', '.').trim()
-  if (t === '') return null
-  const n = Number(t)
-  return Number.isFinite(n) && n >= 0 ? n : null
-}
-
-function parseReps(v: string): number | null {
-  const t = v.trim()
-  if (t === '') return null
-  const n = Number(t)
-  return Number.isInteger(n) && n >= 0 ? n : null
-}
-
-/** Toon kg zoals Nederlanders 'm typen: komma als decimaalteken. */
-function fmtKg(n: number): string {
-  return String(Math.round(n * 10) / 10).replace('.', ',')
-}
+// Types en parse-helpers zijn gedeeld met het patiënt-scherm: src/lib/session-sets.ts
 
 function seedSets(e: LiveExercise): SetEntry[] {
-  return Array.from({ length: Math.max(1, e.sets) }, () => ({
-    kg: '',
-    reps: e.reps ? String(e.reps) : '',
-    done: false,
-  }))
-}
-
-/** Ghost-waarde voor set i: vorige sessie per set, anders het losse gewicht. */
-function prevKgFor(last: LastLog | undefined, i: number): number | null {
-  if (!last) return null
-  const perSet = last.weightsPerSet?.[i]
-  if (perSet != null) return perSet
-  return last.weight ?? null
-}
-
-function prevRepsFor(last: LastLog | undefined, i: number): number | null {
-  if (!last) return null
-  const perSet = last.repsPerSet?.[i]
-  if (perSet != null) return perSet
-  return last.repsCompleted ?? null
+  return makeSetEntries(e.sets, e.reps)
 }
 
 /** Concept in localStorage zodat een refresh/app-wissel de sessie niet wist. */
@@ -1265,16 +1226,8 @@ function AthleteSessionPageInner() {
           const seed = seedSets(current)
           const entries = setLog[current.uid] ?? seed
           const last = lastLogs[current.exerciseId]
-          const hasPrev = !!last && (last.weight != null || (last.weightsPerSet?.some(w => w != null) ?? false))
-          const prevSummary = (() => {
-            if (!last || !hasPrev) return null
-            const ws = (last.weightsPerSet ?? []).filter((w): w is number => w != null)
-            const reps = last.repsCompleted
-            if (ws.length === 0) return `${fmtKg(last.weight!)} kg${reps ? ` × ${reps}` : ''}`
-            const unique = [...new Set(ws)]
-            if (unique.length === 1) return `${fmtKg(unique[0])} kg${reps ? ` × ${reps}` : ''}`
-            return ws.map(w => fmtKg(w)).join(' / ') + ' kg'
-          })()
+          const prevSummary = prevSummaryFor(last)
+          const hasPrev = prevSummary !== null
 
           return (
             <>
@@ -1498,96 +1451,6 @@ function AthleteSessionPageInner() {
           onClose={() => setVideoModal(null)}
         />
       )}
-    </div>
-  )
-}
-
-// ─── Rusttimer — bottom sheet met aftellende ring ─────────────────────────────
-
-function RestSheet({
-  secondsLeft,
-  total,
-  nextLabel,
-  onExtend,
-  onSkip,
-}: {
-  secondsLeft: number
-  total: number
-  nextLabel: string
-  onExtend: () => void
-  onSkip: () => void
-}) {
-  const r = 52
-  const circ = 2 * Math.PI * r
-  const progress = total > 0 ? secondsLeft / total : 0
-  const offset = circ * (1 - progress)
-  const m = Math.floor(secondsLeft / 60)
-  const s = secondsLeft % 60
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end">
-      <div className="mbt-backdrop absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={onSkip} />
-      <div
-        className="mbt-sheet relative w-full rounded-t-3xl flex flex-col items-center gap-4 px-5 pt-4 pb-[max(env(safe-area-inset-bottom),24px)]"
-        style={{ background: P.surface, border: `1px solid ${P.line}`, maxWidth: 480, margin: '0 auto' }}
-      >
-        <div className="w-10 h-1 rounded-full" style={{ background: P.lineStrong }} />
-        <Kicker>RUST</Kicker>
-        <div className="relative w-32 h-32">
-          <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-            <circle cx="60" cy="60" r={r} fill="none" stroke={P.surfaceHi} strokeWidth="8" />
-            <circle
-              cx="60" cy="60" r={r} fill="none" stroke={P.brand} strokeWidth="8"
-              strokeLinecap="round"
-              strokeDasharray={circ}
-              strokeDashoffset={offset}
-              style={{ transition: 'stroke-dashoffset 1s linear' }}
-            />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="athletic-mono" style={{ color: P.ink, fontSize: 28, fontWeight: 900 }}>
-              {m > 0 ? `${m}:${s.toString().padStart(2, '0')}` : s}
-            </span>
-            <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11 }}>
-              {m > 0 ? 'min' : 'sec'}
-            </span>
-          </div>
-        </div>
-        <p style={{ color: P.inkMuted, fontSize: 12.5 }}>{nextLabel}</p>
-        <div className="flex gap-2 w-full">
-          <button
-            type="button"
-            onClick={onExtend}
-            className="athletic-tap athletic-mono flex-1 rounded-xl py-3"
-            style={{
-              background: 'transparent',
-              border: `1px solid ${P.lineStrong}`,
-              color: P.inkMuted,
-              fontSize: 11,
-              letterSpacing: '0.14em',
-              fontWeight: 800,
-            }}
-          >
-            +15S
-          </button>
-          <button
-            type="button"
-            onClick={onSkip}
-            className="athletic-tap athletic-mono flex-1 rounded-xl py-3 flex items-center justify-center gap-1.5"
-            style={{
-              background: P.lime,
-              border: `1px solid ${P.lime}`,
-              color: P.bg,
-              fontSize: 11,
-              letterSpacing: '0.14em',
-              fontWeight: 900,
-            }}
-          >
-            <SkipForward className="w-3.5 h-3.5" />
-            SLA RUST OVER
-          </button>
-        </div>
-      </div>
     </div>
   )
 }

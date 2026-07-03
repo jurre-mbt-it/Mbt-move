@@ -8,9 +8,20 @@ import { trpc } from '@/lib/trpc/client'
 import { SUPERSET_COLORS } from '@/lib/program-constants'
 import {
   ChevronLeft, ChevronRight, Clock, ChevronDown, ChevronUp, Lightbulb, LayoutList, Target,
-  TrendingUp, TrendingDown, CheckCircle2, SkipForward, Minus, Plus, Trophy, Bell, RotateCcw,
+  TrendingUp, TrendingDown, CheckCircle2, Check, Plus, Trophy, Bell, RotateCcw,
 } from 'lucide-react'
-import { P, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-ui'
+import { P, Kicker, MetaLabel, Tile, DarkButton, DarkInput } from '@/components/dark-ui'
+import {
+  type SetEntry,
+  type LastLog,
+  parseKg,
+  parseReps,
+  makeSetEntries,
+  prevKgFor,
+  prevRepsFor,
+  prevSummaryFor,
+} from '@/lib/session-sets'
+import { RestSheet } from '@/components/session/RestSheet'
 import { MOOD_SCALE, IconCelebration, IconBeach, IconStop, IconWarning } from '@/components/icons'
 import { useDraftBackup, loadDraft, clearStoredDraft } from '@/hooks/useAutosave'
 import {
@@ -52,16 +63,8 @@ type SessionExercise = {
   harderVariantName?: string | null
 }
 
-// Laatst gelogde waarden per oefening — uit getTodayExercises.lastLogs, voor
-// gewicht-prefill (progressive overload).
-type LastLog = {
-  weight: number | null
-  weightsPerSet: Array<number | null> | null
-  repsPerSet: Array<number | null> | null
-  repsCompleted: number | null
-  setsCompleted: number | null
-  completedAt: string | null
-}
+// LastLog (vorige-sessie-waarden) komt uit @/lib/session-sets — gedeeld met
+// het atleet-scherm.
 
 type FeedbackEntry = {
   smiley: number | null
@@ -107,43 +110,6 @@ const SMILEY_COLORS = [P.danger, P.orange, P.gold, P.limeDeep, P.lime]
 function MoodFace({ idx, size = 24 }: { idx: number; size?: number }) {
   const Icon = MOOD_SCALE[idx]
   return Icon ? <Icon size={size} /> : null
-}
-
-// ─── Circular Timer SVG ───────────────────────────────────────────────────────
-
-function CircularTimer({ seconds, total, onSkip }: { seconds: number; total: number; onSkip: () => void }) {
-  const r = 52
-  const circ = 2 * Math.PI * r
-  const progress = total > 0 ? seconds / total : 0
-  const offset = circ * (1 - progress)
-
-  return (
-    <div className="flex flex-col items-center gap-4">
-      <div className="relative w-32 h-32">
-        <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-          <circle cx="60" cy="60" r={r} fill="none" stroke={P.surfaceHi} strokeWidth="8" />
-          <circle
-            cx="60" cy="60" r={r} fill="none" stroke={P.brand} strokeWidth="8"
-            strokeLinecap="round"
-            strokeDasharray={circ}
-            strokeDashoffset={offset}
-            style={{ transition: 'stroke-dashoffset 1s linear' }}
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="athletic-mono" style={{ color: P.ink, fontSize: 30, fontWeight: 900 }}>{seconds}</span>
-          <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11 }}>sec</span>
-        </div>
-      </div>
-      <button
-        onClick={onSkip}
-        className="athletic-tap athletic-mono flex items-center gap-1.5"
-        style={{ color: P.inkMuted, fontSize: 12, fontWeight: 700, letterSpacing: '0.1em' }}
-      >
-        <SkipForward className="w-4 h-4" /> SLA RUST OVER
-      </button>
-    </div>
-  )
 }
 
 // ─── Smiley Feedback Modal ────────────────────────────────────────────────────
@@ -468,7 +434,7 @@ function MinutePicker({
 function SessionSummary({
   exercises,
   feedback,
-  setWeights,
+  setLog,
   elapsed,
   onFinish,
   isSaving,
@@ -477,7 +443,7 @@ function SessionSummary({
 }: {
   exercises: SessionExercise[]
   feedback: Record<string, FeedbackEntry>
-  setWeights: Record<string, number[]>
+  setLog: Record<string, SetEntry[]>
   elapsed: number
   onFinish: (
     sessionSmiley: number | null,
@@ -616,14 +582,18 @@ function SessionSummary({
                       className="athletic-mono"
                       style={{ color: P.inkMuted, fontSize: 11, marginTop: 2 }}
                     >
-                      {e.sets} sets
                       {(() => {
-                        const ws = setWeights[e.uid]
-                        if (ws && ws.some(w => w > 0)) {
-                          const unique = [...new Set(ws.filter(w => w > 0))]
-                          return ` · ${unique.length === 1 ? unique[0] + ' kg' : ws.map(w => w + 'kg').join(' / ')}`
+                        const entries = setLog[e.uid] ?? []
+                        const doneCount = entries.filter(s => s.done).length
+                        const setsLabel = `${doneCount || entries.length || e.sets} sets`
+                        const ws = entries
+                          .map(s => parseKg(s.kg))
+                          .filter((w): w is number => w != null && w > 0)
+                        if (ws.length > 0) {
+                          const unique = [...new Set(ws)]
+                          return `${setsLabel} · ${unique.length === 1 ? unique[0] + ' kg' : ws.map(w => w + 'kg').join(' / ')}`
                         }
-                        return fb?.weight ? ` · ${fb.weight}kg` : ''
+                        return fb?.weight ? `${setsLabel} · ${fb.weight}kg` : setsLabel
                       })()}
                       {pain !== null && pain !== undefined ? ` · pijn ${pain}/10` : ''}
                     </p>
@@ -851,7 +821,8 @@ function SessionPageInner() {
   const viewMode: 'focus' | 'overview' = viewModeRaw === 'overview' ? 'overview' : 'focus'
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [expanded, setExpanded] = useState<string | null>(null)
-  const [setsCompleted, setSetsCompleted] = useState<Record<string, number>>({})
+  // Per-set log (kg/reps/afgevinkt) — zelfde set-flow als het atleet-scherm.
+  const [setLog, setSetLog] = useState<Record<string, SetEntry[]>>({})
   const [done, setDone] = useState<Set<string>>(new Set())
   const [feedback, setFeedback] = useState<Record<string, FeedbackEntry>>({})
   const [showFeedbackFor, setShowFeedbackFor] = useState<string | null>(null)
@@ -861,9 +832,6 @@ function SessionPageInner() {
   const [elapsed, setElapsed] = useState(0)
   const [phase, setPhase] = useState<'session' | 'summary'>('session')
   const [showCuesFor, setShowCuesFor] = useState<string | null>(null)
-  const [setWeights, setSetWeights] = useState<Record<string, number[]>>({})
-  const [showExtraFor, setShowExtraFor] = useState<string | null>(null)
-  const [extraReps, setExtraReps] = useState<Record<string, number>>({})
   // 1RM tracking: estimated 1RM per exercise (current session best) and PR tracker
   const [sessionOneRm, setSessionOneRm] = useState<Record<string, number>>({})  // uid -> best estimated 1RM this session
   const [sessionPRs, setSessionPRs] = useState<Record<string, number>>({})      // uid -> new PR value (if PR set)
@@ -879,12 +847,12 @@ function SessionPageInner() {
   useEffect(() => { doneRef.current = done }, [done])
 
   // ── Resume / draft-backup ───────────────────────────────────────────────────
+  // v2: per-set log (SetEntry[]) i.p.v. losse setsCompleted/setWeights/extraReps.
+  // Nieuwe key zodat oude (v1) concepten genegeerd worden i.p.v. crashen.
   type SessionDraft = {
-    setsCompleted: Record<string, number>
+    setLog: Record<string, SetEntry[]>
     done: string[]
     feedback: Record<string, FeedbackEntry>
-    setWeights: Record<string, number[]>
-    extraReps: Record<string, number>
     sessionOneRm: Record<string, number>
     sessionPRs: Record<string, number>
     expanded: string | null
@@ -895,7 +863,7 @@ function SessionPageInner() {
     const pid = sessionData?.program?.id ?? 'no-program'
     const week = isCatchUp ? catchUpWeek : (sessionData?.program?.currentWeek ?? 1)
     const day = isCatchUp ? catchUpDay : (sessionData?.program?.currentDay ?? 1)
-    return `mbt-session-draft-${pid}-${week}-${day}`
+    return `mbt-session-draft-v2-${pid}-${week}-${day}`
   }, [sessionData?.program?.id, sessionData?.program?.currentWeek, sessionData?.program?.currentDay, isCatchUp, catchUpWeek, catchUpDay])
 
   const [resumeChecked, setResumeChecked] = useState(false)
@@ -906,7 +874,11 @@ function SessionPageInner() {
     if (resumeChecked) return
     if (!sessionData?.program?.id) return
     const draft = loadDraft<SessionDraft>(draftKey)
-    if (draft && (draft.done?.length || Object.keys(draft.setsCompleted ?? {}).length)) {
+    const hasContent =
+      !!draft &&
+      (draft.done?.length > 0 ||
+        Object.values(draft.setLog ?? {}).some(sets => sets.some(s => s.done || s.kg !== '')))
+    if (hasContent) {
       setShowResumeBanner(true)
     }
     setResumeChecked(true)
@@ -915,11 +887,9 @@ function SessionPageInner() {
   function handleResume() {
     const draft = loadDraft<SessionDraft>(draftKey)
     if (draft) {
-      setSetsCompleted(draft.setsCompleted ?? {})
+      setSetLog(draft.setLog ?? {})
       setDone(new Set(draft.done ?? []))
       setFeedback(draft.feedback ?? {})
-      setSetWeights(draft.setWeights ?? {})
-      setExtraReps(draft.extraReps ?? {})
       setSessionOneRm(draft.sessionOneRm ?? {})
       setSessionPRs(draft.sessionPRs ?? {})
       if (draft.expanded) setExpanded(draft.expanded)
@@ -938,11 +908,9 @@ function SessionPageInner() {
   useDraftBackup<SessionDraft>({
     key: draftKey,
     value: {
-      setsCompleted,
+      setLog,
       done: [...done],
       feedback,
-      setWeights,
-      extraReps,
       sessionOneRm,
       sessionPRs,
       expanded,
@@ -950,31 +918,6 @@ function SessionPageInner() {
     },
     enabled: !showResumeBanner && !!sessionData?.program?.id,
   })
-
-  // Prefill gewichten met de vorige sessie (progressive overload): de stepper
-  // begint dan op je laatste gewicht in plaats van op 0. Loopt pas ná de
-  // resume-keuze en slaat oefeningen over waar al iets is ingevuld (draft).
-  const prefilledRef = useRef(false)
-  useEffect(() => {
-    if (prefilledRef.current) return
-    if (!resumeChecked || showResumeBanner) return
-    if (exercises.length === 0) return
-    prefilledRef.current = true
-    setSetWeights(prev => {
-      const next = { ...prev }
-      for (const e of exercises) {
-        if (next[e.uid]?.some(w => w > 0)) continue
-        const last = lastLogs[e.exerciseId]
-        if (!last) continue
-        const arr = Array.from({ length: e.sets }, (_, i) => {
-          const w = last.weightsPerSet?.[i] ?? last.weight
-          return w != null && w > 0 ? w : 0
-        })
-        if (arr.some(w => w > 0)) next[e.uid] = arr
-      }
-      return next
-    })
-  }, [resumeChecked, showResumeBanner, exercises, lastLogs])
 
   // Step-structuur (alleen welke uids horen bij welke stap) — bewust een
   // memo vóór alle early-returns zodat de hooks-volgorde constant blijft.
@@ -1084,17 +1027,16 @@ function SessionPageInner() {
     setShowRestTimer(false)
   }, [])
 
-  const adjustSetWeight = useCallback((uid: string, setIdx: number, delta: number) => {
-    setSetWeights(prev => {
-      const arr = [...(prev[uid] ?? [])]
-      arr[setIdx] = Math.max(0, Math.round(((arr[setIdx] ?? 0) + delta) * 10) / 10)
-      return { ...prev, [uid]: arr }
-    })
+  const extendRest = useCallback(() => {
+    setRestDuration(t => t + 15)
+    setRestSecondsLeft(s => s + 15)
   }, [])
 
-  const updateOneRm = useCallback((uid: string, exerciseId: string, weights: number[], reps: number) => {
-    const best = Math.max(...weights.filter(w => w > 0), 0)
+  const updateOneRm = useCallback((uid: string, exerciseId: string, entries: SetEntry[]) => {
+    const best = Math.max(...entries.map(s => parseKg(s.kg) ?? 0), 0)
     if (best <= 0) return
+    const reps = entries.map(s => parseReps(s.reps)).find(n => n != null) ?? 0
+    if (reps <= 0) return
     const estimated = calcEpley(best, reps)
     setSessionOneRm(prev => {
       const current = prev[uid] ?? 0
@@ -1109,15 +1051,52 @@ function SessionPageInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const markSetDone = useCallback((uid: string, restSec: number, totalSets: number) => {
-    setSetsCompleted(prev => {
-      const next = (prev[uid] ?? 0) + 1
-      if (next < totalSets && restTimerEnabled) {
-        startRestTimer(restSec)
-      }
-      return { ...prev, [uid]: next }
+  // ── Set-log helpers — zelfde flow als het atleet-scherm ────────────────────
+  // `seed` = default-rijen op basis van het programma (sets × doel-reps).
+
+  function updateSet(e: SessionExercise, seed: SetEntry[], idx: number, patch: Partial<SetEntry>) {
+    const arr = [...(setLog[e.uid] ?? seed)]
+    arr[idx] = { ...arr[idx], ...patch }
+    setSetLog(prev => ({ ...prev, [e.uid]: arr }))
+    if (sessionData?.program?.trackOneRepMax) updateOneRm(e.uid, e.exerciseId, arr)
+  }
+
+  function addSet(e: SessionExercise, seed: SetEntry[]) {
+    setSetLog(prev => {
+      const arr = [...(prev[e.uid] ?? seed)]
+      const last = arr[arr.length - 1]
+      arr.push({ kg: last?.kg ?? '', reps: last?.reps ?? '', done: false })
+      return { ...prev, [e.uid]: arr }
     })
-  }, [startRestTimer, restTimerEnabled])
+  }
+
+  /** Set afvinken → rusttimer starten zolang er nog sets te doen zijn. */
+  function toggleSetDone(e: SessionExercise, seed: SetEntry[], idx: number) {
+    const entries = setLog[e.uid] ?? seed
+    const wasDone = entries[idx]?.done ?? false
+    updateSet(e, seed, idx, { done: !wasDone })
+    if (!wasDone && restTimerEnabled) {
+      const othersLeft = entries.some((s, i) => i !== idx && !s.done)
+      if (othersLeft) startRestTimer(e.restTime || 60)
+    }
+  }
+
+  /** Neem de gewichten/reps van de vorige sessie over in de open velden. */
+  function takeOverPrevious(e: SessionExercise, seed: SetEntry[]) {
+    const last = lastLogs[e.exerciseId]
+    if (!last) return
+    const arr = (setLog[e.uid] ?? seed).map((s, i) => {
+      const kg = prevKgFor(last, i)
+      const reps = prevRepsFor(last, i)
+      return {
+        ...s,
+        kg: s.kg !== '' ? s.kg : kg != null && kg > 0 ? String(kg).replace('.', ',') : s.kg,
+        reps: reps != null ? String(reps) : s.reps,
+      }
+    })
+    setSetLog(prev => ({ ...prev, [e.uid]: arr }))
+    if (sessionData?.program?.trackOneRepMax) updateOneRm(e.uid, e.exerciseId, arr)
+  }
 
   const markExerciseDone = useCallback((uid: string) => {
     // Smiley/pijn/RPE/weight worden alleen aan het einde van de hele sessie
@@ -1188,31 +1167,30 @@ function SessionPageInner() {
         // de sessie als "deels voltooid" (oranje) in de week-planner.
         completedAll: doneRef.current.size >= exercises.length,
         exercises: exercises.map(e => {
-          const weights = setWeights[e.uid] ?? []
-          const lastSetWeight = weights.filter(w => w > 0).slice(-1)[0] ?? null
+          const entries = setLog[e.uid] ?? []
+          const ws = entries.map(s => {
+            const w = parseKg(s.kg)
+            return w != null && w > 0 ? w : null
+          })
+          const rs = entries.map(s => parseReps(s.reps))
+          const doneCount = entries.filter(s => s.done).length
+          const lastSetWeight = [...ws].reverse().find(w => w != null) ?? null
           const feedbackWeight = feedback[e.uid]?.weight ?? null
           const finalWeight = lastSetWeight ?? (feedbackWeight && feedbackWeight > 0 ? feedbackWeight : null)
-          const reps = extraReps[e.uid] ?? e.reps
+          const reps = rs.find(n => n != null && n > 0) ?? e.reps
           const programTrack1rm = sessionData?.program?.trackOneRepMax ?? false
           const estimated1rm = (programTrack1rm && finalWeight && finalWeight > 0)
             ? calcEpley(finalWeight, reps)
             : null
-          // Volledige per-set gewichten meesturen (niet alleen de laatste):
-          // 0 = niet ingevuld → null, zodat de vorige-sessie-hints kloppen.
-          const weightsPerSet = weights.length
-            ? Array.from({ length: e.sets }, (_, i) => {
-                const w = weights[i]
-                return w != null && w > 0 ? w : null
-              })
-            : undefined
           return {
             exerciseId: e.exerciseId,
-            setsCompleted: setsCompleted[e.uid] ?? 0,
+            setsCompleted: doneCount,
             repsCompleted: reps,
             repUnit: e.repUnit,
             painLevel: tendinopathyMode ? (feedback[e.uid]?.painDuring ?? null) : (feedback[e.uid]?.pain ?? null),
             weight: finalWeight,
-            weightsPerSet,
+            weightsPerSet: entries.length ? ws : undefined,
+            repsPerSet: entries.length ? rs : undefined,
             estimatedOneRepMax: estimated1rm,
             painDuring: tendinopathyMode ? (feedback[e.uid]?.painDuring ?? null) : null,
           }
@@ -1241,7 +1219,7 @@ function SessionPageInner() {
     clearStoredDraft(draftKey)
 
     router.push('/patient/dashboard')
-  }, [sessionData, feedback, exercises, setsCompleted, extraReps, setWeights, logSession, router, utils, draftKey])
+  }, [sessionData, feedback, exercises, setLog, logSession, router, utils, draftKey])
 
   // Keuzescherm: patient heeft meerdere actieve programma's en moet kiezen
   // welk programma ze vandaag wil doen. Selectie zet ?programId=… in de URL.
@@ -1396,7 +1374,7 @@ function SessionPageInner() {
       <SessionSummary
         exercises={exercises}
         feedback={feedback}
-        setWeights={setWeights}
+        setLog={setLog}
         elapsed={elapsed}
         onFinish={handleFinish}
         isSaving={logSession.isPending}
@@ -1419,8 +1397,11 @@ function SessionPageInner() {
   const renderExercise = (e: SessionExercise) => {
     const isDone = done.has(e.uid)
     const isExpanded = expanded === e.uid
-    const sets = setsCompleted[e.uid] ?? 0
-    const allSetsDone = sets >= e.sets
+    const seed = makeSetEntries(e.sets, e.reps)
+    const entries = setLog[e.uid] ?? seed
+    const last = lastLogs[e.exerciseId]
+    const doneSets = entries.filter(s => s.done).length
+    const allSetsDone = entries.length > 0 && entries.every(s => s.done)
     // Cues uit de library: tips zijn de aandachtspunten; val terug op de
     // uitvoerings-instructies als er geen tips zijn ingevuld.
     const cues = (e.tips?.length ? e.tips : e.instructions) ?? []
@@ -1444,7 +1425,7 @@ function SessionPageInner() {
               fontWeight: 900,
             }}
           >
-            {isDone ? '✓' : e.sets > 0 ? `${sets}/${e.sets}` : '—'}
+            {isDone ? '✓' : entries.length > 0 ? `${doneSets}/${entries.length}` : '—'}
           </div>
           <div className="flex-1 min-w-0">
             <p
@@ -1472,21 +1453,28 @@ function SessionPageInner() {
           return (
             <div className="px-4 pb-4 pt-3 space-y-3" style={{ borderTop: `1px solid ${P.line}` }}>
               <div className="space-y-1.5">
-                {Array.from({ length: e.sets }, (_, i) => {
-                  const w = setWeights[e.uid]?.[i] ?? 0
+                {entries.map((s, i) => {
+                  const w = parseKg(s.kg)
                   return (
                     <div
                       key={i}
                       className="flex items-center justify-between px-4 rounded-xl"
-                      style={{ height: 44, background: P.lime + '15', border: `1px solid ${P.lime}33` }}
+                      style={{
+                        height: 44,
+                        background: s.done ? P.lime + '15' : P.surfaceHi,
+                        border: `1px solid ${s.done ? P.lime + '33' : P.line}`,
+                      }}
                     >
                       <span
                         className="athletic-mono"
-                        style={{ color: P.lime, fontSize: 13, fontWeight: 800 }}
+                        style={{ color: s.done ? P.lime : P.inkMuted, fontSize: 13, fontWeight: 800 }}
                       >
-                        Set {i + 1} ✓
+                        Set {i + 1} {s.done ? '✓' : '—'}
                       </span>
-                      <span style={{ color: P.inkMuted, fontSize: 13 }}>{w > 0 ? `${w} kg` : '—'}</span>
+                      <span style={{ color: P.inkMuted, fontSize: 13 }}>
+                        {w != null && w > 0 ? `${String(w).replace('.', ',')} kg` : '—'}
+                        {s.reps ? ` × ${s.reps}` : ''}
+                      </span>
                     </div>
                   )
                 })}
@@ -1560,111 +1548,134 @@ function SessionPageInner() {
 
             {/* Params grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <ParamPill label="Sets" value={String(e.sets)} />
+              <ParamPill label="Sets" value={String(entries.length)} />
               <ParamPill label="Reps" value={`${e.reps} ${e.repUnit}`} />
               <ParamPill label="Rust" value={`${e.restTime}s`} />
-              <ParamPill label="Sets klaar" value={`${sets}/${e.sets}`} highlight />
+              <ParamPill label="Sets klaar" value={`${doneSets}/${entries.length}`} highlight />
             </div>
 
-            {/* Vorige sessie als anker — verklaart de voorgevulde gewichten */}
+            {/* Vorige sessie als anker — één tik neemt de waarden over */}
             {(() => {
-              const last = lastLogs[e.exerciseId]
-              const ws = (last?.weightsPerSet ?? []).filter((w): w is number => w != null && w > 0)
-              const single = last?.weight != null && last.weight > 0 ? last.weight : null
-              if (ws.length === 0 && single === null) return null
-              const uniq = [...new Set(ws.length ? ws : [single!])]
-              const summary = uniq.length === 1
-                ? `${String(uniq[0]).replace('.', ',')} kg`
-                : ws.map(w => String(w).replace('.', ',')).join(' / ') + ' kg'
+              const prevSummary = prevSummaryFor(last)
+              if (!prevSummary) return null
               return (
-                <div className="flex items-center gap-2 px-1">
+                <button
+                  type="button"
+                  onClick={() => takeOverPrevious(e, seed)}
+                  className="athletic-tap w-full flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left"
+                  style={{ background: P.surfaceHi, border: `1px solid ${P.line}` }}
+                >
                   <span aria-hidden className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: P.ice }} />
-                  <span style={{ color: P.inkMuted, fontSize: 11 }}>
+                  <span className="flex-1 min-w-0 truncate" style={{ color: P.inkMuted, fontSize: 12 }}>
                     Vorige keer{' '}
-                    <span className="athletic-mono" style={{ color: P.ink, fontWeight: 800 }}>{summary}</span>
-                    {last?.repsCompleted ? ` × ${last.repsCompleted}` : ''} — gewichten staan alvast klaar
+                    <span className="athletic-mono" style={{ color: P.ink, fontWeight: 800 }}>{prevSummary}</span>
                   </span>
-                </div>
+                  <span
+                    className="athletic-mono shrink-0"
+                    style={{ color: P.lime, fontSize: 9, letterSpacing: '0.12em', fontWeight: 800 }}
+                  >
+                    NEEM OVER
+                  </span>
+                </button>
               )
             })()}
 
-            {/* Set buttons — one per set for tactile feedback, with per-set weight */}
-            <div className="space-y-2">
-              {Array.from({ length: e.sets }, (_, i) => {
-                const setNum = i + 1
-                const isSetDone = sets >= setNum
-                const w = setWeights[e.uid]?.[i] ?? 0
-                return (
-                  <div key={setNum} className="space-y-1">
-                    <button
-                      disabled={isSetDone || sets < setNum - 1}
-                      onClick={() => !isSetDone && markSetDone(e.uid, e.restTime || 60, e.sets)}
-                      className="athletic-tap w-full flex items-center justify-between px-4 rounded-2xl athletic-mono transition-all"
+            {/* Set-rijen: per set kg/reps invullen en afvinken; rust start vanzelf */}
+            <div>
+              <div className="flex items-center gap-2 px-3">
+                <span style={{ width: 26 }} />
+                <span className="flex-1 athletic-mono" style={{ color: P.inkDim, fontSize: 9, letterSpacing: '0.14em' }}>
+                  KG
+                </span>
+                <span className="flex-1 athletic-mono" style={{ color: P.inkDim, fontSize: 9, letterSpacing: '0.14em' }}>
+                  {e.repUnit === 'reps' ? 'REPS' : e.repUnit.toUpperCase()}
+                </span>
+                <span style={{ width: 44 }} />
+              </div>
+              <div className="space-y-1.5 mt-1.5">
+                {entries.map((s, i) => {
+                  const pk = prevKgFor(last, i)
+                  const pr = prevRepsFor(last, i)
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-center gap-2 rounded-xl px-3 py-2 transition-colors"
                       style={{
-                        height: 48,
-                        background: isSetDone
-                          ? P.lime + '22'
-                          : sets === setNum - 1 ? P.surfaceHi : P.surface,
-                        color: isSetDone
-                          ? P.lime
-                          : sets === setNum - 1 ? P.ink : P.inkMuted,
-                        border: isSetDone ? `1.5px solid ${P.lime}` : `1.5px solid ${P.line}`,
-                        fontSize: 13,
-                        fontWeight: 800,
+                        background: s.done ? 'rgba(190,242,100,0.06)' : P.surfaceHi,
+                        border: `1px solid ${s.done ? 'rgba(190,242,100,0.35)' : P.line}`,
                       }}
                     >
-                      <span>Set {setNum}</span>
-                      <span>{isSetDone ? `✓ ${w > 0 ? w + ' kg' : 'Klaar'}` : sets === setNum - 1 ? 'Tik om te voltooien →' : '—'}</span>
-                    </button>
-                    {(isSetDone || sets === setNum - 1) && (
-                      <div className="flex items-center gap-2 px-2 py-1">
-                        <span style={{ color: P.inkMuted, fontSize: 11 }} className="flex-1">Gewicht set {setNum}</span>
-                        <button
-                          className="athletic-tap w-7 h-7 rounded-lg flex items-center justify-center"
-                          style={{ background: P.surfaceHi, color: P.ink }}
-                          onClick={() => {
-                            adjustSetWeight(e.uid, i, -2.5)
-                            if (sessionData?.program?.trackOneRepMax) {
-                              const newWeights = [...(setWeights[e.uid] ?? [])]
-                              newWeights[i] = Math.max(0, Math.round(((newWeights[i] ?? 0) - 2.5) * 10) / 10)
-                              updateOneRm(e.uid, e.exerciseId, newWeights, extraReps[e.uid] ?? e.reps)
-                            }
-                          }}
-                        >
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <span
-                          className="athletic-mono w-14 text-center"
-                          style={{ color: P.ink, fontSize: 13, fontWeight: 800 }}
-                        >
-                          {w} kg
-                        </span>
-                        <button
-                          className="athletic-tap w-7 h-7 rounded-lg flex items-center justify-center"
-                          style={{ background: P.surfaceHi, color: P.ink }}
-                          onClick={() => {
-                            adjustSetWeight(e.uid, i, 2.5)
-                            if (sessionData?.program?.trackOneRepMax) {
-                              const newWeights = [...(setWeights[e.uid] ?? [])]
-                              newWeights[i] = Math.round(((newWeights[i] ?? 0) + 2.5) * 10) / 10
-                              updateOneRm(e.uid, e.exerciseId, newWeights, extraReps[e.uid] ?? e.reps)
-                            }
-                          }}
-                        >
-                          <Plus className="w-3 h-3" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+                      <span
+                        className="athletic-mono shrink-0"
+                        style={{ width: 26, color: s.done ? P.lime : P.inkMuted, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em' }}
+                      >
+                        S{i + 1}
+                      </span>
+                      <DarkInput
+                        value={s.kg}
+                        onChange={(ev) =>
+                          updateSet(e, seed, i, { kg: ev.target.value.replace(/[^0-9.,]/g, '') })
+                        }
+                        inputMode="decimal"
+                        placeholder={pk != null && pk > 0 ? String(pk).replace('.', ',') : undefined}
+                        aria-label={`Gewicht set ${i + 1} (kg)`}
+                        className="flex-1 min-w-0"
+                        style={{ padding: '8px 10px', fontSize: 16 }}
+                      />
+                      <DarkInput
+                        value={s.reps}
+                        onChange={(ev) =>
+                          updateSet(e, seed, i, { reps: ev.target.value.replace(/[^0-9]/g, '') })
+                        }
+                        inputMode="numeric"
+                        placeholder={pr != null ? String(pr) : undefined}
+                        aria-label={`Reps set ${i + 1}`}
+                        className="flex-1 min-w-0"
+                        style={{ padding: '8px 10px', fontSize: 16 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleSetDone(e, seed, i)}
+                        aria-label={s.done ? `Set ${i + 1} heropenen` : `Set ${i + 1} klaar`}
+                        aria-pressed={s.done}
+                        className="athletic-tap shrink-0 rounded-xl flex items-center justify-center transition-all"
+                        style={{
+                          width: 44,
+                          height: 40,
+                          background: s.done ? P.lime : 'transparent',
+                          border: `1.5px solid ${s.done ? P.lime : P.lineStrong}`,
+                          color: s.done ? P.bg : P.inkDim,
+                        }}
+                      >
+                        <Check className="w-4 h-4" strokeWidth={3} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={() => addSet(e, seed)}
+                className="athletic-tap athletic-mono mt-2 w-full flex items-center justify-center gap-1.5 rounded-xl"
+                style={{
+                  padding: '9px 12px',
+                  border: `1px dashed ${P.lineStrong}`,
+                  color: P.inkMuted,
+                  background: 'transparent',
+                  fontSize: 10,
+                  fontWeight: 900,
+                  letterSpacing: '0.14em',
+                }}
+              >
+                <Plus className="w-3 h-3" />
+                SET TOEVOEGEN
+              </button>
             </div>
 
             {/* 1RM indicator */}
-            {(sessionData?.program?.trackOneRepMax) && sets > 0 && (() => {
-              const weights = setWeights[e.uid] ?? []
-              const bestWeight = Math.max(...weights.filter(w => w > 0), 0)
-              const reps = extraReps[e.uid] ?? e.reps
+            {(sessionData?.program?.trackOneRepMax) && doneSets > 0 && (() => {
+              const bestWeight = Math.max(...entries.map(s => parseKg(s.kg) ?? 0), 0)
+              const reps = entries.map(s => parseReps(s.reps)).find(n => n != null && n > 0) ?? e.reps
               const est1rm = bestWeight > 0 ? calcEpley(bestWeight, reps) : null
               const prevBest = prevOneRm[e.exerciseId] ?? 0
               const isPR = est1rm !== null && est1rm > prevBest && prevBest > 0
@@ -1697,52 +1708,6 @@ function SessionPageInner() {
                 </div>
               ) : null
             })()}
-
-            {/* Extra parameters collapsible */}
-            <div>
-              <button
-                onClick={() => setShowExtraFor(showExtraFor === e.uid ? null : e.uid)}
-                className="athletic-tap flex items-center gap-1.5 athletic-mono"
-                style={{ color: P.inkMuted, fontSize: 11, fontWeight: 700, letterSpacing: '0.08em' }}
-              >
-                {showExtraFor === e.uid
-                  ? <ChevronUp className="w-3.5 h-3.5" />
-                  : <ChevronDown className="w-3.5 h-3.5" />}
-                EXTRA PARAMETERS
-              </button>
-              {showExtraFor === e.uid && (
-                <div
-                  className="mt-2 rounded-2xl p-3 space-y-2"
-                  style={{ background: P.surfaceHi, border: `1px solid ${P.line}` }}
-                >
-                  <div className="flex items-center justify-between">
-                    <span style={{ color: P.ink, fontSize: 11, fontWeight: 600 }}>Reps gedaan</span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        className="athletic-tap w-7 h-7 rounded-lg flex items-center justify-center"
-                        style={{ background: P.surface, color: P.ink }}
-                        onClick={() => setExtraReps(prev => ({ ...prev, [e.uid]: Math.max(1, (prev[e.uid] ?? e.reps) - 1) }))}
-                      >
-                        <Minus className="w-3 h-3" />
-                      </button>
-                      <span
-                        className="athletic-mono w-8 text-center"
-                        style={{ color: P.ink, fontSize: 13, fontWeight: 800 }}
-                      >
-                        {extraReps[e.uid] ?? e.reps}
-                      </span>
-                      <button
-                        className="athletic-tap w-7 h-7 rounded-lg flex items-center justify-center"
-                        style={{ background: P.surface, color: P.ink }}
-                        onClick={() => setExtraReps(prev => ({ ...prev, [e.uid]: (prev[e.uid] ?? e.reps) + 1 }))}
-                      >
-                        <Plus className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
 
             {/* Coaching cues */}
             {cues.length > 0 && (
@@ -2076,21 +2041,25 @@ function SessionPageInner() {
         )}
       </div>
 
-      {/* Rest Timer overlay */}
+      {/* Rest Timer — bottom sheet met countdown, +15s en overslaan */}
       {showRestTimer && (
-        <div
-          className="fixed inset-0 z-40 flex items-center justify-center"
-          style={{ background: 'rgba(0,0,0,0.7)' }}
-        >
-          <div
-            className="rounded-3xl px-8 py-8 text-center space-y-2 mx-4 w-full max-w-xs"
-            style={{ background: P.surface, border: `1px solid ${P.line}` }}
-          >
-            <Kicker>RUST</Kicker>
-            <p style={{ color: P.inkMuted, fontSize: 11, marginBottom: 8 }}>Adem rustig door je neus</p>
-            <CircularTimer seconds={restSecondsLeft} total={restDuration} onSkip={skipRest} />
-          </div>
-        </div>
+        <RestSheet
+          secondsLeft={restSecondsLeft}
+          total={restDuration}
+          nextLabel={(() => {
+            const ex = exercises.find(x => x.uid === expanded)
+            if (!ex) return 'Adem rustig door je neus'
+            const entries = setLog[ex.uid] ?? makeSetEntries(ex.sets, ex.reps)
+            const nextIdx = entries.findIndex(s => !s.done)
+            if (nextIdx === -1) return 'Alle sets klaar — vink de oefening af'
+            const pk = prevKgFor(lastLogs[ex.exerciseId], nextIdx)
+            const pr = prevRepsFor(lastLogs[ex.exerciseId], nextIdx)
+            const hint = pk != null && pk > 0 ? ` · vorige keer ${String(pk).replace('.', ',')} kg${pr ? ` × ${pr}` : ''}` : ''
+            return `Volgende: set ${nextIdx + 1}${hint}`
+          })()}
+          onExtend={extendRest}
+          onSkip={skipRest}
+        />
       )}
 
       {/* Smiley feedback modal */}
