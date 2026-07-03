@@ -154,6 +154,7 @@ function AthleteSessionPageInner() {
     repUnit: e.repUnit,
     restTime: e.restTime,
     videoUrl: e.videoUrl ?? null,
+    weights: Array(Math.max(1, e.sets)).fill(''),
   }))
 
   // Extra exercises added during session
@@ -170,8 +171,15 @@ function AthleteSessionPageInner() {
   const [painEnabled, setPainEnabled] = useState(false)
   const [finishOpen, setFinishOpen] = useState(false)
 
+  // Tijdens de programma-sessie gelogde waarden (gewicht/sets/reps per uid).
+  // Programma-oefeningen worden elke render opnieuw uit de query afgeleid, dus
+  // de invoer leeft hier los van die afleiding en wint bij het samenvoegen.
+  const [logByUid, setLogByUid] = useState<Record<string, Partial<LiveExercise>>>({})
+
   const baseExercises = isQuickMode ? [] : programExercises
-  const exercises: LiveExercise[] = [...baseExercises, ...extraExercises]
+  const exercises: LiveExercise[] = [...baseExercises, ...extraExercises].map(e =>
+    logByUid[e.uid] ? { ...e, ...logByUid[e.uid] } : e
+  )
 
   const [state, setState] = useState<SessionState>('ready')
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -220,6 +228,12 @@ function AthleteSessionPageInner() {
   // programma-oefeningen blijven staan.
   function removeExercise(uid: string) {
     setExtraExercises(prev => prev.filter(e => e.uid !== uid))
+  }
+
+  // Log-invoer tijdens de actieve programma-sessie (gewicht/sets/reps). Werkt
+  // voor zowel programma- als toegevoegde oefeningen; de override wint.
+  function updateLog(uid: string, patch: Partial<LiveExercise>) {
+    setLogByUid(prev => ({ ...prev, [uid]: { ...(prev[uid] ?? {}), ...patch } }))
   }
 
   const filteredLibrary = addExerciseQuery
@@ -894,6 +908,55 @@ function AthleteSessionPageInner() {
             <MetaLabel>RUST · {current?.restTime ?? 60}S TUSSEN SETS</MetaLabel>
           </div>
         </Tile>
+
+        {/* Loggen: gewicht/sets/reps voor de huidige oefening */}
+        {current && (
+          <Tile style={{ padding: 16 }}>
+            <Kicker>LOGGEN</Kicker>
+            <div className="grid grid-cols-2 gap-2 mt-3">
+              <QuickField
+                label="Sets"
+                value={current.sets ? String(current.sets) : ''}
+                onChange={(v) => {
+                  const n = Math.max(1, Number(v) || 1)
+                  updateLog(current.uid, { sets: n, weights: resizeWeights(current.weights ?? [], n) })
+                }}
+              />
+              <QuickField
+                label="Reps"
+                value={current.reps ? String(current.reps) : ''}
+                onChange={(v) => updateLog(current.uid, { reps: Math.max(0, Number(v) || 0) })}
+              />
+            </div>
+            <div className="mt-3">
+              <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.12em' }}>
+                GEWICHT (KG) · PER SET
+              </span>
+              <div
+                className="grid gap-1.5 mt-1.5"
+                style={{ gridTemplateColumns: `repeat(${Math.min(Math.max(1, current.sets || 1), 6)}, minmax(0, 1fr))` }}
+              >
+                {(current.weights ?? []).map((w, i) => (
+                  <div key={i} className="flex flex-col gap-0.5">
+                    <span className="athletic-mono" style={{ color: P.inkDim, fontSize: 9, letterSpacing: '0.1em' }}>
+                      S{i + 1}
+                    </span>
+                    <DarkInput
+                      value={w}
+                      onChange={(e) => {
+                        const next = [...(current.weights ?? [])]
+                        next[i] = e.target.value
+                        updateLog(current.uid, { weights: next })
+                      }}
+                      inputMode="decimal"
+                      style={{ padding: '6px 8px', fontSize: 13 }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Tile>
+        )}
 
         <DarkButton
           variant="primary"
