@@ -277,6 +277,12 @@ model User {
   dpaAcceptedVersion String?
   dpaAcceptedAt      DateTime?
 
+  // Geheimhoudingsverklaring (GHV) — in-app acceptatie door THERAPIST vóór
+  // dossier-toegang. Aanvullend op het getekende papieren exemplaar in het
+  // personeelsdossier (DPIA actie 14); dit is de technische afdwinging.
+  ghvAcceptedVersion String?
+  ghvAcceptedAt      DateTime?
+
   // MFA
   mfaEnabled                    Boolean   @default(false)
   mfaSecret                     String?

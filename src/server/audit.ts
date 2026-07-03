@@ -38,6 +38,7 @@ export type AuditEvent =
   | 'PAIN_REPORTED'
   | 'CONSENT_CHANGED'
   | 'DPA_ACCEPTED'
+  | 'GHV_ACCEPTED'
   // GDPR
   | 'DATA_EXPORTED'
   | 'ACCOUNT_DELETION_REQUESTED'

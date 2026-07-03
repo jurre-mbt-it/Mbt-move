@@ -7,6 +7,7 @@ import { weekSchedulesRouter } from './weekSchedules'
 import { researchRouter } from './research'
 import { patientRouter } from './patient'
 import { dpaRouter } from './dpa'
+import { ghvRouter } from './ghv'
 import { wellnessRouter } from './wellness'
 import { adminRouter } from './admin'
 import { inviteRouter } from './invite'
@@ -37,6 +38,7 @@ export const appRouter = createTRPCRouter({
   research: researchRouter,
   patient: patientRouter,
   dpa: dpaRouter,
+  ghv: ghvRouter,
   wellness: wellnessRouter,
   admin: adminRouter,
   invite: inviteRouter,

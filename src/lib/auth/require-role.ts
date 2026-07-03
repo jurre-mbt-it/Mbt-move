@@ -22,6 +22,7 @@ import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { DPA_VERSION } from '@/lib/dpa-constants'
+import { GHV_VERSION } from '@/lib/ghv-constants'
 import { isPersonalModeEnabled } from './personal-mode'
 
 export type RequiredRole = 'THERAPIST' | 'ADMIN' | 'PATIENT' | 'ATHLETE'
@@ -34,6 +35,7 @@ export type SessionUser = {
   practiceId: string | null
   supabaseUserId: string
   dpaAcceptedVersion: string | null
+  ghvAcceptedVersion: string | null
 }
 
 const ROLE_HOME: Record<RequiredRole, string> = {
@@ -72,6 +74,7 @@ export const getServerUser = cache(async (): Promise<SessionUser | null> => {
         practiceId: true,
         supabaseUserId: true,
         dpaAcceptedVersion: true,
+        ghvAcceptedVersion: true,
       },
     })
     if (!dbUser || !dbUser.supabaseUserId) return null
@@ -130,6 +133,14 @@ export async function requireRole(
 
   if (!options.skipDpa && DPA_REQUIRED_ROLES.has(user.role) && user.dpaAcceptedVersion !== DPA_VERSION) {
     redirect('/onboarding/dpa')
+  }
+
+  // Geheimhoudingsverklaring: THERAPIST accepteert in-app vóór dossier-toegang
+  // (DPIA actie 14). ADMIN is de werkgever/verwerkingsverantwoordelijke zelf
+  // en valt buiten de gate. `skipDpa` fungeert als generieke consent-escape
+  // (settings/logout) en slaat ook deze gate over.
+  if (!options.skipDpa && user.role === 'THERAPIST' && user.ghvAcceptedVersion !== GHV_VERSION) {
+    redirect('/onboarding/geheimhouding')
   }
 
   return user
