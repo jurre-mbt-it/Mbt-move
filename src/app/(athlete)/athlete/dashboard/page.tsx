@@ -285,16 +285,20 @@ export default function AthleteDashboard() {
               bar={P.lime}
             />
           )}
-          <ActionTile
-            label="BERICHTEN"
-            sub={
-              unreadMessages > 0
-                ? `${unreadMessages} nieuw${unreadMessages > 1 ? 'e' : ''} bericht${unreadMessages > 1 ? 'en' : ''} van je coach`
-                : 'Vraag of reactie naar je coach'
-            }
-            href="/athlete/messages"
-            bar={unreadMessages > 0 ? P.brand : P.ice}
-          />
+          {/* Berichten zijn atleet-only; therapeuten in personal mode hebben
+              geen eigen draad, dus dan verbergen we de tegel. */}
+          {me?.role === 'ATHLETE' && (
+            <ActionTile
+              label="BERICHTEN"
+              sub={
+                unreadMessages > 0
+                  ? `${unreadMessages} nieuw${unreadMessages > 1 ? 'e' : ''} bericht${unreadMessages > 1 ? 'en' : ''} van je coach`
+                  : 'Vraag of reactie naar je coach'
+              }
+              href="/athlete/messages"
+              bar={unreadMessages > 0 ? P.brand : P.ice}
+            />
+          )}
           <ActionTile
             label="PROGRAMMA"
             sub="Eigen schema maken"

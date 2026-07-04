@@ -25,7 +25,7 @@ export default function TherapistMessagesPage() {
         <Kicker>COMMUNICATIE</Kicker>
         <Display size="lg">BERICHTEN</Display>
         <MetaLabel style={{ marginTop: 4, textTransform: 'none', fontWeight: 500 }}>
-          Vragen en reacties van je patiënten en atleten
+          Vragen en reacties van je atleten
         </MetaLabel>
       </div>
 
@@ -39,8 +39,8 @@ export default function TherapistMessagesPage() {
             <MessageSquare className="w-8 h-8" style={{ color: P.inkDim }} />
             <p style={{ color: P.ink, fontSize: 15, fontWeight: 700 }}>Nog geen gesprekken</p>
             <p style={{ color: P.inkMuted, fontSize: 13, maxWidth: 360, lineHeight: 1.5 }}>
-              Zodra een patiënt een bericht stuurt — of jij er een start vanaf een
-              patiëntenpagina — verschijnt het gesprek hier.
+              Zodra een atleet een bericht stuurt — of jij er een start vanaf een
+              atletenpagina — verschijnt het gesprek hier.
             </p>
           </div>
         </Tile>

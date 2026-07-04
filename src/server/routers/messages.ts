@@ -21,31 +21,41 @@ import type { PrismaClient } from '@prisma/client'
 type SessionUserLite = { id: string; role: string; practiceId: string | null }
 
 /**
- * Bepaal wiens draad de caller mag zien/beschrijven. Patiënt/atleet: alleen de
- * eigen draad. Therapeut/admin: draad van een toegankelijke patiënt.
+ * Bepaal wiens draad de caller mag zien/beschrijven. Berichten zijn
+ * atleet-only (bewuste keuze 2026-07): een ATHLETE ziet alleen de eigen
+ * draad; therapeut/admin de draad van een toegankelijke atleet. PATIENT-rol
+ * heeft geen berichten-omgeving.
  */
 async function resolveThreadPatient(
   prisma: Pick<PrismaClient, 'user'>,
   user: SessionUserLite,
   patientId: string | undefined,
 ): Promise<string> {
-  if (!patientId || patientId === user.id) return user.id
+  if (!patientId || patientId === user.id) {
+    if (user.role !== 'ATHLETE') throw new TRPCError({ code: 'FORBIDDEN' })
+    return user.id
+  }
   if (user.role !== 'THERAPIST' && user.role !== 'ADMIN') {
     throw new TRPCError({ code: 'FORBIDDEN' })
   }
-  if (user.role === 'ADMIN') return patientId
-  // Zelfde toegangsmodel als hasPatientAccess in patients.ts.
+  // Zelfde toegangsmodel als hasPatientAccess in patients.ts, plus de
+  // atleet-only-regel: de draad-eigenaar moet ATHLETE zijn.
   const found = await prisma.user.findFirst({
     where: {
       id: patientId,
-      OR: [
-        {
-          patientTherapists: {
-            some: { therapistId: user.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
-          },
-        },
-        ...(user.practiceId ? [{ practiceId: user.practiceId }] : []),
-      ],
+      role: 'ATHLETE',
+      ...(user.role === 'ADMIN'
+        ? {}
+        : {
+            OR: [
+              {
+                patientTherapists: {
+                  some: { therapistId: user.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
+                },
+              },
+              ...(user.practiceId ? [{ practiceId: user.practiceId }] : []),
+            ],
+          }),
     },
     select: { id: true },
   })
@@ -168,8 +178,9 @@ export const messagesRouter = createTRPCRouter({
       return { ok: true }
     }),
 
-  // ── Ongelezen-teller voor de eigen draad (patiënt/atleet) ─────────────────
+  // ── Ongelezen-teller voor de eigen draad (alleen atleten) ─────────────────
   unreadCount: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.user.role !== 'ATHLETE') return 0
     return ctx.prisma.message.count({
       where: { patientId: ctx.user.id, fromPatient: false, readAt: null },
     })
@@ -180,11 +191,12 @@ export const messagesRouter = createTRPCRouter({
     if (ctx.user.role !== 'THERAPIST' && ctx.user.role !== 'ADMIN') {
       throw new TRPCError({ code: 'FORBIDDEN' })
     }
-    const accessiblePatient =
-      ctx.user.role === 'ADMIN'
-        ? {}
-        : {
-            patient: {
+    const accessiblePatient = {
+      patient: {
+        role: 'ATHLETE' as never,
+        ...(ctx.user.role === 'ADMIN'
+          ? {}
+          : {
               OR: [
                 {
                   patientTherapists: {
@@ -193,8 +205,9 @@ export const messagesRouter = createTRPCRouter({
                 },
                 ...(ctx.user.practiceId ? [{ practiceId: ctx.user.practiceId }] : []),
               ],
-            },
-          }
+            }),
+      },
+    }
 
     // Recentste berichten eerst; eerste per patiënt = de draad-preview.
     const recent = await ctx.prisma.message.findMany({
@@ -258,10 +271,11 @@ export const messagesRouter = createTRPCRouter({
       where: {
         fromPatient: true,
         readAt: null,
-        ...(ctx.user.role === 'ADMIN'
-          ? {}
-          : {
-              patient: {
+        patient: {
+          role: 'ATHLETE' as never,
+          ...(ctx.user.role === 'ADMIN'
+            ? {}
+            : {
                 OR: [
                   {
                     patientTherapists: {
@@ -270,8 +284,8 @@ export const messagesRouter = createTRPCRouter({
                   },
                   ...(ctx.user.practiceId ? [{ practiceId: ctx.user.practiceId }] : []),
                 ],
-              },
-            }),
+              }),
+        },
       },
     })
   }),
