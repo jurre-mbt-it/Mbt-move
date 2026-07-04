@@ -181,7 +181,11 @@ export const patientRouter = createTRPCRouter({
       where: {
         patientId: ctx.user.id,
         status: 'ACTIVE',
-        ...(input?.programId ? { id: input.programId } : {}),
+        // Zonder specifiek verzoek: alleen programma's die daadwerkelijk
+        // oefeningen hebben. Anders kan een leeg ACTIVE-programma (bv. een
+        // rehab-placeholder zonder oefeningen) als "actief" terugkomen en blijft
+        // het weekschema leeg terwijl er wél een echt programma is.
+        ...(input?.programId ? { id: input.programId } : { exercises: { some: {} } }),
       },
       // Deterministische default als de patient meerdere actieve programma's
       // heeft en er geen specifieke wordt opgevraagd: oudste eerst.
