@@ -142,4 +142,5 @@ export const RATE_LIMITS = {
   wearableSync:       { max: 60, windowSec: 3600, message: 'Te veel sync-verzoeken. Probeer het later opnieuw.' },
   loginLog:           { max: 12, windowSec: 600,  message: 'Te veel login-registraties.' },
   cspReport:          { max: 60, windowSec: 600,  message: 'Te veel CSP-reports.' },
+  messageSend:        { max: 120, windowSec: 3600, message: 'Te veel berichten. Probeer het later opnieuw.' },
 } as const

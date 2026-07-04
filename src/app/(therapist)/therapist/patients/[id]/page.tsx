@@ -276,6 +276,12 @@ export default function PatientDetailPage({
           >
             <span className="inline-flex items-center gap-1.5"><IconCalendar size={15} /> Weekschema</span>
           </DarkButton>
+          <DarkButton
+            variant="secondary"
+            href={`/therapist/messages/${patient.id}`}
+          >
+            Berichten
+          </DarkButton>
           {/* Programma's. Een patient kan er meerdere naast elkaar hebben
               (bv. dagelijkse iso's + 3×/week kracht). "+ Programma" en
               "Vanaf template" blijven daarom altijd beschikbaar — ook als er

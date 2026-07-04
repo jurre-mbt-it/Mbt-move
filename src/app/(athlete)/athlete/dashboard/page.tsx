@@ -57,6 +57,10 @@ export default function AthleteDashboard() {
   })
   const { data: rehabTracker } = trpc.rehab.getMyTracker.useQuery()
   const { data: me } = trpc.auth.getMe.useQuery()
+  // Ongelezen berichten van de coach — badge op de Berichten-tegel.
+  const { data: unreadMessages = 0 } = trpc.messages.unreadCount.useQuery(undefined, {
+    refetchInterval: 60_000,
+  })
 
   const todayExercises = sessionData?.exercises ?? []
   const lastSession = sessionHistory?.[0] ?? null
@@ -281,6 +285,16 @@ export default function AthleteDashboard() {
               bar={P.lime}
             />
           )}
+          <ActionTile
+            label="BERICHTEN"
+            sub={
+              unreadMessages > 0
+                ? `${unreadMessages} nieuw${unreadMessages > 1 ? 'e' : ''} bericht${unreadMessages > 1 ? 'en' : ''} van je coach`
+                : 'Vraag of reactie naar je coach'
+            }
+            href="/athlete/messages"
+            bar={unreadMessages > 0 ? P.brand : P.ice}
+          />
           <ActionTile
             label="PROGRAMMA"
             sub="Eigen schema maken"

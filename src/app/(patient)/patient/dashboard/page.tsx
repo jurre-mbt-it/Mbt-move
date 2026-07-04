@@ -36,6 +36,10 @@ export default function PatientDashboard() {
   const program = sessionData?.program ?? null
   // Weekdag (1=ma..7=zo) waarnaar de patiënt de sessie van vandaag verschoof.
   const movedToDay = program?.movedToDay ?? null
+  // Ongelezen berichten van de behandelaar — badge op de Berichten-tegel.
+  const { data: unreadMessages = 0 } = trpc.messages.unreadCount.useQuery(undefined, {
+    refetchInterval: 60_000,
+  })
   const lastSession = sessionHistory?.[0] ?? null
 
   const completedToday =
@@ -247,6 +251,17 @@ export default function PatientDashboard() {
         </Tile>
 
         {/* Wellness quick action */}
+        <ActionTile
+          href="/patient/messages"
+          label="Berichten"
+          sub={
+            unreadMessages > 0
+              ? `${unreadMessages} nieuw${unreadMessages > 1 ? 'e' : ''} bericht${unreadMessages > 1 ? 'en' : ''} van je behandelaar`
+              : 'Stel een vraag of reageer op je therapeut'
+          }
+          bar={unreadMessages > 0 ? P.brand : P.ice}
+        />
+
         <ActionTile
           href="/patient/wellness"
           label={todayWellness ? 'Wellness update' : 'Wellness check'}

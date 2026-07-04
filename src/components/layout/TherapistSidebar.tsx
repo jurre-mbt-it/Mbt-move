@@ -19,6 +19,7 @@ import {
   Stethoscope,
   Blocks,
   FileText,
+  MessageSquare,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -29,6 +30,7 @@ import { P } from '@/components/dark-ui'
 const navItems = [
   { href: '/therapist/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/therapist/patients', label: 'Patiënten', icon: Users },
+  { href: '/therapist/messages', label: 'Berichten', icon: MessageSquare },
   { href: '/therapist/signals', label: 'Signalen', icon: AlertCircle },
   { href: '/therapist/programs', label: "Programma's", icon: ClipboardList },
   { href: '/therapist/programs/new', label: 'Builder', icon: Blocks },
@@ -70,6 +72,10 @@ export function TherapistSidebar() {
   const asideRef = useRef<HTMLElement>(null)
   const { data: me } = trpc.auth.getMe.useQuery()
   const { data: assessmentAccess } = trpc.assessments.hasAccess.useQuery()
+  // Ongelezen patiënt-berichten — badge op de Berichten-rij.
+  const { data: unreadMessages = 0 } = trpc.messages.unreadTotal.useQuery(undefined, {
+    refetchInterval: 60_000,
+  })
   const isAdmin = me?.role === 'ADMIN'
   const canUseAssessment = !!assessmentAccess?.hasAccess
 
@@ -202,8 +208,25 @@ export function TherapistSidebar() {
                 borderLeft: active ? `2px solid ${P.brand}` : '2px solid transparent',
               }}
             >
-              <Icon className="w-4.5 h-4.5 shrink-0" />
+              <span className="relative shrink-0 inline-flex">
+                <Icon className="w-4.5 h-4.5" />
+                {href === '/therapist/messages' && unreadMessages > 0 && collapsed && (
+                  <span
+                    aria-hidden
+                    className="absolute -top-1 -right-1 w-2 h-2 rounded-full"
+                    style={{ background: P.brand }}
+                  />
+                )}
+              </span>
               {!collapsed && label}
+              {href === '/therapist/messages' && unreadMessages > 0 && !collapsed && (
+                <span
+                  className="athletic-mono ml-auto rounded-full flex items-center justify-center"
+                  style={{ minWidth: 20, height: 20, padding: '0 6px', background: P.brand, color: P.bg, fontSize: 10, fontWeight: 900 }}
+                >
+                  {unreadMessages}
+                </span>
+              )}
             </Link>
           )
           })

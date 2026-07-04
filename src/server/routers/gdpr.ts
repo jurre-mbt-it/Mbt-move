@@ -107,7 +107,7 @@ export const gdprRouter = createTRPCRouter({
       ctx.prisma.wellnessCheck.findMany({ where: { userId } }),
       ctx.prisma.painEntry.findMany({ where: { userId } }),
       ctx.prisma.message.findMany({
-        where: { OR: [{ senderId: userId }, { recipientId: userId }] },
+        where: { OR: [{ patientId: userId }, { authorId: userId }] },
       }),
       ctx.prisma.notification.findMany({ where: { userId } }),
       ctx.prisma.weekSchedule.findMany({
