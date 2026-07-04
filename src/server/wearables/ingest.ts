@@ -86,6 +86,8 @@ const vitalsSchema = z.object({
   restingHeartRate: z.number().int().min(20).max(150).optional(),
   respiratoryRate: z.number().positive().max(60).optional(),
   wristTempDeviation: z.number().min(-10).max(10).optional(),
+  steps: z.number().int().nonnegative().max(200000).optional(),
+  activeEnergyKcal: z.number().nonnegative().max(30000).optional(),
 })
 
 // Hard caps per batch: de native bridge stuurt incrementele anchored queries,
@@ -232,6 +234,8 @@ export async function ingestWearableData(
       hrvType: v.hrvType ?? null,
       respiratoryRate: v.respiratoryRate ?? null,
       wristTempDeviation: v.wristTempDeviation ?? null,
+      steps: v.steps != null ? Math.round(v.steps) : null,
+      activeEnergyKcal: v.activeEnergyKcal != null ? Math.round(v.activeEnergyKcal) : null,
       source: 'APPLE_WATCH' as const,
     }
     await prisma.vitalsEntry.upsert({

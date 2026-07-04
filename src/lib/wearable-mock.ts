@@ -149,13 +149,16 @@ const ACTIVITIES = [
 export function mockOverview(days = 30, end: Date = new Date()) {
   const gen = genDays(days, end)
 
-  const vitals = gen.map(g => ({
+  const vitals = gen.map((g, i) => ({
     date: g.date,
     hrv: g.hrv,
     hrvType: 'SDNN' as const,
     restingHeartRate: g.restingHeartRate,
     respiratoryRate: g.respiratoryRate,
     wristTempDeviation: g.wristTempDeviation,
+    // Deterministische mock-waarden (geen rng nodig): stappen ~7-12k, kcal ~500-900.
+    steps: 7000 + ((i * 997) % 5000),
+    activeEnergyKcal: 500 + ((i * 379) % 400),
   }))
 
   const sleep = gen.map(g => {

@@ -143,6 +143,8 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
       restingHeartRate: v.restingHeartRate,
       respiratoryRate: v.respiratoryRate,
       wristTempDeviation: v.wristTempDeviation,
+      steps: v.steps,
+      activeEnergyKcal: v.activeEnergyKcal,
     })),
     activities: activities.map(a => ({
       id: a.id,
