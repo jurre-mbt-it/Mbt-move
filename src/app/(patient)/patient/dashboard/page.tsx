@@ -34,6 +34,8 @@ export default function PatientDashboard() {
 
   const todayExercises = sessionData?.exercises ?? []
   const program = sessionData?.program ?? null
+  // Weekdag (1=ma..7=zo) waarnaar de patiënt de sessie van vandaag verschoof.
+  const movedToDay = program?.movedToDay ?? null
   const lastSession = sessionHistory?.[0] ?? null
 
   const completedToday =
@@ -119,8 +121,16 @@ export default function PatientDashboard() {
                   ? `${activePrograms!.length} PROGRAMMA'S`
                   : completedToday
                     ? 'KLAAR'
-                    : `${todayExercises.length} OEFENINGEN`}
+                    : movedToDay
+                      ? 'VERPLAATST'
+                      : `${todayExercises.length} OEFENINGEN`}
               </Display>
+              {!multiProgram && !completedToday && movedToDay && (
+                <span className="block mt-2" style={{ color: P.inkMuted, fontSize: 13 }}>
+                  Je sessie van vandaag staat op{' '}
+                  {['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag'][movedToDay - 1]}.
+                </span>
+              )}
               {multiProgram ? (
                 <span
                   className="block mt-2"

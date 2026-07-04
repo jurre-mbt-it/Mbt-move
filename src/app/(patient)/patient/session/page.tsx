@@ -1340,14 +1340,26 @@ function SessionPageInner() {
   }
 
   if (!sessionData?.program || exercises.length === 0) {
+    const movedToDay = sessionData?.program?.movedToDay ?? null
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center" style={{ background: P.bg, color: P.ink }}>
         <div className="flex justify-center"><IconBeach size={48} /></div>
         <p style={{ color: P.ink, fontSize: 18, fontWeight: 800 }}>Geen sessie vandaag</p>
-        <p style={{ color: P.inkMuted, fontSize: 13 }}>Je hebt vandaag geen oefeningen gepland. Geniet van je rustdag!</p>
-        <DarkButton variant="secondary" onClick={() => router.push('/patient/dashboard')}>
-          Terug naar dashboard
-        </DarkButton>
+        <p style={{ color: P.inkMuted, fontSize: 13 }}>
+          {movedToDay
+            ? `Je hebt deze sessie verplaatst naar ${['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag'][movedToDay - 1]}.`
+            : 'Je hebt vandaag geen oefeningen gepland. Geniet van je rustdag!'}
+        </p>
+        <div className="flex flex-col gap-2 w-full max-w-xs">
+          {movedToDay && (
+            <DarkButton variant="secondary" onClick={() => router.push('/patient/schedule')}>
+              Bekijk je schema
+            </DarkButton>
+          )}
+          <DarkButton variant="secondary" onClick={() => router.push('/patient/dashboard')}>
+            Terug naar dashboard
+          </DarkButton>
+        </div>
       </div>
     )
   }

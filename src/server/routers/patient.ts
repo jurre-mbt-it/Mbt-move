@@ -241,6 +241,12 @@ export const patientRouter = createTRPCRouter({
       exercises.map(e => e.day)
     )
 
+    // Verplaatste sessies in de huidige week — voor de schema-weergave.
+    const sessionMoves = await ctx.prisma.sessionMove.findMany({
+      where: { patientId: ctx.user.id, programId: program.id, week: currentWeek },
+      select: { fromDay: true, toDay: true },
+    })
+
     return {
       id: program.id,
       name: program.name,
@@ -255,6 +261,7 @@ export const patientRouter = createTRPCRouter({
       byWeekDay,
       resources,
       resourcesByWeekDay,
+      sessionMoves,
     }
   }),
 
@@ -297,6 +304,58 @@ export const patientRouter = createTRPCRouter({
       }
     })
   }),
+
+  // ── Sessie verplaatsen binnen de week ─────────────────────────────────────
+  // "Vandaag geen tijd → doe ik donderdag." Eén verplaatsing per programma-dag
+  // per week; fromDay === toDay zet 'm terug (rij verwijderen). Alleen eigen
+  // actieve programma's.
+
+  moveSession: protectedProcedure
+    .input(z.object({
+      programId: z.string(),
+      week: z.number().int().min(1).max(104),
+      fromDay: z.number().int().min(1).max(7),
+      toDay: z.number().int().min(1).max(7),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const program = await ctx.prisma.program.findFirst({
+        where: { id: input.programId, patientId: ctx.user.id, status: 'ACTIVE' },
+        select: { id: true },
+      })
+      if (!program) throw new TRPCError({ code: 'NOT_FOUND' })
+
+      if (input.fromDay === input.toDay) {
+        await ctx.prisma.sessionMove.deleteMany({
+          where: {
+            patientId: ctx.user.id,
+            programId: input.programId,
+            week: input.week,
+            fromDay: input.fromDay,
+          },
+        })
+        return { moved: false }
+      }
+
+      await ctx.prisma.sessionMove.upsert({
+        where: {
+          patientId_programId_week_fromDay: {
+            patientId: ctx.user.id,
+            programId: input.programId,
+            week: input.week,
+            fromDay: input.fromDay,
+          },
+        },
+        create: {
+          patientId: ctx.user.id,
+          programId: input.programId,
+          week: input.week,
+          fromDay: input.fromDay,
+          toDay: input.toDay,
+        },
+        update: { toDay: input.toDay },
+      })
+      return { moved: true }
+    }),
 
   // ── Today's exercises (for session page) ─────────────────────────────────
 
@@ -434,6 +493,7 @@ export const patientRouter = createTRPCRouter({
           name: program.name,
           currentWeek: currentProgramWeek,
           currentDay: 1,
+          movedToDay: null as number | null,
           weeks: program.weeks,
           isCatchUp: false,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -465,14 +525,44 @@ export const patientRouter = createTRPCRouter({
     const day = input?.day ?? computed.day
     const isCatchUp = input?.week !== undefined || input?.day !== undefined
 
-    const todayExercises = allExercises.filter(e => e.week === week && e.day === day)
+    // Sessie-verplaatsingen binnen deze week ("doe ik donderdag"). Alleen in de
+    // default vandaag-flow; expliciete catch-up laat de keuze bij de gebruiker.
+    let effectiveDay = day
+    let movedToDay: number | null = null
+    if (!isCatchUp) {
+      const moves = await ctx.prisma.sessionMove.findMany({
+        where: { patientId: targetPatientId, programId: program.id, week },
+      })
+      if (moves.length > 0) {
+        const d0 = new Date().getDay()
+        const todayWeekday = d0 === 0 ? 7 : d0
+        const movedIn = moves.find(m => m.toDay === todayWeekday)
+        const movedAway = moves.find(m => m.fromDay === day && m.toDay !== todayWeekday)
+        if (movedIn) {
+          // Vandaag is het doel van een verplaatsing → serveer die programma-dag.
+          effectiveDay = movedIn.fromDay
+        } else if (movedAway) {
+          // De sessie van vandaag is vooruitgeschoven → vandaag niets.
+          movedToDay = movedAway.toDay
+          effectiveDay = -1
+        }
+      }
+    }
+
+    const todayExercises =
+      effectiveDay === -1 ? [] : allExercises.filter(e => e.week === week && e.day === effectiveDay)
 
     return {
       program: {
         id: program.id,
         name: program.name,
         currentWeek: week,
-        currentDay: day,
+        // Bij een naar-vandaag-verplaatste sessie toont de header de dag die
+        // daadwerkelijk gedaan wordt.
+        currentDay: effectiveDay !== -1 ? effectiveDay : day,
+        // Weekdag (1=ma..7=zo) waarnaar de sessie van vandaag is verplaatst;
+        // null = niet verplaatst.
+        movedToDay,
         weeks: program.weeks,
         isCatchUp,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

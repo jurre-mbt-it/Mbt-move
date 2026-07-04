@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
-import { Dumbbell, Moon, Play, ChevronRight, CheckCircle2 } from 'lucide-react'
+import { Dumbbell, Moon, Play, ChevronRight, CheckCircle2, CalendarClock, X } from 'lucide-react'
 import { IconLeaf, IconClipboard } from '@/components/icons'
 import { P, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-ui'
 
@@ -40,6 +40,19 @@ export default function PatientSchedulePage() {
 
   const [selectedDay, setSelectedDay] = useState(todayDayNum)
 
+  // Sessie verplaatsen ("doe ik donderdag") — dag-kiezer + mutation.
+  const [movePickerOpen, setMovePickerOpen] = useState(false)
+  const utils = trpc.useUtils()
+  const moveSession = trpc.patient.moveSession.useMutation({
+    onSuccess: async () => {
+      setMovePickerOpen(false)
+      await Promise.all([
+        utils.patient.getActiveProgram.invalidate(),
+        utils.patient.getTodayExercises.invalidate(),
+      ])
+    },
+  })
+
 
   if (isLoading) {
     return (
@@ -59,8 +72,23 @@ export default function PatientSchedulePage() {
     )
   }
 
-  // Programma-dagen voor deze week (oorspronkelijke planning)
-  const programDaysInWeek = Object.keys(program.byWeekDay[program.currentWeek] ?? {}).map(Number).sort()
+  // Programma-dagen voor deze week (oorspronkelijke planning), met de door de
+  // patiënt verplaatste sessies toegepast: het blok verschijnt op de gekozen
+  // weekdag en onthoudt zijn oorspronkelijke programma-dag (voor de start-link
+  // en het "verplaatst van"-label).
+  const rawProgramDays = Object.keys(program.byWeekDay[program.currentWeek] ?? {}).map(Number).sort()
+  const sessionMoves = program.sessionMoves ?? []
+  const plannedByDay: Record<number, { exercises: ProgramExercise[]; programDay: number; movedFrom?: number }> = {}
+  for (const d of rawProgramDays) {
+    const move = sessionMoves.find(m => m.fromDay === d)
+    const target = move ? move.toDay : d
+    plannedByDay[target] = {
+      exercises: (program.byWeekDay[program.currentWeek]?.[d] as ProgramExercise[] | undefined) ?? [],
+      programDay: d,
+      movedFrom: move && move.toDay !== d ? d : undefined,
+    }
+  }
+  const programDaysInWeek = Object.keys(plannedByDay).map(Number).sort()
 
   // ── Schedule-shifting: catch-up sessies "verschuiven" het programma naar de
   // dag waarop ze daadwerkelijk afgerond zijn. We doen dit greedy:
@@ -77,6 +105,10 @@ export default function PatientSchedulePage() {
     exercises: ProgramExercise[]
     status: DayStatus
     originalDay?: number  // bij catch-up: de planned-day waar dit oorspronkelijk voor was
+    /** Programma-dag (week/day in het programma) achter dit blok — voor start-links. */
+    programDay?: number
+    /** Door de patiënt verplaatst vanaf deze weekdag. */
+    movedFrom?: number
   }
   const sessionsThisWeek = (sessionHistory ?? [])
     .filter(s => {
@@ -120,11 +152,12 @@ export default function PatientSchedulePage() {
     }
     if (plannedDay !== undefined) {
       usedPlannedDays.add(plannedDay)
-      const exs = (program.byWeekDay[program.currentWeek]?.[plannedDay] as ProgramExercise[] | undefined) ?? []
+      const planned = plannedByDay[plannedDay]
       dayInfo[targetDay] = {
-        exercises: exs,
+        exercises: planned?.exercises ?? [],
         status: 'done',
         originalDay: plannedDay !== targetDay ? plannedDay : undefined,
+        programDay: planned?.programDay,
       }
     } else {
       dayInfo[targetDay] = { exercises: [], status: 'done' }
@@ -133,10 +166,12 @@ export default function PatientSchedulePage() {
   for (const plannedDay of programDaysInWeek) {
     if (usedPlannedDays.has(plannedDay)) continue
     if (dayInfo[plannedDay]) continue
-    const exs = (program.byWeekDay[program.currentWeek]?.[plannedDay] as ProgramExercise[] | undefined) ?? []
+    const planned = plannedByDay[plannedDay]
     dayInfo[plannedDay] = {
-      exercises: exs,
+      exercises: planned?.exercises ?? [],
       status: plannedDay < todayDayNum ? 'missed' : 'planned',
+      programDay: planned?.programDay,
+      movedFrom: planned?.movedFrom,
     }
   }
   for (let d = 1; d <= 7; d++) {
@@ -229,7 +264,7 @@ export default function PatientSchedulePage() {
             return (
               <button
                 key={i}
-                onClick={() => setSelectedDay(dayNum)}
+                onClick={() => { setSelectedDay(dayNum); setMovePickerOpen(false) }}
                 className="athletic-tap flex flex-col items-center gap-1.5 min-w-[44px] rounded-2xl p-2.5 transition-all"
                 style={{
                   background: isSelected ? P.surfaceHi : P.surface,
@@ -311,6 +346,14 @@ export default function PatientSchedulePage() {
                   ✓ INGEHAALD VAN {(DAY_SHORT[selectedDayInfo.originalDay - 1] ?? '?').toUpperCase()}
                 </p>
               )}
+              {selectedDayInfo.movedFrom !== undefined && (
+                <p
+                  className="athletic-mono"
+                  style={{ color: P.ice, fontSize: 11, fontWeight: 700, letterSpacing: '0.10em', marginTop: 4 }}
+                >
+                  VERPLAATST VAN {(DAY_SHORT[selectedDayInfo.movedFrom - 1] ?? '?').toUpperCase()}
+                </p>
+              )}
             </div>
             {hasExercises && selectedDayInfo.status !== 'done' && isToday && (
               <DarkButton href={`/patient/session?programId=${program.id}`} size="sm" variant="primary">
@@ -319,14 +362,94 @@ export default function PatientSchedulePage() {
             )}
             {hasExercises && selectedDayInfo.status !== 'done' && !isToday && (
               <DarkButton
-                href={`/patient/session?programId=${program.id}&week=${program.currentWeek}&day=${selectedDay}`}
+                href={`/patient/session?programId=${program.id}&week=${program.currentWeek}&day=${selectedDayInfo.programDay ?? selectedDay}`}
                 size="sm"
                 variant="secondary"
               >
-                <Play className="w-3 h-3 fill-current mr-1.5" /> INHALEN
+                <Play className="w-3 h-3 fill-current mr-1.5" />
+                {selectedDay < todayDayNum ? 'INHALEN' : 'EERDER DOEN'}
               </DarkButton>
             )}
           </div>
+
+          {/* Verplaatsen: geplande (nog niet gedane) sessie naar een andere
+              weekdag schuiven — of terugzetten naar de oorspronkelijke dag. */}
+          {hasExercises && selectedDayInfo.status !== 'done' && selectedDayInfo.programDay !== undefined && (
+            movePickerOpen ? (
+              <div
+                className="rounded-2xl p-3"
+                style={{ background: P.surface, border: `1px dashed ${P.lineStrong}` }}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <MetaLabel>VERPLAATS NAAR</MetaLabel>
+                  <button
+                    type="button"
+                    onClick={() => setMovePickerOpen(false)}
+                    aria-label="Sluiten"
+                    className="athletic-tap"
+                    style={{ color: P.inkDim, padding: 2 }}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="flex gap-1.5 flex-wrap">
+                  {Array.from({ length: 7 }, (_, i) => i + 1)
+                    .filter(d =>
+                      d !== selectedDay &&
+                      dayInfo[d].status !== 'done' &&
+                      (dayInfo[d].exercises.length === 0 || d === selectedDayInfo.movedFrom))
+                    .map(d => (
+                      <button
+                        key={d}
+                        type="button"
+                        disabled={moveSession.isPending}
+                        onClick={() =>
+                          moveSession.mutate({
+                            programId: program.id,
+                            week: program.currentWeek,
+                            fromDay: selectedDayInfo.programDay!,
+                            toDay: d,
+                          })
+                        }
+                        className="athletic-tap athletic-mono rounded-full"
+                        style={{
+                          padding: '7px 14px',
+                          border: `1px solid ${d === selectedDayInfo.movedFrom ? P.ice : P.lineStrong}`,
+                          background: P.surfaceHi,
+                          color: d === selectedDayInfo.movedFrom ? P.ice : P.ink,
+                          fontSize: 11,
+                          fontWeight: 800,
+                          letterSpacing: '0.08em',
+                          opacity: moveSession.isPending ? 0.6 : 1,
+                        }}
+                      >
+                        {DAY_SHORT[d - 1].toUpperCase()}
+                        {d === selectedDayInfo.movedFrom ? ' · TERUG' : ''}
+                        {d === todayDayNum ? ' · VANDAAG' : ''}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setMovePickerOpen(true)}
+                className="athletic-tap athletic-mono w-full flex items-center justify-center gap-1.5 rounded-2xl"
+                style={{
+                  padding: '10px 14px',
+                  border: `1px dashed ${P.lineStrong}`,
+                  color: P.inkMuted,
+                  background: 'transparent',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  letterSpacing: '0.12em',
+                }}
+              >
+                <CalendarClock className="w-3.5 h-3.5" />
+                {selectedDayInfo.movedFrom !== undefined ? 'VERPLAATS OF ZET TERUG' : 'VERPLAATS NAAR ANDERE DAG'}
+              </button>
+            )
+          )}
 
           {hasExercises ? (
             <div className="space-y-2">
@@ -362,7 +485,7 @@ export default function PatientSchedulePage() {
               ))}
 
               <Link
-                href={isToday ? `/patient/session?programId=${program.id}` : `/patient/session?programId=${program.id}&week=${program.currentWeek}&day=${selectedDay}`}
+                href={isToday ? `/patient/session?programId=${program.id}` : `/patient/session?programId=${program.id}&week=${program.currentWeek}&day=${selectedDayInfo.programDay ?? selectedDay}`}
                 className="athletic-tap flex items-center justify-center gap-2 py-4 rounded-2xl mt-2"
                 style={{ background: isToday ? P.brand : P.gold, color: P.bg }}
               >
@@ -371,7 +494,7 @@ export default function PatientSchedulePage() {
                   className="athletic-mono"
                   style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.1em' }}
                 >
-                  {isToday ? 'START SESSIE' : 'INHALEN'} — {exercisesForSelectedDay.length} OEFENINGEN
+                  {isToday ? 'START SESSIE' : selectedDay < todayDayNum ? 'INHALEN' : 'EERDER DOEN'} — {exercisesForSelectedDay.length} OEFENINGEN
                 </span>
               </Link>
             </div>

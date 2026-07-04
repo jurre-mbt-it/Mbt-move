@@ -320,6 +320,7 @@ model User {
   therapistAppointments Appointment[]        @relation("TherapistAppointments")
   sessionLogs           SessionLog[]         @relation("SessionLogPatient")
   therapistSessionLogs  SessionLog[]         @relation("SessionLogTherapist")
+  sessionMoves          SessionMove[]        @relation("SessionMovePatient")
   cardioLogs            CardioLog[]
   notifications         Notification[]
   messages              Message[]
@@ -687,6 +688,7 @@ model Program {
   cardioLogs           CardioLog[]
   // Consumenten-shop: dit template kan als betaald product worden verkocht.
   shopProducts         ShopProduct[]
+  sessionMoves         SessionMove[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -694,6 +696,24 @@ model Program {
   @@index([practiceId])
   @@index([creatorId, practiceId])
   @@map("programs")
+}
+
+// Sessie verplaatsen binnen de week: patiënt/atleet schuift een geplande
+// programma-dag naar een andere weekdag. Eén rij per (patiënt, programma,
+// week, fromDay); verplaatsen overschrijft, terugzetten verwijdert de rij.
+model SessionMove {
+  id        String   @id @default(cuid())
+  patient   User     @relation("SessionMovePatient", fields: [patientId], references: [id], onDelete: Cascade)
+  patientId String
+  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  programId String
+  week      Int
+  fromDay   Int // programma-dag (1-7) die verschoven wordt
+  toDay     Int // weekdag (1=ma .. 7=zo) waarop de sessie gepland staat
+  createdAt DateTime @default(now())
+
+  @@unique([patientId, programId, week, fromDay])
+  @@map("session_moves")
 }
 
 model CardioLog {
