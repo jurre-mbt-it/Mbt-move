@@ -120,6 +120,14 @@ export default function EditProgramPage({ params }: Props) {
     repsMax: (pe as any).repsMax ?? null,
     repUnit: (pe.repUnit as 'reps' | 'sec' | 'min') ?? 'reps',
     notes: pe.notes ?? null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    intensityType: ((pe as any).intensityType as BuilderExercise['intensityType']) ?? 'NONE',
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    intensityMin: (pe as any).intensityMin ?? null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    intensityMax: (pe as any).intensityMax ?? null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    intensityText: (pe as any).intensityText ?? null,
     rest: pe.restTime,
     extraParams: [],
     supersetGroup: pe.supersetGroup ?? null,

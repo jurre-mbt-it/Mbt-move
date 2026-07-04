@@ -116,6 +116,10 @@ function mapProgramExercise(pe: {
   supersetGroup: string | null
   supersetOrder: number
   notes: string | null
+  intensityType?: string
+  intensityMin?: number | null
+  intensityMax?: number | null
+  intensityText?: string | null
   exercise: {
     name: string
     category: string
@@ -153,6 +157,12 @@ function mapProgramExercise(pe: {
     supersetGroup: pe.supersetGroup ?? null,
     supersetOrder: pe.supersetOrder,
     notes: pe.notes ?? null,
+    // Intensiteits-voorschrift — de session-runner toont dit als doel-badge en
+    // rekent het (waar mogelijk) om naar kg. Zie @/lib/prescription.
+    intensityType: pe.intensityType ?? 'NONE',
+    intensityMin: pe.intensityMin ?? null,
+    intensityMax: pe.intensityMax ?? null,
+    intensityText: pe.intensityText ?? null,
     easierVariantId: pe.exercise.easierVariantId ?? null,
     harderVariantId: pe.exercise.harderVariantId ?? null,
     // Coaching-cues uit de oefening-library (instructions + tips) en de namen

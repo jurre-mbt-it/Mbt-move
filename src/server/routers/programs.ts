@@ -33,6 +33,14 @@ const ProgramExerciseInput = z.object({
   supersetGroup: z.string().nullable().optional(),
   supersetOrder: z.number().int().default(0),
   notes: z.string().nullable().optional(),
+  // Gestructureerd intensiteits-voorschrift (zie IntensityType in schema.prisma).
+  // min/max dragen afhankelijk van type een RPE, percentage of kg-offset.
+  intensityType: z
+    .enum(['NONE', 'RPE', 'PERCENT_1RM', 'RELATIVE_DAILY_MAX', 'TECHNIQUE', 'TEXT'])
+    .default('NONE'),
+  intensityMin: z.number().nullable().optional(),
+  intensityMax: z.number().nullable().optional(),
+  intensityText: z.string().nullable().optional(),
 })
 
 // Educatie-blok (de "Leer"-items) gekoppeld aan een dag/week van het programma.
@@ -255,6 +263,10 @@ export const programsRouter = createTRPCRouter({
             supersetGroup: ex.supersetGroup ?? null,
             supersetOrder: ex.supersetOrder ?? 0,
             notes: ex.notes ?? null,
+            intensityType: ex.intensityType,
+            intensityMin: ex.intensityMin ?? null,
+            intensityMax: ex.intensityMax ?? null,
+            intensityText: ex.intensityText ?? null,
           })),
         }
       }
@@ -344,6 +356,10 @@ export const programsRouter = createTRPCRouter({
               supersetGroup: ex.supersetGroup,
               supersetOrder: ex.supersetOrder,
               notes: ex.notes,
+              intensityType: ex.intensityType,
+              intensityMin: ex.intensityMin,
+              intensityMax: ex.intensityMax,
+              intensityText: ex.intensityText,
             })),
           },
           resources: {

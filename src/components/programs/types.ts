@@ -1,3 +1,5 @@
+import type { IntensityType } from '@/lib/prescription'
+
 export type RepUnit = 'reps' | 'sec' | 'min' | 'm'
 export type ParamType = 'number' | 'text' | 'select' | 'slider'
 
@@ -34,6 +36,13 @@ export interface BuilderExercise {
   repsMax?: number | null
   repUnit: RepUnit
   rest: number          // seconds
+
+  // Intensiteits-voorschrift — RPE / %1RM / onder daily max / techniek / tekst.
+  // Zie @/lib/prescription en enum IntensityType in schema.prisma.
+  intensityType: IntensityType
+  intensityMin?: number | null
+  intensityMax?: number | null
+  intensityText?: string | null
 
   // Dynamic
   extraParams: ExtraParam[]
