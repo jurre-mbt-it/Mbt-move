@@ -2132,6 +2132,8 @@ model VitalsEntry {
   hrvType            HrvType? // SDNN (Apple) vs RMSSD — nooit cross-device vergelijken
   respiratoryRate    Float? // ademhalingen/min (nachtelijk)
   wristTempDeviation Float? // °C afwijking van persoonlijke baseline (Series 8+)
+  steps              Int? // dagelijks aantal stappen (HealthKit stepCount, dagsom)
+  activeEnergyKcal   Int? // dagelijkse actieve verbranding in kcal (HealthKit activeEnergyBurned, dagsom)
   source             WorkoutSource @default(APPLE_WATCH)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
