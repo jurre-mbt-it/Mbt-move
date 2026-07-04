@@ -5,7 +5,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { trpc } from '@/lib/trpc/client'
 import {
-  Search, X, Plus, Play, Heart, RotateCcw,
+  Search, X, Plus, Play, Heart, RotateCcw, TrendingUp,
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -35,6 +35,7 @@ import {
 import { RestSheet } from '@/components/session/RestSheet'
 import { SetRows } from '@/components/session/SetRows'
 import { ExtraParamsEditor, RepUnitPicker } from '@/components/session/ExtraParams'
+import { ExerciseProgressSheet } from '@/components/session/ExerciseProgressSheet'
 import {
   IconStrength,
   IconLightning,
@@ -216,6 +217,8 @@ function AthleteSessionPageInner() {
   const [showAddExercise, setShowAddExercise] = useState(false)
   const [addExerciseQuery, setAddExerciseQuery] = useState('')
   const [videoModal, setVideoModal] = useState<{ url: string; name: string } | null>(null)
+  // Voortgang-grafiekje per oefening (bottom-sheet).
+  const [progressFor, setProgressFor] = useState<{ id: string; name: string } | null>(null)
   const [sessionRpe, setSessionRpe] = useState<number | null>(null)
   const [sessionPain, setSessionPain] = useState<number | null>(null)
   // Quick-workout afrond-popup: feel-score / notities / aanpasbare duur / pijn.
@@ -738,6 +741,11 @@ function AthleteSessionPageInner() {
                   params={paramsFor(e)}
                   onParamsChange={(next) => updateParams(e.uid, next)}
                   onUnitChange={(u) => setUnit(e.uid, u)}
+                  onProgress={
+                    lastLogs[e.exerciseId]
+                      ? () => setProgressFor({ id: e.exerciseId, name: e.name })
+                      : undefined
+                  }
                   onUpdateSet={(idx, patch) => updateSet(e.uid, seedSets(e), idx, patch)}
                   onToggleSet={(idx) => toggleSetDone(e, seedSets(e), idx)}
                   onAddSet={() => addSet(e.uid, seedSets(e))}
@@ -950,6 +958,14 @@ function AthleteSessionPageInner() {
             nextLabel={restLabel}
             onExtend={() => extendRest(15)}
             onSkip={skipRest}
+          />
+        )}
+
+        {progressFor && (
+          <ExerciseProgressSheet
+            exerciseId={progressFor.id}
+            exerciseName={progressFor.name}
+            onClose={() => setProgressFor(null)}
           />
         )}
       </div>
@@ -1311,13 +1327,27 @@ function AthleteSessionPageInner() {
               <Tile style={{ padding: 16 }}>
                 <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
                   <Kicker>SETS</Kicker>
-                  {/* Eenheid alleen aanpasbaar op zelf toegevoegde oefeningen */}
-                  {extraExercises.some(x => x.uid === current.uid) && (
-                    <RepUnitPicker
-                      value={current.repUnit}
-                      onChange={(u) => setUnit(current.uid, u)}
-                    />
-                  )}
+                  <div className="flex items-center gap-2">
+                    {/* Voortgang-grafiek — alleen als er historie is */}
+                    {hasPrev && (
+                      <button
+                        type="button"
+                        onClick={() => setProgressFor({ id: current.exerciseId, name: current.name })}
+                        aria-label={`Voortgang ${current.name}`}
+                        className="athletic-tap rounded-full flex items-center justify-center"
+                        style={{ width: 28, height: 28, border: `1px solid ${P.lineStrong}`, color: P.inkMuted }}
+                      >
+                        <TrendingUp className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    {/* Eenheid alleen aanpasbaar op zelf toegevoegde oefeningen */}
+                    {extraExercises.some(x => x.uid === current.uid) && (
+                      <RepUnitPicker
+                        value={current.repUnit}
+                        onChange={(u) => setUnit(current.uid, u)}
+                      />
+                    )}
+                  </div>
                 </div>
                 <SetRows
                   entries={entries}
@@ -1395,6 +1425,14 @@ function AthleteSessionPageInner() {
           nextLabel={restLabel}
           onExtend={() => extendRest(15)}
           onSkip={skipRest}
+        />
+      )}
+
+      {progressFor && (
+        <ExerciseProgressSheet
+          exerciseId={progressFor.id}
+          exerciseName={progressFor.name}
+          onClose={() => setProgressFor(null)}
         />
       )}
 
@@ -1775,6 +1813,7 @@ function QuickEditRow({
   params,
   onParamsChange,
   onUnitChange,
+  onProgress,
   onUpdateSet,
   onToggleSet,
   onAddSet,
@@ -1789,6 +1828,7 @@ function QuickEditRow({
   params: SessionParam[]
   onParamsChange: (next: SessionParam[]) => void
   onUnitChange: (unit: string) => void
+  onProgress?: () => void
   onUpdateSet: (idx: number, patch: Partial<SetEntry>) => void
   onToggleSet: (idx: number) => void
   onAddSet: () => void
@@ -1825,6 +1865,17 @@ function QuickEditRow({
             {entries.filter(s => s.done).length}/{entries.length} SETS
           </div>
         </div>
+        {onProgress && (
+          <button
+            type="button"
+            onClick={onProgress}
+            aria-label={`Voortgang ${ex.name}`}
+            className="athletic-tap inline-flex items-center justify-center rounded-full shrink-0"
+            style={{ width: 28, height: 28, border: `1px solid ${P.lineStrong}`, color: P.inkMuted }}
+          >
+            <TrendingUp className="w-3.5 h-3.5" />
+          </button>
+        )}
         {ex.videoUrl && (
           <button
             type="button"

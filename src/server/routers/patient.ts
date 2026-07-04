@@ -681,6 +681,47 @@ export const patientRouter = createTRPCRouter({
       return sessionLog
     }),
 
+  // ── Progressie per oefening (eigen historie) ──────────────────────────────
+  // Voor het voortgang-grafiekje in de sessie-runner: zwaarste set + geschatte
+  // 1RM per gelogde sessie, oud → nieuw. Alleen eigen data.
+
+  exerciseProgress: protectedProcedure
+    .input(z.object({
+      exerciseId: z.string(),
+      limit: z.number().int().min(3).max(30).default(15),
+    }))
+    .query(async ({ ctx, input }) => {
+      const logs = await ctx.prisma.exerciseLog.findMany({
+        where: {
+          exerciseId: input.exerciseId,
+          session: { patientId: ctx.user.id, status: 'COMPLETED' },
+        },
+        orderBy: { session: { completedAt: { sort: 'desc', nulls: 'last' } } },
+        take: input.limit,
+        select: {
+          weight: true,
+          weightsPerSet: true,
+          repsCompleted: true,
+          estimatedOneRepMax: true,
+          session: { select: { completedAt: true, scheduledAt: true } },
+        },
+      })
+      return logs.reverse().map(l => {
+        const perSet = Array.isArray(l.weightsPerSet)
+          ? (l.weightsPerSet as Array<number | null>).filter((w): w is number => w != null && w > 0)
+          : []
+        const best = Math.max(...perSet, l.weight ?? 0)
+        return {
+          date: (l.session.completedAt ?? l.session.scheduledAt).toISOString(),
+          bestKg: best > 0 ? Math.round(best * 10) / 10 : null,
+          est1Rm: l.estimatedOneRepMax != null && l.estimatedOneRepMax > 0
+            ? Math.round(l.estimatedOneRepMax * 10) / 10
+            : null,
+          reps: l.repsCompleted,
+        }
+      })
+    }),
+
   // ── Laatste log per oefening (vrije selectie) ─────────────────────────────
   // Voor de quick workout: ghost-waardes/"vorige keer"-hints bij oefeningen
   // die niet in het programma van vandaag zitten. Alleen eigen data

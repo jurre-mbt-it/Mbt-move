@@ -27,6 +27,7 @@ import {
 import { RestSheet } from '@/components/session/RestSheet'
 import { SetRows } from '@/components/session/SetRows'
 import { ExtraParamsEditor } from '@/components/session/ExtraParams'
+import { ExerciseProgressSheet } from '@/components/session/ExerciseProgressSheet'
 import { MOOD_SCALE, IconCelebration, IconBeach, IconStop, IconWarning } from '@/components/icons'
 import { useDraftBackup, loadDraft, clearStoredDraft } from '@/hooks/useAutosave'
 import {
@@ -842,6 +843,8 @@ function SessionPageInner() {
   const [elapsed, setElapsed] = useState(0)
   const [phase, setPhase] = useState<'session' | 'summary'>('session')
   const [showCuesFor, setShowCuesFor] = useState<string | null>(null)
+  // Voortgang-grafiekje per oefening (bottom-sheet).
+  const [progressFor, setProgressFor] = useState<{ id: string; name: string } | null>(null)
   // 1RM tracking: estimated 1RM per exercise (current session best) and PR tracker
   const [sessionOneRm, setSessionOneRm] = useState<Record<string, number>>({})  // uid -> best estimated 1RM this session
   const [sessionPRs, setSessionPRs] = useState<Record<string, number>>({})      // uid -> new PR value (if PR set)
@@ -1599,6 +1602,18 @@ function SessionPageInner() {
                   {doneSets}/{entries.length} KLAAR
                 </span>
               )}
+              {/* Voortgang-grafiek — alleen als er historie is */}
+              {prevSummaryFor(last) && (
+                <button
+                  type="button"
+                  onClick={() => setProgressFor({ id: e.exerciseId, name: e.name })}
+                  className="athletic-tap athletic-mono rounded-full inline-flex items-center gap-1"
+                  style={{ padding: '4px 10px', border: `1px solid ${P.lineStrong}`, background: 'transparent', color: P.inkMuted, fontSize: 9, letterSpacing: '0.14em', fontWeight: 700 }}
+                >
+                  <TrendingUp className="w-2.5 h-2.5" />
+                  VOORTGANG
+                </button>
+              )}
             </div>
 
             {/* Vorige sessie als anker — één tik neemt de waarden over */}
@@ -2039,6 +2054,15 @@ function SessionPageInner() {
           })()}
           onExtend={extendRest}
           onSkip={skipRest}
+        />
+      )}
+
+      {/* Voortgang-grafiek per oefening */}
+      {progressFor && (
+        <ExerciseProgressSheet
+          exerciseId={progressFor.id}
+          exerciseName={progressFor.name}
+          onClose={() => setProgressFor(null)}
         />
       )}
 
