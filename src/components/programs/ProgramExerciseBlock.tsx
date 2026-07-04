@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
 import type { BuilderExercise, ExtraParam, RepUnit } from './types'
+import { INTENSITY_TYPES, INTENSITY_TYPE_LABELS, type IntensityType } from '@/lib/prescription'
 import { STANDARD_PARAMS, REP_UNITS } from '@/lib/program-constants'
 import { cn } from '@/lib/utils'
 import { useAutosave } from '@/hooks/useAutosave'
@@ -114,6 +115,80 @@ function FixedChip({
             </button>
           )}
         </span>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Intensiteits-voorschrift-chip: kies type (RPE / %1RM / onder daily max /
+ * techniek / vrije tekst) en de bijbehorende waarde(n). Vervangt het in-de-
+ * notitie-frommelen van "RPE 8" of "-10kg onder daily max" door een
+ * gestructureerd doel dat de session-runner toont en omrekent naar kg.
+ */
+function PrescriptionChip({
+  exercise, onUpdate,
+}: {
+  exercise: BuilderExercise
+  onUpdate: (uid: string, patch: Partial<BuilderExercise>) => void
+}) {
+  const t: IntensityType = exercise.intensityType ?? 'NONE'
+  const set = (patch: Partial<BuilderExercise>) => onUpdate(exercise.uid, patch)
+  const numInput = (
+    val: number | null | undefined,
+    on: (n: number | null) => void,
+    ph: string,
+    w = 'w-10',
+  ) => (
+    <input
+      type="number"
+      value={val ?? ''}
+      placeholder={ph}
+      onChange={e => on(e.target.value === '' ? null : Number(e.target.value))}
+      className={cn(
+        w,
+        'h-5 text-center text-xs font-semibold bg-transparent rounded border-0 focus:outline-none focus:ring-1 focus:ring-[#e87a55]',
+      )}
+    />
+  )
+  return (
+    <div className="inline-flex items-center gap-1 bg-[#1C2425] border border-[rgba(255,255,255,0.06)] rounded-md pl-2 pr-1.5 py-0.5 text-xs h-7">
+      <span className="text-[#7B8889] font-medium">Doel</span>
+      <select
+        value={t}
+        onChange={e =>
+          // Reset de waarden bij type-wissel zodat er geen betekenisloos
+          // getal van het vorige type blijft hangen.
+          set({ intensityType: e.target.value as IntensityType, intensityMin: null, intensityMax: null, intensityText: null })
+        }
+        className="text-xs bg-transparent border-0 rounded px-0.5 h-5 focus:outline-none focus:ring-1 focus:ring-[#e87a55] text-foreground"
+      >
+        {INTENSITY_TYPES.map(it => (
+          <option key={it} value={it} className="bg-[#1C2425]">{INTENSITY_TYPE_LABELS[it]}</option>
+        ))}
+      </select>
+      {(t === 'RPE' || t === 'PERCENT_1RM') && (
+        <span className="flex items-center gap-0.5 text-foreground">
+          {numInput(exercise.intensityMin, n => set({ intensityMin: n }), t === 'RPE' ? '7' : '70')}
+          <span className="text-[#7B8889]">–</span>
+          {numInput(exercise.intensityMax, n => set({ intensityMax: n }), t === 'RPE' ? '8' : '75')}
+          {t === 'PERCENT_1RM' && <span className="text-[#7B8889]">%</span>}
+        </span>
+      )}
+      {t === 'RELATIVE_DAILY_MAX' && (
+        <span className="flex items-center gap-0.5 text-foreground">
+          {numInput(exercise.intensityMin, n => set({ intensityMin: n }), '-10', 'w-12')}
+          <span className="text-[#7B8889]">kg</span>
+        </span>
+      )}
+      {(t === 'TEXT' || t === 'TECHNIQUE') && (
+        <input
+          type="text"
+          value={exercise.intensityText ?? ''}
+          placeholder={t === 'TECHNIQUE' ? 'techniek…' : 'vrij voorschrift'}
+          onChange={e => set({ intensityText: e.target.value || null })}
+          className="w-28 h-5 text-xs bg-transparent border-0 rounded px-1 focus:outline-none focus:ring-1 focus:ring-[#e87a55] text-foreground"
+        />
       )}
     </div>
   )
@@ -479,6 +554,9 @@ export function ProgramExerciseBlock({
               <InlineNumber value={exercise.rest} onChange={v => onUpdate(exercise.uid, { rest: v })} min={0} />
               <span className="text-[#7B8889]">s</span>
             </FixedChip>
+
+            {/* Intensiteits-voorschrift (RPE / %1RM / onder daily max / …) */}
+            <PrescriptionChip exercise={exercise} onUpdate={onUpdate} />
 
             {/* Extra params — elk in een chip met filter (range) en trash. */}
             {exercise.extraParams.map(param => {

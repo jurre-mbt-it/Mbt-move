@@ -890,6 +890,27 @@ model WeekScheduleDayItemExercise {
   @@map("week_schedule_day_item_exercises")
 }
 
+// Gestructureerd intensiteits-voorschrift op een ProgramExercise. Vervangt
+// het loggen-van-losse-kg-en-1RM-schatten-achteraf door een expliciet doel
+// dat de session-runner toont en (waar mogelijk) omrekent naar kg. Zo wordt
+// een RPE-/percentage-gestuurd schema deelbaar en door de app aangestuurd,
+// i.p.v. als vrije tekst in `notes`.
+//   NONE               = geen expliciet voorschrift (gebruik notes)
+//   RPE                = doel-RPE, intensityMin..intensityMax (bv. 7..8)
+//   PERCENT_1RM        = percentage van (geschatte) 1RM, intensityMin..intensityMax (bv. 70..75)
+//   RELATIVE_DAILY_MAX = kg-offset t.o.v. de zwaarste set van dezelfde oefening
+//                        eerder in deze sessie (de "daily max"), intensityMin = offset (bv. -10)
+//   TECHNIQUE          = techniek-only, geen belasting (bv. lege stang opbouw)
+//   TEXT               = vrij voorschrift in intensityText (bv. "Eigen keuze — anti-rotatie")
+enum IntensityType {
+  NONE
+  RPE
+  PERCENT_1RM
+  RELATIVE_DAILY_MAX
+  TECHNIQUE
+  TEXT
+}
+
 model ProgramExercise {
   id            String   @id @default(cuid())
   program       Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
@@ -911,6 +932,14 @@ model ProgramExercise {
   supersetGroup String?
   supersetOrder Int      @default(0)
   notes         String?
+
+  // Intensiteits-voorschrift — zie enum IntensityType hierboven. min/max dragen
+  // afhankelijk van type een RPE-waarde, percentage of kg-offset; intensityText
+  // is de vrije voorschrift-tekst bij TEXT/TECHNIQUE.
+  intensityType IntensityType @default(NONE)
+  intensityMin  Float?
+  intensityMax  Float?
+  intensityText String?
 
   @@map("program_exercises")
 }

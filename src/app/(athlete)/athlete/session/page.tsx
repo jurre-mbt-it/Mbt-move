@@ -32,6 +32,13 @@ import {
   seedParams,
   filledParams,
 } from '@/lib/session-sets'
+import {
+  toPrescription,
+  formatPrescription,
+  computeTargetKg,
+  formatTargetKg,
+} from '@/lib/prescription'
+import { toast } from 'sonner'
 import { RestSheet } from '@/components/session/RestSheet'
 import { SetRows } from '@/components/session/SetRows'
 import { ExtraParamsEditor, RepUnitPicker } from '@/components/session/ExtraParams'
@@ -64,6 +71,10 @@ type UsedExercise = DbExercise & { count: number }
 
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
 
+// Categorie-opties voor het snel aanmaken van een oefening vanuit de sessie —
+// zelfde enum-waarden als ExerciseInput.category (server).
+const CREATE_CATEGORIES = ['STRENGTH', 'CARDIO', 'MOBILITY', 'PLYOMETRICS', 'STABILITY'] as const
+
 const CATEGORY_LABELS_NL: Record<string, string> = {
   STRENGTH: 'KRACHT',
   MOBILITY: 'MOBILITEIT',
@@ -89,6 +100,12 @@ type LiveExercise = {
   videoUrl: string | null
   /** Standaard extra parameters uit de oefening-library (ExtraParam[] JSON). */
   defaultExtraParams?: unknown
+  /** Per-instance notitie + intensiteits-voorschrift uit het programma. */
+  notes?: string | null
+  intensityType?: string
+  intensityMin?: number | null
+  intensityMax?: number | null
+  intensityText?: string | null
 }
 
 function dbExerciseToLive(ex: DbExercise): LiveExercise {
@@ -104,6 +121,8 @@ function dbExerciseToLive(ex: DbExercise): LiveExercise {
     restTime: 60,
     videoUrl: (ex.videoUrl as string | null | undefined) ?? null,
     defaultExtraParams: ex.defaultExtraParams,
+    notes: null,
+    intensityType: 'NONE',
   }
 }
 
@@ -169,6 +188,8 @@ function AthleteSessionPageInner() {
   const router = useRouter()
   const utils = trpc.useUtils()
   const { data: sessionData, isLoading } = trpc.patient.getTodayExercises.useQuery()
+  // Personal-best 1RM per oefening — voor het omrekenen van %1RM-voorschriften.
+  const { data: prevOneRm = {} } = trpc.patient.getPersonalBests.useQuery(undefined, { staleTime: 60_000 })
   // Cast naar lokaal shallow type; tRPC inference is te diep voor TS (TS2589).
   const dbExercisesQuery = trpc.exercises.list.useQuery(undefined, { staleTime: 60_000 })
   const dbExercises: DbExercise[] = (dbExercisesQuery.data as DbExercise[] | undefined) ?? []
@@ -210,6 +231,11 @@ function AthleteSessionPageInner() {
     restTime: e.restTime,
     videoUrl: e.videoUrl ?? null,
     defaultExtraParams: e.defaultExtraParams,
+    notes: e.notes ?? null,
+    intensityType: e.intensityType ?? 'NONE',
+    intensityMin: e.intensityMin ?? null,
+    intensityMax: e.intensityMax ?? null,
+    intensityText: e.intensityText ?? null,
   }))
 
   // Extra exercises added during session
@@ -396,6 +422,24 @@ function AthleteSessionPageInner() {
     setExtraExercises(prev => [...prev, dbExerciseToLive(ex)])
     setShowAddExercise(false)
     setAddExerciseQuery('')
+  }
+
+  // Snel een nieuwe oefening aanmaken vanuit de sessie — als wat je deed niet
+  // in de bibliotheek staat. Minimale oefening (naam + categorie KRACHT);
+  // details verfijn je later in de bibliotheek. Wordt meteen toegevoegd aan
+  // de lopende sessie. creatorProcedure staat dit toe voor athlete/therapist/admin.
+  const createExercise = trpc.exercises.create.useMutation()
+  async function createAndAddExercise(name: string, category: string) {
+    const trimmed = name.trim()
+    if (!trimmed || createExercise.isPending) return
+    try {
+      const created = await createExercise.mutateAsync({ name: trimmed, category: category as never, bodyRegion: [] })
+      addExercise(created as unknown as DbExercise)
+      utils.exercises.list.invalidate()
+      toast.success(`"${trimmed}" aangemaakt en toegevoegd`)
+    } catch {
+      toast.error('Aanmaken mislukt — probeer het opnieuw')
+    }
   }
 
   // Alleen zelf toegevoegde oefeningen zijn verwijderbaar (vóór de start);
@@ -937,6 +981,8 @@ function AthleteSessionPageInner() {
             mostUsed={mostUsed}
             added={extraExercises}
             onAdd={addExercise}
+            onCreate={createAndAddExercise}
+            creating={createExercise.isPending}
             onToggleFavorite={toggleFav}
             onClose={() => { setShowAddExercise(false); setAddExerciseQuery('') }}
           />
@@ -1258,8 +1304,23 @@ function AthleteSessionPageInner() {
           >
             {current?.name ?? '—'}
           </div>
-          {/* Chips: doel · rust · video — mockup-stijl */}
-          {current && (
+          {/* Chips: doel · voorschrift · rust · video — mockup-stijl */}
+          {current && (() => {
+            // Voorschrift → doel-badge + (waar mogelijk) concreet kg-doel. %1RM
+            // tegen personal-best 1RM; "onder daily max" tegen de zwaarste set
+            // die vandaag al voor dezelfde oefening is ingevoerd.
+            const presc = toPrescription(current)
+            const dailyMaxKg =
+              presc.intensityType === 'RELATIVE_DAILY_MAX'
+                ? exercises
+                    .filter(x => x.exerciseId === current.exerciseId)
+                    .flatMap(x => (setLog[x.uid] ?? []).map(s => parseKg(s.kg) ?? 0))
+                    .reduce((m, kg) => Math.max(m, kg), 0)
+                : null
+            const targetKg = computeTargetKg(presc, { oneRepMax: prevOneRm[current.exerciseId] ?? null, dailyMaxKg })
+            const prescLabel = formatPrescription(presc)
+            const targetKgLabel = formatTargetKg(targetKg)
+            return (
             <div className="flex items-center gap-1.5 flex-wrap" style={{ marginTop: 12 }}>
               <span
                 className="athletic-mono rounded-full"
@@ -1267,6 +1328,14 @@ function AthleteSessionPageInner() {
               >
                 {(setLog[current.uid] ?? seedSets(current)).length} SETS · DOEL {current.reps} {current.repUnit.toUpperCase()}
               </span>
+              {prescLabel && (
+                <span
+                  className="athletic-mono rounded-full"
+                  style={{ padding: '4px 10px', border: `1px solid ${P.brand}55`, color: P.brand, fontSize: 9, letterSpacing: '0.14em', fontWeight: 800 }}
+                >
+                  {prescLabel.toUpperCase()}{targetKgLabel ? ` · ${targetKgLabel.toUpperCase()}` : ''}
+                </span>
+              )}
               <span
                 className="athletic-mono rounded-full"
                 style={{ padding: '4px 10px', border: `1px solid ${P.lineStrong}`, color: P.inkMuted, fontSize: 9, letterSpacing: '0.14em', fontWeight: 700 }}
@@ -1282,6 +1351,18 @@ function AthleteSessionPageInner() {
                   VIDEO
                 </span>
               )}
+            </div>
+            )
+          })()}
+          {/* Programma-notitie bij deze oefening (coach-cue / uitvoering). */}
+          {current?.notes?.trim() && (
+            <div
+              className="rounded-2xl px-4 py-3"
+              style={{ marginTop: 12, background: P.surfaceHi, border: `1px solid ${P.line}` }}
+            >
+              <p style={{ color: P.ink, fontSize: 13, lineHeight: '20px', whiteSpace: 'pre-line' }}>
+                {current.notes}
+              </p>
             </div>
           )}
         </Tile>
@@ -1446,6 +1527,8 @@ function AthleteSessionPageInner() {
           mostUsed={mostUsed}
           added={extraExercises}
           onAdd={addExercise}
+          onCreate={createAndAddExercise}
+          creating={createExercise.isPending}
           onToggleFavorite={toggleFav}
           onClose={() => { setShowAddExercise(false); setAddExerciseQuery('') }}
         />
@@ -1632,6 +1715,8 @@ function AddExerciseSheet({
   mostUsed,
   added,
   onAdd,
+  onCreate,
+  creating,
   onToggleFavorite,
   onClose,
 }: {
@@ -1642,10 +1727,67 @@ function AddExerciseSheet({
   mostUsed: UsedExercise[]
   added: LiveExercise[]
   onAdd: (ex: DbExercise) => void
+  /** Maak een nieuwe oefening (naam + categorie) aan en voeg 'm meteen toe. */
+  onCreate?: (name: string, category: string) => void
+  creating?: boolean
   onToggleFavorite: (id: string) => void
   onClose: () => void
 }) {
   const searching = query.trim().length > 0
+  // Gekozen categorie voor een snel-aangemaakte oefening (default KRACHT).
+  const [createCat, setCreateCat] = useState<string>('STRENGTH')
+  // "Aanmaken"-blok: categorie-keuze + knop. Toont zodra je iets typt — óók als
+  // er (deels) matches zijn, want de exacte oefening kan ontbreken.
+  const createBlock = onCreate && searching ? (
+    <div className="space-y-2">
+      <MetaLabel>NIEUWE OEFENING · CATEGORIE</MetaLabel>
+      <div className="flex flex-wrap gap-1.5">
+        {CREATE_CATEGORIES.map(cat => {
+          const active = createCat === cat
+          return (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => setCreateCat(cat)}
+              className="athletic-tap athletic-mono rounded-full"
+              style={{
+                padding: '5px 11px',
+                border: `1px solid ${active ? P.brand : P.lineStrong}`,
+                background: active ? `${P.brand}1f` : 'transparent',
+                color: active ? P.brand : P.inkMuted,
+                fontSize: 9,
+                letterSpacing: '0.12em',
+                fontWeight: 800,
+              }}
+            >
+              {CATEGORY_LABELS_NL[cat] ?? cat}
+            </button>
+          )
+        })}
+      </div>
+      <button
+        type="button"
+        onClick={() => onCreate(query.trim(), createCat)}
+        disabled={creating}
+        className="athletic-tap mbt-btn-hover w-full flex items-center justify-center gap-2 rounded-xl"
+        style={{
+          padding: '12px 16px',
+          border: `1px dashed ${P.brand}`,
+          color: P.brand,
+          background: 'transparent',
+          fontFamily: mono,
+          fontSize: 11,
+          fontWeight: 900,
+          letterSpacing: '0.10em',
+          textTransform: 'uppercase',
+          opacity: creating ? 0.6 : 1,
+        }}
+      >
+        <Plus className="w-3.5 h-3.5" />
+        {creating ? 'Aanmaken…' : `"${query.trim()}" aanmaken en toevoegen`}
+      </button>
+    </div>
+  ) : null
 
   // Escape sluit de sheet; scroll-lock zolang die open is (zelfde gedrag als
   // de VideoModal).
@@ -1722,24 +1864,28 @@ function AddExerciseSheet({
 
         <div className="flex-1 overflow-y-auto px-5 pb-[max(env(safe-area-inset-bottom),32px)] space-y-5">
           {searching ? (
-            // Zoekmodus: platte gefilterde lijst (oud gedrag).
-            filtered.length === 0 ? (
-              <div className="text-center py-6">
-                <MetaLabel>GEEN OEFENINGEN GEVONDEN</MetaLabel>
-              </div>
-            ) : (
-              <div className="space-y-2 mbt-stagger">
-                {filtered.map(ex => (
-                  <ExerciseRow
-                    key={ex.id}
-                    ex={ex}
-                    added={added}
-                    onAdd={onAdd}
-                    onToggleFavorite={onToggleFavorite}
-                  />
-                ))}
-              </div>
-            )
+            // Zoekmodus: gefilterde lijst + altijd de "aanmaken"-optie onderaan,
+            // zodat een ontbrekende oefening direct aangemaakt kan worden.
+            <div className="space-y-3">
+              {filtered.length === 0 ? (
+                <div className="text-center py-6">
+                  <MetaLabel>GEEN OEFENINGEN GEVONDEN</MetaLabel>
+                </div>
+              ) : (
+                <div className="space-y-2 mbt-stagger">
+                  {filtered.map(ex => (
+                    <ExerciseRow
+                      key={ex.id}
+                      ex={ex}
+                      added={added}
+                      onAdd={onAdd}
+                      onToggleFavorite={onToggleFavorite}
+                    />
+                  ))}
+                </div>
+              )}
+              {createBlock}
+            </div>
           ) : (
             // Bladermodus: snelkoppelingen bovenaan, dan de hele bibliotheek.
             <>

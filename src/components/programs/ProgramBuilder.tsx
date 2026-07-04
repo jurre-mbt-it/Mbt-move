@@ -401,6 +401,10 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       rest: 60,
       extraParams: inheritedParams,
       notes: null,
+      intensityType: 'NONE',
+      intensityMin: null,
+      intensityMax: null,
+      intensityText: null,
       supersetGroup: null,
       supersetOrder: 0,
       selected: false,
@@ -539,7 +543,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         harderVariantId: null,
         videoUrl: ex.videoUrl,
         sets: 3, setsMax: null, reps: inheritedReps, repsMax: null, repUnit: inheritedRepUnit, rest: 60,
-        extraParams: inheritedParams, notes: null, supersetGroup: null, supersetOrder: 0, selected: false,
+        extraParams: inheritedParams, notes: null, intensityType: 'NONE', intensityMin: null, intensityMax: null, intensityText: null, supersetGroup: null, supersetOrder: 0, selected: false,
         trackOneRepMax: exWithDefaults.trackOneRepMax ?? false,
         day: targetDay, week: targetWeek,
       }
@@ -707,6 +711,10 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       supersetGroup: ex.supersetGroup ?? null,
       supersetOrder: ex.supersetOrder,
       notes: ex.notes?.trim() ? ex.notes : null,
+      intensityType: ex.intensityType ?? 'NONE',
+      intensityMin: ex.intensityMin ?? null,
+      intensityMax: ex.intensityMax ?? null,
+      intensityText: ex.intensityText?.trim() ? ex.intensityText : null,
     }))
     const resourcePayload = val.resources.map((r, i) => ({
       resourceId: r.resourceId,
@@ -966,6 +974,10 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       repUnit: ex.repUnit, restTime: ex.rest,
       supersetGroup: ex.supersetGroup ?? null,
       supersetOrder: ex.supersetOrder, notes: null,
+      intensityType: ex.intensityType ?? 'NONE',
+      intensityMin: ex.intensityMin ?? null,
+      intensityMax: ex.intensityMax ?? null,
+      intensityText: ex.intensityText?.trim() ? ex.intensityText : null,
     }))
     const resourcePayload = resources.map((r, i) => ({
       resourceId: r.resourceId, week: r.week, day: r.day, order: i,
@@ -1022,6 +1034,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         repUnit: string; restTime: number;
         supersetGroup: string | null; supersetOrder: number;
         notes?: string | null;
+        intensityType?: string; intensityMin?: number | null;
+        intensityMax?: number | null; intensityText?: string | null;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         exercise: any
       }>
@@ -1044,6 +1058,10 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         rest: pe.restTime,
         extraParams: [],
         notes: pe.notes ?? null,
+        intensityType: (pe.intensityType as BuilderExercise['intensityType']) ?? 'NONE',
+        intensityMin: pe.intensityMin ?? null,
+        intensityMax: pe.intensityMax ?? null,
+        intensityText: pe.intensityText ?? null,
         supersetGroup: pe.supersetGroup ?? null,
         supersetOrder: pe.supersetOrder,
         selected: false,

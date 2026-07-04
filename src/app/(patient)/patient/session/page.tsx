@@ -24,6 +24,12 @@ import {
   seedParams,
   filledParams,
 } from '@/lib/session-sets'
+import {
+  toPrescription,
+  formatPrescription,
+  computeTargetKg,
+  formatTargetKg,
+} from '@/lib/prescription'
 import { RestSheet } from '@/components/session/RestSheet'
 import { SetRows } from '@/components/session/SetRows'
 import { ExtraParamsEditor } from '@/components/session/ExtraParams'
@@ -58,6 +64,12 @@ type SessionExercise = {
   supersetGroup: string | null
   supersetOrder: number
   notes: string | null
+  // Intensiteits-voorschrift uit het programma — getoond als doel-badge.
+  // Loose string aan de rand; toPrescription() valideert naar IntensityType.
+  intensityType?: string
+  intensityMin?: number | null
+  intensityMax?: number | null
+  intensityText?: string | null
   easierVariantId: string | null
   harderVariantId: string | null
   trackOneRepMax?: boolean
@@ -1441,6 +1453,25 @@ function SessionPageInner() {
     const variants = { easier: e.easierVariantName ?? undefined, harder: e.harderVariantName ?? undefined }
     const showCues = showCuesFor === e.uid
 
+    // Intensiteits-voorschrift → doel-badge + (waar mogelijk) concreet kg-doel.
+    // %1RM rekent af tegen de personal-best 1RM; "onder daily max" tegen de
+    // zwaarste set die vandaag al voor dezelfde oefening is ingevoerd (de
+    // top-set kan een andere rij zijn, bv. "Snatch daily max" vóór de back-off).
+    const presc = toPrescription(e)
+    const dailyMaxKg =
+      presc.intensityType === 'RELATIVE_DAILY_MAX'
+        ? exercises
+            .filter(x => x.exerciseId === e.exerciseId)
+            .flatMap(x => (setLog[x.uid] ?? []).map(s => parseKg(s.kg) ?? 0))
+            .reduce((m, kg) => Math.max(m, kg), 0)
+        : null
+    const targetKg = computeTargetKg(presc, {
+      oneRepMax: prevOneRm[e.exerciseId] ?? null,
+      dailyMaxKg,
+    })
+    const prescLabel = formatPrescription(presc)
+    const targetKgLabel = formatTargetKg(targetKg)
+
     return (
       <div key={e.uid}>
         {/* Header row */}
@@ -1588,6 +1619,14 @@ function SessionPageInner() {
               >
                 {entries.length} SETS · DOEL {e.reps} {e.repUnit.toUpperCase()}
               </span>
+              {prescLabel && (
+                <span
+                  className="athletic-mono rounded-full"
+                  style={{ padding: '4px 10px', border: `1px solid ${P.brand}55`, color: P.brand, fontSize: 9, letterSpacing: '0.14em', fontWeight: 800 }}
+                >
+                  {prescLabel.toUpperCase()}{targetKgLabel ? ` · ${targetKgLabel.toUpperCase()}` : ''}
+                </span>
+              )}
               <span
                 className="athletic-mono rounded-full"
                 style={{ padding: '4px 10px', border: `1px solid ${P.lineStrong}`, color: P.inkMuted, fontSize: 9, letterSpacing: '0.14em', fontWeight: 700 }}
