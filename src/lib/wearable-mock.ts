@@ -159,6 +159,8 @@ export function mockOverview(days = 30, end: Date = new Date()) {
     // Deterministische mock-waarden (geen rng nodig): stappen ~7-12k, kcal ~500-900.
     steps: 7000 + ((i * 997) % 5000),
     activeEnergyKcal: 500 + ((i * 379) % 400),
+    basalEnergyKcal: 1500 + ((i * 131) % 300),
+    vo2Max: round1(44 + ((i * 17) % 60) / 10),
   }))
 
   const sleep = gen.map(g => {
@@ -232,6 +234,7 @@ export function mockOverview(days = 30, end: Date = new Date()) {
     sleep,
     vitals,
     activities,
+    stress: [],
   }
 }
 
@@ -269,6 +272,19 @@ export function mockSyncPayload(days = 30, end: Date = new Date()) {
       respiratoryRate: g.respiratoryRate,
       wristTempDeviation: g.wristTempDeviation,
     })),
+    // Intraday HR (30-min buckets, 06:00–22:30) → voedt de stress-meter. Rustig
+    // 's ochtends/avonds, hoger midden op de dag, met sporadische verhogingen.
+    hrIntraday: gen.map((g, gi) => {
+      const rest = g.restingHeartRate ?? 58
+      const buckets: { m: number; bpm: number }[] = []
+      for (let m = 6 * 60; m <= 22 * 60; m += 30) {
+        const hour = m / 60
+        let bpm = rest + 6 + Math.round(8 * Math.sin(((hour - 6) / 16) * Math.PI))
+        if ((gi * 7 + m) % 190 < 30) bpm += 28 // af en toe een stress-piek
+        buckets.push({ m, bpm })
+      }
+      return { date: g.date, buckets }
+    }),
   }
 }
 

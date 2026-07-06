@@ -28,6 +28,7 @@ const SLEEP_DAYS = 30
 const VITALS_DAYS = 30
 const ACTIVITY_LIMIT = 20
 const TREND_DAYS = 30
+const STRESS_DAYS = 60
 
 /** Toegang: directe PatientTherapist-koppeling OF zelfde praktijk (ADMIN altijd). */
 async function hasPatientAccess(
@@ -81,8 +82,10 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
   vitalsSince.setDate(vitalsSince.getDate() - VITALS_DAYS)
   const trendSince = startOfDay()
   trendSince.setDate(trendSince.getDate() - TREND_DAYS)
+  const stressSince = startOfDay()
+  stressSince.setDate(stressSince.getDate() - STRESS_DAYS)
 
-  const [connection, readiness, sleep, vitals, activities, trend] = await Promise.all([
+  const [connection, readiness, sleep, vitals, activities, trend, stress] = await Promise.all([
     prisma.wearableConnection.findUnique({
       where: { userId_provider: { userId, provider: 'APPLE_HEALTH' } },
       select: { provider: true, deviceModel: true, enabled: true, lastSyncAt: true, connectedAt: true },
@@ -105,6 +108,10 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
       where: { userId, date: { gte: trendSince } },
       orderBy: { date: 'asc' },
       select: { date: true, score: true, band: true },
+    }),
+    prisma.stressEntry.findMany({
+      where: { userId, date: { gte: stressSince } },
+      orderBy: { date: 'asc' },
     }),
   ])
 
@@ -145,6 +152,8 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
       wristTempDeviation: v.wristTempDeviation,
       steps: v.steps,
       activeEnergyKcal: v.activeEnergyKcal,
+      basalEnergyKcal: v.basalEnergyKcal,
+      vo2Max: v.vo2Max,
     })),
     activities: activities.map(a => ({
       id: a.id,
@@ -159,6 +168,13 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
       avgPaceSecPerKm: a.avgPaceSecPerKm,
       timeInZones: a.timeInZones as unknown,
       completedAt: a.completedAt.toISOString(),
+    })),
+    stress: stress.map(s => ({
+      date: isoDay(s.date),
+      avgScore: s.avgScore,
+      restingHeartRate: s.restingHeartRate,
+      samples: s.samples as unknown,
+      timeInBands: s.timeInBands as unknown,
     })),
   }
 }
