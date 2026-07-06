@@ -375,6 +375,7 @@ model User {
   sleepEntries        SleepEntry[]
   vitalsEntries       VitalsEntry[]
   readinessSnapshots  ReadinessSnapshot[]
+  stressEntries       StressEntry[]
 
   @@index([deletedAt])
   @@map("users")
@@ -646,22 +647,22 @@ model ExerciseCollectionItem {
 }
 
 model Program {
-  id           String        @id @default(cuid())
-  name         String
-  description  String?
-  status       ProgramStatus @default(DRAFT)
-  type         ProgramType   @default(STRENGTH)
-  isTemplate   Boolean       @default(false)
-  weeks        Int           @default(4)
-  daysPerWeek  Int           @default(3)
-  startDate    DateTime?
-  endDate      DateTime?
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  status      ProgramStatus @default(DRAFT)
+  type        ProgramType   @default(STRENGTH)
+  isTemplate  Boolean       @default(false)
+  weeks       Int           @default(4)
+  daysPerWeek Int           @default(3)
+  startDate   DateTime?
+  endDate     DateTime?
 
   // Na hoeveel weken zónder wijziging het schema een controle-signaal voor de
   // therapeut oplevert. Null = standaard (8 weken, zie lib/program-review.ts).
   // De klok telt vanaf `updatedAt`: elke aanpassing reset 'm.
   reviewAfterWeeks Int?
-  cardioParams Json? // CardioParams JSONB for cardio programs
+  cardioParams     Json? // CardioParams JSONB for cardio programs
 
   tendinopathyMode Boolean @default(false)
   trackOneRepMax   Boolean @default(false)
@@ -2163,6 +2164,8 @@ model VitalsEntry {
   wristTempDeviation Float? // °C afwijking van persoonlijke baseline (Series 8+)
   steps              Int? // dagelijks aantal stappen (HealthKit stepCount, dagsom)
   activeEnergyKcal   Int? // dagelijkse actieve verbranding in kcal (HealthKit activeEnergyBurned, dagsom)
+  basalEnergyKcal    Int? // dagelijkse basaalverbranding in kcal (HealthKit basalEnergyBurned, dagsom); totaal = actief + basaal
+  vo2Max             Float? // ml/kg/min — Apple cardio-fitness VO2max (één waarde, uit outdoor loop/wandel/hike)
   source             WorkoutSource @default(APPLE_WATCH)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
@@ -2170,6 +2173,29 @@ model VitalsEntry {
   @@unique([userId, date])
   @@index([userId, date])
   @@map("vitals_entries")
+}
+
+/// Dagelijkse stress-momentopname (Athlytic-stijl): cardiovasculaire "silent
+/// workload" tijdens rust, 0–100 via %HRR (HR t.o.v. rust-HR), actieve/workout-
+/// periodes uitgesloten. On-device berekend uit HealthKit HR-samples en compact
+/// gesynct (dag-gemiddelde + gedownsamplede intraday-serie + tijd-in-band). Puur
+/// welzijnssignaal, geen diagnose. Zie research-memo stress-meter.
+model StressEntry {
+  id               String        @id @default(cuid())
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String
+  date             DateTime // start-of-day, uniek per user
+  avgScore         Int? // dag-gemiddelde 0–100 (alleen rust-periodes)
+  restingHeartRate Int? // gebruikte rust-HR (bpm) die dag
+  samples          Json? // gedownsamplede intraday-serie: [{ m: minutenVanafMiddernacht, v: 0–100 }]
+  timeInBands      Json? // seconden per band: { low, moderate, elevated, high }
+  source           WorkoutSource @default(APPLE_WATCH)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("stress_entries")
 }
 
 /// Dagelijkse momentopname van de hybride readiness-score. Bewaard voor trend

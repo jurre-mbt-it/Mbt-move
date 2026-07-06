@@ -11,6 +11,8 @@
 import { z } from 'zod'
 import type { PrismaClient, CardioActivity } from '@prisma/client'
 import { aggregateNight, sleepQualityScore, type SleepSegment } from '@/lib/sleep-metrics'
+import { resolveMaxHr } from '@/lib/cardio-zones'
+import { computeStressDay } from '@/lib/stress'
 
 const createId = () => crypto.randomUUID()
 
@@ -88,6 +90,8 @@ const vitalsSchema = z.object({
   wristTempDeviation: z.number().min(-10).max(10).optional(),
   steps: z.number().int().nonnegative().max(200000).optional(),
   activeEnergyKcal: z.number().nonnegative().max(30000).optional(),
+  basalEnergyKcal: z.number().nonnegative().max(30000).optional(),
+  vo2Max: z.number().positive().max(100).optional(), // ml/kg/min
 })
 
 // Hard caps per batch: de native bridge stuurt incrementele anchored queries,
@@ -96,6 +100,16 @@ const vitalsSchema = z.object({
 const MAX_WORKOUTS = 500
 const MAX_SLEEP = 200
 const MAX_VITALS = 200
+const MAX_HR_DAYS = 200
+
+// Intraday HR voor de stress-meter: compacte buckets (avg bpm per venster,
+// workouts al client-side uitgesloten). m = minuut van de dag (0–1439).
+const hrDaySchema = z.object({
+  date: z.string(), // yyyy-mm-dd
+  buckets: z
+    .array(z.object({ m: z.number().int().min(0).max(1439), bpm: z.number().min(20).max(240) }))
+    .max(96),
+})
 
 export const syncPayloadSchema = z.object({
   device: z.object({ model: z.string().optional() }).optional(),
@@ -103,6 +117,7 @@ export const syncPayloadSchema = z.object({
   workouts: z.array(workoutSchema).max(MAX_WORKOUTS).default([]),
   sleep: z.array(sleepNightSchema).max(MAX_SLEEP).default([]),
   vitals: z.array(vitalsSchema).max(MAX_VITALS).default([]),
+  hrIntraday: z.array(hrDaySchema).max(MAX_HR_DAYS).default([]),
 })
 
 export type SyncPayload = z.infer<typeof syncPayloadSchema>
@@ -122,7 +137,7 @@ function startOfDayUTCLocal(dateStr: string): Date {
   return new Date(y, (m ?? 1) - 1, d ?? 1, 0, 0, 0, 0)
 }
 
-type Db = Pick<PrismaClient, 'wearableConnection' | 'cardioLog' | 'sleepEntry' | 'vitalsEntry' | 'user'>
+type Db = Pick<PrismaClient, 'wearableConnection' | 'cardioLog' | 'sleepEntry' | 'vitalsEntry' | 'stressEntry' | 'user'>
 
 export async function ingestWearableData(
   prisma: Db,
@@ -134,7 +149,7 @@ export async function ingestWearableData(
   // HR-profiel ophalen voor de sRPE-afleiding van workouts.
   const profile = await prisma.user.findUnique({
     where: { id: userId },
-    select: { maxHeartRate: true, restingHeartRate: true },
+    select: { maxHeartRate: true, restingHeartRate: true, dateOfBirth: true },
   })
 
   // ── Connection bijwerken (upsert) ──────────────────────
@@ -236,6 +251,8 @@ export async function ingestWearableData(
       wristTempDeviation: v.wristTempDeviation ?? null,
       steps: v.steps != null ? Math.round(v.steps) : null,
       activeEnergyKcal: v.activeEnergyKcal != null ? Math.round(v.activeEnergyKcal) : null,
+      basalEnergyKcal: v.basalEnergyKcal != null ? Math.round(v.basalEnergyKcal) : null,
+      vo2Max: v.vo2Max ?? null,
       source: 'APPLE_WATCH' as const,
     }
     await prisma.vitalsEntry.upsert({
@@ -244,6 +261,42 @@ export async function ingestWearableData(
       create: { id: createId(), userId, date, ...data },
     })
     affected.add(date.getTime())
+  }
+
+  // ── Stress → StressEntry (server-side %HRR, HRmax uit profiel/leeftijd) ───
+  // Alleen als we een max-HR kunnen bepalen (expliciet of via geboortedatum).
+  const maxHrRes = resolveMaxHr({
+    maxHeartRate: profile?.maxHeartRate,
+    restingHeartRate: profile?.restingHeartRate,
+    dateOfBirth: profile?.dateOfBirth,
+  })
+  if (maxHrRes && payload.hrIntraday.length > 0) {
+    // Rust-HR per dag uit de meegestuurde vitals (valt anders terug op dag-p10).
+    const restByDay = new Map<string, number>()
+    for (const v of payload.vitals) {
+      if (v.restingHeartRate != null) restByDay.set(v.date, v.restingHeartRate)
+    }
+    for (const day of payload.hrIntraday) {
+      const result = computeStressDay(day.buckets, {
+        restingHr: restByDay.get(day.date) ?? profile?.restingHeartRate ?? null,
+        maxHr: maxHrRes.maxHr,
+      })
+      if (!result) continue
+      const date = startOfDayUTCLocal(day.date)
+      const data = {
+        avgScore: result.avgScore,
+        restingHeartRate: result.restingHeartRate,
+        samples: result.samples,
+        timeInBands: result.timeInBands,
+        source: 'APPLE_WATCH' as const,
+      }
+      await prisma.stressEntry.upsert({
+        where: { userId_date: { userId, date } },
+        update: data,
+        create: { id: createId(), userId, date, ...data },
+      })
+      affected.add(date.getTime())
+    }
   }
 
   return {
