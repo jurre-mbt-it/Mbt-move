@@ -3,28 +3,36 @@ import Link from 'next/link'
 // v2 — interactive hover pass
 
 
+// Palette gematcht op de iOS-app (constants/theme.ts) én movementbasedtherapy.nl:
+// diep petrol-groen met crème tekst, oranje merkaccent, mint + goud, echt groen
+// voor "goed/max". Vervangt de oude near-black + electric-lime look.
 const P = {
-  bg: '#0A0E0F',
-  surface: '#141A1B',
-  surfaceHi: '#1C2425',
-  surfaceLow: '#0F1415',
-  line: 'rgba(255,255,255,0.06)',
-  lineStrong: 'rgba(255,255,255,0.12)',
-  ink: '#F5F7F6',
-  inkMuted: '#7B8889',
-  inkDim: '#4A5454',
-  lime: '#BEF264',
-  limeDark: '#65A30D',
-  brand: '#e87a55',
-  brandDeep: '#c9613f',
-  gold: '#F4C261',
-  ice: '#93C5FD',
+  bg: '#0E2729',              // diep petrol — app background
+  surface: '#15363A',         // tile surface
+  surfaceHi: '#1C4448',       // elevated / hover
+  surfaceLow: '#081A1C',      // recessed
+  line: 'rgba(212,232,230,0.08)',
+  lineStrong: 'rgba(212,232,230,0.18)',
+  ink: '#F5F2ED',             // crème — primary text
+  inkMuted: '#9EB5B3',        // secondary text
+  inkDim: '#658180',          // tertiary
+  lime: '#5FD08A',            // echt groen — "goed / uitgerust / max"
+  limeDark: '#3FA968',
+  brand: '#E87A55',           // oranje merkaccent
+  brandDeep: '#C9613F',
+  gold: '#F5B942',            // goud / amber
+  ice: '#9FCEC9',             // mint — vervangt het koude blauw
   danger: '#F87171',
-  purple: '#C084FC',
+  purple: '#9FCEC9',          // (legacy sleutel) → mint; app kent geen paars
 }
 
+// Merk-fonts, gematcht op de iOS-app: JetBrains Mono voor labels/meters,
+// Inter Tight voor body, Geometos voor display-koppen (zie @font-face + de
+// .mbt-gym-root regels in het <style>-blok hieronder).
 const mono =
-  'ui-monospace, Menlo, "SF Mono", "Cascadia Code", "Source Code Pro", monospace'
+  "'JetBrains Mono', ui-monospace, Menlo, 'SF Mono', monospace"
+
+const geo = "'Geometos', 'Satoshi', ui-sans-serif, system-ui, sans-serif"
 
 const requestAccess =
   'mailto:jurre@movementbasedtherapy.nl?subject=MBT-Gym%20TestFlight%20toegang&body=Hoi%20Jurre%2C%20ik%20zou%20graag%20toegang%20tot%20de%20MBT-Gym%20beta.'
@@ -32,14 +40,50 @@ const requestAccess =
 export default function GymLandingPage() {
   return (
     <main
+      className="mbt-gym-root"
       style={{
         background: P.bg,
         color: P.ink,
         minHeight: '100vh',
-        fontFamily: 'Satoshi, ui-sans-serif, system-ui, sans-serif',
+        fontFamily: "'InterTight', ui-sans-serif, system-ui, sans-serif",
       }}
     >
       <style>{`
+        /* Merk-fonts uit de iOS-app, self-hosted (public/fonts) */
+        @font-face {
+          font-family: 'Geometos';
+          src: url('/fonts/Geometos.ttf') format('truetype');
+          font-weight: 100 900; font-style: normal; font-display: swap;
+        }
+        @font-face {
+          font-family: 'InterTight';
+          src: url('/fonts/InterTight-Regular.ttf') format('truetype');
+          font-weight: 400; font-style: normal; font-display: swap;
+        }
+        @font-face {
+          font-family: 'InterTight';
+          src: url('/fonts/InterTight-SemiBold.ttf') format('truetype');
+          font-weight: 500 600; font-style: normal; font-display: swap;
+        }
+        @font-face {
+          font-family: 'InterTight';
+          src: url('/fonts/InterTight-Bold.ttf') format('truetype');
+          font-weight: 700 900; font-style: normal; font-display: swap;
+        }
+        @font-face {
+          font-family: 'JetBrains Mono';
+          src: url('/fonts/JetBrainsMono-Regular.ttf') format('truetype');
+          font-weight: 400 500; font-style: normal; font-display: swap;
+        }
+        @font-face {
+          font-family: 'JetBrains Mono';
+          src: url('/fonts/JetBrainsMono-Medium.ttf') format('truetype');
+          font-weight: 600 900; font-style: normal; font-display: swap;
+        }
+        /* Geometos = display-font voor de koppen (allemaal uppercase) */
+        .mbt-gym-root h1, .mbt-gym-root h2, .mbt-gym-root h3 {
+          font-family: ${geo};
+        }
         @keyframes mbt-pulse-kf {
           0%, 100% { opacity: 1; transform: scale(1); }
           50% { opacity: 0.45; transform: scale(1.25); }
@@ -480,9 +524,9 @@ function Hero() {
             fontWeight: 400,
           }}
         >
-          MBT·Gym koppelt jouw programma, workload en herstel in één athletic-first app.
-          Gebouwd door een sportfysiotherapeut — voor sporters die onder begeleiding
-          doorgaan waar de behandelkamer stopt.
+          MBT·Gym koppelt jouw programma, je Apple Watch en je herstel in één
+          athletic-first app. Gebouwd door een sportfysiotherapeut — voor sporters
+          die onder begeleiding doorgaan waar de behandelkamer stopt.
         </p>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 40 }}>
@@ -499,9 +543,9 @@ function Hero() {
           }}
         >
           <StatTile value="24/7" unit="COACH IN JE ZAK" color={P.brand} />
-          <StatTile value="sRPE" unit="WORKLOAD-TRACKING" color={P.gold} />
-          <StatTile value="0.8–1.3" unit="ACWR SWEET-SPOT" color={P.ice} />
-          <StatTile value="iOS" unit="NATIVE / TESTFLIGHT" color={P.purple} />
+          <StatTile value="WATCH" unit="APPLE WATCH · SYNC" color={P.ice} />
+          <StatTile value="sRPE" unit="FITHEID · VERMOEIDHEID" color={P.gold} />
+          <StatTile value="iOS 26" unit="LIQUID GLASS · NATIVE" color={P.lime} />
         </div>
       </div>
     </section>
@@ -590,43 +634,43 @@ const FEATURES: Array<{
     kicker: '01 · PROGRAMMA',
     title: 'JOUW WEEK, VOLLEDIG GEPLAND',
     body:
-      'Je coach zet workouts, mobility-blokken en cardio in een weekplanner. Jij ziet per dag precies wat je moet doen — en wat je gisteren deed.',
+      'Je coach zet kracht, mobiliteit, plyometrie en cardio in een weekplanner. Jij ziet per dag precies wat je moet doen — en wat je gisteren deed.',
     color: P.brand,
   },
   {
     kicker: '02 · WORKOUT',
-    title: 'LOGGEN ALS EEN ATLEET',
+    title: 'LOGGEN PER SET, MÉT GEVOEL',
     body:
-      'Sets, reps, gewicht en RPE in één tap. Laatst-gebruikte gewichten worden voorgevuld. Custom parameters voor bewegings-specifieke data.',
-    color: P.ice,
+      'Gewicht en reps per set, laatste waarden voorgevuld, rusttimer tussen sets. Na afloop: "Hoe voelde het?" van SLECHT tot TOP, plus pijn en zwaarte.',
+    color: P.lime,
   },
   {
-    kicker: '03 · RECOVERY',
-    title: 'WEET WANNEER JE MOET RUSTEN',
+    kicker: '03 · CARDIO',
+    title: 'ZONES, INTERVALLEN, TEMPO',
     body:
-      'sRPE-workload, 7-daagse acute vs. 28-daagse chronische belasting, ACWR sweet-spot 0.8–1.3. Rood = overload, lime = uitgerust.',
-    color: P.gold,
-  },
-  {
-    kicker: '04 · PIJN',
-    title: 'PIJN EN WELLNESS IN KAART',
-    body:
-      'Dagelijkse wellness-checks. Tendinopathie-protocol met 24-uurs follow-up. Jouw therapeut ziet direct of een oefening helpt of verergert.',
+      'Cardio wordt apart gelogd: HR-zones Z1–Z5, intervallen, tempo en steady-state. Inclusief een walk-run-opbouw terug naar hardlopen.',
     color: P.danger,
   },
   {
-    kicker: '05 · TRAINEN',
-    title: 'LIVE SESSIE MET DE THERAPEUT',
+    kicker: '04 · GEZONDHEID',
+    title: 'JE APPLE WATCH, GESYNCED',
     body:
-      'In de behandelkamer logt je therapeut live mee. Buiten de kamer zie je jouw data terug — alles ademt dezelfde Supabase-backend.',
-    color: P.purple,
+      'Readiness, slaapkwaliteit, stappen en actieve verbranding. Plus HRV, rust-hartslag, ademhaling en polstemperatuur — direct van je pols.',
+    color: P.ice,
   },
   {
-    kicker: '06 · ANALYSE',
-    title: 'GRAFIEKEN DIE NIET LIEGEN',
+    kicker: '05 · BELASTING',
+    title: 'FITHEID VERSUS VERMOEIDHEID',
     body:
-      'PR-tracking per oefening, hartslagzones Z1–Z5, pijn-trends over de tijd. Geen gamification-fluff, wel harde data om te analyseren.',
+      'Elke set krijgt een sRPE-score. De curve zet je fitheid af tegen je vermoeidheid, met ACWR-trend en sweet-spot 0.8–1.3. Weet wanneer je moet rusten.',
     color: P.gold,
+  },
+  {
+    kicker: '06 · PIJN & CONTACT',
+    title: 'WELLNESS EN EEN LIJN NAAR JE COACH',
+    body:
+      'Dagelijkse wellness-checks, tendinopathie-follow-up na 24 uur, en een chat met je therapeut — gekoppeld aan de sessie of oefening waar het over gaat.',
+    color: P.brand,
   },
 ]
 
@@ -779,7 +823,7 @@ function PhoneMockups() {
             <MockWorkoutScreen />
           </PhoneFrame>
           <PhoneFrame>
-            <MockRecoveryScreen />
+            <MockHealthScreen />
           </PhoneFrame>
         </div>
       </div>
@@ -880,13 +924,13 @@ function MockTodayScreen() {
       </div>
 
       <MiniTile
-        kicker="STRENGTH · 45 MIN"
+        kicker="KRACHT · 45 MIN"
         title="LOWER · PUSH"
-        accent={P.lime}
+        accent={P.brand}
         meta="6 OEFENINGEN"
       />
       <MiniTile
-        kicker="MOBILITY · 15 MIN"
+        kicker="MOBILITEIT · 15 MIN"
         title="HIP FLOW"
         accent={P.ice}
         meta="3 BLOKKEN"
@@ -975,10 +1019,10 @@ function MockWorkoutScreen() {
   )
 }
 
-function MockRecoveryScreen() {
+function MockHealthScreen() {
   return (
     <>
-      <MetaLabel color={P.inkMuted}>SYSTEM STATUS</MetaLabel>
+      <MetaLabel color={P.ice}>APPLE WATCH · GESYNCED</MetaLabel>
       <div
         style={{
           fontSize: 32,
@@ -989,7 +1033,7 @@ function MockRecoveryScreen() {
           paddingTop: 2,
         }}
       >
-        RECOVERY
+        READINESS
       </div>
       <div
         style={{
@@ -997,17 +1041,17 @@ function MockRecoveryScreen() {
           fontSize: 72,
           fontWeight: 900,
           letterSpacing: -3,
-          color: P.brand,
+          color: P.lime,
           lineHeight: 1.12,
           paddingTop: 6,
         }}
       >
-        74
+        82
         <span style={{ fontSize: 22, color: P.inkMuted, marginLeft: 4 }}>%</span>
       </div>
-      <RecoveryBar value={0.74} />
+      <RecoveryBar value={0.82} />
       <div style={{ marginTop: 8 }}>
-        <MetaLabel color={P.lime}>UITGERUST · TRAIN HARD</MetaLabel>
+        <MetaLabel color={P.lime}>GOED · TRAIN HARD</MetaLabel>
       </div>
       <div
         style={{
@@ -1017,8 +1061,10 @@ function MockRecoveryScreen() {
           gap: 8,
         }}
       >
-        <StatChip label="ACUTE" value="642" color={P.gold} />
-        <StatChip label="CHRONIC" value="578" color={P.ice} />
+        <StatChip label="SLAAP" value="88%" color={P.ice} />
+        <StatChip label="STAPPEN" value="9.4K" color={P.lime} />
+        <StatChip label="HRV" value="62" color={P.gold} />
+        <StatChip label="RUST-HR" value="48" color={P.brand} />
       </div>
     </>
   )
@@ -1169,7 +1215,7 @@ function WorkloadSection() {
         }}
       >
         <div>
-          <Kicker color={P.gold}>WORKLOAD-MODEL</Kicker>
+          <Kicker color={P.gold}>BELASTING-MODEL</Kicker>
           <h2
             style={{
               fontSize: 'clamp(36px, 5vw, 60px)',
@@ -1180,7 +1226,7 @@ function WorkloadSection() {
               paddingTop: 4,
             }}
           >
-            DE <span style={{ color: P.brand }}>ACWR</span> IN JE BROEKZAK.
+            FITHEID VS <span style={{ color: P.brand }}>VERMOEIDHEID</span>.
           </h2>
           <p
             style={{
@@ -1190,10 +1236,10 @@ function WorkloadSection() {
               color: P.inkMuted,
             }}
           >
-            Elke set krijgt een sRPE-score (RPE × duur). We rekenen jouw acute
-            7-daagse load af tegen je chronische 28-daagse baseline. Het resultaat:
-            een <strong style={{ color: P.ink }}>ACWR-ratio</strong> — de
-            gouden standaard uit sportwetenschap om overtraining te voorkomen.
+            Elke set krijgt een sRPE-score (RPE × duur). De curve zet je opgebouwde
+            fitheid af tegen je actuele vermoeidheid en berekent een{' '}
+            <strong style={{ color: P.ink }}>ACWR-trend</strong> — de gouden
+            standaard uit sportwetenschap om overtraining te voorkomen.
           </p>
           <p
             style={{
@@ -1203,7 +1249,9 @@ function WorkloadSection() {
               color: P.inkMuted,
             }}
           >
-            Sweet-spot 0.8–1.3 = groen licht. Daarboven? Rust. Daaronder? Push.
+            Je Apple Watch legt er readiness, HRV en slaap naast. Sweet-spot
+            0.8–1.3 = groen licht. Daarboven? Rust. Daaronder? Push. Trend-indicator,
+            geen diagnose.
           </p>
         </div>
 
@@ -1262,7 +1310,7 @@ function ACWRMeter() {
           inset: '18px 0',
           borderRadius: 999,
           background:
-            'linear-gradient(90deg, #F87171 0%, #F4C261 25%, #e87a55 40%, #e87a55 65%, #F4C261 80%, #F87171 100%)',
+            'linear-gradient(90deg, #F87171 0%, #F5B942 25%, #E87A55 40%, #E87A55 65%, #F5B942 80%, #F87171 100%)',
           opacity: 0.9,
         }}
       />
