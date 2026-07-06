@@ -34,16 +34,23 @@ import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
 import { CARDIO_ICON_MAP, IconMail, IconCalendar, IconClipboard } from '@/components/icons'
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  ACTIVE:    { label: 'Actief',    bg: 'rgba(232,122,85,0.14)', text: P.lime },
-  DRAFT:     { label: 'Concept',   bg: 'rgba(244,194,97,0.14)',  text: P.gold },
-  COMPLETED: { label: 'Afgerond',  bg: 'rgba(255,255,255,0.06)', text: P.inkMuted },
+  ACTIVE:    { label: 'Actief',       bg: 'rgba(232,122,85,0.14)', text: P.lime },
+  DRAFT:     { label: 'Concept',      bg: 'rgba(244,194,97,0.14)',  text: P.gold },
+  COMPLETED: { label: 'Afgerond',     bg: 'rgba(255,255,255,0.06)', text: P.inkMuted },
+  ARCHIVED:  { label: 'Gearchiveerd', bg: 'rgba(255,255,255,0.06)', text: P.inkMuted },
 }
 
 const STATUS_ACCENT: Record<string, string> = {
   ACTIVE: P.lime,
   DRAFT: P.gold,
   COMPLETED: P.inkDim,
+  ARCHIVED: P.inkDim,
 }
+
+// Afgesloten = uit het actieve overzicht, maar bewaard. Voltooid (COMPLETED)
+// óf gearchiveerd (ARCHIVED) vallen hieronder.
+const CLOSED_STATUSES = ['COMPLETED', 'ARCHIVED']
+const isClosedStatus = (status: string) => CLOSED_STATUSES.includes(status)
 
 const TAB_VALUES = ['profiel', 'programmas', 'geschiedenis', 'revalidatie', 'tests', 'signalen', 'voortgang', 'wearables'] as const
 
@@ -210,6 +217,10 @@ export default function PatientDetailPage({
 
   const status = patient.programStatus ? STATUS_CONFIG[patient.programStatus] : null
   const activePrograms = programs.filter(p => p.status === 'ACTIVE' && !p.isTemplate)
+  // Actief overzicht = alles behalve afgesloten; afgesloten schema's blijven
+  // bewaard maar verhuizen naar een aparte, doorzichtige sectie.
+  const openPrograms = programs.filter(p => !isClosedStatus(p.status))
+  const closedPrograms = programs.filter(p => isClosedStatus(p.status))
 
   return (
     <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
@@ -555,7 +566,7 @@ export default function PatientDetailPage({
           <TabsContent value="programmas" className="space-y-3">
             <div className="flex items-center justify-between">
               <MetaLabel>
-                {programs.length} programma{programs.length !== 1 ? "'s" : ''}
+                {openPrograms.length} programma{openPrograms.length !== 1 ? "'s" : ''}
               </MetaLabel>
               <DarkButton
                 variant="secondary"
@@ -579,77 +590,20 @@ export default function PatientDetailPage({
                 </div>
               </Tile>
             )}
-            {programs.map(prog => {
-              const progStatus = STATUS_CONFIG[prog.status] ?? STATUS_CONFIG.DRAFT
-              const accent = STATUS_ACCENT[prog.status] ?? P.inkDim
-              // Controle-signaal: actief programma dat langer dan de drempel
-              // (reviewAfterWeeks of standaard 8) ongewijzigd is.
-              const reviewDue =
-                prog.status === 'ACTIVE' && !prog.isTemplate &&
-                isReviewDue(prog.updatedAt, prog.reviewAfterWeeks)
-              const weeksUnchanged = Math.floor(weeksSince(prog.updatedAt))
-              return (
-                <Tile key={prog.id} accentBar={reviewDue ? P.gold : accent}>
-                  <div className="flex items-center gap-3">
-                    <Link href={`/therapist/programs/${prog.id}/edit`} className="flex-1 min-w-0 cursor-pointer">
-                      <p
-                        style={{
-                          color: P.ink,
-                          fontSize: 14,
-                          fontWeight: 800,
-                          letterSpacing: '0.06em',
-                          textTransform: 'uppercase',
-                        }}
-                        className="truncate"
-                      >
-                        {prog.name}
-                      </p>
-                      <p
-                        className="athletic-mono"
-                        style={{ color: P.inkMuted, fontSize: 11, marginTop: 3, letterSpacing: '0.03em' }}
-                      >
-                        {prog.weeks} weken · {prog.daysPerWeek}×/week
-                        {prog.startDate && ` · Start ${new Date(prog.startDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`}
-                      </p>
-                      {reviewDue && (
-                        <span
-                          className="inline-flex items-center gap-1.5 mt-2"
-                          style={{
-                            background: 'rgba(244,194,97,0.12)',
-                            color: P.gold,
-                            border: `1px solid ${P.gold}`,
-                            borderRadius: 999,
-                            padding: '2px 8px',
-                            fontSize: 10,
-                            fontWeight: 800,
-                            letterSpacing: '0.04em',
-                          }}
-                        >
-                          ⚠ Controleer schema · {weeksUnchanged} wk ongewijzigd
-                          {prog.reviewAfterWeeks ? ` (ingesteld: ${prog.reviewAfterWeeks})` : ''}
-                        </span>
-                      )}
-                    </Link>
-                    <span
-                      className="athletic-mono shrink-0"
-                      style={{
-                        background: progStatus.bg,
-                        color: progStatus.text,
-                        fontSize: 10,
-                        letterSpacing: '0.1em',
-                        padding: '2px 8px',
-                        borderRadius: 999,
-                        fontWeight: 800,
-                        textTransform: 'uppercase',
-                      }}
-                    >
-                      {progStatus.label}
-                    </span>
-                    <ProgramActions programId={prog.id} status={prog.status} patientId={patient.id} reviewDue={reviewDue} />
-                  </div>
-                </Tile>
-              )
-            })}
+            {openPrograms.map(prog => (
+              <ProgramTile key={prog.id} prog={prog} patientId={patient.id} />
+            ))}
+            {closedPrograms.length > 0 && (
+              <div className="pt-3 space-y-3">
+                <MetaLabel>Afgesloten · {closedPrograms.length}</MetaLabel>
+                <p style={{ color: P.inkDim, fontSize: 11, marginTop: -4 }}>
+                  Bewaard in het patiëntdossier — heropen om weer actief te maken.
+                </p>
+                {closedPrograms.map(prog => (
+                  <ProgramTile key={prog.id} prog={prog} patientId={patient.id} dimmed />
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           {/* ── TAB: Geschiedenis ─────────────────────────────────── */}
@@ -1019,6 +973,97 @@ function ProfileRow({ label, value }: { label: string; value: string }) {
   )
 }
 
+type ProgramTileData = {
+  id: string; name: string; status: string; weeks: number;
+  daysPerWeek: number; startDate: Date | null; endDate: Date | null; isTemplate: boolean;
+  updatedAt: Date | string; reviewAfterWeeks: number | null
+}
+
+// Eén programma-tile. `dimmed` = afgesloten schema: doorzichtig zodat het
+// visueel wegzakt maar zichtbaar blijft in het dossier.
+function ProgramTile({
+  prog,
+  patientId,
+  dimmed = false,
+}: {
+  prog: ProgramTileData
+  patientId: string
+  dimmed?: boolean
+}) {
+  const progStatus = STATUS_CONFIG[prog.status] ?? STATUS_CONFIG.DRAFT
+  const accent = STATUS_ACCENT[prog.status] ?? P.inkDim
+  // Controle-signaal: actief programma dat langer dan de drempel
+  // (reviewAfterWeeks of standaard 8) ongewijzigd is.
+  const reviewDue =
+    prog.status === 'ACTIVE' && !prog.isTemplate &&
+    isReviewDue(prog.updatedAt, prog.reviewAfterWeeks)
+  const weeksUnchanged = Math.floor(weeksSince(prog.updatedAt))
+  return (
+    <div style={{ opacity: dimmed ? 0.55 : 1 }}>
+      <Tile accentBar={reviewDue ? P.gold : accent}>
+        <div className="flex items-center gap-3">
+          <Link href={`/therapist/programs/${prog.id}/edit`} className="flex-1 min-w-0 cursor-pointer">
+            <p
+              style={{
+                color: P.ink,
+                fontSize: 14,
+                fontWeight: 800,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+              }}
+              className="truncate"
+            >
+              {prog.name}
+            </p>
+            <p
+              className="athletic-mono"
+              style={{ color: P.inkMuted, fontSize: 11, marginTop: 3, letterSpacing: '0.03em' }}
+            >
+              {prog.weeks} weken · {prog.daysPerWeek}×/week
+              {prog.startDate && ` · Start ${new Date(prog.startDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`}
+              {dimmed && prog.endDate && ` · Afgesloten ${new Date(prog.endDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`}
+            </p>
+            {reviewDue && (
+              <span
+                className="inline-flex items-center gap-1.5 mt-2"
+                style={{
+                  background: 'rgba(244,194,97,0.12)',
+                  color: P.gold,
+                  border: `1px solid ${P.gold}`,
+                  borderRadius: 999,
+                  padding: '2px 8px',
+                  fontSize: 10,
+                  fontWeight: 800,
+                  letterSpacing: '0.04em',
+                }}
+              >
+                ⚠ Controleer schema · {weeksUnchanged} wk ongewijzigd
+                {prog.reviewAfterWeeks ? ` (ingesteld: ${prog.reviewAfterWeeks})` : ''}
+              </span>
+            )}
+          </Link>
+          <span
+            className="athletic-mono shrink-0"
+            style={{
+              background: progStatus.bg,
+              color: progStatus.text,
+              fontSize: 10,
+              letterSpacing: '0.1em',
+              padding: '2px 8px',
+              borderRadius: 999,
+              fontWeight: 800,
+              textTransform: 'uppercase',
+            }}
+          >
+            {progStatus.label}
+          </span>
+          <ProgramActions programId={prog.id} status={prog.status} patientId={patientId} reviewDue={reviewDue} />
+        </div>
+      </Tile>
+    </div>
+  )
+}
+
 function ProgramActions({
   programId,
   status,
@@ -1045,6 +1090,7 @@ function ProgramActions({
   })
 
   const isActive = status === 'ACTIVE'
+  const isClosed = isClosedStatus(status)
 
   return (
     <div className="flex items-center gap-2 shrink-0">
@@ -1058,7 +1104,41 @@ function ProgramActions({
           ✓ Gecontroleerd
         </DarkButton>
       )}
-      {!isActive && (
+      {/* Actief → afsluiten: verdwijnt uit het actieve overzicht maar blijft
+          bewaard in het dossier. */}
+      {isActive && (
+        <DarkButton
+          variant="secondary"
+          size="sm"
+          disabled={save.isPending}
+          onClick={() =>
+            save.mutate(
+              { id: programId, status: 'COMPLETED', endDate: new Date().toISOString() },
+              { onSuccess: () => toast.success('Programma afgesloten') },
+            )
+          }
+        >
+          Afsluiten
+        </DarkButton>
+      )}
+      {/* Afgesloten → heropenen: terug naar actief, einddatum gewist. */}
+      {isClosed && (
+        <DarkButton
+          variant="primary"
+          size="sm"
+          disabled={save.isPending}
+          onClick={() =>
+            save.mutate(
+              { id: programId, status: 'ACTIVE', endDate: null },
+              { onSuccess: () => toast.success('Programma heropend') },
+            )
+          }
+        >
+          ↻ Heropenen
+        </DarkButton>
+      )}
+      {/* Concept → starten (bestaand gedrag). */}
+      {!isActive && !isClosed && (
         <DarkButton
           variant="primary"
           size="sm"
