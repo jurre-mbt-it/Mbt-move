@@ -19,6 +19,7 @@ import { auditLog } from '@/server/audit'
 import { signEducationFile } from '@/lib/education/storage'
 import { paceSecPerKm } from '@/lib/cardio-zones'
 import { estimateOneRepMax } from '@/lib/one-rep-max'
+import { clampSessionDurationSec } from '@/lib/training-load'
 import type { PrismaClient } from '@prisma/client'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -652,7 +653,8 @@ export const patientRouter = createTRPCRouter({
           completedAt: new Date(input.completedAt),
           status: 'COMPLETED',
           completedAll: input.completedAll ?? true,
-          duration: input.durationSeconds,
+          // Kap absurde duren (doorgelopen timer) zodat ze de belasting-curve niet vergiftigen.
+          duration: clampSessionDurationSec(input.durationSeconds),
           painLevel: input.painLevel,
           exertionLevel: input.exertionLevel,
           feelScore: input.feelScore ?? null,

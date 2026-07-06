@@ -5,6 +5,7 @@ import type { PrismaClient } from '@prisma/client'
 import { createTRPCRouter, therapistProcedure, mfaTherapistProcedure } from '@/server/trpc'
 import { auditLog } from '@/server/audit'
 import { estimateOneRepMax } from '@/lib/one-rep-max'
+import { clampSessionDurationSec } from '@/lib/training-load'
 
 const createId = () => crypto.randomUUID()
 
@@ -1115,7 +1116,9 @@ export const patientsRouter = createTRPCRouter({
           scheduledAt: new Date(input.scheduledAt),
           completedAt: new Date(input.completedAt),
           status: 'COMPLETED',
-          duration: input.durationSeconds,
+          // Doorgelopen-timer afvangen: kap absurde duren af zodat ze de
+          // belasting-curve (ACWR/vorm) niet vergiftigen. Sessie blijft behouden.
+          duration: clampSessionDurationSec(input.durationSeconds),
           painLevel: input.painLevel,
           exertionLevel: input.exertionLevel,
           feelScore: input.feelScore ?? null,
@@ -1198,7 +1201,7 @@ export const patientsRouter = createTRPCRouter({
       const updates: Record<string, unknown> = {}
       if (input.scheduledAt) updates.scheduledAt = new Date(input.scheduledAt)
       if (input.completedAt) updates.completedAt = new Date(input.completedAt)
-      if (input.durationSeconds !== undefined) updates.duration = input.durationSeconds
+      if (input.durationSeconds !== undefined) updates.duration = clampSessionDurationSec(input.durationSeconds)
       if (input.painLevel !== undefined) updates.painLevel = input.painLevel
       if (input.exertionLevel !== undefined) updates.exertionLevel = input.exertionLevel
       if (input.notes !== undefined) updates.notes = input.notes ?? null

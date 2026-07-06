@@ -47,6 +47,21 @@ const TAU_FITNESS = 42
 const TAU_FATIGUE = 7
 const TAU_CHRONIC = 28 // EWMA-ACWR: acute 7d vs chronisch 28d
 
+/**
+ * Bovengrens op één sessieduur (seconden). Vangt de doorgelopen-timer-bug:
+ * een sessie die "voltooid" wordt weggeschreven nadat de app uren/dagen open
+ * bleef staan, krijgt anders een absurde duur (bv. 76 u) die als enorme sRPE
+ * de fitness/chronische basis opblaast en ACWR + vorm dagenlang vergiftigt.
+ * Mediaan-sessie ≈ 30 min, p95 ≈ 2 u, dus 4 u knipt nooit een echte sessie af.
+ */
+export const MAX_SESSION_DURATION_SEC = 4 * 60 * 60
+
+/** Kap een geregistreerde sessieduur (s) af op MAX_SESSION_DURATION_SEC; niet-eindige/negatieve → 0. */
+export function clampSessionDurationSec(sec: number | null | undefined): number {
+  if (sec == null || !Number.isFinite(sec) || sec < 0) return 0
+  return Math.min(sec, MAX_SESSION_DURATION_SEC)
+}
+
 /** sRPE in arbitrary units; ontbrekende RPE → 5 (matig), zoals elders in de app. */
 export function sessionLoad(durationMinutes: number, rpe: number | null | undefined): number {
   return Math.max(0, durationMinutes) * (rpe ?? 5)

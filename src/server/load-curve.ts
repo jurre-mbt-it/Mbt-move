@@ -20,6 +20,7 @@
 import type { PrismaClient } from '@prisma/client'
 import {
   buildLoadCurve,
+  clampSessionDurationSec,
   edwardsTrimp,
   ewmaAcwr,
   loadStatus,
@@ -105,7 +106,9 @@ export async function computeLoadCurve(
     if (!s.completedAt) continue
     strengthLoads.push({
       date: isoDay(s.completedAt),
-      load: sessionLoad((s.duration ?? 0) / 60, s.exertionLevel),
+      // Duur defensief afkappen: legacy-rijen met een doorgelopen timer mogen
+      // de curve niet vergiftigen, ook vóór ze in de DB gecorrigeerd zijn.
+      load: sessionLoad(clampSessionDurationSec(s.duration) / 60, s.exertionLevel),
     })
   }
 
@@ -117,7 +120,7 @@ export async function computeLoadCurve(
     const dateIso = isoDay(c.completedAt)
     cardioLoads.push({
       date: dateIso,
-      load: sessionLoad(c.durationSec / 60, c.rpe),
+      load: sessionLoad(clampSessionDurationSec(c.durationSec) / 60, c.rpe),
     })
     // TRIMP alleen meetellen voor het zichtbare venster (niet de warm-up).
     if (dateIso >= windowStartIso) {
