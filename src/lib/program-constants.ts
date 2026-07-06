@@ -12,11 +12,34 @@ export const STANDARD_PARAMS = [
 ]
 
 export const REP_UNITS = [
-  { value: 'reps', label: 'reps' },
-  { value: 'sec',  label: 'sec'  },
-  { value: 'min',  label: 'min'  },
-  { value: 'm',    label: 'm'    },
+  { value: 'reps',       label: 'reps'       },
+  { value: 'reps/zijde', label: 'reps/zijde' },
+  { value: 'sec',        label: 'sec'        },
+  { value: 'min',        label: 'min'        },
+  { value: 'm',          label: 'm'          },
 ]
+
+/**
+ * Eenheid voor "per zijde" (unilateraal): het opgegeven aantal geldt per kant,
+ * de patiënt doet links én rechts. Eén keer "set voltooien" dekt beide zijden.
+ * Symmetrisch — geen aparte links/rechts-registratie (bewust simpel gehouden).
+ */
+export const PER_SIDE_UNIT = 'reps/zijde'
+
+/** Telt de eenheid als herhalingen (reps of reps/zijde), niet tijd/afstand? null = legacy = reps. */
+export function isRepBasedUnit(unit: string | null | undefined): boolean {
+  return unit == null || unit === 'reps' || unit === PER_SIDE_UNIT
+}
+
+/** Wordt de oefening per zijde uitgevoerd (links + rechts)? */
+export function isPerSideUnit(unit: string | null | undefined): boolean {
+  return unit === PER_SIDE_UNIT
+}
+
+/** Volumefactor: per zijde telt dubbel (L+R = 2×), anders 1×. 1RM blíjft de per-zijde-waarde gebruiken. */
+export function sideVolumeFactor(unit: string | null | undefined): number {
+  return isPerSideUnit(unit) ? 2 : 1
+}
 
 // Visual colors per superset group letter — athletic-dark palette: subtiele
 // gekleurde overlay op dark base, rand in accent-tint, tekst in lichte tint.

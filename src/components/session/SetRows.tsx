@@ -8,6 +8,7 @@ import {
   prevKgFor,
   prevRepsFor,
 } from '@/lib/session-sets'
+import { isPerSideUnit } from '@/lib/program-constants'
 
 const mono =
   'ui-monospace, Menlo, "SF Mono", "Cascadia Code", "Source Code Pro", monospace'
@@ -34,6 +35,7 @@ export function SetRows({
   onAdd: () => void
 }) {
   const activeIdx = entries.findIndex(s => !s.done)
+  const perSide = isPerSideUnit(repUnit)
 
   return (
     <div>
@@ -44,10 +46,15 @@ export function SetRows({
           KG
         </span>
         <span className="flex-1 athletic-mono" style={{ color: P.inkDim, fontSize: 9, letterSpacing: '0.14em' }}>
-          {repUnit === 'reps' ? 'REPS' : repUnit.toUpperCase()}
+          {perSide ? 'REPS/ZIJDE' : repUnit === 'reps' ? 'REPS' : repUnit.toUpperCase()}
         </span>
         <span style={{ width: 44 }} />
       </div>
+      {perSide && (
+        <p className="px-3 mt-1 athletic-mono" style={{ color: P.gold, fontSize: 9, letterSpacing: '0.08em' }}>
+          PER ZIJDE · ÉÉN VINKJE TELT LINKS + RECHTS
+        </p>
+      )}
 
       <div className="space-y-1.5 mt-1.5">
         {entries.map((s, i) => {

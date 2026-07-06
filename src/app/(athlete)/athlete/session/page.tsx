@@ -42,6 +42,7 @@ import { toast } from 'sonner'
 import { RestSheet } from '@/components/session/RestSheet'
 import { SetRows } from '@/components/session/SetRows'
 import { ExtraParamsEditor, RepUnitPicker } from '@/components/session/ExtraParams'
+import { isRepBasedUnit, sideVolumeFactor } from '@/lib/program-constants'
 import { ExerciseProgressSheet } from '@/components/session/ExerciseProgressSheet'
 import {
   IconStrength,
@@ -1065,7 +1066,8 @@ function AthleteSessionPageInner() {
                 if (s.done) setsDone++
                 const kg = parseKg(s.kg)
                 const reps = parseReps(s.reps) ?? e.reps
-                if (kg != null && e.repUnit === 'reps') volume += kg * (reps || 0)
+                // Per-zijde telt dubbel (L+R); tijd/afstand-eenheden tellen niet mee in kg-volume.
+                if (kg != null && isRepBasedUnit(e.repUnit)) volume += kg * (reps || 0) * sideVolumeFactor(e.repUnit)
               }
             }
             return (

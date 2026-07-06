@@ -1,6 +1,6 @@
 import type { IntensityType } from '@/lib/prescription'
 
-export type RepUnit = 'reps' | 'sec' | 'min' | 'm'
+export type RepUnit = 'reps' | 'reps/zijde' | 'sec' | 'min' | 'm'
 export type ParamType = 'number' | 'text' | 'select' | 'slider'
 
 export interface ExtraParam {
