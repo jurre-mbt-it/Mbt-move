@@ -58,6 +58,40 @@ async function reportPatientId(
   return r.patientId
 }
 
+/** Dedupe batterij-items op catalogItemId (unique-constraint) → create-shape. */
+function dedupeItems(
+  items: Array<{ catalogItemId: string; order: number; targetWeek?: number | null }>,
+) {
+  const seen = new Set<string>()
+  const out: Array<{ catalogItemId: string; order: number; targetWeek: number | null }> = []
+  for (const it of items) {
+    if (seen.has(it.catalogItemId)) continue
+    seen.add(it.catalogItemId)
+    out.push({ catalogItemId: it.catalogItemId, order: it.order, targetWeek: it.targetWeek ?? null })
+  }
+  return out
+}
+
+/** Reads: globale seeds (practiceId NULL) + items van de eigen praktijk. */
+function practiceScope(practiceId: string | null) {
+  return practiceId
+    ? [{ practiceId: null }, { practiceId }]
+    : [{ practiceId: null }]
+}
+
+/** Mag deze therapeut dit catalog/battery-item bewerken? Globale seeds
+ *  (practiceId NULL) zijn in de single-clinic realiteit ook bewerkbaar; anders
+ *  moet het item in de eigen praktijk zitten. Admin mag alles. */
+function assertCanEditLibrary(
+  user: { role: string; practiceId: string | null },
+  item: { practiceId: string | null },
+) {
+  if (user.role === 'ADMIN') return
+  if (item.practiceId === null) return
+  if (user.practiceId && item.practiceId === user.practiceId) return
+  throw new TRPCError({ code: 'FORBIDDEN', message: 'Geen toegang tot dit item' })
+}
+
 // ── Zod ─────────────────────────────────────────────────────────────────
 const kind = z.enum(['BILATERAL', 'SINGLE'])
 const metric = z.enum(['LSI', 'RIGHT', 'LEFT', 'VALUE'])
@@ -113,14 +147,14 @@ export const testReportsRouter = createTRPCRouter({
   // ── Catalogus + batterijen ──────────────────────────────────────────────
   catalog: therapistProcedure.query(async ({ ctx }) => {
     return ctx.prisma.testCatalogItem.findMany({
-      where: { isActive: true },
+      where: { isActive: true, OR: practiceScope(ctx.user.practiceId) },
       orderBy: [{ categoryOrder: 'asc' }, { category: 'asc' }, { order: 'asc' }, { name: 'asc' }],
     })
   }),
 
   batteries: therapistProcedure.query(async ({ ctx }) => {
     return ctx.prisma.testBattery.findMany({
-      where: { isActive: true },
+      where: { isActive: true, OR: practiceScope(ctx.user.practiceId) },
       orderBy: [{ order: 'asc' }, { name: 'asc' }],
       include: {
         items: {
@@ -130,6 +164,99 @@ export const testReportsRouter = createTRPCRouter({
       },
     })
   }),
+
+  // ── Catalogus-CRUD (eigen tests aanmaken/bewerken) ────────────────────────
+  catalogUpsert: therapistProcedure
+    .input(specInput.extend({ id: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...spec } = input
+      if (id) {
+        const existing = await ctx.prisma.testCatalogItem.findUnique({
+          where: { id }, select: { practiceId: true },
+        })
+        if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
+        assertCanEditLibrary(ctx.user, existing)
+        return ctx.prisma.testCatalogItem.update({ where: { id }, data: spec })
+      }
+      return ctx.prisma.testCatalogItem.create({
+        data: { ...spec, practiceId: ctx.user.practiceId ?? null, creatorId: ctx.user.id },
+      })
+    }),
+
+  // Zachte verwijdering: isActive=false zodat bestaande rapporten/batterijen
+  // die ernaar verwijzen intact blijven.
+  catalogSetActive: therapistProcedure
+    .input(z.object({ id: z.string(), isActive: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.prisma.testCatalogItem.findUnique({
+        where: { id: input.id }, select: { practiceId: true },
+      })
+      if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
+      assertCanEditLibrary(ctx.user, existing)
+      return ctx.prisma.testCatalogItem.update({
+        where: { id: input.id }, data: { isActive: input.isActive },
+      })
+    }),
+
+  // ── Batterij-CRUD (samenstellen + weken-protocol) ─────────────────────────
+  batteryUpsert: therapistProcedure
+    .input(z.object({
+      id: z.string().optional(),
+      name: z.string().min(1),
+      description: z.string().nullable().optional(),
+      durationWeeks: z.number().int().min(1).max(104).nullable().optional(),
+      items: z.array(z.object({
+        catalogItemId: z.string(),
+        order: z.number().int(),
+        targetWeek: z.number().int().min(0).max(104).nullable().optional(),
+      })).default([]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { id, items, ...meta } = input
+      const data = {
+        name: meta.name,
+        description: meta.description ?? null,
+        durationWeeks: meta.durationWeeks ?? null,
+      }
+      if (id) {
+        const existing = await ctx.prisma.testBattery.findUnique({
+          where: { id }, select: { practiceId: true },
+        })
+        if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
+        assertCanEditLibrary(ctx.user, existing)
+        // Items volledig vervangen (dedup op catalogItemId i.v.m. unique).
+        await ctx.prisma.testBatteryItem.deleteMany({ where: { batteryId: id } })
+        return ctx.prisma.testBattery.update({
+          where: { id },
+          data: {
+            ...data,
+            items: { create: dedupeItems(items) },
+          },
+          include: { items: true },
+        })
+      }
+      return ctx.prisma.testBattery.create({
+        data: {
+          ...data,
+          practiceId: ctx.user.practiceId ?? null,
+          creatorId: ctx.user.id,
+          items: { create: dedupeItems(items) },
+        },
+        include: { items: true },
+      })
+    }),
+
+  batteryDelete: therapistProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const existing = await ctx.prisma.testBattery.findUnique({
+        where: { id: input.id }, select: { practiceId: true },
+      })
+      if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
+      assertCanEditLibrary(ctx.user, existing)
+      await ctx.prisma.testBattery.delete({ where: { id: input.id } })
+      return { ok: true }
+    }),
 
   // ── Rapporten ────────────────────────────────────────────────────────────
   listForPatient: therapistProcedure
@@ -356,6 +483,8 @@ export const testReportsRouter = createTRPCRouter({
       const battery = await ctx.prisma.testBattery.create({
         data: {
           name: input.name,
+          practiceId: ctx.user.practiceId ?? null,
+          creatorId: ctx.user.id,
           items: { create: ids.map((catalogItemId, order) => ({ catalogItemId, order })) },
         },
       })

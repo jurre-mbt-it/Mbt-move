@@ -18,6 +18,14 @@ opzettelijk; documenteer hier áls je het wijzigt:
   patiënt + treating-therapeuten.
 - **Week-schedules** — owner is creator, maar collega-therapeuten in
   dezelfde praktijk kunnen ze lezen.
+- **Test-library** (`TestCatalogItem`, `TestBattery`/`TestBatteryItem`) —
+  therapeut-bewerkbaar via `/therapist/test-reports/manage`. Scope via
+  `practiceId`: NULL = globale seed (voor iedereen), gevuld = eigen
+  praktijk. Reads = `practiceScope()` in `testReports.ts` (NULL OF eigen
+  practiceId). Writes = `assertCanEditLibrary()`: globale seeds zijn in de
+  single-clinic realiteit óók bewerkbaar, verder alleen eigen praktijk.
+  Batterijen kunnen als revalidatie-protocol dienen (`durationWeeks` +
+  per-test `targetWeek`). Deze drie tabellen hebben RLS deny-all.
 - **Patiënt-data** (sessions, wellness, pain entries, assessments,
   rehab-trackers, programma-toewijzing, dashboard, voortgang, insights,
   **wearable-data** — `SleepEntry`, `VitalsEntry`, `ReadinessSnapshot`,

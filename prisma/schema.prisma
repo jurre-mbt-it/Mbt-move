@@ -934,6 +934,14 @@ model ProgramExercise {
   supersetOrder Int      @default(0)
   notes         String?
 
+  // Extra voorschrift-parameters per oefening in dit programma (Tempo, Gewicht,
+  // Afstand, Hartslag, Moeite, Band kleur, …). Vorm:
+  //   [{ id, label, type, value, unit?, options?, min?, max?, valueMax? }, ...]
+  // Anders dan ExerciseLog.extraParams (gelogde waarden van de patiënt) en
+  // Exercise.defaultExtraParams (template-defaults) draagt dit de door de
+  // therapeut ingestelde doel-waarden voor dít programma.
+  extraParams   Json?
+
   // Intensiteits-voorschrift — zie enum IntensityType hierboven. min/max dragen
   // afhankelijk van type een RPE-waarde, percentage of kg-offset; intensityText
   // is de vrije voorschrift-tekst bij TEXT/TECHNIQUE.
@@ -1833,6 +1841,13 @@ model TestCatalogItem {
   id             String     @id @default(cuid())
   /// Stabiele kebab-case slug — idempotente seed-key.
   key            String?    @unique
+  /// Praktijk-scope. NULL = globale seed-test (voor iedereen zichtbaar);
+  /// gevuld = door een therapeut in die praktijk aangemaakt. Reads: NULL OF
+  /// eigen practiceId. Writes: alleen binnen eigen praktijk (globale items
+  /// zijn in de single-clinic realiteit ook bewerkbaar — zie router).
+  practiceId     String?
+  /// Therapeut die de test aanmaakte (audit); NULL voor seeds.
+  creatorId      String?
   category       String // "Kracht", "Power", "Mobiliteit"
   categoryOrder  Int        @default(0)
   name           String // "Quadriceps"
@@ -1857,6 +1872,7 @@ model TestCatalogItem {
   reportEntries TestReportEntry[]
 
   @@index([category, order])
+  @@index([practiceId])
   @@map("test_catalog_items")
 }
 
@@ -1865,8 +1881,16 @@ model TestCatalogItem {
 model TestBattery {
   id          String   @id @default(cuid())
   key         String?  @unique
+  /// Praktijk-scope, zelfde semantiek als TestCatalogItem.practiceId.
+  practiceId  String?
+  /// Therapeut die de batterij aanmaakte (audit); NULL voor seeds.
+  creatorId   String?
   name        String
   description String?
+  /// Looptijd van de batterij als revalidatie-protocol, in weken. NULL = geen
+  /// tijdlijn (losse meet-batterij). Gevuld → per test kan een targetWeek gezet
+  /// worden waarin het doel behaald zou moeten zijn.
+  durationWeeks Int?
   order       Int      @default(0)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -1874,6 +1898,7 @@ model TestBattery {
 
   items TestBatteryItem[]
 
+  @@index([practiceId])
   @@map("test_batteries")
 }
 
@@ -1884,6 +1909,10 @@ model TestBatteryItem {
   catalogItemId String
   catalogItem   TestCatalogItem @relation(fields: [catalogItemId], references: [id], onDelete: Cascade)
   order         Int             @default(0)
+  /// Week (t.o.v. start protocol) waarin het doel voor deze test behaald zou
+  /// moeten zijn. NULL = geen week-doel. Alleen zinvol als battery.durationWeeks
+  /// gezet is.
+  targetWeek    Int?
 
   @@unique([batteryId, catalogItemId])
   @@map("test_battery_items")

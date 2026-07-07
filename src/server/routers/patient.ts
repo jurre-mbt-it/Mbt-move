@@ -121,6 +121,7 @@ function mapProgramExercise(pe: {
   intensityMin?: number | null
   intensityMax?: number | null
   intensityText?: string | null
+  extraParams?: unknown
   exercise: {
     name: string
     category: string
@@ -164,6 +165,10 @@ function mapProgramExercise(pe: {
     intensityMin: pe.intensityMin ?? null,
     intensityMax: pe.intensityMax ?? null,
     intensityText: pe.intensityText ?? null,
+    // Door de therapeut ingestelde extra voorschrift-parameters (Tempo,
+    // Gewicht, Afstand, Hartslag, Moeite, Band kleur, …). Read-only doel-info
+    // voor de runner — losstaand van de invulbare defaultExtraParams.
+    programExtraParams: Array.isArray(pe.extraParams) ? pe.extraParams : [],
     easierVariantId: pe.exercise.easierVariantId ?? null,
     harderVariantId: pe.exercise.harderVariantId ?? null,
     // Coaching-cues uit de oefening-library (instructions + tips) en de namen

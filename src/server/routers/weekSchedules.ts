@@ -617,6 +617,10 @@ export const weekSchedulesRouter = createTRPCRouter({
               program: {
                 include: {
                   exercises: {
+                    // extraParams (recursieve JsonValue) weglaten: deze kalender-
+                    // view gebruikt 'm niet, en meenemen tipt de tRPC-inferentie
+                    // in de consumer over de TS2589-grens (te diepe type-instantie).
+                    omit: { extraParams: true },
                     include: { exercise: { select: { id: true, name: true, category: true, videoUrl: true } } },
                     orderBy: [{ week: 'asc' }, { day: 'asc' }, { order: 'asc' }],
                   },

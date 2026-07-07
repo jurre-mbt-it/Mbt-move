@@ -64,6 +64,10 @@ export default function TestReportsPage() {
               Objectieve meting van kracht, power en mobiliteit → PDF
             </MetaLabel>
           </div>
+          <div className="flex items-center gap-2">
+          <DarkButton variant="ghost" onClick={() => router.push('/therapist/test-reports/manage')}>
+            Tests & batterijen
+          </DarkButton>
           <DarkDialog open={createOpen} onOpenChange={setCreateOpen}>
             <DarkDialogTrigger asChild>
               <DarkButton variant="primary" onClick={() => setCreateOpen(true)}>
@@ -125,6 +129,7 @@ export default function TestReportsPage() {
               </div>
             </DarkDialogContent>
           </DarkDialog>
+          </div>
         </div>
 
         <Tile>

@@ -153,9 +153,10 @@ export function WeekPlannerEditor({ initialData }: Props) {
         days: daysPayload,
       })
       setCurrentScheduleId(created.id)
-      // Navigeer naar de edit-pagina (history.replaceState veroorzaakt een
-      // PageTransition-remount waardoor lokale state weg is).
-      router.replace(`/therapist/week-planner/${created.id}/edit`)
+      // URL stil naar /edit/{id} zetten zonder route-navigatie: geen
+      // AppLoader-flash, geen remount. PageTransition mapt new + {id}/edit op
+      // één stabiele key, dus lokale state blijft behouden.
+      window.history.replaceState(null, '', `/therapist/week-planner/${created.id}/edit`)
     }
     await utils.weekSchedules.list.invalidate()
   }

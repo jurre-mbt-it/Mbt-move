@@ -222,14 +222,14 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
     } else {
       const created = await createMutation.mutateAsync(payload)
       setCurrentExerciseId(created.id)
-      // Navigeer naar de edit-pagina zodat de URL klopt en refresh blijft werken.
-      // (history.replaceState triggert een PageTransition-remount waardoor de
-      // form-state weg is.)
+      // URL stil naar de edit-pagina zetten (geen route-navigatie → geen
+      // AppLoader-flash). PageTransition mapt new + {id}/edit op één stabiele
+      // key, dus de form-state blijft staan; een refresh laadt daarna correct.
       const dest =
         roleBase === '/therapist'
           ? `/therapist/exercises/${created.id}/edit`
           : `/athlete/exercises/${created.id}`
-      router.replace(dest)
+      window.history.replaceState(null, '', dest)
     }
   }
 

@@ -154,3 +154,30 @@ export function formatTargetKg(t: TargetKg): string {
   const one = t.min ?? t.max
   return one != null ? `${fmt(one)} kg` : ''
 }
+
+/** Read-only voorschrift-parameter zoals door de therapeut ingesteld op een
+ *  programma-oefening (Tempo, Gewicht, Afstand, Hartslag, Moeite, Band kleur,
+ *  …). Vorm sluit aan op ExtraParam in de builder. */
+export type PrescribedParam = {
+  id: string
+  label: string
+  type: 'number' | 'text' | 'select' | 'slider'
+  value: string | number
+  unit?: string
+  valueMax?: string | number
+}
+
+/** Format een voorschrift-parameter naar "Label waarde eenheid", of null als er
+ *  geen zinvolle waarde is ingevuld (leeg, of 0 zonder bovengrens). */
+export function formatPrescribedParam(p: PrescribedParam): string | null {
+  const hasMax = p.valueMax !== undefined && p.valueMax !== '' && p.valueMax !== null
+  const empty =
+    p.value === '' ||
+    p.value === null ||
+    p.value === undefined ||
+    (typeof p.value === 'number' && p.value === 0 && !hasMax)
+  if (empty) return null
+  const val = hasMax ? `${p.value}–${p.valueMax}` : `${p.value}`
+  const unit = p.unit ? ` ${p.unit}` : ''
+  return `${p.label} ${val}${unit}`
+}

@@ -37,6 +37,8 @@ import {
   formatPrescription,
   computeTargetKg,
   formatTargetKg,
+  formatPrescribedParam,
+  type PrescribedParam,
 } from '@/lib/prescription'
 import { toast } from 'sonner'
 import { RestSheet } from '@/components/session/RestSheet'
@@ -107,6 +109,9 @@ type LiveExercise = {
   intensityMin?: number | null
   intensityMax?: number | null
   intensityText?: string | null
+  /** Read-only voorschrift-parameters (Tempo, Gewicht, Band kleur, …) uit het
+   *  programma — getoond als doel-chips. */
+  programExtraParams?: PrescribedParam[]
 }
 
 function dbExerciseToLive(ex: DbExercise): LiveExercise {
@@ -237,6 +242,7 @@ function AthleteSessionPageInner() {
     intensityMin: e.intensityMin ?? null,
     intensityMax: e.intensityMax ?? null,
     intensityText: e.intensityText ?? null,
+    programExtraParams: (e as { programExtraParams?: PrescribedParam[] }).programExtraParams ?? [],
   }))
 
   // Extra exercises added during session
@@ -1338,6 +1344,19 @@ function AthleteSessionPageInner() {
                   {prescLabel.toUpperCase()}{targetKgLabel ? ` · ${targetKgLabel.toUpperCase()}` : ''}
                 </span>
               )}
+              {(current.programExtraParams ?? []).map(p => {
+                const label = formatPrescribedParam(p)
+                if (!label) return null
+                return (
+                  <span
+                    key={p.id}
+                    className="athletic-mono rounded-full"
+                    style={{ padding: '4px 10px', border: `1px solid ${P.lineStrong}`, color: P.inkMuted, fontSize: 9, letterSpacing: '0.14em', fontWeight: 700 }}
+                  >
+                    {label.toUpperCase()}
+                  </span>
+                )
+              })}
               <span
                 className="athletic-mono rounded-full"
                 style={{ padding: '4px 10px', border: `1px solid ${P.lineStrong}`, color: P.inkMuted, fontSize: 9, letterSpacing: '0.14em', fontWeight: 700 }}

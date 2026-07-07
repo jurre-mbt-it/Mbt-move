@@ -29,6 +29,8 @@ import {
   formatPrescription,
   computeTargetKg,
   formatTargetKg,
+  formatPrescribedParam,
+  type PrescribedParam,
 } from '@/lib/prescription'
 import { RestSheet } from '@/components/session/RestSheet'
 import { SetRows } from '@/components/session/SetRows'
@@ -81,6 +83,9 @@ type SessionExercise = {
   harderVariantName?: string | null
   /** Door de therapeut/library ingestelde extra parameters (ExtraParam[] JSON). */
   defaultExtraParams?: unknown
+  /** Door de therapeut in dít programma voorgeschreven extra parameters
+   *  (Tempo, Gewicht, Band kleur, …) — read-only doel-info. */
+  programExtraParams?: PrescribedParam[]
 }
 
 // LastLog (vorige-sessie-waarden) komt uit @/lib/session-sets — gedeeld met
@@ -1627,6 +1632,19 @@ function SessionPageInner() {
                   {prescLabel.toUpperCase()}{targetKgLabel ? ` · ${targetKgLabel.toUpperCase()}` : ''}
                 </span>
               )}
+              {(e.programExtraParams ?? []).map(p => {
+                const label = formatPrescribedParam(p)
+                if (!label) return null
+                return (
+                  <span
+                    key={p.id}
+                    className="athletic-mono rounded-full"
+                    style={{ padding: '4px 10px', border: `1px solid ${P.lineStrong}`, color: P.inkMuted, fontSize: 9, letterSpacing: '0.14em', fontWeight: 700 }}
+                  >
+                    {label.toUpperCase()}
+                  </span>
+                )
+              })}
               <span
                 className="athletic-mono rounded-full"
                 style={{ padding: '4px 10px', border: `1px solid ${P.lineStrong}`, color: P.inkMuted, fontSize: 9, letterSpacing: '0.14em', fontWeight: 700 }}

@@ -24,6 +24,8 @@ type EditExercise = {
   supersetGroup: string | null
   supersetOrder: number
   notes: string | null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  extraParams?: any
   day: number
   week: number
   exercise: {
@@ -129,7 +131,8 @@ export default function EditProgramPage({ params }: Props) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     intensityText: (pe as any).intensityText ?? null,
     rest: pe.restTime,
-    extraParams: [],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    extraParams: (pe as any).extraParams ?? [],
     supersetGroup: pe.supersetGroup ?? null,
     supersetOrder: pe.supersetOrder,
     selected: false,

@@ -715,6 +715,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       intensityMin: ex.intensityMin ?? null,
       intensityMax: ex.intensityMax ?? null,
       intensityText: ex.intensityText?.trim() ? ex.intensityText : null,
+      extraParams: ex.extraParams && ex.extraParams.length > 0 ? ex.extraParams : null,
     }))
     const resourcePayload = val.resources.map((r, i) => ({
       resourceId: r.resourceId,
@@ -760,13 +761,12 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         })
       }
       setCurrentProgramId(created.id)
-      // Doorsturen naar de edit-pagina zodat de URL op /edit/{id} landt en
-      // de pagina door tRPC opnieuw vanuit de server geladen wordt (incl.
-      // exercises). N.B. `history.replaceState` werkt niet — PageTransition
-      // gebruikt `key={pathname}` waardoor een silent URL-change alsnog de
-      // hele subtree remount en lokale state (de net toegevoegde oefeningen)
-      // weggooit.
-      router.replace(`/therapist/programs/${created.id}/edit`)
+      // URL stil naar /edit/{id} zetten zonder route-navigatie: geen
+      // Suspense/AppLoader-flash en geen remount. PageTransition mapt
+      // /programs/new en /programs/{id}/edit op één stabiele key, dus de
+      // subtree (incl. net-toegevoegde oefeningen) blijft staan. Een refresh
+      // laadt daarna gewoon /edit/{id} vanuit de server.
+      window.history.replaceState(null, '', `/therapist/programs/${created.id}/edit`)
     }
   }
 
@@ -978,6 +978,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       intensityMin: ex.intensityMin ?? null,
       intensityMax: ex.intensityMax ?? null,
       intensityText: ex.intensityText?.trim() ? ex.intensityText : null,
+      // Voorschrift-parameters horen wél in het sjabloon (niet patiënt-specifiek).
+      extraParams: ex.extraParams && ex.extraParams.length > 0 ? ex.extraParams : null,
     }))
     const resourcePayload = resources.map((r, i) => ({
       resourceId: r.resourceId, week: r.week, day: r.day, order: i,
@@ -1036,6 +1038,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         notes?: string | null;
         intensityType?: string; intensityMin?: number | null;
         intensityMax?: number | null; intensityText?: string | null;
+        extraParams?: BuilderExercise['extraParams'] | null;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         exercise: any
       }>
@@ -1056,7 +1059,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         repsMax: pe.repsMax ?? null,
         repUnit: (pe.repUnit as 'reps' | 'sec' | 'min') ?? 'reps',
         rest: pe.restTime,
-        extraParams: [],
+        extraParams: pe.extraParams ?? [],
         notes: pe.notes ?? null,
         intensityType: (pe.intensityType as BuilderExercise['intensityType']) ?? 'NONE',
         intensityMin: pe.intensityMin ?? null,

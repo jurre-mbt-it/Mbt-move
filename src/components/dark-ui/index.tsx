@@ -8,6 +8,7 @@
 'use client'
 
 import * as React from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
@@ -1355,7 +1356,12 @@ function DarkSearchSelect({
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState('')
   const [activeIndex, setActiveIndex] = React.useState(0)
+  // Portal-positie (viewport-coördinaten) t.o.v. de trigger. `above` flipt het
+  // paneel omhoog als er onder te weinig ruimte is.
+  const [pos, setPos] = React.useState<{ left: number; width: number; top?: number; bottom?: number; above: boolean; maxHeight: number } | null>(null)
   const rootRef = React.useRef<HTMLDivElement>(null)
+  const triggerRef = React.useRef<HTMLButtonElement>(null)
+  const panelRef = React.useRef<HTMLDivElement>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
   const listRef = React.useRef<HTMLDivElement>(null)
 
@@ -1367,16 +1373,50 @@ function DarkSearchSelect({
     return options.filter((o) => o.label.toLowerCase().includes(q))
   }, [options, query])
 
-  // Outside-click + Escape sluiten het paneel.
+  // Outside-click + Escape sluiten het paneel. Het paneel hangt in een portal
+  // buiten rootRef (om de overflow-hidden van bv. een Tile te ontsnappen), dus
+  // een klik erin telt niet als "buiten".
   React.useEffect(() => {
     if (!open) return
     function onPointer(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
+      const t = e.target as Node
+      if (rootRef.current?.contains(t)) return
+      if (panelRef.current?.contains(t)) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', onPointer)
     return () => document.removeEventListener('mousedown', onPointer)
+  }, [open])
+
+  // Bereken de portal-positie t.o.v. de trigger en houd 'm bij tijdens
+  // scrollen/resizen zolang het paneel open is.
+  React.useEffect(() => {
+    if (!open) return
+    function place() {
+      const el = triggerRef.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      const gap = 6
+      const spaceBelow = window.innerHeight - r.bottom - gap - 8
+      const spaceAbove = r.top - gap - 8
+      const above = spaceBelow < 220 && spaceAbove > spaceBelow
+      const maxHeight = Math.max(160, Math.min(340, (above ? spaceAbove : spaceBelow)))
+      setPos({
+        left: r.left,
+        width: r.width,
+        top: above ? undefined : r.bottom + gap,
+        bottom: above ? window.innerHeight - (r.top - gap) : undefined,
+        above,
+        maxHeight,
+      })
+    }
+    place()
+    window.addEventListener('scroll', place, true)
+    window.addEventListener('resize', place)
+    return () => {
+      window.removeEventListener('scroll', place, true)
+      window.removeEventListener('resize', place)
+    }
   }, [open])
 
   // Bij openen: reset zoekterm en focus het zoekveld.
@@ -1432,6 +1472,7 @@ function DarkSearchSelect({
   return (
     <div ref={rootRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         aria-label={ariaLabel}
         aria-haspopup="listbox"
@@ -1451,13 +1492,26 @@ function DarkSearchSelect({
         <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
       </button>
 
-      {open && (
+      {open && pos && typeof document !== 'undefined' && createPortal(
         <div
-          className="absolute left-0 right-0 z-50 mt-1.5 overflow-hidden rounded-xl border shadow-xl duration-150 ease-out animate-in fade-in-0 zoom-in-95 slide-in-from-top-1"
-          style={{ background: P.surfaceHi, borderColor: P.lineStrong, color: P.ink }}
+          ref={panelRef}
+          className={cn(
+            'fixed z-[9999] flex flex-col overflow-hidden rounded-xl border shadow-xl duration-150 ease-out animate-in fade-in-0 zoom-in-95',
+            pos.above ? 'slide-in-from-bottom-1' : 'slide-in-from-top-1',
+          )}
+          style={{
+            left: pos.left,
+            width: pos.width,
+            top: pos.top,
+            bottom: pos.bottom,
+            maxHeight: pos.maxHeight,
+            background: P.surfaceHi,
+            borderColor: P.lineStrong,
+            color: P.ink,
+          }}
         >
           <div
-            className="flex items-center gap-2 px-3 py-2"
+            className="flex shrink-0 items-center gap-2 px-3 py-2"
             style={{ borderBottom: `1px solid ${P.line}` }}
           >
             <Search className="h-4 w-4 shrink-0 opacity-50" />
@@ -1485,7 +1539,7 @@ function DarkSearchSelect({
             )}
           </div>
 
-          <div ref={listRef} role="listbox" className="max-h-64 overflow-y-auto p-1">
+          <div ref={listRef} role="listbox" className="min-h-0 flex-1 overflow-y-auto p-1">
             {filtered.length === 0 ? (
               <div className="px-3 py-6 text-center text-sm" style={{ color: P.inkMuted }}>
                 Geen resultaten
@@ -1518,7 +1572,8 @@ function DarkSearchSelect({
               })
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

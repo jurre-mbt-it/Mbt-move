@@ -41,6 +41,24 @@ const ProgramExerciseInput = z.object({
   intensityMin: z.number().nullable().optional(),
   intensityMax: z.number().nullable().optional(),
   intensityText: z.string().nullable().optional(),
+  // Extra voorschrift-parameters (Tempo, Gewicht, Afstand, Hartslag, Moeite,
+  // Band kleur, …). Vrij van vorm aan de rand; opgeslagen als JSON.
+  extraParams: z
+    .array(
+      z.object({
+        id: z.string(),
+        label: z.string(),
+        type: z.enum(['number', 'text', 'select', 'slider']),
+        value: z.union([z.string(), z.number()]),
+        unit: z.string().optional(),
+        options: z.array(z.string()).optional(),
+        min: z.number().optional(),
+        max: z.number().optional(),
+        valueMax: z.union([z.string(), z.number()]).optional(),
+      }),
+    )
+    .nullable()
+    .optional(),
 })
 
 // Educatie-blok (de "Leer"-items) gekoppeld aan een dag/week van het programma.
@@ -267,6 +285,7 @@ export const programsRouter = createTRPCRouter({
             intensityMin: ex.intensityMin ?? null,
             intensityMax: ex.intensityMax ?? null,
             intensityText: ex.intensityText ?? null,
+            extraParams: ex.extraParams && ex.extraParams.length > 0 ? ex.extraParams : undefined,
           })),
         }
       }
@@ -360,6 +379,7 @@ export const programsRouter = createTRPCRouter({
               intensityMin: ex.intensityMin,
               intensityMax: ex.intensityMax,
               intensityText: ex.intensityText,
+              extraParams: ex.extraParams ?? undefined,
             })),
           },
           resources: {

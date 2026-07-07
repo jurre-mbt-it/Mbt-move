@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { useRef, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -20,6 +20,7 @@ import {
   Blocks,
   FileText,
   MessageSquare,
+  PanelLeftClose,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -81,18 +82,14 @@ export function TherapistSidebar() {
 
   const collapsed = useSyncExternalStore(subscribeCollapsed, getCollapsedSnapshot, () => false)
 
-  // Auto-inklappen zodra je iets in de content aanklikt (buiten de zijbalk).
-  useEffect(() => {
-    function onPointerDown(e: PointerEvent) {
-      if (!asideRef.current) return
-      if (asideRef.current.contains(e.target as Node)) return
-      storeCollapsed(true)
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [])
+  // Handmatig in-/uitklappen via de toggle-knop bovenin. Bewust géén
+  // auto-inklappen meer bij klikken in de content — dat was hinderlijk tijdens
+  // het werken. De voorkeur blijft in localStorage bewaard.
+  function toggleCollapsed() {
+    storeCollapsed(!collapsed)
+  }
 
-  /** Ingeklapt: eerste klik op een item klapt alleen het menu uit. */
+  /** Ingeklapt: eerste klik op het logo/een item klapt alleen het menu uit. */
   function expandGuard(e: React.MouseEvent): boolean {
     if (!collapsed) return false
     e.preventDefault()
@@ -133,7 +130,21 @@ export function TherapistSidebar() {
         borderColor: P.lineStrong,
       }}
     >
-      {/* Logo — ingeklapt blijft alleen MBT over; klik klapt dan uit */}
+      {/* Logo + handmatige inklap-toggle. Ingeklapt blijft alleen MBT over;
+          klik op het logo klapt dan uit. Uitgeklapt staat rechtsboven een
+          knopje om te minimaliseren. */}
+      <div className="relative">
+      {!collapsed && (
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          title="Menu inklappen"
+          aria-label="Menu inklappen"
+          className="mbt-btn-hover athletic-tap absolute right-3 top-4 z-10 rounded-lg p-1.5 text-[#7B8889] hover:text-[#F5F7F6]"
+        >
+          <PanelLeftClose className="h-4 w-4" />
+        </button>
+      )}
       <button
         type="button"
         onClick={(e) => { expandGuard(e) }}
@@ -181,6 +192,7 @@ export function TherapistSidebar() {
           </>
         )}
       </button>
+      </div>
 
       {/* Navigation */}
       <nav className={cn('flex-1 p-3 flex flex-col gap-1 mbt-stagger', collapsed && 'px-2')}>
