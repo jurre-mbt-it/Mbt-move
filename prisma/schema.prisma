@@ -370,8 +370,9 @@ model User {
   runningAnalysesAsPatient   RunningAnalysis[] @relation("RunningAnalysisPatient")
   runningAnalysesAsTherapist RunningAnalysis[] @relation("RunningAnalysisTherapist")
 
-  // Wearables (Apple Watch / HealthKit)
+  // Wearables (Apple Watch / HealthKit + Strava)
   wearableConnections WearableConnection[]
+  stravaConnection    StravaConnection?
   sleepEntries        SleepEntry[]
   vitalsEntries       VitalsEntry[]
   readinessSnapshots  ReadinessSnapshot[]
@@ -2110,11 +2111,13 @@ model RunningAnalysisAdvice {
 
 enum WearableProvider {
   APPLE_HEALTH
+  STRAVA // Strava API (cloud-to-cloud, OAuth 2.0 + activity/stream-pull)
 }
 
 enum WorkoutSource {
   MANUAL // handmatig gelogd in de app
   APPLE_WATCH // gesynct vanuit HealthKit
+  STRAVA // gesynct via de Strava API (OAuth 2.0 + activity/stream-pull)
 }
 
 enum HrvType {
@@ -2148,6 +2151,25 @@ model WearableConnection {
   @@unique([userId, provider])
   @@index([userId])
   @@map("wearable_connections")
+}
+
+/// Strava OAuth 2.0-koppeling per user. Access-token verloopt (6u); refresh-token
+/// haalt een nieuw op. `athleteId` = Strava-athlete-id (mapping/dedup).
+model StravaConnection {
+  id           String    @id @default(cuid())
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String    @unique
+  athleteId    String    @unique // Strava athlete-id (als string; ids zijn groot)
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime // vervaltijd van het access-token
+  scope        String? // toegekende OAuth-scopes (bv. "read,activity:read_all")
+  lastSyncAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([athleteId])
+  @@map("strava_connections")
 }
 
 /// Eén nacht slaap, geaggregeerd uit HealthKit sleep-analysis-segmenten.

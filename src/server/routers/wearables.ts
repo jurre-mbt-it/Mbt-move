@@ -5,6 +5,8 @@ import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { computeReadinessFor } from '@/server/readiness'
 import { wearablesEnabledForRole } from '@/lib/wearables-access'
 import { auditLog } from '@/server/audit'
+import { buildAuthorizeUrl, isStravaConfigured } from '@/server/wearables/strava/config'
+import { syncStravaActivities } from '@/server/wearables/strava/sync'
 
 /**
  * Uitrol-gate: wearables is voorlopig alleen voor de admin (zie
@@ -206,6 +208,40 @@ export const wearablesRouter = createTRPCRouter({
       })
       return { ok: true }
     }),
+
+  // ── Strava (OAuth 2.0 cloud-to-cloud) ──────────────────────────────────────
+
+  /** Geautoriseerde Strava authorize-URL; de app opent 'm in de browser. */
+  stravaAuthorizeUrl: wearablesProcedure.query(({ ctx }) => {
+    if (!isStravaConfigured()) {
+      throw new TRPCError({ code: 'NOT_IMPLEMENTED', message: 'strava_not_configured' })
+    }
+    return { url: buildAuthorizeUrl(ctx.user!.id) }
+  }),
+
+  /** Strava-koppelingsstatus (voor de integraties-tegel). */
+  stravaStatus: wearablesProcedure.query(async ({ ctx }) => {
+    const c = await ctx.prisma.stravaConnection.findUnique({
+      where: { userId: ctx.user!.id },
+      select: { athleteId: true, lastSyncAt: true },
+    })
+    return { connected: !!c, lastSyncAt: c?.lastSyncAt?.toISOString() ?? null }
+  }),
+
+  /** Strava: handmatig (her)synchroniseren van de laatste 30 dagen. */
+  stravaSync: wearablesProcedure.mutation(async ({ ctx }) => {
+    const synced = await syncStravaActivities(ctx.prisma, ctx.user!.id, { days: 30 })
+    return { synced }
+  }),
+
+  /** Strava: loskoppelen (verwijdert tokens + connectie). */
+  stravaDisconnect: wearablesProcedure.mutation(async ({ ctx }) => {
+    await ctx.prisma.stravaConnection.deleteMany({ where: { userId: ctx.user!.id } })
+    await ctx.prisma.wearableConnection.deleteMany({
+      where: { userId: ctx.user!.id, provider: 'STRAVA' },
+    })
+    return { ok: true }
+  }),
 
   /** Therapeut/admin: wearable-overzicht van een patiënt (na toegangscheck). */
   forPatient: wearablesProcedure
