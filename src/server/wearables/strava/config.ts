@@ -34,7 +34,9 @@ export function getStravaConfig() {
   const clientId = process.env.STRAVA_CLIENT_ID
   const clientSecret = process.env.STRAVA_CLIENT_SECRET
   if (!clientId || !clientSecret) throw new Error('strava_not_configured')
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '')
+  // .trim() vangt een per ongeluk meegekopieerde enter/spatie in de env-waarde
+  // op — die zou anders de redirect_uri breken (Strava geeft dan "unexpected error").
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? '').trim().replace(/\/+$/, '')
   return {
     clientId,
     clientSecret,
