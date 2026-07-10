@@ -183,14 +183,6 @@ export async function ingestWearableData(
   })
 
   // ── Workouts → CardioLog (idempotent op externalId) ────
-  // Door de gebruiker beoordeelde workouts: hun RPE nooit overschrijven met de
-  // HR-schatting (anchor-reset na herinstallatie levert dezelfde workouts opnieuw).
-  const ratedRows = await prisma.cardioLog.findMany({
-    where: { patientId: userId, source: 'APPLE_WATCH', ratedAt: { not: null } },
-    select: { externalId: true },
-  })
-  const ratedIds = new Set(ratedRows.map(r => r.externalId))
-
   for (const w of payload.workouts) {
     const activity = mapActivity(w.activity)
     const completedAt = new Date(w.startAt)
@@ -214,14 +206,33 @@ export async function ingestWearableData(
       completedAt,
     }
 
-    await prisma.cardioLog.upsert({
-      // Key op (patientId, externalId): een door de client aangeleverde
-      // HealthKit-UUID kan zo nooit de cardio-rij van een ándere patiënt raken.
-      where: { patientId_externalId: { patientId: userId, externalId: w.externalId } },
-      // Beoordeeld → rpe niet aanraken (undefined = veld ongemoeid in Prisma).
-      update: ratedIds.has(w.externalId) ? { ...data, rpe: undefined } : data,
-      create: { id: createId(), patientId: userId, externalId: w.externalId, ...data },
+    // Key op (patientId, externalId): een door de client aangeleverde
+    // HealthKit-UUID kan zo nooit de cardio-rij van een ándere patiënt raken.
+    // Atomische rated-bescherming: de ratedAt-conditie zit in de WHERE, dus een
+    // door de gebruiker ingevulde RPE wordt nooit overschreven — ook niet bij
+    // een race met de beoordeel-popup (anchor-reset levert workouts opnieuw).
+    const upd = await prisma.cardioLog.updateMany({
+      where: { patientId: userId, externalId: w.externalId, ratedAt: null },
+      data,
     })
+    if (upd.count === 0) {
+      const updRated = await prisma.cardioLog.updateMany({
+        where: { patientId: userId, externalId: w.externalId },
+        data: { ...data, rpe: undefined },
+      })
+      if (updRated.count === 0) {
+        try {
+          await prisma.cardioLog.create({
+            data: { id: createId(), patientId: userId, externalId: w.externalId, ...data },
+          })
+        } catch (err) {
+          // P2002 = parallelle sync creëerde de rij zojuist; die is dan al bijgewerkt.
+          if (!(err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === 'P2002')) {
+            throw err
+          }
+        }
+      }
+    }
     affected.add(startOfDayUTCLocal(completedAt.toISOString().slice(0, 10)).getTime())
   }
 

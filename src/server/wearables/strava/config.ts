@@ -1,11 +1,14 @@
 /**
- * Strava-integratie-config: env-secrets, endpoints en OAuth-state-signing.
+ * Strava-integratie-config: env-secrets, endpoints, OAuth-state-signing en het
+ * verzegelen van de token-handoff.
  *
- * De koppeling start vanuit de mobiele app: die vraagt via tRPC een
- * geautoriseerde authorize-URL op (met een HMAC-getekende `state` die de userId
- * draagt), opent die in de browser, en Strava redirect naar onze callback-route.
- * De `state` laat de callback (die géén sessie heeft) veilig weten wélke user
- * koppelt — getekend met de client-secret, dus niet te vervalsen.
+ * Koppel-flow (claim-model): de app vraagt via tRPC een authorize-URL op
+ * (state = HMAC-getekend, TTL) en opent die in de browser. Strava redirect naar
+ * onze callback; die wisselt de code om maar slaat NIETS op — de tokens gaan
+ * AES-versleuteld (sealTokens) via de deep-link terug naar de app, die ze als
+ * ingelogde gebruiker claimt (`wearables.stravaClaim`). Zo landen tokens altijd
+ * onder het account dat de flow in de app doorloopt, en kan een doorgestuurde
+ * authorize-link nooit andermans Strava onder een aanvaller-account hangen.
  *
  * Env (zet in Vercel + .env.local):
  *   STRAVA_CLIENT_ID     — publieke client-id van de Strava-API-app
@@ -13,7 +16,7 @@
  *   NEXT_PUBLIC_APP_URL  — basis voor de callback-URL (moet matchen met de
  *                          "Authorization Callback Domain" in de Strava-app)
  */
-import { createHmac, timingSafeEqual } from 'crypto'
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto'
 
 export const STRAVA_ENDPOINTS = {
   authorize: 'https://www.strava.com/oauth/authorize',
@@ -84,4 +87,57 @@ export function verifyState(state: string | null | undefined): string | null {
   const [userId, expStr] = payload.split('.')
   if (!userId || !expStr || Date.now() > Number(expStr)) return null
   return userId
+}
+
+// ── Token-handoff: verzegelde blob callback → app (AES-256-GCM) ─────────────
+
+export type SealedStravaTokens = {
+  accessToken: string
+  refreshToken: string
+  expiresAt: number // unix-seconden
+  athleteId: string
+  scope: string | null
+}
+
+const BLOB_TTL_MS = 10 * 60 * 1000
+
+function sealKey(): Buffer {
+  return createHash('sha256').update(getStravaConfig().clientSecret).digest()
+}
+
+/** Versleutel de tokens voor de deep-link terug naar de app. */
+export function sealTokens(t: SealedStravaTokens): string {
+  const iv = randomBytes(12)
+  const cipher = createCipheriv('aes-256-gcm', sealKey(), iv)
+  const plain = JSON.stringify({ ...t, exp: Date.now() + BLOB_TTL_MS })
+  const ct = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()])
+  const tag = cipher.getAuthTag()
+  return Buffer.concat([iv, tag, ct]).toString('base64url')
+}
+
+/** Ontsleutel + valideer de blob; null bij ongeldig/verlopen/geknoeid. */
+export function openTokens(blob: string | null | undefined): SealedStravaTokens | null {
+  if (!blob) return null
+  try {
+    const raw = Buffer.from(blob, 'base64url')
+    if (raw.length < 12 + 16 + 2) return null
+    const iv = raw.subarray(0, 12)
+    const tag = raw.subarray(12, 28)
+    const ct = raw.subarray(28)
+    const decipher = createDecipheriv('aes-256-gcm', sealKey(), iv)
+    decipher.setAuthTag(tag)
+    const plain = Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8')
+    const parsed = JSON.parse(plain) as SealedStravaTokens & { exp: number }
+    if (!parsed.accessToken || !parsed.refreshToken || !parsed.athleteId) return null
+    if (!parsed.exp || Date.now() > parsed.exp) return null
+    return {
+      accessToken: parsed.accessToken,
+      refreshToken: parsed.refreshToken,
+      expiresAt: parsed.expiresAt,
+      athleteId: parsed.athleteId,
+      scope: parsed.scope ?? null,
+    }
+  } catch {
+    return null
+  }
 }

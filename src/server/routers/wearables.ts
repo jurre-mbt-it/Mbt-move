@@ -5,7 +5,7 @@ import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { computeReadinessFor } from '@/server/readiness'
 import { wearablesEnabledForRole } from '@/lib/wearables-access'
 import { auditLog } from '@/server/audit'
-import { buildAuthorizeUrl, isStravaConfigured } from '@/server/wearables/strava/config'
+import { buildAuthorizeUrl, isStravaConfigured, openTokens } from '@/server/wearables/strava/config'
 import { syncStravaActivities } from '@/server/wearables/strava/sync'
 
 /**
@@ -221,6 +221,48 @@ export const wearablesRouter = createTRPCRouter({
     }
     return { url: buildAuthorizeUrl(ctx.user!.id) }
   }),
+
+  /**
+   * Claim de tokens uit de verzegelde callback-blob voor de INGELOGDE gebruiker.
+   * Dit bindt de koppeling aan de app-sessie i.p.v. aan een (doorstuurbare)
+   * OAuth-state — zie strava/config.ts voor het waarom.
+   */
+  stravaClaim: wearablesProcedure
+    .input(z.object({ blob: z.string().min(1).max(4096) }))
+    .mutation(async ({ ctx, input }) => {
+      const t = openTokens(input.blob)
+      if (!t) throw new TRPCError({ code: 'BAD_REQUEST', message: 'invalid_blob' })
+      const userId = ctx.user!.id
+      const data = {
+        athleteId: t.athleteId,
+        accessToken: t.accessToken,
+        refreshToken: t.refreshToken,
+        expiresAt: new Date(t.expiresAt * 1000),
+        scope: t.scope,
+      }
+      try {
+        await ctx.prisma.$transaction([
+          ctx.prisma.stravaConnection.upsert({
+            where: { userId },
+            update: data,
+            create: { userId, ...data },
+          }),
+          ctx.prisma.wearableConnection.upsert({
+            where: { userId_provider: { userId, provider: 'STRAVA' } },
+            update: { enabled: true },
+            create: { userId, provider: 'STRAVA', enabled: true, deviceModel: 'Strava' },
+          }),
+        ])
+      } catch (err) {
+        // athleteId is uniek: dezelfde Strava-account kan niet aan twee
+        // app-accounts hangen.
+        if (err && typeof err === 'object' && 'code' in err && err.code === 'P2002') {
+          throw new TRPCError({ code: 'CONFLICT', message: 'athlete_already_linked' })
+        }
+        throw err
+      }
+      return { ok: true }
+    }),
 
   /** Strava-koppelingsstatus (voor de integraties-tegel). */
   stravaStatus: wearablesProcedure.query(async ({ ctx }) => {

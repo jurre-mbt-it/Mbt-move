@@ -32,7 +32,10 @@ type StravaActivity = {
   average_heartrate?: number
   max_heartrate?: number
   average_speed?: number
+  // NB: de lijst-endpoint (SummaryActivity) heeft GEEN calories-veld; rides
+  // hebben wel kilojoules (arbeid) — 1 kJ ≈ 1 kcal verbrand (≈24% efficiëntie).
   calories?: number
+  kilojoules?: number
   start_date?: string
   has_heartrate?: boolean
 }
@@ -85,11 +88,24 @@ export async function syncStravaActivities(prisma: Db, userId: string, opts?: { 
   const days = opts?.days ?? 30
   const after = Math.floor((Date.now() - days * 86_400_000) / 1000)
 
-  const activities = await stravaGet<StravaActivity[]>(token, `/athlete/activities?after=${after}&per_page=100`)
-  if (!Array.isArray(activities) || activities.length === 0) {
+  // Met `after` sorteert Strava oplopend (oudste eerst) — pagineren dus, anders
+  // mist een venster met >100 activiteiten juist de níeuwste. Cap op 3 pagina's.
+  const activities: StravaActivity[] = []
+  for (let page = 1; page <= 3; page++) {
+    const batch = await stravaGet<StravaActivity[]>(
+      token,
+      `/athlete/activities?after=${after}&per_page=100&page=${page}`,
+    )
+    if (!Array.isArray(batch) || batch.length === 0) break
+    activities.push(...batch)
+    if (batch.length < 100) break
+  }
+  if (activities.length === 0) {
     await prisma.stravaConnection.update({ where: { userId }, data: { lastSyncAt: new Date() } })
     return 0
   }
+  // Nieuwste eerst: zo gaat het stream-budget naar de recentste activiteiten.
+  activities.sort((a, b) => (b.start_date ?? '').localeCompare(a.start_date ?? ''))
 
   const profile = await prisma.user.findUnique({
     where: { id: userId },
@@ -101,14 +117,6 @@ export async function syncStravaActivities(prisma: Db, userId: string, opts?: { 
       restingHeartRate: profile?.restingHeartRate,
       dateOfBirth: profile?.dateOfBirth,
     })?.maxHr ?? null
-
-  // Door de gebruiker beoordeelde activiteiten: hun RPE nooit overschrijven
-  // met de HR-schatting (Strava her-synct hetzelfde venster elke keer).
-  const ratedRows = await prisma.cardioLog.findMany({
-    where: { patientId: userId, source: 'STRAVA', ratedAt: { not: null } },
-    select: { externalId: true },
-  })
-  const ratedIds = new Set(ratedRows.map(r => r.externalId))
 
   // Strava's read-limit is 100 req/15 min; 1 lijst-call + 1 stream-call per
   // activiteit kan daar bij een grote eerste sync overheen. Budget de streams;
@@ -146,7 +154,9 @@ export async function syncStravaActivities(prisma: Db, userId: string, opts?: { 
       distanceM,
       avgHeartRate,
       maxHeartRate: a.max_heartrate != null ? Math.round(a.max_heartrate) : null,
-      calories: a.calories != null ? Math.round(a.calories) : null,
+      // SummaryActivity heeft geen calories; voor rides is kilojoules ≈ kcal.
+      calories:
+        a.calories != null ? Math.round(a.calories) : a.kilojoules != null ? Math.round(a.kilojoules) : null,
       rpe: rpeFromHeartRate(avgHeartRate, maxHr, profile?.restingHeartRate),
       avgPaceSecPerKm,
       series: series ?? undefined,
@@ -154,12 +164,31 @@ export async function syncStravaActivities(prisma: Db, userId: string, opts?: { 
       completedAt: a.start_date ? new Date(a.start_date) : new Date(),
     }
     const externalId = `strava:${a.id}`
-    await prisma.cardioLog.upsert({
-      where: { patientId_externalId: { patientId: userId, externalId } },
-      // Beoordeeld → rpe niet aanraken (undefined = veld ongemoeid in Prisma).
-      update: ratedIds.has(externalId) ? { ...data, rpe: undefined } : data,
-      create: { id: createId(), patientId: userId, externalId, ...data },
+    // Atomisch t.o.v. gelijktijdig beoordelen: de ratedAt-conditie zit in de
+    // WHERE zelf, dus een parallelle sync kan een net-ingevulde RPE nooit
+    // overschrijven (de rated-tak raakt rpe niet aan).
+    const upd = await prisma.cardioLog.updateMany({
+      where: { patientId: userId, externalId, ratedAt: null },
+      data,
     })
+    if (upd.count === 0) {
+      const updRated = await prisma.cardioLog.updateMany({
+        where: { patientId: userId, externalId },
+        data: { ...data, rpe: undefined },
+      })
+      if (updRated.count === 0) {
+        try {
+          await prisma.cardioLog.create({
+            data: { id: createId(), patientId: userId, externalId, ...data },
+          })
+        } catch (err) {
+          // P2002 = parallelle sync creëerde de rij zojuist; die is dan al bijgewerkt.
+          if (!(err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === 'P2002')) {
+            throw err
+          }
+        }
+      }
+    }
     count++
   }
 
