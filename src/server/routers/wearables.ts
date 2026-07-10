@@ -167,6 +167,7 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
       rpe: a.rpe,
       avgPaceSecPerKm: a.avgPaceSecPerKm,
       timeInZones: a.timeInZones as unknown,
+      series: a.series as unknown,
       completedAt: a.completedAt.toISOString(),
     })),
     stress: stress.map(s => ({

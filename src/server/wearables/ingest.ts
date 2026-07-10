@@ -67,6 +67,18 @@ const workoutSchema = z.object({
   maxHeartRate: z.number().int().min(30).max(240).optional(),
   activeEnergyKcal: z.number().nonnegative().optional(),
   timeInZones: z.record(z.string(), z.number()).optional(),
+  // Per-minuut HR/tempo-tijdreeks voor de grafiek + decoupling. Gecapt op 240
+  // punten (≈4u bij 1-min buckets); nul-tijdreeksen worden genegeerd.
+  series: z
+    .array(
+      z.object({
+        t: z.number().int().nonnegative(),
+        hr: z.number().int().min(20).max(240).nullable(),
+        spd: z.number().nonnegative().max(30).nullable(),
+      }),
+    )
+    .max(240)
+    .optional(),
 })
 
 const sleepSegmentSchema = z.object({
@@ -188,6 +200,7 @@ export async function ingestWearableData(
       calories: w.activeEnergyKcal != null ? Math.round(w.activeEnergyKcal) : null,
       rpe,
       timeInZones: w.timeInZones ?? undefined,
+      series: w.series ?? undefined,
       avgPaceSecPerKm,
       source: 'APPLE_WATCH' as const,
       completedAt,

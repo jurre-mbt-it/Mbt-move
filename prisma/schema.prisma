@@ -768,6 +768,10 @@ model CardioLog {
   // Tijd-in-zone (seconden per HR-zone): { "1": sec, "2": sec, ... }. Afgeleid
   // uit gemeten HR + het HR-profiel van de patiënt op moment van loggen.
   timeInZones     Json?
+  // Per-minuut tijdreeks van de wearable-sync: [{ t: sec-vanaf-start, hr: bpm|null,
+  // spd: m/s|null }]. Voedt de HR/tempo-grafiek + cardiac-decoupling op het
+  // activity-scherm. Alleen gevuld voor gesyncte workouts met samples.
+  series          Json?
   avgPaceSecPerKm Int? // gemiddeld tempo in s/km (afgeleid uit distanceM/durationSec, opgeslagen voor trends)
   // Bron van de sessie: handmatig gelogd of gesynct vanuit een wearable.
   // `externalId` = HealthKit-workout-UUID; uniek PER PATIËNT zodat overlappende
