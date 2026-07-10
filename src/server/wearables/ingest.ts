@@ -183,6 +183,14 @@ export async function ingestWearableData(
   })
 
   // ── Workouts → CardioLog (idempotent op externalId) ────
+  // Door de gebruiker beoordeelde workouts: hun RPE nooit overschrijven met de
+  // HR-schatting (anchor-reset na herinstallatie levert dezelfde workouts opnieuw).
+  const ratedRows = await prisma.cardioLog.findMany({
+    where: { patientId: userId, source: 'APPLE_WATCH', ratedAt: { not: null } },
+    select: { externalId: true },
+  })
+  const ratedIds = new Set(ratedRows.map(r => r.externalId))
+
   for (const w of payload.workouts) {
     const activity = mapActivity(w.activity)
     const completedAt = new Date(w.startAt)
@@ -210,7 +218,8 @@ export async function ingestWearableData(
       // Key op (patientId, externalId): een door de client aangeleverde
       // HealthKit-UUID kan zo nooit de cardio-rij van een ándere patiënt raken.
       where: { patientId_externalId: { patientId: userId, externalId: w.externalId } },
-      update: data,
+      // Beoordeeld → rpe niet aanraken (undefined = veld ongemoeid in Prisma).
+      update: ratedIds.has(w.externalId) ? { ...data, rpe: undefined } : data,
       create: { id: createId(), patientId: userId, externalId: w.externalId, ...data },
     })
     affected.add(startOfDayUTCLocal(completedAt.toISOString().slice(0, 10)).getTime())

@@ -170,6 +170,7 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
       avgPaceSecPerKm: a.avgPaceSecPerKm,
       timeInZones: a.timeInZones as unknown,
       series: a.series as unknown,
+      source: a.source,
       feelScore: a.feelScore,
       ratedAt: a.ratedAt ? a.ratedAt.toISOString() : null,
       completedAt: a.completedAt.toISOString(),
@@ -247,10 +248,15 @@ export const wearablesRouter = createTRPCRouter({
 
   // ── Beoordelen van gesyncte activiteiten ───────────────────────────────────
 
-  /** Gesyncte activiteiten (watch/Strava) die nog beoordeeld moeten worden. */
+  /**
+   * Gesyncte activiteiten (watch/Strava) die nog beoordeeld moeten worden.
+   * Venster bewust kort (7d): een eerste Strava-backfill importeert 30 dagen
+   * en zou anders een flood aan popups geven; ouder werk is via het
+   * activity-detailscherm alsnog te beoordelen.
+   */
   unratedActivities: wearablesProcedure.query(async ({ ctx }) => {
     const since = startOfDay()
-    since.setDate(since.getDate() - 30)
+    since.setDate(since.getDate() - 7)
     const rows = await ctx.prisma.cardioLog.findMany({
       where: {
         patientId: ctx.user!.id,
@@ -259,7 +265,7 @@ export const wearablesRouter = createTRPCRouter({
         completedAt: { gte: since },
       },
       orderBy: { completedAt: 'desc' },
-      take: 20,
+      take: 10,
       select: {
         id: true, activity: true, distanceM: true, durationSec: true,
         avgHeartRate: true, rpe: true, source: true, completedAt: true,

@@ -102,6 +102,20 @@ export async function syncStravaActivities(prisma: Db, userId: string, opts?: { 
       dateOfBirth: profile?.dateOfBirth,
     })?.maxHr ?? null
 
+  // Door de gebruiker beoordeelde activiteiten: hun RPE nooit overschrijven
+  // met de HR-schatting (Strava her-synct hetzelfde venster elke keer).
+  const ratedRows = await prisma.cardioLog.findMany({
+    where: { patientId: userId, source: 'STRAVA', ratedAt: { not: null } },
+    select: { externalId: true },
+  })
+  const ratedIds = new Set(ratedRows.map(r => r.externalId))
+
+  // Strava's read-limit is 100 req/15 min; 1 lijst-call + 1 stream-call per
+  // activiteit kan daar bij een grote eerste sync overheen. Budget de streams;
+  // activiteiten zonder budget krijgen ze bij een volgende sync alsnog
+  // (upsert vult series dan aan).
+  let streamBudget = 40
+
   let count = 0
   for (const a of activities) {
     const durationSec = a.moving_time ?? a.elapsed_time
@@ -112,7 +126,8 @@ export async function syncStravaActivities(prisma: Db, userId: string, opts?: { 
     const avgPaceSecPerKm = distanceM && distanceM > 0 ? Math.round(durationSec / (distanceM / 1000)) : null
 
     let series: ReturnType<typeof buildSeries> = undefined
-    if (a.has_heartrate) {
+    if (a.has_heartrate && streamBudget > 0) {
+      streamBudget--
       try {
         const streams = await stravaGet<StreamResponse>(
           token,
@@ -141,7 +156,8 @@ export async function syncStravaActivities(prisma: Db, userId: string, opts?: { 
     const externalId = `strava:${a.id}`
     await prisma.cardioLog.upsert({
       where: { patientId_externalId: { patientId: userId, externalId } },
-      update: data,
+      // Beoordeeld → rpe niet aanraken (undefined = veld ongemoeid in Prisma).
+      update: ratedIds.has(externalId) ? { ...data, rpe: undefined } : data,
       create: { id: createId(), patientId: userId, externalId, ...data },
     })
     count++

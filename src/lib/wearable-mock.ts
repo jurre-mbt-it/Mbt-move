@@ -217,6 +217,7 @@ export function mockOverview(days = 30, end: Date = new Date()) {
       avgPaceSecPerKm: Math.round(a.dur / (a.dist / 1000)),
       timeInZones: null as unknown,
       series: null as unknown,
+      source: 'APPLE_WATCH' as const,
       feelScore: null as number | null,
       ratedAt: null as string | null,
       completedAt: d.toISOString(),
