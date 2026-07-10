@@ -216,6 +216,9 @@ export function mockOverview(days = 30, end: Date = new Date()) {
       rpe: Math.round(((a.hr - 53) / (185 - 53)) * 10),
       avgPaceSecPerKm: Math.round(a.dur / (a.dist / 1000)),
       timeInZones: null as unknown,
+      series: null as unknown,
+      feelScore: null as number | null,
+      ratedAt: null as string | null,
       completedAt: d.toISOString(),
     }
   })

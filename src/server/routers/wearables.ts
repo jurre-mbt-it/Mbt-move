@@ -102,7 +102,7 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
       orderBy: { date: 'asc' },
     }),
     prisma.cardioLog.findMany({
-      where: { patientId: userId, source: 'APPLE_WATCH' },
+      where: { patientId: userId, source: { in: ['APPLE_WATCH', 'STRAVA'] } },
       orderBy: { completedAt: 'desc' },
       take: ACTIVITY_LIMIT,
     }),
@@ -170,6 +170,8 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
       avgPaceSecPerKm: a.avgPaceSecPerKm,
       timeInZones: a.timeInZones as unknown,
       series: a.series as unknown,
+      feelScore: a.feelScore,
+      ratedAt: a.ratedAt ? a.ratedAt.toISOString() : null,
       completedAt: a.completedAt.toISOString(),
     })),
     stress: stress.map(s => ({
@@ -242,6 +244,56 @@ export const wearablesRouter = createTRPCRouter({
     })
     return { ok: true }
   }),
+
+  // ── Beoordelen van gesyncte activiteiten ───────────────────────────────────
+
+  /** Gesyncte activiteiten (watch/Strava) die nog beoordeeld moeten worden. */
+  unratedActivities: wearablesProcedure.query(async ({ ctx }) => {
+    const since = startOfDay()
+    since.setDate(since.getDate() - 30)
+    const rows = await ctx.prisma.cardioLog.findMany({
+      where: {
+        patientId: ctx.user!.id,
+        source: { in: ['APPLE_WATCH', 'STRAVA'] },
+        ratedAt: null,
+        completedAt: { gte: since },
+      },
+      orderBy: { completedAt: 'desc' },
+      take: 20,
+      select: {
+        id: true, activity: true, distanceM: true, durationSec: true,
+        avgHeartRate: true, rpe: true, source: true, completedAt: true,
+      },
+    })
+    return rows.map(r => ({ ...r, completedAt: r.completedAt.toISOString() }))
+  }),
+
+  /**
+   * Beoordeel een activiteit: RPE (overschrijft de HR-schatting en telt zo mee
+   * in de load-curve), gevoel-score en optionele notitie. Zet `ratedAt`.
+   */
+  rateActivity: wearablesProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        rpe: z.number().int().min(1).max(10),
+        feelScore: z.number().int().min(1).max(5).nullable().optional(),
+        notes: z.string().max(1000).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const res = await ctx.prisma.cardioLog.updateMany({
+        where: { id: input.id, patientId: ctx.user!.id },
+        data: {
+          rpe: input.rpe,
+          feelScore: input.feelScore ?? null,
+          ...(input.notes?.trim() ? { notes: input.notes.trim() } : {}),
+          ratedAt: new Date(),
+        },
+      })
+      if (res.count === 0) throw new TRPCError({ code: 'NOT_FOUND' })
+      return { ok: true }
+    }),
 
   /** Therapeut/admin: wearable-overzicht van een patiënt (na toegangscheck). */
   forPatient: wearablesProcedure
