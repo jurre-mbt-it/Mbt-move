@@ -5,13 +5,18 @@ import { Button } from '@/components/ui/button'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
 import type { BuilderExercise, ExtraParam, RepUnit } from './types'
-import { INTENSITY_TYPES, INTENSITY_TYPE_LABELS, type IntensityType } from '@/lib/prescription'
+import {
+  INTENSITY_TYPES, INTENSITY_TYPE_LABELS, type IntensityType,
+  formatSetsReps, formatPrescription, toPrescription, formatPrescribedParam,
+  type PrescribedParam,
+} from '@/lib/prescription'
 import { STANDARD_PARAMS, REP_UNITS } from '@/lib/program-constants'
 import { cn } from '@/lib/utils'
 import { useAutosave } from '@/hooks/useAutosave'
 import {
   GripVertical, X, Plus, ArrowUp, ArrowDown, MoreHorizontal, Play,
   Check, Loader2, AlertCircle, SlidersHorizontal, Trash2, StickyNote,
+  ChevronDown, ChevronUp,
 } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -51,6 +56,10 @@ interface Props {
   isInSuperset?: boolean
   allExercises?: LibraryExerciseLike[]
   customParams?: CustomParameter[]
+  /** Ingeklapt = één samengevatte doseerregel; uitgeklapt = bewerkbare chips.
+   *  Ongecontroleerd (undefined) valt terug op uitgeklapt (legacy gedrag). */
+  expanded?: boolean
+  onToggleExpanded?: (uid: string) => void
 }
 
 function InlineNumber({
@@ -152,8 +161,17 @@ function PrescriptionChip({
     />
   )
   return (
-    <div className="inline-flex items-center gap-1 bg-[#1C2425] border border-[rgba(255,255,255,0.06)] rounded-md pl-2 pr-1.5 py-0.5 text-xs h-7">
-      <span className="text-[#7B8889] font-medium">Doel</span>
+    <div
+      className={cn(
+        'inline-flex items-center gap-1 rounded-md pl-2 pr-1.5 py-0.5 text-xs h-7 transition-colors',
+        // Doel is klinisch het belangrijkste voorschrift — met een gezet type
+        // krijgt de chip een accent zodat 'ie niet wegvalt tussen de rest.
+        t !== 'NONE'
+          ? 'bg-[rgba(232,122,85,0.10)] border border-[rgba(232,122,85,0.40)]'
+          : 'bg-[#1C2425] border border-[rgba(255,255,255,0.06)]',
+      )}
+    >
+      <span className={cn('font-semibold', t !== 'NONE' ? 'text-[#e87a55]' : 'text-[#7B8889]')}>Doel</span>
       <select
         value={t}
         onChange={e =>
@@ -197,7 +215,12 @@ function PrescriptionChip({
 export function ProgramExerciseBlock({
   exercise, onUpdate, onRemove, onToggleSelect, onSwapVariant,
   isInSuperset = false, allExercises = [], customParams = [],
+  expanded, onToggleExpanded,
 }: Props) {
+  // undefined = ongecontroleerd → altijd uitgeklapt (legacy gedrag voor
+  // aanroepplekken die de expand-state (nog) niet beheren).
+  const isExpanded = expanded ?? true
+  const toggleExpanded = () => onToggleExpanded?.(exercise.uid)
   const [videoOpen, setVideoOpen] = useState(false)
   const [videoUrlDraft, setVideoUrlDraft] = useState('')
   const setVideoUrl = trpc.exercises.setVideoUrl.useMutation({
@@ -312,6 +335,13 @@ export function ProgramExerciseBlock({
     p => !exercise.extraParams.find(ep => ep.label === p.label)
   )
 
+  // Samengevatte doseerregel voor de ingeklapte kaart: "3–5 × 8–12 reps · 60s"
+  // plus het intensiteits-doel (accent) en de gevulde extra params (gedempt).
+  const prescriptionLabel = formatPrescription(toPrescription(exercise))
+  const filledParamLabels = exercise.extraParams
+    .map(p => formatPrescribedParam(p as PrescribedParam))
+    .filter((s): s is string => !!s)
+
   return (
     <div
       ref={setNodeRef}
@@ -357,9 +387,49 @@ export function ProgramExerciseBlock({
             {exercise.name}
           </button>
 
+          {/* Ingeklapt: samengevatte doseerregel op dezelfde rij — hele kaart
+              blijft één regel hoog, klik = uitklappen om te bewerken. */}
+          {!isExpanded && (
+            <button
+              type="button"
+              onClick={toggleExpanded}
+              title="Klik om te bewerken"
+              className="hidden sm:flex items-center gap-1.5 shrink min-w-0 max-w-[60%] group/summary"
+            >
+              <span className="athletic-mono text-[11px] whitespace-nowrap text-[#9CA8A9] group-hover/summary:text-foreground transition-colors">
+                {formatSetsReps(exercise.sets, exercise.setsMax, exercise.reps, exercise.repsMax, exercise.repUnit)}
+                {exercise.rest > 0 && <span className="text-[#566060]"> · {exercise.rest}s</span>}
+              </span>
+              {prescriptionLabel && (
+                <span
+                  className="text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap shrink-0"
+                  style={{ background: 'rgba(232,122,85,0.12)', color: '#e87a55', border: '1px solid rgba(232,122,85,0.30)' }}
+                >
+                  {prescriptionLabel}
+                </span>
+              )}
+              {filledParamLabels.slice(0, 2).map(label => (
+                <span
+                  key={label}
+                  className="athletic-mono text-[10px] whitespace-nowrap truncate text-[#7B8889]"
+                >
+                  {label}
+                </span>
+              ))}
+              {filledParamLabels.length > 2 && (
+                <span className="athletic-mono text-[10px] text-[#566060] shrink-0">
+                  +{filledParamLabels.length - 2}
+                </span>
+              )}
+              {!!exercise.notes?.trim() && (
+                <StickyNote className="w-3 h-3 shrink-0 text-[#4ECDC4]" aria-label="Heeft patiënt-notitie" />
+              )}
+            </button>
+          )}
+
           {/* Variant-swap quick-chips — direct zichtbaar zodat therapeut
               weet dat er een progressie/regressie beschikbaar is. */}
-          {(easierEx || harderEx) && (
+          {isExpanded && (easierEx || harderEx) && (
             <div className="hidden sm:flex items-center gap-1 shrink-0">
               {easierEx && (
                 <button
@@ -398,6 +468,19 @@ export function ProgramExerciseBlock({
             </div>
           )}
 
+          {/* Uitklap-toggle — parameters toevoegen zit in de uitgeklapte rij
+              (+ Parameter), dus het menu blijft klein: varianten + verwijderen. */}
+          {onToggleExpanded && (
+            <button
+              type="button"
+              onClick={toggleExpanded}
+              title={isExpanded ? 'Inklappen' : 'Uitklappen om te bewerken'}
+              className="shrink-0 w-6 h-6 rounded flex items-center justify-center text-[#7B8889] hover:text-foreground hover:bg-[rgba(255,255,255,0.06)] transition-colors"
+            >
+              {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+          )}
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-6 w-6 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
@@ -419,37 +502,6 @@ export function ProgramExerciseBlock({
                 </DropdownMenuItem>
               )}
               {(easierEx || harderEx) && <DropdownMenuSeparator />}
-
-              {/* Standard params */}
-              {availableStandard.length > 0 && (
-                <>
-                  <DropdownMenuLabel className="text-xs">Standaard parameters</DropdownMenuLabel>
-                  {availableStandard.map(p => (
-                    <DropdownMenuItem key={p.label} onClick={() => addParam(p)} className="text-xs">
-                      + {p.label}
-                      {(p as { unit?: string }).unit && (
-                        <span className="text-muted-foreground ml-1">{(p as { unit?: string }).unit}</span>
-                      )}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-
-              {/* Custom params */}
-              {availableCustom.length > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-xs">Custom parameters</DropdownMenuLabel>
-                  {availableCustom.map(cp => (
-                    <DropdownMenuItem key={cp.id} onClick={() => addParam(cp)} className="text-xs">
-                      + {cp.label}
-                      {cp.unit && <span className="text-muted-foreground ml-1">{cp.unit}</span>}
-                    </DropdownMenuItem>
-                  ))}
-                </>
-              )}
-
-              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onRemove(exercise.uid)} className="text-destructive gap-2">
                 <X className="w-3.5 h-3.5" />
                 Verwijderen
@@ -462,40 +514,38 @@ export function ProgramExerciseBlock({
           </button>
         </div>
 
-        {/* Second line: pills + chip-row.
-            - Pills tonen alleen parameters die NOG NIET zijn toegevoegd, zodat
-              je snel kunt klikken zonder het menu te openen.
-            - Chips staan op één flex-wrap rij — sets, reps, pauze + extras
-              schuiven netjes naast elkaar door, ook bij smalle schermen. */}
-        <div className="pl-10 space-y-1 pb-1">
+        {/* Mobiel (smal scherm): samenvatting op een eigen regel, want inline
+            naast de naam past 'ie daar niet. */}
+        {!isExpanded && (
+          <button
+            type="button"
+            onClick={toggleExpanded}
+            className="sm:hidden flex items-center gap-1.5 pl-10 pb-1 text-left min-w-0"
+          >
+            <span className="athletic-mono text-[11px] whitespace-nowrap text-[#9CA8A9]">
+              {formatSetsReps(exercise.sets, exercise.setsMax, exercise.reps, exercise.repsMax, exercise.repUnit)}
+              {exercise.rest > 0 && <span className="text-[#566060]"> · {exercise.rest}s</span>}
+            </span>
+            {prescriptionLabel && (
+              <span
+                className="text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap truncate"
+                style={{ background: 'rgba(232,122,85,0.12)', color: '#e87a55', border: '1px solid rgba(232,122,85,0.30)' }}
+              >
+                {prescriptionLabel}
+              </span>
+            )}
+            {!!exercise.notes?.trim() && (
+              <StickyNote className="w-3 h-3 shrink-0 text-[#4ECDC4]" />
+            )}
+          </button>
+        )}
 
-          {/* Quick-add pills + notitie-pill (alleen tonen als nog geen notitie) */}
-          {(availableStandard.length > 0 || !exercise.notes) && (
-            <div className="flex flex-wrap gap-1">
-              {availableStandard.map(p => (
-                <button
-                  key={p.label}
-                  type="button"
-                  onClick={() => addParam(p)}
-                  className="inline-flex items-center gap-1 h-6 px-2 rounded-full text-[11px] font-semibold border border-[rgba(255,255,255,0.10)] text-[#7B8889] hover:text-[#e87a55] hover:border-[rgba(232,122,85,0.35)] hover:bg-[rgba(232,122,85,0.06)] transition-colors"
-                >
-                  <Plus className="w-2.5 h-2.5" strokeWidth={3} />
-                  {p.label}
-                </button>
-              ))}
-              {!exercise.notes && (
-                <button
-                  type="button"
-                  onClick={() => onUpdate(exercise.uid, { notes: ' ' })}
-                  title="Voeg een notitie toe die alleen voor deze patiënt zichtbaar is"
-                  className="inline-flex items-center gap-1 h-6 px-2 rounded-full text-[11px] font-semibold border border-[rgba(255,255,255,0.10)] text-[#7B8889] hover:text-[#4ECDC4] hover:border-[rgba(78,205,196,0.35)] hover:bg-[rgba(78,205,196,0.06)] transition-colors"
-                >
-                  <StickyNote className="w-2.5 h-2.5" />
-                  Notitie
-                </button>
-              )}
-            </div>
-          )}
+        {/* Uitgeklapte bewerk-rij: sets/reps/pauze/doel + gevulde extra params
+            op één wrappende chip-rij. Nieuwe parameters komen via de
+            "+ Parameter"-chip aan het eind — geen rij lege suggestie-pills
+            meer per kaart. */}
+        {isExpanded && (
+        <div className="pl-10 space-y-1 pb-1">
 
           {/* Param chips — alle waarden naast elkaar, één rij die wrapt. */}
           <div className="flex flex-wrap items-center gap-1.5">
@@ -643,6 +693,61 @@ export function ProgramExerciseBlock({
                 </FixedChip>
               )
             })}
+
+            {/* Eén "+ Parameter"-menu i.p.v. een rij lege suggestie-pills. */}
+            {(availableStandard.length > 0 || availableCustom.length > 0) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-semibold border border-dashed border-[rgba(255,255,255,0.14)] text-[#7B8889] hover:text-[#e87a55] hover:border-[rgba(232,122,85,0.40)] hover:bg-[rgba(232,122,85,0.06)] transition-colors"
+                  >
+                    <Plus className="w-3 h-3" strokeWidth={3} />
+                    Parameter
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-52 max-h-80 overflow-y-auto">
+                  {availableStandard.length > 0 && (
+                    <>
+                      <DropdownMenuLabel className="text-xs">Standaard</DropdownMenuLabel>
+                      {availableStandard.map(p => (
+                        <DropdownMenuItem key={p.label} onClick={() => addParam(p)} className="text-xs">
+                          + {p.label}
+                          {(p as { unit?: string }).unit && (
+                            <span className="text-muted-foreground ml-1">{(p as { unit?: string }).unit}</span>
+                          )}
+                        </DropdownMenuItem>
+                      ))}
+                    </>
+                  )}
+                  {availableCustom.length > 0 && (
+                    <>
+                      {availableStandard.length > 0 && <DropdownMenuSeparator />}
+                      <DropdownMenuLabel className="text-xs">Eigen parameters</DropdownMenuLabel>
+                      {availableCustom.map(cp => (
+                        <DropdownMenuItem key={cp.id} onClick={() => addParam(cp)} className="text-xs">
+                          + {cp.label}
+                          {cp.unit && <span className="text-muted-foreground ml-1">{cp.unit}</span>}
+                        </DropdownMenuItem>
+                      ))}
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {/* Notitie-pill alleen tonen zolang er geen notitie staat. */}
+            {!exercise.notes && (
+              <button
+                type="button"
+                onClick={() => onUpdate(exercise.uid, { notes: ' ' })}
+                title="Voeg een notitie toe die alleen voor deze patiënt zichtbaar is"
+                className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-semibold border border-dashed border-[rgba(255,255,255,0.14)] text-[#7B8889] hover:text-[#4ECDC4] hover:border-[rgba(78,205,196,0.40)] hover:bg-[rgba(78,205,196,0.06)] transition-colors"
+              >
+                <StickyNote className="w-3 h-3" />
+                Notitie
+              </button>
+            )}
           </div>
 
           {/* Patiënt-notitie — opgeslagen op deze ProgramExercise (niet op de
@@ -699,6 +804,7 @@ export function ProgramExerciseBlock({
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Video dialog */}
@@ -720,8 +826,8 @@ export function ProgramExerciseBlock({
               <div>
                 <p className="text-sm font-medium">Nog geen video gekoppeld</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Plak een YouTube of Vimeo link en sla 'm op — wordt direct
-                  gekoppeld aan deze oefening voor alle programma's.
+                  Plak een YouTube of Vimeo link en sla &apos;m op — wordt direct
+                  gekoppeld aan deze oefening voor alle programma&apos;s.
                 </p>
               </div>
               <form onSubmit={handleAddVideoUrl} className="w-full max-w-sm flex gap-2 mt-2">

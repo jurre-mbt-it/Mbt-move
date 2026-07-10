@@ -15,9 +15,11 @@ interface Props {
   onSwapVariant: (uid: string, direction: 'easier' | 'harder') => void
   allExercises?: { id: string; name: string; category: string; difficulty: string; videoUrl?: string | null; easierVariantId?: string | null; harderVariantId?: string | null; muscleLoads: Record<string, number> }[]
   customParams?: CustomParameter[]
+  expandedUids?: Set<string>
+  onToggleExpanded?: (uid: string) => void
 }
 
-export function SupersetGroupBlock({ groupLetter, exercises, onUpdate, onRemove, onToggleSelect, onSwapVariant, allExercises, customParams }: Props) {
+export function SupersetGroupBlock({ groupLetter, exercises, onUpdate, onRemove, onToggleSelect, onSwapVariant, allExercises, customParams, expandedUids, onToggleExpanded }: Props) {
   const colors = SUPERSET_COLORS[groupLetter] ?? SUPERSET_COLORS.A
 
   const { setNodeRef, isOver } = useDroppable({
@@ -63,6 +65,8 @@ export function SupersetGroupBlock({ groupLetter, exercises, onUpdate, onRemove,
             isInSuperset
             allExercises={allExercises}
             customParams={customParams}
+            expanded={expandedUids ? expandedUids.has(ex.uid) : undefined}
+            onToggleExpanded={onToggleExpanded}
           />
         ))}
       </SortableContext>

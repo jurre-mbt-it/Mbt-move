@@ -1,9 +1,12 @@
 import type { CustomParameter } from '@/components/programs/types'
 
+// Let op: geen "Pauze"-param hier — rusttijd is een vast veld op de kaart
+// (restTime). Een tweede "Pauze" als extra param zorgde voor dubbele,
+// tegenstrijdige invoer. Bestaande programma's met een oude Pauze-param
+// blijven gewoon renderen (params zijn data, dit is alleen het aanbod).
 export const STANDARD_PARAMS = [
   { label: 'Tempo',        type: 'text'   as const, unit: '',     placeholder: '3-1-2-0' },
   { label: 'RPE',          type: 'slider' as const, unit: '/10',  min: 1, max: 10 },
-  { label: 'Pauze',        type: 'number' as const, unit: 'sec',  min: 0 },
   { label: 'Gewicht',      type: 'number' as const, unit: 'kg',   min: 0 },
   { label: 'Afstand',      type: 'number' as const, unit: 'm',    min: 0 },
   { label: 'Hartslag',     type: 'number' as const, unit: 'bpm',  min: 0 },
