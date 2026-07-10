@@ -30,6 +30,7 @@ import {
   computeTargetKg,
   formatTargetKg,
   formatPrescribedParam,
+  formatSetsReps,
   type PrescribedParam,
 } from '@/lib/prescription'
 import { RestSheet } from '@/components/session/RestSheet'
@@ -58,7 +59,9 @@ type SessionExercise = {
   difficulty: string
   description: string | null
   sets: number
+  setsMax?: number | null
   reps: number
+  repsMax?: number | null
   repUnit: string
   restTime: number
   videoUrl: string | null
@@ -1507,7 +1510,7 @@ function SessionPageInner() {
               className="athletic-mono"
               style={{ color: P.inkMuted, fontSize: 11, marginTop: 2 }}
             >
-              {e.sets} × {e.reps} {e.repUnit}
+              {formatSetsReps(e.sets, e.setsMax, e.reps, e.repsMax, e.repUnit)}
             </p>
           </div>
           {isExpanded

@@ -738,6 +738,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         flexibleSchedule: val.program.flexibleSchedule,
         weeklyTarget: val.program.flexibleSchedule ? val.program.weeklyTarget : null,
         reviewAfterWeeks: val.program.reviewAfterWeeks,
+        tendinopathyMode: val.program.tendinopathyMode,
+        trackOneRepMax: val.program.trackOneRepMax,
         exercises: exercisePayload,
         resources: resourcePayload,
       })
@@ -752,6 +754,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         flexibleSchedule: val.program.flexibleSchedule,
         weeklyTarget: val.program.flexibleSchedule ? val.program.weeklyTarget : null,
         reviewAfterWeeks: val.program.reviewAfterWeeks,
+        tendinopathyMode: val.program.tendinopathyMode,
+        trackOneRepMax: val.program.trackOneRepMax,
       })
       if (val.exercises.length > 0 || val.resources.length > 0) {
         await saveProgram.mutateAsync({
@@ -1000,6 +1004,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           description: program.description ?? undefined,
           weeks: program.weeks, daysPerWeek: program.daysPerWeek,
           isTemplate: true, patientId: null,
+          tendinopathyMode: program.tendinopathyMode,
+          trackOneRepMax: program.trackOneRepMax,
         })
         if (exercises.length > 0 || resources.length > 0) {
           await saveProgram.mutateAsync({

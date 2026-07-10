@@ -38,6 +38,7 @@ import {
   computeTargetKg,
   formatTargetKg,
   formatPrescribedParam,
+  formatSetsReps,
   type PrescribedParam,
 } from '@/lib/prescription'
 import { toast } from 'sonner'
@@ -97,7 +98,9 @@ type LiveExercise = {
   name: string
   category: string
   sets: number
+  setsMax?: number | null
   reps: number
+  repsMax?: number | null
   repUnit: string
   restTime: number
   videoUrl: string | null
@@ -868,7 +871,7 @@ function AthleteSessionPageInner() {
                             textTransform: 'uppercase',
                           }}
                         >
-                          {CATEGORY_LABELS_NL[e.category] ?? e.category} · {e.sets} × {e.reps} {e.repUnit}
+                          {CATEGORY_LABELS_NL[e.category] ?? e.category} · {formatSetsReps(e.sets, e.setsMax, e.reps, e.repsMax, e.repUnit)}
                         </div>
                       </div>
                       {clickable && (

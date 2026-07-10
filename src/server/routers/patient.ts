@@ -111,7 +111,9 @@ function mapProgramExercise(pe: {
   day: number
   order: number
   sets: number
+  setsMax?: number | null
   reps: number
+  repsMax?: number | null
   repUnit: string
   restTime: number
   supersetGroup: string | null
@@ -149,7 +151,10 @@ function mapProgramExercise(pe: {
     difficulty: pe.exercise.difficulty,
     description: pe.exercise.description ?? null,
     sets: pe.sets,
+    // Bereik-voorschrift ("3-5 sets" / "8-12 reps"): null = enkele waarde.
+    setsMax: pe.setsMax ?? null,
     reps: pe.reps,
+    repsMax: pe.repsMax ?? null,
     repUnit: pe.repUnit,
     restTime: pe.restTime,
     videoUrl: pe.exercise.videoUrl ?? null,

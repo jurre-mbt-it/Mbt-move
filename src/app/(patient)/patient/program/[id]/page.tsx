@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { trpc } from '@/lib/trpc/client'
 import { cn } from '@/lib/utils'
+import { formatSetsReps } from '@/lib/prescription'
 import { DAY_LABELS } from '@/lib/program-constants'
 import { ExerciseVideoModal, type ExerciseForModal } from '@/components/exercises/ExerciseVideoModal'
 import { ChevronLeft, Play, CheckCircle2, Lock } from 'lucide-react'
@@ -276,7 +277,7 @@ export default function PatientProgramPage() {
                         className="athletic-mono shrink-0"
                         style={{ color: P.inkMuted, fontSize: 11 }}
                       >
-                        {e.sets}×{e.reps}
+                        {formatSetsReps(e.sets, e.setsMax, e.reps, e.repsMax)}
                       </span>
                       {e.videoUrl && (
                         <Play className="w-3 h-3 shrink-0" style={{ color: P.lime }} />

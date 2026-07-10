@@ -3,6 +3,7 @@
 import { use, useState } from 'react'
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
+import { formatSetsReps } from '@/lib/prescription'
 import { ExerciseVideoModal, type ExerciseForModal } from '@/components/exercises/ExerciseVideoModal'
 import { ChevronLeft, Moon, Dumbbell, Play, CheckCircle2 } from 'lucide-react'
 import { IconSleep } from '@/components/icons'
@@ -185,7 +186,7 @@ export default function ScheduleDayPage({ params }: Props) {
                         className="athletic-mono"
                         style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.04em', marginTop: 2 }}
                       >
-                        {pe.sets} sets × {pe.reps} {pe.repUnit} · {pe.restTime}s rust
+                        {formatSetsReps(pe.sets, pe.setsMax, pe.reps, pe.repsMax, pe.repUnit)} · {pe.restTime}s rust
                       </p>
                     </div>
                     {pe.exercise.videoUrl && (

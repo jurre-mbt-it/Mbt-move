@@ -155,6 +155,22 @@ export function formatTargetKg(t: TargetKg): string {
   return one != null ? `${fmt(one)} kg` : ''
 }
 
+/**
+ * "3 × 10 reps", "3–5 × 8–12 reps" — sets×reps inclusief bereik-voorschrift.
+ * setsMax/repsMax null of gelijk aan de ondergrens = enkele waarde.
+ */
+export function formatSetsReps(
+  sets: number,
+  setsMax: number | null | undefined,
+  reps: number,
+  repsMax: number | null | undefined,
+  repUnit?: string,
+): string {
+  const setsPart = setsMax != null && setsMax !== sets ? `${sets}–${setsMax}` : `${sets}`
+  const repsPart = repsMax != null && repsMax !== reps ? `${reps}–${repsMax}` : `${reps}`
+  return `${setsPart} × ${repsPart}${repUnit ? ` ${repUnit}` : ''}`
+}
+
 /** Read-only voorschrift-parameter zoals door de therapeut ingesteld op een
  *  programma-oefening (Tempo, Gewicht, Afstand, Hartslag, Moeite, Band kleur,
  *  …). Vorm sluit aan op ExtraParam in de builder. */
