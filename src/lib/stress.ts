@@ -3,9 +3,18 @@
  *
  * Puur welzijnssignaal, GEEN diagnose. Model: cardiovasculaire "silent workload"
  * tijdens inactiviteit. We mappen elke (rustende) HR-meting naar 0–100 via
- * percentage hartslagreserve (%HRR / Karvonen):
+ * percentage hartslagreserve (%HRR / Karvonen), maar op een RUST-band i.p.v. de
+ * volledige reserve tot HRmax:
  *
- *     score = clamp( (bpm − rustHR) / (maxHR − rustHR), 0..1 ) × 100
+ *     score = clamp( (bpm − rustHR) / (RESERVE_FRACTION × (maxHR − rustHR)), 0..1 ) × 100
+ *
+ * Waarom niet de volle reserve: workouts zijn al uitgefilterd, dus in rust kom
+ * je zelden boven ~15% HRR — met de volle reserve plakt de meter dan permanent
+ * in de laagste band (precies de klacht "stress altijd heel laag"). Een
+ * verhoging van de rust-HR met enkele tientallen slagen (stress, cafeïne,
+ * ziekte, matig herstel) is fysiologisch de bovenkant van "rust"; die
+ * rust-band spannen we op naar de volle 0–100 schaal. `RESERVE_FRACTION` is de
+ * knop om gevoeligheid bij te stellen.
  *
  * Actieve/workout-periodes worden client-side al uitgesloten (alleen rust telt,
  * net als Athlytic). Banden volgen Athlytic: 0–25 laag · 26–50 matig ·
@@ -17,11 +26,19 @@ export type StressBand = 'low' | 'moderate' | 'elevated' | 'high';
 export type StressBucket = { m: number; bpm: number };
 export type StressSample = { m: number; v: number };
 
+/**
+ * Deel van de hartslagreserve dat de rust-stress-band (0–100) overspant.
+ * ~0.45 ⇒ een rust-HR ~45% van de weg naar HRmax leest als maximale rust-stress
+ * (bij reserve 130 ≈ +60 bpm boven rust). Verlagen = gevoeliger.
+ */
+const RESERVE_FRACTION = 0.45;
+
 export function stressScore(bpm: number, restingHr: number, maxHr: number): number {
   const reserve = maxHr - restingHr;
   if (reserve <= 0) return 0;
-  const hrr = (bpm - restingHr) / reserve;
-  return Math.round(Math.max(0, Math.min(1, hrr)) * 100);
+  const span = reserve * RESERVE_FRACTION;
+  const norm = (bpm - restingHr) / span;
+  return Math.round(Math.max(0, Math.min(1, norm)) * 100);
 }
 
 export function stressBand(score: number): StressBand {

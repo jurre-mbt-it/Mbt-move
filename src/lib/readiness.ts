@@ -63,6 +63,11 @@ export type ReadinessResult = {
   band: ReadinessBandKey
   label: string
   description: string
+  /**
+   * Data-gedreven uitleg-zin (Athlytic-stijl): benoemt de gemeten HRV/rust-HR
+   * met de exacte afwijking t.o.v. de eigen baseline. Past zich aan de dag aan.
+   */
+  narrative: string
   contributors: Contributor[]
   /** Aantal nachten met bruikbare HRV-data dat de baseline voedt. */
   baselineNights: number
@@ -122,6 +127,7 @@ export function computeReadiness(
     sd: hrvSd,
     direction: 'higherBetter',
     sensitivity: 20,
+    minSd: 0.1, // lnHRV: ~10% nacht-op-nacht is normale ruis, geen signaal
     rawValue: todayVitals?.hrv ?? null,
     rawBaseline: hrvMean != null ? Math.round(Math.exp(hrvMean)) : null,
     weight: WEIGHTS.hrv,
@@ -137,6 +143,7 @@ export function computeReadiness(
     sd: sd(priorRhr.slice(-NORMAL_WINDOW)),
     direction: 'lowerBetter',
     sensitivity: 20,
+    minSd: 3, // rust-HR: ±3 bpm dag-op-dag is normale meetruis
     rawValue: todayVitals?.restingHeartRate ?? null,
     rawBaseline: priorRhr.length ? Math.round(mean(priorRhr.slice(-BASELINE_WINDOW))!) : null,
     weight: WEIGHTS.rhr,
@@ -152,6 +159,7 @@ export function computeReadiness(
     sd: sd(priorResp.slice(-NORMAL_WINDOW)),
     direction: 'lowerBetter',
     sensitivity: 15,
+    minSd: 0.7, // ademhaling: ±0.7/min dag-op-dag is normale ruis
     rawValue: todayVitals?.respiratoryRate ?? null,
     rawBaseline: priorResp.length ? round1(mean(priorResp.slice(-BASELINE_WINDOW))!) : null,
     weight: WEIGHTS.respiratory,
@@ -166,7 +174,10 @@ export function computeReadiness(
     baseline: 0,
     weight: WEIGHTS.wristTemp,
     status: tempDev == null ? 'na' : Math.abs(tempDev) <= 0.3 ? 'within' : 'below',
-    points: tempDev == null ? null : clamp(100 - Math.abs(tempDev) * 40, 0, 100),
+    // Een normale huidtemp is neutraal (~70), geen boost naar 100 — anders duwt
+    // 'ie de score kunstmatig omhoog. Alleen een afwijking (koorts/oververmoeid)
+    // trekt de deelscore neer.
+    points: tempDev == null ? null : clamp(70 - Math.abs(tempDev) * 70, 0, 100),
   }
 
   // --- Slaap (vorige nacht, t.o.v. eigen recent gemiddelde voor status) ---
@@ -201,13 +212,15 @@ export function computeReadiness(
 
   // --- LEARNING-gate ---
   if (baselineNights < MIN_BASELINE_NIGHTS) {
+    const learningText = `Nog ${MIN_BASELINE_NIGHTS - baselineNights} ${
+      MIN_BASELINE_NIGHTS - baselineNights === 1 ? 'nacht' : 'nachten'
+    } te gaan voordat je readiness betrouwbaar is. Draag je watch ’s nachts om je persoonlijke normaal op te bouwen.`
     return {
       score: null,
       band: 'LEARNING',
       label: 'Baseline leren',
-      description: `Nog ${MIN_BASELINE_NIGHTS - baselineNights} ${
-        MIN_BASELINE_NIGHTS - baselineNights === 1 ? 'nacht' : 'nachten'
-      } te gaan voordat je readiness betrouwbaar is. Draag je watch ’s nachts om je persoonlijke normaal op te bouwen.`,
+      description: learningText,
+      narrative: learningText,
       contributors: withWellness(physioContribs, wellness),
       baselineNights,
       illnessFlag: false,
@@ -248,6 +261,7 @@ export function computeReadiness(
     band,
     label: meta.label,
     description: meta.description,
+    narrative: buildNarrative(physioContribs, illnessFlag),
     contributors: [...physioContribs, wellnessContrib],
     baselineNights,
     illnessFlag,
@@ -264,19 +278,26 @@ function contributorFromDeviation(args: {
   sd: number | null
   direction: 'higherBetter' | 'lowerBetter'
   sensitivity: number // punten per SD-afwijking
+  /**
+   * Ondergrens voor de SD. Bij een héél stabiele reeks wordt de gemeten SD
+   * minuscuul, waardoor triviale nachtelijke ruis een enorme z-score geeft en
+   * de deelscore verzadigt op 0 of 100 (precies waarom readiness "altijd >90"
+   * bleef). De vloer houdt de score genuanceerd i.p.v. bimodaal.
+   */
+  minSd: number
   rawValue: number | null
   rawBaseline: number | null
   weight: number
 }): Contributor {
-  const { today, mean: m, sd: s, direction, sensitivity } = args
+  const { today, mean: m, sd: s, direction, sensitivity, minSd } = args
   if (today == null || m == null) {
     return {
       key: args.key, label: args.label, value: args.rawValue, baseline: args.rawBaseline,
       weight: args.weight, status: 'na', points: null,
     }
   }
-  const sdv = s && s > 1e-6 ? s : null
-  const z = sdv ? (today - m) / sdv : today - m > 0 ? 1 : today - m < 0 ? -1 : 0
+  const sdv = Math.max(s ?? 0, minSd)
+  const z = sdv > 0 ? (today - m) / sdv : 0
   const signed = direction === 'higherBetter' ? z : -z
   const points = clamp(50 + signed * sensitivity, 0, 100)
   const status: ContributorStatus =
@@ -306,6 +327,52 @@ function wellnessContributor(w: WellnessToday): Contributor {
 
 function withWellness(contribs: Contributor[], w: WellnessToday): Contributor[] {
   return [...contribs, wellnessContributor(w)]
+}
+
+/** Procentuele afwijking van een waarde t.o.v. baseline (afgerond). */
+function pctDiff(value: number, baseline: number): number {
+  if (!baseline) return 0
+  return Math.round(((value - baseline) / baseline) * 100)
+}
+
+/**
+ * Bouwt de data-gedreven uitleg-zin uit de contributors: benoemt HRV en rust-HR
+ * met hun exacte afwijking t.o.v. de eigen baseline (Athlytic-stijl), en voegt
+ * ademhaling/ziekte-signaal alleen toe als die duidelijk afwijken.
+ */
+function buildNarrative(contribs: Contributor[], illness: boolean): string {
+  const by = (k: Contributor['key']) => contribs.find(c => c.key === k)
+  const deviation = (c: Contributor | undefined, higherWord: string, lowerWord: string): string | null => {
+    if (!c || c.value == null || c.baseline == null) return null
+    const p = pctDiff(c.value, c.baseline)
+    if (p === 0) return `gelijk aan je gemiddelde van ${c.baseline}`
+    return `${Math.abs(p)}% ${p > 0 ? higherWord : lowerWord} dan je gemiddelde van ${c.baseline}`
+  }
+
+  const parts: string[] = []
+  const hrv = by('hrv')
+  const hrvDev = deviation(hrv, 'hoger', 'lager')
+  if (hrv?.value != null && hrvDev) parts.push(`je HRV tijdens de slaap van ${hrv.value} ms (${hrvDev} ms)`)
+
+  const rhr = by('rhr')
+  const rhrDev = deviation(rhr, 'hoger', 'lager')
+  if (rhr?.value != null && rhrDev) parts.push(`een rust-hartslag van ${rhr.value} bpm (${rhrDev} bpm)`)
+
+  let s =
+    parts.length === 0
+      ? 'Je herstelscore is gebaseerd op je HRV, rust-hartslag en slaap. Zodra je watch meer nachten heeft gemeten, wordt deze uitleg specifieker.'
+      : `Je herstelscore is vooral gebaseerd op ${parts.join(' en ')}.`
+
+  // Ademhaling alleen noemen als ze duidelijk afwijkt (≥1/min).
+  const resp = by('respiratory')
+  if (resp?.value != null && resp.baseline != null && Math.abs(resp.value - resp.baseline) >= 1) {
+    const p = pctDiff(resp.value, resp.baseline)
+    s += ` Je ademhaling ligt met ${resp.value}/min ${p > 0 ? 'hoger' : 'lager'} dan je normaal van ${resp.baseline}/min.`
+  }
+  if (illness) {
+    s += ' Let op: een verhoogde ademhaling én huidtemperatuur kunnen op een opkomende infectie wijzen.'
+  }
+  return s
 }
 
 function bandFromScore(score: number): ReadinessBandKey {
