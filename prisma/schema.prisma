@@ -808,6 +808,21 @@ model WeekSchedule {
   // weekNumber = 1, 2, 3, ... voor multi-week behandelplannen per patient.
   // Bestaande records behouden 1 (default). Templates negeren dit veld.
   weekNumber  Int               @default(1)
+
+  // ── Periodisering (per-week metadata) ──────────────────────────────────────
+  // Trainingsfase/blok van deze week — vrije string, maar de UI kent de vaste
+  // set ACCUMULATION | INTENSIFICATION | REALIZATION | DELOAD | TAPER en geeft
+  // die een label + kleur. Null = geen fase toegewezen.
+  phaseType   String?
+  // Deload-week: minder volume/intensiteit. Los van phaseType zodat je ook
+  // binnen een blok een losse deload kunt markeren.
+  isDeload    Boolean           @default(false)
+  // Geplande weekbelasting (sRPE-stijl punten) — richtwaarde die de planner
+  // naast de gerealiseerde belasting toont. Null = geen doel gezet.
+  targetLoad  Int?
+  // Week-brede coaching-notitie (doel/aandachtspunt voor deze week).
+  weekNote    String?
+
   days        WeekScheduleDay[]
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt

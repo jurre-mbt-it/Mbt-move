@@ -584,6 +584,60 @@ export const weekSchedulesRouter = createTRPCRouter({
     }),
 
   /**
+   * Zet periodiserings-metadata (fase/deload/target/notitie) op één week van
+   * een patient. Maakt de week-rij aan als die nog niet bestaat (7 lege dagen),
+   * zodat je een fase kunt plannen vóór er workouts in staan.
+   */
+  setWeekMeta: therapistProcedure
+    .input(z.object({
+      patientId: z.string(),
+      weekNumber: z.number().int().min(1),
+      phaseType: z.enum([
+        'ACCUMULATION', 'INTENSIFICATION', 'REALIZATION', 'DELOAD', 'TAPER',
+      ]).nullable().optional(),
+      isDeload: z.boolean().optional(),
+      targetLoad: z.number().int().min(0).max(10000).nullable().optional(),
+      weekNote: z.string().max(2000).nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
+      const { patientId, weekNumber, ...meta } = input
+      // Alleen de meegegeven velden bijwerken (undefined = ongemoeid laten).
+      const data: Record<string, unknown> = {}
+      if (meta.phaseType !== undefined) data.phaseType = meta.phaseType
+      if (meta.isDeload !== undefined) data.isDeload = meta.isDeload
+      if (meta.targetLoad !== undefined) data.targetLoad = meta.targetLoad
+      if (meta.weekNote !== undefined) data.weekNote = meta.weekNote
+
+      const existing = await ctx.prisma.weekSchedule.findFirst({
+        where: { creatorId: ctx.user.id, patientId, weekNumber },
+      })
+      if (existing) {
+        return ctx.prisma.weekSchedule.update({ where: { id: existing.id }, data })
+      }
+      const patient = await ctx.prisma.user.findUnique({
+        where: { id: patientId }, select: { name: true, email: true },
+      })
+      const label = patient?.name ?? patient?.email ?? 'Patient'
+      return ctx.prisma.weekSchedule.create({
+        data: {
+          id: createId(),
+          name: `Weekplan · ${label} · week ${weekNumber}`,
+          creatorId: ctx.user.id,
+          practiceId: ctx.user.practiceId ?? null,
+          patientId,
+          startDate: new Date(),
+          isTemplate: false,
+          weekNumber,
+          ...data,
+          days: {
+            create: Array.from({ length: 7 }, (_, dow) => ({ id: createId(), dayOfWeek: dow })),
+          },
+        },
+      })
+    }),
+
+  /**
    * Verwijder één weekNumber voor een patient.
    */
   deleteWeek: therapistProcedure
@@ -1069,6 +1123,15 @@ export const weekSchedulesRouter = createTRPCRouter({
       sourceWeekNumber: z.number().int().min(1),
       targetWeekNumber: z.number().int().min(1),
       replace: z.boolean().default(false),
+      // Periodisering: de nieuwe week meteen als deload markeren en/of een
+      // fase toewijzen. Zonder deze velden erft de kopie de fase van de bron.
+      markDeload: z.boolean().optional(),
+      phaseType: z.enum([
+        'ACCUMULATION', 'INTENSIFICATION', 'REALIZATION', 'DELOAD', 'TAPER',
+      ]).nullable().optional(),
+      // Geplande weekbelasting van de nieuwe week; bij een deload-preset zet de
+      // UI dit typisch op ~60% van de bron.
+      targetLoad: z.number().int().min(0).max(10000).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (input.sourceWeekNumber === input.targetWeekNumber) {
@@ -1185,6 +1248,19 @@ export const weekSchedulesRouter = createTRPCRouter({
       for (const td of target.days) {
         await syncDayProgramId(ctx.prisma, td.id)
       }
+
+      // Periodiserings-metadata op de doel-week zetten. Expliciete input wint;
+      // anders erft de kopie de fase van de bron (deload wordt NIET geërfd —
+      // een gedupliceerde week is standaard een gewone week).
+      const metaUpdate: Record<string, unknown> = {}
+      if (input.markDeload !== undefined) metaUpdate.isDeload = input.markDeload
+      if (input.phaseType !== undefined) metaUpdate.phaseType = input.phaseType
+      else if (source.phaseType != null) metaUpdate.phaseType = source.phaseType
+      if (input.targetLoad !== undefined) metaUpdate.targetLoad = input.targetLoad
+      if (Object.keys(metaUpdate).length > 0) {
+        await ctx.prisma.weekSchedule.update({ where: { id: target.id }, data: metaUpdate })
+      }
+
       return { targetWeekScheduleId: target.id, copied: creates.length }
     }),
 
