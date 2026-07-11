@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { trpc } from '@/lib/trpc/client'
-import { DarkButton, DarkInput, Kicker, MetaLabel, MetricTile, P, Tile } from '@/components/dark-ui'
+import { DarkButton, DarkInput, Kicker, MetricTile, P, Tile } from '@/components/dark-ui'
 import { DPA_VERSION } from '@/lib/dpa-constants'
 
 export default function AdminDpaPage() {
@@ -21,11 +21,12 @@ export default function AdminDpaPage() {
   const pendingCount = patients.length - acceptedCount
 
   function downloadCsv() {
-    const header = 'Naam,E-mail,DPA versie,Geaccepteerd op,Account aangemaakt\n'
+    const header = 'Naam,E-mail,Rol,DPA versie,Geaccepteerd op,Account aangemaakt\n'
     const rows = patients.map(p =>
       [
         `"${p.name}"`,
         `"${p.email}"`,
+        p.role,
         p.dpaAcceptedVersion ?? 'Niet geaccepteerd',
         p.dpaAcceptedAt
           ? new Date(p.dpaAcceptedAt).toLocaleDateString('nl-NL')
@@ -57,7 +58,7 @@ export default function AdminDpaPage() {
             VERWERKINGSOVEREENKOMST
           </h1>
           <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 4 }}>
-            Overzicht patiëntacceptaties · Huidige versie:{' '}
+            Overzicht acceptaties · Huidige versie:{' '}
             <span className="athletic-mono" style={{ color: P.ink, fontWeight: 700 }}>
               {DPA_VERSION}
             </span>
@@ -75,7 +76,7 @@ export default function AdminDpaPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
-        <MetricTile label="Totaal patiënten" value={patients.length} tint={P.ink} />
+        <MetricTile label="Totaal (pat. + atleten)" value={patients.length} tint={P.ink} />
         <MetricTile label="Geaccepteerd" value={acceptedCount} tint={P.lime} />
         <MetricTile label="Openstaand" value={pendingCount} tint={P.gold} />
       </div>
@@ -98,7 +99,7 @@ export default function AdminDpaPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="py-16 text-center" style={{ color: P.inkMuted, fontSize: 13 }}>
-            {query ? 'Geen patiënten gevonden' : 'Geen patiënten gekoppeld aan uw account'}
+            {query ? 'Geen resultaten' : 'Nog geen patiënten of atleten in deze praktijk'}
           </div>
         ) : (
           <div>
@@ -115,7 +116,7 @@ export default function AdminDpaPage() {
                 borderBottom: `1px solid ${P.line}`,
               }}
             >
-              <span>Patiënt</span>
+              <span>Persoon</span>
               <span>Status</span>
               <span>Versie</span>
               <span>Datum</span>
@@ -127,8 +128,22 @@ export default function AdminDpaPage() {
                 style={{ borderBottom: idx === filtered.length - 1 ? 'none' : `1px solid ${P.line}` }}
               >
                 <div className="min-w-0">
-                  <p className="truncate" style={{ color: P.ink, fontSize: 13, fontWeight: 600 }}>
+                  <p className="truncate flex items-center gap-2" style={{ color: P.ink, fontSize: 13, fontWeight: 600 }}>
                     {p.name}
+                    <span
+                      className="athletic-mono"
+                      style={{
+                        color: p.role === 'ATHLETE' ? P.ice : P.inkMuted,
+                        fontSize: 9,
+                        letterSpacing: '0.1em',
+                        fontWeight: 800,
+                        padding: '1px 5px',
+                        borderRadius: 4,
+                        background: P.surfaceHi,
+                      }}
+                    >
+                      {p.role === 'ATHLETE' ? 'ATLEET' : 'PATIËNT'}
+                    </span>
                   </p>
                   <p
                     className="athletic-mono truncate"
@@ -189,8 +204,8 @@ export default function AdminDpaPage() {
       </Tile>
 
       <p style={{ color: P.inkDim, fontSize: 11, lineHeight: 1.5 }}>
-        Dit overzicht toont uitsluitend patiënten die aan uw account zijn gekoppeld.
-        Bewaar deze export conform de bewaartermijn van 15 jaar (WGBO).
+        Dit overzicht toont alle patiënten en atleten in je praktijk. Bewaar deze
+        export conform de bewaartermijn van 15 jaar (WGBO).
       </p>
     </div>
   )

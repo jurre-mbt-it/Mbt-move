@@ -5,7 +5,7 @@
  * Versie bijgehouden in User model (dpaAcceptedVersion + dpaAcceptedAt).
  */
 
-import { createTRPCRouter, protectedProcedure, therapistProcedure, invalidateUserCache } from '@/server/trpc'
+import { createTRPCRouter, protectedProcedure, adminProcedure, invalidateUserCache } from '@/server/trpc'
 import { DPA_VERSION } from '@/lib/dpa-constants'
 
 export { DPA_VERSION }
@@ -46,20 +46,25 @@ export const dpaRouter = createTRPCRouter({
     return { accepted: true, version: DPA_VERSION }
   }),
 
-  // ── Therapeut/admin: DPA-overzicht van eigen patiënten ───────────────────
-
-  listPatients: therapistProcedure.query(async ({ ctx }) => {
+  // ── Admin: DPA-overzicht van de héle praktijk ────────────────────────────
+  //
+  // Alleen ADMIN — therapeuten hoeven dit compliance-overzicht niet te zien.
+  // Scope = praktijk-breed en beide DPA-plichtige rollen (PATIENT + ATHLETE),
+  // niet meer versmald tot de eigen therapeut-koppeling. Zo klopt het totaal
+  // met de werkelijke populatie i.p.v. alleen je eigen gekoppelde patiënten.
+  listPatients: adminProcedure.query(async ({ ctx }) => {
     const patients = await ctx.prisma.user.findMany({
       where: {
-        role: 'PATIENT',
-        patientTherapists: {
-          some: { therapistId: ctx.user.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
-        },
+        role: { in: ['PATIENT', 'ATHLETE'] },
+        // Multi-tenant: beperk tot de eigen praktijk. Admin zonder praktijk
+        // (globale beheerder) ziet alles.
+        ...(ctx.user.practiceId ? { practiceId: ctx.user.practiceId } : {}),
       },
       select: {
         id: true,
         name: true,
         email: true,
+        role: true,
         dpaAcceptedVersion: true,
         dpaAcceptedAt: true,
         createdAt: true,
@@ -71,6 +76,7 @@ export const dpaRouter = createTRPCRouter({
       id: p.id,
       name: p.name ?? 'Onbekend',
       email: p.email,
+      role: p.role,
       dpaAcceptedVersion: p.dpaAcceptedVersion ?? null,
       dpaAcceptedAt: p.dpaAcceptedAt?.toISOString() ?? null,
       createdAt: p.createdAt.toISOString(),
