@@ -1664,11 +1664,15 @@ function WeekPlannerContent() {
     weekNumber: number | null
     items: ScheduleItem[]
   }
-  const { dateMap, adhocStatusById } = useMemo(() => {
+  const { dateMap, adhocStatusById, weekAnchor } = useMemo(() => {
     const map = new Map<string, DayCellInfo>()
     // Status per quick-item-id (geen programId → geen sessionByKey-match):
     // gevuld door cardio- en losse-sessie-matching hieronder.
     const adhocStatusById = new Map<string, SessionMatch>()
+    // Anker (maandag van week `baselineWeekNumber`) — hiermee kan de UI ook
+    // voor LEGE kalenderrijen het weekNumber afleiden, zodat je een fase op
+    // een toekomstige week kunt zetten vóór er workouts staan.
+    let weekAnchor: { monday: Date; weekNumber: number } | null = null
 
     // ── 1. WeekSchedule-items (geplande workouts) ──
     if (schedules.length > 0) {
@@ -1689,6 +1693,7 @@ function WeekPlannerContent() {
         baseline = mondayOf(new Date(earliest.createdAt))
         baselineWeekNumber = earliest.weekNumber
       }
+      weekAnchor = { monday: baseline, weekNumber: baselineWeekNumber }
 
       for (const ws of schedules) {
         const start = ws.startDate
@@ -1855,7 +1860,7 @@ function WeekPlannerContent() {
       }
     }
 
-    return { dateMap: map, adhocStatusById }
+    return { dateMap: map, adhocStatusById, weekAnchor }
   }, [schedules, sessionsRaw, cardioRaw, contentsByItem])
 
   // Periodiserings-metadata per weekNumber (fase/deload/target/notitie).
@@ -2328,7 +2333,15 @@ function WeekPlannerContent() {
             // Bepaal weekNumber van deze rij voor 3-dots menu (kies de 1e dag in deze rij die in onze maand valt)
             const referenceDate = week.find(d => d.getMonth() === month0) ?? week[0]
             const info = dateMap.get(isoDate(referenceDate))
-            const weekNum = info?.weekNumber ?? null
+            // Bestaat er (nog) geen schema-rij voor deze week, leid het
+            // weekNumber dan af van het anker — zo kun je óók op een lege
+            // (toekomstige) week een fase zetten; setWeekMeta maakt de rij aan.
+            const rowMonday = mondayOf(referenceDate)
+            const derivedNum = weekAnchor
+              ? weekAnchor.weekNumber + Math.round((rowMonday.getTime() - weekAnchor.monday.getTime()) / (7 * 86_400_000))
+              : null
+            const weekNum = info?.weekNumber ?? (derivedNum != null && derivedNum >= 1 ? derivedNum : null)
+            const weekExists = info?.weekNumber != null
             const meta = weekNum != null ? weekMetaByNumber.get(weekNum) : undefined
             const progress = weekNum != null ? weekProgressByNumber.get(weekNum) : undefined
             const phase = phaseMeta(meta?.phaseType)
@@ -2398,14 +2411,19 @@ function WeekPlannerContent() {
                             <Layers className="w-3.5 h-3.5" />
                             Fase &amp; belasting instellen
                           </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => handleDuplicateWeek(weekNum)} className="gap-2 text-xs">
-                            <Copy className="w-3.5 h-3.5" />
-                            Dupliceer naar volgende week
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => handleDuplicateWeekAsDeload(weekNum)} className="gap-2 text-xs">
-                            <Moon className="w-3.5 h-3.5" />
-                            Dupliceer als deload-week
-                          </DropdownMenuItem>
+                          {/* Dupliceren vereist een bestaande bron-week. */}
+                          {weekExists && (
+                            <>
+                              <DropdownMenuItem onSelect={() => handleDuplicateWeek(weekNum)} className="gap-2 text-xs">
+                                <Copy className="w-3.5 h-3.5" />
+                                Dupliceer naar volgende week
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => handleDuplicateWeekAsDeload(weekNum)} className="gap-2 text-xs">
+                                <Moon className="w-3.5 h-3.5" />
+                                Dupliceer als deload-week
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </>
@@ -2463,9 +2481,15 @@ function WeekPlannerContent() {
             saving={setWeekMeta.isPending}
             onClose={() => setWeekMetaOpen(null)}
             onSave={async (vals) => {
+              // Maandag-anker van deze week meesturen zodat een nog niet
+              // bestaande (toekomstige) week op de juiste kalenderrij landt.
+              const monday = weekAnchor
+                ? addDays(weekAnchor.monday, (weekMetaOpen - weekAnchor.weekNumber) * 7)
+                : undefined
               await setWeekMeta.mutateAsync({
                 patientId: selectedPatientId,
                 weekNumber: weekMetaOpen,
+                ...(monday ? { startDate: monday.toISOString() } : {}),
                 ...vals,
               })
               setWeekMetaOpen(null)
