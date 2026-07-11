@@ -9,6 +9,7 @@
 import type { CardioActivity, PrismaClient } from '@prisma/client'
 import { resolveMaxHr } from '@/lib/cardio-zones'
 import { rpeFromHeartRate } from '@/server/wearables/ingest'
+import { findCrossSourceDuplicate, enrichExistingLog } from '@/server/wearables/dedupe'
 import { getValidAccessToken, stravaGet } from './oauth'
 
 const createId = () => crypto.randomUUID()
@@ -177,14 +178,22 @@ export async function syncStravaActivities(prisma: Db, userId: string, opts?: { 
         data: { ...data, rpe: undefined },
       })
       if (updRated.count === 0) {
-        try {
-          await prisma.cardioLog.create({
-            data: { id: createId(), patientId: userId, externalId, ...data },
-          })
-        } catch (err) {
-          // P2002 = parallelle sync creëerde de rij zojuist; die is dan al bijgewerkt.
-          if (!(err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === 'P2002')) {
-            throw err
+        // Cross-source check: dezelfde workout kan al via de Apple Watch-sync
+        // binnen zijn. Tijd-overlap = zelfde training → niet dupliceren, alleen
+        // ontbrekende velden (bv. tempo/afstand) op de bestaande rij aanvullen.
+        const dup = await findCrossSourceDuplicate(prisma, userId, data.completedAt, durationSec, 'STRAVA')
+        if (dup) {
+          await enrichExistingLog(prisma, dup, data)
+        } else {
+          try {
+            await prisma.cardioLog.create({
+              data: { id: createId(), patientId: userId, externalId, ...data },
+            })
+          } catch (err) {
+            // P2002 = parallelle sync creëerde de rij zojuist; die is dan al bijgewerkt.
+            if (!(err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === 'P2002')) {
+              throw err
+            }
           }
         }
       }
