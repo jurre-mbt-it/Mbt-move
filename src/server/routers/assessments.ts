@@ -19,6 +19,11 @@ async function assertTreating(
   patientId: string,
 ) {
   if (user.role === 'ADMIN') return
+  // Defense-in-depth: de praktijk-tak mag ALLEEN voor THERAPIST gelden
+  // (patiënten/atleten delen de practiceId). Vangnet tegen toekomstige regressie.
+  if (user.role !== 'THERAPIST') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Geen actieve behandelrelatie met deze patiënt' })
+  }
   // Toegang = directe PatientTherapist-relatie OF zelfde praktijk.
   const ok = await prisma.user.findFirst({
     where: {

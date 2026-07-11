@@ -16,7 +16,7 @@ const checkInput = z.object({
   fatigue: z.number().int().min(1).max(5),
   mood: z.number().int().min(1).max(5),
   stress: z.number().int().min(1).max(5),
-  notes: z.string().optional(),
+  notes: z.string().max(2000).optional(),
 })
 
 function startOfDay(d = new Date()) {

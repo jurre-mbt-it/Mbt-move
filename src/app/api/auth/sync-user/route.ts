@@ -2,7 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 
-const ALLOWED_SELF_SIGNUP_ROLES = new Set(['THERAPIST', 'ATHLETE'])
+// THERAPIST is bewust GEEN self-signup-rol: staff wordt via invite/admin
+// geprovisioneerd. Anders kan iedere bezoeker zichzelf therapeut-standing geven
+// (en zo de therapist-API-surface + MFA-onboarding omzeilen). PATIENT loopt via
+// invite.finalize; blijft dus ATHLETE als enige self-signup-rol.
+const ALLOWED_SELF_SIGNUP_ROLES = new Set(['ATHLETE'])
 
 /**
  * Bind een net-aangemaakte Supabase auth-account aan een Prisma user-row.
@@ -31,7 +35,7 @@ export async function POST(request: Request) {
     const requestedRole = typeof body?.role === 'string' ? body.role : undefined
     const safeRole = requestedRole && ALLOWED_SELF_SIGNUP_ROLES.has(requestedRole)
       ? requestedRole
-      : 'THERAPIST'
+      : 'ATHLETE'
     const safeName = typeof body?.name === 'string' && body.name.trim().length > 0
       ? body.name.trim().slice(0, 200)
       : authUser.email.split('@')[0]

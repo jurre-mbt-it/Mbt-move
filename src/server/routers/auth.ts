@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import crypto from 'node:crypto'
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
-import { createTRPCRouter, publicProcedure, protectedProcedure } from '@/server/trpc'
+import { createTRPCRouter, publicProcedure, protectedProcedure, invalidateUserCache } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
 import { auditLog } from '@/server/audit'
 
@@ -126,6 +126,9 @@ export const authRouter = createTRPCRouter({
         where: { id: ctx.user.id },
         data: { mfaEnabled: enabled },
       })
+      // Context-cache verversen zodat de MFA-enroll-gate (assertStaffMfaEnrolled)
+      // direct de nieuwe stand ziet i.p.v. tot 60s de oude te blijven gebruiken.
+      invalidateUserCache(ctx.user.supabaseUserId)
       await auditLog({
         event: enabled ? 'MFA_VERIFIED' : 'MFA_ENROLLED',
         userId: ctx.user.id,

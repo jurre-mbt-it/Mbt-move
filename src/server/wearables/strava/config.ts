@@ -115,6 +115,44 @@ export function sealTokens(t: SealedStravaTokens): string {
   return Buffer.concat([iv, tag, ct]).toString('base64url')
 }
 
+// ── Token-versleuteling AT REST (AES-256-GCM) ───────────────────────────────
+// Strava access/refresh-tokens worden versleuteld in de DB opgeslagen zodat een
+// database-dump of backup-lek geen bruikbare `activity:read_all`-tokens
+// prijsgeeft. De sleutel leeft alleen in de app-env (afgeleid van de
+// client-secret), niet in de database — een DB-lek zonder de env is dus waardeloos.
+const AT_REST_PREFIX = 'enc:v1:'
+
+function atRestKey(): Buffer {
+  // Andere afleiding dan sealKey() zodat de at-rest-sleutel en de
+  // in-transit-handoff-sleutel niet identiek zijn.
+  return createHash('sha256').update(`strava-at-rest:${getStravaConfig().clientSecret}`).digest()
+}
+
+/** Versleutel een token voor opslag in de DB. */
+export function encryptToken(plain: string): string {
+  const iv = randomBytes(12)
+  const cipher = createCipheriv('aes-256-gcm', atRestKey(), iv)
+  const ct = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()])
+  const tag = cipher.getAuthTag()
+  return AT_REST_PREFIX + Buffer.concat([iv, tag, ct]).toString('base64url')
+}
+
+/**
+ * Ontsleutel een uit de DB gelezen token. Backward-compat: rijen van vóór deze
+ * wijziging staan als plaintext opgeslagen (geen prefix) en worden ongewijzigd
+ * teruggegeven — ze versleutelen vanzelf bij de eerstvolgende token-refresh.
+ */
+export function decryptToken(stored: string): string {
+  if (!stored.startsWith(AT_REST_PREFIX)) return stored
+  const raw = Buffer.from(stored.slice(AT_REST_PREFIX.length), 'base64url')
+  const iv = raw.subarray(0, 12)
+  const tag = raw.subarray(12, 28)
+  const ct = raw.subarray(28)
+  const decipher = createDecipheriv('aes-256-gcm', atRestKey(), iv)
+  decipher.setAuthTag(tag)
+  return Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8')
+}
+
 /** Ontsleutel + valideer de blob; null bij ongeldig/verlopen/geknoeid. */
 export function openTokens(blob: string | null | undefined): SealedStravaTokens | null {
   if (!blob) return null

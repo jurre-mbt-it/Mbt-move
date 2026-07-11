@@ -38,9 +38,11 @@ export type NarrativeTestLine = {
 // AVG-dataminimalisatie (art. 5(1)(c)): we sturen BEWUST geen patiëntnaam of
 // ander direct identificerend gegeven naar de externe AI. Het model schrijft in
 // de "je"-vorm en heeft de naam niet nodig; wat overblijft is pseudonieme
-// klinische context (blessure/doel + testwaarden).
+// klinische context (rehab-fase + testwaarden). Vrije-tekstvelden zoals
+// blessure/doel worden bewust NIET meegestuurd (kunnen een naam bevatten).
 export type NarrativeInput = {
-  injuryGoal?: string | null
+  // NB: geen `injuryGoal` — vrije tekst gaat niet naar de externe AI (zie
+  // buildUserPrompt). Alleen gestructureerde, pseudonieme velden.
   rehabPhaseLabel?: string | null
   measurementNumber?: number | null
   tests: NarrativeTestLine[]
@@ -99,8 +101,12 @@ function buildUserPrompt(input: NarrativeInput): string {
         `- [${t.category}] ${t.name}${t.subtitle ? ` (${t.subtitle})` : ''}: ${t.values} → ${t.headline} · ${t.zone}`,
     )
     .join('\n')
+  // AVG-dataminimalisatie: het vrije-tekstveld `injuryGoal` gaat BEWUST NIET
+  // naar de externe AI. Het is door de therapeut ingetypte vrije tekst en kan
+  // (on)bedoeld een naam of ander direct identificerend gegeven bevatten,
+  // waarmee de pseudonieme casus alsnog herleidbaar wordt bij de sub-processor.
+  // Alleen het gestructureerde fase-label + meetnummer + de testwaarden gaan mee.
   const ctx = [
-    input.injuryGoal ? `Blessure/doel: ${input.injuryGoal}` : null,
     input.rehabPhaseLabel ? `Fase: ${input.rehabPhaseLabel}` : null,
     input.measurementNumber ? `Meting nummer: ${input.measurementNumber}` : null,
   ]
@@ -151,7 +157,7 @@ function stripAiDashes(s: string): string {
 // ── Hardloopanalyse ────────────────────────────────────────────────────────
 // Zie NarrativeInput: geen naam/identifier naar de externe AI (dataminimalisatie).
 export type RunningNarrativeInput = {
-  goal?: string | null
+  // NB: geen `goal` — vrije tekst gaat niet naar de externe AI (zie buildRunningPrompt).
   rearTotal?: number | null
   rear: Array<{ label: string; score: number | null; status: string }>
   side: Array<{ label: string; value: number | null; ideal: string; status: string }>
@@ -208,8 +214,10 @@ function buildRunningPrompt(i: RunningNarrativeInput): string {
   const metrics = i.metrics
     .map((m) => `- ${m.label}: ${m.value ?? '—'} ${m.unit}`)
     .join('\n')
+  // AVG-dataminimalisatie: `goal` is vrije tekst van de therapeut en gaat
+  // BEWUST NIET mee naar de externe AI (kan een naam/identifier bevatten).
+  // De numerieke scores/hoeken/metrics zijn pseudonieme klinische data.
   return [
-    i.goal ? `Doel: ${i.goal}` : null,
     i.rearTotal != null ? `Totaalscore achteraanzicht: ${i.rearTotal}%` : null,
     '',
     'Achteraanzicht (score 0-100):',

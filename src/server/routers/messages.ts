@@ -144,11 +144,20 @@ export const messagesRouter = createTRPCRouter({
         if (!session) throw new TRPCError({ code: 'NOT_FOUND', message: 'Sessie niet gevonden.' })
       }
       if (input.exerciseId) {
+        // Zichtbaarheids-scope: alleen een oefening koppelen die de afzender ook
+        // echt mag zien (publiek, eigen, of eigen praktijk). Anders lekt een
+        // willekeurig exerciseId de naam/bestaan van een privé-oefening van een
+        // andere praktijk de draad in.
         const exercise = await ctx.prisma.exercise.findUnique({
           where: { id: input.exerciseId },
-          select: { id: true },
+          select: { id: true, isPublic: true, createdById: true, practiceId: true },
         })
-        if (!exercise) throw new TRPCError({ code: 'NOT_FOUND', message: 'Oefening niet gevonden.' })
+        const visible =
+          exercise &&
+          (exercise.isPublic ||
+            exercise.createdById === ctx.user.id ||
+            (exercise.practiceId != null && exercise.practiceId === ctx.user.practiceId))
+        if (!visible) throw new TRPCError({ code: 'NOT_FOUND', message: 'Oefening niet gevonden.' })
       }
 
       const created = await ctx.prisma.message.create({

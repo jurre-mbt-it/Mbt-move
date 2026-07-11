@@ -34,6 +34,7 @@ export type SessionUser = {
   role: RequiredRole
   practiceId: string | null
   supabaseUserId: string
+  mfaEnabled: boolean
   dpaAcceptedVersion: string | null
   ghvAcceptedVersion: string | null
 }
@@ -73,6 +74,7 @@ export const getServerUser = cache(async (): Promise<SessionUser | null> => {
         role: true,
         practiceId: true,
         supabaseUserId: true,
+        mfaEnabled: true,
         dpaAcceptedVersion: true,
         ghvAcceptedVersion: true,
       },
@@ -127,8 +129,12 @@ export async function requireRole(
   const ok = Array.isArray(allowed) ? allowed.includes(user.role) : user.role === allowed
   if (!ok) redirect(ROLE_HOME[user.role])
 
-  if ((user.role === 'THERAPIST' || user.role === 'ADMIN') && (await staffMfaChallengePending())) {
-    redirect('/mfa/challenge')
+  if (user.role === 'THERAPIST' || user.role === 'ADMIN') {
+    // MFA verplicht voor staff: nog niet geënrold → naar de enroll-flow
+    // (die pagina leeft buiten de role-segments en heeft geen guard, dus geen
+    // redirect-loop). Wél geënrold maar deze sessie nog aal1 → challenge.
+    if (!user.mfaEnabled) redirect('/mfa/enroll')
+    if (await staffMfaChallengePending()) redirect('/mfa/challenge')
   }
 
   if (!options.skipDpa && DPA_REQUIRED_ROLES.has(user.role) && user.dpaAcceptedVersion !== DPA_VERSION) {
@@ -173,6 +179,7 @@ export async function requireAthleteAccess(): Promise<AthleteAccess> {
   }
 
   if (user.role === 'THERAPIST' || user.role === 'ADMIN') {
+    if (!user.mfaEnabled) redirect('/mfa/enroll')
     if (await staffMfaChallengePending()) redirect('/mfa/challenge')
     if (await isPersonalModeEnabled()) {
       return { ...user, isTherapistPersonalMode: true }

@@ -5,7 +5,7 @@ import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { computeReadinessFor } from '@/server/readiness'
 import { wearablesEnabledForRole } from '@/lib/wearables-access'
 import { auditLog } from '@/server/audit'
-import { buildAuthorizeUrl, isStravaConfigured, openTokens } from '@/server/wearables/strava/config'
+import { buildAuthorizeUrl, encryptToken, isStravaConfigured, openTokens } from '@/server/wearables/strava/config'
 import { syncStravaActivities } from '@/server/wearables/strava/sync'
 
 /**
@@ -235,8 +235,8 @@ export const wearablesRouter = createTRPCRouter({
       const userId = ctx.user!.id
       const data = {
         athleteId: t.athleteId,
-        accessToken: t.accessToken,
-        refreshToken: t.refreshToken,
+        accessToken: encryptToken(t.accessToken),
+        refreshToken: encryptToken(t.refreshToken),
         expiresAt: new Date(t.expiresAt * 1000),
         scope: t.scope,
       }

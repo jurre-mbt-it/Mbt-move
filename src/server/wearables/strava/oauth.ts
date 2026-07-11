@@ -3,7 +3,7 @@
  * geldig access-token teruggeeft (refresht + persisteert bij verlopen).
  */
 import type { PrismaClient } from '@prisma/client'
-import { getStravaConfig, STRAVA_ENDPOINTS } from './config'
+import { decryptToken, encryptToken, getStravaConfig, STRAVA_ENDPOINTS } from './config'
 
 export type StravaTokens = {
   access_token: string
@@ -54,23 +54,26 @@ export async function getValidAccessToken(prisma: Db, userId: string): Promise<s
   const conn = await prisma.stravaConnection.findUnique({ where: { userId } })
   if (!conn) throw new Error('strava_not_connected')
 
-  if (conn.expiresAt.getTime() - Date.now() > 60_000) return conn.accessToken
+  // Tokens staan versleuteld in de DB (zie config.encryptToken) — ontsleutel
+  // vóór gebruik. decryptToken laat legacy plaintext-rijen ongewijzigd.
+  if (conn.expiresAt.getTime() - Date.now() > 60_000) return decryptToken(conn.accessToken)
 
-  const t = await refreshTokens(conn.refreshToken)
+  const t = await refreshTokens(decryptToken(conn.refreshToken))
   // Guard tegen gelijktijdige refreshes: alleen de winnaar (die nog het oude
   // refresh-token in de rij ziet) schrijft; de verliezer leest het verse paar
-  // terug i.p.v. het met een verouderd token te overschrijven.
+  // terug i.p.v. het met een verouderd token te overschrijven. De where-match
+  // is op de exact opgeslagen (versleutelde) waarde, dus geen decrypt daar.
   const res = await prisma.stravaConnection.updateMany({
     where: { userId, refreshToken: conn.refreshToken },
     data: {
-      accessToken: t.access_token,
-      refreshToken: t.refresh_token,
+      accessToken: encryptToken(t.access_token),
+      refreshToken: encryptToken(t.refresh_token),
       expiresAt: new Date(t.expires_at * 1000),
     },
   })
   if (res.count === 0) {
     const fresh = await prisma.stravaConnection.findUnique({ where: { userId } })
-    if (fresh) return fresh.accessToken
+    if (fresh) return decryptToken(fresh.accessToken)
   }
   return t.access_token
 }
