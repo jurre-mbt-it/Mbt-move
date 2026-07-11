@@ -21,7 +21,12 @@ import { toast } from 'sonner'
 import {
   ChevronLeft, ChevronRight, Plus, X, MoreHorizontal,
   Search, Building2, Copy, CopyPlus, Pencil, BookmarkPlus, GripVertical,
+  CalendarRange, Layers, Moon, CalendarPlus,
 } from 'lucide-react'
+import {
+  PHASE_TYPES, PHASE_META, phaseMeta, DELOAD_LOAD_FRACTION,
+  type PhaseType,
+} from '@/lib/periodization'
 import {
   DndContext, DragOverlay, closestCenter, PointerSensor,
   useSensor, useSensors, useDroppable, useDraggable,
@@ -473,7 +478,12 @@ function DayCell({
             <button
               type="button"
               data-noselect
-              className="opacity-70 group-hover/cell:opacity-100 transition-opacity self-start text-[10px] flex items-center gap-1 px-1.5 py-0.5 rounded border cursor-pointer mbt-btn-hover"
+              className={cn(
+                // Alleen tonen bij hover/focus of als de dag nog leeg is — zo
+                // is de kalender geen muur van identieke +Workout-knoppen meer.
+                'transition-opacity self-start text-[10px] flex items-center gap-1 px-1.5 py-0.5 rounded border cursor-pointer mbt-btn-hover focus:opacity-100 group-hover/cell:opacity-100',
+                items.length === 0 ? 'opacity-40' : 'opacity-0',
+              )}
               style={{ color: P.brand, borderColor: 'rgba(232,122,85,0.4)', background: 'rgba(232,122,85,0.08)' }}
               title="Toevoegen / kopiëren"
             >
@@ -1005,6 +1015,145 @@ function ItemDetailContent({
   )
 }
 
+// ─── Week-instellingen: fase / deload / target / notitie ─────────────────────
+
+type WeekMetaValues = {
+  phaseType: PhaseType | null
+  isDeload: boolean
+  targetLoad: number | null
+  weekNote: string | null
+}
+
+function WeekMetaDialog({
+  weekNumber, initial, saving, onClose, onSave,
+}: {
+  weekNumber: number
+  initial: { phaseType: string | null; isDeload: boolean; targetLoad: number | null; weekNote: string | null } | null
+  saving: boolean
+  onClose: () => void
+  onSave: (vals: WeekMetaValues) => Promise<void>
+}) {
+  const [phaseType, setPhaseType] = useState<PhaseType | null>(
+    (initial?.phaseType as PhaseType | null) ?? null,
+  )
+  const [isDeload, setIsDeload] = useState(initial?.isDeload ?? false)
+  const [targetLoad, setTargetLoad] = useState<string>(
+    initial?.targetLoad != null ? String(initial.targetLoad) : '',
+  )
+  const [weekNote, setWeekNote] = useState(initial?.weekNote ?? '')
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Week {weekNumber} — fase &amp; belasting</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <MetaLabel>Trainingsfase</MetaLabel>
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              <button
+                type="button"
+                onClick={() => setPhaseType(null)}
+                className="px-2.5 py-1 rounded-md text-xs font-semibold transition-colors"
+                style={{
+                  background: phaseType === null ? P.surfaceHi : 'transparent',
+                  color: phaseType === null ? P.ink : P.inkMuted,
+                  border: `1px solid ${phaseType === null ? P.lineStrong : P.line}`,
+                }}
+              >
+                Geen
+              </button>
+              {PHASE_TYPES.map(pt => {
+                const active = phaseType === pt
+                return (
+                  <button
+                    key={pt}
+                    type="button"
+                    onClick={() => setPhaseType(pt)}
+                    title={PHASE_META[pt].description}
+                    className="px-2.5 py-1 rounded-md text-xs font-semibold transition-colors flex items-center gap-1.5"
+                    style={{
+                      background: active ? `${PHASE_META[pt].color}22` : 'transparent',
+                      color: active ? PHASE_META[pt].color : P.inkMuted,
+                      border: `1px solid ${active ? PHASE_META[pt].color : P.line}`,
+                    }}
+                  >
+                    <span className="w-2 h-2 rounded-full" style={{ background: PHASE_META[pt].color }} />
+                    {PHASE_META[pt].label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsDeload(v => !v)}
+            className="flex items-center gap-2 w-full text-left"
+          >
+            <span
+              className="w-9 h-5 rounded-full relative transition-colors shrink-0"
+              style={{ background: isDeload ? PHASE_META.DELOAD.color : P.lineStrong }}
+            >
+              <span
+                className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform"
+                style={{ transform: isDeload ? 'translateX(18px)' : 'translateX(2px)' }}
+              />
+            </span>
+            <span className="flex items-center gap-1.5 text-sm" style={{ color: P.ink }}>
+              <Moon className="w-3.5 h-3.5" style={{ color: PHASE_META.DELOAD.color }} />
+              Deload-week (herstel)
+            </span>
+          </button>
+
+          <div>
+            <MetaLabel>Geplande weekbelasting (optioneel)</MetaLabel>
+            <DarkInput
+              type="number"
+              inputMode="numeric"
+              placeholder="bijv. 350"
+              value={targetLoad}
+              onChange={(e) => setTargetLoad(e.target.value)}
+              className="mt-1.5"
+            />
+            <p className="text-[11px] mt-1" style={{ color: P.inkDim }}>
+              sRPE-stijl richtpunt — verschijnt naast de gerealiseerde belasting.
+            </p>
+          </div>
+
+          <div>
+            <MetaLabel>Week-notitie (optioneel)</MetaLabel>
+            <DarkTextarea
+              rows={2}
+              placeholder="Doel of aandachtspunt voor deze week…"
+              value={weekNote}
+              onChange={(e) => setWeekNote(e.target.value)}
+              className="mt-1.5"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-1">
+            <DarkButton variant="secondary" onClick={onClose} className="text-xs">Annuleren</DarkButton>
+            <DarkButton
+              disabled={saving}
+              onClick={() => onSave({
+                phaseType,
+                isDeload,
+                targetLoad: targetLoad.trim() === '' ? null : Math.max(0, Math.round(Number(targetLoad))),
+                weekNote: weekNote.trim() === '' ? null : weekNote.trim(),
+              })}
+              className="text-xs"
+            >
+              {saving ? 'Opslaan…' : 'Opslaan'}
+            </DarkButton>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function AddItemModal({
   open, onClose, dayId, dayLabel, programs, onSubmit, initialTab = 'library',
 }: {
@@ -1331,6 +1480,10 @@ function WeekPlannerContent() {
   const duplicateWeek = trpc.weekSchedules.duplicateWeek.useMutation({
     onSuccess: () => { utils.weekSchedules.listWithItems.invalidate(); toast.success('Week gedupliceerd') },
     onError: (err) => toast.error(err.message ?? 'Dupliceren mislukt'),
+  })
+  const setWeekMeta = trpc.weekSchedules.setWeekMeta.useMutation({
+    onSuccess: () => { utils.weekSchedules.listWithItems.invalidate() },
+    onError: (err) => toast.error(err.message ?? 'Opslaan mislukt'),
   })
   const reorderItems = trpc.weekSchedules.reorderItems.useMutation({
     // Optimistic: verplaats het item meteen in de cache zodat de tegel direct
@@ -1705,6 +1858,53 @@ function WeekPlannerContent() {
     return { dateMap: map, adhocStatusById }
   }, [schedules, sessionsRaw, cardioRaw, contentsByItem])
 
+  // Periodiserings-metadata per weekNumber (fase/deload/target/notitie).
+  const weekMetaByNumber = useMemo(() => {
+    const m = new Map<number, {
+      phaseType: string | null
+      isDeload: boolean
+      targetLoad: number | null
+      weekNote: string | null
+    }>()
+    for (const ws of schedules) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const w = ws as any
+      m.set(ws.weekNumber, {
+        phaseType: w.phaseType ?? null,
+        isDeload: w.isDeload ?? false,
+        targetLoad: w.targetLoad ?? null,
+        weekNote: w.weekNote ?? null,
+      })
+    }
+    return m
+  }, [schedules])
+
+  // Gepland vs gedaan per weekNumber: tel echte geplande workouts en hoeveel
+  // daarvan voltooid/deels zijn. Lichte proxy voor "weekbelasting" zonder een
+  // volledige sRPE-berekening client-side.
+  const weekProgressByNumber = useMemo(() => {
+    const m = new Map<number, { planned: number; done: number }>()
+    for (const [iso, info] of dateMap) {
+      if (info.weekNumber == null) continue
+      const cur = m.get(info.weekNumber) ?? { planned: 0, done: 0 }
+      for (const item of info.items) {
+        const real = !item.id.startsWith('legacy-')
+          && !item.id.startsWith('sessionlog-')
+          && !item.id.startsWith('cardiolog-')
+        if (!real) continue
+        cur.planned++
+        const st = statusFor(new Date(iso), item)
+        if (st === 'completed' || st === 'partial') cur.done++
+      }
+      m.set(info.weekNumber, cur)
+    }
+    return m
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateMap])
+
+  // Week-instellingen dialog (fase/deload/target/notitie per week).
+  const [weekMetaOpen, setWeekMetaOpen] = useState<number | null>(null)
+
   // ─ Add modal + detailpaneel ─
   const [addOpen, setAddOpen] = useState(false)
   const [addInitialTab, setAddInitialTab] = useState<'library' | 'quick'>('library')
@@ -1933,6 +2133,22 @@ function WeekPlannerContent() {
     })
   }
 
+  // Dupliceer een week en zet 'm meteen als deload: kopieert de workouts,
+  // markeert deload en verlaagt de geplande belasting naar ~60% van de bron.
+  function handleDuplicateWeekAsDeload(weekNumber: number) {
+    if (!selectedPatientId) return
+    const srcTarget = weekMetaByNumber.get(weekNumber)?.targetLoad ?? null
+    duplicateWeek.mutate({
+      patientId: selectedPatientId,
+      sourceWeekNumber: weekNumber,
+      targetWeekNumber: weekNumber + 1,
+      replace: false,
+      markDeload: true,
+      phaseType: 'DELOAD',
+      targetLoad: srcTarget != null ? Math.round(srcTarget * DELOAD_LOAD_FRACTION) : null,
+    })
+  }
+
   // ─ Render ─
   const monthLabel = `${MONTH_LABELS_NL[month0]} ${year}`
 
@@ -2018,6 +2234,59 @@ function WeekPlannerContent() {
         </Tile>
       ) : (
         <>
+        {/* Lege staat: patiënt gekozen maar nog geen enkel week-schema. Eén
+            duidelijke CTA i.p.v. de gebruiker laten raden tussen de dagen. */}
+        {schedules.length === 0 && (
+          <Tile>
+            <div className="flex flex-col sm:flex-row items-center gap-4 py-5 px-2">
+              <div
+                className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: 'rgba(232,122,85,0.12)', border: '1px solid rgba(232,122,85,0.30)' }}
+              >
+                <CalendarRange className="w-5 h-5" style={{ color: P.brand }} />
+              </div>
+              <div className="flex-1 min-w-0 text-center sm:text-left">
+                <p className="text-sm font-semibold" style={{ color: P.ink }}>
+                  Nog geen planning voor deze patiënt
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: P.inkMuted }}>
+                  Voeg een workout toe op een dag, of plan een programma in één
+                  keer over meerdere weken als periodiseringsblok.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <DarkButton
+                  variant="secondary"
+                  onClick={() => openAddModal(today, 'quick')}
+                  className="gap-1.5 text-xs"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Workout
+                </DarkButton>
+                <DarkButton
+                  onClick={() => openAddModal(mondayOf(today), 'library')}
+                  className="gap-1.5 text-xs"
+                >
+                  <CalendarPlus className="w-3.5 h-3.5" /> Programma plannen
+                </DarkButton>
+              </div>
+            </div>
+          </Tile>
+        )}
+
+        {/* Fase-legenda — alleen tonen zodra er weken zijn, zodat de kleur-
+            codering in de week-rail te lezen is. */}
+        {schedules.length > 0 && (
+          <div className="flex items-center gap-3 flex-wrap px-1">
+            <span className="athletic-mono text-[10px] tracking-wider" style={{ color: P.inkDim }}>FASES</span>
+            {PHASE_TYPES.map(pt => (
+              <span key={pt} className="flex items-center gap-1.5 text-[11px]" style={{ color: P.inkMuted }}>
+                <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: PHASE_META[pt].color }} />
+                {PHASE_META[pt].label}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Selectie-toolbar: zichtbaar zodra er dagen geselecteerd zijn */}
         {selectedIsos.size > 0 && (
           <div
@@ -2060,37 +2329,87 @@ function WeekPlannerContent() {
             const referenceDate = week.find(d => d.getMonth() === month0) ?? week[0]
             const info = dateMap.get(isoDate(referenceDate))
             const weekNum = info?.weekNumber ?? null
+            const meta = weekNum != null ? weekMetaByNumber.get(weekNum) : undefined
+            const progress = weekNum != null ? weekProgressByNumber.get(weekNum) : undefined
+            const phase = phaseMeta(meta?.phaseType)
+            // Fase-kleur bepaalt een subtiele tint links op de rij; deload wint
+            // qua kleur zodat een herstelweek altijd herkenbaar blauw is.
+            const accent = meta?.isDeload ? PHASE_META.DELOAD.color : phase?.color ?? null
             return (
               <div
                 key={wIdx}
                 className="grid grid-cols-[40px_repeat(7,1fr)] border-b last:border-b-0"
-                style={{ borderColor: P.line, minHeight: 130 }}
+                style={{
+                  borderColor: P.line,
+                  minHeight: 130,
+                  borderLeft: accent ? `3px solid ${accent}` : `3px solid transparent`,
+                  background: accent ? `linear-gradient(90deg, ${accent}0D, transparent 12%)` : undefined,
+                }}
               >
-                {/* Week-rij menu */}
-                <div className="flex items-start justify-center pt-2">
-                  {weekNum !== null && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          className="p-1 rounded hover:bg-[rgba(255,255,255,0.05)]"
-                          title={`Week ${weekNum} acties`}
+                {/* Week-rail: nummer, fase-pill, deload, gepland/gedaan + menu */}
+                <div className="flex flex-col items-center pt-2 gap-1 min-w-0">
+                  {weekNum !== null ? (
+                    <>
+                      <span className="athletic-mono text-[10px] font-bold" style={{ color: P.inkMuted }}>
+                        W{weekNum}
+                      </span>
+                      {meta?.isDeload && (
+                        <span title="Deload-week">
+                          <Moon className="w-3 h-3" style={{ color: PHASE_META.DELOAD.color }} />
+                        </span>
+                      )}
+                      {phase && !meta?.isDeload && (
+                        <span
+                          className="w-2 h-2 rounded-full"
+                          style={{ background: phase.color }}
+                          title={`${phase.label} — ${phase.description}`}
+                        />
+                      )}
+                      {progress && progress.planned > 0 && (
+                        <span
+                          className="athletic-mono text-[9px]"
+                          style={{ color: progress.done >= progress.planned ? PHASE_META.ACCUMULATION.color : P.inkDim }}
+                          title={`${progress.done} van ${progress.planned} geplande workouts gedaan`}
                         >
-                          <MoreHorizontal className="w-3.5 h-3.5 text-zinc-300" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-56">
-                        <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                          Week {weekNum}
-                        </DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onSelect={() => handleDuplicateWeek(weekNum)} className="gap-2 text-xs">
-                          <Copy className="w-3.5 h-3.5" />
-                          Dupliceer naar volgende week
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
+                          {progress.done}/{progress.planned}
+                        </span>
+                      )}
+                      {meta?.targetLoad != null && (
+                        <span className="athletic-mono text-[9px]" style={{ color: P.inkDim }} title="Geplande weekbelasting">
+                          {meta.targetLoad}
+                        </span>
+                      )}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            className="p-1 rounded hover:bg-[rgba(255,255,255,0.05)]"
+                            title={`Week ${weekNum} acties`}
+                          >
+                            <MoreHorizontal className="w-3.5 h-3.5 text-zinc-300" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-60">
+                          <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                            Week {weekNum}
+                          </DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onSelect={() => setWeekMetaOpen(weekNum)} className="gap-2 text-xs">
+                            <Layers className="w-3.5 h-3.5" />
+                            Fase &amp; belasting instellen
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => handleDuplicateWeek(weekNum)} className="gap-2 text-xs">
+                            <Copy className="w-3.5 h-3.5" />
+                            Dupliceer naar volgende week
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => handleDuplicateWeekAsDeload(weekNum)} className="gap-2 text-xs">
+                            <Moon className="w-3.5 h-3.5" />
+                            Dupliceer als deload-week
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </>
+                  ) : null}
                 </div>
 
                 {/* 7 dag-cellen */}
@@ -2135,6 +2454,24 @@ function WeekPlannerContent() {
           initialTab={addInitialTab}
           onSubmit={handleAddSubmit}
         />
+
+        {/* Week-instellingen (fase/deload/target/notitie) */}
+        {weekMetaOpen !== null && selectedPatientId && (
+          <WeekMetaDialog
+            weekNumber={weekMetaOpen}
+            initial={weekMetaByNumber.get(weekMetaOpen) ?? null}
+            saving={setWeekMeta.isPending}
+            onClose={() => setWeekMetaOpen(null)}
+            onSave={async (vals) => {
+              await setWeekMeta.mutateAsync({
+                patientId: selectedPatientId,
+                weekNumber: weekMetaOpen,
+                ...vals,
+              })
+              setWeekMetaOpen(null)
+            }}
+          />
+        )}
       </div>
       {/* /kalender-kolom — krimpt mee via flex-1 wanneer het paneel opent */}
 

@@ -34,6 +34,7 @@ import {
   type PrescribedParam,
 } from '@/lib/prescription'
 import { RestSheet } from '@/components/session/RestSheet'
+import { WeekPhaseLine } from '@/components/schedule/WeekPhaseLine'
 import { SetRows } from '@/components/session/SetRows'
 import { ExtraParamsEditor } from '@/components/session/ExtraParams'
 import { ExerciseProgressSheet } from '@/components/session/ExerciseProgressSheet'
@@ -2022,6 +2023,8 @@ function SessionPageInner() {
 
       {/* Exercise cards */}
       <div className="max-w-lg mx-auto px-4 pt-4 pb-6 space-y-3">
+        {/* Alleen zichtbaar in een deload-week: uitleg waarom het lichter is. */}
+        <WeekPhaseLine variant="deload" />
         {viewMode === 'focus' && steps.length > 0 ? (
           <>
             {steps[safeStepIndex].render()}
