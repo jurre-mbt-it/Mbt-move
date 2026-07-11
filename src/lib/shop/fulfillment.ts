@@ -111,6 +111,21 @@ export async function syncOrderWithMollie(orderId: string): Promise<OrderStatus>
         update: { orderId: order.id, revokedAt: null },
       })
     }
+
+    // Voorraad afboeken voor fysieke artikelen waarvan de voorraad wordt
+    // bijgehouden (stockQty null = niet bijgehouden, dan niets doen).
+    for (const it of order.items) {
+      if (it.product.kind !== 'PHYSICAL') continue
+      await tx.shopProduct.updateMany({
+        where: { id: it.productId, stockQty: { not: null } },
+        data: { stockQty: { decrement: it.quantity } },
+      })
+      // Niet onder nul laten zakken (race tussen twee gelijktijdige betalingen).
+      await tx.shopProduct.updateMany({
+        where: { id: it.productId, stockQty: { lt: 0 } },
+        data: { stockQty: 0 },
+      })
+    }
   })
 
   // E-mails buiten de transactie (best-effort, nooit hard falen).

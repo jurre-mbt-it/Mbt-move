@@ -8,6 +8,7 @@ import { heroGradient } from '@/lib/shop/gradient'
 import { BODY_REGION_LABELS, KIND_LABELS, LEVEL_LABELS } from '@/lib/shop/labels'
 import { isShopPublic } from '@/lib/shop/access'
 import { isMollieConfigured } from '@/lib/shop/mollie'
+import { youtubeId, youtubeEmbed } from '@/lib/shop/youtube'
 import { CheckoutForm } from '@/components/shop/CheckoutForm'
 
 export const dynamic = 'force-dynamic'
@@ -134,6 +135,39 @@ export default async function ProductDetailPage({
               ))}
             </ul>
           )}
+
+          {/* Preview-video (YouTube-embed; andere links als knop). */}
+          {product.previewVideoUrl &&
+            (() => {
+              const ytId = youtubeId(product.previewVideoUrl)
+              return ytId ? (
+                <div className="mt-10">
+                  <h2 className="mb-3 text-lg font-semibold">Bekijk een preview</h2>
+                  <div
+                    className="aspect-video overflow-hidden rounded-2xl border"
+                    style={{ borderColor: P.line }}
+                  >
+                    <iframe
+                      src={youtubeEmbed(ytId)}
+                      title={`Preview van ${product.name}`}
+                      className="h-full w-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                </div>
+              ) : (
+                <a
+                  href={product.previewVideoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-8 inline-flex items-center gap-2 text-sm font-medium transition-colors hover:text-white"
+                  style={{ color: P.brand }}
+                >
+                  ▶ Bekijk een preview-video
+                </a>
+              )
+            })()}
         </div>
 
         {/* Rechter kolom — koopkaart (sticky) */}
@@ -153,7 +187,7 @@ export default async function ProductDetailPage({
             <p className="mt-1 text-xs" style={{ color: P.inkDim }}>
               ({formatPriceCents(priceExVat, product.currency)} excl. btw)
               {isProgram ? ' · eenmalig, levenslange toegang' : null}
-              {isPhysical ? (product.requiresShipping ? ' · exclusief verzendkosten' : '') : null}
+              {isPhysical ? (product.requiresShipping ? ' · inclusief verzending' : '') : null}
             </p>
 
             {soldOut && (

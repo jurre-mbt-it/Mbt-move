@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { generateObject } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
-import { createTRPCRouter, publicProcedure, adminProcedure } from '@/server/trpc'
+import { createTRPCRouter, publicProcedure, protectedProcedure, adminProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
 import { matchSlug, LABELS, type IntakeAnswers } from '@/lib/shop/intake/flow'
 import { sendOrderEmails as sendOrderEmailsLib } from '@/lib/shop/email/order-emails'
@@ -104,6 +104,16 @@ export const shopRouter = createTRPCRouter({
     .input(ProductInput)
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input
+
+      // Een gepubliceerd schema-product zonder gekoppeld schema levert een koper
+      // die betaalt maar niets krijgt — server-side blokkeren (de wizard checkt
+      // dit ook, maar dit is het vangnet).
+      if (data.status === 'PUBLISHED' && data.kind === 'PROGRAM' && !data.programId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Koppel eerst een schema voordat je dit product publiceert.',
+        })
+      }
 
       // Slug-uniciteit netjes afvangen (i.p.v. een ruwe DB-constraint-error).
       const slugOwner = await ctx.prisma.shopProduct.findUnique({
@@ -261,8 +271,13 @@ export const shopRouter = createTRPCRouter({
       // Veiligheidsnet: haal eventuele gedachtestreepjes uit de tekst.
       rationale = rationale.replace(/\s*[—–]\s*/g, ', ').trim()
 
+      // Vangnet: als zowel de AI-keuze als de regel-kandidaat niet (meer) in de
+      // catalogus staan, val terug op het eerste gepubliceerde product i.p.v.
+      // crashen (products is hierboven al gegarandeerd niet-leeg).
       const recommended =
-        products.find((p) => p.slug === recommendedSlug) ?? products.find((p) => p.slug === candidate)!
+        products.find((p) => p.slug === recommendedSlug) ??
+        products.find((p) => p.slug === candidate) ??
+        products[0]
       const alternative =
         alternativeSlug && alternativeSlug !== recommended.slug
           ? products.find((p) => p.slug === alternativeSlug) ?? null
@@ -490,6 +505,192 @@ export const shopRouter = createTRPCRouter({
         invoiceNumber: order?.invoiceNumber ?? null,
         productNames: order?.items.map((i) => i.nameSnapshot) ?? [],
       }
+    }),
+
+  // ── App-koppeling: aankopen activeren als toegewezen programma ─────────────
+  // Brug tussen shop (gast-checkout op e-mail) en app-wereld (User): aankopen
+  // worden gematcht op e-mailadres. Bij activatie wordt het gekochte
+  // Program-template gekopieerd naar een eigen, toegewezen Program
+  // (patientId = koper) met een zelfgekozen startmoment. Daarna verschijnt het
+  // vanzelf in web én iOS via de bestaande patient-endpoints
+  // (`patient.getActiveProgram[s]`) — geen aparte shop-weergave nodig.
+
+  /** Gekochte schema-producten van de ingelogde app-gebruiker (match op e-mail). */
+  myPurchases: protectedProcedure.query(async ({ ctx }) => {
+    const email = ctx.user.email?.toLowerCase()
+    if (!email) return []
+    const entitlements = await ctx.prisma.shopEntitlement.findMany({
+      where: {
+        revokedAt: null,
+        customer: { email },
+        product: { kind: 'PROGRAM', programId: { not: null } },
+      },
+      orderBy: { grantedAt: 'desc' },
+      include: {
+        product: {
+          select: {
+            id: true,
+            slug: true,
+            name: true,
+            tagline: true,
+            heroImageUrl: true,
+            level: true,
+            durationWeeks: true,
+            program: { select: { id: true, weeks: true, daysPerWeek: true } },
+          },
+        },
+        // De geactiveerde kopie (als die er is), om de status te tonen.
+        program: { select: { id: true, status: true, startDate: true } },
+      },
+    })
+    return entitlements.map((e) => ({
+      entitlementId: e.id,
+      grantedAt: e.grantedAt,
+      product: {
+        slug: e.product.slug,
+        name: e.product.name,
+        tagline: e.product.tagline,
+        heroImageUrl: e.product.heroImageUrl,
+        level: e.product.level,
+        durationWeeks: e.product.durationWeeks,
+      },
+      template: e.product.program
+        ? { weeks: e.product.program.weeks, daysPerWeek: e.product.program.daysPerWeek }
+        : null,
+      activated: e.program
+        ? { programId: e.program.id, status: e.program.status, startDate: e.program.startDate }
+        : null,
+    }))
+  }),
+
+  /**
+   * Zet een gekochte aankoop om in een eigen actief programma. De koper kiest
+   * het startmoment: `startDate` (ISO-datum, default vandaag) en/of
+   * `startWeek` (begin midden in het schema; de startdatum schuift dan terug
+   * zodat de weekberekening op die week uitkomt). Idempotent: al geactiveerd →
+   * bestaande kopie terug.
+   */
+  activateProgram: protectedProcedure
+    .input(
+      z.object({
+        entitlementId: z.string(),
+        startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Gebruik JJJJ-MM-DD').optional(),
+        startWeek: z.number().int().min(1).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const email = ctx.user.email?.toLowerCase()
+      const entitlement = await ctx.prisma.shopEntitlement.findUnique({
+        where: { id: input.entitlementId },
+        include: {
+          customer: { select: { email: true } },
+          program: { select: { id: true } },
+          product: {
+            include: {
+              program: { include: { exercises: true, resources: true } },
+            },
+          },
+        },
+      })
+      if (!entitlement || !email || entitlement.customer.email !== email) {
+        throw new TRPCError({ code: 'NOT_FOUND' })
+      }
+      if (entitlement.revokedAt) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Deze aankoop is niet meer geldig.' })
+      }
+      // Al geactiveerd en de kopie bestaat nog → die teruggeven.
+      if (entitlement.program) {
+        return { programId: entitlement.program.id, alreadyActive: true as const }
+      }
+      const source = entitlement.product.program
+      if (!source) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Aan dit product is (nog) geen schema gekoppeld. Neem contact met ons op.',
+        })
+      }
+      if (input.startWeek && input.startWeek > source.weeks) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Dit schema heeft ${source.weeks} weken; kies een startweek binnen het schema.`,
+        })
+      }
+
+      // Startmoment: gekozen datum (of vandaag), en bij een latere startweek
+      // schuift de startdatum terug zodat de weekklok (startDate-gebaseerd,
+      // zie computeCurrentWeekDay) op die week uitkomt.
+      const base = input.startDate ? new Date(`${input.startDate}T00:00:00`) : new Date()
+      if (Number.isNaN(base.getTime())) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Ongeldige startdatum.' })
+      }
+      const startDate = new Date(base.getTime() - ((input.startWeek ?? 1) - 1) * 7 * 86_400_000)
+
+      const programId = crypto.randomUUID()
+      await ctx.prisma.$transaction([
+        ctx.prisma.program.create({
+          data: {
+            id: programId,
+            // Consumentgerichte naam van het product, niet de interne templatenaam.
+            name: entitlement.product.name,
+            description: source.description ?? undefined,
+            weeks: source.weeks,
+            daysPerWeek: source.daysPerWeek,
+            isTemplate: false,
+            type: source.type,
+            cardioParams: (source.cardioParams ?? null) as never,
+            flexibleSchedule: source.flexibleSchedule,
+            weeklyTarget: source.weeklyTarget,
+            reviewAfterWeeks: source.reviewAfterWeeks,
+            tendinopathyMode: source.tendinopathyMode,
+            trackOneRepMax: source.trackOneRepMax,
+            patientId: ctx.user.id,
+            // Maker blijft de template-eigenaar (therapeut/admin), zodat het
+            // programma in de praktijk-wereld beheerd kan blijven worden.
+            creatorId: source.creatorId,
+            practiceId: source.practiceId ?? null,
+            status: 'ACTIVE',
+            startDate,
+            exercises: {
+              create: source.exercises.map((ex) => ({
+                id: crypto.randomUUID(),
+                exerciseId: ex.exerciseId,
+                week: ex.week,
+                day: ex.day,
+                order: ex.order,
+                sets: ex.sets,
+                setsMax: ex.setsMax,
+                reps: ex.reps,
+                repsMax: ex.repsMax,
+                repUnit: ex.repUnit,
+                restTime: ex.restTime,
+                supersetGroup: ex.supersetGroup,
+                supersetOrder: ex.supersetOrder,
+                notes: ex.notes,
+                intensityType: ex.intensityType,
+                intensityMin: ex.intensityMin,
+                intensityMax: ex.intensityMax,
+                intensityText: ex.intensityText,
+                extraParams: ex.extraParams ?? undefined,
+              })),
+            },
+            resources: {
+              create: source.resources.map((r) => ({
+                id: crypto.randomUUID(),
+                resourceId: r.resourceId,
+                week: r.week,
+                day: r.day,
+                order: r.order,
+              })),
+            },
+          },
+        }),
+        ctx.prisma.shopEntitlement.update({
+          where: { id: entitlement.id },
+          data: { programId, activatedAt: new Date() },
+        }),
+      ])
+
+      return { programId, alreadyActive: false as const }
     }),
 
   // ── Omzet- en verkoop-overzicht ────────────────────────────────────────────

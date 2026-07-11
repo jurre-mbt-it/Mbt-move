@@ -693,6 +693,8 @@ model Program {
   // Consumenten-shop: dit template kan als betaald product worden verkocht.
   shopProducts         ShopProduct[]
   sessionMoves         SessionMove[]
+  // Shop-aankopen die als dit (gekopieerde) programma zijn geactiveerd.
+  activatedEntitlements ShopEntitlement[] @relation("EntitlementActivatedProgram")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1790,6 +1792,15 @@ model ShopEntitlement {
   orderId    String?
   grantedAt  DateTime     @default(now())
   revokedAt  DateTime?
+
+  // App-koppeling: bij activatie wordt het gekochte Program-template gekopieerd
+  // naar een toegewezen Program (patientId = koper met een app-account, gematcht
+  // op e-mail). De iOS-app en web tonen dat programma dan via de normale
+  // patient-endpoints. SetNull: verwijdert een therapeut de kopie, dan kan de
+  // koper opnieuw activeren.
+  program     Program?  @relation("EntitlementActivatedProgram", fields: [programId], references: [id], onDelete: SetNull)
+  programId   String?
+  activatedAt DateTime?
 
   @@unique([customerId, productId])
   @@index([customerId])
