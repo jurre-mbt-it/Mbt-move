@@ -21,7 +21,11 @@ import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-export const maxDuration = 60
+// Ruim vangnet: een chunk van de mobiele sync (zie healthkit.ts in de app)
+// verwerkt in seconden, maar een chunk met veel readiness-herberekeningen mag
+// niet op de functie-limiet klappen. NB: iOS kapt een request client-side na
+// ~60s — de echte bescherming is de chunking in de app.
+export const maxDuration = 120
 
 const DPA_REQUIRED_ROLES = new Set(['PATIENT', 'ATHLETE'])
 
