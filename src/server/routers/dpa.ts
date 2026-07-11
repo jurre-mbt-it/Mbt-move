@@ -5,7 +5,7 @@
  * Versie bijgehouden in User model (dpaAcceptedVersion + dpaAcceptedAt).
  */
 
-import { createTRPCRouter, protectedProcedure, therapistProcedure } from '@/server/trpc'
+import { createTRPCRouter, protectedProcedure, therapistProcedure, invalidateUserCache } from '@/server/trpc'
 import { DPA_VERSION } from '@/lib/dpa-constants'
 
 export { DPA_VERSION }
@@ -40,6 +40,9 @@ export const dpaRouter = createTRPCRouter({
         dpaAcceptedAt: new Date(),
       },
     })
+    // Cache-invalidatie: anders houdt de tRPC-DPA-gate (protectedProcedure) de
+    // patiënt tot 60s tegen op basis van de oude, gecachte dpaAcceptedVersion.
+    invalidateUserCache(ctx.user.supabaseUserId)
     return { accepted: true, version: DPA_VERSION }
   }),
 

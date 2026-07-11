@@ -4,6 +4,7 @@ import { ZodError } from 'zod'
 import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
+import { DPA_VERSION } from '@/lib/dpa-constants'
 
 export interface Context {
   req?: NextRequest
@@ -15,6 +16,7 @@ export interface Context {
     practiceId: string | null
     supabaseUserId: string
     mfaEnabled: boolean
+    dpaAcceptedVersion: string | null
   } | null
   /** Assurance level uit de `aal`-claim van de sessie-JWT ('aal1'|'aal2'|null).
    *  'aal2' = tweede factor (TOTP) is deze sessie daadwerkelijk doorlopen. */
@@ -41,6 +43,16 @@ const userCache = new Map<string, { user: Context['user']; expiresAt: number }>(
 const USER_CACHE_TTL = 60_000 // 60 seconden
 
 /**
+ * Verwijder een user uit de lookup-cache. Aan te roepen wanneer een veld dat
+ * in `Context['user']` gecached wordt muteert binnen dezelfde instantie —
+ * met name `dpaAcceptedVersion` na `dpa.accept`, zodat de DPA-gate de patiënt
+ * niet nog tot 60s blijft blokkeren na acceptatie. Sleutel = supabaseUserId.
+ */
+export function invalidateUserCache(supabaseUserId: string) {
+  userCache.delete(supabaseUserId)
+}
+
+/**
  * Resolve een Supabase auth-user naar een Prisma user-row.
  *
  * Lookup-volgorde:
@@ -56,13 +68,13 @@ const USER_CACHE_TTL = 60_000 // 60 seconden
 async function resolveUser(supabaseUserId: string, email: string) {
   const byUuid = await prisma.user.findUnique({
     where: { supabaseUserId },
-    select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true, mfaEnabled: true },
+    select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true, mfaEnabled: true, dpaAcceptedVersion: true },
   })
   if (byUuid) return byUuid
 
   const byEmail = await prisma.user.findUnique({
     where: { email },
-    select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true, mfaEnabled: true },
+    select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true, mfaEnabled: true, dpaAcceptedVersion: true },
   })
   if (!byEmail) return null
   if (byEmail.supabaseUserId && byEmail.supabaseUserId !== supabaseUserId) {
@@ -82,7 +94,7 @@ async function resolveUser(supabaseUserId: string, email: string) {
       const updated = await prisma.user.update({
         where: { id: byEmail.id },
         data: { supabaseUserId },
-        select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true, mfaEnabled: true },
+        select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true, mfaEnabled: true, dpaAcceptedVersion: true },
       })
       return updated
     } catch {
@@ -136,6 +148,7 @@ export async function createTRPCContext(opts: { req?: NextRequest }): Promise<Co
             practiceId: dbUser.practiceId,
             supabaseUserId: dbUser.supabaseUserId,
             mfaEnabled: dbUser.mfaEnabled,
+            dpaAcceptedVersion: dbUser.dpaAcceptedVersion,
           }
           userCache.set(supabaseUser.id, { user, expiresAt: Date.now() + USER_CACHE_TTL })
         }
@@ -169,17 +182,51 @@ export const createCallerFactory = t.createCallerFactory
 export const createTRPCRouter = t.router
 export const publicProcedure = t.procedure
 
-export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
-  if (!ctx.user) {
-    throw new TRPCError({ code: 'UNAUTHORIZED' })
+/**
+ * DPA-vangnet op de API-laag (defense-in-depth naast de web-shell-guard
+ * `src/lib/auth/require-role.ts` én de iOS-gate). PATIENT/ATHLETE mogen géén
+ * patient-data-endpoints raken vóór ze de verwerkersovereenkomst hebben
+ * geaccepteerd. Staff (THERAPIST/ADMIN) tekent de DPA buiten de app om en valt
+ * dus buiten deze gate.
+ *
+ * De check is rol-gericht, zodat een tRPC-brede toepassing (via
+ * `protectedProcedure`) therapeut-/admin-flows nooit raakt. Alleen een kleine,
+ * expliciete set prefixes moet vóór acceptatie bereikbaar blijven:
+ *   - `dpa.*`    → status opvragen + accepteren (anders kan men nooit voldoen)
+ *   - `auth.*`   → identiteit/rol (mobiel leest `auth.getMe` om de gate te sturen)
+ *   - `invite.*` → `invite.finalize` draait direct na OTP, vóór de DPA-stap
+ */
+const DPA_REQUIRED_ROLES: ReadonlySet<string> = new Set(['PATIENT', 'ATHLETE'])
+const DPA_EXEMPT_PREFIXES = ['dpa.', 'auth.', 'invite.'] as const
+const DPA_REQUIRED_MESSAGE =
+  'Accepteer eerst de verwerkersovereenkomst (AVG) om verder te gaan.'
+
+const dpaGuard = t.middleware(({ ctx, path, next }) => {
+  const u = ctx.user
+  if (
+    u &&
+    DPA_REQUIRED_ROLES.has(u.role) &&
+    u.dpaAcceptedVersion !== DPA_VERSION &&
+    !DPA_EXEMPT_PREFIXES.some((p) => path.startsWith(p))
+  ) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: DPA_REQUIRED_MESSAGE })
   }
-  return next({
-    ctx: {
-      ...ctx,
-      user: ctx.user,
-    },
-  })
+  return next()
 })
+
+export const protectedProcedure = t.procedure
+  .use(({ ctx, next }) => {
+    if (!ctx.user) {
+      throw new TRPCError({ code: 'UNAUTHORIZED' })
+    }
+    return next({
+      ctx: {
+        ...ctx,
+        user: ctx.user,
+      },
+    })
+  })
+  .use(dpaGuard)
 
 const MFA_CHALLENGE_MESSAGE =
   'Voltooi de tweede-factor-verificatie (MFA) om deze actie uit te voeren.'
