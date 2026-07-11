@@ -125,6 +125,7 @@ function ProgramsPageInner() {
           </TabsList>
 
           <TabsContent value="lopende" className="space-y-3">
+            <MyOwnProgramsPanel />
             <ActiveProgramsPanel />
           </TabsContent>
 
@@ -133,6 +134,87 @@ function ProgramsPageInner() {
           </TabsContent>
         </Tabs>
       </div>
+    </div>
+  )
+}
+
+// ─── Eigen (aan jezelf toegewezen) programma's ───────────────────────────────
+//
+// Programma's met patientId = de ingelogde gebruiker zelf (persoonlijke
+// trainingsmodus: therapeut/admin traint als zichzelf). Die vallen buiten de
+// reguliere "Lopende"-lijst — die filtert patient-programma's eruit — én buiten
+// een patient-profiel, want je bent geen eigen patiënt. Zonder deze sectie zijn
+// ze daardoor nergens te verwijderen. `programs.delete` staat dit al toe
+// (creator/admin). Zelf-verbergend: leeg → niets tonen (geen ruis voor
+// therapeuten zonder eigen programma's).
+function MyOwnProgramsPanel() {
+  const utils = trpc.useUtils()
+  const { data: me } = trpc.auth.getMe.useQuery()
+  const selfId = me?.id ?? null
+
+  const queryInput = { isTemplate: false, patientId: selfId ?? '', includeAssigned: true }
+  const { data: rawMine } = trpc.programs.list.useQuery(queryInput, {
+    enabled: !!selfId,
+    staleTime: 30_000,
+  })
+  const deleteMutation = trpc.programs.delete.useMutation()
+
+  const mine: Program[] = (rawMine ?? []) as Program[]
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`"${name}" uit je eigen trainingsomgeving verwijderen?`)) return
+    try {
+      await deleteMutation.mutateAsync({ id })
+      await utils.programs.list.invalidate(queryInput)
+      toast.success('Programma verwijderd')
+    } catch {
+      toast.error('Verwijderen mislukt')
+    }
+  }
+
+  if (!selfId || mine.length === 0) return null
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-col gap-1">
+        <Kicker>Mijn eigen programma&apos;s ({mine.length})</Kicker>
+        <MetaLabel style={{ textTransform: 'none', fontWeight: 500 }}>
+          Aan je eigen account toegewezen (persoonlijke training). Hier kun je ze verwijderen.
+        </MetaLabel>
+      </div>
+      {mine.map(p => {
+        const status = STATUS_COLORS[p.status] ?? STATUS_COLORS.DRAFT
+        return (
+          <Tile key={p.id} accentBar={status.accent}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h3
+                  className="truncate"
+                  style={{ color: P.ink, fontSize: 14, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}
+                >
+                  {p.name}
+                </h3>
+                <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 2 }}>
+                  {status.label} · {p._count?.exercises ?? 0} oefeningen · {p.weeks}w × {p.daysPerWeek}d
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <DarkButton variant="secondary" size="sm" href={`/therapist/programs/${p.id}/edit`}>
+                  Bekijk
+                </DarkButton>
+                <DarkButton
+                  variant="danger"
+                  size="sm"
+                  onClick={() => handleDelete(p.id, p.name)}
+                  disabled={deleteMutation.isPending}
+                >
+                  Verwijder
+                </DarkButton>
+              </div>
+            </div>
+          </Tile>
+        )
+      })}
     </div>
   )
 }
