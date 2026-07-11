@@ -598,10 +598,15 @@ export const weekSchedulesRouter = createTRPCRouter({
       isDeload: z.boolean().optional(),
       targetLoad: z.number().int().min(0).max(10000).nullable().optional(),
       weekNote: z.string().max(2000).nullable().optional(),
+      // Maandag van de week waarop dit slaat — alleen gebruikt wanneer de
+      // week-rij nog niet bestaat. Zonder dit anker zou een fase op een
+      // toekomstige week met startDate=vandaag worden aangemaakt en op de
+      // verkeerde kalenderrij renderen.
+      startDate: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
-      const { patientId, weekNumber, ...meta } = input
+      const { patientId, weekNumber, startDate, ...meta } = input
       // Alleen de meegegeven velden bijwerken (undefined = ongemoeid laten).
       const data: Record<string, unknown> = {}
       if (meta.phaseType !== undefined) data.phaseType = meta.phaseType
@@ -626,7 +631,7 @@ export const weekSchedulesRouter = createTRPCRouter({
           creatorId: ctx.user.id,
           practiceId: ctx.user.practiceId ?? null,
           patientId,
-          startDate: new Date(),
+          startDate: startDate ? new Date(startDate) : new Date(),
           isTemplate: false,
           weekNumber,
           ...data,
