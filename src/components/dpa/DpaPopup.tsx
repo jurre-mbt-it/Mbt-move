@@ -74,7 +74,7 @@ export function DpaPopup() {
           <ul className="space-y-2">
             {[
               'Uw gegevens worden verwerkt voor fysiotherapeutische behandeling',
-              'Bewaartermijn: 15 jaar (WGBO-verplichting)',
+              'Bewaartermijn: 20 jaar (WGBO-verplichting)',
               'Gegevens worden opgeslagen bij Supabase (EU Frankfurt)',
               'U heeft recht op inzage, correctie en dataportabiliteit',
               'U kunt een klacht indienen bij de Autoriteit Persoonsgegevens',

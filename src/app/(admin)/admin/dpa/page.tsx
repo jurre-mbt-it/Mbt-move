@@ -205,7 +205,7 @@ export default function AdminDpaPage() {
 
       <p style={{ color: P.inkDim, fontSize: 11, lineHeight: 1.5 }}>
         Dit overzicht toont alle patiënten en atleten in je praktijk. Bewaar deze
-        export conform de bewaartermijn van 15 jaar (WGBO).
+        export conform de bewaartermijn van 20 jaar (WGBO).
       </p>
     </div>
   )
