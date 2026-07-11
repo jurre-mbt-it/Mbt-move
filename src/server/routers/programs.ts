@@ -204,7 +204,10 @@ export const programsRouter = createTRPCRouter({
       // Vrije JSON-blob voor cardio/walk-run protocollen. Geen strikte schema
       // omdat de wizards verschillende velden vastleggen (zone-training,
       // intervallen, walk-run weken, etc.). UI blijft de bron van waarheid.
-      cardioParams: z.unknown().optional(),
+      cardioParams: z
+        .unknown()
+        .refine((v) => v == null || JSON.stringify(v).length <= 8000, 'cardioParams te groot (max 8 kB)')
+        .optional(),
       // Flexible-schedule modus + weekly target. Wanneer aan, kan patient
       // het programma elke dag van de week starten; klaar zodra weeklyTarget
       // is bereikt.
@@ -255,7 +258,10 @@ export const programsRouter = createTRPCRouter({
       type: z.enum(['STRENGTH', 'MOBILITY', 'PLYOMETRICS', 'CARDIO', 'STABILITY', 'MIXED']).optional(),
       // Zelfde vrije blob als bij create — de cardio/walk-run wizards kunnen
       // hiermee een bestaand programma bijwerken.
-      cardioParams: z.unknown().optional(),
+      cardioParams: z
+        .unknown()
+        .refine((v) => v == null || JSON.stringify(v).length <= 8000, 'cardioParams te groot (max 8 kB)')
+        .optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const { id, exercises, resources, startDate, endDate, cardioParams, ...data } = input

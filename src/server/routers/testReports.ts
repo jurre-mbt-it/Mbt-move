@@ -31,6 +31,11 @@ async function assertTreating(
   patientId: string,
 ) {
   if (user.role === 'ADMIN') return
+  // Defense-in-depth: de praktijk-tak hieronder mag ALLEEN voor THERAPIST gelden
+  // (patiënten/atleten delen de practiceId). Vangnet tegen toekomstige regressie.
+  if (user.role !== 'THERAPIST') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Geen actieve behandelrelatie met deze patiënt' })
+  }
   const ok = await prisma.user.findFirst({
     where: {
       id: patientId,
@@ -499,7 +504,6 @@ export const testReportsRouter = createTRPCRouter({
         where: { id: input.reportId },
         include: {
           entries: { orderBy: [{ categoryOrder: 'asc' }, { order: 'asc' }] },
-          patient: { select: { name: true, email: true } },
         },
       })
       if (!report) throw new TRPCError({ code: 'NOT_FOUND' })
@@ -548,7 +552,8 @@ export const testReportsRouter = createTRPCRouter({
       })
 
       const draft = await draftTestReportNarrative({
-        injuryGoal: report.injuryGoal,
+        // injuryGoal bewust weggelaten: vrije tekst gaat niet naar de externe AI
+        // (AVG-dataminimalisatie, zie anthropic.ts).
         rehabPhaseLabel: report.rehabPhaseLabel,
         measurementNumber: report.measurementNumber,
         tests,

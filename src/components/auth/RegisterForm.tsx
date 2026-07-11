@@ -15,7 +15,7 @@ export function RegisterForm() {
   const [formData, setFormData] = useState({
     email: '',
     name: '',
-    role: 'THERAPIST',
+    role: 'ATHLETE',
   })
   const [otpCode, setOtpCode] = useState('')
   const [codeSent, setCodeSent] = useState(false)
@@ -197,7 +197,8 @@ export function RegisterForm() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="THERAPIST">Fysiotherapeut / Clinicus</SelectItem>
+                  {/* Fysiotherapeut/clinicus is bewust geen self-signup-optie:
+                      staff wordt via invite/admin geprovisioneerd. */}
                   <SelectItem value="ATHLETE">Atleet</SelectItem>
                   <SelectItem value="PATIENT">Patiënt</SelectItem>
                 </SelectContent>

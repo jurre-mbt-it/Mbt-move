@@ -18,6 +18,11 @@ async function assertTreating(
   patientId: string,
 ) {
   if (user.role === 'ADMIN') return
+  // Defense-in-depth: de praktijk-tak mag ALLEEN voor THERAPIST gelden
+  // (patiënten/atleten delen de practiceId). Vangnet tegen toekomstige regressie.
+  if (user.role !== 'THERAPIST') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Geen actieve behandelrelatie met deze patiënt' })
+  }
   // Toegang = directe PatientTherapist-relatie OF zelfde praktijk.
   const ok = await prisma.user.findFirst({
     where: {
@@ -87,7 +92,7 @@ export const rehabRouter = createTRPCRouter({
         protocolId: z.string(),
         surgeryDate: z.string().nullable().optional(),
         injuryDate: z.string().nullable().optional(),
-        notes: z.string().optional(),
+        notes: z.string().max(2000).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -151,7 +156,7 @@ export const rehabRouter = createTRPCRouter({
         patientId: z.string(),
         surgeryDate: z.string().nullable().optional(),
         injuryDate: z.string().nullable().optional(),
-        notes: z.string().nullable().optional(),
+        notes: z.string().max(2000).nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -186,7 +191,7 @@ export const rehabRouter = createTRPCRouter({
         status: z.enum(['NOT_MET', 'IN_PROGRESS', 'MET']),
         measurementValue: z.string().nullable().optional(),
         measurementDate: z.string().nullable().optional(),
-        notes: z.string().nullable().optional(),
+        notes: z.string().max(2000).nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -286,9 +291,9 @@ export const rehabRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         name: z.string().min(2).optional(),
-        description: z.string().nullable().optional(),
+        description: z.string().max(2000).nullable().optional(),
         specialty: z.string().min(1).optional(),
-        sourceReference: z.string().nullable().optional(),
+        sourceReference: z.string().max(500).nullable().optional(),
         isActive: z.boolean().optional(),
       }),
     )
@@ -306,9 +311,9 @@ export const rehabRouter = createTRPCRouter({
       z.object({
         key: z.string().min(3).regex(/^[a-z0-9-]+$/, 'Key: alleen lowercase + cijfers + streepjes'),
         name: z.string().min(2),
-        description: z.string().optional(),
+        description: z.string().max(2000).optional(),
         specialty: z.string().min(1),
-        sourceReference: z.string().optional(),
+        sourceReference: z.string().max(500).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {

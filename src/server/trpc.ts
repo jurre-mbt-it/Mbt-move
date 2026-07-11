@@ -128,10 +128,21 @@ export async function createTRPCContext(opts: { req?: NextRequest }): Promise<Co
       accessToken = bearerToken
     } else {
       const supabase = await createClient()
-      // getSession() leest uit cookie — geen netwerkroundtrip naar Supabase
-      const { data: { session } } = await supabase.auth.getSession()
-      supabaseUser = session?.user
-      accessToken = session?.access_token ?? null
+      // KRITIEK: gebruik getUser() — dat verifieert de JWT bij de Supabase
+      // Auth-server. getSession() zou de identiteit ONGEVERIFIEERD uit de
+      // cookie lezen (auth-js doet daar enkel een vorm- + expiry-check, geen
+      // signature-verificatie), en de auth-helpers-cookie is niet met een
+      // app-secret ondertekend. Een aanvaller kan dan een `Cookie`-header met
+      // een willekeurige `user.id`/`aal` verzinnen en zich op /api/trpc als
+      // elke gebruiker voordoen (én de aal2/MFA-gate omzeilen). Alleen ná
+      // een geslaagde getUser() lezen we het access-token (voor de aal-claim);
+      // dat token is dan aantoonbaar door de Auth-server geaccepteerd.
+      const { data: { user: verifiedUser } } = await supabase.auth.getUser()
+      if (verifiedUser?.id) {
+        supabaseUser = { id: verifiedUser.id, email: verifiedUser.email }
+        const { data: { session } } = await supabase.auth.getSession()
+        accessToken = session?.access_token ?? null
+      }
     }
 
     if (supabaseUser?.id && supabaseUser?.email) {
@@ -248,10 +259,30 @@ function assertMfaSatisfied(ctx: Context) {
   }
 }
 
+const MFA_ENROLL_REQUIRED_MESSAGE =
+  'MFA is verplicht voor behandelaars. Schakel Two-Factor Authentication in om verder te gaan.'
+
+/**
+ * MFA verplicht voor staff (THERAPIST/ADMIN): een nog-niet-geënrolde behandelaar
+ * mag de therapist-/admin-API niet raken. De web-shell stuurt zulke gebruikers
+ * al naar /mfa/enroll; dit is het server-side vangnet voor directe/mobiele API-
+ * calls. De enroll-flow zelf loopt via `protectedProcedure` (auth.setMfaStatus),
+ * die deze gate niet heeft, dus dit veroorzaakt geen lockout. `mfaEnabled` komt
+ * uit de context-cache; `auth.setMfaStatus` invalideert die na enrollment.
+ */
+function assertStaffMfaEnrolled(ctx: Context) {
+  const u = ctx.user
+  if (!u) return
+  if ((u.role === 'THERAPIST' || u.role === 'ADMIN') && !u.mfaEnabled) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: MFA_ENROLL_REQUIRED_MESSAGE })
+  }
+}
+
 export const therapistProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (ctx.user!.role !== 'THERAPIST' && ctx.user!.role !== 'ADMIN') {
     throw new TRPCError({ code: 'FORBIDDEN' })
   }
+  assertStaffMfaEnrolled(ctx)
   assertMfaSatisfied(ctx)
   return next({ ctx })
 })
@@ -262,6 +293,8 @@ export const creatorProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (role !== 'THERAPIST' && role !== 'ATHLETE' && role !== 'ADMIN') {
     throw new TRPCError({ code: 'FORBIDDEN' })
   }
+  // Staff (THERAPIST/ADMIN) moet geënrold zijn; ATHLETE valt hierbuiten.
+  assertStaffMfaEnrolled(ctx)
   assertMfaSatisfied(ctx)
   return next({ ctx })
 })
@@ -270,6 +303,7 @@ export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (ctx.user!.role !== 'ADMIN') {
     throw new TRPCError({ code: 'FORBIDDEN' })
   }
+  assertStaffMfaEnrolled(ctx)
   assertMfaSatisfied(ctx)
   return next({ ctx })
 })

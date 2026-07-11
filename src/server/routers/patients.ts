@@ -25,6 +25,10 @@ async function hasPatientAccess(
   patientId: string,
 ): Promise<boolean> {
   if (user.role === 'ADMIN') return true
+  // Defense-in-depth: de praktijk-tak hieronder mag ALLEEN voor THERAPIST gelden
+  // (patiënten/atleten delen de practiceId van hun therapeut). Vangnet tegen
+  // toekomstige regressie mocht een non-therapist deze helper ooit bereiken.
+  if (user.role !== 'THERAPIST') return false
   const found = await prisma.user.findFirst({
     where: {
       id: patientId,

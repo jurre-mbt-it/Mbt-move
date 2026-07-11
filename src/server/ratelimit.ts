@@ -73,7 +73,16 @@ export interface RateLimitOpts {
   max: number          // maximum aantal calls
   windowSec: number    // binnen hoeveel seconden
   message?: string     // custom error-bericht
+  /**
+   * Beveiligingskritieke bucket (brute-force / GDPR-misbruik). Zonder een
+   * gedeelde store (Upstash/KV) is de in-memory fallback per-instance en dus
+   * omzeilbaar op Vercel. Voor deze buckets faalt de limiter daarom
+   * FAIL-CLOSED in productie i.p.v. stil door te laten. Zie de module-comment.
+   */
+  failClosedInProd?: boolean
 }
+
+let warnedNoStore = false
 
 /**
  * Check of `identifier` binnen de limiet zit voor `bucket`.
@@ -92,6 +101,32 @@ export async function rateLimit(
 
   let count: number
   let resetAt: number
+
+  if (!client && process.env.NODE_ENV === 'production') {
+    if (!warnedNoStore) {
+      warnedNoStore = true
+      console.error(
+        '[ratelimit] Geen gedeelde store (Upstash/KV) geconfigureerd in productie — ' +
+          'de in-memory fallback is per-instance en handhaaft NIET betrouwbaar. ' +
+          'Zet UPSTASH_REDIS_REST_URL/TOKEN of KV_REST_API_URL/TOKEN op het Vercel-project.',
+      )
+    }
+    // Fail-closed is OPT-IN via RATE_LIMIT_STRICT=1. Reden: zolang er geen
+    // gedeelde store (Upstash/KV) is geprovisioned, zou default-fail-closed
+    // invite/export/deletion/consent in productie blokkeren. Zet eerst de store
+    // op; daarna is `client` niet-null en is dit pad sowieso onbereikbaar. De
+    // flag is het vangnet mocht de store later wegvallen.
+    if (opts.failClosedInProd && process.env.RATE_LIMIT_STRICT === '1') {
+      return {
+        ok: false,
+        remaining: 0,
+        resetAt: now + windowSec * 1000,
+        message:
+          message ??
+          'Deze actie is tijdelijk niet beschikbaar (rate-limiting niet geconfigureerd).',
+      }
+    }
+  }
 
   if (client) {
     count = await client.incrByWithTTL(key, windowSec)
@@ -132,11 +167,13 @@ export async function rateLimit(
  * Standaard buckets gebruikt door de app. Eén plek zodat je ze makkelijk tunt.
  */
 export const RATE_LIMITS = {
-  inviteCreate:       { max: 20, windowSec: 3600, message: 'Max 20 uitnodigingen per uur.' },
-  inviteRedeem:       { max: 5,  windowSec: 900,  message: 'Te vaak geprobeerd. Wacht 15 minuten.' },
-  dataExport:         { max: 3,  windowSec: 3600, message: 'Max 3 data-exports per uur.' },
-  accountDeletion:    { max: 3,  windowSec: 86400, message: 'Max 3 verwijder-verzoeken per dag.' },
-  consentChange:      { max: 10, windowSec: 3600, message: 'Max 10 consent-wijzigingen per uur.' },
+  // failClosedInProd: brute-force- / GDPR-misbruik-gevoelig — zonder gedeelde
+  // store in productie liever blokkeren dan ongelimiteerd doorlaten.
+  inviteCreate:       { max: 20, windowSec: 3600, message: 'Max 20 uitnodigingen per uur.', failClosedInProd: true },
+  inviteRedeem:       { max: 5,  windowSec: 900,  message: 'Te vaak geprobeerd. Wacht 15 minuten.', failClosedInProd: true },
+  dataExport:         { max: 3,  windowSec: 3600, message: 'Max 3 data-exports per uur.', failClosedInProd: true },
+  accountDeletion:    { max: 3,  windowSec: 86400, message: 'Max 3 verwijder-verzoeken per dag.', failClosedInProd: true },
+  consentChange:      { max: 10, windowSec: 3600, message: 'Max 10 consent-wijzigingen per uur.', failClosedInProd: true },
   sessionLog:         { max: 60, windowSec: 3600, message: 'Max 60 sessies per uur gelogd.' },
   shopIntake:         { max: 5,  windowSec: 600,  message: 'Te veel intakes. Wacht 10 minuten.' },
   wearableSync:       { max: 60, windowSec: 3600, message: 'Te veel sync-verzoeken. Probeer het later opnieuw.' },

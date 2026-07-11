@@ -18,6 +18,12 @@ async function assertPatientLink(
   if (!patientId) return
   if (user.role === 'ADMIN') return
   if (patientId === user.id) return
+  // Defense-in-depth: de praktijk-tak mag ALLEEN voor THERAPIST gelden
+  // (patiënten/atleten delen de practiceId). Self- en admin-toegang zijn
+  // hierboven al afgehandeld; vangnet tegen toekomstige regressie.
+  if (user.role !== 'THERAPIST') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Geen actieve koppeling met deze patiënt' })
+  }
   // Toegang = directe PatientTherapist-relatie OF zelfde praktijk.
   const ok = await prisma.user.findFirst({
     where: {
@@ -1558,7 +1564,10 @@ export const weekSchedulesRouter = createTRPCRouter({
     .input(z.object({
       itemId: z.string(),
       // JSON-blob; vorm wordt in de UI beheerd (type/duur/afstand/zone/intervallen).
-      cardioParams: z.record(z.string(), z.unknown()).nullable(),
+      cardioParams: z
+        .record(z.string(), z.unknown())
+        .refine((v) => JSON.stringify(v).length <= 8000, 'cardioParams te groot (max 8 kB)')
+        .nullable(),
     }))
     .mutation(async ({ ctx, input }) => {
       const item = await ctx.prisma.weekScheduleDayItem.findUnique({

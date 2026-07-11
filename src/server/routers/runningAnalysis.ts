@@ -28,6 +28,13 @@ async function assertTreating(
   patientId: string,
 ) {
   if (user.role === 'ADMIN') return
+  // Defense-in-depth: de praktijk-tak hieronder mag ALLEEN voor THERAPIST gelden.
+  // Patiënten/atleten delen de practiceId van hun therapeut; zonder deze check
+  // zou een non-therapist via die tak bij mede-patiënten kunnen. Alle callers
+  // zijn nu therapist-gated, dus dit is een vangnet tegen toekomstige regressie.
+  if (user.role !== 'THERAPIST') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Geen actieve behandelrelatie met deze patiënt' })
+  }
   const ok = await prisma.user.findFirst({
     where: {
       id: patientId,
@@ -151,20 +158,20 @@ export const runningAnalysisRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         performedAt: z.string().optional(),
-        goal: z.string().nullable().optional(),
-        location: z.string().nullable().optional(),
-        subtitle: z.string().nullable().optional(),
-        viewLabel: z.string().nullable().optional(),
+        goal: z.string().max(2000).nullable().optional(),
+        location: z.string().max(200).nullable().optional(),
+        subtitle: z.string().max(200).nullable().optional(),
+        viewLabel: z.string().max(200).nullable().optional(),
         cadence: z.number().nullable().optional(),
         strideLength: z.number().nullable().optional(),
         stepLength: z.number().nullable().optional(),
         groundContact: z.number().nullable().optional(),
         flightTime: z.number().nullable().optional(),
         dutyFactor: z.number().nullable().optional(),
-        therapistComments: z.string().nullable().optional(),
-        nextMoment: z.string().nullable().optional(),
+        therapistComments: z.string().max(4000).nullable().optional(),
+        nextMoment: z.string().max(2000).nullable().optional(),
         status: z.enum(['DRAFT', 'FINAL']).optional(),
-        notes: z.string().nullable().optional(),
+        notes: z.string().max(4000).nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -226,7 +233,6 @@ export const runningAnalysisRouter = createTRPCRouter({
         where: { id: input.id },
         include: {
           items: { orderBy: { order: 'asc' } },
-          patient: { select: { name: true, email: true } },
         },
       })
       if (!a) throw new TRPCError({ code: 'NOT_FOUND' })
@@ -270,7 +276,8 @@ export const runningAnalysisRouter = createTRPCRouter({
       })
 
       return draftRunningAnalysisNarrative({
-        goal: a.goal,
+        // goal bewust weggelaten: vrije tekst gaat niet naar de externe AI
+        // (AVG-dataminimalisatie, zie anthropic.ts).
         rearTotal: rearTotal(rearItems.map((i) => i.value)),
         rear,
         side,
