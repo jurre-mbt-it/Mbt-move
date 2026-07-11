@@ -40,7 +40,7 @@ import { cn } from '@/lib/utils'
 import {
   Eye, Copy, Plus, Trash2, Rocket, Check, AlertCircle, Loader2,
   ChevronLeft, Layers, Search, CheckCircle2, X, BarChart2, Info,
-  User, ChevronDown,
+  User, ChevronDown, ChevronsUpDown, ChevronsDownUp,
 } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -413,6 +413,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       week: program.currentWeek,
     }
     setExercises(prev => [...prev, newEx])
+    // Vers toegevoegde oefening meteen open — daar ga je nu doseren.
+    setExpandedUids(prev => new Set(prev).add(newEx.uid))
   }, [program.currentDay, program.currentWeek])
 
   // Create superset from selected exercises
@@ -435,6 +437,54 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
   }
 
   const clearSelection = () => setExercises(prev => prev.map(e => ({ ...e, selected: false })))
+
+  // ── Kaart uitklappen/inklappen ─────────────────────────────────────────────
+  // Ingeklapt = één samengevatte doseerregel; alleen de kaarten waar je aan
+  // werkt staan open. Nieuw toegevoegde oefeningen klappen automatisch uit.
+  const [expandedUids, setExpandedUids] = useState<Set<string>>(new Set())
+  const toggleExpanded = useCallback((uid: string) => {
+    setExpandedUids(prev => {
+      const next = new Set(prev)
+      if (next.has(uid)) next.delete(uid)
+      else next.add(uid)
+      return next
+    })
+  }, [])
+  const dayUids = dayExercises.map(e => e.uid)
+  const allDayExpanded = dayUids.length > 0 && dayUids.every(uid => expandedUids.has(uid))
+  const toggleExpandAllForDay = () => {
+    setExpandedUids(prev => {
+      const next = new Set(prev)
+      if (allDayExpanded) dayUids.forEach(uid => next.delete(uid))
+      else dayUids.forEach(uid => next.add(uid))
+      return next
+    })
+  }
+
+  // ── Week verwijderen ────────────────────────────────────────────────────────
+  // Verwijdert de inhoud van week `w` en schuift alle latere weken één plek
+  // naar voren, zodat er geen gat in de nummering valt.
+  const removeWeek = (w: number) => {
+    if (program.weeks <= 1) return
+    const inWeek = exercises.filter(e => e.week === w).length
+      + resources.filter(r => r.week === w).length
+    if (inWeek > 0) {
+      const ok = confirm(`Week ${w} bevat ${inWeek} item(s). Week en inhoud verwijderen?`)
+      if (!ok) return
+    }
+    setExercises(prev => prev
+      .filter(e => e.week !== w)
+      .map(e => e.week > w ? { ...e, week: e.week - 1 } : e))
+    setResources(prev => prev
+      .filter(r => r.week !== w)
+      .map(r => r.week > w ? { ...r, week: r.week - 1 } : r))
+    setProgram(p => ({
+      ...p,
+      weeks: p.weeks - 1,
+      currentWeek: Math.min(p.currentWeek > w ? p.currentWeek - 1 : p.currentWeek, p.weeks - 1),
+    }))
+    toast.success(`Week ${w} verwijderd`)
+  }
 
   // ── Bulk-kopie: dag → dag / week → week ───────────────────────────────────
   const copyDayTo = (toWeek: number, toDay: number) => {
@@ -1122,6 +1172,46 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
   const exerciseCountForDay = (day: number, week: number) =>
     exercises.filter(e => e.day === day && e.week === week).length
 
+  // Week-navigatie naast de dag-tabs (was: los in de topbalk). Hover over een
+  // week toont een verwijder-kruisje; de laatste week kan niet weg.
+  const weekNav = (
+    <div className="hidden md:flex items-center gap-1 shrink-0">
+      {weeks.map(w => (
+        <div key={w} className="relative group/week">
+          <button
+            onClick={() => setProgram(p => ({ ...p, currentWeek: w }))}
+            className={cn(
+              'px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
+              program.currentWeek === w ? 'bg-[#e87a55] text-white' : 'text-muted-foreground hover:bg-[#1C2425]'
+            )}
+          >
+            W{w}
+          </button>
+          {program.weeks > 1 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); removeWeek(w) }}
+              title={`Week ${w} verwijderen`}
+              className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full hidden group-hover/week:flex items-center justify-center bg-[#1C2425] border border-[rgba(255,255,255,0.15)] text-[#7B8889] hover:text-red-400 hover:border-red-400/50"
+            >
+              <X className="w-2 h-2" strokeWidth={3} />
+            </button>
+          )}
+        </div>
+      ))}
+      {program.weeks < 8 && (
+        <button
+          onClick={() => setProgram(p => ({ ...p, weeks: p.weeks + 1, currentWeek: p.weeks + 1 }))}
+          title="Week toevoegen"
+          className="px-1.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:bg-[#1C2425] flex items-center gap-1"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span className="hidden lg:inline">Week</span>
+        </button>
+      )}
+      <div className="w-px h-5 mx-1 bg-[rgba(255,255,255,0.10)]" />
+    </div>
+  )
+
   const activeEx = activeId ? exercises.find(e => e.uid === activeId) : null
   const activeLibraryName = activeId?.startsWith('library-')
     ? activeId.replace('library-', '')
@@ -1265,30 +1355,6 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             </span>
           )}
           <div className="flex-1" />
-
-          {/* Week tabs — hidden on mobile */}
-          <div className="hidden md:flex items-center gap-1">
-            {weeks.map(w => (
-              <button
-                key={w}
-                onClick={() => setProgram(p => ({ ...p, currentWeek: w }))}
-                className={cn(
-                  'px-2.5 py-1 rounded text-xs font-medium transition-colors',
-                  program.currentWeek === w ? 'bg-[#e87a55] text-white' : 'text-muted-foreground hover:bg-[#1C2425]'
-                )}
-              >
-                W{w}
-              </button>
-            ))}
-            {program.weeks < 8 && (
-              <button
-                onClick={() => setProgram(p => ({ ...p, weeks: p.weeks + 1 }))}
-                className="px-1.5 py-1 rounded text-xs text-muted-foreground hover:bg-[#1C2425]"
-              >
-                <Plus className="w-3 h-3" />
-              </button>
-            )}
-          </div>
 
           <div className="hidden md:flex items-center gap-1">
             <Separator orientation="vertical" className="h-5 mx-1" />
@@ -1590,6 +1656,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                 blijven. */}
             {!program.flexibleSchedule ? (
               <div className="flex items-center gap-1 px-3 md:px-4 pt-3 pb-2 border-b shrink-0 overflow-x-auto">
+                {weekNav}
                 {days.map(d => {
                   const count = exerciseCountForDay(d, program.currentWeek)
                   return (
@@ -1628,9 +1695,19 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                   </button>
                 )}
 
-                {/* Bulk-kopie menu — toont alleen als er iets te kopiëren is */}
+                {/* Bulk-kopie menu + uitklap-alles — tonen alleen bij inhoud */}
                 {dayExercises.length > 0 && (
-                  <div className="ml-auto shrink-0">
+                  <div className="ml-auto shrink-0 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={toggleExpandAllForDay}
+                      title={allDayExpanded ? 'Alles inklappen' : 'Alles uitklappen'}
+                      className="h-7 px-2 rounded-lg text-xs text-muted-foreground hover:bg-[#1C2425] flex items-center gap-1 transition-colors"
+                    >
+                      {allDayExpanded
+                        ? <ChevronsDownUp className="w-3.5 h-3.5" />
+                        : <ChevronsUpDown className="w-3.5 h-3.5" />}
+                    </button>
                     <CopyMenu
                       weeks={weeks}
                       days={days}
@@ -1656,8 +1733,10 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                 )}
               </div>
             ) : (
-              ((dayExercises.length > 0) || selectedUids.length >= 2) && (
-                <div className="flex items-center justify-end gap-2 px-3 md:px-4 pt-3 pb-2 border-b shrink-0">
+              (
+                <div className="flex items-center gap-2 px-3 md:px-4 pt-3 pb-2 border-b shrink-0">
+                  {weekNav}
+                  <div className="flex-1" />
                   {dayExercises.length > 0 && (
                     <CopyMenu
                       weeks={weeks}
@@ -1706,6 +1785,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                               onSwapVariant={swapVariant}
                               allExercises={libraryExercises as never}
                               customParams={customParams}
+                              expandedUids={expandedUids}
+                              onToggleExpanded={toggleExpanded}
                             />
                             <button
                               onClick={() => dissolveSuperset(item.group)}
@@ -1726,6 +1807,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                           onSwapVariant={swapVariant}
                           allExercises={libraryExercises as never}
                           customParams={customParams}
+                          expanded={expandedUids.has(item.ex.uid)}
+                          onToggleExpanded={toggleExpanded}
                         />
                       )
                     })}

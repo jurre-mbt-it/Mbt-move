@@ -73,7 +73,12 @@ export function MuscleBalancePanel({ exercises, currentDay, currentWeek }: Props
     <div className="flex flex-col h-full">
       <div className="px-3 pt-3 pb-2 border-b shrink-0">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Spiergroep balans</p>
-        <p className="text-xs text-muted-foreground mt-0.5">Dag {currentDay} · Week {currentWeek}</p>
+        <p
+          className="text-xs text-muted-foreground mt-0.5"
+          title="Belastingspunten = spierbelasting van de oefening × sets, gewogen naar reps (laag = zwaarder) en extra gewicht. Relatief binnen deze dag — bedoeld om verhoudingen te zien, geen absolute maat."
+        >
+          Dag {currentDay} · Week {currentWeek} · belastingspunten
+        </p>
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
@@ -91,7 +96,7 @@ export function MuscleBalancePanel({ exercises, currentDay, currentWeek }: Props
               <div key={muscle} className="space-y-0.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground truncate">{muscle}</span>
-                  <span className="font-semibold shrink-0 ml-1" style={{ color }}>{load}</span>
+                  <span className="font-semibold shrink-0 ml-1" style={{ color }}>{Math.round(load)}</span>
                 </div>
                 <div className="h-1.5 bg-[#1C2425] rounded-full overflow-hidden">
                   <div
@@ -105,15 +110,33 @@ export function MuscleBalancePanel({ exercises, currentDay, currentWeek }: Props
         )}
       </div>
 
+      {/* Kleur-legenda: intensiteit t.o.v. de zwaarst belaste spiergroep. */}
+      {sorted.length > 0 && (
+        <div className="px-3 py-1.5 border-t shrink-0 flex items-center gap-1.5">
+          <span className="text-[10px] text-muted-foreground shrink-0">licht</span>
+          <div className="flex-1 flex gap-0.5">
+            {LOAD_COLORS.slice(1).map(c => (
+              <div key={c} className="h-1.5 flex-1 rounded-sm" style={{ background: c }} />
+            ))}
+          </div>
+          <span className="text-[10px] text-muted-foreground shrink-0">zwaar</span>
+        </div>
+      )}
+
       {/* Imbalance warnings */}
       {imbalances.length > 0 && (
         <div className="px-3 py-2 border-t shrink-0 space-y-1.5">
-          <p className="text-xs font-semibold text-amber-600 flex items-center gap-1">
+          <p className="text-xs font-semibold flex items-center gap-1" style={{ color: '#f59e0b' }}>
             <AlertTriangle className="w-3.5 h-3.5" />
             Onevenwichtigheden
           </p>
           {imbalances.map(([a, b]) => (
-            <div key={`${a}-${b}`} className="text-xs text-amber-700 bg-amber-50 rounded px-2 py-1">
+            <div
+              key={`${a}-${b}`}
+              className="text-xs rounded px-2 py-1"
+              style={{ color: '#fbbf24', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)' }}
+              title="Meer dan 2× verschil in belasting tussen dit spierpaar op deze dag."
+            >
               {a} vs {b}
             </div>
           ))}
@@ -126,7 +149,7 @@ export function MuscleBalancePanel({ exercises, currentDay, currentWeek }: Props
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>Totale volume</span>
             <span className="font-semibold text-foreground">
-              {Object.values(totals).reduce((a, b) => a + b, 0)}
+              {Math.round(Object.values(totals).reduce((a, b) => a + b, 0))}
             </span>
           </div>
           <div className="flex justify-between text-xs text-muted-foreground mt-0.5">
