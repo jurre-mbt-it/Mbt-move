@@ -26,6 +26,7 @@ import {
   IconStrength, IconMobility, IconPlyometrics, IconCardio, IconCore, IconSleep,
 } from '@/components/icons'
 import { CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
+import { WeekPhaseLine } from '@/components/schedule/WeekPhaseLine'
 
 const mono =
   'ui-monospace, Menlo, "SF Mono", "Cascadia Code", "Source Code Pro", monospace'
@@ -353,6 +354,10 @@ export default function AthleteSchedulePage() {
             KALENDER
           </h1>
         </div>
+
+        {/* Periodiserings-context van de huidige week (subtiel, alleen als
+            de therapeut een fase/notitie heeft ingesteld). */}
+        <WeekPhaseLine />
 
         {/* Maand-nav */}
         <div className="flex items-center justify-between">

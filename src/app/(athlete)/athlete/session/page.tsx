@@ -43,6 +43,7 @@ import {
 } from '@/lib/prescription'
 import { toast } from 'sonner'
 import { RestSheet } from '@/components/session/RestSheet'
+import { WeekPhaseLine } from '@/components/schedule/WeekPhaseLine'
 import { SetRows } from '@/components/session/SetRows'
 import { ExtraParamsEditor, RepUnitPicker } from '@/components/session/ExtraParams'
 import { isRepBasedUnit, sideVolumeFactor } from '@/lib/program-constants'
@@ -718,6 +719,9 @@ function AthleteSessionPageInner() {
               </div>
             )}
           </div>
+
+          {/* Alleen zichtbaar in een deload-week: uitleg waarom het lichter is. */}
+          {!isQuickMode && <WeekPhaseLine variant="deload" />}
 
           {/* Workout-samenvatting: oefeningen · sets · richttijd */}
           {exercises.length > 0 && (

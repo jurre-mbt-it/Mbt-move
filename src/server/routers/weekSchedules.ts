@@ -688,6 +688,53 @@ export const weekSchedulesRouter = createTRPCRouter({
     }),
 
   /**
+   * Patient: periodiserings-metadata van de week waar vandaag in valt.
+   * Datum-mapping spiegelt de week-planner: elke week-rij is geanchord op de
+   * maandag van zijn startDate, of afgeleid van de eerste rij mét startDate
+   * via de weekNumber-offset. Null = geen (actuele) week gevonden — de UI
+   * toont dan gewoon niets, dit is decoratieve context.
+   */
+  myWeekMeta: protectedProcedure.query(async ({ ctx }) => {
+    const schedules = await ctx.prisma.weekSchedule.findMany({
+      where: { patientId: ctx.user!.id, isTemplate: false },
+      select: {
+        weekNumber: true, startDate: true, createdAt: true,
+        phaseType: true, isDeload: true, targetLoad: true, weekNote: true,
+      },
+      orderBy: { weekNumber: 'asc' },
+    })
+    if (schedules.length === 0) return null
+
+    const mondayOf = (d: Date) => {
+      const x = new Date(d); x.setHours(0, 0, 0, 0)
+      const day = (x.getDay() + 6) % 7 // 0 = maandag
+      x.setDate(x.getDate() - day)
+      return x
+    }
+    const baselineRow = schedules.find(s => s.startDate) ?? schedules[0]
+    const baseline = mondayOf(baselineRow.startDate ?? baselineRow.createdAt)
+    const todayMonday = mondayOf(new Date()).getTime()
+
+    for (const s of schedules) {
+      const start = s.startDate
+        ? mondayOf(s.startDate)
+        : new Date(baseline.getTime() + (s.weekNumber - baselineRow.weekNumber) * 7 * 86_400_000)
+      if (start.getTime() === todayMonday) {
+        // Alleen teruggeven als er echt iets is ingesteld — anders rendert de
+        // consument onnodig een lege regel.
+        if (!s.phaseType && !s.isDeload && !s.weekNote) return null
+        return {
+          weekNumber: s.weekNumber,
+          phaseType: s.phaseType,
+          isDeload: s.isDeload,
+          weekNote: s.weekNote,
+        }
+      }
+    }
+    return null
+  }),
+
+  /**
    * Plan een programma in de kalender van een patient voor X weken op bepaalde dagen.
    * Merged met bestaande schedule: overschrijft de geselecteerde dagen, laat andere dagen
    * intact. Als er nog geen schedule bestaat voor de patient, wordt er eentje aangemaakt.

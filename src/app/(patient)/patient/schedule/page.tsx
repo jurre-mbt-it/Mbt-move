@@ -7,6 +7,7 @@ import { formatSetsReps } from '@/lib/prescription'
 import { Dumbbell, Moon, Play, ChevronRight, CheckCircle2, CalendarClock, X } from 'lucide-react'
 import { IconLeaf, IconClipboard } from '@/components/icons'
 import { P, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-ui'
+import { WeekPhaseLine } from '@/components/schedule/WeekPhaseLine'
 
 const DAY_SHORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
@@ -251,6 +252,10 @@ export default function PatientSchedulePage() {
             {program.name}
           </MetaLabel>
         </div>
+
+        {/* Periodiserings-context van deze week (subtiel; niets ingesteld =
+            niets te zien). */}
+        <WeekPhaseLine />
 
         {/* 7-day strip */}
         <div className="flex gap-2 overflow-x-auto pb-1">
