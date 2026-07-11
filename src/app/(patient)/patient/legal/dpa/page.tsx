@@ -237,7 +237,7 @@ export default function DpaPage() {
         <Section title="5. Bewaartermijn">
           <p>
             Op grond van de Wet op de Geneeskundige Behandelingsovereenkomst (WGBO) bewaren wij uw
-            dossier gedurende <strong>15 jaar</strong> na het einde van de behandelrelatie, of
+            dossier gedurende <strong>20 jaar</strong> na het einde van de behandelrelatie, of
             zoveel langer als nodig is voor een goede zorgverlening.
           </p>
           <p className="mt-2" style={{ color: P.inkMuted }}>
