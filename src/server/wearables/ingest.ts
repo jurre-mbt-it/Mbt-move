@@ -283,24 +283,41 @@ export async function ingestWearableData(
   }
 
   // ── Vitals → VitalsEntry (idempotent op userId+date) ───
+  // BELANGRIJK: de bridge levert een dag in deelbatches aan (anchored
+  // queries) — de ochtend-sync heeft HRV/rust-HR, een latere sync alleen
+  // stappen/energie. De update mag daarom ALLEEN meegeleverde velden raken;
+  // afwezig veld = ongemoeid laten. Voorheen wiste `?? null` hier de
+  // HRV/rust-HR/ademhaling van eerdere batches op dezelfde dag.
   for (const v of payload.vitals) {
     const date = startOfDayUTCLocal(v.date)
-    const data = {
-      restingHeartRate: v.restingHeartRate ?? null,
-      hrv: v.hrv ?? null,
-      hrvType: v.hrvType ?? null,
-      respiratoryRate: v.respiratoryRate ?? null,
-      wristTempDeviation: v.wristTempDeviation ?? null,
-      steps: v.steps != null ? Math.round(v.steps) : null,
-      activeEnergyKcal: v.activeEnergyKcal != null ? Math.round(v.activeEnergyKcal) : null,
-      basalEnergyKcal: v.basalEnergyKcal != null ? Math.round(v.basalEnergyKcal) : null,
-      vo2Max: v.vo2Max ?? null,
-      source: 'APPLE_WATCH' as const,
-    }
+    const patch: Record<string, unknown> = { source: 'APPLE_WATCH' }
+    if (v.restingHeartRate !== undefined) patch.restingHeartRate = v.restingHeartRate
+    if (v.hrv !== undefined) patch.hrv = v.hrv
+    if (v.hrvType !== undefined) patch.hrvType = v.hrvType
+    if (v.respiratoryRate !== undefined) patch.respiratoryRate = v.respiratoryRate
+    if (v.wristTempDeviation !== undefined) patch.wristTempDeviation = v.wristTempDeviation
+    if (v.steps !== undefined) patch.steps = Math.round(v.steps)
+    if (v.activeEnergyKcal !== undefined) patch.activeEnergyKcal = Math.round(v.activeEnergyKcal)
+    if (v.basalEnergyKcal !== undefined) patch.basalEnergyKcal = Math.round(v.basalEnergyKcal)
+    if (v.vo2Max !== undefined) patch.vo2Max = v.vo2Max
     await prisma.vitalsEntry.upsert({
       where: { userId_date: { userId, date } },
-      update: data,
-      create: { id: createId(), userId, date, ...data },
+      update: patch,
+      create: {
+        id: createId(),
+        userId,
+        date,
+        restingHeartRate: v.restingHeartRate ?? null,
+        hrv: v.hrv ?? null,
+        hrvType: v.hrvType ?? null,
+        respiratoryRate: v.respiratoryRate ?? null,
+        wristTempDeviation: v.wristTempDeviation ?? null,
+        steps: v.steps != null ? Math.round(v.steps) : null,
+        activeEnergyKcal: v.activeEnergyKcal != null ? Math.round(v.activeEnergyKcal) : null,
+        basalEnergyKcal: v.basalEnergyKcal != null ? Math.round(v.basalEnergyKcal) : null,
+        vo2Max: v.vo2Max ?? null,
+        source: 'APPLE_WATCH',
+      },
     })
     affected.add(date.getTime())
   }
