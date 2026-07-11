@@ -13,6 +13,7 @@ import type { PrismaClient, CardioActivity } from '@prisma/client'
 import { aggregateNight, sleepQualityScore, type SleepSegment } from '@/lib/sleep-metrics'
 import { resolveMaxHr } from '@/lib/cardio-zones'
 import { computeStressDay } from '@/lib/stress'
+import { findCrossSourceDuplicate, enrichExistingLog } from '@/server/wearables/dedupe'
 
 const createId = () => crypto.randomUUID()
 
@@ -221,14 +222,22 @@ export async function ingestWearableData(
         data: { ...data, rpe: undefined },
       })
       if (updRated.count === 0) {
-        try {
-          await prisma.cardioLog.create({
-            data: { id: createId(), patientId: userId, externalId: w.externalId, ...data },
-          })
-        } catch (err) {
-          // P2002 = parallelle sync creëerde de rij zojuist; die is dan al bijgewerkt.
-          if (!(err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === 'P2002')) {
-            throw err
+        // Cross-source check: dezelfde workout kan al via Strava binnen zijn
+        // (of andersom). Tijd-overlap = zelfde training → niet dupliceren,
+        // alleen ontbrekende velden op de bestaande rij aanvullen.
+        const dup = await findCrossSourceDuplicate(prisma, userId, completedAt, w.durationSec, 'APPLE_WATCH')
+        if (dup) {
+          await enrichExistingLog(prisma, dup, data)
+        } else {
+          try {
+            await prisma.cardioLog.create({
+              data: { id: createId(), patientId: userId, externalId: w.externalId, ...data },
+            })
+          } catch (err) {
+            // P2002 = parallelle sync creëerde de rij zojuist; die is dan al bijgewerkt.
+            if (!(err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === 'P2002')) {
+              throw err
+            }
           }
         }
       }
