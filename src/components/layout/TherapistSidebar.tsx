@@ -40,7 +40,6 @@ const navItems = [
   { href: '/therapist/tests', label: 'Tests', icon: Stethoscope },
   { href: '/therapist/test-reports', label: 'Testrapport', icon: FileText },
   { href: '/therapist/cohort', label: 'Cohort', icon: BarChart3 },
-  { href: '/therapist/dpa', label: 'DPA-status', icon: Shield },
 ]
 
 // Ingeklapt-voorkeur als externe store (localStorage) via
