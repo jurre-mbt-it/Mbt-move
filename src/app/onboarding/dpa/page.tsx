@@ -119,6 +119,13 @@ export default function OnboardingDpaPage() {
               tweetraps-verificatie voor zorgverleners.
             </p>
             <p>
+              <strong>Sporthorloge (optioneel):</strong> als je zelf een Apple Watch of
+              Strava koppelt, verwerken we ook slaap, hartslag, trainingen en dagelijkse
+              activiteit. Dit gebeurt alleen na jouw toestemming per gegevenssoort op je
+              eigen toestel, is nooit verplicht voor je behandeling, en je kunt de
+              koppeling altijd weer verbreken.
+            </p>
+            <p>
               De volledige tekst kun je later raadplegen onder je privacy-instellingen.
             </p>
             <div ref={bottomRef} />
