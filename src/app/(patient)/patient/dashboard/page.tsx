@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
+import { formatSetsReps } from '@/lib/prescription'
 import { wearablesEnabledForRole } from '@/lib/wearables-access'
 import {
   ActionTile,
@@ -154,7 +155,7 @@ export default function PatientDashboard() {
                           className="athletic-mono"
                           style={{ color: P.inkMuted, fontSize: 11 }}
                         >
-                          {e.sets}×{e.reps}
+                          {formatSetsReps(e.sets, e.setsMax, e.reps, e.repsMax)}
                         </span>
                       </div>
                     ))}

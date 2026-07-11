@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
+import { formatSetsReps } from '@/lib/prescription'
 import { Dumbbell, Moon, Play, ChevronRight, CheckCircle2, CalendarClock, X } from 'lucide-react'
 import { IconLeaf, IconClipboard } from '@/components/icons'
 import { P, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-ui'
@@ -15,7 +16,9 @@ type ProgramExercise = {
   exerciseId: string
   name: string
   sets: number
+  setsMax?: number | null
   reps: number
+  repsMax?: number | null
   repUnit: string
   restTime: number
   supersetGroup: string | null
@@ -535,7 +538,7 @@ function ExerciseRow({ exercise, isToday }: { exercise: ProgramExercise; isToday
           className="athletic-mono"
           style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.04em', marginTop: 2 }}
         >
-          {exercise.sets} × {exercise.reps} {exercise.repUnit}
+          {formatSetsReps(exercise.sets, exercise.setsMax, exercise.reps, exercise.repsMax, exercise.repUnit)}
           {exercise.restTime > 0 ? ` · ${exercise.restTime}s rust` : ''}
         </p>
       </div>

@@ -210,6 +210,8 @@ export const programsRouter = createTRPCRouter({
       // is bereikt.
       flexibleSchedule: z.boolean().optional(),
       weeklyTarget: z.number().int().min(1).max(14).nullable().optional(),
+      tendinopathyMode: z.boolean().optional(),
+      trackOneRepMax: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const { patientId, cardioParams, ...rest } = input
@@ -223,6 +225,10 @@ export const programsRouter = createTRPCRouter({
           creatorId: ctx.user!.id,
           practiceId: ctx.user!.practiceId ?? null,
           status: patientId ? 'ACTIVE' : 'DRAFT',
+          // Week-berekening (computeCurrentWeekDay) leunt op startDate; bij
+          // directe toewijzing aan een patiënt start de klok nu i.p.v. terug
+          // te vallen op createdAt.
+          startDate: patientId ? new Date() : null,
         },
       })
     }),
@@ -244,9 +250,15 @@ export const programsRouter = createTRPCRouter({
       resources: z.array(ProgramResourceInput).optional(),
       flexibleSchedule: z.boolean().optional(),
       weeklyTarget: z.number().int().min(1).max(14).nullable().optional(),
+      tendinopathyMode: z.boolean().optional(),
+      trackOneRepMax: z.boolean().optional(),
+      type: z.enum(['STRENGTH', 'MOBILITY', 'PLYOMETRICS', 'CARDIO', 'STABILITY', 'MIXED']).optional(),
+      // Zelfde vrije blob als bij create — de cardio/walk-run wizards kunnen
+      // hiermee een bestaand programma bijwerken.
+      cardioParams: z.unknown().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const { id, exercises, resources, startDate, endDate, ...data } = input
+      const { id, exercises, resources, startDate, endDate, cardioParams, ...data } = input
 
       const existing = await ctx.prisma.program.findUnique({ where: { id } })
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
@@ -261,6 +273,17 @@ export const programsRouter = createTRPCRouter({
       const updateData: Record<string, unknown> = { ...data }
       if (startDate !== undefined) updateData.startDate = startDate ? new Date(startDate) : null
       if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null
+      if (cardioParams !== undefined) updateData.cardioParams = cardioParams
+
+      // Deploy-moment: programma wordt (of is) patient-gebonden en gaat ACTIVE
+      // zonder expliciete startDate → klok start nu. Voorkomt de fallback op
+      // createdAt in computeCurrentWeekDay wanneer een concept dagen later
+      // pas wordt gedeployed.
+      const willBeActive = (data.status ?? existing.status) === 'ACTIVE'
+      const willHavePatient = data.patientId !== undefined ? data.patientId : existing.patientId
+      if (startDate === undefined && willBeActive && willHavePatient && !existing.startDate) {
+        updateData.startDate = new Date()
+      }
 
       if (exercises !== undefined) {
         // Replace all exercises
@@ -352,6 +375,11 @@ export const programsRouter = createTRPCRouter({
           weeks: source.weeks,
           daysPerWeek: source.daysPerWeek,
           isTemplate: input.isTemplate ?? source.isTemplate,
+          type: source.type,
+          cardioParams: (source.cardioParams ?? null) as never,
+          flexibleSchedule: source.flexibleSchedule,
+          weeklyTarget: source.weeklyTarget,
+          reviewAfterWeeks: source.reviewAfterWeeks,
           ...(targetPatientId ? { patientId: targetPatientId } : {}),
           creatorId: ctx.user!.id,
           practiceId: ctx.user!.practiceId ?? null,
@@ -359,6 +387,9 @@ export const programsRouter = createTRPCRouter({
           // ACTIVE (zichtbaar voor de patiënt), net als `create`. Alleen een
           // template/los concept blijft DRAFT.
           status: targetPatientId ? 'ACTIVE' : 'DRAFT',
+          startDate: targetPatientId ? new Date() : null,
+          tendinopathyMode: source.tendinopathyMode,
+          trackOneRepMax: source.trackOneRepMax,
           exercises: {
             create: source.exercises.map(ex => ({
               id: createId(),
