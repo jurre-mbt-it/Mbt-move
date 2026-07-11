@@ -1531,6 +1531,11 @@ export const patientRouter = createTRPCRouter({
               setsCompleted: true,
               repsCompleted: true,
               weight: true,
+              // Per-set detail ("42,5 × 10, 45 × 8") — de runner logt dit al,
+              // maar de historie-weergaves toonden alleen de samenvatting.
+              weightsPerSet: true,
+              repsPerSet: true,
+              repUnit: true,
               painLevel: true,
               painDuring: true,
               supersetGroup: true,
