@@ -359,11 +359,18 @@ export function ProgramExerciseBlock({
             Drag-listeners zitten ALLEEN op de GripVertical — anders triggert
             klikken op een input/pill een drag wanneer de cursor 6px+ beweegt,
             waardoor de tile spontaan verplaatst. */}
-        <div className="flex items-center gap-2">
+        <div
+          className={cn('flex items-center gap-2', onToggleExpanded && 'cursor-pointer')}
+          // Klik op de balk zelf = parameters uit-/inklappen. De interactieve
+          // onderdelen (naam→video, checkbox, grip, chevron, menu, X, chips)
+          // stoppen de bubble zodat zij hun eigen actie houden.
+          onClick={onToggleExpanded ? toggleExpanded : undefined}
+        >
           <button
             type="button"
             {...attributes}
             {...listeners}
+            onClick={e => e.stopPropagation()}
             className="cursor-grab active:cursor-grabbing touch-none shrink-0 p-0.5 -m-0.5 rounded hover:bg-[rgba(255,255,255,0.05)]"
             aria-label="Sleep om te verplaatsen"
           >
@@ -374,6 +381,7 @@ export function ProgramExerciseBlock({
             type="checkbox"
             checked={exercise.selected}
             onChange={() => onToggleSelect(exercise.uid)}
+            onClick={e => e.stopPropagation()}
             className="w-3.5 h-3.5 shrink-0 accent-[#e87a55]"
           />
 
@@ -381,7 +389,8 @@ export function ProgramExerciseBlock({
 
           <button
             type="button"
-            onClick={() => setVideoOpen(true)}
+            onClick={e => { e.stopPropagation(); setVideoOpen(true) }}
+            title="Klik voor video"
             className="flex-1 text-sm font-semibold truncate min-w-0 text-left hover:underline decoration-dotted underline-offset-2"
           >
             {exercise.name}
@@ -392,7 +401,7 @@ export function ProgramExerciseBlock({
           {!isExpanded && (
             <button
               type="button"
-              onClick={toggleExpanded}
+              onClick={e => { e.stopPropagation(); toggleExpanded() }}
               title="Klik om te bewerken"
               className="hidden sm:flex items-center gap-1.5 shrink min-w-0 max-w-[60%] group/summary"
             >
@@ -434,7 +443,7 @@ export function ProgramExerciseBlock({
               {easierEx && (
                 <button
                   type="button"
-                  onClick={() => onSwapVariant(exercise.uid, 'easier')}
+                  onClick={e => { e.stopPropagation(); onSwapVariant(exercise.uid, 'easier') }}
                   title={`Wissel naar gemakkelijker: ${easierEx.name}`}
                   className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide border transition-colors"
                   style={{
@@ -451,7 +460,7 @@ export function ProgramExerciseBlock({
               {harderEx && (
                 <button
                   type="button"
-                  onClick={() => onSwapVariant(exercise.uid, 'harder')}
+                  onClick={e => { e.stopPropagation(); onSwapVariant(exercise.uid, 'harder') }}
                   title={`Wissel naar zwaarder: ${harderEx.name}`}
                   className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide border transition-colors"
                   style={{
@@ -473,7 +482,7 @@ export function ProgramExerciseBlock({
           {onToggleExpanded && (
             <button
               type="button"
-              onClick={toggleExpanded}
+              onClick={e => { e.stopPropagation(); toggleExpanded() }}
               title={isExpanded ? 'Inklappen' : 'Uitklappen om te bewerken'}
               className="shrink-0 w-6 h-6 rounded flex items-center justify-center text-[#7B8889] hover:text-foreground hover:bg-[rgba(255,255,255,0.06)] transition-colors"
             >
@@ -483,7 +492,7 @@ export function ProgramExerciseBlock({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-6 w-6 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
+              <Button variant="ghost" size="icon" onClick={e => e.stopPropagation()} className="h-6 w-6 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
                 <MoreHorizontal className="w-3.5 h-3.5" />
               </Button>
             </DropdownMenuTrigger>
@@ -509,7 +518,7 @@ export function ProgramExerciseBlock({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <button onClick={() => onRemove(exercise.uid)} className="text-zinc-300 hover:text-destructive shrink-0">
+          <button onClick={e => { e.stopPropagation(); onRemove(exercise.uid) }} className="text-zinc-300 hover:text-destructive shrink-0">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
