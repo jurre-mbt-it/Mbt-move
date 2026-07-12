@@ -18,6 +18,7 @@ import { formatPriceCents } from '@/lib/shop/format'
 import { heroGradient } from '@/lib/shop/gradient'
 import { KIND_LABELS, STATUS_LABELS } from '@/lib/shop/labels'
 import { ProductWizard, type AdminProduct } from '@/components/shop/admin/ProductWizard'
+import { AccessRequestsPanel } from '@/components/shop/admin/AccessRequestsPanel'
 
 type Status = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
 
@@ -76,7 +77,10 @@ export default function AdminShopPage() {
           therapists={therapists}
           onClose={() => setEditing(null)}
         />
-      ) : isLoading ? (
+      ) : (
+        <>
+          <AccessRequestsPanel />
+          {isLoading ? (
         <p style={{ color: P.inkMuted }}>Laden…</p>
       ) : products.length === 0 ? (
         <div
@@ -183,6 +187,8 @@ export default function AdminShopPage() {
             )
           })}
         </div>
+          )}
+        </>
       )}
     </div>
   )

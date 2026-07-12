@@ -68,7 +68,13 @@ export function LoginForm() {
       }
 
       reportLoginSuccess()
-      const next = await resolvePostLoginRedirect(supabase)
+      // Respecteer ?next= (bv. terug naar een productpagina na "inloggen om te
+      // kopen"); resolvePostLoginRedirect valideert 'm en dwingt MFA/DPA eerst af.
+      const nextParam =
+        typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('next')
+          : null
+      const next = await resolvePostLoginRedirect(supabase, { next: nextParam })
       // Harde navigatie i.p.v. router.push+refresh: in de iOS-webview-wrapper
       // herrendert een soft RSC-navigatie de role-layouts niet altijd, waardoor
       // het scherm na inloggen "bevriest" tot de app handmatig herstart wordt.

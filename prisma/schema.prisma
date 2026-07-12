@@ -1830,6 +1830,25 @@ model ShopIntakeSession {
   @@map("shop_intake_sessions")
 }
 
+/// Aanvraag voor een account door iemand zonder account. Kopen kan alleen mét
+/// account; wie er geen heeft laat hier z'n gegevens achter, waarna de praktijk
+/// hem via het reguliere invite-systeem (`invite.create`) uitnodigt. `status`:
+/// PENDING (nieuw) → INVITED (uitgenodigd) of DISMISSED (afgewezen/spam).
+model ShopAccessRequest {
+  id          String    @id @default(cuid())
+  name        String
+  email       String
+  note        String?
+  // Slug van het product dat de interesse wekte (voor context, optioneel).
+  productSlug String?
+  status      String    @default("PENDING")
+  createdAt   DateTime  @default(now())
+  handledAt   DateTime?
+
+  @@index([status])
+  @@map("shop_access_requests")
+}
+
 // ─── Testrapport (Return to Sport / voortgangsmeting) ────────────────────────
 // Een momentopname-rapport dat de behandelaar samenstelt uit losse tests met
 // links/rechts-waarden, een doelzone-balk (rood/oranje/groen) en een marker.

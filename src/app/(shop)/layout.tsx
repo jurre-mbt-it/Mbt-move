@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { gateShopPreview } from '@/lib/shop/access'
+import { getServerUser } from '@/lib/auth/require-role'
 import { P } from '@/lib/shop/palette'
 
 export default async function ShopLayout({
@@ -9,6 +10,7 @@ export default async function ShopLayout({
 }) {
   // Pre-launch: alleen zichtbaar voor ingelogde admin (Jurre). Anders 404.
   const { isPreview } = await gateShopPreview()
+  const user = await getServerUser()
 
   return (
     <div
@@ -39,9 +41,19 @@ export default async function ShopLayout({
             <Link href="/intake" className="hover:text-white transition-colors">
               Vind jouw schema
             </Link>
-            <Link href="/mijn-programmas" className="hover:text-white transition-colors">
-              Mijn programma&apos;s
-            </Link>
+            {user ? (
+              <Link href="/mijn-programmas" className="hover:text-white transition-colors">
+                Mijn programma&apos;s
+              </Link>
+            ) : (
+              <Link
+                href="/login?next=/shop"
+                className="rounded-full px-4 py-1.5 font-semibold transition-transform hover:-translate-y-0.5"
+                style={{ background: P.brand, color: P.bg }}
+              >
+                Inloggen
+              </Link>
+            )}
           </nav>
         </div>
       </header>

@@ -5,6 +5,7 @@ import { createTRPCRouter, publicProcedure, protectedProcedure, adminProcedure }
 import { TRPCError } from '@trpc/server'
 import { matchSlug, LABELS, type IntakeAnswers } from '@/lib/shop/intake/flow'
 import { sendOrderEmails as sendOrderEmailsLib } from '@/lib/shop/email/order-emails'
+import { sendMail } from '@/server/mail'
 import { isShopPublic } from '@/lib/shop/access'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { createPayment, isMollieConfigured } from '@/lib/shop/mollie'
@@ -371,14 +372,15 @@ export const shopRouter = createTRPCRouter({
     }),
 
   // ── Checkout (Mollie) ──────────────────────────────────────────────────────
-  // Maakt een order + Mollie-betaling en geeft de checkout-URL terug. Gast-
-  // checkout: koper hoeft (nog) niet in te loggen; we koppelen op e-mail.
-  checkout: publicProcedure
+  // Maakt een order + Mollie-betaling en geeft de checkout-URL terug. Kopen kan
+  // alleen mét account (protectedProcedure): naam/e-mail komen uit het account,
+  // niet uit een formulier. Wie geen account heeft vraagt er een aan via
+  // `requestAccess` en wordt door de praktijk uitgenodigd. De ShopCustomer wordt
+  // aan de Supabase-gebruiker gekoppeld zodat aankopen (myPurchases) matchen.
+  checkout: protectedProcedure
     .input(
       z.object({
         slug: z.string(),
-        name: z.string().min(1),
-        email: z.string().email(),
         marketingOptIn: z.boolean().default(false),
         shipping: z
           .object({
@@ -391,7 +393,7 @@ export const shopRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const isAdmin = ctx.user?.role === 'ADMIN'
+      const isAdmin = ctx.user.role === 'ADMIN'
       if (!isShopPublic() && !isAdmin) throw new TRPCError({ code: 'FORBIDDEN' })
       if (!isMollieConfigured()) {
         throw new TRPCError({
@@ -399,6 +401,17 @@ export const shopRouter = createTRPCRouter({
           message: 'Betalen is nog niet geconfigureerd. Probeer het later opnieuw.',
         })
       }
+
+      // Identiteit uit het account, niet uit een formulier.
+      const account = await ctx.prisma.user.findUnique({
+        where: { id: ctx.user.id },
+        select: { email: true, name: true, firstName: true, lastName: true },
+      })
+      const email = (account?.email ?? ctx.user.email).toLowerCase()
+      const buyerName =
+        account?.name ||
+        [account?.firstName, account?.lastName].filter(Boolean).join(' ') ||
+        email
 
       const product = await ctx.prisma.shopProduct.findUnique({ where: { slug: input.slug } })
       if (!product || (product.status !== 'PUBLISHED' && !isAdmin)) {
@@ -410,6 +423,16 @@ export const shopRouter = createTRPCRouter({
       if (product.stockQty !== null && product.stockQty <= 0) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Dit artikel is uitverkocht.' })
       }
+      // Al in bezit (digitaal schema): niet nog een keer laten kopen.
+      if (product.kind === 'PROGRAM') {
+        const owned = await ctx.prisma.shopEntitlement.findFirst({
+          where: { revokedAt: null, productId: product.id, customer: { email } },
+          select: { id: true },
+        })
+        if (owned) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Je hebt dit programma al.' })
+        }
+      }
       const needsShipping = product.kind === 'PHYSICAL' && product.requiresShipping
       if (needsShipping && !input.shipping) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Vul een verzendadres in.' })
@@ -418,16 +441,18 @@ export const shopRouter = createTRPCRouter({
       const shippingCents = 0 // verzendkosten nog niet ingesteld (inbegrepen)
       const amountCents = product.priceCents + shippingCents
 
-      // Koper koppelen op e-mail (gast-checkout, geen account nodig).
+      // Koper koppelen op e-mail + Supabase-id (account verplicht).
       const customer = await ctx.prisma.shopCustomer.upsert({
-        where: { email: input.email.toLowerCase() },
+        where: { email },
         create: {
-          email: input.email.toLowerCase(),
-          name: input.name,
+          email,
+          name: buyerName,
+          supabaseUserId: ctx.user.supabaseUserId,
           marketingOptIn: input.marketingOptIn,
         },
         update: {
-          name: input.name,
+          name: buyerName,
+          supabaseUserId: ctx.user.supabaseUserId,
           ...(input.marketingOptIn ? { marketingOptIn: true } : {}),
         },
       })
@@ -435,14 +460,14 @@ export const shopRouter = createTRPCRouter({
       const order = await ctx.prisma.shopOrder.create({
         data: {
           customerId: customer.id,
-          email: input.email.toLowerCase(),
-          buyerName: input.name,
+          email,
+          buyerName,
           status: 'PENDING',
           amountCents,
           shippingCents,
           ...(input.shipping
             ? {
-                shippingName: input.name,
+                shippingName: buyerName,
                 shippingAddress: input.shipping.address,
                 shippingPostalCode: input.shipping.postalCode,
                 shippingCity: input.shipping.city,
@@ -477,6 +502,82 @@ export const shopRouter = createTRPCRouter({
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Geen betaal-URL ontvangen van Mollie.' })
       }
       return { checkoutUrl, orderId: order.id }
+    }),
+
+  // ── Toegang aanvragen (geen account) ───────────────────────────────────────
+  // Kopen kan alleen mét account. Wie er geen heeft laat hier z'n gegevens
+  // achter; de praktijk nodigt 'm daarna uit via het reguliere invite-systeem.
+  // Publiek + gethrottled; slaat een ShopAccessRequest op en mailt de praktijk.
+  requestAccess: publicProcedure
+    .input(
+      z.object({
+        name: z.string().min(1).max(120),
+        email: z.string().email(),
+        note: z.string().max(1000).optional(),
+        productSlug: z.string().max(200).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const isAdmin = ctx.user?.role === 'ADMIN'
+      if (!isShopPublic() && !isAdmin) throw new TRPCError({ code: 'FORBIDDEN' })
+
+      const ip =
+        ctx.req?.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+        ctx.req?.headers.get('x-real-ip') ??
+        'unknown'
+      const rl = await rateLimit('shop.requestAccess', ip, RATE_LIMITS.shopAccessRequest)
+      if (!rl.ok) throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
+
+      const email = input.email.toLowerCase().trim()
+      const name = input.name.trim()
+      const note = input.note?.trim() || null
+
+      // Al een account? Dan hoeft er niets aangevraagd te worden.
+      const existingUser = await ctx.prisma.user.findFirst({
+        where: { email, deletedAt: null },
+        select: { id: true },
+      })
+      if (existingUser) {
+        return { ok: true as const, alreadyHasAccount: true as const }
+      }
+
+      // Dubbele open aanvraag samenvoegen i.p.v. stapelen.
+      const open = await ctx.prisma.shopAccessRequest.findFirst({
+        where: { email, status: 'PENDING' },
+        select: { id: true },
+      })
+      if (open) {
+        await ctx.prisma.shopAccessRequest.update({
+          where: { id: open.id },
+          data: { name, note, productSlug: input.productSlug ?? null },
+        })
+      } else {
+        await ctx.prisma.shopAccessRequest.create({
+          data: { name, email, note, productSlug: input.productSlug ?? null },
+        })
+      }
+
+      // Praktijk op de hoogte brengen (best-effort, nooit hard falen).
+      const to = process.env.SHOP_NOTIFY_EMAIL || 'info@movementbasedtherapy.nl'
+      try {
+        await sendMail({
+          to,
+          replyTo: email,
+          subject: `Nieuwe toegangsaanvraag shop — ${name}`,
+          html: [
+            `<p><strong>${name}</strong> vraagt toegang tot de MBT Gym shop.</p>`,
+            `<p>E-mail: <a href="mailto:${email}">${email}</a></p>`,
+            input.productSlug ? `<p>Interesse in: ${input.productSlug}</p>` : '',
+            note ? `<p>Bericht:<br>${note.replace(/</g, '&lt;')}</p>` : '',
+            `<p>Nodig deze persoon uit via het uitnodigingsscherm om ze te laten kopen.</p>`,
+          ].join('\n'),
+          text: `${name} (${email}) vraagt toegang tot de shop.${note ? `\n\nBericht: ${note}` : ''}`,
+        })
+      } catch {
+        // Mail-fout mag de aanvraag niet blokkeren; de rij staat er al.
+      }
+
+      return { ok: true as const, alreadyHasAccount: false as const }
     }),
 
   // Status van een order (voor de bedankt-pagina). Synct eerst met Mollie zodat
@@ -789,6 +890,29 @@ export const shopRouter = createTRPCRouter({
         paidAt: o.paidAt,
         productNames: o.items.map((i) => i.nameSnapshot),
       }))
+    }),
+
+  // ── Toegangsaanvragen beheren (admin) ──────────────────────────────────────
+  /** Open (en recent afgehandelde) toegangsaanvragen voor het admin-overzicht. */
+  adminAccessRequests: adminProcedure.query(async ({ ctx }) => {
+    return ctx.prisma.shopAccessRequest.findMany({
+      where: { status: { in: ['PENDING', 'INVITED'] } },
+      orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+      take: 50,
+    })
+  }),
+
+  /** Zet een aanvraag op INVITED (uitgenodigd) of DISMISSED (afgewezen). */
+  adminResolveAccessRequest: adminProcedure
+    .input(z.object({ id: z.string(), status: z.enum(['INVITED', 'DISMISSED', 'PENDING']) }))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.shopAccessRequest.update({
+        where: { id: input.id },
+        data: {
+          status: input.status,
+          handledAt: input.status === 'PENDING' ? null : new Date(),
+        },
+      })
     }),
 
   // Verstuurt bevestiging + factuur-e-mail voor een bestaande order. Wordt later

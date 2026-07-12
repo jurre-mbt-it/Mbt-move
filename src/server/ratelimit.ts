@@ -176,6 +176,7 @@ export const RATE_LIMITS = {
   consentChange:      { max: 10, windowSec: 3600, message: 'Max 10 consent-wijzigingen per uur.', failClosedInProd: true },
   sessionLog:         { max: 60, windowSec: 3600, message: 'Max 60 sessies per uur gelogd.' },
   shopIntake:         { max: 5,  windowSec: 600,  message: 'Te veel intakes. Wacht 10 minuten.' },
+  shopAccessRequest:  { max: 5,  windowSec: 3600, message: 'Te veel aanvragen. Probeer het later opnieuw.', failClosedInProd: true },
   wearableSync:       { max: 60, windowSec: 3600, message: 'Te veel sync-verzoeken. Probeer het later opnieuw.' },
   loginLog:           { max: 12, windowSec: 600,  message: 'Te veel login-registraties.' },
   cspReport:          { max: 60, windowSec: 600,  message: 'Te veel CSP-reports.' },

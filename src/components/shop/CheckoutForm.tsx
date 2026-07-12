@@ -1,9 +1,10 @@
 'use client'
 
 /**
- * Gast-checkout op de productpagina. Verzamelt naam/e-mail (en bij een fysiek
- * artikel het verzendadres), maakt via tRPC een Mollie-betaling aan en stuurt
- * de koper door naar de iDEAL-checkout.
+ * Checkout op de productpagina — alleen voor ingelogde kopers. Naam en e-mail
+ * komen uit het account (server-side), dus die worden hier niet meer gevraagd.
+ * Bij een fysiek artikel vult de koper een verzendadres in. De mutatie maakt een
+ * Mollie-betaling en stuurt door naar de iDEAL-checkout.
  */
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -18,8 +19,6 @@ export function CheckoutForm({
   slug: string
   requiresShipping: boolean
 }) {
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
   const [address, setAddress] = useState('')
   const [postalCode, setPostalCode] = useState('')
   const [city, setCity] = useState('')
@@ -34,15 +33,11 @@ export function CheckoutForm({
   })
 
   function submit() {
-    if (!name.trim()) return toast.error('Vul je naam in')
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) return toast.error('Vul een geldig e-mailadres in')
     if (requiresShipping && (!address.trim() || !postalCode.trim() || !city.trim())) {
       return toast.error('Vul je verzendadres in')
     }
     checkout.mutate({
       slug,
-      name: name.trim(),
-      email: email.trim(),
       marketingOptIn: optIn,
       shipping: requiresShipping
         ? { address: address.trim(), postalCode: postalCode.trim(), city: city.trim(), country: 'NL' }
@@ -54,13 +49,6 @@ export function CheckoutForm({
 
   return (
     <div className="mt-5 space-y-3">
-      <DarkInput placeholder="Naam" value={name} onChange={(e) => setName(e.target.value)} />
-      <DarkInput
-        type="email"
-        placeholder="E-mailadres"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
       {requiresShipping && (
         <>
           <DarkInput

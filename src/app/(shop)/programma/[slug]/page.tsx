@@ -10,6 +10,7 @@ import { isShopPublic } from '@/lib/shop/access'
 import { isMollieConfigured } from '@/lib/shop/mollie'
 import { youtubeId, youtubeEmbed } from '@/lib/shop/youtube'
 import { CheckoutForm } from '@/components/shop/CheckoutForm'
+import { RequestAccessDialog } from '@/components/shop/RequestAccessDialog'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,6 +33,19 @@ export default async function ProductDetailPage({
   const isService = product.kind === 'SERVICE'
   const isPhysical = product.kind === 'PHYSICAL'
   const soldOut = isPhysical && product.stockQty !== null && product.stockQty <= 0
+  const isLoggedIn = !!user
+
+  // Bezit de ingelogde koper dit digitale programma al? Dan niet nog eens laten
+  // kopen, maar doorsturen naar 'mijn programma's'. Match op accountmail.
+  let alreadyOwned = false
+  if (isLoggedIn && isProgram) {
+    const owned = await prisma.shopEntitlement.findFirst({
+      where: { revokedAt: null, productId: product.id, customer: { email: user.email.toLowerCase() } },
+      select: { id: true },
+    })
+    alreadyOwned = !!owned
+  }
+
   // Koopbaar als de shop publiek staat (of admin test) én Mollie is geconfigureerd.
   const purchasable =
     (isShopPublic() || user?.role === 'ADMIN') &&
@@ -196,8 +210,9 @@ export default async function ProductDetailPage({
               </p>
             )}
 
-            {/* Afrekenen volgt zodra Mollie is aangesloten. Voor diensten met een
-                boekingslink kan de bezoeker nu al een afspraak plannen. */}
+            {/* Diensten met een boekingslink: direct plannen. Voor de rest geldt:
+                kopen kan alleen mét account. Uitgelogd -> inloggen of toegang
+                aanvragen; al in bezit -> door naar 'mijn programma's'. */}
             {isService && product.bookingUrl ? (
               <a
                 href={product.bookingUrl}
@@ -208,19 +223,58 @@ export default async function ProductDetailPage({
               >
                 Plan je afspraak
               </a>
-            ) : purchasable ? (
-              <CheckoutForm slug={product.slug} requiresShipping={isPhysical && product.requiresShipping} />
-            ) : (
+            ) : alreadyOwned ? (
+              <>
+                <Link
+                  href="/mijn-programmas"
+                  className="mt-5 block w-full rounded-xl px-5 py-3.5 text-center font-extrabold transition-transform hover:-translate-y-0.5"
+                  style={{ background: P.brand, color: P.bg, letterSpacing: '0.03em' }}
+                >
+                  Open in mijn programma&apos;s
+                </Link>
+                <p className="mt-3 text-center text-xs" style={{ color: P.inkDim }}>
+                  Je hebt dit programma al. Volg het op web en in de app.
+                </p>
+              </>
+            ) : !purchasable ? (
               <>
                 <button
                   disabled
                   className="mt-5 w-full rounded-xl px-5 py-3.5 font-extrabold opacity-60"
                   style={{ background: P.brand, color: P.bg, letterSpacing: '0.03em' }}
                 >
-                  Binnenkort te koop
+                  {soldOut ? 'Uitverkocht' : 'Binnenkort te koop'}
                 </button>
+                {!soldOut && (
+                  <p className="mt-3 text-center text-xs" style={{ color: P.inkDim }}>
+                    Betalen via iDEAL volgt zodra de shop live gaat.
+                  </p>
+                )}
+              </>
+            ) : isLoggedIn ? (
+              <CheckoutForm slug={product.slug} requiresShipping={isPhysical && product.requiresShipping} />
+            ) : (
+              <>
+                <Link
+                  href={`/login?next=/programma/${product.slug}`}
+                  className="mt-5 block w-full rounded-xl px-5 py-3.5 text-center font-extrabold transition-transform hover:-translate-y-0.5"
+                  style={{ background: P.brand, color: P.bg, letterSpacing: '0.03em' }}
+                >
+                  Inloggen om te kopen
+                </Link>
+                <RequestAccessDialog
+                  productSlug={product.slug}
+                  trigger={
+                    <button
+                      className="mt-3 block w-full rounded-xl px-5 py-3 text-center text-sm font-semibold transition-colors"
+                      style={{ border: `1px solid ${P.lineStrong}`, color: P.ink }}
+                    >
+                      Nog geen account? Vraag toegang aan
+                    </button>
+                  }
+                />
                 <p className="mt-3 text-center text-xs" style={{ color: P.inkDim }}>
-                  Betalen via iDEAL volgt zodra de shop live gaat.
+                  Je koopt onze programma&apos;s met een account.
                 </p>
               </>
             )}

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
+import { getServerUser } from '@/lib/auth/require-role'
 import { P } from '@/lib/shop/palette'
 import { heroGradient } from '@/lib/shop/gradient'
 import { LEVEL_LABELS } from '@/lib/shop/labels'
@@ -8,11 +9,40 @@ export const dynamic = 'force-dynamic'
 export const metadata = { title: "Mijn programma's" }
 
 export default async function MyProgramsPage() {
-  // Preview: producten met een gekoppeld schema gelden als "in bezit".
-  // In productie wordt dit de lijst met programma's die de ingelogde koper heeft.
-  const products = await prisma.shopProduct.findMany({
-    where: { programId: { not: null }, status: { not: 'ARCHIVED' } },
-    orderBy: [{ sortOrder: 'asc' }],
+  const user = await getServerUser()
+
+  // Niet ingelogd: kopen en bezitten kan alleen met account.
+  if (!user) {
+    return (
+      <div className="mx-auto max-w-4xl px-5 py-12">
+        <h1 className="text-3xl font-bold tracking-tight">Mijn programma&apos;s</h1>
+        <p className="mt-2 mb-8" style={{ color: P.inkMuted }}>
+          Log in om je aangeschafte programma&apos;s te bekijken.
+        </p>
+        <Link
+          href="/login?next=/mijn-programmas"
+          className="inline-flex items-center gap-2 rounded-full px-6 py-3 font-semibold text-sm transition-transform hover:-translate-y-0.5"
+          style={{ background: P.brand, color: P.bg }}
+        >
+          Inloggen
+        </Link>
+      </div>
+    )
+  }
+
+  // Aankopen van deze gebruiker (match op accountmail), alleen met een schema.
+  const entitlements = await prisma.shopEntitlement.findMany({
+    where: {
+      revokedAt: null,
+      customer: { email: user.email.toLowerCase() },
+      product: { kind: 'PROGRAM', programId: { not: null }, status: { not: 'ARCHIVED' } },
+    },
+    orderBy: { grantedAt: 'desc' },
+    include: {
+      product: {
+        select: { slug: true, name: true, level: true, durationWeeks: true, heroImageUrl: true },
+      },
+    },
   })
 
   return (
@@ -25,7 +55,7 @@ export default async function MyProgramsPage() {
         De programma&apos;s die je hebt aangeschaft. Je volgt ze op je eigen tempo, op web en mobiel.
       </p>
 
-      {products.length === 0 ? (
+      {entitlements.length === 0 ? (
         <div
           className="rounded-2xl border border-dashed p-12 text-center"
           style={{ borderColor: P.lineStrong, color: P.inkMuted }}
@@ -38,19 +68,19 @@ export default async function MyProgramsPage() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
-          {products.map((p) => (
+          {entitlements.map((e) => (
             <Link
-              key={p.id}
-              href={`/mijn-programmas/${p.slug}`}
+              key={e.id}
+              href={`/mijn-programmas/${e.product.slug}`}
               className="group rounded-2xl overflow-hidden border flex flex-col transition-all hover:-translate-y-0.5"
               style={{ borderColor: P.line, background: P.surface }}
             >
               <div
                 className="aspect-[16/9] relative"
                 style={{
-                  background: p.heroImageUrl
-                    ? `center / cover no-repeat url(${p.heroImageUrl})`
-                    : heroGradient(p.slug),
+                  background: e.product.heroImageUrl
+                    ? `center / cover no-repeat url(${e.product.heroImageUrl})`
+                    : heroGradient(e.product.slug),
                 }}
               >
                 <span
@@ -62,18 +92,18 @@ export default async function MyProgramsPage() {
               </div>
               <div className="p-5">
                 <div className="flex items-center gap-2 mb-1.5">
-                  {p.level && (
+                  {e.product.level && (
                     <span className="text-[11px] font-semibold" style={{ color: P.brand }}>
-                      {LEVEL_LABELS[p.level] ?? p.level}
+                      {LEVEL_LABELS[e.product.level] ?? e.product.level}
                     </span>
                   )}
-                  {p.durationWeeks ? (
+                  {e.product.durationWeeks ? (
                     <span className="text-[11px]" style={{ color: P.inkDim }}>
-                      · {p.durationWeeks} weken
+                      · {e.product.durationWeeks} weken
                     </span>
                   ) : null}
                 </div>
-                <h3 className="font-semibold text-lg">{p.name}</h3>
+                <h3 className="font-semibold text-lg">{e.product.name}</h3>
                 <span
                   className="mt-3 inline-block text-sm font-medium transition-transform group-hover:translate-x-0.5"
                   style={{ color: P.brand }}
