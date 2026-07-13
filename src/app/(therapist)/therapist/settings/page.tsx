@@ -82,6 +82,12 @@ export default function SettingsPage() {
           sub="Aangepaste meetparameters voor programma's"
           bar={P.ice}
         />
+        <ActionTile
+          href="/therapist/settings/tag-vocabulary"
+          label="Klacht-tags"
+          sub="Suggestielijst voor #hashtags bij het loggen"
+          bar={P.ice}
+        />
         {isAdmin && (
           <>
             <ActionTile

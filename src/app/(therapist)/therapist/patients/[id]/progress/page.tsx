@@ -10,6 +10,7 @@ import { trpc } from '@/lib/trpc/client'
 import { HR_ZONES, type HRZone, CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
 import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
 import { LoadCurveChart } from '@/components/workload/LoadCurveChart'
+import { PatientTagsPanel } from '@/components/tags/PatientTagsPanel'
 import { CARDIO_ICON_MAP } from '@/components/icons'
 import {
   DARK_CHART_STYLES,
@@ -332,13 +333,14 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
         ) : (
           <Tabs defaultValue={defaultTab} className="space-y-4">
             <TabsList
-              className="w-full grid grid-cols-4 rounded-xl"
+              className="w-full grid grid-cols-5 rounded-xl"
               style={{ background: P.surface, border: `1px solid ${P.line}` }}
             >
               <TabsTrigger value="belasting" className="text-xs">Belasting</TabsTrigger>
               <TabsTrigger value="sessies" className="text-xs">Sessies</TabsTrigger>
               <TabsTrigger value="cardio" className="text-xs">Cardio</TabsTrigger>
               <TabsTrigger value="krachtopbouw" className="text-xs">1RM</TabsTrigger>
+              <TabsTrigger value="klachten" className="text-xs">Klachten</TabsTrigger>
             </TabsList>
 
             {/* ── Belasting tab: fitness-fatigue curve (kracht + cardio) ── */}
@@ -654,6 +656,11 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
                   )}
                 </>
               )}
+            </TabsContent>
+
+            {/* ── Klachten tab: #hashtags met episodes ── */}
+            <TabsContent value="klachten" className="space-y-4">
+              <PatientTagsPanel patientId={id} />
             </TabsContent>
           </Tabs>
         )}
