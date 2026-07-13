@@ -210,9 +210,15 @@ export function weekToWeekChange(
   priorStart.setDate(priorStart.getDate() - (priorWeeks * 7 - 1))
 
   const last7 = dailyTotals(loads, last7Start, end).reduce((a, b) => a + b, 0)
-  const priorSum = dailyTotals(loads, priorStart, priorEnd).reduce((a, b) => a + b, 0)
+  const priorDays = dailyTotals(loads, priorStart, priorEnd)
+  const priorSum = priorDays.reduce((a, b) => a + b, 0)
+  const priorActiveDays = priorDays.filter(d => d > 0).length
   const priorWeekMean = priorSum / priorWeeks
-  if (priorWeekMean < 1) return null // te weinig basis voor een zinvolle vergelijking
+  // Te dunne basis → geen zinvolle vergelijking. Vlak na de eerste logs is de
+  // voorgaande periode bijna leeg en explodeert de deling (+283%-artefacten);
+  // eis daarom minstens 4 actieve dagen én een substantiële weekload in de
+  // voorgaande weken. Consumers tonen dan "basis in opbouw" i.p.v. een getal.
+  if (priorActiveDays < 4 || priorWeekMean < 100) return null
   return Math.round(((last7 - priorWeekMean) / priorWeekMean) * 100)
 }
 
