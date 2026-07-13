@@ -173,9 +173,11 @@ export function LoadCurveChart({ data, compact = false }: { data: LoadCurveData;
               {acwr !== null && (
                 <span
                   className="athletic-mono"
-                  title="Acute:Chronic Workload Ratio (EWMA 7d/28d) — indicatief, geen harde voorspeller"
+                  title="Acute:Chronic Workload Ratio (EWMA 7d/28d) — stil trend-cijfer, stuurt de status niet (ratio-maat methodologisch omstreden, Impellizzeri 2020)"
                   style={{
-                    color: acwr > 1.5 ? P.danger : acwr > 1.3 ? P.gold : acwr < 0.8 ? P.ice : P.inkMuted,
+                    // Bewust neutraal: de ACWR is een indicatie, geen oordeel —
+                    // kleuren zou 'm weer als verdict laten lezen.
+                    color: P.inkMuted,
                     fontSize: 11,
                     fontWeight: 800,
                     letterSpacing: '0.08em',
