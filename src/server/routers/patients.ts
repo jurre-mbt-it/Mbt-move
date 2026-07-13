@@ -6,6 +6,7 @@ import { createTRPCRouter, therapistProcedure, mfaTherapistProcedure } from '@/s
 import { auditLog } from '@/server/audit'
 import { estimateOneRepMax } from '@/lib/one-rep-max'
 import { clampSessionDurationSec } from '@/lib/training-load'
+import { syncHashtagsForLog } from '@/server/tags'
 
 const createId = () => crypto.randomUUID()
 
@@ -1109,7 +1110,7 @@ export const patientsRouter = createTRPCRouter({
         })
       }
 
-      return ctx.prisma.sessionLog.create({
+      const created = await ctx.prisma.sessionLog.create({
         data: {
           id: createId(),
           patientId: input.patientId,
@@ -1149,6 +1150,17 @@ export const patientsRouter = createTRPCRouter({
         },
         select: { id: true },
       })
+      // Therapeut kan bij het afronden #tags op de klacht zetten. taggedById =
+      // de therapeut zodat de tijdlijn "wie" laat zien; patientId blijft de
+      // patiënt zodat de tag onder diens dossier valt.
+      await syncHashtagsForLog(ctx.prisma, {
+        patientId: input.patientId,
+        taggedById: ctx.user.id,
+        loggedAt: new Date(input.completedAt),
+        notes: input.notes,
+        target: { sessionLogId: created.id },
+      })
+      return created
     }),
 
   /**
@@ -1193,7 +1205,7 @@ export const patientsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const session = await ctx.prisma.sessionLog.findUnique({
         where: { id: input.sessionId },
-        select: { patientId: true },
+        select: { patientId: true, completedAt: true },
       })
       if (!session) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Sessie niet gevonden' })
@@ -1238,6 +1250,17 @@ export const patientsRouter = createTRPCRouter({
           }
         }
       })
+
+      // Notitie-edit kan hashtags toevoegen/verwijderen → hersync (idempotent).
+      if (input.notes !== undefined) {
+        await syncHashtagsForLog(ctx.prisma, {
+          patientId: session.patientId,
+          taggedById: ctx.user.id,
+          loggedAt: input.completedAt ? new Date(input.completedAt) : session.completedAt ?? new Date(),
+          notes: input.notes,
+          target: { sessionLogId: input.sessionId },
+        })
+      }
 
       return { id: input.sessionId }
     }),

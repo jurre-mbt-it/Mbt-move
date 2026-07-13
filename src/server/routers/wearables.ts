@@ -7,6 +7,7 @@ import { wearablesEnabledForRole } from '@/lib/wearables-access'
 import { auditLog } from '@/server/audit'
 import { buildAuthorizeUrl, encryptToken, isStravaConfigured, openTokens } from '@/server/wearables/strava/config'
 import { syncStravaActivities } from '@/server/wearables/strava/sync'
+import { syncHashtagsForLog } from '@/server/tags'
 
 /**
  * Uitrol-gate: wearables is voorlopig alleen voor de admin (zie
@@ -340,6 +341,20 @@ export const wearablesRouter = createTRPCRouter({
         },
       })
       if (res.count === 0) throw new TRPCError({ code: 'NOT_FOUND' })
+      // Beoordeel-notitie kan hashtags bevatten (#achillespees na het hardlopen).
+      if (input.notes?.trim()) {
+        const log = await ctx.prisma.cardioLog.findUnique({
+          where: { id: input.id },
+          select: { completedAt: true },
+        })
+        await syncHashtagsForLog(ctx.prisma as PrismaClient, {
+          patientId: ctx.user!.id,
+          taggedById: ctx.user!.id,
+          loggedAt: log?.completedAt ?? new Date(),
+          notes: input.notes,
+          target: { cardioLogId: input.id },
+        })
+      }
       return { ok: true }
     }),
 

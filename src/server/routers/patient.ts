@@ -19,6 +19,7 @@ import { signEducationFile } from '@/lib/education/storage'
 import { paceSecPerKm } from '@/lib/cardio-zones'
 import { estimateOneRepMax } from '@/lib/one-rep-max'
 import { clampSessionDurationSec } from '@/lib/training-load'
+import { syncHashtagsForLog } from '@/server/tags'
 import type { PrismaClient } from '@prisma/client'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -703,6 +704,15 @@ export const patientRouter = createTRPCRouter({
         },
         req: ctx.req,
       })
+      // Klacht-/aandachts-hashtags uit de notitie (#achillespees) — faalt stil,
+      // mag de zojuist opgeslagen sessie nooit terugdraaien.
+      await syncHashtagsForLog(ctx.prisma, {
+        patientId: ctx.user.id,
+        taggedById: ctx.user.id,
+        loggedAt: new Date(input.completedAt),
+        notes: input.notes,
+        target: { sessionLogId: sessionLog.id },
+      })
       return sessionLog
     }),
 
@@ -902,6 +912,13 @@ export const patientRouter = createTRPCRouter({
           durationSec: input.durationSec,
         },
         req: ctx.req,
+      })
+      await syncHashtagsForLog(ctx.prisma, {
+        patientId: ctx.user.id,
+        taggedById: ctx.user.id,
+        loggedAt: completedAt ?? new Date(),
+        notes: input.notes,
+        target: { cardioLogId: log.id },
       })
       return log
     }),

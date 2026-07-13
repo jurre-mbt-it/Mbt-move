@@ -331,6 +331,7 @@ model User {
   favoriteExercises     FavoriteExercise[]
   wellnessChecks        WellnessCheck[]
   painEntries           PainEntry[]
+  hashtags              HashTag[]            @relation("PatientHashTags")
   invitesSent           InviteCode[]         @relation("InviteSender")
   auditLogs             AuditLog[]
   mfaBackupCodes        MfaBackupCode[]
@@ -684,17 +685,17 @@ model Program {
   // Multi-tenant scope — defensief. Null = legacy (van vóór practice-scoping).
   practiceId String?
 
-  exercises            ProgramExercise[]
-  resources            ProgramResource[]
-  sessionLogs          SessionLog[]
-  weekScheduleDays     WeekScheduleDay[]
-  weekScheduleDayItems WeekScheduleDayItem[] @relation("ProgramWeekScheduleItems")
-  cardioLogs           CardioLog[]
+  exercises             ProgramExercise[]
+  resources             ProgramResource[]
+  sessionLogs           SessionLog[]
+  weekScheduleDays      WeekScheduleDay[]
+  weekScheduleDayItems  WeekScheduleDayItem[] @relation("ProgramWeekScheduleItems")
+  cardioLogs            CardioLog[]
   // Consumenten-shop: dit template kan als betaald product worden verkocht.
-  shopProducts         ShopProduct[]
-  sessionMoves         SessionMove[]
+  shopProducts          ShopProduct[]
+  sessionMoves          SessionMove[]
   // Shop-aankopen die als dit (gekopieerde) programma zijn geactiveerd.
-  activatedEntitlements ShopEntitlement[] @relation("EntitlementActivatedProgram")
+  activatedEntitlements ShopEntitlement[]     @relation("EntitlementActivatedProgram")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -791,43 +792,45 @@ model CardioLog {
   completedAt     DateTime       @default(now())
   createdAt       DateTime       @default(now())
 
+  hashtagUsages HashTagUsage[]
+
   @@unique([patientId, externalId])
   @@index([patientId, completedAt])
   @@map("cardio_logs")
 }
 
 model WeekSchedule {
-  id          String            @id
+  id          String    @id
   name        String
   description String?
   creatorId   String
-  creator     User              @relation("CreatedWeekSchedules", fields: [creatorId], references: [id])
+  creator     User      @relation("CreatedWeekSchedules", fields: [creatorId], references: [id])
   patientId   String?
-  patient     User?             @relation("PatientWeekSchedules", fields: [patientId], references: [id], onDelete: Cascade)
+  patient     User?     @relation("PatientWeekSchedules", fields: [patientId], references: [id], onDelete: Cascade)
   startDate   DateTime?
   endDate     DateTime?
-  isTemplate  Boolean           @default(false)
+  isTemplate  Boolean   @default(false)
   // weekNumber = 1, 2, 3, ... voor multi-week behandelplannen per patient.
   // Bestaande records behouden 1 (default). Templates negeren dit veld.
-  weekNumber  Int               @default(1)
+  weekNumber  Int       @default(1)
 
   // ── Periodisering (per-week metadata) ──────────────────────────────────────
   // Trainingsfase/blok van deze week — vrije string, maar de UI kent de vaste
   // set ACCUMULATION | INTENSIFICATION | REALIZATION | DELOAD | TAPER en geeft
   // die een label + kleur. Null = geen fase toegewezen.
-  phaseType   String?
+  phaseType  String?
   // Deload-week: minder volume/intensiteit. Los van phaseType zodat je ook
   // binnen een blok een losse deload kunt markeren.
-  isDeload    Boolean           @default(false)
+  isDeload   Boolean @default(false)
   // Geplande weekbelasting (sRPE-stijl punten) — richtwaarde die de planner
   // naast de gerealiseerde belasting toont. Null = geen doel gezet.
-  targetLoad  Int?
+  targetLoad Int?
   // Week-brede coaching-notitie (doel/aandachtspunt voor deze week).
-  weekNote    String?
+  weekNote   String?
 
-  days        WeekScheduleDay[]
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  days      WeekScheduleDay[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
 
   // Multi-tenant scope. Null = legacy.
   practiceId String?
@@ -966,7 +969,7 @@ model ProgramExercise {
   // Anders dan ExerciseLog.extraParams (gelogde waarden van de patiënt) en
   // Exercise.defaultExtraParams (template-defaults) draagt dit de door de
   // therapeut ingestelde doel-waarden voor dít programma.
-  extraParams   Json?
+  extraParams Json?
 
   // Intensiteits-voorschrift — zie enum IntensityType hierboven. min/max dragen
   // afhankelijk van type een RPE-waarde, percentage of kg-offset; intensityText
@@ -1003,8 +1006,9 @@ model SessionLog {
   exertionLevel Int? // 0-10 RPE
   feelScore     Int? // 1-5 subjectief gevoel sessie (1=slecht .. 5=top); null = niet ingevuld
 
-  exerciseLogs ExerciseLog[]
-  messages     Message[]
+  exerciseLogs  ExerciseLog[]
+  messages      Message[]
+  hashtagUsages HashTagUsage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1933,22 +1937,22 @@ model TestCatalogItem {
 /// Test-batterij: een benoemde set tests om in één keer aan een rapport toe te
 /// voegen (bv "Return to Sport · VKB"). Global library.
 model TestBattery {
-  id          String   @id @default(cuid())
-  key         String?  @unique
+  id            String   @id @default(cuid())
+  key           String?  @unique
   /// Praktijk-scope, zelfde semantiek als TestCatalogItem.practiceId.
-  practiceId  String?
+  practiceId    String?
   /// Therapeut die de batterij aanmaakte (audit); NULL voor seeds.
-  creatorId   String?
-  name        String
-  description String?
+  creatorId     String?
+  name          String
+  description   String?
   /// Looptijd van de batterij als revalidatie-protocol, in weken. NULL = geen
   /// tijdlijn (losse meet-batterij). Gevuld → per test kan een targetWeek gezet
   /// worden waarin het doel behaald zou moeten zijn.
   durationWeeks Int?
-  order       Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  order         Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   items TestBatteryItem[]
 
@@ -2319,4 +2323,66 @@ model ReadinessSnapshot {
   @@unique([userId, date])
   @@index([userId, date])
   @@map("readiness_snapshots")
+}
+
+/// Klacht-/aandachts-hashtag van een patiënt/atleet, geparsed uit de notities
+/// van workouts en cardio-sessies (#achillespees). `name` is genormaliseerd
+/// (lowercase, geen accenten) — typevarianten worden bij het opslaan al aan
+/// een bestaande tag gekoppeld via bigram-similarity (src/server/tags.ts),
+/// en de invoer-UI suggereert bestaande tags zodra iemand # typt.
+model HashTag {
+  id        String   @id @default(cuid())
+  patient   User     @relation("PatientHashTags", fields: [patientId], references: [id], onDelete: Cascade)
+  patientId String
+  /// Genormaliseerde sleutel: lowercase, accenten weg, alleen [a-z0-9-].
+  name      String
+  /// Weergavevorm zoals de eerste keer getypt (zonder #).
+  display   String
+  createdAt DateTime @default(now())
+
+  usages HashTagUsage[]
+
+  @@unique([patientId, name])
+  @@map("hashtags")
+}
+
+/// Eén voorkomen van een hashtag op een gelogde sessie. `loggedAt` (de
+/// completedAt van de log) is de basis voor episode-groepering: zit er >3
+/// maanden tussen twee opeenvolgende usages, dan begint een nieuwe episode
+/// en worden oudere logs niet meer als samenhangend getoond.
+model HashTagUsage {
+  id           String      @id @default(cuid())
+  tag          HashTag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  tagId        String
+  sessionLog   SessionLog? @relation(fields: [sessionLogId], references: [id], onDelete: Cascade)
+  sessionLogId String?
+  cardioLog    CardioLog?  @relation(fields: [cardioLogId], references: [id], onDelete: Cascade)
+  cardioLogId  String?
+  /// Wie de tag zette (patiënt zelf of behandelend therapeut) — audit/inzicht.
+  taggedById   String?
+  loggedAt     DateTime
+  createdAt    DateTime    @default(now())
+
+  @@unique([tagId, sessionLogId])
+  @@unique([tagId, cardioLogId])
+  @@index([tagId, loggedAt])
+  @@map("hashtag_usages")
+}
+
+/// Praktijk-brede suggestielijst voor hashtags (achillespees, knie, lage-rug…),
+/// zelfde scope-patroon als de test-library: practiceId NULL = globale seed,
+/// gevuld = eigen praktijk. Voorkomt typevarianten aan de bron: de invoer-UI
+/// toont deze lijst zodra iemand # typt.
+model TagVocabularyItem {
+  id         String   @id @default(cuid())
+  practiceId String?
+  /// Genormaliseerde sleutel (zelfde normalisatie als HashTag.name).
+  name       String
+  display    String
+  /// Therapeut die het item toevoegde (audit); NULL voor seeds.
+  creatorId  String?
+  createdAt  DateTime @default(now())
+
+  @@unique([practiceId, name])
+  @@map("tag_vocabulary")
 }
