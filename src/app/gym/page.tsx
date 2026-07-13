@@ -1291,8 +1291,9 @@ function WorkloadSection() {
               gap: 12,
             }}
           >
-            <MiniStat label="FITHEID" value="578" color={P.ice} />
-            <MiniStat label="VERMOEIDHEID" value="642" color={P.gold} />
+            {/* Vorm = fitheid − vermoeidheid (620 − 634 = −14), productief-zone. */}
+            <MiniStat label="FITHEID" value="620" color={P.ice} />
+            <MiniStat label="VERMOEIDHEID" value="634" color={P.gold} />
             <MiniStat label="VORM" value="−14" color={P.lime} />
           </div>
         </div>
