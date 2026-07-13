@@ -35,6 +35,43 @@ export type SleepNight = {
 export const SLEEP_NEED_MIN = 480
 
 /**
+ * Persoonlijke slaapbehoefte (min) uit de eigen historie: het p75 van de
+ * laatste ≤30 nachten. p75 i.p.v. gemiddelde zodat een reeks korte nachten de
+ * "behoefte" niet omlaag trekt — het schat wat iemand slaapt als hij de kans
+ * krijgt. Geclampt op 6-9u: de baseline mag nooit afglijden naar "4 uur is
+ * jouw norm" (chronisch tekort voelt went, maar herstel blijft objectief
+ * achter). Onder de 7 nachten historie vallen we terug op de populatienorm.
+ *
+ * Waarom: wie structureel korter slaapt dan 8u zat anders élke dag in het
+ * rood op de duur-component — readiness moet afwijking van je eigen normaal
+ * meten, niet je levensstijl elke ochtend opnieuw veroordelen.
+ */
+export const SLEEP_NEED_FLOOR_MIN = 360
+export const SLEEP_NEED_CEIL_MIN = 540
+
+export function personalSleepNeed(asleepMins: number[]): number {
+  const valid = asleepMins.filter(m => m > 0).slice(-30)
+  if (valid.length < 7) return SLEEP_NEED_MIN
+  const sorted = [...valid].sort((a, b) => a - b)
+  const p75 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.75))]
+  return Math.round(Math.max(SLEEP_NEED_FLOOR_MIN, Math.min(SLEEP_NEED_CEIL_MIN, p75)))
+}
+
+/**
+ * Slaapschuld (min) over de laatste ≤7 nachten: som van de tekorten t.o.v.
+ * de (persoonlijke) behoefte. Langere nachten lossen geen schuld af — surplus
+ * telt niet negatief; drie keer "net iets te kort" stapelt wél, wat losse
+ * nachtscores missen.
+ */
+export function sleepDebtMin(nights: { asleepMin: number }[], needMin: number): number {
+  return Math.round(
+    nights
+      .slice(-7)
+      .reduce((sum, n) => sum + Math.max(0, needMin - n.asleepMin), 0),
+  )
+}
+
+/**
  * Aggregeer ruwe segmenten tot één nacht. `inBed`-segmenten bepalen de
  * tijd-in-bed (voor efficiëntie); asleep-stages tellen op tot de slaaptijd.
  * Latency = tijd tussen eerste in-bed en eerste slaap-segment.
@@ -94,9 +131,17 @@ export function aggregateNight(segments: SleepSegment[]): SleepNight {
  *  - 25 pt: herstellende slaap = (deep+REM)/asleep t.o.v. ideaal ~0.43
  *           (deep 13-23% + REM 20-25% ≈ gezonde nacht)
  *  - 25 pt: efficiëntie (asleep/inBed), 0.85+ = vol, <0.5 = 0
+ *
+ * `needMin` default = populatienorm (8u). De opgeslagen score (ingest) blijft
+ * absoluut — die verschuift niet als de baseline verschuift; readiness
+ * herberekent bij het lezen met `personalSleepNeed` zodat structurele korte
+ * slapers op hun eigen normaal worden beoordeeld.
  */
-export function sleepQualityScore(n: Pick<SleepNight, 'asleepMin' | 'deepMin' | 'remMin' | 'efficiency'>): number {
-  const durationPts = 50 * clamp01(n.asleepMin / SLEEP_NEED_MIN)
+export function sleepQualityScore(
+  n: Pick<SleepNight, 'asleepMin' | 'deepMin' | 'remMin' | 'efficiency'>,
+  needMin: number = SLEEP_NEED_MIN,
+): number {
+  const durationPts = 50 * clamp01(n.asleepMin / needMin)
 
   const restorativeShare = n.asleepMin > 0 ? (n.deepMin + n.remMin) / n.asleepMin : 0
   const IDEAL_RESTORATIVE = 0.43

@@ -13,6 +13,7 @@ import {
   type SleepDay,
   type VitalsDay,
 } from '@/lib/readiness'
+import { personalSleepNeed, sleepQualityScore } from '@/lib/sleep-metrics'
 
 type Db = Pick<PrismaClient, 'vitalsEntry' | 'sleepEntry' | 'wellnessCheck' | 'readinessSnapshot'>
 
@@ -53,7 +54,10 @@ export async function computeReadinessFor(
     prisma.sleepEntry.findMany({
       where: { userId, date: { gte: since, lte: target } },
       orderBy: { date: 'asc' },
-      select: { date: true, qualityScore: true },
+      select: {
+        date: true, qualityScore: true,
+        asleepMin: true, deepMin: true, remMin: true, efficiency: true,
+      },
     }),
     prisma.wellnessCheck.findUnique({
       where: { userId_date: { userId, date: target } },
@@ -68,7 +72,27 @@ export async function computeReadinessFor(
     respiratoryRate: v.respiratoryRate,
     wristTempDeviation: v.wristTempDeviation,
   }))
-  const sleep: SleepDay[] = sleepRows.map(s => ({ date: isoDay(s.date), qualityScore: s.qualityScore }))
+  // Slaapscore relatief aan de eigen behoefte (p75 laatste 30 nachten,
+  // geclampt 6-9u): een structurele korte slaper wordt beoordeeld op zijn
+  // eigen normaal i.p.v. elke ochtend rood op de 8u-populatienorm. Herberekend
+  // bij het lezen — de opgeslagen qualityScore blijft de absolute score voor
+  // de slaap-detailschermen.
+  const needMin = personalSleepNeed(sleepRows.map(s => s.asleepMin ?? 0))
+  const sleep: SleepDay[] = sleepRows.map(s => ({
+    date: isoDay(s.date),
+    qualityScore:
+      s.asleepMin != null && s.asleepMin > 0
+        ? sleepQualityScore(
+            {
+              asleepMin: s.asleepMin,
+              deepMin: s.deepMin ?? 0,
+              remMin: s.remMin ?? 0,
+              efficiency: s.efficiency,
+            },
+            needMin,
+          )
+        : s.qualityScore,
+  }))
 
   return computeReadiness(vitals, sleep, wellness, isoDay(target))
 }
