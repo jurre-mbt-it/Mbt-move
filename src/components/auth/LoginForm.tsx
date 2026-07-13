@@ -22,15 +22,25 @@ export function LoginForm() {
     setError(null)
 
     try {
+      // shouldCreateUser: false — de gewone login is alleen voor bestaande
+      // accounts. Nieuwe patiënten gaan via /login/code (invite.request checkt
+      // daar e-mail + geboortejaar); anders zou Supabase hier stilletjes een
+      // account aanmaken en is de invite-beveiliging omzeilbaar.
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim().toLowerCase(),
         options: {
+          shouldCreateUser: false,
           emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/auth/callback`,
         },
       })
 
       if (error) {
-        setError(error.message)
+        const noAccount = /signup|not allowed|not found/i.test(error.message)
+        setError(
+          noAccount
+            ? 'We kennen dit e-mailadres nog niet. Ben je uitgenodigd door je therapeut? Gebruik dan de onboarding-link uit je uitnodigingsmail (of ga naar /login/code).'
+            : error.message,
+        )
         return
       }
 
@@ -249,13 +259,13 @@ export function LoginForm() {
 
           <div className="mt-10 text-center">
             <p style={{ color: P.inkMuted, fontSize: 13 }}>
-              Nog geen account?{' '}
+              Voor het eerst hier?{' '}
               <a
-                href="/register"
+                href="/login/code"
                 className="athletic-mono transition-colors"
                 style={{ color: P.brand, fontSize: 11, letterSpacing: '0.14em' }}
               >
-                MAAK EEN ACCOUNT
+                ONBOARDING MET JE UITNODIGING
               </a>
             </p>
           </div>

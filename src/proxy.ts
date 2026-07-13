@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
 const protectedPrefixes = ['/therapist', '/patient', '/athlete', '/admin']
-const authRoutes = ['/login', '/register']
+const authRoutes = ['/login']
 
 /**
  * Content-Security-Policy — AFDWINGEND, nonce-based (sinds 2026-06-13; was
