@@ -1250,7 +1250,6 @@ function SessionPageInner() {
 
     // Invalidate all patient queries so dashboard shows fresh data immediately
     await Promise.all([
-      utils.patient.getWorkloadSessions.invalidate(),
       utils.patient.getRecoverySessions.invalidate(),
       utils.patient.getSessionHistory.invalidate(),
       utils.patient.getTodayExercises.invalidate(),

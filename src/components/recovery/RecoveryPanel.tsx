@@ -118,7 +118,7 @@ export function RecoveryPanel({ sessions, showBodyFigure = true }: Props) {
               }}
             >
               Het herstelmodel werkt op basis van oefeningen uit je programma.
-              Quick workouts tellen mee voor ACWR maar niet voor spierbelasting.
+              Quick workouts tellen mee voor de belasting-curve maar niet voor spierbelasting.
             </p>
           </div>
         </Tile>

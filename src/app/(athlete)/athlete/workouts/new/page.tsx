@@ -214,7 +214,6 @@ function NewWorkoutPageInner() {
         })),
       })
       await Promise.all([
-        utils.patient.getWorkloadSessions.invalidate(),
         utils.patient.getRecoverySessions.invalidate(),
         utils.patient.getSessionHistory.invalidate(),
       ])

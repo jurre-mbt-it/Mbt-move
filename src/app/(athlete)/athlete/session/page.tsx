@@ -595,7 +595,6 @@ function AthleteSessionPageInner() {
         }),
       })
       await Promise.all([
-        utils.patient.getWorkloadSessions.invalidate(),
         utils.patient.getRecoverySessions.invalidate(),
         utils.patient.getSessionHistory.invalidate(),
         utils.patient.getTodayExercises.invalidate(),

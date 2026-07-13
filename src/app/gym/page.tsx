@@ -219,15 +219,15 @@ export default function GymLandingPage() {
           transform: translateX(3px);
         }
 
-        /* ACWR meter needle tick on hover */
-        .mbt-acwr { transition: transform 400ms cubic-bezier(.2,.8,.2,1); }
-        .mbt-acwr:hover { transform: scale(1.02); }
+        /* Week-op-week meter needle tick on hover */
+        .mbt-week { transition: transform 400ms cubic-bezier(.2,.8,.2,1); }
+        .mbt-week:hover { transform: scale(1.02); }
 
         /* Respect reduced motion */
         @media (prefers-reduced-motion: reduce) {
           .mbt-pulse { animation: none; }
           .mbt-hero-word, .mbt-cta, .mbt-ghost, .mbt-stat-tile, .mbt-tile,
-          .mbt-forwho, .mbt-phone, .mbt-mini-tile, .mbt-acwr,
+          .mbt-forwho, .mbt-phone, .mbt-mini-tile, .mbt-week,
           .mbt-stat-bar, .mbt-tile-bar, .mbt-tile-title, .mbt-forwho-bar, .mbt-arrow {
             transition: none !important;
             animation: none !important;
@@ -662,7 +662,7 @@ const FEATURES: Array<{
     kicker: '05 · BELASTING',
     title: 'FITHEID VERSUS VERMOEIDHEID',
     body:
-      'Elke set krijgt een sRPE-score. De curve zet je fitheid af tegen je vermoeidheid, met ACWR-trend en sweet-spot 0.8–1.3. Weet wanneer je moet rusten.',
+      'Elke set krijgt een sRPE-score. De curve zet je fitheid af tegen je vermoeidheid en signaleert scherpe week-op-week sprongen. Weet wanneer je moet rusten.',
     color: P.gold,
   },
   {
@@ -1237,9 +1237,9 @@ function WorkloadSection() {
             }}
           >
             Elke set krijgt een sRPE-score (RPE × duur). De curve zet je opgebouwde
-            fitheid af tegen je actuele vermoeidheid en berekent een{' '}
-            <strong style={{ color: P.ink }}>ACWR-trend</strong> — de gouden
-            standaard uit sportwetenschap om overtraining te voorkomen.
+            fitheid af tegen je actuele vermoeidheid en leidt daaruit je{' '}
+            <strong style={{ color: P.ink }}>vorm</strong> af — het verschil dat
+            laat zien of je fris bent of juist te veel hooi op je vork neemt.
           </p>
           <p
             style={{
@@ -1249,9 +1249,9 @@ function WorkloadSection() {
               color: P.inkMuted,
             }}
           >
-            Je Apple Watch legt er readiness, HRV en slaap naast. Sweet-spot
-            0.8–1.3 = groen licht. Daarboven? Rust. Daaronder? Push. Trend-indicator,
-            geen diagnose.
+            Je Apple Watch legt er readiness, HRV en slaap naast. Consistent opbouwen
+            maakt je fitter; een scherpe week-op-week sprong is het signaal om gas
+            terug te nemen. Trend-indicator, geen diagnose.
           </p>
         </div>
 
@@ -1263,7 +1263,7 @@ function WorkloadSection() {
             padding: 32,
           }}
         >
-          <MetaLabel color={P.inkMuted}>ACWR · LAATSTE 7 DAGEN</MetaLabel>
+          <MetaLabel color={P.inkMuted}>BELASTING DEZE WEEK</MetaLabel>
           <div
             style={{
               fontFamily: mono,
@@ -1275,13 +1275,13 @@ function WorkloadSection() {
               paddingTop: 8,
             }}
           >
-            1.11
+            +8%
           </div>
           <div style={{ marginBottom: 20 }}>
-            <MetaLabel color={P.lime}>SWEET-SPOT · GA DOOR</MetaLabel>
+            <MetaLabel color={P.lime}>CONSISTENTE OPBOUW · GA DOOR</MetaLabel>
           </div>
 
-          <ACWRMeter />
+          <WeekChangeMeter />
 
           <div
             style={{
@@ -1291,9 +1291,9 @@ function WorkloadSection() {
               gap: 12,
             }}
           >
-            <MiniStat label="ACUTE" value="642" color={P.gold} />
-            <MiniStat label="CHRONIC" value="578" color={P.ice} />
-            <MiniStat label="BALANCE" value="100%" color={P.lime} />
+            <MiniStat label="FITHEID" value="578" color={P.ice} />
+            <MiniStat label="VERMOEIDHEID" value="642" color={P.gold} />
+            <MiniStat label="VORM" value="−14" color={P.lime} />
           </div>
         </div>
       </div>
@@ -1301,9 +1301,9 @@ function WorkloadSection() {
   )
 }
 
-function ACWRMeter() {
+function WeekChangeMeter() {
   return (
-    <div className="mbt-acwr" style={{ position: 'relative', height: 48, marginTop: 8 }}>
+    <div className="mbt-week" style={{ position: 'relative', height: 48, marginTop: 8 }}>
       <div
         style={{
           position: 'absolute',
@@ -1338,7 +1338,7 @@ function ACWRMeter() {
           color: P.inkMuted,
         }}
       >
-        0.5
+        −50%
       </div>
       <div
         style={{
@@ -1352,7 +1352,7 @@ function ACWRMeter() {
           color: P.inkMuted,
         }}
       >
-        1.8
+        +50%
       </div>
     </div>
   )

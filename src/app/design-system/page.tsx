@@ -80,7 +80,7 @@ export default function DesignSystemPage() {
           <Kicker>Metric tiles</Kicker>
           <div className="grid grid-cols-2 gap-3">
             <MetricTile label="Load 7d" value="4.8" unit="AU" sub="Acute belasting" tint={P.lime} />
-            <MetricTile label="ACWR" value="1.12" sub="Sweet-spot" tint={P.ice} />
+            <MetricTile label="Vorm" value="−14" sub="Productief" tint={P.ice} />
             <MetricTile label="Recovery" value="78" unit="%" tint={P.gold} />
             <MetricTile label="Pijn" value="2" unit="/10" tint={P.ink} />
           </div>

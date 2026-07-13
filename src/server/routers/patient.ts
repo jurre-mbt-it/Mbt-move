@@ -6,7 +6,6 @@
  * - getActiveProgram    → full program for schedule / program-detail page
  * - logSession          → save completed session + exercise logs
  * - getSessionHistory   → history / dashboard last session
- * - getWorkloadSessions → ACWR calculation input
  * - getRecoverySessions → muscle recovery calculation input
  */
 
@@ -1579,8 +1578,9 @@ export const patientRouter = createTRPCRouter({
     }),
 
   // ── Belasting-curve: fitness-fatigue model over kracht + cardio ──────────
-  // Zie src/lib/training-load.ts voor het model (Banister CTL/ATL/TSB +
-  // EWMA-ACWR als secundaire indicator).
+  // Zie src/lib/training-load.ts voor het model (Banister CTL/ATL/TSB stuurt de
+  // status; week-op-week + Foster monotony/strain + consistentie ernaast. ACWR
+  // blijft als stil trend-cijfer bestaan, stuurt niets).
 
   loadCurve: protectedProcedure
     .input(z.object({
@@ -1590,36 +1590,6 @@ export const patientRouter = createTRPCRouter({
       const { computeLoadCurve } = await import('@/server/load-curve')
       return computeLoadCurve(ctx.prisma, ctx.user.id, input?.days ?? 120)
     }),
-
-  // ── Workload sessions for ACWR (SessionWorkload[]) ────────────────────────
-
-  getWorkloadSessions: protectedProcedure.query(async ({ ctx }) => {
-    const sessions = await ctx.prisma.sessionLog.findMany({
-      where: {
-        patientId: ctx.user.id,
-        status: 'COMPLETED',
-        completedAt: { not: null },
-        duration: { not: null },
-      },
-      orderBy: { completedAt: 'desc' },
-      take: 50,
-      select: { completedAt: true, duration: true, exertionLevel: true },
-    })
-
-    return sessions
-      .filter(s => s.completedAt && s.duration != null)
-      .map(s => {
-        const durationMinutes = Math.max(1, Math.round(s.duration! / 60))
-        // Default RPE 5 if no smiley was chosen (neutral effort)
-        const rpe = s.exertionLevel ?? 5
-        return {
-          date: s.completedAt!,
-          durationMinutes,
-          rpe,
-          sRPE: Math.round(durationMinutes * rpe),
-        }
-      })
-  }),
 
   // ── Recovery sessions — with muscle loads (ExerciseSession[]) ─────────────
 
