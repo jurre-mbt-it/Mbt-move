@@ -6,9 +6,12 @@
  * advies), met een kracht/cardio-onderverdeling. Tikbaar → volle belasting-
  * curve in het patiëntdossier (Voortgang).
  *
- * Betrouwbaarheid: de fitness-fatigue/ACWR-uitslag is pas zinvol als de
- * chronische basis (28d EWMA) grotendeels gevuld is. Onder de drempel tonen we
- * een neutrale "beeld in opbouw"-staat i.p.v. een (mogelijk vals) kleur-oordeel.
+ * Betrouwbaarheid: de fitness-fatigue-uitslag is pas zinvol als de chronische
+ * basis (28d EWMA) grotendeels gevuld is. Onder de drempel tonen we een
+ * neutrale "beeld in opbouw"-staat i.p.v. een (mogelijk vals) kleur-oordeel.
+ *
+ * Rechtsboven staat de week-op-week %-sprong (spike-indicator, vervangt de
+ * ACWR); daaronder een consistentie-streak als positief opbouw-signaal.
  */
 
 import Link from 'next/link'
@@ -80,8 +83,13 @@ export function PatientLoadStrip({ patientId }: { patientId: string }) {
 
   // ── Volledig beeld ─────────────────────────────────────────────────────
   const color = STATUS_COLORS[data.status.key]
-  const acwr = data.acwr
   const today = data.today
+  // Week-op-week vervangt de ACWR als spike-indicator: kale % sprong t.o.v. de
+  // 3 weken ervoor. Boven ~+50% kleuren we 'm als "let op de opbouw".
+  const wk = data.weekChange
+  const SPIKE = 50
+  const wkColor = wk !== null && wk > SPIKE ? P.gold : P.ink
+  const streak = data.consistency.streakWeeks
 
   return (
     <Link href={href} className="block athletic-tap">
@@ -99,16 +107,23 @@ export function PatientLoadStrip({ patientId }: { patientId: string }) {
               </div>
             </div>
           </div>
-          {acwr !== null && (
+          {wk !== null && (
             <div className="text-right" style={{ flexShrink: 0 }}>
-              <MetaLabel>ACWR</MetaLabel>
-              <div style={{ color: P.ink, fontSize: 15, fontWeight: 700, marginTop: 1 }}>{acwr.toFixed(2)}</div>
+              <MetaLabel>Week-op-week</MetaLabel>
+              <div style={{ color: wkColor, fontSize: 15, fontWeight: 700, marginTop: 1 }}>
+                {signed(wk)}%
+              </div>
             </div>
           )}
         </div>
 
         <p style={{ color: P.inkMuted, fontSize: 12, lineHeight: 1.45, marginTop: 8 }}>
           {data.status.description}
+          {wk !== null && wk > SPIKE
+            ? ' De belasting sprong deze week fors omhoog — bouw de komende dagen rustiger op.'
+            : streak >= 3
+              ? ` ${streak} weken op rij consistent getraind — mooie basis.`
+              : ''}
         </p>
 
         <div className="flex items-center justify-between gap-3" style={{ marginTop: 9 }}>
@@ -120,6 +135,7 @@ export function PatientLoadStrip({ patientId }: { patientId: string }) {
             VORM <span style={{ color }}>{signed(today?.form ?? 0)}</span>
             {' · '}FIT {Math.round(today?.fitness ?? 0)}
             {' · '}VERM {Math.round(today?.fatigue ?? 0)}
+            {streak > 0 ? <>{' · '}STREAK {streak}w</> : null}
           </div>
         </div>
 

@@ -13,9 +13,21 @@
  * korte tijd → Vermoeidheid piekt en Vorm duikt diep negatief (overreaching,
  * zone < −30 per Friel/TrainingPeaks-conventie).
  *
- * ACWR (Gabbett) is bewust SECUNDAIR: de voorspellende waarde is omstreden
- * (Impellizzeri 2020; meta-analyse 2025), dus we tonen 'm als indicatie naast
- * de vorm-curve, niet als hard oordeel. EWMA-variant (7d/28d), niet rollend.
+ * FRAME: opbouw-begeleiding, geen blessure-voorspelling. Op individueel niveau
+ * heeft geen enkel load-getal serieuze predictieve waarde; we sturen daarom op
+ * (1) een consistent opgebouwde fitheidsbasis, (2) het vermijden van scherpe
+ * week-op-week pieken en (3) genoeg afwisseling (Foster monotony/strain).
+ *
+ * De vorm (TSB) is het ENIGE dat de status bepaalt. De ACWR (Gabbett) is
+ * methodologisch onderuit gehaald als stuurmaat — een ratio-artefact zonder
+ * aangetoonde voorspellende waarde (Impellizzeri 2020, IJSPP & Sports Medicine
+ * "Time to Dismiss ACWR") — en drijft daarom NIETS meer aan; hij blijft alleen
+ * als stil trend-cijfer beschikbaar (EWMA 7d/28d), niet als oordeel.
+ *
+ * In plaats daarvan:
+ *   - `weekToWeekChange`  spike-detectie zonder ratio-artefact (kale % sprong)
+ *   - `trainingMonotony`/`trainingStrain`  Foster's afwisselings-maat
+ *   - `computeConsistency`  adherentie: actieve dagen/week + streak
  *
  * Puur (geen server-deps) zodat client en server dezelfde wiskunde delen.
  */
@@ -31,7 +43,7 @@ export type LoadPoint = {
 }
 
 export type LoadStatusKey =
-  | 'overreaching'  // vorm < −30 of ACWR > 1.5 — gas terug
+  | 'overreaching'  // vorm < −30 — gas terug
   | 'productief'    // vorm −30..−10 — effectieve overload
   | 'neutraal'      // vorm −10..+5 — onderhoud/plateau
   | 'fris'          // vorm +5..+25 — hersteld, klaar om te bouwen
@@ -156,12 +168,160 @@ export function ewmaAcwr(loads: DailyLoad[], from: Date, to: Date): number | nul
   return Math.round((acute / chronic) * 100) / 100
 }
 
-export function loadStatus(form: number, acwr: number | null): LoadStatus {
-  if (form < -30 || (acwr !== null && acwr > 1.5)) {
+/** Dagelijkse load-totalen (incl. 0-dagen) over [from..to] inclusief. */
+function dailyTotals(loads: DailyLoad[], from: Date, to: Date): number[] {
+  const byDate = new Map<string, number>()
+  for (const l of loads) byDate.set(l.date, (byDate.get(l.date) ?? 0) + l.load)
+  const out: number[] = []
+  const cursor = new Date(from)
+  cursor.setHours(0, 0, 0, 0)
+  const end = new Date(to)
+  end.setHours(0, 0, 0, 0)
+  while (cursor <= end) {
+    out.push(byDate.get(isoDay(cursor)) ?? 0)
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return out
+}
+
+/**
+ * Week-op-week verandering (%): som van de laatste 7 dagen t.o.v. het
+ * gemiddelde weektotaal over de `priorWeeks` weken dáárvoor. Vervangt de ACWR
+ * als spike-detectie — een kale procentuele sprong zonder ratio-artefact.
+ *
+ *   +60  = deze week 60% zwaarder dan gewend → mogelijke piek, rustiger opbouwen
+ *    0   = gelijk aan het recente gemiddelde (consistente opbouw)
+ *   −40  = flink lichter (deload of gemiste sessies)
+ *
+ * null zolang er te weinig chronische basis is om zinvol te vergelijken.
+ */
+export function weekToWeekChange(
+  loads: DailyLoad[],
+  to: Date,
+  priorWeeks = 3,
+): number | null {
+  const end = new Date(to)
+  end.setHours(0, 0, 0, 0)
+  const last7Start = new Date(end)
+  last7Start.setDate(last7Start.getDate() - 6)
+  const priorEnd = new Date(last7Start)
+  priorEnd.setDate(priorEnd.getDate() - 1)
+  const priorStart = new Date(priorEnd)
+  priorStart.setDate(priorStart.getDate() - (priorWeeks * 7 - 1))
+
+  const last7 = dailyTotals(loads, last7Start, end).reduce((a, b) => a + b, 0)
+  const priorSum = dailyTotals(loads, priorStart, priorEnd).reduce((a, b) => a + b, 0)
+  const priorWeekMean = priorSum / priorWeeks
+  if (priorWeekMean < 1) return null // te weinig basis voor een zinvolle vergelijking
+  return Math.round(((last7 - priorWeekMean) / priorWeekMean) * 100)
+}
+
+/**
+ * Foster's training-monotony over de laatste 7 dagen: gemiddelde dagload
+ * gedeeld door de spreiding (populatie-SD, rustdagen tellen als 0). Hoog =
+ * elke dag hetzelfde, weinig afwisseling zwaar/licht — geassocieerd met ziekte
+ * en blessures (Foster 1998; Anderson 2003). Richtwaarde: > ~2.0 = te eentonig.
+ *
+ * null als er in de week niet getraind is (gem. load 0) of alle dagen exact
+ * gelijk zijn (SD 0 — geen zinvolle spreiding te bepalen).
+ */
+export function trainingMonotony(loads: DailyLoad[], to: Date): number | null {
+  const end = new Date(to)
+  end.setHours(0, 0, 0, 0)
+  const start = new Date(end)
+  start.setDate(start.getDate() - 6)
+  const days = dailyTotals(loads, start, end)
+  const mean = days.reduce((a, b) => a + b, 0) / days.length
+  if (mean <= 0) return null
+  const variance = days.reduce((a, b) => a + (b - mean) ** 2, 0) / days.length
+  const sd = Math.sqrt(variance)
+  if (sd === 0) return null
+  return Math.round((mean / sd) * 100) / 100
+}
+
+/**
+ * Foster's training-strain: weektotaal × monotony. Combineert "hoeveel" met
+ * "hoe eentonig" — het weekvolume weegt zwaarder naarmate de belasting
+ * monotoner verdeeld is. null als monotony niet te bepalen is.
+ */
+export function trainingStrain(loads: DailyLoad[], to: Date): number | null {
+  const monotony = trainingMonotony(loads, to)
+  if (monotony === null) return null
+  const end = new Date(to)
+  end.setHours(0, 0, 0, 0)
+  const start = new Date(end)
+  start.setDate(start.getDate() - 6)
+  const weekLoad = dailyTotals(loads, start, end).reduce((a, b) => a + b, 0)
+  return Math.round(weekLoad * monotony)
+}
+
+/** Adherentie-/consistentie-signaal — de positieve kant van "opdagen". */
+export type Consistency = {
+  activeDaysPerWeek: number  // gem. actieve dagen/week over het venster
+  sessionsLast7d: number     // aantal gelogde sessies in de laatste 7 dagen
+  streakWeeks: number        // aaneengesloten weken (t/m nu) met ≥1 sessie
+}
+
+/**
+ * Bereken hoe consistent er getraind is over [from..to]. `loads` mag meerdere
+ * entries per dag bevatten (één per sessie) — sessies tellen we op entry-niveau,
+ * actieve dagen op unieke datum.
+ */
+export function computeConsistency(loads: DailyLoad[], from: Date, to: Date): Consistency {
+  const start = new Date(from)
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(to)
+  end.setHours(0, 0, 0, 0)
+
+  const activeDates = new Set<string>()
+  for (const l of loads) {
+    if (l.load > 0 && l.date >= isoDay(start) && l.date <= isoDay(end)) activeDates.add(l.date)
+  }
+  const spanDays = Math.max(1, Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1)
+  const weeks = spanDays / 7
+  const activeDaysPerWeek = Math.round((activeDates.size / weeks) * 10) / 10
+
+  const last7Start = new Date(end)
+  last7Start.setDate(last7Start.getDate() - 6)
+  const last7StartIso = isoDay(last7Start)
+  const endIso = isoDay(end)
+  const sessionsLast7d = loads.filter(
+    (l) => l.load > 0 && l.date >= last7StartIso && l.date <= endIso,
+  ).length
+
+  // Streak: loop terug in 7-daagse blokken vanaf vandaag; tel aaneengesloten
+  // weken met minstens één actieve dag.
+  let streakWeeks = 0
+  for (let w = 0; ; w++) {
+    const wEnd = new Date(end)
+    wEnd.setDate(wEnd.getDate() - w * 7)
+    const wStart = new Date(wEnd)
+    wStart.setDate(wStart.getDate() - 6)
+    if (wStart < start) break
+    const wStartIso = isoDay(wStart)
+    const wEndIso = isoDay(wEnd)
+    let has = false
+    for (const d of activeDates) {
+      if (d >= wStartIso && d <= wEndIso) { has = true; break }
+    }
+    if (!has) break
+    streakWeeks++
+  }
+
+  return { activeDaysPerWeek, sessionsLast7d, streakWeeks }
+}
+
+/**
+ * Statuslabel puur op basis van de vorm (TSB). De ACWR bepaalt hier bewust
+ * NIETS meer (zie module-header): één interpreteerbare as i.p.v. een tweede,
+ * omstreden signaal dat het beeld troebel maakt.
+ */
+export function loadStatus(form: number): LoadStatus {
+  if (form < -30) {
     return {
       key: 'overreaching',
       label: 'Overreaching-risico',
-      description: 'Belasting stijgt veel sneller dan het lichaam gewend is. Bouw een rustdag of lichtere sessie in.',
+      description: 'Vermoeidheid ligt fors boven de fitheid. Bouw een rustdag of lichtere sessie in en daarna geleidelijker op.',
     }
   }
   if (form < -10) {

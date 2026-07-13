@@ -3,9 +3,12 @@
  * Overreaching-signaal uit het fitness-fatigue model (zie
  * src/lib/training-load.ts): vorm = fitheid − vermoeidheid. Trigger wanneer
  * de vorm minstens `minDays` opeenvolgende dagen onder `formBelow` zit
- * (TrainingPeaks/Friel-conventie: < −30 = overreaching-zone), ÓF wanneer de
- * EWMA-ACWR boven `acwrAbove` uitkomt (Gabbett — bewust als secundaire,
- * indicatieve drempel; de predictieve waarde is omstreden).
+ * (TrainingPeaks/Friel-conventie: < −30 = overreaching-zone).
+ *
+ * De ACWR triggert hier bewust NIET (meer): als ratio-maat is die
+ * methodologisch onderuit gehaald (Impellizzeri 2020) en gaf loze
+ * overreaching-meldingen. We sturen op de vorm-as; de ACWR blijft alleen als
+ * context in triggerData staan. Het `acwrAbove`-config-veld wordt genegeerd.
  *
  * deloadNeeded kijkt naar aanhoudende pijn; deze regel naar pure belasting —
  * ook zonder pijnklachten kan de opbouw te steil zijn.
@@ -16,7 +19,6 @@ export const overloadRisk: Evaluator = (agg, rule) => {
   const cfg = rule.defaultConfig as {
     formBelow: number   // bv. -30
     minDays: number     // bv. 5 opeenvolgende dagen
-    acwrAbove: number   // bv. 1.5
     feelLow?: number    // bv. 2.5 — versterkt het signaal als het gevoel ook laag is
   }
   const feelLow = cfg.feelLow ?? 2.5
@@ -31,18 +33,12 @@ export const overloadRisk: Evaluator = (agg, rule) => {
     else break
   }
 
-  const acwrHigh = agg.loadAcwr !== null && agg.loadAcwr > cfg.acwrAbove
   const formLow = consecutive >= cfg.minDays
-  if (!formLow && !acwrHigh) return null
+  if (!formLow) return null
 
   const todayForm = hist[hist.length - 1]
   const reasons: string[] = []
-  if (formLow) {
-    reasons.push(`vorm zit ${consecutive} dagen op rij onder ${cfg.formBelow} (nu ${Math.round(todayForm)})`)
-  }
-  if (acwrHigh) {
-    reasons.push(`ACWR is ${agg.loadAcwr!.toFixed(2)} (> ${cfg.acwrAbove})`)
-  }
+  reasons.push(`vorm zit ${consecutive} dagen op rij onder ${cfg.formBelow} (nu ${Math.round(todayForm)})`)
 
   // Feel-versterking: een lage subjectieve gevoelsscore bovenop de hoge load
   // maakt het overreaching-beeld sterker (slecht verdragen, niet alleen veel).
@@ -63,8 +59,7 @@ export const overloadRisk: Evaluator = (agg, rule) => {
       formHistory: hist,
       consecutiveDaysBelow: consecutive,
       formThreshold: cfg.formBelow,
-      acwr: agg.loadAcwr,
-      acwrThreshold: cfg.acwrAbove,
+      acwr: agg.loadAcwr, // context, geen trigger
       recentAvgFeel: agg.recentAvgFeel,
       feelReinforces,
     },

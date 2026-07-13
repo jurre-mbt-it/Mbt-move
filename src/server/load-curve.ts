@@ -21,10 +21,15 @@ import type { PrismaClient } from '@prisma/client'
 import {
   buildLoadCurve,
   clampSessionDurationSec,
+  computeConsistency,
   edwardsTrimp,
   ewmaAcwr,
   loadStatus,
   sessionLoad,
+  trainingMonotony,
+  trainingStrain,
+  weekToWeekChange,
+  type Consistency,
   type DailyLoad,
   type LoadPoint,
   type LoadStatus,
@@ -35,10 +40,16 @@ const WARMUP_DAYS = 42 // EWMA-inloop vóór het weergavevenster
 /** Eén modaliteit-curve (kracht of cardio) of de gecombineerde. */
 export type ModalityCurve = {
   points: LoadPoint[]        // alleen het weergavevenster
-  acwr: number | null        // EWMA 7d/28d op vandaag
-  status: LoadStatus         // o.b.v. vorm vandaag + ACWR
+  acwr: number | null        // EWMA 7d/28d — stil trend-cijfer, stuurt niets
+  status: LoadStatus         // puur o.b.v. vorm (TSB) vandaag
   today: LoadPoint | null
   sessionCount: number       // aantal gelogde sessies in het venster
+  /** Week-op-week %-sprong t.o.v. de 3 weken ervoor (spike-detectie). */
+  weekChange: number | null
+  /** Foster monotony (afwisseling) over de laatste 7 dagen; > ~2.0 = eentonig. */
+  monotony: number | null
+  /** Foster strain: weektotaal × monotony. */
+  strain: number | null
 }
 
 /** Cardio-curve + optionele HR-gebaseerde load (Edwards TRIMP). */
@@ -66,6 +77,8 @@ export type LoadCurveResult = ModalityCurve & {
   historyDays: number
   strength: ModalityCurve    // alleen krachttraining (SessionLog)
   cardio: CardioCurve        // alleen cardio (CardioLog)
+  /** Adherentie over het volledige venster (kracht + cardio samen). */
+  consistency: Consistency
 }
 
 // Prisma-client of transaction-client — alleen de twee findMany's nodig.
@@ -168,10 +181,11 @@ export async function computeLoadCurve(
       trimp: hrSessionCount > 0 ? cardioTrimp : null,
       hrSessionCount,
     },
+    consistency: computeConsistency([...strengthLoads, ...cardioLoads], windowStart, to),
   }
 }
 
-/** Draai het fitness-fatigue model + ACWR over één load-stream. */
+/** Draai het fitness-fatigue model + afgeleide load-signalen over één stream. */
 function buildModality(
   loads: DailyLoad[],
   from: Date,
@@ -181,13 +195,15 @@ function buildModality(
   const all = buildLoadCurve(loads, from, to)
   const points = all.slice(WARMUP_DAYS) // warm-up wegsnijden
   const today = points[points.length - 1] ?? null
-  const acwr = ewmaAcwr(loads, from, to)
   return {
     points,
-    acwr,
-    status: loadStatus(today?.form ?? 0, acwr),
+    acwr: ewmaAcwr(loads, from, to), // stil trend-cijfer, stuurt de status niet
+    status: loadStatus(today?.form ?? 0),
     today,
     sessionCount,
+    weekChange: weekToWeekChange(loads, to),
+    monotony: trainingMonotony(loads, to),
+    strain: trainingStrain(loads, to),
   }
 }
 
