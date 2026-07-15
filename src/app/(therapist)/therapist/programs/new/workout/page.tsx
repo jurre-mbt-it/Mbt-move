@@ -1,47 +1,86 @@
 'use client'
 
+/**
+ * Nieuw cardio-programma — op het blokken-model.
+ *
+ * Stap 1 is de administratie (patiënt, naam, weken, activiteit); stap 2 is de
+ * workout zelf, gebouwd met dezelfde CardioWorkoutBuilder als het weekschema
+ * en de iPad. Er is bewust geen los "protocol + doelen + intervallen"-formulier
+ * meer: dat schreef een eigen plat formaat dat alleen dit scherm kon lezen —
+ * de app las het als leeg, en getActiveCardioProgram moest ernaast een tweede
+ * lezer onderhouden. Eén model ({version:1, activity, blocks}), overal.
+ *
+ * De walk-run-wizard is weg: een return-to-running-schema is gewoon cardio
+ * met afwisselende blokken. Er bestond in productie geen enkel walk-run- of
+ * cardio-programma, dus er is niets te migreren.
+ */
+
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { Layers } from 'lucide-react'
 import {
-  CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, HR_ZONES, SELECTABLE_CARDIO_ACTIVITIES,
-  CARDIO_TEMPLATES, CardioActivityKey, CardioProtocolKey, HRZone, CardioInterval,
+  CARDIO_ACTIVITIES, HR_ZONES, SELECTABLE_CARDIO_ACTIVITIES,
+  CARDIO_TEMPLATES, type CardioActivityKey, type CardioActivityTemplate,
 } from '@/lib/cardio-constants'
+import {
+  summarize, structuredLoad, totalDurationSec, targetColor, isRepeat,
+  type StructuredCardio, type WorkoutBlock,
+} from '@/lib/cardio-workout'
 import { computeHrZones } from '@/lib/cardio-zones'
 import { trpc } from '@/lib/trpc/client'
 import { CARDIO_ICON_MAP } from '@/components/icons'
+import { CardioWorkoutBuilder } from '@/components/week-planner/CardioWorkoutBuilder'
 import {
-  CATEGORY_COLORS,
-  DarkButton,
-  DarkInput,
-  DarkSelect,
-  DarkTextarea,
-  Display,
-  Kicker,
-  MetaLabel,
-  P,
-  Tile,
+  DarkButton, DarkInput, DarkSelect, DarkTextarea,
+  Display, Kicker, MetaLabel, P, Tile,
 } from '@/components/dark-ui'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Snelstart: oude template-vorm → blokken ───────────────────────────────────
+// Trouw aan wat de template zegt, niets verzinnen: intervallen worden een
+// herhaling (werk op de doelzone, rust in Z1), anders één actief blok van de
+// doelduur. Geen gefabriceerde warming-up — die bouwt de therapeut zelf.
+function templateBlocks(tpl: CardioActivityTemplate): WorkoutBlock[] {
+  const zone = tpl.targetZone ?? 2
+  if (tpl.intervals?.length) {
+    return tpl.intervals.map((iv, i) => ({
+      id: `tpl-${tpl.id}-${i}`,
+      kind: 'REPEAT' as const,
+      times: Math.max(1, iv.repetitions),
+      steps: [
+        {
+          id: `tpl-${tpl.id}-${i}-w`, kind: 'ACTIVE' as const,
+          durationSec: iv.workDuration, target: { type: 'ZONE' as const, zone },
+        },
+        ...(iv.restDuration > 0
+          ? [{
+              id: `tpl-${tpl.id}-${i}-r`, kind: 'RECOVERY' as const,
+              durationSec: iv.restDuration, target: { type: 'ZONE' as const, zone: 1 as const },
+            }]
+          : []),
+      ],
+    }))
+  }
+  return [{
+    id: `tpl-${tpl.id}-a`,
+    kind: 'ACTIVE',
+    durationSec: tpl.targetDurationMin * 60,
+    target: { type: 'ZONE', zone },
+  }]
+}
+
+// ── Formulier ─────────────────────────────────────────────────────────────────
 
 interface CardioFormState {
   name: string
   description: string
   patientId: string
   activity: CardioActivityKey
-  protocol: CardioProtocolKey
   weeks: number
   sessionsPerWeek: number
-  targetDurationMin: number
-  targetDistanceKm: string
-  targetZone: HRZone | null
-  targetRpe: number | null
-  /** Doel-tempo in min/km als "m:ss" of leeg. */
-  targetPace: string
-  intervals: CardioInterval[]
+  blocks: WorkoutBlock[]
 }
 
 const DEFAULT_STATE: CardioFormState = {
@@ -49,352 +88,27 @@ const DEFAULT_STATE: CardioFormState = {
   description: '',
   patientId: '',
   activity: 'RUNNING',
-  protocol: 'ZONE_TRAINING',
   weeks: 6,
   sessionsPerWeek: 3,
-  targetDurationMin: 30,
-  targetDistanceKm: '',
-  targetZone: 2,
-  targetRpe: null,
-  targetPace: '',
-  intervals: [],
+  blocks: [],
 }
 
-/** Parse "m:ss" of "m.ss"/"m" min/km naar seconden per km. Leeg/ongeldig → null. */
-function parsePaceToSecPerKm(pace: string): number | null {
-  const t = pace.trim()
-  if (!t) return null
-  const m = t.match(/^(\d{1,2})[:.](\d{1,2})$/)
-  if (m) return parseInt(m[1], 10) * 60 + parseInt(m[2], 10)
-  const justMin = t.match(/^(\d{1,2})$/)
-  if (justMin) return parseInt(justMin[1], 10) * 60
-  return null
-}
-
-function zoneColor(zone: HRZone): string {
-  return CATEGORY_COLORS[`Z${zone}` as 'Z1' | 'Z2' | 'Z3' | 'Z4' | 'Z5']
-}
-
-// ── Visual interval editor ────────────────────────────────────────────────────
-// TrainingPeaks-style: horizontale tijdlijn waar elk blok een interval is,
-// breedte proportioneel aan duur. Klik om te bewerken, ✕ om te verwijderen.
-
-const fmtDuration = (sec: number): string => {
-  const m = Math.floor(sec / 60)
-  const s = sec % 60
-  if (m === 0) return `${s}s`
-  if (s === 0) return `${m}m`
-  return `${m}m ${s}s`
-}
-
-function WorkoutTimeline({ intervals }: { intervals: CardioInterval[] }) {
-  // Bereken totale tijd over alle blokken (×repetitions).
-  const total = intervals.reduce(
-    (sum, iv) =>
-      sum + iv.repetitions * (iv.workDuration + iv.restDuration),
-    0,
+/** Gekleurde balk van de blokken — zelfde beeldtaal als planner en iPad. */
+function BlocksBar({ blocks }: { blocks: WorkoutBlock[] }) {
+  const bars = blocks.flatMap(b =>
+    isRepeat(b)
+      ? b.steps.map(st => ({ id: `${b.id}-${st.id}`, w: (st.durationSec ?? 120) * b.times, c: targetColor(st.target) }))
+      : [{ id: b.id, w: b.durationSec ?? 120, c: targetColor(b.target) }],
   )
-  if (total === 0) {
-    return (
-      <div
-        className="athletic-mono w-full rounded-lg flex items-center justify-center"
-        style={{
-          background: P.surfaceHi,
-          height: 56,
-          color: P.inkDim,
-          fontSize: 11,
-          letterSpacing: '0.12em',
-        }}
-      >
-        TIJDLIJN VERSCHIJNT ZODRA JE EEN BLOK TOEVOEGT
-      </div>
-    )
-  }
-
-  // Bouw flat-segments: voor elk blok rep × (work + rest).
-  type Seg = { kind: 'work' | 'rest'; sec: number; label: string; group: number }
-  const segments: Seg[] = []
-  intervals.forEach((iv, idx) => {
-    const reps = Math.max(1, iv.repetitions)
-    for (let r = 0; r < reps; r++) {
-      segments.push({
-        kind: 'work',
-        sec: iv.workDuration,
-        label: iv.label ?? `Blok ${idx + 1}`,
-        group: idx,
-      })
-      if (iv.restDuration > 0) {
-        segments.push({ kind: 'rest', sec: iv.restDuration, label: 'Rust', group: idx })
-      }
-    }
-  })
-
+  const tot = bars.reduce((s, x) => s + x.w, 0) || 1
   return (
-    <div className="space-y-1.5">
-      <div
-        className="w-full overflow-hidden rounded-lg flex"
-        style={{ height: 56, background: P.surfaceLow, border: `1px solid ${P.line}` }}
-      >
-        {segments.map((seg, i) => {
-          const widthPct = (seg.sec / total) * 100
-          const bg =
-            seg.kind === 'work'
-              ? `linear-gradient(180deg, ${P.lime} 0%, ${P.lime}cc 100%)`
-              : P.surfaceHi
-          return (
-            <div
-              key={i}
-              className="flex items-center justify-center overflow-hidden"
-              style={{
-                width: `${widthPct}%`,
-                background: bg,
-                borderRight:
-                  i < segments.length - 1 ? `1px solid ${P.bg}` : 'none',
-                color: seg.kind === 'work' ? P.bg : P.inkMuted,
-                fontSize: 9,
-                fontWeight: 900,
-                letterSpacing: '0.04em',
-              }}
-              title={`${seg.label} · ${fmtDuration(seg.sec)}`}
-            >
-              {widthPct > 5 && (
-                <span className="athletic-mono truncate px-1">
-                  {seg.kind === 'work' ? fmtDuration(seg.sec) : ''}
-                </span>
-              )}
-            </div>
-          )
-        })}
-      </div>
-      <div className="flex items-center justify-between">
-        <span
-          className="athletic-mono"
-          style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.12em' }}
-        >
-          0:00
-        </span>
-        <span
-          className="athletic-mono"
-          style={{ color: P.lime, fontSize: 11, letterSpacing: '0.08em', fontWeight: 900 }}
-        >
-          TOTAAL · {fmtDuration(total)}
-        </span>
-        <span
-          className="athletic-mono"
-          style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.12em' }}
-        >
-          {fmtDuration(total)}
-        </span>
-      </div>
+    <div className="flex gap-px h-12 rounded-lg overflow-hidden">
+      {bars.map(bar => (
+        <div key={bar.id} style={{ flex: bar.w / tot, background: bar.c, opacity: 0.85 }} />
+      ))}
     </div>
   )
 }
-
-function IntervalBlock({
-  iv,
-  index,
-  expanded,
-  onToggle,
-  onUpdate,
-  onRemove,
-}: {
-  iv: CardioInterval
-  index: number
-  expanded: boolean
-  onToggle: () => void
-  onUpdate: (key: keyof CardioInterval, val: string | number) => void
-  onRemove: () => void
-}) {
-  const blockTotal = iv.repetitions * (iv.workDuration + iv.restDuration)
-  const workPct =
-    iv.workDuration + iv.restDuration > 0
-      ? (iv.workDuration / (iv.workDuration + iv.restDuration)) * 100
-      : 100
-
-  return (
-    <div
-      className="rounded-xl overflow-hidden transition-all"
-      style={{
-        background: P.surface,
-        border: `1px solid ${expanded ? P.lime : P.line}`,
-      }}
-    >
-      {/* Header — altijd zichtbaar */}
-      <button
-        type="button"
-        onClick={onToggle}
-        className="athletic-tap w-full flex items-center gap-3 p-3 text-left"
-      >
-        <span
-          className="athletic-mono inline-flex items-center justify-center rounded-lg shrink-0"
-          style={{
-            background: P.lime,
-            color: P.bg,
-            width: 32,
-            height: 32,
-            fontSize: 12,
-            fontWeight: 900,
-          }}
-        >
-          {index + 1}
-        </span>
-        <div className="flex-1 min-w-0">
-          <p
-            className="truncate"
-            style={{ color: P.ink, fontSize: 13, fontWeight: 700 }}
-          >
-            {iv.label || `Blok ${index + 1}`}
-          </p>
-          <p
-            className="athletic-mono"
-            style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.06em' }}
-          >
-            {iv.repetitions}× ({fmtDuration(iv.workDuration)} werk +{' '}
-            {fmtDuration(iv.restDuration)} rust) · {fmtDuration(blockTotal)} totaal
-          </p>
-        </div>
-        <span
-          className="athletic-mono shrink-0"
-          style={{
-            color: P.inkMuted,
-            fontSize: 10,
-            letterSpacing: '0.12em',
-            transform: expanded ? 'rotate(180deg)' : 'rotate(0)',
-            transition: 'transform 0.15s',
-          }}
-        >
-          ▾
-        </span>
-      </button>
-
-      {/* Mini-tijdlijn van één rep */}
-      <div
-        className="mx-3 mb-3 flex overflow-hidden rounded"
-        style={{ height: 6, background: P.surfaceLow }}
-      >
-        <div style={{ width: `${workPct}%`, background: P.lime }} />
-        <div style={{ width: `${100 - workPct}%`, background: P.surfaceHi }} />
-      </div>
-
-      {/* Edit panel — uitklappen */}
-      {expanded && (
-        <div
-          className="px-3 pb-3 space-y-3"
-          style={{ borderTop: `1px solid ${P.line}` }}
-        >
-          <div className="grid grid-cols-2 gap-2 mt-3">
-            <div className="space-y-1">
-              <MetaLabel>Werk (sec)</MetaLabel>
-              <DarkInput
-                type="number"
-                min={10}
-                value={iv.workDuration}
-                onChange={(e) => onUpdate('workDuration', +e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <MetaLabel>Rust (sec)</MetaLabel>
-              <DarkInput
-                type="number"
-                min={0}
-                value={iv.restDuration}
-                onChange={(e) => onUpdate('restDuration', +e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <MetaLabel>Herhalingen</MetaLabel>
-              <DarkInput
-                type="number"
-                min={1}
-                max={50}
-                value={iv.repetitions}
-                onChange={(e) => onUpdate('repetitions', +e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <MetaLabel>Label</MetaLabel>
-              <DarkInput
-                value={iv.label ?? ''}
-                placeholder="Bijv. Sprint"
-                onChange={(e) => onUpdate('label', e.target.value)}
-              />
-            </div>
-          </div>
-          <button
-            onClick={onRemove}
-            className="athletic-tap w-full text-center py-2 rounded-lg athletic-mono"
-            style={{
-              color: P.danger,
-              background: 'rgba(248,113,113,0.06)',
-              border: `1px solid ${P.danger}33`,
-              fontSize: 11,
-              letterSpacing: '0.12em',
-              fontWeight: 800,
-            }}
-          >
-            ✕  BLOK VERWIJDEREN
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function IntervalEditor({
-  intervals,
-  onChange,
-}: {
-  intervals: CardioInterval[]
-  onChange: (v: CardioInterval[]) => void
-}) {
-  const [expandedIdx, setExpandedIdx] = useState<number | null>(null)
-
-  const addInterval = () => {
-    onChange([
-      ...intervals,
-      { workDuration: 120, restDuration: 60, repetitions: 4, label: 'Blok' },
-    ])
-    setExpandedIdx(intervals.length) // open het nieuwe blok direct
-  }
-
-  const update = (i: number, key: keyof CardioInterval, val: string | number) => {
-    const next = intervals.map((iv, idx) =>
-      idx === i ? { ...iv, [key]: val } : iv,
-    )
-    onChange(next)
-  }
-
-  const remove = (i: number) => {
-    onChange(intervals.filter((_, idx) => idx !== i))
-    if (expandedIdx === i) setExpandedIdx(null)
-  }
-
-  return (
-    <div className="space-y-4">
-      <WorkoutTimeline intervals={intervals} />
-
-      <div className="space-y-2">
-        {intervals.map((iv, i) => (
-          <IntervalBlock
-            key={i}
-            iv={iv}
-            index={i}
-            expanded={expandedIdx === i}
-            onToggle={() => setExpandedIdx(expandedIdx === i ? null : i)}
-            onUpdate={(k, v) => update(i, k, v)}
-            onRemove={() => remove(i)}
-          />
-        ))}
-      </div>
-
-      <DarkButton variant="secondary" size="sm" onClick={addInterval} className="w-full">
-        + Blok toevoegen
-      </DarkButton>
-    </div>
-  )
-}
-
-// ── Hoofdpagina ───────────────────────────────────────────────────────────────
 
 function WorkoutBuilderContent() {
   const router = useRouter()
@@ -404,6 +118,7 @@ function WorkoutBuilderContent() {
   const { data: patientsData = [] } = trpc.patients.list.useQuery()
   const [form, setForm] = useState<CardioFormState>({ ...DEFAULT_STATE, patientId: prePatientId })
   const [step, setStep] = useState<1 | 2>(1)
+  const [builderOpen, setBuilderOpen] = useState(false)
   const utils = trpc.useUtils()
   const createProgram = trpc.programs.create.useMutation()
   const saving = createProgram.isPending
@@ -411,31 +126,20 @@ function WorkoutBuilderContent() {
   const set = <K extends keyof CardioFormState>(key: K, val: CardioFormState[K]) =>
     setForm(f => ({ ...f, [key]: val }))
 
-  const protocolInfo = CARDIO_PROTOCOLS[form.protocol]
-  const activityInfo = CARDIO_ACTIVITIES[form.activity]
-
-  // HR-profiel van de gekoppelde patiënt → toon doelzone als concreet bpm-bereik.
+  // HR-profiel van de gekoppelde patiënt → doelzones als concrete bpm in de kaart.
   const { data: selectedPatient } = trpc.patients.get.useQuery(
     { id: form.patientId },
     { enabled: !!form.patientId },
   )
   const prescribedZones = selectedPatient ? computeHrZones(selectedPatient) : null
-  const targetZoneBpm = form.targetZone && prescribedZones
-    ? prescribedZones.zones.find((z) => z.zone === form.targetZone) ?? null
-    : null
 
-  const applyTemplate = (tpl: typeof CARDIO_TEMPLATES[0]) => {
+  const applyTemplate = (tpl: CardioActivityTemplate) => {
     setForm(f => ({
       ...f,
       name: f.name || tpl.name,
       description: f.description || tpl.description,
       activity: tpl.activity,
-      protocol: tpl.protocol,
-      targetDurationMin: tpl.targetDurationMin,
-      targetDistanceKm: tpl.targetDistanceKm?.toString() ?? '',
-      targetZone: tpl.targetZone ?? null,
-      targetRpe: tpl.targetRpe ?? null,
-      intervals: tpl.intervals ?? [],
+      blocks: templateBlocks(tpl),
     }))
     toast.success(`Template "${tpl.name}" geladen`)
   }
@@ -443,6 +147,10 @@ function WorkoutBuilderContent() {
   const handleSave = async () => {
     if (!form.name.trim()) {
       toast.error('Geef het programma een naam')
+      return
+    }
+    if (form.blocks.length === 0) {
+      toast.error('Bouw eerst de workout op uit blokken')
       return
     }
     try {
@@ -453,26 +161,19 @@ function WorkoutBuilderContent() {
         weeks: form.weeks,
         daysPerWeek: form.sessionsPerWeek,
         type: 'CARDIO',
-        cardioParams: {
-          activity: form.activity,
-          protocol: form.protocol,
-          targetDurationMin: form.targetDurationMin,
-          targetDistanceKm: form.targetDistanceKm
-            ? Number(form.targetDistanceKm)
-            : null,
-          targetZone: form.targetZone,
-          targetRpe: form.targetRpe,
-          targetPaceSecPerKm: parsePaceToSecPerKm(form.targetPace),
-          intervals: form.intervals,
-        },
+        // Zelfde vorm als een cardio-workout in het weekschema en op de iPad;
+        // gelezen door parseStructured/parseWorkout en getActiveCardioProgram.
+        cardioParams: { version: 1, activity: form.activity, blocks: form.blocks },
       })
       await utils.programs.list.invalidate()
-      toast.success('Workout opgeslagen!')
+      toast.success('Cardio-programma opgeslagen!')
       router.push(`/therapist/programs/${created.id}/edit`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Opslaan mislukt')
     }
   }
+
+  const dur = totalDurationSec(form.blocks)
 
   return (
     <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
@@ -504,20 +205,6 @@ function WorkoutBuilderContent() {
         {/* Stap 1: Basis */}
         {step === 1 && (
           <div className="space-y-4">
-            {/* Walk-run opbouwschema's (incl. klachten/blessure-templates) als aparte ingang */}
-            <Link
-              href="/therapist/programs/new/walk-run"
-              className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 mbt-card-hover"
-              style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
-            >
-              <div>
-                <p style={{ color: P.ink, fontSize: 13, fontWeight: 700 }}>Walk-run opbouwschema</p>
-                <p style={{ color: P.inkMuted, fontSize: 11, marginTop: 1 }}>
-                  Wekelijkse loop/wandel-progressie met templates per klacht/blessure
-                </p>
-              </div>
-              <span className="athletic-mono shrink-0" style={{ color: P.brand, fontSize: 11, letterSpacing: '0.12em' }}>OPENEN →</span>
-            </Link>
             <Tile>
               <div className="space-y-4">
                 <MetaLabel>Basisinformatie</MetaLabel>
@@ -614,10 +301,9 @@ function WorkoutBuilderContent() {
                           borderRadius: 999,
                           border: `1px solid ${P.lineStrong}`,
                           fontWeight: 800,
-                          textTransform: 'uppercase',
                         }}
                       >
-                        {CARDIO_PROTOCOLS[tpl.protocol].label}
+                        {Math.round(totalDurationSec(templateBlocks(tpl)) / 60)} MIN
                       </span>
                     </button>
                   ))}
@@ -657,238 +343,102 @@ function WorkoutBuilderContent() {
               </div>
             </Tile>
 
-            {/* Protocol */}
-            <Tile>
-              <div className="space-y-3">
-                <MetaLabel>Protocol</MetaLabel>
-                <div className="space-y-2">
-                  {(Object.entries(CARDIO_PROTOCOLS) as [CardioProtocolKey, typeof CARDIO_PROTOCOLS[CardioProtocolKey]][]).map(([key, proto]) => (
-                    <button
-                      key={key}
-                      onClick={() => set('protocol', key)}
-                      className="athletic-tap w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all"
-                      style={form.protocol === key
-                        ? { border: `1px solid ${proto.color}`, background: proto.color + '18' }
-                        : { border: `1px solid ${P.line}`, background: P.surfaceHi }}
-                    >
-                      <div className="w-3 h-3 rounded-full shrink-0" style={{ background: proto.color }} />
-                      <div className="flex-1">
-                        <p style={{ color: P.ink, fontSize: 13, fontWeight: 700 }}>{proto.label}</p>
-                        <p
-                          className="athletic-mono"
-                          style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.03em' }}
-                        >
-                          {proto.description}
-                        </p>
-                      </div>
-                      {form.protocol === key && (
-                        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: P.lime }} />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </Tile>
-
             <DarkButton variant="primary" className="w-full" onClick={() => setStep(2)}>
-              Volgende → Doelen & Intervallen
+              Volgende → Workout bouwen
             </DarkButton>
           </div>
         )}
 
-        {/* Stap 2: Doelen & Intervallen */}
+        {/* Stap 2: de workout zelf, in blokken */}
         {step === 2 && (
           <div className="space-y-4">
             <Tile>
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <span style={{ color: P.ink }}>{(() => { const Icon = CARDIO_ICON_MAP[form.activity]; return Icon ? <Icon size={22} /> : activityInfo.icon })()}</span>
-                  <div>
-                    <p
-                      className="athletic-mono"
-                      style={{ color: P.ink, fontSize: 13, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}
-                    >
-                      {activityInfo.label}
-                    </p>
-                    <p
-                      className="athletic-mono"
-                      style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.03em' }}
-                    >
-                      {protocolInfo.label}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <MetaLabel>Doelduur (min)</MetaLabel>
-                    <DarkInput
-                      type="number" min={1} max={300}
-                      value={form.targetDurationMin}
-                      onChange={e => set('targetDurationMin', +e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <MetaLabel>Doelafstand (km)</MetaLabel>
-                    <DarkInput
-                      type="number" min={0} step={0.1}
-                      placeholder="Optioneel"
-                      value={form.targetDistanceKm}
-                      onChange={e => set('targetDistanceKm', e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {/* HR Zone */}
-                <div className="space-y-2">
-                  <MetaLabel>Hartslagzone (doelzone)</MetaLabel>
-                  <div className="flex gap-2">
-                    {([null, 1, 2, 3, 4, 5] as (HRZone | null)[]).map(z => {
-                      const zc = z ? zoneColor(z) : P.inkMuted
-                      const active = form.targetZone === z
-                      return (
-                        <button
-                          key={z ?? 'none'}
-                          onClick={() => set('targetZone', z)}
-                          className="athletic-tap flex-1 py-2 rounded-lg athletic-mono transition-all"
-                          style={active
-                            ? { background: zc, color: P.bg, border: '1px solid transparent', fontSize: 12, fontWeight: 800, letterSpacing: '0.08em' }
-                            : { background: P.surfaceHi, color: P.inkMuted, border: `1px solid ${P.lineStrong}`, fontSize: 12, fontWeight: 800, letterSpacing: '0.08em' }}
-                        >
-                          {z === null ? 'GEEN' : `Z${z}`}
-                        </button>
-                      )
-                    })}
-                  </div>
-                  {form.targetZone && (
-                    <div
-                      className="rounded-lg p-3 flex gap-2"
-                      style={{ background: P.surfaceHi, border: `1px solid ${zoneColor(form.targetZone)}` }}
-                    >
-                      <div
-                        className="w-2 h-2 rounded-full mt-1 shrink-0"
-                        style={{ background: zoneColor(form.targetZone) }}
-                      />
-                      <div
-                        className="athletic-mono"
-                        style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.03em' }}
-                      >
-                        <span style={{ color: P.ink, fontWeight: 800 }}>
-                          {HR_ZONES[form.targetZone].label}
-                        </span>
-                        {' — '}{HR_ZONES[form.targetZone].description}
-                        <br />
-                        {HR_ZONES[form.targetZone].rpeFeel}
-                        {targetZoneBpm && (
-                          <>
-                            <br />
-                            <span style={{ color: zoneColor(form.targetZone), fontWeight: 800 }}>
-                              {targetZoneBpm.minBpm}–{targetZoneBpm.maxBpm} bpm
-                            </span>
-                            {' '}voor {selectedPatient?.name}
-                          </>
-                        )}
-                      </div>
+              <div className="space-y-3">
+                <MetaLabel>Workout</MetaLabel>
+                {form.blocks.length === 0 ? (
+                  <p className="text-[12px] leading-relaxed" style={{ color: P.inkDim }}>
+                    Nog geen blokken. Bouw de workout op uit warming-up, intervallen
+                    en cooldown — dezelfde bouwer als in het weekschema.
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold" style={{ color: P.ink }}>
+                        {CARDIO_ACTIVITIES[form.activity]?.label ?? 'Cardio'}
+                      </span>
+                      <span className="athletic-mono text-[11px]" style={{ color: P.inkMuted }}>
+                        {Math.round(dur / 60)} min
+                      </span>
+                      <span className="athletic-mono text-[11px]" style={{ color: P.lime }}>
+                        {structuredLoad(form.blocks)} sRPE
+                      </span>
                     </div>
-                  )}
-                  {form.targetZone && form.patientId && !targetZoneBpm && (
-                    <p className="athletic-mono" style={{ color: P.inkDim, fontSize: 10, letterSpacing: '0.03em' }}>
-                      Geen HR-profiel bij deze patiënt — zones tonen alleen als percentage. Laat ze max-HR invullen voor bpm-bereiken.
+                    <BlocksBar blocks={form.blocks} />
+                    <p className="text-[12px] leading-relaxed" style={{ color: P.inkDim }}>
+                      {summarize(form.blocks)}
                     </p>
-                  )}
-                </div>
-
-                {/* Doel-tempo */}
-                <div className="space-y-1.5">
-                  <MetaLabel>Doeltempo (min/km, optioneel)</MetaLabel>
-                  <DarkInput
-                    placeholder="bijv. 5:30"
-                    value={form.targetPace}
-                    onChange={e => set('targetPace', e.target.value)}
-                  />
-                </div>
-
-                {/* RPE target */}
-                <div className="space-y-2">
-                  <MetaLabel>Doel RPE (1-10, optioneel)</MetaLabel>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="range" min={1} max={10} step={1}
-                      value={form.targetRpe ?? 5}
-                      onChange={e => set('targetRpe', +e.target.value)}
-                      className="flex-1 accent-[#e87a55]"
-                    />
-                    <span
-                      className="athletic-display w-6 text-center"
-                      style={{ color: P.ink, fontSize: 18 }}
-                    >
-                      {form.targetRpe ?? '—'}
-                    </span>
-                    {form.targetRpe && (
-                      <button
-                        onClick={() => set('targetRpe', null)}
-                        className="athletic-mono"
-                        style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.08em' }}
-                      >
-                        WIS
-                      </button>
-                    )}
-                  </div>
-                </div>
+                  </>
+                )}
+                <DarkButton variant="secondary" className="w-full" onClick={() => setBuilderOpen(true)}>
+                  <Layers className="w-4 h-4 mr-1.5" />
+                  {form.blocks.length === 0 ? 'Workout bouwen' : 'Workout bewerken'}
+                </DarkButton>
               </div>
             </Tile>
 
-            {/* Intervallen als protocol dat ondersteunt */}
-            {protocolInfo.hasIntervals && (
-              <Tile accentBar={protocolInfo.color}>
-                <div className="space-y-3">
-                  <MetaLabel>Intervallen</MetaLabel>
-                  <IntervalEditor intervals={form.intervals} onChange={iv => set('intervals', iv)} />
+            {/* Zones van de gekoppelde patiënt als context bij het bouwen. */}
+            {prescribedZones && (
+              <Tile>
+                <div className="space-y-2">
+                  <MetaLabel>HR-zones van {selectedPatient?.name ?? 'patiënt'}</MetaLabel>
+                  <div className="space-y-1">
+                    {prescribedZones.zones.map(z => (
+                      <div key={z.zone} className="flex items-center gap-2 text-[11px]">
+                        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: HR_ZONES[z.zone].color }} />
+                        <span style={{ color: P.ink, fontWeight: 600 }}>{HR_ZONES[z.zone].label}</span>
+                        <span className="athletic-mono ml-auto" style={{ color: P.inkMuted }}>
+                          {z.minBpm}–{z.maxBpm} bpm
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </Tile>
             )}
 
-            {/* Samenvatting */}
-            <Tile accentBar={P.lime}>
-              <div className="space-y-2">
-                <MetaLabel>Samenvatting</MetaLabel>
-                <div
-                  className="athletic-mono"
-                  style={{ color: P.inkMuted, fontSize: 12, letterSpacing: '0.03em' }}
-                >
-                  <p>
-                    <span style={{ color: P.ink, fontWeight: 700 }}>
-                      {(() => { const Icon = CARDIO_ICON_MAP[form.activity]; return Icon ? <Icon size={14} /> : activityInfo.icon })()} {activityInfo.label}
-                    </span>
-                    {' — '}{protocolInfo.label}
-                  </p>
-                  <p>{form.weeks} weken · {form.sessionsPerWeek}×/week · {form.targetDurationMin} min per sessie</p>
-                  {form.targetDistanceKm && <p>Doelafstand: {form.targetDistanceKm} km</p>}
-                  {form.targetZone && <p>Zone {form.targetZone}: {HR_ZONES[form.targetZone].label}</p>}
-                  {form.intervals.length > 0 && <p>{form.intervals.length} intervalblok(ken) geconfigureerd</p>}
-                  {form.patientId && (
-                    <p>Patiënt: {patientsData.find(p => p.id === form.patientId)?.name}</p>
-                  )}
-                </div>
-              </div>
-            </Tile>
-
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <DarkButton variant="secondary" className="flex-1" onClick={() => setStep(1)}>
-                Terug
+                ← Terug
               </DarkButton>
               <DarkButton
                 variant="primary"
                 className="flex-1"
-                disabled={saving || !form.name.trim()}
                 onClick={handleSave}
+                disabled={saving}
               >
-                {saving ? 'Opslaan...' : 'Programma opslaan'}
+                {saving ? 'Opslaan…' : 'Programma opslaan →'}
               </DarkButton>
             </div>
           </div>
         )}
       </div>
+
+      {/* Dezelfde bouwer als het weekschema en de iPad. */}
+      {builderOpen && (
+        <CardioWorkoutBuilder
+          initial={form.blocks.length > 0
+            ? { version: 1, activity: form.activity, blocks: form.blocks } as StructuredCardio
+            : null}
+          activity={form.activity}
+          itemName={form.name.trim() || 'Cardio-workout'}
+          saving={false}
+          onClose={() => setBuilderOpen(false)}
+          onSave={async (w) => {
+            setForm(f => ({ ...f, activity: w.activity, blocks: w.blocks }))
+            setBuilderOpen(false)
+          }}
+        />
+      )}
     </div>
   )
 }
