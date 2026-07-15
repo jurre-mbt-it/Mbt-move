@@ -19,6 +19,7 @@
  */
 
 import { useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   DndContext, DragOverlay, PointerSensor, closestCenter,
   useDraggable, useDroppable, useSensor, useSensors,
@@ -271,16 +272,24 @@ export function CardioWorkoutBuilder({
             </div>
           </div>
 
-          <DragOverlay>
-            {dragLabel && (
-              <div
-                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold"
-                style={{ background: P.surfaceHi, border: `1px solid ${P.lime}`, color: P.ink }}
-              >
-                {dragLabel}
-              </div>
-            )}
-          </DragOverlay>
+          {/* In een portal naar body. De dialoog centreert zichzelf met
+              `translate(-50%, -50%)`, en dnd-kit positioneert het sleep-blokje
+              in viewport-coördinaten: binnen die verschoven laag gerenderd
+              schuift het blokje een halve dialoog mee en zweeft het los van je
+              cursor. Buiten de transform klopt het wel. */}
+          {typeof document !== 'undefined' && createPortal(
+            <DragOverlay dropAnimation={null}>
+              {dragLabel && (
+                <div
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-semibold"
+                  style={{ background: P.surfaceHi, border: `1px solid ${P.lime}`, color: P.ink }}
+                >
+                  {dragLabel}
+                </div>
+              )}
+            </DragOverlay>,
+            document.body,
+          )}
         </DndContext>
 
         <div className="flex justify-end gap-2 pt-3">
