@@ -45,15 +45,19 @@ export default function PatientDashboard() {
     ) ?? false
 
   const currentWeek = program?.currentWeek ?? 1
+  // Alleen sessies van DIT programma tellen (een los cardio-item hoorde de
+  // teller niet op te schuiven), en bij een flexibel programma is weeklyTarget
+  // de noemer — daysPerWeek blijft daar op de builder-default staan.
   const weekCompleted =
     sessionHistory?.filter((s) => {
+      if (activeProgram?.id && s.programId !== activeProgram.id) return false
       const d = new Date(s.completedAt)
       const weekStart = new Date()
       weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1)
       weekStart.setHours(0, 0, 0, 0)
       return d >= weekStart
     }).length ?? 0
-  const weekTotal = activeProgram?.daysPerWeek ?? 0
+  const weekTotal = program?.weeklyTarget ?? activeProgram?.daysPerWeek ?? 0
 
   const jsDay = new Date().getDay() // 0=Sun
   const todayIndex = jsDay === 0 ? 6 : jsDay - 1 // Mon=0..Sun=6

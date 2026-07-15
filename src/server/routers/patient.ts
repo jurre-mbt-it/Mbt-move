@@ -613,6 +613,9 @@ export const patientRouter = createTRPCRouter({
           weeklyTarget,
           completedThisWeek,
           weeklyTargetReached: targetReached,
+          // Zonder dit stond de week-voortgang op iOS permanent op 0%:
+          // de client deelt door daysPerWeek en die ontbrak in de payload.
+          daysPerWeek: program.daysPerWeek,
         },
         // Wanneer target bereikt: lege lijst zodat oude clients (iOS) niet
         // dezelfde oefeningen opnieuw aanbieden. Web-app gebruikt
@@ -682,6 +685,7 @@ export const patientRouter = createTRPCRouter({
         trackOneRepMax: (program as any).trackOneRepMax ?? false,
         flexibleSchedule: false,
         weeklyTarget: null,
+        daysPerWeek: program.daysPerWeek,
         completedThisWeek: 0,
         weeklyTargetReached: false,
       },

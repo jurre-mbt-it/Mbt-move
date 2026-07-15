@@ -52,8 +52,13 @@ export default function PatientTrainingOverview() {
     d.setHours(0, 0, 0, 0)
     return d
   })()
+  // Zelfde regel als de server: per programma tellen, niet alles bij elkaar.
   const weekCompleted =
-    sessionHistory?.filter((s) => new Date(s.completedAt) >= weekStart).length ?? 0
+    sessionHistory?.filter(
+      (s) =>
+        new Date(s.completedAt) >= weekStart &&
+        (!activeProgram?.id || s.programId === activeProgram.id),
+    ).length ?? 0
   const weekTarget =
     program?.weeklyTarget ?? activeProgram?.daysPerWeek ?? null
 
