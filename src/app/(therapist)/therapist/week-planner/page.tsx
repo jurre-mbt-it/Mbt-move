@@ -1910,7 +1910,7 @@ function WeekPlannerContent() {
         plannedRpe: i.plannedRpe ?? null,
         quickCategory: i.quickCategory,
         quickDurationSec: i.quickDurationSec,
-        exercises: i.exercises?.map(e => ({ sets: e.sets, reps: e.reps, restTime: e.restTime })),
+        exercises: i.exercises?.map(e => ({ sets: e.sets, reps: e.reps, repUnit: e.repUnit, restTime: e.restTime })),
       }))))
     }
     return m

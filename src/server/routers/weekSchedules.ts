@@ -1838,7 +1838,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       // training had uitgewerkt — dan spreken de tegel en de workout elkaar
       // tegen. Geen oefeningen meer → terug naar wat er is ingetikt.
       const derivedDurationSec = input.exercises.length > 0
-        ? durationFromExercises(input.exercises.map(e => ({ sets: e.sets, reps: e.reps, restTime: e.restTime ?? null })))
+        ? durationFromExercises(input.exercises.map(e => ({ sets: e.sets, reps: e.reps, repUnit: e.repUnit, restTime: e.restTime ?? null })))
         : null
 
       await ctx.prisma.$transaction([

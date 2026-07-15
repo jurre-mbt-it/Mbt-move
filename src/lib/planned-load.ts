@@ -17,7 +17,7 @@ export type PlannedLoadInput = {
   quickCategory?: string | null
   quickDurationSec?: number | null
   /** Inline oefeningen — gebruikt om duur te schatten als die ontbreekt. */
-  exercises?: { sets: number; reps: number; restTime?: number | null }[]
+  exercises?: { sets: number; reps: number; repUnit?: string | null; restTime?: number | null }[]
 }
 
 /**
@@ -39,6 +39,23 @@ const SECONDS_PER_REP = 3
 const DEFAULT_REST_SEC = 60
 
 /**
+ * De eenheid van `reps` bepaalt wat het getal betékent, en dus hoe lang de set
+ * duurt. Zonder dit telde een plank van 60 sec als 180 seconden werk (60 × 3)
+ * en "10 reps per zijde" als 10 in plaats van 20. Dat getal voedt de geplande
+ * belasting, dus die fout liep door tot in de weekbalk.
+ *
+ * repUnit is vrije tekst (de therapeut kan 'm zelf typen); onbekend → reps.
+ */
+function werkSecondenPerSet(reps: number, repUnit?: string | null): number {
+  const u = (repUnit ?? '').toLowerCase()
+  if (u.startsWith('sec')) return reps
+  if (u.includes('zijde') || u.includes('kant') || u.includes('been') || u.includes('arm')) {
+    return reps * SECONDS_PER_REP * 2
+  }
+  return reps * SECONDS_PER_REP
+}
+
+/**
  * Een PROGRAM-item verwijst naar een programma; zijn oefeningen hangen aan dat
  * programma, niet aan het item, en zijn hier dus niet beschikbaar. Zonder een
  * schatting zou zo'n item op 0 uitkomen en zou een week die volledig uit
@@ -58,10 +75,10 @@ const LOAD_BEARING_KINDS = ['PROGRAM', 'WORKOUT']
  * getal zien.
  */
 export function durationFromExercises(
-  exercises: { sets: number; reps: number; restTime?: number | null }[],
+  exercises: { sets: number; reps: number; repUnit?: string | null; restTime?: number | null }[],
 ): number {
   return exercises.reduce(
-    (sum, e) => sum + e.sets * (e.reps * SECONDS_PER_REP + (e.restTime ?? DEFAULT_REST_SEC)),
+    (sum, e) => sum + e.sets * (werkSecondenPerSet(e.reps, e.repUnit) + (e.restTime ?? DEFAULT_REST_SEC)),
     0,
   )
 }
