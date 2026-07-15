@@ -147,6 +147,10 @@ type CalEvent =
       durationSec: number | null
       programId: string | null
       notes: string | null
+      /** Echt planner-item (geen legacy/synthetische tegel) → uitvoerbaar. */
+      itemId: string | null
+      /** Heeft de therapeut oefeningen klaargezet? Zo niet: lege ad-hoc sessie. */
+      hasExercises: boolean
     }
 
 function eventColor(e: CalEvent): string {
@@ -274,19 +278,27 @@ export default function AthleteSchedulePage() {
             quickName: null,
             quickDurationSec: null,
             notes: null,
+            _count: { exercises: 0 },
+            sessionLogs: [] as { id: string }[],
           }] : []))
           for (const item of items) {
             const category = (item.quickCategory ?? 'STRENGTH') as Category
-            // Al gelogd die dag? Dan toont de log het — gepland item overslaan.
-            let matched = false
-            if (item.programId) {
-              matched = sessionProgramIdsByIso.get(iso)?.has(item.programId) ?? false
-            } else if (category === 'CARDIO') {
-              const left = cardioCountByIso.get(iso) ?? 0
-              if (left > 0) { cardioCountByIso.set(iso, left - 1); matched = true }
-            } else {
-              const left = looseSessionsByIso.get(iso) ?? 0
-              if (left > 0) { looseSessionsByIso.set(iso, left - 1); matched = true }
+            const isRealItem = !item.id.startsWith('legacy-')
+            // Al gelogd? Eerst op identiteit (sessionLogs op het item zelf),
+            // want dat is exact. De datum+teller-heuristiek eronder is alleen
+            // nog nodig voor sessies van vóór deze koppeling en voor clients die
+            // het item niet meesturen (iOS).
+            let matched = (item.sessionLogs?.length ?? 0) > 0
+            if (!matched) {
+              if (item.programId) {
+                matched = sessionProgramIdsByIso.get(iso)?.has(item.programId) ?? false
+              } else if (category === 'CARDIO') {
+                const left = cardioCountByIso.get(iso) ?? 0
+                if (left > 0) { cardioCountByIso.set(iso, left - 1); matched = true }
+              } else {
+                const left = looseSessionsByIso.get(iso) ?? 0
+                if (left > 0) { looseSessionsByIso.set(iso, left - 1); matched = true }
+              }
             }
             if (matched) continue
             push(iso, {
@@ -298,6 +310,8 @@ export default function AthleteSchedulePage() {
               durationSec: item.quickDurationSec,
               programId: item.programId,
               notes: item.notes,
+              itemId: isRealItem ? item.id : null,
+              hasExercises: (item._count?.exercises ?? 0) > 0,
             })
           }
         }
@@ -324,11 +338,23 @@ export default function AthleteSchedulePage() {
   }
 
   // Start-CTA: vandaag geselecteerd + nog een gepland item open.
+  //
+  // Het itemId gaat mee. Zonder dat viel de runner terug op het OUDSTE actieve
+  // programma, dus tikken op workout B startte programma A — en een quick
+  // workout kwam altijd op een leeg ad-hoc scherm uit, hoe zorgvuldig de
+  // therapeut hem ook had opgebouwd.
   const startTarget = (() => {
     if (!isToday) return null
     const open = selectedEvents.find(e => e.kind === 'planned' && e.status === 'planned')
     if (!open || open.kind !== 'planned') return null
-    if (open.category === 'CARDIO') return '/athlete/cardio/new'
+    if (open.category === 'CARDIO') {
+      return open.itemId ? `/athlete/cardio/new?itemId=${open.itemId}` : '/athlete/cardio/new'
+    }
+    if (open.itemId && (open.hasExercises || open.programId)) {
+      return `/athlete/session?itemId=${open.itemId}`
+    }
+    // Gepland, maar de therapeut heeft geen oefeningen klaargezet: dan is een
+    // lege ad-hoc sessie het eerlijke aanbod.
     return open.programId ? '/athlete/session' : '/athlete/session?mode=quick'
   })()
 
@@ -600,6 +626,10 @@ type CalendarData = {
         quickName: string | null
         quickDurationSec: number | null
         notes: string | null
+        /** >0 = de therapeut heeft oefeningen klaargezet → uitvoerbaar. */
+        _count?: { exercises: number }
+        /** Gevuld = al afgevinkt tegen dit item (identiteit, geen heuristiek). */
+        sessionLogs?: Array<{ id: string; completedAt: string | null; completedAll: boolean }>
       }>
     }>
   }>

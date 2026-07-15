@@ -65,44 +65,4 @@ export const DEFAULT_CUSTOM_PARAMS: CustomParameter[] = [
   { id: 'cp3', label: 'Pijnniveau',   type: 'slider', unit: '/10', min: 0, max: 10, defaultValue: 0, isGlobal: false, order: 2 },
 ]
 
-// Mock programs for the list page
-export const MOCK_PROGRAMS = [
-  {
-    id: 'p1',
-    name: 'Knie Revalidatie — Fase 1',
-    description: 'Initieel herstelprotocol na VKB reconstructie',
-    status: 'ACTIVE',
-    patientName: 'Jan de Vries',
-    weeks: 4,
-    daysPerWeek: 3,
-    exerciseCount: 8,
-    createdAt: new Date('2025-03-01'),
-    isTemplate: false,
-  },
-  {
-    id: 'p2',
-    name: 'Schouder Stabilisatie',
-    description: 'Rotatorcuff versterking na SLAP laesie',
-    status: 'DRAFT',
-    patientName: 'Maria Jansen',
-    weeks: 6,
-    daysPerWeek: 2,
-    exerciseCount: 6,
-    createdAt: new Date('2025-03-10'),
-    isTemplate: false,
-  },
-  {
-    id: 'p3',
-    name: 'Heup Mobiliteit Template',
-    description: 'Standaard heup mobilisatie protocol',
-    status: 'ACTIVE',
-    patientName: null,
-    weeks: 3,
-    daysPerWeek: 4,
-    exerciseCount: 5,
-    createdAt: new Date('2025-02-15'),
-    isTemplate: true,
-  },
-]
-
-// buildMockProgram verwijderd — programma's komen uit de database
+// MOCK_PROGRAMS en buildMockProgram verwijderd — programma's komen uit de database

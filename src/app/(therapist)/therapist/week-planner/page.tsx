@@ -21,7 +21,7 @@ import { toast } from 'sonner'
 import {
   ChevronLeft, ChevronRight, Plus, X, MoreHorizontal,
   Search, Building2, Copy, CopyPlus, Pencil, BookmarkPlus, GripVertical,
-  CalendarRange, Layers, Moon, CalendarPlus,
+  CalendarRange, Layers, Moon, CalendarPlus, StickyNote, ClipboardCheck, Flag,
 } from 'lucide-react'
 import {
   PHASE_TYPES, PHASE_META, phaseMeta, DELOAD_LOAD_FRACTION,
@@ -40,6 +40,9 @@ import {
   CARDIO_ACTIVITIES, HR_ZONES,
   type CardioActivityKey, type CardioProtocolKey, type HRZone, type CardioInterval,
 } from '@/lib/cardio-constants'
+import { ApplyPlanDialog, SavePlanDialog } from '@/components/week-planner/PlanTemplateDialogs'
+import { sumPlannedLoad, loadVerdict } from '@/lib/planned-load'
+import { AddItemModal, type AddItemPayload } from '@/components/week-planner/AddItemModal'
 import {
   DarkButton,
   DarkDialog as Dialog,
@@ -212,17 +215,38 @@ type PlannerCardioParams = {
   notes?: string
 }
 
+type ItemKind = 'PROGRAM' | 'WORKOUT' | 'REST' | 'NOTE' | 'TEST' | 'EVENT'
+
 type ScheduleItem = {
   id: string
   order: number
+  kind: ItemKind
   programId: string | null
   program: { id: string; name: string; status?: string | null } | null
   quickCategory: Category | null
+  quickActivity?: CardioActivityKey | null
   quickName: string | null
   quickDurationSec: number | null
+  /** Voorschrift voor de belasting; null = afleiden. Zie lib/planned-load.ts. */
+  plannedDurationSec?: number | null
+  plannedRpe?: number | null
+  testBattery?: { id: string; name: string } | null
   notes: string | null
   exercises?: ItemExercise[]
   cardioParams?: PlannerCardioParams | null
+}
+
+/** Alleen deze twee zijn workouts; de rest zijn kalender-markeringen zonder
+ *  belasting, status of sessie-koppeling. */
+const WORKOUT_KINDS: ItemKind[] = ['PROGRAM', 'WORKOUT']
+const isWorkoutKind = (k: ItemKind) => WORKOUT_KINDS.includes(k)
+
+/** Niet-workout items: eigen kleur, icoon en onderschrift. */
+const MARKER_META: Record<Exclude<ItemKind, 'PROGRAM' | 'WORKOUT'>, { color: string; label: string }> = {
+  REST:  { color: P.inkDim, label: 'geen belasting' },
+  NOTE:  { color: '#F4C261', label: 'notitie' },
+  TEST:  { color: P.ink,    label: 'testbatterij' },
+  EVENT: { color: '#BEF264', label: 'streefdatum' },
 }
 
 type ItemStatus = 'scheduled' | 'completed' | 'partial' | 'missed' | 'in_progress'
@@ -252,6 +276,58 @@ const STATUS_TITLES: Record<ItemStatus, string | undefined> = {
   in_progress: 'Bezig',
 }
 
+/**
+ * Geplande weekbelasting tegen het doel. Het doel staat op 80% van de balk,
+ * zodat "te veel gepland" er zichtbaar voorbij loopt in plaats van stil vol te
+ * lopen. Een geschat getal krijgt een ~ zodat het zich niet voordoet als een
+ * voorschrift.
+ */
+function WeekLoadBar({
+  planned, target, estimated,
+}: { planned: number; target: number | null; estimated: boolean }) {
+  const verdict = loadVerdict(planned, target)
+  const color =
+    verdict === 'over' ? P.brand
+    : verdict === 'under' ? P.inkDim
+    : verdict === 'on_target' ? PHASE_META.ACCUMULATION.color
+    : P.inkMuted
+  const pct = target && target > 0 ? Math.min(100, (planned / (target * 1.25)) * 100) : 0
+  const title = target
+    ? `Gepland ${planned} van ${target} sRPE-punten${estimated ? ' (deels geschat)' : ''}`
+    : `Gepland ${planned} sRPE-punten${estimated ? ' (deels geschat)' : ''} — geen weekdoel gezet`
+
+  return (
+    <span className="flex flex-col items-center gap-0.5 w-full px-1" title={title}>
+      {target != null && target > 0 && (
+        <span
+          className="relative w-full h-[3px] rounded-full overflow-visible"
+          style={{ background: P.surfaceLow, border: `1px solid ${P.line}` }}
+        >
+          <span
+            className="absolute inset-y-0 left-0 rounded-full origin-left"
+            style={{ width: '100%', background: color, transform: `scaleX(${(pct / 100).toFixed(3)})` }}
+          />
+          {/* Doel-markering op 80% */}
+          <span className="absolute top-[-2px] bottom-[-2px] w-px" style={{ left: '80%', background: P.inkMuted }} />
+        </span>
+      )}
+      <span className="athletic-mono text-[9px]" style={{ color }}>
+        {estimated ? '~' : ''}{planned}
+      </span>
+    </span>
+  )
+}
+
+function MarkerIcon({ kind, size = 11 }: { kind: ItemKind; size?: number }) {
+  switch (kind) {
+    case 'REST': return <Moon size={size} />
+    case 'NOTE': return <StickyNote size={size} />
+    case 'TEST': return <ClipboardCheck size={size} />
+    case 'EVENT': return <Flag size={size} />
+    default: return null
+  }
+}
+
 function ItemTile({
   item, status, onRemove, onClick, readOnly, isOpen,
 }: {
@@ -264,15 +340,23 @@ function ItemTile({
   /** True als deze workout nu open staat in het zijpaneel → naam valt weg, alleen icoon. */
   isOpen?: boolean
 }) {
+  const marker = isWorkoutKind(item.kind)
+    ? null
+    : MARKER_META[item.kind as Exclude<ItemKind, 'PROGRAM' | 'WORKOUT'>]
   const category: Category = item.quickCategory ?? 'STRENGTH'  // default voor program-link
-  const color = CATEGORY_COLORS[category]
-  const name = item.programId ? (item.program?.name ?? 'Programma') : (item.quickName ?? 'Workout')
-  const duration = item.quickDurationSec ? fmtDuration(item.quickDurationSec) : null
+  const color = marker ? marker.color : CATEGORY_COLORS[category]
+  const name = marker
+    ? (item.kind === 'TEST' ? (item.testBattery?.name ?? 'Test') : (item.quickName ?? marker.label))
+    : item.programId ? (item.program?.name ?? 'Programma') : (item.quickName ?? 'Workout')
+  const duration = marker || !item.quickDurationSec ? null : fmtDuration(item.quickDurationSec)
 
   // Status leidt de kleur (border + tint); categorie-icoon blijft als anchor
   // zodat het type direct herkenbaar is.
-  const statusBg = STATUS_COLORS[status]
-  const statusBorder = STATUS_BORDER[status]
+  // Markeringen hebben geen status: een notitie of streefdatum in het verleden
+  // is niet "gemist". Ze krijgen hun eigen rustige weergave i.p.v. de
+  // status-kleuren van een workout.
+  const statusBg = marker ? 'transparent' : STATUS_COLORS[status]
+  const statusBorder = marker ? marker.color : STATUS_BORDER[status]
   const isClickable = !!onClick
 
   // Compacte inhoud-preview onder de titel: oefeningen of cardio-samenvatting.
@@ -280,7 +364,10 @@ function ItemTile({
   // zijpaneel dat opent bij klikken. Houdt de kalender schoon.
   const exCount = item.exercises?.length ?? 0
   let previewLine: string | null = null
-  if (exCount > 0) {
+  if (marker) {
+    // Rustdag/notitie/test/doel: geen oefeningen of cardio, alleen het label.
+    previewLine = marker.label
+  } else if (exCount > 0) {
     previewLine = `${exCount} oefening${exCount > 1 ? 'en' : ''}`
   } else if (item.quickCategory === 'CARDIO' && item.cardioParams) {
     const cp = item.cardioParams
@@ -309,12 +396,20 @@ function ItemTile({
       style={{
         background: statusBg,
         borderLeft: `3px solid ${statusBorder}`,
+        border: marker ? `1px solid ${P.line}` : undefined,
+        borderLeftWidth: 3,
+        borderLeftColor: statusBorder,
+        borderLeftStyle: item.kind === 'REST' ? 'dotted' : 'solid',
         color: P.ink,
       }}
-      title={STATUS_TITLES[status]}
+      title={marker ? marker.label : STATUS_TITLES[status]}
     >
       <div className="flex items-center gap-1.5 px-2 py-1">
-        <span style={{ color }} className="shrink-0"><CategoryIcon category={category} size={11} /></span>
+        <span style={{ color }} className="shrink-0">
+          {marker
+            ? <MarkerIcon kind={item.kind} size={11} />
+            : <CategoryIcon category={category} size={11} />}
+        </span>
         {!isOpen && <span className="min-w-0 flex-1 truncate">{name}</span>}
         {duration && <span className="text-[10px] opacity-70 shrink-0">{duration}</span>}
         {!readOnly && (
@@ -462,7 +557,9 @@ function DayCell({
               item={item}
               status={status}
               onRemove={() => onRemoveItem(item, dayId)}
-              onClick={isCardioLog ? undefined : () => onItemClick(item, date, dayId, sId)}
+              // Markeringen (rustdag/notitie/test/doel) hebben geen oefeningen
+              // of cardio, dus het detail-paneel heeft ze niets te tonen.
+              onClick={isCardioLog || !isWorkoutKind(item.kind) ? undefined : () => onItemClick(item, date, dayId, sId)}
               readOnly={item.id.startsWith('sessionlog-') || isCardioLog}
               isOpen={item.id === openItemId}
             />
@@ -789,7 +886,7 @@ function ItemDetailContent({
   showClose?: boolean
   onSaveTemplate: () => void
   onCopy: () => void
-  onSaveQuick: (patch: { quickName?: string; quickDurationSec?: number }) => Promise<void>
+  onSaveQuick: (patch: { quickName?: string; quickDurationSec?: number; plannedRpe?: number | null }) => Promise<void>
   onSaveExercises: (itemId: string, exercises: { exerciseId: string; sets: number; reps: number; repUnit: string }[]) => Promise<void>
   onSaveCardio: (itemId: string, params: PlannerCardioParams | null) => Promise<void>
   savingTemplate: boolean
@@ -827,6 +924,8 @@ function ItemDetailContent({
   const [editing, setEditing] = useState(false)
   const [eName, setEName] = useState(item.quickName ?? '')
   const [eMinutes, setEMinutes] = useState(String(Math.round((item.quickDurationSec ?? 1800) / 60)))
+  // null = geen voorschrift → planned-load leidt de RPE af uit de categorie.
+  const [eRpe, setERpe] = useState<number | null>(item.plannedRpe ?? null)
   const [savingQuick, setSavingQuick] = useState(false)
 
   async function submitQuick() {
@@ -834,7 +933,7 @@ function ItemDetailContent({
     const minutes = Math.max(1, Math.min(720, Number(eMinutes) || 30))
     setSavingQuick(true)
     try {
-      await onSaveQuick({ quickName: eName.trim(), quickDurationSec: minutes * 60 })
+      await onSaveQuick({ quickName: eName.trim(), quickDurationSec: minutes * 60, plannedRpe: eRpe })
       setEditing(false)
     } finally { setSavingQuick(false) }
   }
@@ -904,6 +1003,41 @@ function ItemDetailContent({
               <div>
                 <MetaLabel>Duur (minuten)</MetaLabel>
                 <DarkInput className="mt-1" type="number" min={1} max={720} value={eMinutes} onChange={e => setEMinutes(e.target.value)} disabled={savingQuick} />
+              </div>
+              <div>
+                <MetaLabel>Doel-RPE (optioneel)</MetaLabel>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setERpe(null)}
+                    className="px-2 py-1 rounded-md text-[11px] font-semibold transition-colors"
+                    style={{
+                      background: eRpe === null ? P.surfaceHi : 'transparent',
+                      color: eRpe === null ? P.ink : P.inkMuted,
+                      border: `1px solid ${eRpe === null ? P.lineStrong : P.line}`,
+                    }}
+                  >
+                    Schat
+                  </button>
+                  {[3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setERpe(n)}
+                      className="w-6 h-6 rounded-md text-[11px] font-semibold transition-colors"
+                      style={{
+                        background: eRpe === n ? `${P.lime}22` : 'transparent',
+                        color: eRpe === n ? P.lime : P.inkMuted,
+                        border: `1px solid ${eRpe === n ? P.lime : P.line}`,
+                      }}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] mt-1" style={{ color: P.inkDim }}>
+                  Bepaalt samen met de duur de weekbelasting (duur × RPE). &quot;Schat&quot; leidt 'm af uit het type.
+                </p>
               </div>
               <div className="flex gap-2 pt-1">
                 <DarkButton variant="ghost" size="sm" onClick={() => setEditing(false)} className="flex-1" disabled={savingQuick}>Annuleren</DarkButton>
@@ -1149,207 +1283,6 @@ function WeekMetaDialog({
             </DarkButton>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function AddItemModal({
-  open, onClose, dayId, dayLabel, programs, onSubmit, initialTab = 'library',
-}: {
-  open: boolean
-  onClose: () => void
-  dayId: string | null
-  dayLabel: string
-  programs: ProgramListItem[]
-  initialTab?: 'library' | 'quick'
-  onSubmit: (
-    payload:
-      | { kind: 'program'; programId: string; notes?: string | null }
-      | { kind: 'quick'; quickCategory: Category; quickName: string; quickDurationSec: number; notes?: string | null },
-  ) => Promise<void>
-}) {
-  const [tab, setTab] = useState<'library' | 'quick'>(initialTab)
-  // Bij (her)openen de juiste tab tonen (vanuit +menu: "Workout" → quick,
-  // "Vanuit sjabloon" → library).
-  useEffect(() => {
-    if (open) setTab(initialTab)
-  }, [open, initialTab])
-  const [query, setQuery] = useState('')
-  const [busy, setBusy] = useState(false)
-  // Quick form state
-  const [qCat, setQCat] = useState<Category>('STRENGTH')
-  const [qName, setQName] = useState('')
-  const [qMinutes, setQMinutes] = useState<string>('30')
-  // Therapeut-notitie — geldt voor zowel een programma-keuze als een snelle workout.
-  const [qNotes, setQNotes] = useState('')
-
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase().trim()
-    if (!q) return programs.slice(0, 30)
-    return programs.filter(p => p.name.toLowerCase().includes(q)).slice(0, 30)
-  }, [programs, query])
-
-  function reset() {
-    setTab('library'); setQuery(''); setQCat('STRENGTH'); setQName(''); setQMinutes('30'); setQNotes('')
-  }
-  function handleClose() { reset(); onClose() }
-
-  async function handleProgramPick(programId: string) {
-    if (!dayId || busy) return
-    setBusy(true)
-    try { await onSubmit({ kind: 'program', programId, notes: qNotes.trim() || null }); handleClose() }
-    finally { setBusy(false) }
-  }
-
-  async function handleQuickSubmit() {
-    if (!dayId || busy) return
-    if (!qName.trim()) { toast.error('Naam is verplicht'); return }
-    const minutes = Math.max(1, Math.min(720, Number(qMinutes) || 30))
-    setBusy(true)
-    try {
-      await onSubmit({
-        kind: 'quick',
-        quickCategory: qCat,
-        quickName: qName.trim(),
-        quickDurationSec: minutes * 60,
-        notes: qNotes.trim() || null,
-      })
-      handleClose()
-    } finally { setBusy(false) }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Workout toevoegen — {dayLabel}</DialogTitle>
-        </DialogHeader>
-
-        <div className="flex gap-1 mt-2 p-1 rounded-lg" style={{ background: P.surfaceLow, border: `1px solid ${P.line}` }}>
-          {(['library', 'quick'] as const).map(t => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              className="flex-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
-              style={{
-                background: tab === t ? P.surfaceHi : 'transparent',
-                color: tab === t ? P.ink : P.inkMuted,
-              }}
-            >
-              {t === 'library' ? 'Vanuit bibliotheek' : 'Snelle workout'}
-            </button>
-          ))}
-        </div>
-
-        {/* Therapeut-notitie — altijd beschikbaar, geldt voor de toegevoegde workout */}
-        <div className="mt-3">
-          <MetaLabel>Notitie (optioneel)</MetaLabel>
-          <DarkTextarea
-            className="mt-1"
-            rows={2}
-            value={qNotes}
-            onChange={e => setQNotes(e.target.value)}
-            placeholder="Bijv. focus, aandachtspunt of instructie voor deze dag"
-            disabled={busy}
-          />
-        </div>
-
-        {tab === 'library' && (
-          <div className="space-y-2 mt-3">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <DarkInput
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                placeholder="Zoek programma…"
-                className="pl-8"
-                disabled={busy}
-              />
-            </div>
-            <div className="max-h-72 overflow-y-auto space-y-1 pr-1 mbt-stagger">
-              {filtered.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-3 text-center">Geen programma&apos;s gevonden.</p>
-              ) : (
-                // bg/border via classes, niet inline — inline styles zouden de
-                // hover-tint van .mbt-card-hover overschrijven
-                filtered.map(p => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => handleProgramPick(p.id)}
-                    disabled={busy}
-                    className="w-full text-left px-3 py-2 rounded-lg mbt-card-hover athletic-tap flex items-center gap-2 bg-[#141A1B] border border-[rgba(255,255,255,0.12)]"
-                  >
-                    <span className="flex-1 truncate text-sm">{p.name}</span>
-                    {p.isTemplate && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded uppercase" style={{ background: P.surfaceHi, color: P.inkMuted }}>
-                        Sjabloon
-                      </span>
-                    )}
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-
-        {tab === 'quick' && (
-          <div className="space-y-3 mt-3">
-            <div>
-              <MetaLabel>Type</MetaLabel>
-              <div className="flex flex-wrap gap-1 mt-1.5">
-                {(Object.keys(CATEGORY_LABELS) as Category[]).map(c => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setQCat(c)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all"
-                    style={{
-                      background: qCat === c ? `${CATEGORY_COLORS[c]}20` : P.surface,
-                      color: qCat === c ? CATEGORY_COLORS[c] : P.inkMuted,
-                      border: `1px solid ${qCat === c ? CATEGORY_COLORS[c] : P.lineStrong}`,
-                    }}
-                  >
-                    <CategoryIcon category={c} size={11} />
-                    {CATEGORY_LABELS[c]}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <MetaLabel>Naam</MetaLabel>
-              <DarkInput
-                className="mt-1.5"
-                value={qName}
-                onChange={e => setQName(e.target.value)}
-                placeholder="Bijv. Easy bike ride"
-                disabled={busy}
-              />
-            </div>
-            <div>
-              <MetaLabel>Duur (minuten)</MetaLabel>
-              <DarkInput
-                className="mt-1.5"
-                type="number"
-                min={1}
-                max={720}
-                value={qMinutes}
-                onChange={e => setQMinutes(e.target.value)}
-                disabled={busy}
-              />
-            </div>
-            <div className="flex gap-2 pt-1">
-              <DarkButton variant="ghost" onClick={handleClose} className="flex-1" disabled={busy}>
-                Annuleren
-              </DarkButton>
-              <DarkButton variant="primary" onClick={handleQuickSubmit} className="flex-1" disabled={busy}>
-                {busy ? 'Toevoegen…' : 'Toevoegen'}
-              </DarkButton>
-            </div>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   )
@@ -1627,7 +1560,36 @@ function WeekPlannerContent() {
     return map
   }, [sessionsRaw])
 
+  /**
+   * Sessies die exact aan een gepland item hangen. Dit is de betrouwbare
+   * koppeling; `sessionByKey` (programId + datum) en `adhocStatusById` (teller
+   * per dag) zijn de oude heuristiek, die nog nodig blijft voor sessies van
+   * vóór deze kolom en voor iOS, dat het item nog niet meestuurt.
+   */
+  const sessionByItemId = useMemo(() => {
+    const todayStart = startOfDay(new Date())
+    const map = new Map<string, SessionMatch>()
+    for (const s of sessionsRaw) {
+      const itemId = (s as { weekScheduleDayItemId?: string | null }).weekScheduleDayItemId
+      if (!itemId) continue
+      let status: ItemStatus
+      if (s.completedAt) status = doneStatus(s)
+      else if (s.status === 'IN_PROGRESS') status = 'in_progress'
+      else if (s.status === 'SKIPPED' || new Date(s.scheduledAt) < todayStart) status = 'missed'
+      else status = 'scheduled'
+      const prev = map.get(itemId)
+      const prio: Record<ItemStatus, number> = { completed: 5, partial: 4, in_progress: 3, scheduled: 2, missed: 1 }
+      if (!prev || prio[status] > prio[prev.status]) map.set(itemId, { status, sessionId: s.id })
+    }
+    return map
+  }, [sessionsRaw])
+
   function statusFor(date: Date, item: ScheduleItem): ItemStatus {
+    // Markeringen zijn geen workout: een notitie kan niet "gemist" zijn.
+    if (!isWorkoutKind(item.kind)) return 'scheduled'
+    // Exacte koppeling wint van elke heuristiek.
+    const byItem = sessionByItemId.get(item.id)
+    if (byItem) return byItem.status
     // Synthetische tiles dragen hun eigen status: een cardiolog-tile ís een
     // gelogde workout, een sessionlog-tile leest zijn eigen SessionLog terug.
     if (item.id.startsWith('cardiolog-')) return 'completed'
@@ -1650,6 +1612,8 @@ function WeekPlannerContent() {
    *  tile de detail-modal kan openen. Voor sessionlog-prefixed items zit
    *  het id in de prefix; voor andere items lookup via sessionByKey. */
   function sessionIdFor(date: Date, item: ScheduleItem): string | null {
+    const byItem = sessionByItemId.get(item.id)
+    if (byItem) return byItem.sessionId
     if (item.id.startsWith('sessionlog-')) {
       return item.id.slice('sessionlog-'.length)
     }
@@ -1708,11 +1672,16 @@ function WeekPlannerContent() {
             return {
               id: it.id,
               order: it.order,
+              kind: (it.kind ?? (it.programId ? 'PROGRAM' : 'WORKOUT')) as ItemKind,
               programId: it.programId,
               program: it.program ?? null,
               quickCategory: (it.quickCategory ?? null) as Category | null,
+              quickActivity: (it.quickActivity ?? null) as CardioActivityKey | null,
               quickName: it.quickName,
               quickDurationSec: it.quickDurationSec,
+              plannedDurationSec: it.plannedDurationSec ?? null,
+              plannedRpe: it.plannedRpe ?? null,
+              testBattery: it.testBattery ?? null,
               notes: it.notes,
               exercises: content?.exercises ?? [],
               cardioParams: content?.cardioParams ?? null,
@@ -1725,6 +1694,7 @@ function WeekPlannerContent() {
             items = [{
               id: `legacy-${day.id}`,
               order: 0,
+              kind: 'PROGRAM',
               programId: day.programId,
               program: day.program,
               quickCategory: null,
@@ -1802,16 +1772,22 @@ function WeekPlannerContent() {
       const iso = isoDate(date)
       const existing = map.get(iso)
 
-      // Skip als er al een item op die dag is met dezelfde programId
-      // (dan voegt de status-kleur al de info toe).
-      const alreadyMatched = existing?.items.some(it =>
-        it.programId !== null && it.programId === session.programId,
-      )
+      // Skip als deze sessie al door een gepland item wordt weergegeven — dan
+      // draagt dat item de status-kleur en zou een losse tegel hem verdubbelen.
+      // Eerst op identiteit, dan op de oude programId-heuristiek.
+      const linkedItemId = (session as { weekScheduleDayItemId?: string | null }).weekScheduleDayItemId
+      const alreadyMatched = linkedItemId
+        ? existing?.items.some(it => it.id === linkedItemId)
+        : existing?.items.some(it =>
+            it.programId !== null && it.programId === session.programId,
+          )
       if (alreadyMatched) continue
 
       const synthetic: ScheduleItem = {
         id: `sessionlog-${session.id}`,
         order: 999,  // historisch → onderaan de cel
+        // Gelogde sessie = altijd een workout, ook zonder programma-koppeling.
+        kind: session.programId ? 'PROGRAM' : 'WORKOUT',
         programId: session.programId,
         program: session.programId ? {
           id: session.programId,
@@ -1845,6 +1821,7 @@ function WeekPlannerContent() {
       const synthetic: ScheduleItem = {
         id: `cardiolog-${c.id}`,
         order: 999,
+        kind: 'WORKOUT',
         programId: null,
         program: null,
         quickCategory: 'CARDIO',
@@ -1905,6 +1882,41 @@ function WeekPlannerContent() {
     }
     return m
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateMap])
+
+  /**
+   * Geplande belasting per week (sRPE = duur × RPE). Dit is wat `targetLoad` en
+   * `phaseType` voor het eerst ergens over laat gaan: zonder dit getal is een
+   * fase-label een sticker en geen plan. Zelfde eenheid als de gerealiseerde
+   * load-curve, dus gepland en gehaald zijn vergelijkbaar.
+   */
+  const plannedLoadByWeek = useMemo(() => {
+    const m = new Map<number, ReturnType<typeof sumPlannedLoad>>()
+    const perWeek = new Map<number, ScheduleItem[]>()
+    for (const info of dateMap.values()) {
+      if (info.weekNumber == null) continue
+      const bucket = perWeek.get(info.weekNumber) ?? []
+      for (const item of info.items) {
+        // Alleen écht geplande items: synthetische tegels van gelogde sessies
+        // zijn realisatie, geen planning.
+        const real = !item.id.startsWith('legacy-')
+          && !item.id.startsWith('sessionlog-')
+          && !item.id.startsWith('cardiolog-')
+        if (real) bucket.push(item)
+      }
+      perWeek.set(info.weekNumber, bucket)
+    }
+    for (const [wn, items] of perWeek) {
+      m.set(wn, sumPlannedLoad(items.map(i => ({
+        kind: i.kind,
+        plannedDurationSec: i.plannedDurationSec ?? null,
+        plannedRpe: i.plannedRpe ?? null,
+        quickCategory: i.quickCategory,
+        quickDurationSec: i.quickDurationSec,
+        exercises: i.exercises?.map(e => ({ sets: e.sets, reps: e.reps, restTime: e.restTime })),
+      }))))
+    }
+    return m
   }, [dateMap])
 
   // Week-instellingen dialog (fase/deload/target/notitie per week).
@@ -1981,6 +1993,10 @@ function WeekPlannerContent() {
     setAddOpen(true)
   }
 
+  // ─ Plan-sjablonen ─
+  const [applyPlanOpen, setApplyPlanOpen] = useState(false)
+  const [savePlanRange, setSavePlanRange] = useState<{ from: string; to: string } | null>(null)
+
   // ─ Multi-dag selectie (ingedrukt slepen) ─
   const [selectedIsos, setSelectedIsos] = useState<Set<string>>(new Set())
   const selecting = useRef(false)
@@ -2011,6 +2027,20 @@ function WeekPlannerContent() {
     window.addEventListener('pointerup', up)
     return () => window.removeEventListener('pointerup', up)
   }, [])
+
+  // Kalenderbereik van de huidige dag-selectie, als ISO-dagen. Bewust op datum
+  // en niet op weekNumber: dat veld is in de praktijk vrijwel altijd 1 en
+  // meerdere schedules delen het, dus het identificeert geen kalenderweek.
+  const selectedWeekRange = useMemo(() => {
+    if (selectedIsos.size === 0) return null
+    const sorted = [...selectedIsos].sort()
+    const from = sorted[0]
+    const to = sorted[sorted.length - 1]
+    const firstMonday = mondayOf(new Date(`${from}T00:00:00`))
+    const lastMonday = mondayOf(new Date(`${to}T00:00:00`))
+    const count = Math.round((lastMonday.getTime() - firstMonday.getTime()) / (7 * 864e5)) + 1
+    return { from, to, count }
+  }, [selectedIsos])
 
   // ─ Drag-drop (dnd-kit): item verplaatsen + dag-blok kopiëren ─
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
@@ -2093,7 +2123,7 @@ function WeekPlannerContent() {
     }
     toast.success('Workout gekopieerd op deze dag')
   }
-  async function handleSaveQuick(patch: { quickName?: string; quickDurationSec?: number }) {
+  async function handleSaveQuick(patch: { quickName?: string; quickDurationSec?: number; plannedRpe?: number | null }) {
     if (!detailItem) return
     await updateItem.mutateAsync({ id: detailItem.item.id, ...patch })
     setDetailItem(d => d ? { ...d, item: { ...d.item, ...patch } } : d)
@@ -2108,45 +2138,33 @@ function WeekPlannerContent() {
     await setItemCardio.mutateAsync({ itemId, cardioParams: params })
   }
 
-  async function handleAddSubmit(
-    payload:
-      | { kind: 'program'; programId: string; notes?: string | null }
-      | { kind: 'quick'; quickCategory: Category; quickName: string; quickDurationSec: number; notes?: string | null },
-  ) {
+  async function handleAddSubmit(payload: AddItemPayload) {
     if (!addDayId) return
-    if (payload.kind === 'program') {
-      await addItem.mutateAsync({ kind: 'program', dayId: addDayId, programId: payload.programId, notes: payload.notes ?? null })
-    } else {
-      await addItem.mutateAsync({
-        kind: 'quick', dayId: addDayId,
-        quickCategory: payload.quickCategory,
-        quickName: payload.quickName,
-        quickDurationSec: payload.quickDurationSec,
-        notes: payload.notes ?? null,
-      })
-    }
+    await addItem.mutateAsync({ ...payload, dayId: addDayId } as Parameters<typeof addItem.mutateAsync>[0])
   }
 
-  function handleDuplicateWeek(weekNumber: number) {
+  // Dupliceren gaat op DATUM (de maandag van de rij), niet op weekNumber: dat
+  // veld is niet uniek per patiënt, waardoor de server een willekeurige
+  // naamgenoot kon pakken en de verkeerde week kopieerde.
+  function handleDuplicateWeek(rowMonday: Date) {
     if (!selectedPatientId) return
-    const targetWeek = weekNumber + 1
     duplicateWeek.mutate({
       patientId: selectedPatientId,
-      sourceWeekNumber: weekNumber,
-      targetWeekNumber: targetWeek,
+      fromDate: isoDate(rowMonday),
+      toDate: isoDate(addDays(rowMonday, 7)),
       replace: false,
     })
   }
 
   // Dupliceer een week en zet 'm meteen als deload: kopieert de workouts,
   // markeert deload en verlaagt de geplande belasting naar ~60% van de bron.
-  function handleDuplicateWeekAsDeload(weekNumber: number) {
+  function handleDuplicateWeekAsDeload(rowMonday: Date, weekNumber: number) {
     if (!selectedPatientId) return
     const srcTarget = weekMetaByNumber.get(weekNumber)?.targetLoad ?? null
     duplicateWeek.mutate({
       patientId: selectedPatientId,
-      sourceWeekNumber: weekNumber,
-      targetWeekNumber: weekNumber + 1,
+      fromDate: isoDate(rowMonday),
+      toDate: isoDate(addDays(rowMonday, 7)),
       replace: false,
       markDeload: true,
       phaseType: 'DELOAD',
@@ -2173,6 +2191,22 @@ function WeekPlannerContent() {
           <Display size="md">{monthLabel.toUpperCase()}</Display>
         </div>
         <div className="flex items-center gap-2">
+          {selectedPatientId && selectedWeekRange && (
+            <DarkButton
+              variant="secondary"
+              onClick={() => setSavePlanRange({ from: selectedWeekRange.from, to: selectedWeekRange.to })}
+              className="text-xs"
+            >
+              <BookmarkPlus className="w-3.5 h-3.5 mr-1.5" />
+              Opslaan als plan ({selectedWeekRange.count} {selectedWeekRange.count === 1 ? 'week' : 'weken'})
+            </DarkButton>
+          )}
+          {selectedPatientId && (
+            <DarkButton onClick={() => setApplyPlanOpen(true)} className="text-xs">
+              <CalendarRange className="w-3.5 h-3.5 mr-1.5" />
+              Plan toepassen
+            </DarkButton>
+          )}
           <PatientPicker
             patients={patients}
             selectedId={selectedPatientId || null}
@@ -2387,11 +2421,17 @@ function WeekPlannerContent() {
                           {progress.done}/{progress.planned}
                         </span>
                       )}
-                      {meta?.targetLoad != null && (
-                        <span className="athletic-mono text-[9px]" style={{ color: P.inkDim }} title="Geplande weekbelasting">
-                          {meta.targetLoad}
-                        </span>
-                      )}
+                      {(() => {
+                        const pl = plannedLoadByWeek.get(weekNum)
+                        if (!pl || (pl.load === 0 && meta?.targetLoad == null)) return null
+                        return (
+                          <WeekLoadBar
+                            planned={pl.load}
+                            target={meta?.targetLoad ?? null}
+                            estimated={pl.estimated}
+                          />
+                        )
+                      })()}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
@@ -2414,11 +2454,11 @@ function WeekPlannerContent() {
                           {/* Dupliceren vereist een bestaande bron-week. */}
                           {weekExists && (
                             <>
-                              <DropdownMenuItem onSelect={() => handleDuplicateWeek(weekNum)} className="gap-2 text-xs">
+                              <DropdownMenuItem onSelect={() => handleDuplicateWeek(rowMonday)} className="gap-2 text-xs">
                                 <Copy className="w-3.5 h-3.5" />
                                 Dupliceer naar volgende week
                               </DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => handleDuplicateWeekAsDeload(weekNum)} className="gap-2 text-xs">
+                              <DropdownMenuItem onSelect={() => handleDuplicateWeekAsDeload(rowMonday, weekNum)} className="gap-2 text-xs">
                                 <Moon className="w-3.5 h-3.5" />
                                 Dupliceer als deload-week
                               </DropdownMenuItem>
@@ -2494,6 +2534,35 @@ function WeekPlannerContent() {
               })
               setWeekMetaOpen(null)
             }}
+          />
+        )}
+
+        {/* Plan-sjabloon toepassen vanaf een datum */}
+        {applyPlanOpen && selectedPatientId && (
+          <ApplyPlanDialog
+            patientId={selectedPatientId}
+            patientLabel={
+              patients.find(p => p.id === selectedPatientId)?.name
+              ?? patients.find(p => p.id === selectedPatientId)?.email
+              ?? 'deze patiënt'
+            }
+            defaultDate={isoDate(new Date(year, month0, 1))}
+            onClose={() => setApplyPlanOpen(false)}
+            onApplied={() => {
+              utils.weekSchedules.listWithItems.invalidate()
+              utils.weekSchedules.listItemContents.invalidate()
+            }}
+          />
+        )}
+
+        {/* Geselecteerd weekbereik opslaan als herbruikbaar plan */}
+        {savePlanRange && selectedPatientId && (
+          <SavePlanDialog
+            patientId={selectedPatientId}
+            fromDate={savePlanRange.from}
+            toDate={savePlanRange.to}
+            onClose={() => setSavePlanRange(null)}
+            onSaved={clearSelection}
           />
         )}
       </div>

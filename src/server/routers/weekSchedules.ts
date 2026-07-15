@@ -1,9 +1,23 @@
 import { z } from 'zod'
 import { createTRPCRouter, therapistProcedure, protectedProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
-import { Prisma, type PrismaClient } from '@prisma/client'
+import { mondayKey, mondayKeyOf, addDaysKey, amsMidnight, weeksBetween, isDateKey } from '@/lib/week-dates'
+import {
+  Prisma,
+  type PrismaClient,
+  type WeekItemKind,
+  type ExerciseCategory,
+  type CardioActivity,
+  type IntensityType,
+} from '@prisma/client'
 
 const createId = () => crypto.randomUUID()
+
+/** Waarden van de CardioActivity-enum, voor zod-input. */
+const CARDIO_ACTIVITY_VALUES = [
+  'RUNNING', 'CYCLING', 'ROWING', 'SWIMMING', 'CROSSTRAINER', 'WALKING',
+  'SKIERG', 'ASSAULT_BIKE', 'WATTBIKE', 'STAIRCLIMBER', 'OTHER',
+] as const
 
 /**
  * Security: zorg dat een therapeut alleen een schedule kan koppelen aan een
@@ -52,6 +66,85 @@ const DayInput = z.object({
   programId: z.string().nullable().optional(),
 })
 
+/** Volledige vorm van een item, zoals nodig om het te kunnen kopiëren. */
+export const COPY_ITEM_INCLUDE = {
+  exercises: { orderBy: { order: 'asc' } },
+} as const
+
+/**
+ * Kopieer één item naar een doel-dag, mét alles wat eraan hangt.
+ *
+ * Bestaat omdat `createMany` géén geneste relaties kan aanmaken: de vorige
+ * implementaties van duplicateWeek/copyDayItems bouwden een platte lijst en
+ * lieten daarmee stil de inline oefeningen en cardioParams vallen. Elk nieuw
+ * veld op het item moet hier langs — daarom één functie i.p.v. drie kopieën.
+ */
+export async function copyItemToDay(
+  prisma: Pick<PrismaClient, 'weekScheduleDayItem'>,
+  item: {
+    kind: WeekItemKind
+    programId: string | null
+    quickCategory: ExerciseCategory | null
+    quickActivity: CardioActivity | null
+    quickName: string | null
+    quickDurationSec: number | null
+    testBatteryId: string | null
+    plannedDurationSec: number | null
+    plannedRpe: number | null
+    notes: string | null
+    cardioParams: Prisma.JsonValue | null
+    exercises: {
+      exerciseId: string; order: number; sets: number; reps: number
+      repUnit: string; restTime: number | null; notes: string | null
+      setsMax: number | null; repsMax: number | null
+      intensityType: IntensityType; intensityMin: number | null
+      intensityMax: number | null; intensityText: string | null
+      supersetGroup: string | null; supersetOrder: number
+      extraParams: Prisma.JsonValue
+    }[]
+  },
+  dayId: string,
+  order: number,
+) {
+  await prisma.weekScheduleDayItem.create({
+    data: {
+      dayId,
+      order,
+      kind: item.kind,
+      programId: item.programId,
+      quickCategory: item.quickCategory,
+      quickActivity: item.quickActivity,
+      quickName: item.quickName,
+      quickDurationSec: item.quickDurationSec,
+      testBatteryId: item.testBatteryId,
+      plannedDurationSec: item.plannedDurationSec,
+      plannedRpe: item.plannedRpe,
+      notes: item.notes,
+      cardioParams: item.cardioParams ?? Prisma.DbNull,
+      exercises: {
+        create: item.exercises.map(ex => ({
+          exerciseId: ex.exerciseId,
+          order: ex.order,
+          sets: ex.sets,
+          reps: ex.reps,
+          repUnit: ex.repUnit,
+          restTime: ex.restTime,
+          notes: ex.notes,
+          setsMax: ex.setsMax,
+          repsMax: ex.repsMax,
+          intensityType: ex.intensityType,
+          intensityMin: ex.intensityMin,
+          intensityMax: ex.intensityMax,
+          intensityText: ex.intensityText,
+          supersetGroup: ex.supersetGroup,
+          supersetOrder: ex.supersetOrder,
+          extraParams: ex.extraParams ?? [],
+        })),
+      },
+    },
+  })
+}
+
 /**
  * Synchroniseer legacy `WeekScheduleDay.programId` met het eerste
  * program-gekoppelde item (op `order`). Voor backwards-compat met
@@ -90,7 +183,20 @@ export const weekSchedulesRouter = createTRPCRouter({
         },
         include: {
           patient: { select: { id: true, name: true, email: true } },
-          days: { include: { program: { select: { id: true, name: true } } }, orderBy: { dayOfWeek: 'asc' } },
+          days: {
+            include: {
+              program: { select: { id: true, name: true } },
+              // items[] additief meegeleverd zodat clients van de legacy
+              // programId-per-dag af kunnen zonder API-wijziging. cardioParams
+              // weggelaten om TS2589 te vermijden — zie listWithItems.
+              items: {
+                omit: { cardioParams: true },
+                include: { program: { select: { id: true, name: true } } },
+                orderBy: { order: 'asc' },
+              },
+            },
+            orderBy: { dayOfWeek: 'asc' },
+          },
         },
         orderBy: { updatedAt: 'desc' },
       })
@@ -103,7 +209,22 @@ export const weekSchedulesRouter = createTRPCRouter({
         where: { id: input.id },
         include: {
           patient: { select: { id: true, name: true, email: true } },
-          days: { include: { program: { select: { id: true, name: true, status: true, weeks: true, daysPerWeek: true, _count: { select: { exercises: true } } } } }, orderBy: { dayOfWeek: 'asc' } },
+          days: {
+            include: {
+              program: { select: { id: true, name: true, status: true, weeks: true, daysPerWeek: true, _count: { select: { exercises: true } } } },
+              // Zie `list`: additief, zodat legacy clients naar items kunnen
+              // migreren. cardioParams weggelaten (TS2589).
+              items: {
+                omit: { cardioParams: true },
+                include: {
+                  program: { select: { id: true, name: true, status: true } },
+                  testBattery: { select: { id: true, name: true } },
+                },
+                orderBy: { order: 'asc' },
+              },
+            },
+            orderBy: { dayOfWeek: 'asc' },
+          },
         },
       })
       if (!ws) throw new TRPCError({ code: 'NOT_FOUND' })
@@ -186,23 +307,97 @@ export const weekSchedulesRouter = createTRPCRouter({
         await assertPatientLink(ctx.prisma, ctx.user, existing.patientId)
       }
 
-      await ctx.prisma.weekScheduleDay.deleteMany({ where: { weekScheduleId: id } })
-
-      return ctx.prisma.weekSchedule.update({
-        where: { id },
-        data: {
-          ...rest,
-          patientId: patientId ?? null,
-          startDate: startDate ? new Date(startDate) : null,
-          endDate: endDate ? new Date(endDate) : null,
-          days: {
-            create: days.map(d => ({
-              id: createId(),
-              dayOfWeek: d.dayOfWeek,
-              ...(d.programId ? { programId: d.programId } : {}),
-            })),
-          },
+      // Legacy-API: de client kent alleen "één programma per dag" en weet niets
+      // van items. Twee valkuilen, allebei erger dan ze lijken:
+      //
+      //  1. deleteMany op days (de oude implementatie) cascade-wiste ELK item
+      //     van dit schema — stille dataverlies.
+      //  2. Alleen `day.programId` bijwerken (mijn eerste fix) is net zo fout:
+      //     de patiënt-app leest `items[]` en valt alleen terug op de legacy
+      //     kolom als er géén items zijn. Een therapeut die op iOS een dag
+      //     leegmaakt kreeg "opgeslagen" te zien terwijl de patiënt de workout
+      //     gewoon bleef zien.
+      //
+      // Daarom vertalen we de legacy-schrijfactie naar echte item-operaties:
+      // het PROGRAM-item van die dag wordt gezet of verwijderd. Quick-workouts
+      // blijven staan — die kan deze client niet zien, dus er is geen intentie
+      // over uit te spreken.
+      const existingDays = await ctx.prisma.weekScheduleDay.findMany({
+        where: { weekScheduleId: id },
+        select: {
+          id: true,
+          dayOfWeek: true,
+          items: { where: { kind: 'PROGRAM' }, select: { id: true, programId: true } },
         },
+        orderBy: { dayOfWeek: 'asc' },
+      })
+      const dayByDow = new Map<number, (typeof existingDays)[number]>()
+      for (const d of existingDays) {
+        // Bij (historische) duplicaten wint de eerste; de rest laten we staan
+        // i.p.v. te verwijderen, want daar kunnen items aan hangen.
+        if (!dayByDow.has(d.dayOfWeek)) dayByDow.set(d.dayOfWeek, d)
+      }
+
+      await ctx.prisma.$transaction(async tx => {
+        await tx.weekSchedule.update({
+          where: { id },
+          data: {
+            ...rest,
+            patientId: patientId ?? null,
+            startDate: startDate ? new Date(startDate) : null,
+            endDate: endDate ? new Date(endDate) : null,
+          },
+        })
+
+        for (const d of days) {
+          let day = dayByDow.get(d.dayOfWeek)
+          if (!day) {
+            const created = await tx.weekScheduleDay.create({
+              data: { id: createId(), weekScheduleId: id, dayOfWeek: d.dayOfWeek },
+            })
+            day = { ...created, items: [] }
+            dayByDow.set(d.dayOfWeek, day)
+          }
+
+          const wanted = d.programId ?? null
+          const current = day.items
+          // Al precies goed? Dan niets aanraken — anders zou een no-op-save de
+          // notities van een bestaand item weggooien.
+          const alreadyRight =
+            wanted === null
+              ? current.length === 0
+              : current.length === 1 && current[0].programId === wanted
+
+          if (alreadyRight) continue
+          if (current.length > 0) {
+            await tx.weekScheduleDayItem.deleteMany({ where: { id: { in: current.map(i => i.id) } } })
+          }
+          if (wanted !== null) {
+            const last = await tx.weekScheduleDayItem.findFirst({
+              where: { dayId: day.id },
+              orderBy: { order: 'desc' },
+              select: { order: true },
+            })
+            await tx.weekScheduleDayItem.create({
+              data: {
+                dayId: day.id,
+                order: last ? last.order + 1 : 0,
+                kind: 'PROGRAM',
+                programId: wanted,
+              },
+            })
+          }
+          // Houd de legacy kolom in lijn met de items, net als elke andere
+          // item-mutatie doet. Zonder dit loopt `day.programId` uit de pas.
+          await tx.weekScheduleDay.update({
+            where: { id: day.id },
+            data: { programId: wanted },
+          })
+        }
+      })
+
+      return ctx.prisma.weekSchedule.findUniqueOrThrow({
+        where: { id },
         include: { days: { include: { program: { select: { id: true, name: true } } }, orderBy: { dayOfWeek: 'asc' } } },
       })
     }),
@@ -296,90 +491,6 @@ export const weekSchedulesRouter = createTRPCRouter({
         where: { id: existing.id },
         include: { days: { include: { program: { select: { id: true, name: true } } }, orderBy: { dayOfWeek: 'asc' } } },
       })
-    }),
-
-  /**
-   * Kopieer alle days van bron-week naar één of meerdere doel-weken voor
-   * dezelfde patient. Maakt nieuwe WeekSchedule-records aan, of overschrijft
-   * bestaande ones met dezelfde weekNumber.
-   */
-  copyWeek: therapistProcedure
-    .input(z.object({
-      patientId: z.string(),
-      fromWeekNumber: z.number().int().min(1),
-      toWeekNumbers: z.array(z.number().int().min(1)).min(1),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
-
-      const source = await ctx.prisma.weekSchedule.findFirst({
-        where: {
-          creatorId: ctx.user.id,
-          patientId: input.patientId,
-          weekNumber: input.fromWeekNumber,
-        },
-        include: { days: true },
-      })
-      if (!source) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: `Week ${input.fromWeekNumber} bestaat niet voor deze patient`,
-        })
-      }
-
-      const patient = await ctx.prisma.user.findUnique({
-        where: { id: input.patientId },
-        select: { name: true, email: true },
-      })
-      const label = patient?.name ?? patient?.email ?? 'Patient'
-
-      const targets = input.toWeekNumbers.filter(n => n !== input.fromWeekNumber)
-      let created = 0
-
-      for (const wn of targets) {
-        const existing = await ctx.prisma.weekSchedule.findFirst({
-          where: { creatorId: ctx.user.id, patientId: input.patientId, weekNumber: wn },
-        })
-        if (existing) {
-          // Overschrijf: clear days, herinsert
-          await ctx.prisma.weekScheduleDay.deleteMany({ where: { weekScheduleId: existing.id } })
-          await ctx.prisma.weekSchedule.update({
-            where: { id: existing.id },
-            data: {
-              days: {
-                create: source.days.map(d => ({
-                  id: createId(),
-                  dayOfWeek: d.dayOfWeek,
-                  programId: d.programId,
-                })),
-              },
-            },
-          })
-        } else {
-          await ctx.prisma.weekSchedule.create({
-            data: {
-              id: createId(),
-              name: `Weekplan · ${label} · week ${wn}`,
-              creatorId: ctx.user.id,
-              practiceId: ctx.user.practiceId ?? null,
-              patientId: input.patientId,
-              startDate: source.startDate ?? new Date(),
-              isTemplate: false,
-              weekNumber: wn,
-              days: {
-                create: source.days.map(d => ({
-                  id: createId(),
-                  dayOfWeek: d.dayOfWeek,
-                  programId: d.programId,
-                })),
-              },
-            },
-          })
-        }
-        created++
-      }
-
-      return { copied: created }
     }),
 
   /**
@@ -484,6 +595,10 @@ export const weekSchedulesRouter = createTRPCRouter({
           completedAll: true,
           duration: true,
           programId: true,
+          // Identiteit i.p.v. de (programId, datum)-heuristiek: welke geplande
+          // workout is hiermee afgevinkt? Null voor oude sessies en voor
+          // clients die het item nog niet meesturen (iOS).
+          weekScheduleDayItemId: true,
           program: { select: { id: true, name: true } },
         },
         orderBy: { scheduledAt: 'asc' },
@@ -500,6 +615,7 @@ export const weekSchedulesRouter = createTRPCRouter({
           completedAll: s.completedAll,
           duration: s.duration,
           programId: s.programId,
+          weekScheduleDayItemId: s.weekScheduleDayItemId,
           programName: s.program?.name ?? null,
           weekdayIndex,
         }
@@ -906,7 +1022,10 @@ export const weekSchedulesRouter = createTRPCRouter({
                 // JsonValue-type doet react-query's setData op TS2589 lopen.
                 // Cardio + oefeningen komen via listItemContents.
                 omit: { cardioParams: true },
-                include: { program: { select: { id: true, name: true, status: true } } },
+                include: {
+                  program: { select: { id: true, name: true, status: true } },
+                  testBattery: { select: { id: true, name: true } },
+                },
                 orderBy: { order: 'asc' },
               },
             },
@@ -935,7 +1054,10 @@ export const weekSchedulesRouter = createTRPCRouter({
           exercises: {
             select: {
               id: true, order: true, sets: true, reps: true, repUnit: true,
-              restTime: true, exerciseId: true,
+              restTime: true, exerciseId: true, notes: true,
+              setsMax: true, repsMax: true,
+              intensityType: true, intensityMin: true, intensityMax: true, intensityText: true,
+              supersetGroup: true, supersetOrder: true, extraParams: true,
               exercise: { select: { name: true, category: true } },
             },
             orderBy: { order: 'asc' },
@@ -952,9 +1074,20 @@ export const weekSchedulesRouter = createTRPCRouter({
           reps: e.reps,
           repUnit: e.repUnit,
           restTime: e.restTime,
+          notes: e.notes,
           exerciseId: e.exerciseId,
           exerciseName: e.exercise.name,
           exerciseCategory: e.exercise.category,
+          setsMax: e.setsMax,
+          repsMax: e.repsMax,
+          intensityType: e.intensityType,
+          intensityMin: e.intensityMin,
+          intensityMax: e.intensityMax,
+          intensityText: e.intensityText,
+          supersetGroup: e.supersetGroup,
+          supersetOrder: e.supersetOrder,
+          // Begrensd casten (geen recursief Prisma JsonValue) → geen TS2589.
+          extraParams: (e.extraParams ?? []) as { label: string; type?: string; value?: string | number | null; unit?: string }[],
         })),
       }))
     }),
@@ -980,6 +1113,32 @@ export const weekSchedulesRouter = createTRPCRouter({
         quickCategory: z.enum(['STRENGTH', 'MOBILITY', 'PLYOMETRICS', 'CARDIO', 'STABILITY']),
         quickName: z.string().min(1).max(120),
         quickDurationSec: z.number().int().positive().max(60 * 60 * 12),  // max 12u
+        /** Alleen zinvol bij quickCategory CARDIO (hardlopen/fietsen/aerobic). */
+        quickActivity: z.enum(CARDIO_ACTIVITY_VALUES).optional(),
+        notes: z.string().nullable().optional(),
+      }),
+      z.object({
+        kind: z.literal('rest'),
+        dayId: z.string(),
+        notes: z.string().nullable().optional(),
+      }),
+      z.object({
+        kind: z.literal('note'),
+        dayId: z.string(),
+        /** De notitietekst zelf — kort genoeg voor een tegel. */
+        quickName: z.string().min(1).max(200),
+        notes: z.string().nullable().optional(),
+      }),
+      z.object({
+        kind: z.literal('test'),
+        dayId: z.string(),
+        testBatteryId: z.string(),
+        notes: z.string().nullable().optional(),
+      }),
+      z.object({
+        kind: z.literal('event'),
+        dayId: z.string(),
+        quickName: z.string().min(1).max(120),
         notes: z.string().nullable().optional(),
       }),
     ]))
@@ -1004,22 +1163,44 @@ export const weekSchedulesRouter = createTRPCRouter({
         select: { order: true },
       })
       const nextOrder = last ? last.order + 1 : 0
+      // Testbatterij moet in scope van de praktijk liggen (NULL = globale seed).
+      if (input.kind === 'test') {
+        const battery = await ctx.prisma.testBattery.findFirst({
+          where: {
+            id: input.testBatteryId,
+            OR: ctx.user.practiceId
+              ? [{ practiceId: null }, { practiceId: ctx.user.practiceId }]
+              : [{ practiceId: null }],
+          },
+          select: { id: true },
+        })
+        if (!battery) throw new TRPCError({ code: 'NOT_FOUND', message: 'Testbatterij niet gevonden' })
+      }
+
+      const base = { dayId: input.dayId, order: nextOrder, notes: input.notes ?? null }
+      const data =
+        input.kind === 'program'
+          ? { ...base, kind: 'PROGRAM' as const, programId: input.programId }
+          : input.kind === 'quick'
+            ? {
+                ...base,
+                kind: 'WORKOUT' as const,
+                quickCategory: input.quickCategory,
+                quickName: input.quickName,
+                quickDurationSec: input.quickDurationSec,
+                // Activiteit alleen bewaren als het écht cardio is.
+                quickActivity: input.quickCategory === 'CARDIO' ? (input.quickActivity ?? null) : null,
+              }
+            : input.kind === 'rest'
+              ? { ...base, kind: 'REST' as const, quickName: 'Rustdag' }
+              : input.kind === 'note'
+                ? { ...base, kind: 'NOTE' as const, quickName: input.quickName }
+                : input.kind === 'test'
+                  ? { ...base, kind: 'TEST' as const, testBatteryId: input.testBatteryId }
+                  : { ...base, kind: 'EVENT' as const, quickName: input.quickName }
+
       const created = await ctx.prisma.weekScheduleDayItem.create({
-        data: input.kind === 'program'
-          ? {
-              dayId: input.dayId,
-              order: nextOrder,
-              programId: input.programId,
-              notes: input.notes ?? null,
-            }
-          : {
-              dayId: input.dayId,
-              order: nextOrder,
-              quickCategory: input.quickCategory,
-              quickName: input.quickName,
-              quickDurationSec: input.quickDurationSec,
-              notes: input.notes ?? null,
-            },
+        data,
         // cardioParams (recursief JsonValue) weglaten → voorkomt TS2589 op de
         // client-mutatietypes. Client leest deze return niet.
         omit: { cardioParams: true },
@@ -1039,6 +1220,9 @@ export const weekSchedulesRouter = createTRPCRouter({
       quickDurationSec: z.number().int().positive().max(60 * 60 * 12).optional(),
       notes: z.string().nullable().optional(),
       order: z.number().int().min(0).optional(),
+      // Geplande belasting. Null = terug naar afleiden i.p.v. voorschrijven.
+      plannedDurationSec: z.number().int().positive().max(60 * 60 * 12).nullable().optional(),
+      plannedRpe: z.number().int().min(1).max(10).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const item = await ctx.prisma.weekScheduleDayItem.findUnique({
@@ -1178,8 +1362,15 @@ export const weekSchedulesRouter = createTRPCRouter({
   duplicateWeek: therapistProcedure
     .input(z.object({
       patientId: z.string(),
-      sourceWeekNumber: z.number().int().min(1),
-      targetWeekNumber: z.number().int().min(1),
+      /**
+       * ISO-dagen. Bewust op DATUM en niet op weekNumber: dat veld is in de
+       * praktijk bijna altijd 1 en meerdere weken delen het (één patiënt had 3
+       * weken met nummer 1, waarvan 2 op dezelfde maandag), zodat een
+       * findFirst-op-weekNumber willekeurig de VERKEERDE week kon dupliceren.
+       * De kalender is date-keyed; dit is de enige betrouwbare sleutel.
+       */
+      fromDate: z.string(),
+      toDate: z.string(),
       replace: z.boolean().default(false),
       // Periodisering: de nieuwe week meteen als deload markeren en/of een
       // fase toewijzen. Zonder deze velden erft de kopie de fase van de bron.
@@ -1192,8 +1383,13 @@ export const weekSchedulesRouter = createTRPCRouter({
       targetLoad: z.number().int().min(0).max(10000).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      if (input.sourceWeekNumber === input.targetWeekNumber) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Bron en doel zijn gelijk' })
+      if (!isDateKey(input.fromDate) || !isDateKey(input.toDate)) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Ongeldige datum' })
+      }
+      const fromMonday = mondayKey(input.fromDate)
+      const toMonday = mondayKey(input.toDate)
+      if (fromMonday === toMonday) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Bron en doel zijn dezelfde week' })
       }
       await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
 
@@ -1213,28 +1409,31 @@ export const weekSchedulesRouter = createTRPCRouter({
             ],
           }
 
-      const source = await ctx.prisma.weekSchedule.findFirst({
+      // Alle weken van deze patiënt ophalen en op maandag matchen; findFirst op
+      // weekNumber zou een willekeurige naamgenoot pakken.
+      const candidates = await ctx.prisma.weekSchedule.findMany({
         where: {
           patientId: input.patientId,
-          weekNumber: input.sourceWeekNumber,
           isTemplate: false,
+          startDate: { not: null },
           ...accessibleScopeFilter,
         },
         include: {
-          days: { include: { items: { orderBy: { order: 'asc' } } }, orderBy: { dayOfWeek: 'asc' } },
+          days: {
+            // exercises meeladen: copyItemToDay kopieert ze mee.
+            include: { items: { orderBy: { order: 'asc' }, include: COPY_ITEM_INCLUDE } },
+            orderBy: { dayOfWeek: 'asc' },
+          },
         },
+        orderBy: { startDate: 'asc' },
       })
+      const onMonday = (m: string) =>
+        candidates.find(w => mondayKeyOf(w.startDate!) === m)
+
+      const source = onMonday(fromMonday)
       if (!source) throw new TRPCError({ code: 'NOT_FOUND', message: 'Bron-week niet gevonden' })
 
-      let target = await ctx.prisma.weekSchedule.findFirst({
-        where: {
-          patientId: input.patientId,
-          weekNumber: input.targetWeekNumber,
-          isTemplate: false,
-          ...accessibleScopeFilter,
-        },
-        include: { days: { include: { items: true } } },
-      })
+      let target = onMonday(toMonday) ?? null
 
       // Als doel-week bestaat met content → afhankelijk van `replace`.
       if (target) {
@@ -1258,9 +1457,19 @@ export const weekSchedulesRouter = createTRPCRouter({
             description: source.description,
             patientId: input.patientId,
             isTemplate: false,
-            weekNumber: input.targetWeekNumber,
+            // weekNumber is geen sleutel (zie de input-doc) maar wordt nog wel
+            // getoond; leid 'm af uit het weekverschil t.o.v. de bron.
+            weekNumber: Math.max(1, source.weekNumber + weeksBetween(fromMonday, toMonday)),
             creatorId: ctx.user.id,
             practiceId: ctx.user.practiceId ?? null,
+            // startDate = de doel-maandag. Zonder startDate kwam de week nergens
+            // op de kalender terecht: planTemplates filtert op
+            // `startDate: { not: null }` en ankert op de maandag, dus een
+            // gedupliceerde week was onzichtbaar voor "opslaan als plan" en werd
+            // door "plan toepassen" genegeerd i.p.v. samengevoegd.
+            // NL-middernacht, dezelfde vorm als bestaande startDate-waarden.
+            startDate: amsMidnight(toMonday),
+            endDate: amsMidnight(addDaysKey(toMonday, 6)),
             days: {
               create: Array.from({ length: 7 }, (_, i) => ({
                 id: createId(),
@@ -1268,40 +1477,26 @@ export const weekSchedulesRouter = createTRPCRouter({
               })),
             },
           },
-          include: { days: { include: { items: true } } },
+          include: { days: { include: { items: { orderBy: { order: 'asc' }, include: COPY_ITEM_INCLUDE } } } },
         })
       }
 
       // Map source.dayOfWeek → target.day.id voor item-create.
       const targetDayMap = new Map(target.days.map(d => [d.dayOfWeek, d.id]))
 
-      // Bouw item-creates op uit source.
-      const creates: Array<{
-        dayId: string; order: number;
-        programId?: string | null;
-        quickCategory?: 'STRENGTH' | 'MOBILITY' | 'PLYOMETRICS' | 'CARDIO' | 'STABILITY' | null;
-        quickName?: string | null;
-        quickDurationSec?: number | null;
-        notes?: string | null;
-      }> = []
+      // Kopieer item-voor-item via copyItemToDay: createMany kan geen geneste
+      // relaties aanmaken, waardoor de vorige versie stil de inline oefeningen
+      // en cardioParams liet vallen bij het dupliceren van een week.
+      let copied = 0
       for (const sDay of source.days) {
         const tDayId = targetDayMap.get(sDay.dayOfWeek)
         if (!tDayId) continue
         for (const it of sDay.items) {
-          creates.push({
-            dayId: tDayId,
-            order: it.order,
-            programId: it.programId,
-            quickCategory: it.quickCategory ?? null,
-            quickName: it.quickName,
-            quickDurationSec: it.quickDurationSec,
-            notes: it.notes,
-          })
+          await copyItemToDay(ctx.prisma, it, tDayId, it.order)
+          copied++
         }
       }
-      if (creates.length > 0) {
-        await ctx.prisma.weekScheduleDayItem.createMany({ data: creates })
-      }
+      const creates = { length: copied }
       // Sync legacy programId voor alle doel-dagen na de bulk create.
       for (const td of target.days) {
         await syncDayProgramId(ctx.prisma, td.id)
@@ -1315,6 +1510,9 @@ export const weekSchedulesRouter = createTRPCRouter({
       if (input.phaseType !== undefined) metaUpdate.phaseType = input.phaseType
       else if (source.phaseType != null) metaUpdate.phaseType = source.phaseType
       if (input.targetLoad !== undefined) metaUpdate.targetLoad = input.targetLoad
+      else if (source.targetLoad != null) metaUpdate.targetLoad = source.targetLoad
+      // Weeknotitie hoort bij de weekopzet en gaat mee, net als de fase.
+      if (source.weekNote != null) metaUpdate.weekNote = source.weekNote
       if (Object.keys(metaUpdate).length > 0) {
         await ctx.prisma.weekSchedule.update({ where: { id: target.id }, data: metaUpdate })
       }
@@ -1343,7 +1541,8 @@ export const weekSchedulesRouter = createTRPCRouter({
         where: { id: { in: dayIds } },
         include: {
           weekSchedule: { select: { creatorId: true, practiceId: true } },
-          items: { orderBy: { order: 'asc' } },
+          // exercises meeladen: copyItemToDay kopieert ze mee.
+          items: { orderBy: { order: 'asc' }, include: COPY_ITEM_INCLUDE },
         },
       })
       if (days.length !== dayIds.length) throw new TRPCError({ code: 'NOT_FOUND' })
@@ -1366,14 +1565,9 @@ export const weekSchedulesRouter = createTRPCRouter({
         const max = d.items.length ? Math.max(...d.items.map(i => i.order)) : -1
         nextOrder.set(d.id, max + 1)
       }
-      const creates: Array<{
-        dayId: string; order: number;
-        programId?: string | null;
-        quickCategory?: 'STRENGTH' | 'MOBILITY' | 'PLYOMETRICS' | 'CARDIO' | 'STABILITY' | null;
-        quickName?: string | null;
-        quickDurationSec?: number | null;
-        notes?: string | null;
-      }> = []
+      // Item-voor-item via copyItemToDay — createMany kan de geneste
+      // oefeningen niet mee aanmaken en liet ze stil vallen.
+      let copied = 0
       const touchedTargets = new Set<string>()
       for (const pair of input.pairs) {
         const src = byId.get(pair.fromDayId)
@@ -1382,24 +1576,14 @@ export const weekSchedulesRouter = createTRPCRouter({
         for (const it of src.items) {
           const order = nextOrder.get(pair.toDayId) ?? 0
           nextOrder.set(pair.toDayId, order + 1)
-          creates.push({
-            dayId: pair.toDayId,
-            order,
-            programId: it.programId,
-            quickCategory: it.quickCategory ?? null,
-            quickName: it.quickName,
-            quickDurationSec: it.quickDurationSec,
-            notes: it.notes,
-          })
+          await copyItemToDay(ctx.prisma, it, pair.toDayId, order)
+          copied++
         }
-      }
-      if (creates.length > 0) {
-        await ctx.prisma.weekScheduleDayItem.createMany({ data: creates })
       }
       for (const t of touchedTargets) {
         await syncDayProgramId(ctx.prisma, t)
       }
-      return { copied: creates.length }
+      return { copied }
     }),
 
   /**
@@ -1477,6 +1661,14 @@ export const weekSchedulesRouter = createTRPCRouter({
                 supersetGroup: ex.supersetGroup,
                 supersetOrder: ex.supersetOrder,
                 notes: ex.notes,
+                // Voorschrift + doelwaarden gaan mee. Zonder deze regels
+                // verloor "opslaan als sjabloon" stil elk RPE-/%1RM-doel en
+                // viel intensityType terug op NONE.
+                intensityType: ex.intensityType,
+                intensityMin: ex.intensityMin,
+                intensityMax: ex.intensityMax,
+                intensityText: ex.intensityText,
+                extraParams: ex.extraParams ?? undefined,
               })),
             },
             resources: {
@@ -1491,7 +1683,14 @@ export const weekSchedulesRouter = createTRPCRouter({
           },
         })
       } else {
-        // Quick-item → leeg praktijk-sjabloon met de naam ingevuld.
+        // Quick-item → praktijk-sjabloon MET zijn inline oefeningen. Dit was
+        // ooit een leeg sjabloon ("de therapeut vult 'm later"), maar dat
+        // stamt van vóór de inline-builder: sindsdien gooide het een volledig
+        // opgebouwde workout weg zonder waarschuwing.
+        const inline = await ctx.prisma.weekScheduleDayItem.findUnique({
+          where: { id: input.itemId },
+          select: { exercises: { orderBy: { order: 'asc' } } },
+        })
         await ctx.prisma.program.create({
           data: {
             id: newId,
@@ -1501,6 +1700,39 @@ export const weekSchedulesRouter = createTRPCRouter({
             creatorId: ctx.user.id,
             practiceId: ctx.user.practiceId ?? null,
             status: 'DRAFT',
+            type: item.quickCategory ?? 'STRENGTH',
+            // Een planner-item is één sessie; in een programma is dat week 1,
+            // dag 1.
+            weeks: 1,
+            daysPerWeek: 1,
+            cardioParams: item.cardioParams ?? undefined,
+            ...(inline && inline.exercises.length > 0
+              ? {
+                  exercises: {
+                    create: inline.exercises.map(ex => ({
+                      id: createId(),
+                      exerciseId: ex.exerciseId,
+                      week: 1,
+                      day: 1,
+                      order: ex.order,
+                      sets: ex.sets,
+                      setsMax: ex.setsMax,
+                      reps: ex.reps,
+                      repsMax: ex.repsMax,
+                      repUnit: ex.repUnit,
+                      restTime: ex.restTime ?? 60,
+                      supersetGroup: ex.supersetGroup,
+                      supersetOrder: ex.supersetOrder,
+                      notes: ex.notes,
+                      intensityType: ex.intensityType,
+                      intensityMin: ex.intensityMin,
+                      intensityMax: ex.intensityMax,
+                      intensityText: ex.intensityText,
+                      extraParams: ex.extraParams ?? undefined,
+                    })),
+                  },
+                }
+              : {}),
           },
         })
       }
@@ -1522,6 +1754,23 @@ export const weekSchedulesRouter = createTRPCRouter({
         repUnit: z.string().max(20).default('reps'),
         restTime: z.number().int().min(0).max(3600).nullable().optional(),
         notes: z.string().max(500).nullable().optional(),
+        // Voorschrift-pariteit met ProgramExercise: zonder deze velden verliest
+        // een therapeut de RPE/%1RM/superset-laag zodra hij in de kalender
+        // bouwt i.p.v. in de programma-builder.
+        setsMax: z.number().int().min(1).max(50).nullable().optional(),
+        repsMax: z.number().int().min(1).max(1000).nullable().optional(),
+        intensityType: z.enum(['NONE', 'RPE', 'PERCENT_1RM', 'RELATIVE_DAILY_MAX', 'TECHNIQUE', 'TEXT']).optional(),
+        intensityMin: z.number().min(-1000).max(1000).nullable().optional(),
+        intensityMax: z.number().min(-1000).max(1000).nullable().optional(),
+        intensityText: z.string().max(200).nullable().optional(),
+        supersetGroup: z.string().max(4).nullable().optional(),
+        supersetOrder: z.number().int().min(0).max(20).optional(),
+        extraParams: z.array(z.object({
+          label: z.string().min(1).max(60),
+          type: z.string().max(20).optional(),
+          value: z.union([z.string().max(200), z.number().min(-1_000_000).max(1_000_000)]).nullable().optional(),
+          unit: z.string().max(20).optional(),
+        })).max(20).optional(),
       })).max(60),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -1552,6 +1801,15 @@ export const weekSchedulesRouter = createTRPCRouter({
                 repUnit: e.repUnit,
                 restTime: e.restTime ?? null,
                 notes: e.notes ?? null,
+                setsMax: e.setsMax ?? null,
+                repsMax: e.repsMax ?? null,
+                intensityType: e.intensityType ?? 'NONE',
+                intensityMin: e.intensityMin ?? null,
+                intensityMax: e.intensityMax ?? null,
+                intensityText: e.intensityText ?? null,
+                supersetGroup: e.supersetGroup ?? null,
+                supersetOrder: e.supersetOrder ?? 0,
+                extraParams: (e.extraParams ?? []) as object,
               })),
             })]
           : []),

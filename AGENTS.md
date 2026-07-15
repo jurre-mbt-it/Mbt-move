@@ -18,6 +18,13 @@ opzettelijk; documenteer hier áls je het wijzigt:
   patiënt + treating-therapeuten.
 - **Week-schedules** — owner is creator, maar collega-therapeuten in
   dezelfde praktijk kunnen ze lezen.
+- **Plan-sjablonen** (`WeekPlanTemplate`) — meerweekse behandelplannen die je
+  vanaf een datum op de kalender van een patiënt zet. Scope als de
+  test-library: `practiceId` NULL = globale seed (voor iedereen), gevuld =
+  eigen praktijk. Reads = `practiceScope()` in `planTemplates.ts`, writes =
+  `assertCanEdit()`. RLS deny-all. De inhoud zijn `WeekSchedule`-rijen met
+  `isTemplate: true` + `planTemplateId`. Toepassen (`applyToPatient`) is een
+  KOPIE: het sjabloon later wijzigen raakt lopende patiënten niet.
 - **Test-library** (`TestCatalogItem`, `TestBattery`/`TestBatteryItem`) —
   therapeut-bewerkbaar via `/therapist/test-reports/manage`. Scope via
   `practiceId`: NULL = globale seed (voor iedereen), gevuld = eigen
@@ -56,6 +63,39 @@ Escape-hatch: `where: { deletedAt: undefined }` (geen filter) of
 DPA-acceptance is verplicht voor PATIENT/ATHLETE vóór ze patient-data
 endpoints raken, server-side afgedwongen in
 [`src/lib/auth/require-role.ts`](src/lib/auth/require-role.ts).
+
+# Weekdatums: reken in NL-tijd, nooit in UTC
+
+`WeekSchedule.startDate` is "maandag 00:00 lokale tijd", opgeslagen als instant.
+In de database ziet dat eruit als `2026-05-03T22:00:00Z` — dat is **maandag 4
+mei in Amsterdam, maar zondag 3 mei in UTC**. Alle startDate-waarden in
+productie hebben deze vorm.
+
+Server-side `getUTCDay()` gebruiken ziet dus een zondag en schuift naar de
+maandag ervóór: **een hele week ernaast**. De server draait op Vercel in UTC,
+dus `getDay()` helpt evenmin. Gebruik altijd [`src/lib/week-dates.ts`](src/lib/week-dates.ts):
+kalenderdagen als `YYYY-MM-DD` in `Europe/Amsterdam`, en `amsMidnight()` om
+terug te schrijven in dezelfde vorm als de bestaande data.
+
+Gerelateerd: **`weekNumber` is geen sleutel.** Er is geen unique-constraint en
+de planner zet 'm niet op; in productie is hij vrijwel altijd 1 en delen
+meerdere weken van dezelfde patiënt hetzelfde nummer (één patiënt heeft er 3,
+waarvan 2 op dezelfde maandag). Alles wat een kalenderweek moet aanwijzen —
+`duplicateWeek`, `saveFromWeeks`, `applyToPatient` — ankert daarom op datum.
+
+# Wat mag een patiënt-client zien van de weekplanner?
+
+`WeekScheduleDayItem.kind` (`WeekItemKind`) bepaalt wat er op een dag staat.
+Alleen **PROGRAM** en **WORKOUT** zijn workouts. REST/NOTE/TEST/EVENT zijn
+kalender-markeringen voor de therapeut.
+
+`patient.calendarRange` is het **enige** endpoint dat items aan een patiënt of
+aan de mobiele app teruggeeft, en filtert daarom hard op
+`kind: { in: ['PROGRAM', 'WORKOUT'] }`. Dat moet zo blijven zolang die clients
+`kind` niet kennen: web-atleet én iOS doen allebei
+`quickCategory ?? 'STRENGTH'`, dus een notitie zou daar als krachttraining
+verschijnen — in het verleden zelfs als "gemist", en als start-knop naar de
+sessie-runner. Ruim het filter pas op ná een mobiele release die `kind` leest.
 
 # RLS verplicht op ELKE nieuwe public-tabel
 

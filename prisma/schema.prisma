@@ -310,31 +310,32 @@ model User {
   practice   Practice? @relation(fields: [practiceId], references: [id], onDelete: SetNull)
 
   // Relations
-  therapistPatients     PatientTherapist[]   @relation("TherapistRelation")
-  patientTherapists     PatientTherapist[]   @relation("PatientRelation")
-  createdPrograms       Program[]            @relation("ProgramCreator")
-  patientPrograms       Program[]            @relation("ProgramPatient")
-  exercises             Exercise[]
-  collections           ExerciseCollection[]
-  appointments          Appointment[]        @relation("PatientAppointments")
-  therapistAppointments Appointment[]        @relation("TherapistAppointments")
-  sessionLogs           SessionLog[]         @relation("SessionLogPatient")
-  therapistSessionLogs  SessionLog[]         @relation("SessionLogTherapist")
-  sessionMoves          SessionMove[]        @relation("SessionMovePatient")
-  messageThread         Message[]            @relation("MessageThreadPatient")
-  authoredMessages      Message[]            @relation("MessageAuthor")
-  cardioLogs            CardioLog[]
-  notifications         Notification[]
-  createdWeekSchedules  WeekSchedule[]       @relation("CreatedWeekSchedules")
-  patientWeekSchedules  WeekSchedule[]       @relation("PatientWeekSchedules")
-  researchConsent       ResearchConsent?
-  favoriteExercises     FavoriteExercise[]
-  wellnessChecks        WellnessCheck[]
-  painEntries           PainEntry[]
-  hashtags              HashTag[]            @relation("PatientHashTags")
-  invitesSent           InviteCode[]         @relation("InviteSender")
-  auditLogs             AuditLog[]
-  mfaBackupCodes        MfaBackupCode[]
+  therapistPatients        PatientTherapist[]   @relation("TherapistRelation")
+  patientTherapists        PatientTherapist[]   @relation("PatientRelation")
+  createdPrograms          Program[]            @relation("ProgramCreator")
+  patientPrograms          Program[]            @relation("ProgramPatient")
+  exercises                Exercise[]
+  collections              ExerciseCollection[]
+  appointments             Appointment[]        @relation("PatientAppointments")
+  therapistAppointments    Appointment[]        @relation("TherapistAppointments")
+  sessionLogs              SessionLog[]         @relation("SessionLogPatient")
+  therapistSessionLogs     SessionLog[]         @relation("SessionLogTherapist")
+  sessionMoves             SessionMove[]        @relation("SessionMovePatient")
+  messageThread            Message[]            @relation("MessageThreadPatient")
+  authoredMessages         Message[]            @relation("MessageAuthor")
+  cardioLogs               CardioLog[]
+  notifications            Notification[]
+  createdWeekSchedules     WeekSchedule[]       @relation("CreatedWeekSchedules")
+  patientWeekSchedules     WeekSchedule[]       @relation("PatientWeekSchedules")
+  createdWeekPlanTemplates WeekPlanTemplate[]   @relation("CreatedWeekPlanTemplates")
+  researchConsent          ResearchConsent?
+  favoriteExercises        FavoriteExercise[]
+  wellnessChecks           WellnessCheck[]
+  painEntries              PainEntry[]
+  hashtags                 HashTag[]            @relation("PatientHashTags")
+  invitesSent              InviteCode[]         @relation("InviteSender")
+  auditLogs                AuditLog[]
+  mfaBackupCodes           MfaBackupCode[]
 
   // CIE relations
   patientInsightStatus PatientInsightStatus?  @relation("PatientInsightStatusPatient")
@@ -799,20 +800,58 @@ model CardioLog {
   @@map("cardio_logs")
 }
 
-model WeekSchedule {
-  id          String    @id
+/// Meerweeks plan-sjabloon (TrainingPeaks-stijl "training plan"). De inhoud
+/// zijn gewoon WeekSchedule-rijen met `isTemplate: true`, `patientId: null` en
+/// `weekNumber` 1..N, gekoppeld via `planTemplateId`. Toepassen op een patiënt
+/// is een KOPIE (stempel), geen levende link: het sjabloon later wijzigen
+/// verandert niets aan lopende patiënten. Zie `planTemplates.apply`.
+///
+/// Scope volgt de test-library: practiceId NULL = globale seed (zichtbaar voor
+/// iedereen), gevuld = eigen praktijk.
+model WeekPlanTemplate {
+  id          String  @id @default(cuid())
   name        String
   description String?
-  creatorId   String
-  creator     User      @relation("CreatedWeekSchedules", fields: [creatorId], references: [id])
-  patientId   String?
-  patient     User?     @relation("PatientWeekSchedules", fields: [patientId], references: [id], onDelete: Cascade)
-  startDate   DateTime?
-  endDate     DateTime?
-  isTemplate  Boolean   @default(false)
+  /// Behandeldoel in therapeut-taal, bv. "Achillespees fase 2".
+  goal        String?
+  /// Aantal weken. Redundant met het aantal schedules, maar nodig om een
+  /// sjabloon te kunnen tonen zonder de weken in te laden.
+  weeks       Int     @default(1)
+
+  creatorId String
+  creator   User   @relation("CreatedWeekPlanTemplates", fields: [creatorId], references: [id])
+
+  /// Multi-tenant scope. Null = globale seed.
+  practiceId String?
+
+  schedules WeekSchedule[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([practiceId])
+  @@index([creatorId])
+  @@map("week_plan_templates")
+}
+
+model WeekSchedule {
+  id             String            @id
+  name           String
+  description    String?
+  creatorId      String
+  creator        User              @relation("CreatedWeekSchedules", fields: [creatorId], references: [id])
+  /// Gevuld op de sjabloon-weken zelf (isTemplate = true). Een schema dat via
+  /// `apply` bij een patiënt is geplaatst laat dit bewust leeg — het is een
+  /// kopie, geen verwijzing.
+  planTemplateId String?
+  planTemplate   WeekPlanTemplate? @relation(fields: [planTemplateId], references: [id], onDelete: Cascade)
+  patientId      String?
+  patient        User?             @relation("PatientWeekSchedules", fields: [patientId], references: [id], onDelete: Cascade)
+  startDate      DateTime?
+  endDate        DateTime?
+  isTemplate     Boolean           @default(false)
   // weekNumber = 1, 2, 3, ... voor multi-week behandelplannen per patient.
   // Bestaande records behouden 1 (default). Templates negeren dit veld.
-  weekNumber  Int       @default(1)
+  weekNumber     Int               @default(1)
 
   // ── Periodisering (per-week metadata) ──────────────────────────────────────
   // Trainingsfase/blok van deze week — vrije string, maar de UI kent de vaste
@@ -837,6 +876,7 @@ model WeekSchedule {
 
   @@index([practiceId])
   @@index([creatorId, practiceId])
+  @@index([planTemplateId, weekNumber])
   @@map("week_schedules")
 }
 
@@ -857,15 +897,43 @@ model WeekScheduleDay {
   @@map("week_schedule_days")
 }
 
-/// Eén workout binnen een dag — kan een gekoppeld programma zijn (variant A)
-/// of een losse "snelle workout" (variant B, TP-stijl) zonder oefeningen.
-/// Exact één van `programId` of `quickCategory` is gevuld; de andere set is null.
+/// Wat staat er op deze dag? Vervangt de impliciete "exact één van programId of
+/// quickCategory"-conventie door een expliciet veld, zodat een dag ook niet-
+/// workout-dingen kan dragen (rustdag, notitie, test, streefdatum).
+///
+/// LET OP: alleen PROGRAM en WORKOUT zijn workouts. Alles daaronder mag NIET
+/// naar patiënt-clients gestuurd worden zonder dat die het kent — zie
+/// `patient.calendarRange`, dat filtert op WORKOUT_KINDS. Legacy clients doen
+/// `quickCategory ?? 'STRENGTH'` en zouden een notitie als krachttraining tonen.
+enum WeekItemKind {
+  /// Gekoppeld programma uit de bibliotheek (programId gevuld).
+  PROGRAM
+  /// Losse workout: quickCategory + naam + duur, optioneel quickActivity.
+  WORKOUT
+  /// Expliciete rustdag. Telt als 0 belasting en is voor de patiënt een
+  /// duidelijker signaal dan een lege dag.
+  REST
+  /// Therapeut-notitie op een dag (quickName = tekst).
+  NOTE
+  /// Testbatterij op een dag (testBatteryId).
+  TEST
+  /// Doel/streefdatum, bv. terug naar veldtraining (quickName = titel).
+  EVENT
+}
+
+/// Eén item binnen een dag. Zie `kind` voor de varianten; de oude conventie
+/// "exact één van programId of quickCategory" geldt alleen nog voor PROGRAM en
+/// WORKOUT.
 model WeekScheduleDayItem {
   id    String          @id @default(cuid())
   day   WeekScheduleDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
   dayId String
   // Volgorde binnen de dag — laagste eerst gerenderd.
   order Int             @default(0)
+
+  /// Default WORKOUT zodat bestaande rijen zonder programId kloppen; de
+  /// backfill zet PROGRAM waar programId gevuld is.
+  kind WeekItemKind @default(WORKOUT)
 
   // Variant A: koppeling aan bestaand programma uit de bibliotheek.
   programId String?
@@ -879,11 +947,34 @@ model WeekScheduleDayItem {
   quickName        String?
   quickDurationSec Int?
 
+  /// Cardio-activiteit bij een WORKOUT met quickCategory = CARDIO. Hardlopen en
+  /// fietsen zijn in de UI eigen tegels omdat ze het meest gebruikt worden; de
+  /// rest valt onder "Aerobic" en kiest de activiteit hier. Bewust géén nieuwe
+  /// enum: dit hergebruikt CardioActivity.
+  quickActivity CardioActivity?
+
+  /// Testbatterij bij kind = TEST. Zet een meetmoment op de kalender i.p.v. in
+  /// een los scherm; TestBattery heeft al durationWeeks + per-test targetWeek.
+  testBatteryId String?
+  testBattery   TestBattery? @relation(fields: [testBatteryId], references: [id], onDelete: SetNull)
+
+  // ── Geplande belasting ─────────────────────────────────────────────────
+  // sRPE-backbone: last = duur_min × RPE, dezelfde eenheid als de
+  // gerealiseerde load-curve, zodat gepland en werkelijk vergelijkbaar zijn.
+  // Null = afleiden (duur uit quickDurationSec/oefeningen, RPE uit de
+  // categorie). Zie lib/planned-load.ts.
+  /// Overschrijft quickDurationSec voor de belastingberekening.
+  plannedDurationSec Int?
+  /// Doel-RPE 1..10 voor deze sessie.
+  plannedRpe         Int?
+
   // Optionele therapeut-notitie bij dit specifieke item.
   notes String?
 
   // Inline-opgebouwde oefeningen voor een quick-workout (los van een programma).
-  exercises WeekScheduleDayItemExercise[]
+  exercises   WeekScheduleDayItemExercise[]
+  /// Sessies die de patiënt tegen dit geplande item logde.
+  sessionLogs SessionLog[]
 
   // Cardio-parameters voor een quick CARDIO-workout (type/duur/afstand/zone/
   // intervallen). JSON-vorm beheerd in de UI.
@@ -912,6 +1003,23 @@ model WeekScheduleDayItemExercise {
   repUnit  String  @default("reps")
   restTime Int?
   notes    String?
+
+  // ── Voorschrift-pariteit met ProgramExercise ────────────────────────────
+  // Zonder deze velden verliest een therapeut de hele prescription-laag zodra
+  // hij in de kalender bouwt i.p.v. in de programma-builder. Semantiek is
+  // identiek aan ProgramExercise — zie de IntensityType-doc hieronder.
+  /// null = vast aantal, gevuld = bereik (bv. 3..5 sets)
+  setsMax       Int?
+  repsMax       Int?
+  intensityType IntensityType @default(NONE)
+  intensityMin  Float?
+  intensityMax  Float?
+  intensityText String?
+  /// Supersets: zelfde letter = samen uitvoeren, supersetOrder bepaalt de beurt.
+  supersetGroup String?
+  supersetOrder Int           @default(0)
+  /// Therapeut-doelwaarden (ExtraParam[]), zelfde vorm als ProgramExercise.
+  extraParams   Json          @default("[]")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -983,28 +1091,35 @@ model ProgramExercise {
 }
 
 model SessionLog {
-  id            String        @id @default(cuid())
-  program       Program?      @relation(fields: [programId], references: [id], onDelete: SetNull)
-  programId     String?
-  patient       User          @relation("SessionLogPatient", fields: [patientId], references: [id], onDelete: Cascade)
-  patientId     String
+  id                    String               @id @default(cuid())
+  program               Program?             @relation(fields: [programId], references: [id], onDelete: SetNull)
+  programId             String?
+  /// Het geplande item waar deze sessie bij hoort. Zonder deze kolom kon
+  /// gepland-vs-gelogd alleen op (programId, datum) gematcht worden, en voor
+  /// quick-workouts zelfs alleen op een teller per dag — twee workouts op één
+  /// dag waren dan niet te onderscheiden. Null = ad-hoc sessie of een client
+  /// die het item nog niet meestuurt (iOS).
+  weekScheduleDayItem   WeekScheduleDayItem? @relation(fields: [weekScheduleDayItemId], references: [id], onDelete: SetNull)
+  weekScheduleDayItemId String?
+  patient               User                 @relation("SessionLogPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  patientId             String
   // Null = patient logde de sessie zelf (via patient-app). Bij therapist-live-log
   // staat hier de behandelend therapeut. SetNull omdat een verwijderde therapeut
   // de historie van de patient niet mag cascade-deleten.
-  therapist     User?         @relation("SessionLogTherapist", fields: [therapistId], references: [id], onDelete: SetNull)
-  therapistId   String?
-  status        SessionStatus @default(PENDING)
-  scheduledAt   DateTime
-  completedAt   DateTime?
+  therapist             User?                @relation("SessionLogTherapist", fields: [therapistId], references: [id], onDelete: SetNull)
+  therapistId           String?
+  status                SessionStatus        @default(PENDING)
+  scheduledAt           DateTime
+  completedAt           DateTime?
   // False = patiënt is eerder gestopt (niet alle oefeningen afgevinkt bij
   // afronden). Status blijft COMPLETED zodat workload/historie-queries de
   // sessie blijven meetellen; de week-planner kleurt 'm oranje (deels).
-  completedAll  Boolean       @default(true)
-  duration      Int? // seconds
-  notes         String?
-  painLevel     Int? // 0-10
-  exertionLevel Int? // 0-10 RPE
-  feelScore     Int? // 1-5 subjectief gevoel sessie (1=slecht .. 5=top); null = niet ingevuld
+  completedAll          Boolean              @default(true)
+  duration              Int? // seconds
+  notes                 String?
+  painLevel             Int? // 0-10
+  exertionLevel         Int? // 0-10 RPE
+  feelScore             Int? // 1-5 subjectief gevoel sessie (1=slecht .. 5=top); null = niet ingevuld
 
   exerciseLogs  ExerciseLog[]
   messages      Message[]
@@ -1014,6 +1129,7 @@ model SessionLog {
   updatedAt DateTime @updatedAt
 
   @@index([therapistId])
+  @@index([weekScheduleDayItemId])
   @@map("session_logs")
 }
 
@@ -1954,7 +2070,8 @@ model TestBattery {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  items TestBatteryItem[]
+  items             TestBatteryItem[]
+  weekScheduleItems WeekScheduleDayItem[]
 
   @@index([practiceId])
   @@map("test_batteries")

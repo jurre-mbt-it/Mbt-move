@@ -397,6 +397,11 @@ export const patientRouter = createTRPCRouter({
           // week/day op te vragen i.p.v. computeCurrentWeekDay.
           week: z.number().int().min(1).optional(),
           day: z.number().int().min(1).max(7).optional(),
+          // Voer een specifiek gepland item uit de week-planner uit. Zonder dit
+          // kan een quick-workout met inline oefeningen NIET gestart worden:
+          // de runner viel terug op het oudste actieve programma, dus tikken op
+          // workout B startte programma A. Weglaten = oude gedrag (programma).
+          itemId: z.string().optional(),
         })
         .optional(),
     )
@@ -433,11 +438,80 @@ export const patientRouter = createTRPCRouter({
       targetPatientId = input.patientId
     }
 
+    // ── Gepland item uit de week-planner ──────────────────────────────────
+    // Een WORKOUT-item draagt zijn eigen oefeningen; die zijn de waarheid en
+    // hebben niets met de week/dag-rekensom van een programma te maken. Een
+    // PROGRAM-item is een verwijzing: die valt door naar het programma-pad.
+    let programIdOverride: string | undefined = input?.programId
+    if (input?.itemId) {
+      const item = await ctx.prisma.weekScheduleDayItem.findFirst({
+        where: {
+          id: input.itemId,
+          kind: { in: ['PROGRAM', 'WORKOUT'] },
+          day: { weekSchedule: { patientId: targetPatientId, isTemplate: false } },
+        },
+        include: {
+          exercises: {
+            orderBy: [{ order: 'asc' }],
+            include: {
+              exercise: {
+                select: {
+                  name: true, category: true, difficulty: true, description: true,
+                  videoUrl: true, easierVariantId: true, harderVariantId: true,
+                  trackOneRepMax: true, defaultExtraParams: true,
+                  instructions: true, tips: true,
+                  easierVariant: { select: { name: true } },
+                  harderVariant: { select: { name: true } },
+                },
+              },
+            },
+          },
+        },
+      })
+      if (!item) throw new TRPCError({ code: 'NOT_FOUND', message: 'Geplande workout niet gevonden' })
+
+      if (item.kind === 'WORKOUT') {
+        const exercises = item.exercises.map(e =>
+          mapProgramExercise({
+            ...e,
+            // Een planner-item hangt aan een kalenderdag, niet aan een
+            // week/dag-raster. 1/1 is hier louter vormvereiste.
+            week: 1,
+            day: 1,
+            restTime: e.restTime ?? 60,
+          }),
+        )
+        const lastLogs = await lastLogsForExercises(
+          ctx.prisma,
+          targetPatientId,
+          [...new Set(exercises.map(e => e.exerciseId))],
+        )
+        return {
+          program: null,
+          // Additief veld: oude clients negeren het, de web-runner gebruikt het
+          // om te tonen wát hij draait en om de sessie eraan te koppelen.
+          plannedItem: {
+            id: item.id,
+            name: item.quickName ?? 'Workout',
+            category: item.quickCategory ?? null,
+            activity: item.quickActivity ?? null,
+            durationSec: item.plannedDurationSec ?? item.quickDurationSec ?? null,
+            plannedRpe: item.plannedRpe ?? null,
+            notes: item.notes,
+          },
+          exercises,
+          lastLogs,
+        }
+      }
+      // PROGRAM-item → het gekoppelde programma draaien.
+      programIdOverride = item.programId ?? undefined
+    }
+
     const program = await ctx.prisma.program.findFirst({
       where: {
         patientId: targetPatientId,
         status: 'ACTIVE',
-        ...(input?.programId ? { id: input.programId } : {}),
+        ...(programIdOverride ? { id: programIdOverride } : {}),
       },
       // Deterministische default bij meerdere actieve programma's: oudste eerst.
       orderBy: { createdAt: 'asc' },
@@ -610,6 +684,11 @@ export const patientRouter = createTRPCRouter({
     .input(
       z.object({
         programId: z.string().optional(),
+        // Het geplande item dat deze sessie afvinkt. Zonder dit valt de
+        // planner terug op matchen per datum + teller, waardoor twee workouts
+        // op één dag niet te onderscheiden zijn. Optioneel: iOS stuurt 'm nog
+        // niet mee.
+        weekScheduleDayItemId: z.string().optional(),
         scheduledAt: z.string(),       // ISO date string
         completedAt: z.string(),       // ISO date string
         durationSeconds: z.number().int().min(0).max(86_400),
@@ -652,9 +731,29 @@ export const patientRouter = createTRPCRouter({
       if (!rl.ok) {
         throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
       }
+
+      // Een item mag alleen afgevinkt worden als het op het eigen weekschema
+      // staat. Anders kan een patiënt zijn sessie aan de planning van een ander
+      // hangen en daar de gepland/gehaald-cijfers mee vervuilen.
+      let linkedItemId: string | undefined
+      if (input.weekScheduleDayItemId) {
+        const owned = await ctx.prisma.weekScheduleDayItem.findFirst({
+          where: {
+            id: input.weekScheduleDayItemId,
+            day: { weekSchedule: { patientId: ctx.user.id, isTemplate: false } },
+          },
+          select: { id: true },
+        })
+        if (!owned) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Deze geplande workout hoort niet bij jou' })
+        }
+        linkedItemId = owned.id
+      }
+
       const sessionLog = await ctx.prisma.sessionLog.create({
         data: {
           patientId: ctx.user.id,
+          weekScheduleDayItemId: linkedItemId,
           // Markeer expliciet als zelf-gelogd (patient == therapist). Zo kan de
           // UI in collega-historie "Patiënt zelf" tonen i.p.v. "—" (legacy).
           therapistId: ctx.user.id,
@@ -714,6 +813,125 @@ export const patientRouter = createTRPCRouter({
         target: { sessionLogId: sessionLog.id },
       })
       return sessionLog
+    }),
+
+  // ── Eigen gelogde sessie bijwerken ────────────────────────────────────────
+
+  /**
+   * Corrigeer een sessie die je zelf hebt gelogd (typo in een gewicht, set
+   * vergeten). Spiegelt `patients.updateSessionLog` uit de therapeut-flow —
+   * zelfde "alles is editable na opslaan"-intentie — maar alleen op je eigen
+   * sessies: een andere `patientId` is FORBIDDEN, ook voor een therapeut die
+   * hier per ongeluk belandt (die heeft z'n eigen endpoint mét access-check).
+   * ExerciseLogs worden volledig vervangen i.p.v. gediffed.
+   */
+  updateSession: protectedProcedure
+    .input(
+      z.object({
+        sessionId: z.string(),
+        completedAt: z.string().optional(),
+        durationSeconds: z.number().int().min(0).max(86_400).optional(),
+        painLevel: z.number().int().min(0).max(10).nullable().optional(),
+        exertionLevel: z.number().int().min(0).max(10).nullable().optional(),
+        notes: z.string().max(2000).nullable().optional(),
+        // Zelfde begrenzingen als logSession — een edit mag geen achterdeur
+        // zijn om de 1RM-/belasting-curve met absurde waarden te vergiftigen.
+        exercises: z.array(
+          z.object({
+            exerciseId: z.string(),
+            setsCompleted: z.number().int().min(0).max(1000).optional(),
+            repsCompleted: z.number().int().min(0).max(100_000).optional(),
+            weight: z.number().min(0).max(100_000).nullable().optional(),
+            weightsPerSet: z.array(z.number().min(0).max(100_000).nullable()).max(50).nullable().optional(),
+            repsPerSet: z.array(z.number().int().min(0).max(100_000).nullable()).max(50).nullable().optional(),
+            extraParams: z.array(z.object({
+              label: z.string().min(1).max(60),
+              type: z.string().max(20).optional(),
+              value: z.union([z.string().max(200), z.number().min(-1_000_000).max(1_000_000)]),
+              unit: z.string().max(20).optional(),
+            })).max(20).nullable().optional(),
+            estimatedOneRepMax: z.number().min(0).max(100_000).nullable().optional(),
+          })
+        ).max(200).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const rl = await rateLimit('patient.logSession', ctx.user.id, RATE_LIMITS.sessionLog)
+      if (!rl.ok) {
+        throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
+      }
+
+      const session = await ctx.prisma.sessionLog.findUnique({
+        where: { id: input.sessionId },
+        select: { patientId: true, completedAt: true },
+      })
+      if (!session) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Sessie niet gevonden' })
+      }
+      if (session.patientId !== ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+
+      const updates: Record<string, unknown> = {}
+      if (input.completedAt) updates.completedAt = new Date(input.completedAt)
+      if (input.durationSeconds !== undefined) {
+        updates.duration = clampSessionDurationSec(input.durationSeconds)
+      }
+      if (input.painLevel !== undefined) updates.painLevel = input.painLevel
+      if (input.exertionLevel !== undefined) updates.exertionLevel = input.exertionLevel
+      if (input.notes !== undefined) updates.notes = input.notes ?? null
+
+      await ctx.prisma.$transaction(async (tx) => {
+        if (Object.keys(updates).length > 0) {
+          await tx.sessionLog.update({ where: { id: input.sessionId }, data: updates })
+        }
+        if (input.exercises) {
+          await tx.exerciseLog.deleteMany({ where: { sessionId: input.sessionId } })
+          if (input.exercises.length > 0) {
+            await tx.exerciseLog.createMany({
+              data: input.exercises.map((ex) => ({
+                sessionId: input.sessionId,
+                exerciseId: ex.exerciseId,
+                setsCompleted: ex.setsCompleted ?? null,
+                repsCompleted: ex.repsCompleted ?? null,
+                weight: ex.weight ?? null,
+                weightsPerSet: (ex.weightsPerSet ?? undefined) as never,
+                repsPerSet: (ex.repsPerSet ?? undefined) as never,
+                extraParams: (ex.extraParams && ex.extraParams.length > 0
+                  ? ex.extraParams
+                  : undefined) as never,
+                estimatedOneRepMax: ex.estimatedOneRepMax
+                  ?? estimateOneRepMax(ex.weight, ex.repsCompleted),
+              })),
+            })
+          }
+        }
+      })
+
+      await auditLog({
+        event: 'SESSION_LOGGED',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        resource: 'SessionLog',
+        resourceId: input.sessionId,
+        metadata: { edited: true, exerciseCount: input.exercises?.length ?? 0 },
+        req: ctx.req,
+      })
+
+      // Notitie-edit kan hashtags toevoegen/verwijderen → hersync (idempotent).
+      if (input.notes !== undefined) {
+        await syncHashtagsForLog(ctx.prisma, {
+          patientId: ctx.user.id,
+          taggedById: ctx.user.id,
+          loggedAt: input.completedAt
+            ? new Date(input.completedAt)
+            : session.completedAt ?? new Date(),
+          notes: input.notes ?? undefined,
+          target: { sessionLogId: input.sessionId },
+        })
+      }
+
+      return { id: input.sessionId }
     }),
 
   // ── Progressie per oefening (eigen historie) ──────────────────────────────
@@ -1487,16 +1705,37 @@ export const patientRouter = createTRPCRouter({
                 programId: true,
                 program: { select: { id: true, name: true } },
                 items: {
+                  // ALLEEN workouts naar patiënt-clients. Web-atleet en iOS doen
+                  // beide `quickCategory ?? 'STRENGTH'`, dus een NOTE/REST/TEST/
+                  // EVENT-item zou daar als krachttraining verschijnen — in het
+                  // verleden zelfs als "gemist", en als start-knop naar
+                  // /session. Zodra die clients `kind` kennen mag dit filter
+                  // ruimer. Zie WeekItemKind in schema.prisma.
+                  where: { kind: { in: ['PROGRAM', 'WORKOUT'] } },
                   orderBy: { order: 'asc' },
                   select: {
                     id: true,
                     order: true,
+                    kind: true,
                     programId: true,
                     program: { select: { id: true, name: true } },
                     quickCategory: true,
+                    quickActivity: true,
                     quickName: true,
                     quickDurationSec: true,
                     notes: true,
+                    // Kan de patiënt dit item überhaupt uitvoeren? Zonder dit
+                    // toont de kalender een start-knop die op een leeg scherm
+                    // uitkomt. Het aantal volstaat — de oefeningen zelf komen
+                    // via getTodayExercises({ itemId }).
+                    _count: { select: { exercises: true } },
+                    // Identiteit i.p.v. de oude teller-heuristiek: hoort er al
+                    // een gelogde sessie bij dit item?
+                    sessionLogs: {
+                      select: { id: true, completedAt: true, completedAll: true },
+                      orderBy: { completedAt: 'desc' },
+                      take: 1,
+                    },
                   },
                 },
               },

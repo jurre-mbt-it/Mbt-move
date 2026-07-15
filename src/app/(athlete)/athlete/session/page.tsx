@@ -197,7 +197,15 @@ export default function AthleteSessionPage() {
 function AthleteSessionPageInner() {
   const router = useRouter()
   const utils = trpc.useUtils()
-  const { data: sessionData, isLoading } = trpc.patient.getTodayExercises.useQuery()
+  // Quick mode + gepland item — direct uit de URL, geen effect-flash.
+  const searchParams = useSearchParams()
+  const isQuickMode = searchParams.get('mode') === 'quick'
+  // ?itemId=… → voer exact die geplande workout uit. Zonder dit pakt de server
+  // het oudste actieve programma, ongeacht waar je op tikte.
+  const plannedItemId = searchParams.get('itemId')
+  const { data: sessionData, isLoading } = trpc.patient.getTodayExercises.useQuery(
+    plannedItemId ? { itemId: plannedItemId } : undefined,
+  )
   // Personal-best 1RM per oefening — voor het omrekenen van %1RM-voorschriften.
   const { data: prevOneRm = {} } = trpc.patient.getPersonalBests.useQuery(undefined, { staleTime: 60_000 })
   // Cast naar lokaal shallow type; tRPC inference is te diep voor TS (TS2589).
@@ -225,10 +233,6 @@ function AthleteSessionPageInner() {
       { onError: () => utils.exercises.list.setData(undefined, flip) }
     )
   }
-
-  // Quick mode detection — direct uit de URL, geen effect-flash
-  const searchParams = useSearchParams()
-  const isQuickMode = searchParams.get('mode') === 'quick'
 
   const programExercises: LiveExercise[] = (sessionData?.exercises ?? []).map(e => ({
     uid: e.uid,
@@ -351,9 +355,13 @@ function AthleteSessionPageInner() {
 
   // ── Concept-backup: refresh of app-wissel mag de sessie niet wissen ────────
   const draftKey = useMemo(() => {
-    const scope = isQuickMode ? 'quick' : (sessionData?.program?.id ?? 'program')
+    // Scope per gepland item wanneer we er één draaien: twee workouts op één
+    // dag delen anders dezelfde concept-sleutel en herstellen in elkaars sessie.
+    const scope = plannedItemId
+      ? `item-${plannedItemId}`
+      : isQuickMode ? 'quick' : (sessionData?.program?.id ?? 'program')
     return `${DRAFT_PREFIX}${scope}-${todayKey()}`
-  }, [isQuickMode, sessionData?.program?.id])
+  }, [isQuickMode, plannedItemId, sessionData?.program?.id])
 
   const [resumeChecked, setResumeChecked] = useState(false)
   const [showResumeBanner, setShowResumeBanner] = useState(false)
@@ -561,6 +569,8 @@ function AthleteSessionPageInner() {
     try {
       await logSession.mutateAsync({
         programId: isQuickMode ? undefined : sessionData?.program?.id,
+        // Vinkt exact dit geplande item af i.p.v. "er is die dag íets gelogd".
+        weekScheduleDayItemId: plannedItemId ?? undefined,
         scheduledAt: new Date().toISOString(),
         completedAt: new Date().toISOString(),
         durationSeconds,
