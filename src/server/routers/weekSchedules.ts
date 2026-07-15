@@ -3,6 +3,7 @@ import { createTRPCRouter, therapistProcedure, protectedProcedure } from '@/serv
 import { TRPCError } from '@trpc/server'
 import { mondayKey, mondayKeyOf, addDaysKey, amsMidnight, weeksBetween, isDateKey } from '@/lib/week-dates'
 import { parseStructured, legacySummaryFields, structuredLoad } from '@/lib/cardio-workout'
+import { durationFromExercises } from '@/lib/planned-load'
 import {
   Prisma,
   type PrismaClient,
@@ -1789,7 +1790,19 @@ export const weekSchedulesRouter = createTRPCRouter({
       if (!isAdmin && !isOwner && !isSamePractice) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
+      // De inhoud bepaalt de duur. Zonder dit bleef de tegel het getal tonen dat
+      // de therapeut bij het toevoegen intikte ("30 min"), ook nadat hij de
+      // training had uitgewerkt — dan spreken de tegel en de workout elkaar
+      // tegen. Geen oefeningen meer → terug naar wat er is ingetikt.
+      const derivedDurationSec = input.exercises.length > 0
+        ? durationFromExercises(input.exercises.map(e => ({ sets: e.sets, reps: e.reps, restTime: e.restTime ?? null })))
+        : null
+
       await ctx.prisma.$transaction([
+        ctx.prisma.weekScheduleDayItem.update({
+          where: { id: input.itemId },
+          data: { plannedDurationSec: derivedDurationSec },
+        }),
         ctx.prisma.weekScheduleDayItemExercise.deleteMany({ where: { itemId: input.itemId } }),
         ...(input.exercises.length > 0
           ? [ctx.prisma.weekScheduleDayItemExercise.createMany({

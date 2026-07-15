@@ -1755,6 +1755,10 @@ export const patientRouter = createTRPCRouter({
                     quickActivity: true,
                     quickName: true,
                     quickDurationSec: true,
+                    // Afgeleid uit de oefeningen/blokken zodra die er zijn; de
+                    // clients tonen `plannedDurationSec ?? quickDurationSec`,
+                    // zodat de patiënt dezelfde duur ziet als de therapeut.
+                    plannedDurationSec: true,
                     notes: true,
                     // Kan de patiënt dit item überhaupt uitvoeren? Zonder dit
                     // toont de kalender een start-knop die op een leeg scherm

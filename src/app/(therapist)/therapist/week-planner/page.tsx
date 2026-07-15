@@ -503,7 +503,11 @@ function ItemTile({
   const name = marker
     ? (item.kind === 'TEST' ? (item.testBattery?.name ?? 'Test') : (item.quickName ?? marker.label))
     : item.programId ? (item.program?.name ?? 'Programma') : (item.quickName ?? 'Workout')
-  const duration = marker || !item.quickDurationSec ? null : fmtDuration(item.quickDurationSec)
+  // De inhoud wint. `plannedDurationSec` wordt door de server afgeleid zodra er
+  // oefeningen of cardio-blokken staan; wat de therapeut bij het toevoegen
+  // intikte is alleen het plan zolang er nog niets is.
+  const durationSec = item.plannedDurationSec ?? item.quickDurationSec
+  const duration = marker || !durationSec ? null : fmtDuration(durationSec)
 
   // Status leidt de kleur (border + tint); categorie-icoon blijft als anchor
   // zodat het type direct herkenbaar is.
@@ -860,6 +864,10 @@ function ItemDetailContent({
     { enabled: !!sessionId, staleTime: 30_000 },
   ) as { data: SessionDetail | null | undefined; isLoading: boolean }
 
+  // Staat er inhoud op dit item? Dan is de duur afgeleid en niet meer iets dat
+  // je los intikt.
+  const hasContent = (item.exercises?.length ?? 0) > 0 || item.plannedDurationSec != null
+
   // Quick-edit state
   const [editing, setEditing] = useState(false)
   const [eName, setEName] = useState(item.quickName ?? '')
@@ -873,7 +881,13 @@ function ItemDetailContent({
     const minutes = Math.max(1, Math.min(720, Number(eMinutes) || 30))
     setSavingQuick(true)
     try {
-      await onSaveQuick({ quickName: eName.trim(), quickDurationSec: minutes * 60, plannedRpe: eRpe })
+      await onSaveQuick({
+        quickName: eName.trim(),
+        // Duur alleen meesturen als de therapeut 'm zelf bepaalt; anders is
+        // hij afgeleid uit de inhoud en zou dit 'm overschrijven.
+        ...(hasContent ? {} : { quickDurationSec: minutes * 60 }),
+        plannedRpe: eRpe,
+      })
       setEditing(false)
     } finally { setSavingQuick(false) }
   }
@@ -942,7 +956,23 @@ function ItemDetailContent({
               </div>
               <div>
                 <MetaLabel>Duur (minuten)</MetaLabel>
-                <DarkInput className="mt-1" type="number" min={1} max={720} value={eMinutes} onChange={e => setEMinutes(e.target.value)} disabled={savingQuick} />
+                {hasContent ? (
+                  // Er staat inhoud: die bepaalt de duur. Een invoerveld hier zou
+                  // een getal accepteren dat vervolgens genegeerd wordt.
+                  <>
+                    <div
+                      className="mt-1 px-3 py-2 rounded-lg text-sm athletic-mono"
+                      style={{ background: P.surfaceLow, border: `1px solid ${P.line}`, color: P.inkMuted }}
+                    >
+                      {Math.round((item.plannedDurationSec ?? 0) / 60)} min
+                    </div>
+                    <p className="text-[10px] mt-1" style={{ color: P.inkDim }}>
+                      Volgt uit {item.quickCategory === 'CARDIO' ? 'de blokken' : 'de oefeningen'} — pas die aan om de duur te wijzigen.
+                    </p>
+                  </>
+                ) : (
+                  <DarkInput className="mt-1" type="number" min={1} max={720} value={eMinutes} onChange={e => setEMinutes(e.target.value)} disabled={savingQuick} />
+                )}
               </div>
               <div>
                 <MetaLabel>Doel-RPE (optioneel)</MetaLabel>

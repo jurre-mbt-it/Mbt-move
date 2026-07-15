@@ -277,6 +277,7 @@ export default function AthleteSchedulePage() {
             quickCategory: null,
             quickName: null,
             quickDurationSec: null,
+            plannedDurationSec: null,
             notes: null,
             _count: { exercises: 0 },
             sessionLogs: [] as { id: string }[],
@@ -307,7 +308,7 @@ export default function AthleteSchedulePage() {
               name: item.programId ? (item.program?.name ?? 'Programma') : (item.quickName ?? 'Workout'),
               category,
               status: date < today ? 'missed' : 'planned',
-              durationSec: item.quickDurationSec,
+              durationSec: item.plannedDurationSec ?? item.quickDurationSec,
               programId: item.programId,
               notes: item.notes,
               itemId: isRealItem ? item.id : null,
@@ -625,6 +626,8 @@ type CalendarData = {
         quickCategory: string | null
         quickName: string | null
         quickDurationSec: number | null
+        /** Volgt uit de oefeningen/blokken; wint van quickDurationSec. */
+        plannedDurationSec?: number | null
         notes: string | null
         /** >0 = de therapeut heeft oefeningen klaargezet → uitvoerbaar. */
         _count?: { exercises: number }

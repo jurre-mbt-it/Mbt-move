@@ -51,6 +51,21 @@ const DEFAULT_PROGRAM_DURATION_SEC = 45 * 60
 /** Alleen deze tellen mee; een rustdag of notitie is per definitie 0. */
 const LOAD_BEARING_KINDS = ['PROGRAM', 'WORKOUT']
 
+/**
+ * Duur van een set oefeningen: reps × 3s werk + rust. Grof, maar het is de
+ * enige plek waar die schatting staat — de server schrijft 'm bij het opslaan
+ * weg op het item, zodat de tegel, de weekbalk en de patiënt allemaal hetzelfde
+ * getal zien.
+ */
+export function durationFromExercises(
+  exercises: { sets: number; reps: number; restTime?: number | null }[],
+): number {
+  return exercises.reduce(
+    (sum, e) => sum + e.sets * (e.reps * SECONDS_PER_REP + (e.restTime ?? DEFAULT_REST_SEC)),
+    0,
+  )
+}
+
 export type PlannedLoad = {
   /** sRPE-punten. 0 voor niet-belastende items. */
   load: number
@@ -70,10 +85,7 @@ export function itemPlannedLoad(item: PlannedLoadInput): PlannedLoad {
   // ── Duur ──
   let durationSec = item.plannedDurationSec ?? item.quickDurationSec ?? null
   if (durationSec == null && item.exercises?.length) {
-    durationSec = item.exercises.reduce(
-      (sum, e) => sum + e.sets * (e.reps * SECONDS_PER_REP + (e.restTime ?? DEFAULT_REST_SEC)),
-      0,
-    )
+    durationSec = durationFromExercises(item.exercises)
     estimated = true
   }
   if (durationSec == null && item.kind === 'PROGRAM') {
