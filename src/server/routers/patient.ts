@@ -1764,7 +1764,15 @@ export const patientRouter = createTRPCRouter({
                     // toont de kalender een start-knop die op een leeg scherm
                     // uitkomt. Het aantal volstaat — de oefeningen zelf komen
                     // via getTodayExercises({ itemId }).
+                    //
+                    // LET OP: cardio heeft GEEN oefeningen; die inhoud zit in
+                    // cardioParams. Alleen op dit aantal gaan betekent dat een
+                    // geplande cardio-workout niet te starten is. We sturen
+                    // hieronder een `hasContent`-boolean mee i.p.v. de hele
+                    // blokken-blob — de client hoeft alleen te weten óf er iets
+                    // staat, niet wát.
                     _count: { select: { exercises: true } },
+                    cardioParams: true,
                     // Identiteit i.p.v. de oude teller-heuristiek: hoort er al
                     // een gelogde sessie bij dit item?
                     sessionLogs: {
@@ -1794,7 +1802,20 @@ export const patientRouter = createTRPCRouter({
           exerciseCount: s._count.exerciseLogs,
         })),
         cardio,
-        schedules,
+        // cardioParams eruit, `hasContent` erin: de blokken zijn tot 8 kB per
+        // item en een maandoverzicht heeft er tientallen. De client hoeft alleen
+        // te weten of dit item te starten is.
+        schedules: schedules.map(ws => ({
+          ...ws,
+          days: ws.days.map(d => ({
+            ...d,
+            items: d.items.map(({ cardioParams, ...it }) => ({
+              ...it,
+              hasContent:
+                it._count.exercises > 0 || it.programId !== null || cardioParams != null,
+            })),
+          })),
+        })),
       }
     }),
 

@@ -1249,6 +1249,49 @@ export const weekSchedulesRouter = createTRPCRouter({
       })
     }),
 
+  /**
+   * Kopieer één item naar een dag (standaard dezelfde). Bestaat omdat de
+   * "Kopiëren"-knop het item natypte i.p.v. te kopiëren: hij bouwde een nieuw
+   * quick-item uit naam/categorie/duur en liet de oefeningen, de cardio-blokken,
+   * de activiteit en de geplande belasting vallen.
+   */
+  duplicateItem: therapistProcedure
+    .input(z.object({ itemId: z.string(), toDayId: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const item = await ctx.prisma.weekScheduleDayItem.findUnique({
+        where: { id: input.itemId },
+        include: {
+          ...COPY_ITEM_INCLUDE,
+          day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true } } } },
+        },
+      })
+      if (!item) throw new TRPCError({ code: 'NOT_FOUND' })
+      const isAdmin = ctx.user.role === 'ADMIN'
+      const canTouch = (ws: { creatorId: string; practiceId: string | null }) =>
+        isAdmin || ws.creatorId === ctx.user.id ||
+        (!!ctx.user.practiceId && ws.practiceId === ctx.user.practiceId)
+      if (!canTouch(item.day.weekSchedule)) throw new TRPCError({ code: 'FORBIDDEN' })
+
+      const targetDayId = input.toDayId ?? item.dayId
+      if (targetDayId !== item.dayId) {
+        const target = await ctx.prisma.weekScheduleDay.findUnique({
+          where: { id: targetDayId },
+          include: { weekSchedule: { select: { creatorId: true, practiceId: true } } },
+        })
+        if (!target) throw new TRPCError({ code: 'NOT_FOUND' })
+        if (!canTouch(target.weekSchedule)) throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+
+      const last = await ctx.prisma.weekScheduleDayItem.findFirst({
+        where: { dayId: targetDayId },
+        orderBy: { order: 'desc' },
+        select: { order: true },
+      })
+      await copyItemToDay(ctx.prisma, item, targetDayId, last ? last.order + 1 : 0)
+      await syncDayProgramId(ctx.prisma, targetDayId)
+      return { ok: true }
+    }),
+
   /** Item verwijderen. */
   removeItem: therapistProcedure
     .input(z.object({ id: z.string() }))
@@ -1867,6 +1910,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       let derived: {
         plannedDurationSec?: number | null
         plannedRpe?: number | null
+        quickActivity?: CardioActivity | null
       } = {}
       let payload = input.cardioParams
 
@@ -1883,6 +1927,10 @@ export const weekSchedulesRouter = createTRPCRouter({
           plannedDurationSec: dur > 0 ? dur : null,
           // Gewogen gemiddelde RPE over de workout; de DB eist 1..10.
           plannedRpe: dur > 0 ? Math.min(10, Math.max(1, Math.round(load / (dur / 60)))) : null,
+          // De activiteit uit de bouwer wint. Zonder dit bleef quickActivity op
+          // de tegel-keuze staan ("Hardlopen") terwijl de workout inmiddels
+          // fietsen was — en dat is precies het veld dat iOS leest.
+          quickActivity: legacy.activity as CardioActivity,
         }
       } else if (payload === null) {
         // Cardio gewist → de afgeleide belasting hoort ook weg.

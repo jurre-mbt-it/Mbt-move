@@ -216,8 +216,17 @@ export const planTemplatesRouter = createTRPCRouter({
         if (bucket) bucket.push(ws)
         else byMonday.set(m, [ws])
       }
-      const mondays = [...byMonday.keys()].sort()
+      // Elke maandag in het bereik krijgt een sjabloon-week, óók als er niets
+      // staat. Voorheen liepen we alleen over de weken die een rij hadden: een
+      // bewust lege week (rust) verdween dan, en alle weken erna schoven een
+      // week op — de periodisering veranderde stil. Het aantal weken klopt nu
+      // ook met wat de dialoog toont.
+      const mondays: string[] = []
+      for (let m = fromMonday; m <= toMonday; m = addDaysKey(m, 7)) mondays.push(m)
       if (mondays.length === 0) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Leeg bereik' })
+      }
+      if (byMonday.size === 0) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Geen weken met inhoud in dit bereik' })
       }
 
@@ -236,9 +245,10 @@ export const planTemplatesRouter = createTRPCRouter({
         })
 
         for (const [i, key] of mondays.entries()) {
-          const group = byMonday.get(key)!
-          // Meta van de eerste rij die iets ingevuld heeft.
-          const meta = group.find(g => g.phaseType || g.isDeload || g.targetLoad != null || g.weekNote) ?? group[0]
+          const group = byMonday.get(key) ?? []
+          // Meta van de eerste rij die iets ingevuld heeft; een lege week heeft
+          // niets en wordt gewoon een lege sjabloon-week.
+          const meta = group.find(g => g.phaseType || g.isDeload || g.targetLoad != null || g.weekNote) ?? group[0] ?? null
 
           const weekId = createId()
           await tx.weekSchedule.create({
@@ -252,10 +262,10 @@ export const planTemplatesRouter = createTRPCRouter({
               planTemplateId: templateId,
               weekNumber: i + 1,
               // Periodisering hoort bij het plan en gaat mee.
-              phaseType: meta.phaseType,
-              isDeload: meta.isDeload,
-              targetLoad: meta.targetLoad,
-              weekNote: meta.weekNote,
+              phaseType: meta?.phaseType ?? null,
+              isDeload: meta?.isDeload ?? false,
+              targetLoad: meta?.targetLoad ?? null,
+              weekNote: meta?.weekNote ?? null,
             },
           })
 

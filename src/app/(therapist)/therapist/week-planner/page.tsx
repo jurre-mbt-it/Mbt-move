@@ -867,6 +867,11 @@ function ItemDetailContent({
   // Staat er inhoud op dit item? Dan is de duur afgeleid en niet meer iets dat
   // je los intikt.
   const hasContent = (item.exercises?.length ?? 0) > 0 || item.plannedDurationSec != null
+  // Zelfde regel als de tegel: de inhoud wint van wat er is ingetikt.
+  const durationSec = item.plannedDurationSec ?? item.quickDurationSec
+  // Bij cardio leidt setItemCardio de RPE af uit de zones; dan is 'm hier laten
+  // kiezen een keuze die bij het volgende opslaan verdwijnt.
+  const rpeIsDerived = item.quickCategory === 'CARDIO' && item.plannedRpe != null
 
   // Quick-edit state
   const [editing, setEditing] = useState(false)
@@ -886,7 +891,7 @@ function ItemDetailContent({
         // Duur alleen meesturen als de therapeut 'm zelf bepaalt; anders is
         // hij afgeleid uit de inhoud en zou dit 'm overschrijven.
         ...(hasContent ? {} : { quickDurationSec: minutes * 60 }),
-        plannedRpe: eRpe,
+        ...(rpeIsDerived ? {} : { plannedRpe: eRpe }),
       })
       setEditing(false)
     } finally { setSavingQuick(false) }
@@ -920,7 +925,7 @@ function ItemDetailContent({
         <div className="flex items-center flex-wrap gap-2 text-xs" style={{ color: P.inkMuted }}>
           <span>{date.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
           <span>· {CATEGORY_LABELS[category]}</span>
-          {item.quickDurationSec ? <span>· {fmtDuration(item.quickDurationSec)}</span> : null}
+          {durationSec ? <span>· {fmtDuration(durationSec)}</span> : null}
         </div>
 
         {/* Acties */}
@@ -975,7 +980,23 @@ function ItemDetailContent({
                 )}
               </div>
               <div>
-                <MetaLabel>Doel-RPE (optioneel)</MetaLabel>
+                <MetaLabel>Doel-RPE {rpeIsDerived ? '' : '(optioneel)'}</MetaLabel>
+                {rpeIsDerived ? (
+                  // Cardio: de zones in de blokken bepalen de RPE. Een keuze
+                  // hier werd bij het volgende opslaan van de blokken stil
+                  // overschreven — dan is een keuze aanbieden misleidend.
+                  <>
+                    <div
+                      className="mt-1 px-3 py-2 rounded-lg text-sm athletic-mono"
+                      style={{ background: P.surfaceLow, border: `1px solid ${P.line}`, color: P.inkMuted }}
+                    >
+                      RPE {item.plannedRpe}
+                    </div>
+                    <p className="text-[10px] mt-1" style={{ color: P.inkDim }}>
+                      Volgt uit de zones in de blokken.
+                    </p>
+                  </>
+                ) : (
                 <div className="flex flex-wrap gap-1 mt-1">
                   <button
                     type="button"
@@ -1005,9 +1026,12 @@ function ItemDetailContent({
                     </button>
                   ))}
                 </div>
-                <p className="text-[10px] mt-1" style={{ color: P.inkDim }}>
-                  Bepaalt samen met de duur de weekbelasting (duur × RPE). &quot;Schat&quot; leidt 'm af uit het type.
-                </p>
+                )}
+                {!rpeIsDerived && (
+                  <p className="text-[10px] mt-1" style={{ color: P.inkDim }}>
+                    Bepaalt samen met de duur de weekbelasting (duur × RPE). &quot;Schat&quot; leidt 'm af uit het type.
+                  </p>
+                )}
               </div>
               <div className="flex gap-2 pt-1">
                 <DarkButton variant="ghost" size="sm" onClick={() => setEditing(false)} className="flex-1" disabled={savingQuick}>Annuleren</DarkButton>
@@ -1375,6 +1399,14 @@ function WeekPlannerContent() {
       removeItem.mutate({ id: item.id })
     }
   }
+  const duplicateItem = trpc.weekSchedules.duplicateItem.useMutation({
+    onSuccess: () => {
+      utils.weekSchedules.listWithItems.invalidate()
+      utils.weekSchedules.listItemContents.invalidate()
+      toast.success('Workout gekopieerd op deze dag')
+    },
+    onError: (e) => toast.error(e.message),
+  })
   const duplicateWeek = trpc.weekSchedules.duplicateWeek.useMutation({
     onSuccess: () => { utils.weekSchedules.listWithItems.invalidate(); toast.success('Week gedupliceerd') },
     onError: (err) => toast.error(err.message ?? 'Dupliceren mislukt'),
@@ -2078,18 +2110,10 @@ function WeekPlannerContent() {
   }
   function handleCopyItem() {
     if (!detailItem?.dayId) return
-    const it = detailItem.item
-    if (it.programId) {
-      addItem.mutate({ kind: 'program', dayId: detailItem.dayId, programId: it.programId })
-    } else {
-      addItem.mutate({
-        kind: 'quick', dayId: detailItem.dayId,
-        quickCategory: it.quickCategory ?? 'STRENGTH',
-        quickName: it.quickName ?? 'Workout',
-        quickDurationSec: it.quickDurationSec ?? 1800,
-      })
-    }
-    toast.success('Workout gekopieerd op deze dag')
+    // Server-side kopiëren: die neemt de oefeningen, de cardio-blokken, de
+    // activiteit en de geplande belasting mee. De vorige versie bouwde hier een
+    // nieuw quick-item uit naam/categorie/duur en gooide de rest weg.
+    duplicateItem.mutate({ itemId: detailItem.item.id, toDayId: detailItem.dayId })
   }
   async function handleSaveQuick(patch: { quickName?: string; quickDurationSec?: number; plannedRpe?: number | null }) {
     if (!detailItem) return
@@ -2566,6 +2590,10 @@ function WeekPlannerContent() {
           style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
         >
           <ItemDetailContent
+            // Key op het item: zonder dit reconcilieert React hetzelfde element
+            // bij het wisselen van workout en blijven de useState-waarden van de
+            // vórige staan — je bewerkt dan B met de naam/RPE van A.
+            key={detailItem.item.id}
             detail={detailItem}
             onClose={closeDetail}
             showClose
@@ -2575,7 +2603,7 @@ function WeekPlannerContent() {
             onSaveExercises={handleSaveItemExercises}
             onBuildCardio={setCardioBuilderItem}
             savingTemplate={saveItemAsTemplate.isPending}
-            copying={addItem.isPending}
+            copying={duplicateItem.isPending}
             savingExercises={setItemExercises.isPending}
           />
         </aside>
@@ -2591,6 +2619,7 @@ function WeekPlannerContent() {
             <div className="max-h-[80vh] flex flex-col">
               {detailItem && (
                 <ItemDetailContent
+                  key={detailItem.item.id}
                   detail={detailItem}
                   onClose={() => setDetailItem(null)}
                   onSaveTemplate={handleSaveTemplate}
@@ -2599,7 +2628,7 @@ function WeekPlannerContent() {
                   onSaveExercises={handleSaveItemExercises}
                   onBuildCardio={setCardioBuilderItem}
                   savingTemplate={saveItemAsTemplate.isPending}
-                  copying={addItem.isPending}
+                  copying={duplicateItem.isPending}
                   savingExercises={setItemExercises.isPending}
                 />
               )}

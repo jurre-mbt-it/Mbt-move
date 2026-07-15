@@ -280,6 +280,7 @@ export default function AthleteSchedulePage() {
             plannedDurationSec: null,
             notes: null,
             _count: { exercises: 0 },
+            hasContent: true,
             sessionLogs: [] as { id: string }[],
           }] : []))
           for (const item of items) {
@@ -312,7 +313,7 @@ export default function AthleteSchedulePage() {
               programId: item.programId,
               notes: item.notes,
               itemId: isRealItem ? item.id : null,
-              hasExercises: (item._count?.exercises ?? 0) > 0,
+              hasExercises: item.hasContent ?? ((item._count?.exercises ?? 0) > 0),
             })
           }
         }
@@ -629,8 +630,11 @@ type CalendarData = {
         /** Volgt uit de oefeningen/blokken; wint van quickDurationSec. */
         plannedDurationSec?: number | null
         notes: string | null
-        /** >0 = de therapeut heeft oefeningen klaargezet → uitvoerbaar. */
+        /** >0 = de therapeut heeft oefeningen klaargezet. */
         _count?: { exercises: number }
+        /** Server-signaal: oefeningen, cardio-blokken óf een programma. Cardio
+         *  heeft géén oefeningen, dus op _count alleen gaan is fout. */
+        hasContent?: boolean
         /** Gevuld = al afgevinkt tegen dit item (identiteit, geen heuristiek). */
         sessionLogs?: Array<{ id: string; completedAt: string | null; completedAll: boolean }>
       }>
