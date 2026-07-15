@@ -1871,10 +1871,31 @@ export const weekSchedulesRouter = createTRPCRouter({
         ? durationFromExercises(input.exercises.map(e => ({ sets: e.sets, reps: e.reps, repUnit: e.repUnit, restTime: e.restTime ?? null })))
         : null
 
+      // Zelfde principe voor de intensiteit: staat er een RPE-voorschrift op de
+      // oefeningen, dan is dát de geplande RPE van het item — niet de
+      // categorie-standaard (7) waar de belastingschatting anders op terugvalt.
+      // Cardio doet dit al (setItemCardio leidt 'm uit de blokken af); zonder
+      // deze tak telde een kracht-voorschrift van RPE 8-9 gewoon niet mee.
+      // Alleen overschrijven als er echt iets afgeleid kan worden: een handmatig
+      // gezette plannedRpe blijft anders staan.
+      const rpes = input.exercises
+        .filter(e => e.intensityType === 'RPE' && (e.intensityMin != null || e.intensityMax != null))
+        .map(e => {
+          const lo = e.intensityMin ?? e.intensityMax!
+          const hi = e.intensityMax ?? e.intensityMin!
+          return (lo + hi) / 2
+        })
+      const derivedRpe = rpes.length > 0
+        ? Math.min(10, Math.max(1, Math.round(rpes.reduce((a, b) => a + b, 0) / rpes.length)))
+        : null
+
       await ctx.prisma.$transaction([
         ctx.prisma.weekScheduleDayItem.update({
           where: { id: input.itemId },
-          data: { plannedDurationSec: derivedDurationSec },
+          data: {
+            plannedDurationSec: derivedDurationSec,
+            ...(derivedRpe != null ? { plannedRpe: derivedRpe } : {}),
+          },
         }),
         ctx.prisma.weekScheduleDayItemExercise.deleteMany({ where: { itemId: input.itemId } }),
         ...(input.exercises.length > 0
