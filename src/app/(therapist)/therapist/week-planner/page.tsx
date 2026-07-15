@@ -1398,7 +1398,7 @@ function WeekPlannerContent() {
   )
   // Oefeningen + cardio-params per item (apart van listWithItems om TS2589 te
   // vermijden). Gegroepeerd op itemId voor merge in dateMap.
-  const { data: itemContents = [] } = trpc.weekSchedules.listItemContents.useQuery(
+  const { data: itemContents = [], isFetched: contentsLoaded } = trpc.weekSchedules.listItemContents.useQuery(
     selectedPatientId ? { patientId: selectedPatientId } : { patientId: '' },
     { enabled: !!selectedPatientId, staleTime: 10_000 },
   )
@@ -1983,6 +1983,20 @@ function WeekPlannerContent() {
     setPanelClosing(true)
     window.setTimeout(() => { setDetailItem(null); setPanelClosing(false) }, 260)
   }
+  // Het detail-paneel leest zijn oefeningen/cardio LIVE uit de query in
+  // plaats van uit de momentopname van de klik. Wie sneller klikte dan
+  // listItemContents laadde, kreeg anders een lege builder — en één keer
+  // Opslaan wiste dan de hele lijst inclusief voorschrift.
+  const liveDetail = useMemo(() => {
+    if (!detailItem) return null
+    const c = contentsByItem.get(detailItem.item.id)
+    if (!c) return detailItem
+    return {
+      ...detailItem,
+      item: { ...detailItem.item, exercises: c.exercises, cardioParams: c.cardioParams },
+    }
+  }, [detailItem, contentsByItem])
+
   function openDetail(d: DetailItem) {
     setPanelClosing(false)
     setDetailItem(d)
@@ -2630,7 +2644,7 @@ function WeekPlannerContent() {
       {/* /kalender-kolom — krimpt mee via flex-1 wanneer het paneel opent */}
 
       {/* Desktop: item-detail als zij-paneel naast de (gekrompen) kalender */}
-      {detailItem && isDesktop && (
+      {liveDetail && isDesktop && (
         <aside
           className={cn(
             'hidden lg:flex flex-col w-[360px] xl:w-[420px] shrink-0 rounded-2xl overflow-hidden sticky top-4 max-h-[calc(100vh-2rem)] duration-300 ease-out',
@@ -2644,8 +2658,8 @@ function WeekPlannerContent() {
             // Key op het item: zonder dit reconcilieert React hetzelfde element
             // bij het wisselen van workout en blijven de useState-waarden van de
             // vórige staan — je bewerkt dan B met de naam/RPE van A.
-            key={detailItem.item.id}
-            detail={detailItem}
+            key={`${liveDetail.item.id}:${contentsLoaded ? 'c' : 'l'}`}
+            detail={liveDetail}
             onClose={closeDetail}
             showClose
             onSaveTemplate={handleSaveTemplate}
@@ -2668,10 +2682,10 @@ function WeekPlannerContent() {
               <DialogTitle>Workout-details</DialogTitle>
             </DialogHeader>
             <div className="max-h-[80vh] flex flex-col">
-              {detailItem && (
+              {liveDetail && (
                 <ItemDetailContent
-                  key={detailItem.item.id}
-                  detail={detailItem}
+                  key={`${liveDetail.item.id}:${contentsLoaded ? 'c' : 'l'}`}
+                  detail={liveDetail}
                   onClose={() => setDetailItem(null)}
                   onSaveTemplate={handleSaveTemplate}
                   onCopy={handleCopyItem}

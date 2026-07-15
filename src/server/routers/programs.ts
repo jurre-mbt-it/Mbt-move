@@ -18,9 +18,12 @@ async function assertCanAssignPatient(
   await assertPatientAccess(prisma, user, patientId, 'Geen actieve koppeling met deze patiënt')
 }
 
+// Caps ruim boven wat er feitelijk staat (gemeten: notes 101, intensityText 62,
+// 248 oefeningen in het grootste programma) — dit is een rem op opslag-bommen,
+// geen functionele grens. setItemExercises hanteert hetzelfde patroon.
 const ProgramExerciseInput = z.object({
-  id: z.string().optional(), // existing id for updates
-  exerciseId: z.string(),
+  id: z.string().max(60).optional(), // existing id for updates
+  exerciseId: z.string().max(60),
   week: z.number().int().min(1).default(1),
   day: z.number().int().min(1).default(1),
   order: z.number().int().default(0),
@@ -28,11 +31,11 @@ const ProgramExerciseInput = z.object({
   setsMax: z.number().int().min(1).nullable().optional(),
   reps: z.number().int().min(1).default(10),
   repsMax: z.number().int().min(1).nullable().optional(),
-  repUnit: z.string().default('reps'),
+  repUnit: z.string().max(20).default('reps'),
   restTime: z.number().int().default(60),
-  supersetGroup: z.string().nullable().optional(),
+  supersetGroup: z.string().max(4).nullable().optional(),
   supersetOrder: z.number().int().default(0),
-  notes: z.string().nullable().optional(),
+  notes: z.string().max(1000).nullable().optional(),
   // Gestructureerd intensiteits-voorschrift (zie IntensityType in schema.prisma).
   // min/max dragen afhankelijk van type een RPE, percentage of kg-offset.
   intensityType: z
@@ -40,23 +43,24 @@ const ProgramExerciseInput = z.object({
     .default('NONE'),
   intensityMin: z.number().nullable().optional(),
   intensityMax: z.number().nullable().optional(),
-  intensityText: z.string().nullable().optional(),
+  intensityText: z.string().max(200).nullable().optional(),
   // Extra voorschrift-parameters (Tempo, Gewicht, Afstand, Hartslag, Moeite,
   // Band kleur, …). Vrij van vorm aan de rand; opgeslagen als JSON.
   extraParams: z
     .array(
       z.object({
-        id: z.string(),
-        label: z.string(),
+        id: z.string().max(60),
+        label: z.string().max(60),
         type: z.enum(['number', 'text', 'select', 'slider']),
-        value: z.union([z.string(), z.number()]),
-        unit: z.string().optional(),
-        options: z.array(z.string()).optional(),
-        min: z.number().optional(),
-        max: z.number().optional(),
-        valueMax: z.union([z.string(), z.number()]).optional(),
+        value: z.union([z.string().max(200), z.number().min(-1_000_000).max(1_000_000)]),
+        unit: z.string().max(20).optional(),
+        options: z.array(z.string().max(60)).max(20).optional(),
+        min: z.number().min(-1_000_000).max(1_000_000).optional(),
+        max: z.number().min(-1_000_000).max(1_000_000).optional(),
+        valueMax: z.union([z.string().max(200), z.number().min(-1_000_000).max(1_000_000)]).optional(),
       }),
     )
+    .max(20)
     .nullable()
     .optional(),
 })

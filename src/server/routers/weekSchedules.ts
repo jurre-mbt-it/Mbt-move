@@ -1089,7 +1089,13 @@ export const weekSchedulesRouter = createTRPCRouter({
           supersetGroup: e.supersetGroup,
           supersetOrder: e.supersetOrder,
           // Begrensd casten (geen recursief Prisma JsonValue) → geen TS2589.
-          extraParams: (e.extraParams ?? []) as { label: string; type?: string; value?: string | number | null; unit?: string }[],
+          // Volle ExtraParam-vorm: clients sturen dit 1-op-1 terug naar
+          // setItemExercises, dus een smaller type hier verleidt tot droppen.
+          extraParams: (e.extraParams ?? []) as {
+            id?: string; label: string; type?: string;
+            value?: string | number | null; valueMax?: string | number | null;
+            unit?: string; options?: string[]; min?: number; max?: number;
+          }[],
         })),
       }))
     }),

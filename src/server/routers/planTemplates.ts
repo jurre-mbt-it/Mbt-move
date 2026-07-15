@@ -341,8 +341,23 @@ export const planTemplatesRouter = createTRPCRouter({
       // Bestaande weken van deze patiënt ophalen om op startDate te matchen.
       // weekNumber is per-patiënt en zegt niets over de kalender, dus we
       // ankeren op de maandag-datum.
+      //
+      // Zelfde scope-filter als duplicateWeek: alleen weken van jezelf of je
+      // eigen praktijk. Zonder dit zou replace-mode de weken van een
+      // mede-behandelende therapeut uit een ándere praktijk wissen (deleteMany
+      // op de gevonden week), en merge-mode diens fase/deload overschrijven.
+      const isAdmin = ctx.user.role === 'ADMIN'
+      const practiceId = ctx.user.practiceId ?? null
+      const accessibleScopeFilter = isAdmin
+        ? {}
+        : {
+            OR: [
+              { creatorId: ctx.user.id },
+              ...(practiceId ? [{ practiceId }] : []),
+            ],
+          }
       const existing = await ctx.prisma.weekSchedule.findMany({
-        where: { patientId: input.patientId, isTemplate: false },
+        where: { patientId: input.patientId, isTemplate: false, ...accessibleScopeFilter },
         select: { id: true, startDate: true, weekNumber: true },
       })
       const byMonday = new Map<string, { id: string; weekNumber: number }>()

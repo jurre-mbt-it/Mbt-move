@@ -17,6 +17,7 @@ import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { auditLog } from '@/server/audit'
 import { signEducationFile } from '@/lib/education/storage'
 import { paceSecPerKm } from '@/lib/cardio-zones'
+import { parseStructured, flattenSteps, totalDurationSec, STEP_META } from '@/lib/cardio-workout'
 import { estimateOneRepMax } from '@/lib/one-rep-max'
 import { clampSessionDurationSec } from '@/lib/training-load'
 import { syncHashtagsForLog } from '@/server/tags'
@@ -1200,6 +1201,54 @@ export const patientRouter = createTRPCRouter({
     )
     const weekIdx = Math.min(Math.floor(daysSince / 7), program.weeks - 1)
     const week = weekIdx + 1
+
+    // ── Nieuw model: {version:1, activity, blocks} (iPad-bouwer) ────────────
+    // Zonder deze tak viel een blocks-programma door naar het platte pad
+    // hieronder en kreeg de patiënt een verzonnen "30 min zone 2 steady
+    // state" zonder intervallen — het voorschrift van de therapeut was dan
+    // stil vervangen door defaults.
+    const structured = parseStructured(program.cardioParams)
+    if (structured) {
+      const steps = flattenSteps(structured.blocks)
+      const flat: Array<{ label: string; type: 'WALK' | 'RUN'; durationSec: number }> = []
+      const zoneSec = new Map<number, number>()
+      for (const st of steps) {
+        const sec = st.durationSec ?? 120
+        const rustig = st.kind === 'RECOVERY' || st.kind === 'COOLDOWN'
+        flat.push({
+          label: STEP_META[st.kind].label,
+          type: rustig ? 'WALK' : 'RUN',
+          durationSec: sec,
+        })
+        if (!rustig && st.target?.type === 'ZONE') {
+          zoneSec.set(st.target.zone, (zoneSec.get(st.target.zone) ?? 0) + sec)
+        }
+      }
+      // Doelzone = de zone waar het meeste wérk in zit; de blokken zelf zijn
+      // leidend, dit veld is samenvatting voor de oude client-weergave.
+      const dominantZone = [...zoneSec.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
+      const targetZone = (dominantZone && dominantZone >= 1 && dominantZone <= 5
+        ? dominantZone
+        : 2) as 1 | 2 | 3 | 4 | 5
+      return {
+        id: program.id,
+        programName: program.name,
+        activity: (structured.activity ?? 'RUNNING') as
+          | 'RUNNING' | 'CYCLING' | 'ROWING' | 'SWIMMING' | 'CROSSTRAINER'
+          | 'WALKING' | 'SKIERG' | 'ASSAULT_BIKE' | 'WATTBIKE' | 'STAIRCLIMBER' | 'OTHER',
+        protocol: (structured.blocks.some(b => b.kind === 'REPEAT')
+          ? 'INTERVALS'
+          : 'STEADY_STATE') as
+          | 'STEADY_STATE' | 'INTERVALS' | 'TEMPO' | 'FARTLEK'
+          | 'ZONE_TRAINING' | 'THRESHOLD' | 'LONG_SLOW_DISTANCE' | 'WALK_RUN',
+        week,
+        session: 1,
+        targetDurationMin: Math.round(totalDurationSec(structured.blocks) / 60),
+        targetZone,
+        targetPaceSecPerKm: null as number | null,
+        intervals: flat,
+      }
+    }
 
     // Walk-Run subtype: weken bevatten run/walk minutes en aantal rondes.
     if (params.subType === 'WALK_RUN' && Array.isArray(params.weeks)) {
