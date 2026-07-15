@@ -752,51 +752,58 @@ model SessionMove {
 }
 
 model CardioLog {
-  id              String         @id @default(cuid())
-  program         Program?       @relation(fields: [programId], references: [id], onDelete: SetNull)
-  programId       String?
-  patient         User           @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  patientId       String
-  activity        CardioActivity
-  protocol        CardioProtocol
-  durationSec     Int // seconds
-  distanceM       Int? // meters
-  avgHeartRate    Int?
-  maxHeartRate    Int?
-  zone            Int? // 1-5 (behaalde gemiddelde zone)
-  targetZone      Int? // 1-5 (voorgeschreven doel-zone, los van behaalde `zone`)
-  calories        Int?
-  rpe             Int? // 1-10 (bij watch/Strava eerst uit HR geschat; door de gebruiker overschreven bij beoordelen)
-  feelScore       Int? // 1-5 subjectieve voldoening/gevoel (uit de beoordeel-popup)
+  id                    String               @id @default(cuid())
+  program               Program?             @relation(fields: [programId], references: [id], onDelete: SetNull)
+  programId             String?
+  /// Het geplande cardio-item dat hiermee is afgevinkt. Zonder dit kan de
+  /// planner gepland-vs-gedaan alleen matchen op "er is die dag íets aan cardio
+  /// gelogd" — twee cardio-workouts op één dag zijn dan niet te onderscheiden.
+  /// Null = ad-hoc, of een client die het item nog niet meestuurt (iOS).
+  weekScheduleDayItem   WeekScheduleDayItem? @relation(fields: [weekScheduleDayItemId], references: [id], onDelete: SetNull)
+  weekScheduleDayItemId String?
+  patient               User                 @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId             String
+  activity              CardioActivity
+  protocol              CardioProtocol
+  durationSec           Int // seconds
+  distanceM             Int? // meters
+  avgHeartRate          Int?
+  maxHeartRate          Int?
+  zone                  Int? // 1-5 (behaalde gemiddelde zone)
+  targetZone            Int? // 1-5 (voorgeschreven doel-zone, los van behaalde `zone`)
+  calories              Int?
+  rpe                   Int? // 1-10 (bij watch/Strava eerst uit HR geschat; door de gebruiker overschreven bij beoordelen)
+  feelScore             Int? // 1-5 subjectieve voldoening/gevoel (uit de beoordeel-popup)
   // Gezet zodra de gebruiker de activiteit heeft beoordeeld (RPE/gevoel/notitie).
   // NULL = nog niet beoordeeld → gesyncte activiteiten met NULL triggeren de popup.
-  ratedAt         DateTime?
-  painLevel       Int? // 0-10
-  notes           String?
-  intervals       Json? // werkelijk gelogde interval-breakdown [{ label, type, durationSec, distanceM?, avgHeartRate? }]
+  ratedAt               DateTime?
+  painLevel             Int? // 0-10
+  notes                 String?
+  intervals             Json? // werkelijk gelogde interval-breakdown [{ label, type, durationSec, distanceM?, avgHeartRate? }]
   // Tijd-in-zone (seconden per HR-zone): { "1": sec, "2": sec, ... }. Afgeleid
   // uit gemeten HR + het HR-profiel van de patiënt op moment van loggen.
-  timeInZones     Json?
+  timeInZones           Json?
   // Per-minuut tijdreeks van de wearable-sync: [{ t: sec-vanaf-start, hr: bpm|null,
   // spd: m/s|null }]. Voedt de HR/tempo-grafiek + cardiac-decoupling op het
   // activity-scherm. Alleen gevuld voor gesyncte workouts met samples.
-  series          Json?
-  avgPaceSecPerKm Int? // gemiddeld tempo in s/km (afgeleid uit distanceM/durationSec, opgeslagen voor trends)
+  series                Json?
+  avgPaceSecPerKm       Int? // gemiddeld tempo in s/km (afgeleid uit distanceM/durationSec, opgeslagen voor trends)
   // Bron van de sessie: handmatig gelogd of gesynct vanuit een wearable.
   // `externalId` = HealthKit-workout-UUID; uniek PER PATIËNT zodat overlappende
   // sync-batches (na anchor-reset / herinstallatie) niet dubbel landen, en zodat
   // een handmatig gelogde sessie niet dubbelt met dezelfde watch-workout.
   // Scope = (patientId, externalId), NIET globaal: een door de client
   // aangeleverde UUID mag nooit de rij van een ándere patiënt raken.
-  source          WorkoutSource  @default(MANUAL)
-  externalId      String?
-  completedAt     DateTime       @default(now())
-  createdAt       DateTime       @default(now())
+  source                WorkoutSource        @default(MANUAL)
+  externalId            String?
+  completedAt           DateTime             @default(now())
+  createdAt             DateTime             @default(now())
 
   hashtagUsages HashTagUsage[]
 
   @@unique([patientId, externalId])
   @@index([patientId, completedAt])
+  @@index([weekScheduleDayItemId])
   @@map("cardio_logs")
 }
 
@@ -975,6 +982,7 @@ model WeekScheduleDayItem {
   exercises   WeekScheduleDayItemExercise[]
   /// Sessies die de patiënt tegen dit geplande item logde.
   sessionLogs SessionLog[]
+  cardioLogs  CardioLog[]
 
   // Cardio-parameters voor een quick CARDIO-workout (type/duur/afstand/zone/
   // intervallen). JSON-vorm beheerd in de UI.

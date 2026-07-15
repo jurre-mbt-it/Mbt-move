@@ -42,6 +42,8 @@ import {
 } from '@/lib/cardio-constants'
 import { ApplyPlanDialog, SavePlanDialog } from '@/components/week-planner/PlanTemplateDialogs'
 import { sumPlannedLoad, loadVerdict } from '@/lib/planned-load'
+import { CardioWorkoutBuilder } from '@/components/week-planner/CardioWorkoutBuilder'
+import { readWorkout, summarize as summarizeWorkout, totalDurationSec as workoutDuration, structuredLoad, type StructuredCardio } from '@/lib/cardio-workout'
 import { AddItemModal, type AddItemPayload } from '@/components/week-planner/AddItemModal'
 import {
   DarkButton,
@@ -315,6 +317,159 @@ function WeekLoadBar({
         {estimated ? '~' : ''}{planned}
       </span>
     </span>
+  )
+}
+
+/**
+ * Detailpaneel voor één kalender-item. Toont de geplande inhoud (programma-
+ * oefeningen of snelle-workout-velden) + acties (snel bewerken, opslaan als
+ * schema, kopiëren). Als er een gelogde sessie bij hoort, staat de uitgevoerde
+ * data read-only eronder. Herbruikt in zij-paneel (desktop) en modal (mobiel).
+ */
+// Inline oefening-builder voor een quick-workout: categorie-gefilterde kiezer +
+// per oefening sets×reps. Beheert een lokale lijst en slaat in één keer op.
+function QuickExerciseBuilder({
+  item, defaultCategory, onSave, saving,
+}: {
+  item: ScheduleItem
+  defaultCategory: Category
+  onSave: (exercises: { exerciseId: string; sets: number; reps: number; repUnit: string }[]) => Promise<void>
+  saving: boolean
+}) {
+  const [list, setList] = useState<ItemExercise[]>(item.exercises ?? [])
+  const [catFilter, setCatFilter] = useState<Category | null>(defaultCategory)
+  const [search, setSearch] = useState('')
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: candidates = [] } = (trpc.exercises.list.useQuery as any)(
+    { category: catFilter ?? undefined, query: search || undefined },
+    { staleTime: 30_000 },
+  ) as { data: Array<{ id: string; name: string; category: string }> }
+
+  const selectedIds = new Set(list.map(e => e.exerciseId))
+  const numStyle: React.CSSProperties = { background: P.surfaceHi, color: P.ink, border: `1px solid ${P.line}`, padding: '2px 4px' }
+
+  function add(ex: { id: string; name: string; category: string }) {
+    if (selectedIds.has(ex.id)) return
+    setList(l => [...l, {
+      id: `new-${ex.id}-${l.length}`, exerciseId: ex.id, exerciseName: ex.name,
+      exerciseCategory: ex.category, sets: 3, reps: 10, repUnit: 'reps', restTime: null,
+    }])
+  }
+  function update(i: number, patch: Partial<ItemExercise>) {
+    setList(l => l.map((e, idx) => idx === i ? { ...e, ...patch } : e))
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <MetaLabel>Oefeningen</MetaLabel>
+        <DarkButton
+          variant="primary" size="sm" disabled={saving}
+          onClick={() => onSave(list.map(e => ({ exerciseId: e.exerciseId, sets: e.sets, reps: e.reps, repUnit: e.repUnit })))}
+        >
+          {saving ? 'Opslaan…' : 'Opslaan'}
+        </DarkButton>
+      </div>
+
+      {list.length > 0 && (
+        <div className="space-y-1.5">
+          {list.map((e, i) => {
+            const c = CATEGORY_COLORS[(e.exerciseCategory as Category) ?? 'STRENGTH']
+            return (
+              <div key={e.id} className="rounded-lg p-2 flex items-center gap-1.5"
+                style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, borderLeft: `3px solid ${c}` }}>
+                <span className="flex-1 truncate text-xs" style={{ color: P.ink }}>{e.exerciseName}</span>
+                <input type="number" min={1} max={50} value={e.sets} aria-label="sets"
+                  onChange={ev => update(i, { sets: Math.max(1, Number(ev.target.value) || 1) })}
+                  className="w-10 text-center rounded text-xs" style={numStyle} />
+                <span className="text-[10px]" style={{ color: P.inkMuted }}>×</span>
+                <input type="number" min={1} max={999} value={e.reps} aria-label="reps"
+                  onChange={ev => update(i, { reps: Math.max(1, Number(ev.target.value) || 1) })}
+                  className="w-12 text-center rounded text-xs" style={numStyle} />
+                <button type="button" onClick={() => setList(l => l.filter((_, idx) => idx !== i))}
+                  className="text-zinc-400 hover:text-red-400 shrink-0"><X className="w-3.5 h-3.5" /></button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Categorie-filter (standaard aan, uitklikbaar) */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {catFilter ? (
+          <button type="button" onClick={() => setCatFilter(null)}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"
+            style={{ background: `${CATEGORY_COLORS[catFilter]}20`, color: CATEGORY_COLORS[catFilter], border: `1px solid ${CATEGORY_COLORS[catFilter]}` }}>
+            {CATEGORY_LABELS[catFilter]} <X className="w-3 h-3" />
+          </button>
+        ) : (
+          <button type="button" onClick={() => setCatFilter(defaultCategory)}
+            className="px-2 py-0.5 rounded-full text-[11px]" style={{ color: P.inkMuted, border: `1px solid ${P.lineStrong}` }}>
+            Alle categorieën — klik voor {CATEGORY_LABELS[defaultCategory]}
+          </button>
+        )}
+      </div>
+      <div className="relative">
+        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <DarkInput value={search} onChange={e => setSearch(e.target.value)} placeholder="Zoek oefening…" className="pl-8" />
+      </div>
+      <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
+        {candidates.filter(c => !selectedIds.has(c.id)).slice(0, 40).map(c => {
+          const cat = (c.category as Category) ?? 'STRENGTH'
+          return (
+            <button key={c.id} type="button" onClick={() => add(c)}
+              className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-[#1C2425]"
+              style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}>
+              <span style={{ color: CATEGORY_COLORS[cat] }}><CategoryIcon category={cat} size={11} /></span>
+              <span className="flex-1 truncate text-xs" style={{ color: P.ink }}>{c.name}</span>
+              <Plus className="w-3.5 h-3.5" style={{ color: P.inkMuted }} />
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Cardio in het zijpaneel: wat staat er, en een knop naar de bouwer. De
+ * blokken zelf bewerk je in een volledig scherm — 360px is te smal voor een
+ * workout met herhalingen.
+ */
+function CardioSummary({ item, onBuild }: { item: ScheduleItem; onBuild: () => void }) {
+  const w = readWorkout(item.cardioParams)
+  const dur = w ? workoutDuration(w.blocks) : 0
+  return (
+    <div className="space-y-2">
+      <MetaLabel>Cardio-workout</MetaLabel>
+      {w ? (
+        <div className="rounded-lg p-2.5" style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold" style={{ color: P.ink }}>
+              {CARDIO_ACTIVITIES[w.activity]?.label ?? 'Cardio'}
+            </span>
+            <span className="athletic-mono text-[10px]" style={{ color: P.inkMuted }}>
+              {Math.round(dur / 60)} min
+            </span>
+            <span className="athletic-mono text-[10px]" style={{ color: P.lime }}>
+              {structuredLoad(w.blocks)} sRPE
+            </span>
+          </div>
+          <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: P.inkDim }}>
+            {summarizeWorkout(w.blocks)}
+          </p>
+        </div>
+      ) : (
+        <p className="text-[11px] leading-relaxed" style={{ color: P.inkDim }}>
+          Nog geen blokken. Bouw de workout op uit warming-up, intervallen en cooldown.
+        </p>
+      )}
+      <DarkButton variant="secondary" size="sm" onClick={onBuild} className="w-full text-xs">
+        <Layers className="w-3.5 h-3.5 mr-1.5" />
+        {w ? 'Workout bewerken' : 'Workout bouwen'}
+      </DarkButton>
+    </div>
   )
 }
 
@@ -661,225 +816,10 @@ type DetailItem = {
   sessionId: string | null
 }
 
-/**
- * Detailpaneel voor één kalender-item. Toont de geplande inhoud (programma-
- * oefeningen of snelle-workout-velden) + acties (snel bewerken, opslaan als
- * schema, kopiëren). Als er een gelogde sessie bij hoort, staat de uitgevoerde
- * data read-only eronder. Herbruikt in zij-paneel (desktop) en modal (mobiel).
- */
-// Inline oefening-builder voor een quick-workout: categorie-gefilterde kiezer +
-// per oefening sets×reps. Beheert een lokale lijst en slaat in één keer op.
-function QuickExerciseBuilder({
-  item, defaultCategory, onSave, saving,
-}: {
-  item: ScheduleItem
-  defaultCategory: Category
-  onSave: (exercises: { exerciseId: string; sets: number; reps: number; repUnit: string }[]) => Promise<void>
-  saving: boolean
-}) {
-  const [list, setList] = useState<ItemExercise[]>(item.exercises ?? [])
-  const [catFilter, setCatFilter] = useState<Category | null>(defaultCategory)
-  const [search, setSearch] = useState('')
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: candidates = [] } = (trpc.exercises.list.useQuery as any)(
-    { category: catFilter ?? undefined, query: search || undefined },
-    { staleTime: 30_000 },
-  ) as { data: Array<{ id: string; name: string; category: string }> }
-
-  const selectedIds = new Set(list.map(e => e.exerciseId))
-  const numStyle: React.CSSProperties = { background: P.surfaceHi, color: P.ink, border: `1px solid ${P.line}`, padding: '2px 4px' }
-
-  function add(ex: { id: string; name: string; category: string }) {
-    if (selectedIds.has(ex.id)) return
-    setList(l => [...l, {
-      id: `new-${ex.id}-${l.length}`, exerciseId: ex.id, exerciseName: ex.name,
-      exerciseCategory: ex.category, sets: 3, reps: 10, repUnit: 'reps', restTime: null,
-    }])
-  }
-  function update(i: number, patch: Partial<ItemExercise>) {
-    setList(l => l.map((e, idx) => idx === i ? { ...e, ...patch } : e))
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <MetaLabel>Oefeningen</MetaLabel>
-        <DarkButton
-          variant="primary" size="sm" disabled={saving}
-          onClick={() => onSave(list.map(e => ({ exerciseId: e.exerciseId, sets: e.sets, reps: e.reps, repUnit: e.repUnit })))}
-        >
-          {saving ? 'Opslaan…' : 'Opslaan'}
-        </DarkButton>
-      </div>
-
-      {list.length > 0 && (
-        <div className="space-y-1.5">
-          {list.map((e, i) => {
-            const c = CATEGORY_COLORS[(e.exerciseCategory as Category) ?? 'STRENGTH']
-            return (
-              <div key={e.id} className="rounded-lg p-2 flex items-center gap-1.5"
-                style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, borderLeft: `3px solid ${c}` }}>
-                <span className="flex-1 truncate text-xs" style={{ color: P.ink }}>{e.exerciseName}</span>
-                <input type="number" min={1} max={50} value={e.sets} aria-label="sets"
-                  onChange={ev => update(i, { sets: Math.max(1, Number(ev.target.value) || 1) })}
-                  className="w-10 text-center rounded text-xs" style={numStyle} />
-                <span className="text-[10px]" style={{ color: P.inkMuted }}>×</span>
-                <input type="number" min={1} max={999} value={e.reps} aria-label="reps"
-                  onChange={ev => update(i, { reps: Math.max(1, Number(ev.target.value) || 1) })}
-                  className="w-12 text-center rounded text-xs" style={numStyle} />
-                <button type="button" onClick={() => setList(l => l.filter((_, idx) => idx !== i))}
-                  className="text-zinc-400 hover:text-red-400 shrink-0"><X className="w-3.5 h-3.5" /></button>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Categorie-filter (standaard aan, uitklikbaar) */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {catFilter ? (
-          <button type="button" onClick={() => setCatFilter(null)}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"
-            style={{ background: `${CATEGORY_COLORS[catFilter]}20`, color: CATEGORY_COLORS[catFilter], border: `1px solid ${CATEGORY_COLORS[catFilter]}` }}>
-            {CATEGORY_LABELS[catFilter]} <X className="w-3 h-3" />
-          </button>
-        ) : (
-          <button type="button" onClick={() => setCatFilter(defaultCategory)}
-            className="px-2 py-0.5 rounded-full text-[11px]" style={{ color: P.inkMuted, border: `1px solid ${P.lineStrong}` }}>
-            Alle categorieën — klik voor {CATEGORY_LABELS[defaultCategory]}
-          </button>
-        )}
-      </div>
-      <div className="relative">
-        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <DarkInput value={search} onChange={e => setSearch(e.target.value)} placeholder="Zoek oefening…" className="pl-8" />
-      </div>
-      <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
-        {candidates.filter(c => !selectedIds.has(c.id)).slice(0, 40).map(c => {
-          const cat = (c.category as Category) ?? 'STRENGTH'
-          return (
-            <button key={c.id} type="button" onClick={() => add(c)}
-              className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-[#1C2425]"
-              style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}>
-              <span style={{ color: CATEGORY_COLORS[cat] }}><CategoryIcon category={cat} size={11} /></span>
-              <span className="flex-1 truncate text-xs" style={{ color: P.ink }}>{c.name}</span>
-              <Plus className="w-3.5 h-3.5" style={{ color: P.inkMuted }} />
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// Cardio-parametervenster voor een quick CARDIO-workout.
-function QuickCardioForm({
-  item, onSave, saving,
-}: {
-  item: ScheduleItem
-  onSave: (params: PlannerCardioParams | null) => Promise<void>
-  saving: boolean
-}) {
-  const init = item.cardioParams ?? {}
-  const [activity, setActivity] = useState<CardioActivityKey | ''>(init.activity ?? '')
-  const [minutes, setMinutes] = useState(init.durationSec ? String(Math.round(init.durationSec / 60)) : '')
-  const [distanceKm, setDistanceKm] = useState(init.distanceM ? String(init.distanceM / 1000) : '')
-  const [zone, setZone] = useState<HRZone | ''>(init.zone ?? '')
-  const [intervals, setIntervals] = useState<CardioInterval[]>(init.intervals ?? [])
-  const numStyle: React.CSSProperties = { background: P.surfaceHi, color: P.ink, border: `1px solid ${P.line}`, padding: '2px 4px' }
-
-  function save() {
-    const params: PlannerCardioParams = {
-      ...(activity ? { activity } : {}),
-      ...(minutes ? { durationSec: Math.max(1, Number(minutes)) * 60 } : {}),
-      ...(distanceKm ? { distanceM: Math.round(Number(distanceKm) * 1000) } : {}),
-      ...(zone ? { zone } : {}),
-      ...(intervals.length ? { intervals } : {}),
-    }
-    onSave(params)
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <MetaLabel>Cardio-parameters</MetaLabel>
-        <DarkButton variant="primary" size="sm" disabled={saving} onClick={save}>
-          {saving ? 'Opslaan…' : 'Opslaan'}
-        </DarkButton>
-      </div>
-
-      <div>
-        <MetaLabel>Type</MetaLabel>
-        <div className="flex flex-wrap gap-1 mt-1.5">
-          {(Object.keys(CARDIO_ACTIVITIES) as CardioActivityKey[]).map(k => (
-            <button key={k} type="button" onClick={() => setActivity(a => a === k ? '' : k)}
-              className="px-2 py-1 rounded-lg text-xs font-semibold"
-              style={{ background: activity === k ? P.brand : P.surface, color: activity === k ? P.bg : P.inkMuted, border: `1px solid ${activity === k ? P.brand : P.lineStrong}` }}>
-              {(() => { const Icon = CARDIO_ICON_MAP[k]; return Icon ? <Icon size={13} /> : CARDIO_ACTIVITIES[k].icon })()} {CARDIO_ACTIVITIES[k].label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <div><MetaLabel>Duur (min)</MetaLabel>
-          <DarkInput type="number" min={1} className="mt-1" value={minutes} onChange={e => setMinutes(e.target.value)} /></div>
-        <div><MetaLabel>Afstand (km)</MetaLabel>
-          <DarkInput type="number" min={0} step="0.1" className="mt-1" value={distanceKm} onChange={e => setDistanceKm(e.target.value)} /></div>
-      </div>
-
-      <div>
-        <MetaLabel>Intensiteit / zone</MetaLabel>
-        <div className="flex flex-wrap gap-1 mt-1.5">
-          {([1, 2, 3, 4, 5] as HRZone[]).map(z => (
-            <button key={z} type="button" onClick={() => setZone(v => v === z ? '' : z)}
-              className="px-2.5 py-1 rounded-lg text-[11px] font-bold"
-              style={{ background: zone === z ? HR_ZONES[z].color : P.surface, color: zone === z ? '#fff' : P.inkMuted, border: `1px solid ${zone === z ? HR_ZONES[z].color : P.lineStrong}` }}>
-              Z{z}
-            </button>
-          ))}
-        </div>
-        {zone ? <p className="text-[10px] mt-1" style={{ color: P.inkMuted }}>{HR_ZONES[zone].label}</p> : null}
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between">
-          <MetaLabel>Intervallen</MetaLabel>
-          <button type="button" onClick={() => setIntervals(iv => [...iv, { repetitions: 4, workDuration: 180, restDuration: 120 }])}
-            className="text-[11px] flex items-center gap-1" style={{ color: P.brand }}>
-            <Plus className="w-3 h-3" /> blok
-          </button>
-        </div>
-        <div className="space-y-1.5 mt-1.5">
-          {intervals.map((iv, i) => (
-            <div key={i} className="flex items-center gap-1.5 text-xs" style={{ color: P.inkMuted }}>
-              <input type="number" min={1} value={iv.repetitions} aria-label="herhalingen"
-                onChange={e => setIntervals(a => a.map((x, idx) => idx === i ? { ...x, repetitions: Math.max(1, Number(e.target.value) || 1) } : x))}
-                className="w-10 text-center rounded" style={numStyle} />
-              <span>× werk</span>
-              <input type="number" min={1} value={iv.workDuration} aria-label="werk seconden"
-                onChange={e => setIntervals(a => a.map((x, idx) => idx === i ? { ...x, workDuration: Math.max(1, Number(e.target.value) || 1) } : x))}
-                className="w-14 text-center rounded" style={numStyle} />
-              <span>s / rust</span>
-              <input type="number" min={0} value={iv.restDuration} aria-label="rust seconden"
-                onChange={e => setIntervals(a => a.map((x, idx) => idx === i ? { ...x, restDuration: Math.max(0, Number(e.target.value) || 0) } : x))}
-                className="w-14 text-center rounded" style={numStyle} />
-              <span>s</span>
-              <button type="button" onClick={() => setIntervals(a => a.filter((_, idx) => idx !== i))}
-                className="text-zinc-400 hover:text-red-400 ml-auto"><X className="w-3.5 h-3.5" /></button>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function ItemDetailContent({
   detail, onClose, showClose = false,
-  onSaveTemplate, onCopy, onSaveQuick, onSaveExercises, onSaveCardio,
-  savingTemplate, copying, savingExercises, savingCardio,
+  onSaveTemplate, onCopy, onSaveQuick, onSaveExercises, onBuildCardio,
+  savingTemplate, copying, savingExercises,
 }: {
   detail: DetailItem
   onClose: () => void
@@ -888,11 +828,11 @@ function ItemDetailContent({
   onCopy: () => void
   onSaveQuick: (patch: { quickName?: string; quickDurationSec?: number; plannedRpe?: number | null }) => Promise<void>
   onSaveExercises: (itemId: string, exercises: { exerciseId: string; sets: number; reps: number; repUnit: string }[]) => Promise<void>
-  onSaveCardio: (itemId: string, params: PlannerCardioParams | null) => Promise<void>
+  /** Opent de blokken-bouwer als volledig scherm — het zijpaneel is te smal. */
+  onBuildCardio: (item: ScheduleItem) => void
   savingTemplate: boolean
   copying: boolean
   savingExercises: boolean
-  savingCardio: boolean
 }) {
   const { item, date, sessionId } = detail
   const isProgram = !!item.programId
@@ -1081,12 +1021,7 @@ function ItemDetailContent({
         ) : (
           <div className="space-y-4">
             {category === 'CARDIO' ? (
-              <QuickCardioForm
-                key={item.id}
-                item={item}
-                saving={savingCardio}
-                onSave={(params) => onSaveCardio(item.id, params)}
-              />
+              <CardioSummary item={item} onBuild={() => onBuildCardio(item)} />
             ) : (
               <QuickExerciseBuilder
                 key={item.id}
@@ -1993,6 +1928,9 @@ function WeekPlannerContent() {
     setAddOpen(true)
   }
 
+  // ─ Cardio-blokkenbouwer (volledig scherm) ─
+  const [cardioBuilderItem, setCardioBuilderItem] = useState<ScheduleItem | null>(null)
+
   // ─ Plan-sjablonen ─
   const [applyPlanOpen, setApplyPlanOpen] = useState(false)
   const [savePlanRange, setSavePlanRange] = useState<{ from: string; to: string } | null>(null)
@@ -2537,6 +2475,24 @@ function WeekPlannerContent() {
           />
         )}
 
+        {/* Cardio-workout bouwen — volledig scherm */}
+        {cardioBuilderItem && (
+          <CardioWorkoutBuilder
+            initial={readWorkout(cardioBuilderItem.cardioParams)}
+            activity={cardioBuilderItem.quickActivity ?? 'RUNNING'}
+            itemName={cardioBuilderItem.quickName ?? 'Cardio-workout'}
+            saving={setItemCardio.isPending}
+            onClose={() => setCardioBuilderItem(null)}
+            onSave={async (w: StructuredCardio) => {
+              await setItemCardio.mutateAsync({
+                itemId: cardioBuilderItem.id,
+                cardioParams: w as unknown as Record<string, unknown>,
+              })
+              setCardioBuilderItem(null)
+            }}
+          />
+        )}
+
         {/* Plan-sjabloon toepassen vanaf een datum */}
         {applyPlanOpen && selectedPatientId && (
           <ApplyPlanDialog
@@ -2587,11 +2543,10 @@ function WeekPlannerContent() {
             onCopy={handleCopyItem}
             onSaveQuick={handleSaveQuick}
             onSaveExercises={handleSaveItemExercises}
-            onSaveCardio={handleSaveItemCardio}
+            onBuildCardio={setCardioBuilderItem}
             savingTemplate={saveItemAsTemplate.isPending}
             copying={addItem.isPending}
             savingExercises={setItemExercises.isPending}
-            savingCardio={setItemCardio.isPending}
           />
         </aside>
       )}
@@ -2612,11 +2567,10 @@ function WeekPlannerContent() {
                   onCopy={handleCopyItem}
                   onSaveQuick={handleSaveQuick}
                   onSaveExercises={handleSaveItemExercises}
-                  onSaveCardio={handleSaveItemCardio}
+                  onBuildCardio={setCardioBuilderItem}
                   savingTemplate={saveItemAsTemplate.isPending}
                   copying={addItem.isPending}
                   savingExercises={setItemExercises.isPending}
-                  savingCardio={setItemCardio.isPending}
                 />
               )}
             </div>

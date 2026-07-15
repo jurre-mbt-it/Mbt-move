@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { createTRPCRouter, therapistProcedure, protectedProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
 import { mondayKey, mondayKeyOf, addDaysKey, amsMidnight, weeksBetween, isDateKey } from '@/lib/week-dates'
+import { parseStructured, legacySummaryFields, structuredLoad } from '@/lib/cardio-workout'
 import {
   Prisma,
   type PrismaClient,
@@ -1821,7 +1822,11 @@ export const weekSchedulesRouter = createTRPCRouter({
   setItemCardio: therapistProcedure
     .input(z.object({
       itemId: z.string(),
-      // JSON-blob; vorm wordt in de UI beheerd (type/duur/afstand/zone/intervallen).
+      // JSON-blob. Twee vormen leven hier naast elkaar:
+      //  - legacy plat: {activity, protocol, durationSec, distanceM, zone, intervals}
+      //  - gestructureerd: {version: 1, activity, blocks[]} — zie lib/cardio-workout.ts
+      // De gestructureerde vorm wordt hieronder gevalideerd; de platte blijft
+      // ongemoeid zodat bestaande records en oudere UI blijven werken.
       cardioParams: z
         .record(z.string(), z.unknown())
         .refine((v) => JSON.stringify(v).length <= 8000, 'cardioParams te groot (max 8 kB)')
@@ -1842,12 +1847,42 @@ export const weekSchedulesRouter = createTRPCRouter({
       if (!isAdmin && !isOwner && !isSamePractice) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
+      // Gestructureerde workout? Dan valideren en de afgeleide velden
+      // meeschrijven: de duur/zone voor lezers die de blokken niet kennen, en
+      // plannedDurationSec/plannedRpe zodat de weekbalk een écht getal toont
+      // i.p.v. een schatting.
+      let derived: {
+        plannedDurationSec?: number | null
+        plannedRpe?: number | null
+      } = {}
+      let payload = input.cardioParams
+
+      if (payload && payload.version === 1) {
+        const parsed = parseStructured(payload)
+        if (!parsed) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Ongeldige workout-structuur' })
+        }
+        const legacy = legacySummaryFields(parsed)
+        payload = { ...payload, ...legacy }
+        const dur = legacy.durationSec
+        const load = structuredLoad(parsed.blocks)
+        derived = {
+          plannedDurationSec: dur > 0 ? dur : null,
+          // Gewogen gemiddelde RPE over de workout; de DB eist 1..10.
+          plannedRpe: dur > 0 ? Math.min(10, Math.max(1, Math.round(load / (dur / 60)))) : null,
+        }
+      } else if (payload === null) {
+        // Cardio gewist → de afgeleide belasting hoort ook weg.
+        derived = { plannedDurationSec: null, plannedRpe: null }
+      }
+
       await ctx.prisma.weekScheduleDayItem.update({
         where: { id: input.itemId },
         data: {
-          cardioParams: input.cardioParams === null
+          ...derived,
+          cardioParams: payload === null
             ? Prisma.JsonNull
-            : (input.cardioParams as Prisma.InputJsonValue),
+            : (payload as Prisma.InputJsonValue),
         },
       })
       return { ok: true }

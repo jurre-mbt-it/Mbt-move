@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { ChevronLeft, Heart } from 'lucide-react'
@@ -23,6 +23,8 @@ import {
   IntervalEditor, intervalsTotalSec, emptyInterval, type IntervalBlock,
 } from '@/components/cardio/IntervalEditor'
 import { trpc } from '@/lib/trpc/client'
+import { PlannedCardioCard } from '@/components/cardio/PlannedCardioCard'
+import { readWorkout, totalDurationSec as workoutDuration } from '@/lib/cardio-workout'
 
 const SELECTABLE_PROTOCOLS: CardioProtocolKey[] = [
   'STEADY_STATE', 'INTERVALS', 'TEMPO', 'ZONE_TRAINING', 'THRESHOLD', 'LONG_SLOW_DISTANCE',
@@ -56,10 +58,32 @@ const numInputStyle: React.CSSProperties = {
 }
 
 export default function AthleteCardioLogPage() {
+  // useSearchParams vereist een Suspense-grens bij prerenderen.
+  return (
+    <Suspense fallback={null}>
+      <AthleteCardioLogPageInner />
+    </Suspense>
+  )
+}
+
+function AthleteCardioLogPageInner() {
   const router = useRouter()
   const utils = trpc.useUtils()
   const { data: me } = trpc.auth.getMe.useQuery()
   const logCardio = trpc.patient.logCardioSession.useMutation()
+
+  // ?itemId=… → dit is een geplande cardio-workout. Tot nu toe was dit scherm
+  // volledig handinvoer: wat de therapeut voorschreef kwam hier nooit aan.
+  const searchParams = useSearchParams()
+  const plannedItemId = searchParams.get('itemId')
+  const { data: planned } = trpc.patient.getTodayExercises.useQuery(
+    plannedItemId ? { itemId: plannedItemId } : undefined,
+    { enabled: !!plannedItemId },
+  )
+  const plannedWorkout = useMemo(
+    () => readWorkout(planned?.plannedItem?.cardio ?? null),
+    [planned],
+  )
 
   const [activity, setActivity] = useState<CardioActivityKey>('RUNNING')
   const [protocol, setProtocol] = useState<CardioProtocolKey>('STEADY_STATE')
@@ -77,6 +101,22 @@ export default function AthleteCardioLogPage() {
   const [rpe, setRpe] = useState(5)
   const [pain, setPain] = useState(0)
   const [notes, setNotes] = useState('')
+
+  // Voorvullen uit het voorschrift, éénmalig: activiteit en de geplande duur.
+  // Alleen als de atleet nog niets zelf heeft ingevuld, anders overschrijven we
+  // zijn invoer zodra de query binnenkomt.
+  const [prefilled, setPrefilled] = useState(false)
+  useEffect(() => {
+    if (prefilled || !plannedWorkout) return
+    setActivity(plannedWorkout.activity)
+    const sec = workoutDuration(plannedWorkout.blocks)
+    if (sec > 0) {
+      setDurMin(String(Math.floor(sec / 60)))
+      setDurSec(String(sec % 60))
+    }
+    if (plannedWorkout.blocks.some(b => b.kind === 'REPEAT')) setProtocol('INTERVALS')
+    setPrefilled(true)
+  }, [plannedWorkout, prefilled])
 
   const intervalsOn = useIntervals || protocol === 'INTERVALS'
 
@@ -122,6 +162,9 @@ export default function AthleteCardioLogPage() {
     try {
       await logCardio.mutateAsync({
         programId: null,
+        // Vinkt exact deze geplande workout af i.p.v. "er is die dag cardio
+        // gelogd".
+        weekScheduleDayItemId: plannedItemId,
         activity,
         protocol,
         durationSec,
@@ -165,6 +208,10 @@ export default function AthleteCardioLogPage() {
             </h1>
           </div>
         </div>
+
+        {/* Het voorschrift van de therapeut — alleen als dit een geplande
+            workout is. Read-only: hieronder log je wat je écht deed. */}
+        {plannedWorkout && <PlannedCardioCard workout={plannedWorkout} />}
 
         {/* Wanneer — standaard vandaag, maar achteraf loggen kan ook */}
         <Tile>

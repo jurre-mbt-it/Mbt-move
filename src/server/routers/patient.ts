@@ -498,6 +498,11 @@ export const patientRouter = createTRPCRouter({
             durationSec: item.plannedDurationSec ?? item.quickDurationSec ?? null,
             plannedRpe: item.plannedRpe ?? null,
             notes: item.notes,
+            // De gestructureerde cardio-workout (warming-up / intervallen /
+            // cooldown). Tot nu toe bleef die bij de therapeut hangen: het
+            // cardioscherm van de atleet was volledig handinvoer.
+            // Begrensd gecast → geen recursief Prisma JsonValue (TS2589).
+            cardio: (item.cardioParams ?? null) as Record<string, unknown> | null,
           },
           exercises,
           lastLogs,
@@ -534,7 +539,9 @@ export const patientRouter = createTRPCRouter({
       },
     })
 
-    if (!program) return { program: null, exercises: [], lastLogs: {} as Record<string, LastExerciseLog> }
+    // plannedItem: null meegeven zodat alle takken dezelfde vorm hebben — anders
+    // is de union voor de client niet te narrowen.
+    if (!program) return { program: null, plannedItem: null, exercises: [], lastLogs: {} as Record<string, LastExerciseLog> }
 
     const allExercises = program.exercises.map(mapProgramExercise)
 
@@ -587,6 +594,8 @@ export const patientRouter = createTRPCRouter({
       const targetReached = completedThisWeek >= weeklyTarget
 
       return {
+        // plannedItem hoort in elke tak te zitten (uniforme union).
+        plannedItem: null,
         program: {
           id: program.id,
           name: program.name,
@@ -652,6 +661,8 @@ export const patientRouter = createTRPCRouter({
       effectiveDay === -1 ? [] : allExercises.filter(e => e.week === week && e.day === effectiveDay)
 
     return {
+      // plannedItem hoort in elke tak te zitten (uniforme union).
+      plannedItem: null,
       program: {
         id: program.id,
         name: program.name,
@@ -1039,6 +1050,9 @@ export const patientRouter = createTRPCRouter({
     .input(
       z.object({
         programId: z.string().nullable().optional(),
+        // Het geplande cardio-item dat hiermee wordt afgevinkt. Optioneel:
+        // iOS stuurt 'm nog niet mee, en ad-hoc cardio heeft geen plan.
+        weekScheduleDayItemId: z.string().nullable().optional(),
         activity: z.enum([
           'RUNNING', 'CYCLING', 'ROWING', 'SWIMMING', 'CROSSTRAINER',
           'WALKING', 'SKIERG', 'ASSAULT_BIKE', 'WATTBIKE', 'STAIRCLIMBER', 'OTHER',
@@ -1095,10 +1109,28 @@ export const patientRouter = createTRPCRouter({
         completedAt = d
       }
       const avgPaceSecPerKm = paceSecPerKm(input.distanceM, input.durationSec)
+      // Alleen een item van het eigen weekschema mag afgevinkt worden; anders
+      // kan iemand zijn cardio aan andermans planning hangen.
+      let linkedItemId: string | null = null
+      if (input.weekScheduleDayItemId) {
+        const owned = await ctx.prisma.weekScheduleDayItem.findFirst({
+          where: {
+            id: input.weekScheduleDayItemId,
+            day: { weekSchedule: { patientId: ctx.user.id, isTemplate: false } },
+          },
+          select: { id: true },
+        })
+        if (!owned) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Deze geplande workout hoort niet bij jou' })
+        }
+        linkedItemId = owned.id
+      }
+
       const log = await ctx.prisma.cardioLog.create({
         data: {
           patientId: ctx.user.id,
           programId: input.programId ?? null,
+          weekScheduleDayItemId: linkedItemId,
           activity: input.activity,
           protocol: input.protocol,
           durationSec: input.durationSec,
