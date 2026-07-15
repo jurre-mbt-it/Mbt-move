@@ -172,9 +172,9 @@ export const planTemplatesRouter = createTRPCRouter({
       /** ISO-dagen (YYYY-MM-DD); de maandagen eromheen bepalen het bereik. */
       fromDate: z.string(),
       toDate: z.string(),
-      name: z.string().min(1),
-      description: z.string().optional(),
-      goal: z.string().optional(),
+      name: z.string().min(1).max(200),
+      description: z.string().max(2000).optional(),
+      goal: z.string().max(500).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
@@ -489,9 +489,9 @@ export const planTemplatesRouter = createTRPCRouter({
   update: therapistProcedure
     .input(z.object({
       id: z.string(),
-      name: z.string().min(1).optional(),
-      description: z.string().nullable().optional(),
-      goal: z.string().nullable().optional(),
+      name: z.string().min(1).max(200).optional(),
+      description: z.string().max(2000).nullable().optional(),
+      goal: z.string().max(500).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const tpl = await ctx.prisma.weekPlanTemplate.findUnique({

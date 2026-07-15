@@ -245,8 +245,8 @@ export const weekSchedulesRouter = createTRPCRouter({
 
   create: therapistProcedure
     .input(z.object({
-      name: z.string().min(1),
-      description: z.string().optional(),
+      name: z.string().min(1).max(200),
+      description: z.string().max(2000).optional(),
       patientId: z.string().optional(),
       startDate: z.string().optional(),
       endDate: z.string().optional(),
@@ -281,8 +281,8 @@ export const weekSchedulesRouter = createTRPCRouter({
   save: therapistProcedure
     .input(z.object({
       id: z.string(),
-      name: z.string().min(1),
-      description: z.string().optional(),
+      name: z.string().min(1).max(200),
+      description: z.string().max(2000).optional(),
       patientId: z.string().nullable().optional(),
       startDate: z.string().nullable().optional(),
       endDate: z.string().nullable().optional(),
@@ -1171,6 +1171,21 @@ export const weekSchedulesRouter = createTRPCRouter({
         select: { order: true },
       })
       const nextOrder = last ? last.order + 1 : 0
+      // Programma moet van jezelf of je praktijk zijn — zelfde check als
+      // setDayProgram/scheduleProgram. Zonder dit kon een cross-practice
+      // programId aan een dag hangen (naam lekt daarna via de include).
+      if (input.kind === 'program') {
+        const program = await ctx.prisma.program.findUnique({
+          where: { id: input.programId },
+          select: { creatorId: true, practiceId: true },
+        })
+        if (!program) throw new TRPCError({ code: 'NOT_FOUND', message: 'Programma niet gevonden' })
+        const programInScope =
+          isAdmin ||
+          program.creatorId === ctx.user.id ||
+          (!!ctx.user.practiceId && !!program.practiceId && program.practiceId === ctx.user.practiceId)
+        if (!programInScope) throw new TRPCError({ code: 'FORBIDDEN' })
+      }
       // Testbatterij moet in scope van de praktijk liggen (NULL = globale seed).
       if (input.kind === 'test') {
         const battery = await ctx.prisma.testBattery.findFirst({
