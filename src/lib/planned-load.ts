@@ -40,15 +40,21 @@ const DEFAULT_REST_SEC = 60
 
 /**
  * De eenheid van `reps` bepaalt wat het getal betékent, en dus hoe lang de set
- * duurt. Zonder dit telde een plank van 60 sec als 180 seconden werk (60 × 3)
- * en "10 reps per zijde" als 10 in plaats van 20. Dat getal voedt de geplande
- * belasting, dus die fout liep door tot in de weekbalk.
+ * duurt. Zonder dit telde een plank van 60 sec als 180 seconden werk (60 × 3),
+ * "5 min" als 15 seconden, en "10 reps per zijde" als 10 in plaats van 20. Dat
+ * getal voedt de geplande belasting, dus die fout liep door tot in de weekbalk.
  *
- * repUnit is vrije tekst (de therapeut kan 'm zelf typen); onbekend → reps.
+ * De aanbod-lijst staat in REP_UNITS (program-constants), maar repUnit is vrije
+ * tekst en oude rijen bevatten van alles. Onbekend → reps, zodat een eenheid
+ * die we niet kennen nooit een wilde uitschieter oplevert.
+ *
+ * `m` (meters) kan niet: zonder tempo is afstand geen tijd. Valt bewust terug
+ * op de reps-schatting in plaats van te doen alsof we het weten.
  */
 function werkSecondenPerSet(reps: number, repUnit?: string | null): number {
-  const u = (repUnit ?? '').toLowerCase()
+  const u = (repUnit ?? '').toLowerCase().trim()
   if (u.startsWith('sec')) return reps
+  if (u.startsWith('min')) return reps * 60
   if (u.includes('zijde') || u.includes('kant') || u.includes('been') || u.includes('arm')) {
     return reps * SECONDS_PER_REP * 2
   }

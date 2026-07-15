@@ -204,6 +204,57 @@ type ItemExercise = {
   reps: number
   repUnit: string
   restTime: number | null
+  /**
+   * Het voorschrift. Deze builder zet het niet, maar het kómt hier wel binnen
+   * (via listItemContents) zodra een plan-sjabloon of een kopie het meebrengt.
+   * setItemExercises vervangt de hele lijst, dus wat we niet terugsturen is
+   * weg — vandaar dat dit meereist ook al tonen we het hier niet.
+   */
+  notes?: string | null
+  setsMax?: number | null
+  repsMax?: number | null
+  intensityType?: string
+  intensityMin?: number | null
+  intensityMax?: number | null
+  intensityText?: string | null
+  supersetGroup?: string | null
+  supersetOrder?: number
+  extraParams?: ItemExerciseParam[]
+}
+
+type ItemExerciseParam = {
+  id?: string
+  label: string
+  type?: string
+  value?: string | number | null
+  valueMax?: string | number | null
+  unit?: string
+  options?: string[]
+  min?: number
+  max?: number
+}
+
+/** Alles wat setItemExercises accepteert — één plek, zodat een nieuw veld niet
+ *  bij de volgende opslag stil verdwijnt. */
+function toItemExercisePayload(e: ItemExercise) {
+  return {
+    exerciseId: e.exerciseId,
+    sets: e.sets,
+    reps: e.reps,
+    repUnit: e.repUnit,
+    restTime: e.restTime,
+    notes: e.notes ?? null,
+    setsMax: e.setsMax ?? null,
+    repsMax: e.repsMax ?? null,
+    intensityType: (e.intensityType ?? 'NONE') as
+      'NONE' | 'RPE' | 'PERCENT_1RM' | 'RELATIVE_DAILY_MAX' | 'TECHNIQUE' | 'TEXT',
+    intensityMin: e.intensityMin ?? null,
+    intensityMax: e.intensityMax ?? null,
+    intensityText: e.intensityText ?? null,
+    supersetGroup: e.supersetGroup ?? null,
+    supersetOrder: e.supersetOrder,
+    extraParams: e.extraParams ?? [],
+  }
 }
 
 // Cardio-parameters van een quick CARDIO-workout (los opgeslagen als JSON).
@@ -333,7 +384,7 @@ function QuickExerciseBuilder({
 }: {
   item: ScheduleItem
   defaultCategory: Category
-  onSave: (exercises: { exerciseId: string; sets: number; reps: number; repUnit: string }[]) => Promise<void>
+  onSave: (exercises: ReturnType<typeof toItemExercisePayload>[]) => Promise<void>
   saving: boolean
 }) {
   const [list, setList] = useState<ItemExercise[]>(item.exercises ?? [])
@@ -366,7 +417,7 @@ function QuickExerciseBuilder({
         <MetaLabel>Oefeningen</MetaLabel>
         <DarkButton
           variant="primary" size="sm" disabled={saving}
-          onClick={() => onSave(list.map(e => ({ exerciseId: e.exerciseId, sets: e.sets, reps: e.reps, repUnit: e.repUnit })))}
+          onClick={() => onSave(list.map(toItemExercisePayload))}
         >
           {saving ? 'Opslaan…' : 'Opslaan'}
         </DarkButton>
@@ -831,7 +882,7 @@ function ItemDetailContent({
   onSaveTemplate: () => void
   onCopy: () => void
   onSaveQuick: (patch: { quickName?: string; quickDurationSec?: number; plannedRpe?: number | null }) => Promise<void>
-  onSaveExercises: (itemId: string, exercises: { exerciseId: string; sets: number; reps: number; repUnit: string }[]) => Promise<void>
+  onSaveExercises: (itemId: string, exercises: ReturnType<typeof toItemExercisePayload>[]) => Promise<void>
   /** Opent de blokken-bouwer als volledig scherm — het zijpaneel is te smal. */
   onBuildCardio: (item: ScheduleItem) => void
   savingTemplate: boolean
@@ -2122,7 +2173,7 @@ function WeekPlannerContent() {
   }
   async function handleSaveItemExercises(
     itemId: string,
-    exercises: { exerciseId: string; sets: number; reps: number; repUnit: string }[],
+    exercises: ReturnType<typeof toItemExercisePayload>[],
   ) {
     await setItemExercises.mutateAsync({ itemId, exercises })
   }

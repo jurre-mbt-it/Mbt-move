@@ -1810,11 +1810,20 @@ export const weekSchedulesRouter = createTRPCRouter({
         intensityText: z.string().max(200).nullable().optional(),
         supersetGroup: z.string().max(4).nullable().optional(),
         supersetOrder: z.number().int().min(0).max(20).optional(),
+        // Volledige ExtraParam-vorm (zie components/programs/types.ts). Zonder
+        // id/options/min/max/valueMax strippte zod ze er stil af: een
+        // select-param ("Band kleur") verloor zijn keuzes en een range zijn
+        // bovengrens, en het veld was daarna niet meer te renderen.
         extraParams: z.array(z.object({
+          id: z.string().max(60).optional(),
           label: z.string().min(1).max(60),
           type: z.string().max(20).optional(),
           value: z.union([z.string().max(200), z.number().min(-1_000_000).max(1_000_000)]).nullable().optional(),
+          valueMax: z.union([z.string().max(200), z.number().min(-1_000_000).max(1_000_000)]).nullable().optional(),
           unit: z.string().max(20).optional(),
+          options: z.array(z.string().max(60)).max(20).optional(),
+          min: z.number().min(-1_000_000).max(1_000_000).optional(),
+          max: z.number().min(-1_000_000).max(1_000_000).optional(),
         })).max(20).optional(),
       })).max(60),
     }))
