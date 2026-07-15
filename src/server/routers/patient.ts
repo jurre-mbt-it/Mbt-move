@@ -762,6 +762,19 @@ export const patientRouter = createTRPCRouter({
         linkedItemId = owned.id
       }
 
+      // Zelfde regel als hierboven, maar dan voor het programma: alleen aan je
+      // eigen programma hangen. Anders kan een geraden programId in de log en
+      // lekt de programmanaam terug via sessionDetail/calendarRange.
+      if (input.programId) {
+        const ownProgram = await ctx.prisma.program.findFirst({
+          where: { id: input.programId, patientId: ctx.user.id },
+          select: { id: true },
+        })
+        if (!ownProgram) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Dit programma hoort niet bij jou' })
+        }
+      }
+
       const sessionLog = await ctx.prisma.sessionLog.create({
         data: {
           patientId: ctx.user.id,
@@ -1127,6 +1140,17 @@ export const patientRouter = createTRPCRouter({
         linkedItemId = owned.id
       }
 
+      // Zelfde regel voor het programma: alleen aan je eigen programma hangen.
+      if (input.programId) {
+        const ownProgram = await ctx.prisma.program.findFirst({
+          where: { id: input.programId, patientId: ctx.user.id },
+          select: { id: true },
+        })
+        if (!ownProgram) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Dit programma hoort niet bij jou' })
+        }
+      }
+
       const log = await ctx.prisma.cardioLog.create({
         data: {
           patientId: ctx.user.id,
@@ -1180,9 +1204,11 @@ export const patientRouter = createTRPCRouter({
    * Vindt het actieve CARDIO-programma van de ingelogde patiënt en converteert
    * het naar de shape die de cardio-session pagina verwacht.
    *
-   * cardioParams JSONB komt uit twee wizards (zie programs/new/workout en
-   * programs/new/walk-run) en heeft daarom verschillende velden — dit is de
-   * brug die de UI uniform houdt.
+   * cardioParams is sinds 15 jul 2026 overal het blokken-model
+   * ({version:1, activity, blocks} — zie de eerste tak). De platte en
+   * WALK_RUN-takken eronder zijn leesbaarheid voor oude data: er bestond op
+   * dat moment géén enkel cardio-programma in productie, maar oudere
+   * app-builds (≤63) kunnen het platte formaat nog schrijven.
    */
   getActiveCardioProgram: protectedProcedure.query(async ({ ctx }) => {
     const program = await ctx.prisma.program.findFirst({
