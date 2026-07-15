@@ -64,6 +64,19 @@ DPA-acceptance is verplicht voor PATIENT/ATHLETE vóór ze patient-data
 endpoints raken, server-side afgedwongen in
 [`src/lib/auth/require-role.ts`](src/lib/auth/require-role.ts).
 
+# Gespiegelde code met de mobiele repo: draai de drift-check
+
+De iOS-app (`/Users/eva/mbt-gym-mobile`, aparte repo) spiegelt bewust een paar
+stukken uit deze repo: het cardio-blokkenmodel (`src/lib/cardio-workout.ts` ↔
+`lib/cardio-workout.ts`) en de voorschrift/parameter-constanten
+(`src/lib/prescription.ts` + `src/lib/program-constants.ts` ↔
+`lib/prescription-mirror.ts`). Er is geen gedeeld package.
+
+**Wijzig je een van die bronnen, draai dan `npm run check:mirror`** — dat laadt
+de echte bestanden uit beide repo's en vergelijkt gedrag (zelfde blokken →
+zelfde samenvatting/duur/kleuren/RPE's) en constanten. Faalt hij, trek de
+andere kant gelijk vóór een release.
+
 # Weekdatums: reken in NL-tijd, nooit in UTC
 
 `WeekSchedule.startDate` is "maandag 00:00 lokale tijd", opgeslagen als instant.
