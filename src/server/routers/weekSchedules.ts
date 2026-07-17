@@ -1438,6 +1438,11 @@ export const weekSchedulesRouter = createTRPCRouter({
       fromDate: z.string(),
       toDate: z.string(),
       replace: z.boolean().default(false),
+      // Knippen i.p.v. kopiëren: na het kopiëren wordt de bron-week geleegd
+      // (items weg, periodiserings-meta gereset) — de week "verhuist". De
+      // meta van de bron reist dan integraal mee naar het doel, inclusief
+      // deload (bij een gewone kopie wordt deload bewust niet geërfd).
+      move: z.boolean().default(false),
       // Periodisering: de nieuwe week meteen als deload markeren en/of een
       // fase toewijzen. Zonder deze velden erft de kopie de fase van de bron.
       markDeload: z.boolean().optional(),
@@ -1573,6 +1578,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       // een gedupliceerde week is standaard een gewone week).
       const metaUpdate: Record<string, unknown> = {}
       if (input.markDeload !== undefined) metaUpdate.isDeload = input.markDeload
+      else if (input.move && source.isDeload) metaUpdate.isDeload = true
       if (input.phaseType !== undefined) metaUpdate.phaseType = input.phaseType
       else if (source.phaseType != null) metaUpdate.phaseType = source.phaseType
       if (input.targetLoad !== undefined) metaUpdate.targetLoad = input.targetLoad
@@ -1581,6 +1587,22 @@ export const weekSchedulesRouter = createTRPCRouter({
       if (source.weekNote != null) metaUpdate.weekNote = source.weekNote
       if (Object.keys(metaUpdate).length > 0) {
         await ctx.prisma.weekSchedule.update({ where: { id: target.id }, data: metaUpdate })
+      }
+
+      // Knippen: bron leegmaken nu de kopie staat. Items weg, legacy programId
+      // per dag hersyncen en de periodiserings-meta terug naar neutraal — de
+      // week is verhuisd, er blijft een lege kalenderweek achter.
+      if (input.move) {
+        await ctx.prisma.weekScheduleDayItem.deleteMany({
+          where: { day: { weekScheduleId: source.id } },
+        })
+        for (const sDay of source.days) {
+          await syncDayProgramId(ctx.prisma, sDay.id)
+        }
+        await ctx.prisma.weekSchedule.update({
+          where: { id: source.id },
+          data: { isDeload: false, phaseType: null, targetLoad: null, weekNote: null },
+        })
       }
 
       return { targetWeekScheduleId: target.id, copied: creates.length }

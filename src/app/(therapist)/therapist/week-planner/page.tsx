@@ -22,13 +22,14 @@ import {
   ChevronLeft, ChevronRight, Plus, X, MoreHorizontal,
   Search, Building2, Copy, CopyPlus, Pencil, BookmarkPlus, GripVertical,
   CalendarRange, Layers, Moon, CalendarPlus, StickyNote, ClipboardCheck, Flag,
+  Scissors, ClipboardPaste,
 } from 'lucide-react'
 import {
   PHASE_TYPES, PHASE_META, phaseMeta, DELOAD_LOAD_FRACTION,
   type PhaseType,
 } from '@/lib/periodization'
 import {
-  DndContext, DragOverlay, closestCenter, PointerSensor,
+  DndContext, DragOverlay, closestCenter, MouseSensor, TouchSensor,
   useSensor, useSensors, useDroppable, useDraggable,
   type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core'
@@ -626,7 +627,7 @@ function ItemTile({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onRemove() }}
-            className="opacity-0 group-hover/tile:opacity-100 transition-opacity shrink-0 text-zinc-400 hover:text-red-400"
+            className="opacity-0 group-hover/tile:opacity-100 pointer-coarse:opacity-60 transition-opacity shrink-0 text-zinc-400 hover:text-red-400"
             title="Verwijder"
           >
             <X className="w-3 h-3" />
@@ -657,7 +658,16 @@ function DraggableItem({
       ref={setNodeRef}
       data-noselect
       className="w-full min-w-0"
-      style={{ opacity: isDragging ? 0.4 : 1, touchAction: 'none' }}
+      // touchAction 'manipulation' (niet 'none'): scrollen moet vanaf een tegel
+      // kunnen blijven starten; de drag activeert via lang indrukken (TouchSensor).
+      // touchCallout onderdrukt de iOS-preview/het contextmenu bij lang indrukken.
+      style={{
+        opacity: isDragging ? 0.4 : 1,
+        touchAction: 'manipulation',
+        WebkitTouchCallout: 'none',
+        WebkitUserSelect: 'none',
+        userSelect: 'none',
+      }}
       {...attributes}
       {...listeners}
     >
@@ -680,7 +690,7 @@ function SelectionDragHandle({ isos }: { isos: string[] }) {
       {...attributes}
       {...listeners}
       className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-grab active:cursor-grabbing"
-      style={{ background: P.surfaceHi, border: `1px solid ${P.brand}`, color: P.ink, opacity: isDragging ? 0.5 : 1, touchAction: 'none' }}
+      style={{ background: P.surfaceHi, border: `1px solid ${P.brand}`, color: P.ink, opacity: isDragging ? 0.5 : 1, touchAction: 'none', WebkitTouchCallout: 'none' }}
     >
       <GripVertical className="w-3.5 h-3.5" /> Sleep naar doeldag
     </button>
@@ -701,7 +711,7 @@ function DayCell({
   info: { dayId?: string | null; weekNumber?: number | null; items: ScheduleItem[] } | undefined
   weekLabel: number | null
   selected: boolean
-  onSelectStart: (iso: string) => void
+  onSelectStart: (iso: string, pointerType?: string) => void
   onSelectEnter: (iso: string) => void
   onAddWorkout: (date: Date) => void
   onAddTemplate: (date: Date) => void
@@ -730,9 +740,9 @@ function DayCell({
         outlineOffset: -2,
       }}
       onPointerDown={inMonth ? (e) => {
-        if (e.button !== 0) return
+        if (e.button !== 0 && e.pointerType === 'mouse') return
         if ((e.target as HTMLElement).closest('[data-noselect]')) return
-        onSelectStart(iso)
+        onSelectStart(iso, e.pointerType)
       } : undefined}
       onPointerEnter={inMonth ? () => onSelectEnter(iso) : undefined}
     >
@@ -789,7 +799,8 @@ function DayCell({
                 // Alleen tonen bij hover/focus of als de dag nog leeg is — zo
                 // is de kalender geen muur van identieke +Workout-knoppen meer.
                 'transition-opacity self-start text-[10px] flex items-center gap-1 px-1.5 py-0.5 rounded border cursor-pointer mbt-btn-hover focus:opacity-100 group-hover/cell:opacity-100',
-                items.length === 0 ? 'opacity-40' : 'opacity-0',
+                // Touch (iPad) kent geen hover — daar altijd zichtbaar houden.
+                items.length === 0 ? 'opacity-40' : 'opacity-0 pointer-coarse:opacity-40',
               )}
               style={{ color: P.brand, borderColor: 'rgba(232,122,85,0.4)', background: 'rgba(232,122,85,0.08)' }}
               title="Toevoegen / kopiëren"
@@ -2062,6 +2073,14 @@ function WeekPlannerContent() {
   const [applyPlanOpen, setApplyPlanOpen] = useState(false)
   const [savePlanRange, setSavePlanRange] = useState<{ from: string; to: string } | null>(null)
 
+  // ─ Week-klembord (kopieer/knip/plak van hele weken) ─
+  const [weekClipboard, setWeekClipboard] = useState<{
+    mode: 'copy' | 'cut'
+    monday: string
+    patientId: string
+    weekNum: number | null
+  } | null>(null)
+
   // ─ Multi-dag selectie (ingedrukt slepen) ─
   const [selectedIsos, setSelectedIsos] = useState<Set<string>>(new Set())
   const selecting = useRef(false)
@@ -2074,7 +2093,20 @@ function WeekPlannerContent() {
     const [lo, hi] = ia <= ib ? [ia, ib] : [ib, ia]
     return new Set(flatGridIsos.slice(lo, hi + 1))
   }
-  function startSelection(iso: string) {
+  function startSelection(iso: string, pointerType?: string) {
+    // Touch/pen (iPad): ingedrukt-slepen over cellen is daar scrollen, dus
+    // selecteren gaat per tik — eerste tik ankert, een tik op een andere dag
+    // breidt het bereik uit, een tik op het (enige) anker wist de selectie.
+    if (pointerType === 'touch' || pointerType === 'pen') {
+      if (selectAnchor.current && selectedIsos.size > 0) {
+        if (iso === selectAnchor.current && selectedIsos.size === 1) { clearSelection(); return }
+        setSelectedIsos(rangeIsos(selectAnchor.current, iso))
+        return
+      }
+      selectAnchor.current = iso
+      setSelectedIsos(new Set([iso]))
+      return
+    }
     selecting.current = true
     selectAnchor.current = iso
     setSelectedIsos(new Set([iso]))
@@ -2108,7 +2140,13 @@ function WeekPlannerContent() {
   }, [selectedIsos])
 
   // ─ Drag-drop (dnd-kit): item verplaatsen + dag-blok kopiëren ─
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+  // Muis: 6px afstand vóór activatie (klik blijft klik). Touch (iPad): lang
+  // indrukken (250ms) — direct slepen zou vechten met scrollen; beweeg je
+  // binnen de delay >8px dan wint scrollen en activeert de drag niet.
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
+  )
   const [activeDrag, setActiveDrag] = useState<
     | { type: 'item'; label: string }
     | { type: 'days'; count: number }
@@ -2203,14 +2241,39 @@ function WeekPlannerContent() {
   // Dupliceren gaat op DATUM (de maandag van de rij), niet op weekNumber: dat
   // veld is niet uniek per patiënt, waardoor de server een willekeurige
   // naamgenoot kon pakken en de verkeerde week kopieerde.
-  function handleDuplicateWeek(rowMonday: Date) {
+  // ─ Week-klembord: kopieer/knip een hele week en plak 'm op een doelweek.
+  // Kopiëren laat het klembord staan zodat dezelfde week meerdere keren
+  // geplakt kan worden; knippen leegt de bron en wist het klembord na plakken.
+  function handleClipWeek(rowMonday: Date, weekNum: number | null, mode: 'copy' | 'cut') {
     if (!selectedPatientId) return
-    duplicateWeek.mutate({
-      patientId: selectedPatientId,
-      fromDate: isoDate(rowMonday),
-      toDate: isoDate(addDays(rowMonday, 7)),
-      replace: false,
-    })
+    setWeekClipboard({ mode, monday: isoDate(rowMonday), patientId: selectedPatientId, weekNum })
+    toast.success(
+      `Week ${mode === 'copy' ? 'gekopieerd' : 'geknipt'} — kies "Plak week hier" in het menu van de doelweek`,
+    )
+  }
+
+  async function handlePasteWeek(rowMonday: Date) {
+    const clip = weekClipboard
+    if (!clip || !selectedPatientId) return
+    const base = {
+      patientId: clip.patientId,
+      fromDate: clip.monday,
+      toDate: isoDate(rowMonday),
+      move: clip.mode === 'cut',
+    }
+    try {
+      try {
+        await duplicateWeek.mutateAsync({ ...base, replace: false })
+      } catch (e) {
+        // Doelweek heeft al inhoud → expliciet laten bevestigen, dan overschrijven.
+        if (!(e instanceof Error) || !/bevat al items/i.test(e.message)) return
+        if (!window.confirm('De doelweek bevat al workouts. Overschrijven?')) return
+        await duplicateWeek.mutateAsync({ ...base, replace: true })
+      }
+      if (clip.mode === 'cut') setWeekClipboard(null)
+    } catch {
+      // duplicateWeek.onError toont de fout al als toast
+    }
   }
 
   // Dupliceer een week en zet 'm meteen als deload: kopieert de workouts,
@@ -2508,18 +2571,39 @@ function WeekPlannerContent() {
                             <Layers className="w-3.5 h-3.5" />
                             Fase &amp; belasting instellen
                           </DropdownMenuItem>
-                          {/* Dupliceren vereist een bestaande bron-week. */}
+                          {/* Kopiëren/knippen vereist een bestaande bron-week. */}
                           {weekExists && (
                             <>
-                              <DropdownMenuItem onSelect={() => handleDuplicateWeek(rowMonday)} className="gap-2 text-xs">
+                              <DropdownMenuItem onSelect={() => handleClipWeek(rowMonday, weekNum, 'copy')} className="gap-2 text-xs">
                                 <Copy className="w-3.5 h-3.5" />
-                                Dupliceer naar volgende week
+                                Kopieer week
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => handleClipWeek(rowMonday, weekNum, 'cut')} className="gap-2 text-xs">
+                                <Scissors className="w-3.5 h-3.5" />
+                                Knip week
                               </DropdownMenuItem>
                               <DropdownMenuItem onSelect={() => handleDuplicateWeekAsDeload(rowMonday, weekNum)} className="gap-2 text-xs">
                                 <Moon className="w-3.5 h-3.5" />
                                 Dupliceer als deload-week
                               </DropdownMenuItem>
                             </>
+                          )}
+                          {/* Plakken kan op elke week (ook een lege — die wordt
+                              dan aangemaakt), behalve op de bron zelf. */}
+                          {weekClipboard &&
+                            weekClipboard.patientId === selectedPatientId &&
+                            weekClipboard.monday !== isoDate(rowMonday) && (
+                            <DropdownMenuItem onSelect={() => handlePasteWeek(rowMonday)} className="gap-2 text-xs">
+                              <ClipboardPaste className="w-3.5 h-3.5" />
+                              Plak week hier
+                              {weekClipboard.weekNum != null ? ` (W${weekClipboard.weekNum}${weekClipboard.mode === 'cut' ? ' · knip' : ''})` : ''}
+                            </DropdownMenuItem>
+                          )}
+                          {weekClipboard && weekClipboard.patientId === selectedPatientId && (
+                            <DropdownMenuItem onSelect={() => setWeekClipboard(null)} className="gap-2 text-xs">
+                              <X className="w-3.5 h-3.5" />
+                              Klembord wissen
+                            </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>

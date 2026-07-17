@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "paths": {
+      "@/components/dark-ui": ["src/components/dark-ui/index.tsx"],
+      "@/*": ["src/*"],
+      "next/link": [".design-sync/shims/next-link.tsx"]
+    }
+  }
+}
