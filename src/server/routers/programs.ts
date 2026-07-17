@@ -1,10 +1,32 @@
 import { z } from 'zod'
 import { createTRPCRouter, therapistProcedure, creatorProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
+import { Prisma } from '@prisma/client'
 import type { PrismaClient } from '@prisma/client'
 import { maskMuscleLoadsArray } from '@/server/lib/muscle-loads'
 import { assertPatientAccess } from '@/server/lib/patient-access'
 import { isReviewDue, weeksSince, reviewThresholdWeeks } from '@/lib/program-review'
+
+/**
+ * "Leeg concept" van één therapeut: DRAFT zonder inhoud en zonder verwijzingen.
+ * Elke relatie die betekenis draagt telt als inhoud — een concept met sessies,
+ * planner-items of shop-koppeling is niet leeg, wat de naam ook zegt.
+ */
+const EMPTY_DRAFT_WHERE = (creatorId: string): Prisma.ProgramWhereInput => ({
+  creatorId,
+  status: 'DRAFT',
+  isTemplate: false,
+  cardioParams: { equals: Prisma.AnyNull },
+  exercises: { none: {} },
+  resources: { none: {} },
+  sessionLogs: { none: {} },
+  weekScheduleDays: { none: {} },
+  weekScheduleDayItems: { none: {} },
+  cardioLogs: { none: {} },
+  shopProducts: { none: {} },
+  activatedEntitlements: { none: {} },
+  sessionMoves: { none: {} },
+})
 
 const createId = () => crypto.randomUUID()
 
@@ -435,6 +457,36 @@ export const programsRouter = createTRPCRouter({
         },
       })
     }),
+
+  /**
+   * Lege concept-programma's van de ingelogde therapeut: DRAFT, geen
+   * oefeningen/cardio-inhoud en nergens aan gekoppeld (geen sessies, planner-
+   * items, resources of shop). Ontstaan doordat de snelle-flow op de iPad bij
+   * het openen van de builder meteen een concept aanmaakte; wie terug-tikte
+   * liet er zo één achter. Query voor de opruim-banner in de programma-lijst.
+   */
+  emptyDrafts: therapistProcedure.query(async ({ ctx }) => {
+    const empty = await ctx.prisma.program.findMany({
+      where: EMPTY_DRAFT_WHERE(ctx.user!.id),
+      select: { id: true, name: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    })
+    return empty
+  }),
+
+  /** Verwijder alle (nu nog steeds) lege concepten — zie emptyDrafts. */
+  cleanupEmptyDrafts: therapistProcedure.mutation(async ({ ctx }) => {
+    // Her-evalueren op het moment van verwijderen: een concept dat inmiddels
+    // inhoud kreeg valt automatisch buiten de filter.
+    const empty = await ctx.prisma.program.findMany({
+      where: EMPTY_DRAFT_WHERE(ctx.user!.id),
+      select: { id: true },
+    })
+    if (empty.length > 0) {
+      await ctx.prisma.program.deleteMany({ where: { id: { in: empty.map(p => p.id) } } })
+    }
+    return { deleted: empty.length }
+  }),
 
   delete: creatorProcedure
     .input(z.object({ id: z.string() }))

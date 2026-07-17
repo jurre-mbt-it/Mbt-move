@@ -230,12 +230,30 @@ function ActiveProgramsPanel() {
   )
   const duplicateMutation = trpc.programs.duplicate.useMutation()
   const deleteMutation = trpc.programs.delete.useMutation()
+  // Lege concepten (achtergebleven door de iPad-snelle-flow) — opruim-banner.
+  const { data: emptyDrafts = [] } = trpc.programs.emptyDrafts.useQuery(undefined, { staleTime: 30_000 })
+  const cleanupMutation = trpc.programs.cleanupEmptyDrafts.useMutation({
+    onSuccess: (r) => {
+      utils.programs.list.invalidate()
+      utils.programs.emptyDrafts.invalidate()
+      toast.success(`${r.deleted} lege concepten opgeruimd`)
+    },
+    onError: () => toast.error('Opruimen mislukt'),
+  })
 
   const [duplicateTarget, setDuplicateTarget] = useState<Program | null>(null)
   const [duplicateName, setDuplicateName] = useState('')
   const [duplicateAsTemplate, setDuplicateAsTemplate] = useState(false)
 
   const programs: Program[] = (rawData ?? []) as Program[]
+
+  const handleCleanup = () => {
+    if (!confirm(
+      `${emptyDrafts.length} lege concepten verwijderen?\n\n` +
+      'Alleen concepten zonder oefeningen, cardio of koppelingen worden verwijderd.',
+    )) return
+    cleanupMutation.mutate()
+  }
 
   const handleDuplicate = async () => {
     if (!duplicateTarget) return
@@ -272,6 +290,32 @@ function ActiveProgramsPanel() {
   return (
     <>
       <Kicker>Patiëntprogramma&apos;s ({programs.length})</Kicker>
+      {emptyDrafts.length >= 2 && (
+        <button
+          type="button"
+          onClick={handleCleanup}
+          disabled={cleanupMutation.isPending}
+          className="w-full flex items-center gap-3 rounded-xl text-left athletic-tap"
+          style={{
+            background: 'rgba(244,194,97,0.08)',
+            border: `1px solid ${P.gold}`,
+            padding: '12px 14px',
+            opacity: cleanupMutation.isPending ? 0.6 : 1,
+          }}
+        >
+          <div className="flex-1 min-w-0">
+            <span className="athletic-mono" style={{ color: P.gold, fontSize: 11, fontWeight: 900, letterSpacing: '0.1em' }}>
+              {emptyDrafts.length} LEGE CONCEPTEN
+            </span>
+            <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 2 }}>
+              Achtergebleven zonder inhoud — klik om op te ruimen
+            </p>
+          </div>
+          <span className="athletic-mono shrink-0" style={{ color: P.gold, fontSize: 11, fontWeight: 900, letterSpacing: '0.1em' }}>
+            {cleanupMutation.isPending ? 'BEZIG…' : 'OPRUIMEN'}
+          </span>
+        </button>
+      )}
       {programs.length === 0 ? (
         <Tile>
           <div className="py-12 flex flex-col items-center gap-3 text-center">
