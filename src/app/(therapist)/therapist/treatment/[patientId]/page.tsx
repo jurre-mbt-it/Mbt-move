@@ -364,10 +364,18 @@ export default function TreatmentPage({
     setRows((prev) => prev.map((r) => {
       if (r.uid !== uid) return r
       const merged = { ...r, ...patch }
-      // Bij wijziging van setsCompleted het weightsPerSet array meeschalen
+      // Bij wijziging van setsCompleted het weightsPerSet array alleen BIJVULLEN,
+      // nooit afkappen: tijdens het typen is het veld even leeg/laag (4 → "" → 5)
+      // en zou afkappen alle gewichten behalve set 1 wissen. Extra entries blijven
+      // staan (weergave en opslaan knippen op het definitieve aantal sets).
       if (patch.setsCompleted !== undefined) {
         const target = Math.max(1, Number(patch.setsCompleted) || 1)
-        merged.weightsPerSet = resizeWeights(merged.weightsPerSet, target)
+        if (target > merged.weightsPerSet.length) {
+          merged.weightsPerSet = [
+            ...merged.weightsPerSet,
+            ...Array(target - merged.weightsPerSet.length).fill(''),
+          ]
+        }
       }
       return merged
     }))
@@ -657,8 +665,11 @@ export default function TreatmentPage({
       feelScore,
       notes: notes.trim() || undefined,
       exercises: rows.map((r) => {
+        // weightsPerSet kan langer zijn dan het aantal sets (bijvullen tijdens
+        // typen kapt nooit af) — knip hier op het definitieve aantal.
+        const setsCount = Math.max(1, Number(r.setsCompleted) || 1)
         const weights = r.visible.weight
-          ? r.weightsPerSet.map((w) => (w === '' ? null : Number(w))).filter((n) => n === null || !Number.isNaN(n)) as Array<number | null>
+          ? r.weightsPerSet.slice(0, setsCount).map((w) => (w === '' ? null : Number(w))).filter((n) => n === null || !Number.isNaN(n)) as Array<number | null>
           : null
         // Legacy "weight" = laatste niet-lege set, t.b.v. 1RM/trends die op single weight rekenen
         const lastFilled = weights ? [...weights].reverse().find((n) => n !== null) ?? null : null
@@ -1394,7 +1405,9 @@ function ExerciseTile({
                 <DarkInput
                   value={w}
                   onChange={(e) => {
-                    const next = [...weights]
+                    // Schrijf in de volledige opgeslagen array (kan langer zijn
+                    // dan de weergave), zodat verborgen set-gewichten blijven staan.
+                    const next = r.weightsPerSet.length >= weights.length ? [...r.weightsPerSet] : [...weights]
                     next[idx] = e.target.value
                     onUpdate(r.uid, { weightsPerSet: next })
                   }}

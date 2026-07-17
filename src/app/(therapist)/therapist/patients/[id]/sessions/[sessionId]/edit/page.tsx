@@ -148,9 +148,17 @@ export default function EditSessionPage({
     setRows((prev) => prev.map((r) => {
       if (r.id !== id) return r
       const merged = { ...r, ...patch }
+      // Alleen bijvullen, nooit afkappen: tijdens het typen is het sets-veld
+      // even leeg/laag (4 → "" → 5) en zou afkappen alle gewichten behalve
+      // set 1 wissen. Weergave en opslaan knippen op het definitieve aantal.
       if (patch.setsCompleted !== undefined) {
         const target = Math.max(1, Number(patch.setsCompleted) || 1)
-        merged.weightsPerSet = resizeWeights(merged.weightsPerSet, target)
+        if (target > merged.weightsPerSet.length) {
+          merged.weightsPerSet = [
+            ...merged.weightsPerSet,
+            ...Array(target - merged.weightsPerSet.length).fill(''),
+          ]
+        }
       }
       return merged
     }))
@@ -225,7 +233,10 @@ export default function EditSessionPage({
       exertionLevel,
       notes: notes.trim() || null,
       exercises: rows.map((r) => {
-        const weights = r.weightsPerSet.map((w) => w === '' ? null : Number(w))
+        // weightsPerSet kan langer zijn dan het aantal sets (bijvullen tijdens
+        // typen kapt nooit af) — knip hier op het definitieve aantal.
+        const setsCount = Math.max(1, Number(r.setsCompleted) || 1)
+        const weights = r.weightsPerSet.slice(0, setsCount).map((w) => w === '' ? null : Number(w))
           .map((n) => (n === null || Number.isNaN(n)) ? null : n)
         const lastFilled = [...weights].reverse().find((n) => n !== null) ?? null
         return {
@@ -491,7 +502,9 @@ function EditExerciseTile({
               <DarkInput
                 value={w}
                 onChange={(e) => {
-                  const next = [...weights]
+                  // Schrijf in de volledige opgeslagen array (kan langer zijn
+                  // dan de weergave), zodat verborgen set-gewichten blijven staan.
+                  const next = r.weightsPerSet.length >= weights.length ? [...r.weightsPerSet] : [...weights]
                   next[idx] = e.target.value
                   onUpdate(r.id, { weightsPerSet: next })
                 }}
