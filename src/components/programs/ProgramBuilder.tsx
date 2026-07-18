@@ -122,6 +122,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
     isTemplate: initialState?.isTemplate ?? false,
     tendinopathyMode: (initialState as Partial<ProgramState> | undefined)?.tendinopathyMode ?? false,
     trackOneRepMax: (initialState as Partial<ProgramState> | undefined)?.trackOneRepMax ?? false,
+    dailyTarget: (initialState as Partial<ProgramState> | undefined)?.dailyTarget ?? null,
     flexibleSchedule: (initialState as Partial<ProgramState> | undefined)?.flexibleSchedule ?? false,
     weeklyTarget: (initialState as Partial<ProgramState> | undefined)?.weeklyTarget ?? null,
     reviewAfterWeeks: (initialState as Partial<ProgramState> | undefined)?.reviewAfterWeeks ?? null,
@@ -648,6 +649,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       isTemplate: boolean
       tendinopathyMode: boolean
       trackOneRepMax: boolean
+      dailyTarget: number | null
       flexibleSchedule: boolean
       weeklyTarget: number | null
       reviewAfterWeeks: number | null
@@ -665,6 +667,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       isTemplate: program.isTemplate,
       tendinopathyMode: program.tendinopathyMode,
       trackOneRepMax: program.trackOneRepMax,
+      dailyTarget: program.tendinopathyMode ? (program.dailyTarget ?? null) : null,
       flexibleSchedule: program.flexibleSchedule ?? false,
       weeklyTarget: program.weeklyTarget ?? null,
       reviewAfterWeeks: program.reviewAfterWeeks ?? null,
@@ -790,6 +793,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         reviewAfterWeeks: val.program.reviewAfterWeeks,
         tendinopathyMode: val.program.tendinopathyMode,
         trackOneRepMax: val.program.trackOneRepMax,
+        dailyTarget: val.program.tendinopathyMode ? val.program.dailyTarget : null,
         exercises: exercisePayload,
         resources: resourcePayload,
       })
@@ -806,6 +810,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         reviewAfterWeeks: val.program.reviewAfterWeeks,
         tendinopathyMode: val.program.tendinopathyMode,
         trackOneRepMax: val.program.trackOneRepMax,
+        dailyTarget: val.program.tendinopathyMode ? val.program.dailyTarget : null,
       })
       if (val.exercises.length > 0 || val.resources.length > 0) {
         await saveProgram.mutateAsync({
@@ -1056,6 +1061,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           isTemplate: true, patientId: null,
           tendinopathyMode: program.tendinopathyMode,
           trackOneRepMax: program.trackOneRepMax,
+          dailyTarget: program.tendinopathyMode ? program.dailyTarget : null,
         })
         if (exercises.length > 0 || resources.length > 0) {
           await saveProgram.mutateAsync({
@@ -1457,6 +1463,28 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             >
               Actief voor alle oefeningen
             </span>
+          )}
+          {/* Dagdoel: hoe vaak per dag de patient elke ISO-oefening moet doen.
+              Stuurt de dagelijkse herinneringen + voortgang in de app aan. Leeg
+              = geen dag-flow, alleen de reactieve 24u-check. */}
+          {program.tendinopathyMode && (
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-muted-foreground">×</span>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                placeholder="1"
+                value={program.dailyTarget ?? ''}
+                onChange={e => {
+                  const v = e.target.value
+                  setProgram(p => ({ ...p, dailyTarget: v === '' ? null : Math.max(1, Math.min(10, Number(v))) }))
+                }}
+                className="w-12 h-6 text-center text-xs font-bold bg-[#1C2425] rounded border border-[rgba(255,255,255,0.10)] focus:outline-none focus:ring-1 focus:ring-[#e87a55]"
+                title="Aantal keer per dag dat de patiënt elke oefening doet"
+              />
+              <span className="text-[10px] text-muted-foreground">/ dag</span>
+            </div>
           )}
 
           <div className="w-px h-4 bg-[rgba(255,255,255,0.08)] mx-1 hidden sm:block" />

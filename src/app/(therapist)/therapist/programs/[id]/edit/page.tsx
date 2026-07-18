@@ -73,6 +73,7 @@ type EditProgram = {
   // remount (na autosave) terug naar default false gezet.
   tendinopathyMode?: boolean
   trackOneRepMax?: boolean
+  dailyTarget?: number | null
   flexibleSchedule?: boolean
   weeklyTarget?: number | null
   reviewAfterWeeks?: number | null
@@ -313,6 +314,7 @@ export default function EditProgramPage({ params }: Props) {
           patientId: program.patientId ?? null,
           tendinopathyMode: program.tendinopathyMode ?? false,
           trackOneRepMax: program.trackOneRepMax ?? false,
+          dailyTarget: program.dailyTarget ?? null,
           flexibleSchedule: program.flexibleSchedule ?? false,
           weeklyTarget: program.weeklyTarget ?? null,
           reviewAfterWeeks: program.reviewAfterWeeks ?? null,

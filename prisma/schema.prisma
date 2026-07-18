@@ -380,6 +380,10 @@ model User {
   readinessSnapshots  ReadinessSnapshot[]
   stressEntries       StressEntry[]
 
+  // Push-notificaties (mobiele app)
+  pushTokens             PushToken[]
+  notificationPreference NotificationPreference?
+
   @@index([deletedAt])
   @@map("users")
 }
@@ -669,6 +673,12 @@ model Program {
 
   tendinopathyMode Boolean @default(false)
   trackOneRepMax   Boolean @default(false)
+
+  // Tendinopathie-dagritme: aantal ISO-rondes dat de patiënt per dag zou moeten
+  // doen. Alleen betekenisvol als `tendinopathyMode` aan staat. Null = geen
+  // dagdoel (dan blijft alleen de reactieve 24u-check actief, geen dag-flow).
+  // Isometrische peesoefeningen worden typisch 1-2x/dag gedaan.
+  dailyTarget Int?
 
   // Flexible-schedule modus: patient kan dit programma elke dag van de week
   // starten in plaats van vastgepind op specifieke dagen. Klaar zodra de
@@ -2510,4 +2520,41 @@ model TagVocabularyItem {
 
   @@unique([practiceId, name])
   @@map("tag_vocabulary")
+}
+
+/// Expo push-token per device. Eén gebruiker kan meerdere devices hebben, dus
+/// `token` is uniek (niet userId). Wordt geregistreerd door de mobiele app na
+/// permission, en opgeruimd zodra Expo `DeviceNotRegistered` teruggeeft.
+/// RLS: default-deny (alle toegang via Prisma/tRPC, nooit via de anon-key).
+model PushToken {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  /// ExponentPushToken[xxxxxxxx]
+  token      String   @unique
+  platform   String   // "ios" | "android"
+  deviceName String?
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@map("push_tokens")
+}
+
+/// Notificatie-voorkeuren per gebruiker. `pushEnabled` is de master-switch;
+/// `categories` bevat per-categorie booleans ({ message, appointment, reminder,
+/// insight }). Ontbrekende sleutel = default AAN. Quiet hours in minuten na
+/// middernacht (lokale tijd); niet-urgente categorieën (reminder/insight) worden
+/// daarbinnen onderdrukt, message/appointment mogen altijd door.
+model NotificationPreference {
+  id              String   @id @default(cuid())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String   @unique
+  pushEnabled     Boolean  @default(true)
+  categories      Json     @default("{}")
+  quietHoursStart Int?
+  quietHoursEnd   Int?
+  updatedAt       DateTime @updatedAt
+
+  @@map("notification_preferences")
 }

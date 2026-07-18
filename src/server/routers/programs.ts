@@ -6,6 +6,7 @@ import type { PrismaClient } from '@prisma/client'
 import { maskMuscleLoadsArray } from '@/server/lib/muscle-loads'
 import { assertPatientAccess } from '@/server/lib/patient-access'
 import { isReviewDue, weeksSince, reviewThresholdWeeks } from '@/lib/program-review'
+import { notifyNewSchedule } from '@/server/push/notify'
 
 /**
  * "Leeg concept" van één therapeut: DRAFT zonder inhoud en zonder verwijzingen.
@@ -241,11 +242,13 @@ export const programsRouter = createTRPCRouter({
       weeklyTarget: z.number().int().min(1).max(14).nullable().optional(),
       tendinopathyMode: z.boolean().optional(),
       trackOneRepMax: z.boolean().optional(),
+      // Tendinopathie-dagdoel: aantal ISO-rondes per dag per oefening.
+      dailyTarget: z.number().int().min(1).max(10).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const { patientId, cardioParams, ...rest } = input
       await assertCanAssignPatient(ctx.prisma, ctx.user!, patientId)
-      return ctx.prisma.program.create({
+      const program = await ctx.prisma.program.create({
         data: {
           id: createId(),
           ...rest,
@@ -260,6 +263,9 @@ export const programsRouter = createTRPCRouter({
           startDate: patientId ? new Date() : null,
         },
       })
+      // Direct aan een patiënt toegewezen (niet een losse template) → melden.
+      if (patientId) await notifyNewSchedule(patientId).catch(() => {})
+      return program
     }),
 
   save: creatorProcedure
@@ -281,6 +287,7 @@ export const programsRouter = createTRPCRouter({
       weeklyTarget: z.number().int().min(1).max(14).nullable().optional(),
       tendinopathyMode: z.boolean().optional(),
       trackOneRepMax: z.boolean().optional(),
+      dailyTarget: z.number().int().min(1).max(10).nullable().optional(),
       type: z.enum(['STRENGTH', 'MOBILITY', 'PLYOMETRICS', 'CARDIO', 'STABILITY', 'MIXED']).optional(),
       // Zelfde vrije blob als bij create — de cardio/walk-run wizards kunnen
       // hiermee een bestaand programma bijwerken.
@@ -422,6 +429,7 @@ export const programsRouter = createTRPCRouter({
           startDate: targetPatientId ? new Date() : null,
           tendinopathyMode: source.tendinopathyMode,
           trackOneRepMax: source.trackOneRepMax,
+          dailyTarget: source.dailyTarget,
           exercises: {
             create: source.exercises.map(ex => ({
               id: createId(),

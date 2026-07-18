@@ -30,6 +30,7 @@ import { runningAnalysisRouter } from './runningAnalysis'
 import { wearablesRouter } from './wearables'
 import { messagesRouter } from './messages'
 import { tagsRouter } from './tags'
+import { pushRouter } from './push'
 
 export const appRouter = createTRPCRouter({
   auth: authRouter,
@@ -61,6 +62,7 @@ export const appRouter = createTRPCRouter({
   wearables: wearablesRouter,
   messages: messagesRouter,
   tags: tagsRouter,
+  push: pushRouter,
 })
 
 export type AppRouter = typeof appRouter

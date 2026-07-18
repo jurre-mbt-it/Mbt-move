@@ -4,6 +4,7 @@ import { TRPCError } from '@trpc/server'
 import type { PrismaClient } from '@prisma/client'
 import { copyItemToDay, COPY_ITEM_INCLUDE } from './weekSchedules'
 import { mondayKey, mondayKeyOf, addDaysKey, amsMidnight, isDateKey } from '@/lib/week-dates'
+import { notifyNewSchedule } from '@/server/push/notify'
 
 const createId = () => crypto.randomUUID()
 
@@ -473,6 +474,12 @@ export const planTemplatesRouter = createTRPCRouter({
           }
         }
       }, { timeout: 30_000 })
+
+      // Meerweeks plan op de kalender gezet → één melding aan de patiënt (alleen
+      // als er daadwerkelijk iets is aangemaakt of geplaatst).
+      if (createdWeeks > 0 || placedItems > 0) {
+        await notifyNewSchedule(input.patientId).catch(() => {})
+      }
 
       return {
         planName: tpl.name,

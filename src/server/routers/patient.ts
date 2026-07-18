@@ -21,6 +21,13 @@ import { parseStructured, flattenSteps, totalDurationSec, STEP_META } from '@/li
 import { deriveTopSet, estimateOneRepMax } from '@/lib/one-rep-max'
 import { clampSessionDurationSec } from '@/lib/training-load'
 import { syncHashtagsForLog } from '@/server/tags'
+import {
+  computeTendinopathyProgress,
+  milestoneMessage,
+  getTendinopathyReminderState,
+  nlDayRange,
+} from '@/lib/tendinopathy'
+import { dateKey } from '@/lib/week-dates'
 import type { PrismaClient } from '@prisma/client'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -777,6 +784,30 @@ export const patientRouter = createTRPCRouter({
         if (!ownProgram) {
           throw new TRPCError({ code: 'FORBIDDEN', message: 'Dit programma hoort niet bij jou' })
         }
+      }
+
+      // Idempotentie tegen dubbel-loggen. `scheduledAt` = het exacte
+      // startmoment van de sessie (ms-precisie); twee ínzendingen van dezelfde
+      // sessie — dubbel-tik op "afronden", of een offline-retry nadat de
+      // eerste stiekem tóch was aangekomen — dragen daarom een identieke
+      // scheduledAt. Twee échte workouts delen die milliseconde vrijwel nooit,
+      // dus dit is een veilige natuurlijke sleutel. Bestaat er al zo'n verse
+      // sessie, geef die terug i.p.v. een duplicaat aan te maken.
+      // (Gezien bij Jamie Rijff, 13 juli 2026: 2× dezelfde krachtsessie, 33s
+      // uit elkaar, identieke scheduledAt en inhoud.)
+      const scheduled = new Date(input.scheduledAt)
+      const dupWindowStart = new Date(Date.now() - 10 * 60 * 1000)
+      const existingDup = await ctx.prisma.sessionLog.findFirst({
+        where: {
+          patientId: ctx.user.id,
+          scheduledAt: scheduled,
+          status: 'COMPLETED',
+          createdAt: { gte: dupWindowStart },
+        },
+        select: { id: true },
+      })
+      if (existingDup) {
+        return { id: existingDup.id, deduped: true }
       }
 
       const sessionLog = await ctx.prisma.sessionLog.create({
@@ -1695,19 +1726,38 @@ export const patientRouter = createTRPCRouter({
       : []
     const exerciseMap = new Map(exercises.map(e => [e.id, e.name]))
 
+    // Dedup: bij meerdere ISO-rondes op dezelfde dag hoeft de patient maar één
+    // 24u-check per oefening per dag te doen. Houd de laatste ronde aan (nieuwste
+    // sessie eerst), dan valt de rest weg.
+    const chosen = new Set<string>()
+    const seenKeys = new Set<string>()
+    for (const s of [...sessions].sort(
+      (a, b) => (b.completedAt?.getTime() ?? 0) - (a.completedAt?.getTime() ?? 0),
+    )) {
+      const dayKey = s.completedAt ? dateKey(s.completedAt) : ''
+      for (const el of s.exerciseLogs) {
+        const key = `${el.exerciseId}|${dayKey}`
+        if (seenKeys.has(key)) continue
+        seenKeys.add(key)
+        chosen.add(el.id)
+      }
+    }
+
     return sessions
-      .filter(s => s.exerciseLogs.length > 0)
       .map(s => ({
         sessionId: s.id,
         completedAt: s.completedAt,
         programName: s.program?.name ?? null,
-        exerciseLogs: s.exerciseLogs.map(el => ({
-          id: el.id,
-          exerciseId: el.exerciseId,
-          exerciseName: exerciseMap.get(el.exerciseId) ?? 'Oefening',
-          painDuring: el.painDuring,
-        })),
+        exerciseLogs: s.exerciseLogs
+          .filter(el => chosen.has(el.id))
+          .map(el => ({
+            id: el.id,
+            exerciseId: el.exerciseId,
+            exerciseName: exerciseMap.get(el.exerciseId) ?? 'Oefening',
+            painDuring: el.painDuring,
+          })),
       }))
+      .filter(s => s.exerciseLogs.length > 0)
   }),
 
   submitPainFollowUp: protectedProcedure
@@ -1737,13 +1787,232 @@ export const patientRouter = createTRPCRouter({
       })
     }),
 
+  // ── Tendinopathie dag-flow (dagelijkse ISO's + mijlpalen) ──────────────────
+
+  /**
+   * Alles wat het dagelijkse tendinopathie-scherm + de home-tegel nodig hebben:
+   * het programma, de ISO-oefeningen met hun dagdoel en hoe vaak ze vandaag al
+   * gedaan zijn, de streak, week-voortgang en een eventueel bereikte mijlpaal
+   * (met copy). Null als de patient geen actief tendinopathie-programma met een
+   * dagdoel heeft — dan blijft alleen de reactieve 24u-check actief.
+   */
+  getTendinopathyToday: protectedProcedure.query(async ({ ctx }) => {
+    const program = await ctx.prisma.program.findFirst({
+      where: {
+        patientId: ctx.user.id,
+        status: 'ACTIVE',
+        tendinopathyMode: true,
+        dailyTarget: { not: null },
+        exercises: { some: {} },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        weeks: true,
+        startDate: true,
+        dailyTarget: true,
+        exercises: {
+          select: {
+            exerciseId: true,
+            week: true,
+            sets: true,
+            reps: true,
+            repsMax: true,
+            repUnit: true,
+            restTime: true,
+            notes: true,
+            exercise: { select: { name: true, videoUrl: true } },
+          },
+          orderBy: [{ week: 'asc' }, { day: 'asc' }, { order: 'asc' }],
+        },
+      },
+    })
+
+    if (!program || !program.dailyTarget) return null
+
+    const progress = computeTendinopathyProgress(program.startDate, program.weeks)
+    const target = program.dailyTarget
+
+    // Eén rij per oefening: de voorschrift-versie van de huidige week, anders de
+    // vroegste. Tendinopathie-schema's houden de ISO's meestal constant, maar zo
+    // volgen we een eventuele week-progressie netjes.
+    const byExercise = new Map<string, (typeof program.exercises)[number]>()
+    for (const pe of program.exercises) {
+      const cur = byExercise.get(pe.exerciseId)
+      if (!cur) { byExercise.set(pe.exerciseId, pe); continue }
+      const curDist = Math.abs(cur.week - progress.currentWeek)
+      const peDist = Math.abs(pe.week - progress.currentWeek)
+      if (peDist < curDist) byExercise.set(pe.exerciseId, pe)
+    }
+
+    // Hoe vaak elke oefening vandaag (NL-dag) gelogd is.
+    const { start, end } = nlDayRange()
+    const todayLogs = await ctx.prisma.exerciseLog.findMany({
+      where: {
+        session: {
+          patientId: ctx.user.id,
+          programId: program.id,
+          status: 'COMPLETED',
+          completedAt: { gte: start, lt: end },
+        },
+      },
+      select: { exerciseId: true },
+    })
+    const doneToday = new Map<string, number>()
+    for (const l of todayLogs) doneToday.set(l.exerciseId, (doneToday.get(l.exerciseId) ?? 0) + 1)
+
+    // Streak: aaneengesloten NL-dagen met minstens één gelogde ronde. Telt
+    // vanaf vandaag (als er al gelogd is) of gisteren, zodat een vroege ochtend
+    // de streak niet op 0 zet.
+    const streakSince = new Date(Date.now() - 70 * 86_400_000)
+    const streakSessions = await ctx.prisma.sessionLog.findMany({
+      where: {
+        patientId: ctx.user.id,
+        programId: program.id,
+        status: 'COMPLETED',
+        completedAt: { gte: streakSince },
+      },
+      select: { completedAt: true },
+    })
+    const loggedDays = new Set(
+      streakSessions.map(s => dateKey(s.completedAt ?? new Date())),
+    )
+    let streak = 0
+    {
+      const dayMs = 86_400_000
+      const todayKey = dateKey(new Date())
+      // Startpunt: vandaag als vandaag gelogd is, anders gisteren.
+      let cursor = loggedDays.has(todayKey) ? new Date() : new Date(Date.now() - dayMs)
+      while (loggedDays.has(dateKey(cursor))) {
+        streak++
+        cursor = new Date(cursor.getTime() - dayMs)
+      }
+    }
+
+    const exercises = program.exercises.length
+      ? Array.from(byExercise.values()).map(pe => ({
+          exerciseId: pe.exerciseId,
+          name: pe.exercise.name,
+          videoUrl: pe.exercise.videoUrl ?? null,
+          sets: pe.sets,
+          reps: pe.reps,
+          repsMax: pe.repsMax ?? null,
+          repUnit: pe.repUnit,
+          restTime: pe.restTime,
+          notes: pe.notes ?? null,
+          target,
+          doneToday: doneToday.get(pe.exerciseId) ?? 0,
+        }))
+      : []
+
+    const remaining = exercises.reduce((t, e) => t + Math.max(0, e.target - e.doneToday), 0)
+    const milestone = progress.reachedMilestone
+      ? milestoneMessage(progress.reachedMilestone, progress.milestoneWeeks)
+      : null
+
+    return {
+      programId: program.id,
+      programName: program.name,
+      currentWeek: progress.currentWeek,
+      totalWeeks: progress.totalWeeks,
+      dailyTarget: target,
+      streak,
+      remaining,
+      allDoneToday: remaining === 0,
+      reachedMilestone: progress.reachedMilestone,
+      milestone,
+      exercises,
+    }
+  }),
+
+  /**
+   * Lichtgewicht log van één ISO-ronde voor één oefening. Schrijft een compacte
+   * SessionLog + ExerciseLog zodat de bestaande 24u-follow-up (leest painDuring)
+   * en de trend blijven werken. Mag meerdere keren per dag.
+   */
+  logTendinopathyBout: protectedProcedure
+    .input(
+      z.object({
+        programId: z.string(),
+        exerciseId: z.string(),
+        setsCompleted: z.number().int().min(0).max(1000).optional(),
+        repsCompleted: z.number().int().min(0).max(100_000).optional(),
+        repUnit: z.string().max(20).optional(),
+        painDuring: z.number().int().min(0).max(10),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const rl = await rateLimit('patient.logSession', ctx.user.id, RATE_LIMITS.sessionLog)
+      if (!rl.ok) throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
+
+      // Programma moet van de patient zijn én in tendinopathy-mode staan, anders
+      // kan een geraden programId een sessie aan een vreemd programma hangen.
+      const program = await ctx.prisma.program.findFirst({
+        where: { id: input.programId, patientId: ctx.user.id, tendinopathyMode: true },
+        select: { id: true },
+      })
+      if (!program) throw new TRPCError({ code: 'FORBIDDEN', message: 'Dit programma hoort niet bij jou' })
+
+      // Oefening moet in dit programma zitten.
+      const inProgram = await ctx.prisma.programExercise.findFirst({
+        where: { programId: program.id, exerciseId: input.exerciseId },
+        select: { id: true },
+      })
+      if (!inProgram) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Oefening hoort niet bij dit programma' })
+
+      const now = new Date()
+      const session = await ctx.prisma.sessionLog.create({
+        data: {
+          patientId: ctx.user.id,
+          therapistId: ctx.user.id,
+          programId: program.id,
+          scheduledAt: now,
+          completedAt: now,
+          status: 'COMPLETED',
+          completedAll: true,
+          duration: 0,
+          painLevel: input.painDuring,
+          exertionLevel: null,
+          exerciseLogs: {
+            create: [{
+              exerciseId: input.exerciseId,
+              setsCompleted: input.setsCompleted ?? null,
+              repsCompleted: input.repsCompleted ?? null,
+              repUnit: input.repUnit ?? null,
+              painDuring: input.painDuring,
+            }],
+          },
+        },
+        select: { id: true, exerciseLogs: { select: { id: true } } },
+      })
+      return { sessionId: session.id, exerciseLogId: session.exerciseLogs[0]?.id ?? null }
+    }),
+
+  /**
+   * Herinner-status voor de push-cron (aparte flow). Dun laagje over de
+   * gedeelde helper zodat een client 'm ook kan uitlezen.
+   */
+  getTendinopathyReminderState: protectedProcedure.query(async ({ ctx }) => {
+    return getTendinopathyReminderState(ctx.prisma as unknown as PrismaClient, ctx.user.id)
+  }),
+
   // ── Session history (for history page / dashboard) ────────────────────────
 
   getSessionHistory: protectedProcedure
     .input(z.object({ limit: z.number().int().min(1).max(100).default(20) }).optional())
     .query(async ({ ctx, input }) => {
       const sessions = await ctx.prisma.sessionLog.findMany({
-        where: { patientId: ctx.user.id, status: 'COMPLETED' },
+        where: {
+          patientId: ctx.user.id,
+          status: 'COMPLETED',
+          // Sluit de lichtgewicht tendinopathie-dagrondes uit: die worden vaak
+          // meerdere keren per dag gelogd en leven in hun eigen dag-hub. Ze in
+          // de algemene historie meetellen zou "vandaag afgerond", de week-strip
+          // en de gemiddelde-pijn vertekenen. De 24u-check + trend lezen de
+          // SessionLogs los, dus die blijven werken.
+          NOT: { program: { tendinopathyMode: true, dailyTarget: { not: null } } },
+        },
         orderBy: { completedAt: 'desc' },
         take: input?.limit ?? 20,
         include: {

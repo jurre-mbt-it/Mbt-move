@@ -103,6 +103,9 @@ export interface ProgramState {
   isTemplate: boolean
   tendinopathyMode: boolean
   trackOneRepMax: boolean
+  /** Tendinopathie-dagdoel: aantal ISO-rondes per dag per oefening. Alleen
+   *  betekenisvol als `tendinopathyMode` aan staat. */
+  dailyTarget?: number | null
   /** Patient mag programma elke dag starten; klaar zodra `weeklyTarget`
    *  is bereikt binnen een rolling week (Mo-Su). */
   flexibleSchedule?: boolean

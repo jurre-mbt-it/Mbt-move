@@ -9,6 +9,7 @@ import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure, therapistProcedure, adminProcedure, mfaAdminProcedure } from '@/server/trpc'
 import { getPatientRehabTrackerData } from '@/lib/rehab-data'
+import { notifyRehabCriterion, notifyRehabPhase } from '@/server/push/notify'
 
 const ACTIVE_LINK = { isActive: true, status: 'APPROVED' as const }
 
@@ -215,6 +216,19 @@ export const rehabRouter = createTRPCRouter({
 
       const measurementDate = input.measurementDate ? new Date(input.measurementDate) : null
 
+      // Vorige status onthouden zodat we alleen bij de ECHTE overgang naar MET
+      // een melding sturen (niet bij het opnieuw opslaan van een al-behaald
+      // criterium of een meetwaarde-edit).
+      const prevStatus = await ctx.prisma.rehabCriterionStatus.findUnique({
+        where: {
+          patientId_criterionId: {
+            patientId: input.patientId,
+            criterionId: input.criterionId,
+          },
+        },
+        select: { status: true },
+      })
+
       await ctx.prisma.rehabCriterionStatus.upsert({
         where: {
           patientId_criterionId: {
@@ -239,6 +253,36 @@ export const rehabRouter = createTRPCRouter({
           updatedById: ctx.user.id,
         },
       })
+
+      // Melding aan de patiënt bij de overgang naar MET. Faalt nooit de mutatie.
+      if (input.status === 'MET' && prevStatus?.status !== 'MET') {
+        await notifyRehabCriterion(input.patientId).catch(() => {})
+
+        // Fase compleet? Als álle criteria van deze fase nu MET zijn én er een
+        // volgende fase bestaat, ook een fase-overgang-melding sturen.
+        const phaseCriteria = await ctx.prisma.rehabCriterion.findMany({
+          where: { phaseId: criterion.phaseId },
+          select: { id: true },
+        })
+        const metCount = await ctx.prisma.rehabCriterionStatus.count({
+          where: {
+            patientId: input.patientId,
+            criterionId: { in: phaseCriteria.map((c) => c.id) },
+            status: 'MET',
+          },
+        })
+        if (phaseCriteria.length > 0 && metCount === phaseCriteria.length) {
+          const nextPhase = await ctx.prisma.rehabPhase.findFirst({
+            where: {
+              protocolId: criterion.phase.protocolId,
+              order: { gt: criterion.phase.order },
+            },
+            select: { id: true },
+          })
+          if (nextPhase) await notifyRehabPhase(input.patientId).catch(() => {})
+        }
+      }
+
       return { ok: true }
     }),
 

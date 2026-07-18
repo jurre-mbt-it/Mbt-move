@@ -16,9 +16,52 @@ import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
+import { sendPush } from '@/server/push/send'
 import type { PrismaClient } from '@prisma/client'
 
 type SessionUserLite = { id: string; role: string; practiceId: string | null }
+
+/**
+ * Notificeer de ontvangende kant van een nieuw bericht (push + in-app).
+ * Copy is generiek: geen berichtinhoud of naam op het lockscreen (AVG); de
+ * app opent de draad via `data.route`. Faalt nooit de verzend-flow.
+ */
+async function notifyNewMessage(
+  prisma: Pick<PrismaClient, 'patientTherapist'>,
+  opts: { patientId: string; fromPatient: boolean },
+): Promise<void> {
+  if (opts.fromPatient) {
+    // Atleet → behandelend therapeut(en) met een actieve, goedgekeurde koppeling.
+    const therapists = await prisma.patientTherapist.findMany({
+      where: { patientId: opts.patientId, isActive: true, status: 'APPROVED' },
+      select: { therapistId: true },
+    })
+    await Promise.all(
+      therapists.map((t) =>
+        sendPush(
+          t.therapistId,
+          {
+            title: 'Nieuw bericht',
+            body: 'Je hebt een nieuw bericht van een atleet.',
+            data: { type: 'message', route: '/messages', patientId: opts.patientId },
+          },
+          'message',
+        ),
+      ),
+    )
+  } else {
+    // Therapeut → atleet.
+    await sendPush(
+      opts.patientId,
+      {
+        title: 'Bericht van je therapeut',
+        body: 'Je therapeut heeft je een bericht gestuurd. Open de app om te reageren.',
+        data: { type: 'message', route: '/messages' },
+      },
+      'message',
+    )
+  }
+}
 
 /**
  * Bepaal wiens draad de caller mag zien/beschrijven. Berichten zijn
@@ -171,6 +214,15 @@ export const messagesRouter = createTRPCRouter({
         },
         select: messageSelect,
       })
+
+      // Ontvangende kant notificeren. Wél awaiten zodat de push in de serverless-
+      // functie afrondt vóór die bevriest, maar fouten mogen het versturen van
+      // het bericht nooit breken (vandaar de .catch).
+      await notifyNewMessage(ctx.prisma, {
+        patientId,
+        fromPatient: ctx.user.id === patientId,
+      }).catch(() => {})
+
       return mapMessage(created)
     }),
 

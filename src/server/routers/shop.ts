@@ -744,6 +744,7 @@ export const shopRouter = createTRPCRouter({
             reviewAfterWeeks: source.reviewAfterWeeks,
             tendinopathyMode: source.tendinopathyMode,
             trackOneRepMax: source.trackOneRepMax,
+            dailyTarget: source.dailyTarget,
             patientId: ctx.user.id,
             // Maker blijft de template-eigenaar (therapeut/admin), zodat het
             // programma in de praktijk-wereld beheerd kan blijven worden.

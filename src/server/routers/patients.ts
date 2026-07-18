@@ -1111,6 +1111,22 @@ export const patientsRouter = createTRPCRouter({
         })
       }
 
+      // Idempotentie tegen dubbel-loggen (zelfde patroon als patient.logSession):
+      // een dubbel-tik op "afronden" of een retry dragen een identieke
+      // scheduledAt (ms-precies startmoment). Bestaat er al zo'n verse sessie
+      // van deze patiënt, geef die terug i.p.v. een duplicaat aan te maken.
+      const scheduled = new Date(input.scheduledAt)
+      const existingDup = await ctx.prisma.sessionLog.findFirst({
+        where: {
+          patientId: input.patientId,
+          scheduledAt: scheduled,
+          status: 'COMPLETED',
+          createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) },
+        },
+        select: { id: true },
+      })
+      if (existingDup) return existingDup
+
       const created = await ctx.prisma.sessionLog.create({
         data: {
           id: createId(),
