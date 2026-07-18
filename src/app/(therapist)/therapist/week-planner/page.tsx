@@ -36,6 +36,7 @@ import {
 import {
   IconStrength, IconMobility, IconPlyometrics, IconCardio, IconCore,
   IconScale, CARDIO_ICON_MAP,
+  IconMoodVeryLow, IconMoodLow, IconMoodNeutral, IconMoodGood, IconMoodGreat,
 } from '@/components/icons'
 import {
   CARDIO_ACTIVITIES, HR_ZONES,
@@ -312,13 +313,14 @@ function rpeMeta(rpe: number): { label: string; color: string; bg: string } {
   return { label: 'Licht', color: P.lime, bg: 'rgba(190,242,100,0.12)' }
 }
 
-/** feelScore 1–5 → emoji + woord (zelfde schaal als de sessie-afronding). */
-const FEEL_META: Record<number, { emoji: string; label: string }> = {
-  1: { emoji: '😖', label: 'Slecht' },
-  2: { emoji: '🙁', label: 'Matig' },
-  3: { emoji: '🙂', label: 'Normaal' },
-  4: { emoji: '😄', label: 'Goed' },
-  5: { emoji: '🤩', label: 'Top' },
+/** feelScore 1–5 → eigen mood-icoon + woord — zelfde set en labels als de
+ *  gevoel-kiezer bij de sessie-afronding (geen standaard-emoji). */
+const FEEL_META: Record<number, { Icon: (p: { size?: number; className?: string }) => React.ReactNode; label: string }> = {
+  1: { Icon: IconMoodVeryLow, label: 'Slecht' },
+  2: { Icon: IconMoodLow, label: 'Matig' },
+  3: { Icon: IconMoodNeutral, label: 'Oké' },
+  4: { Icon: IconMoodGood, label: 'Goed' },
+  5: { Icon: IconMoodGreat, label: 'Top' },
 }
 
 /** Sport-groepen voor de weektotalen. */
@@ -727,8 +729,8 @@ function ItemTile({
                   )
                 })()}
                 {feel && (
-                  <span style={{ fontSize: 9, color: P.inkMuted }}>
-                    {feel.emoji} {feel.label}
+                  <span className="inline-flex items-center gap-1" style={{ fontSize: 9, color: P.inkMuted }}>
+                    <feel.Icon size={11} /> {feel.label}
                   </span>
                 )}
               </div>
