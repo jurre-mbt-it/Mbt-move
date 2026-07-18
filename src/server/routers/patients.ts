@@ -4,7 +4,7 @@ import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js
 import type { PrismaClient } from '@prisma/client'
 import { createTRPCRouter, therapistProcedure, mfaTherapistProcedure } from '@/server/trpc'
 import { auditLog } from '@/server/audit'
-import { estimateOneRepMax } from '@/lib/one-rep-max'
+import { deriveTopSet, estimateOneRepMax } from '@/lib/one-rep-max'
 import { clampSessionDurationSec } from '@/lib/training-load'
 import { syncHashtagsForLog } from '@/server/tags'
 
@@ -1084,6 +1084,7 @@ export const patientsRouter = createTRPCRouter({
             painLevel: z.number().int().min(0).max(10).nullable().optional(),
             weight: z.number().nullable().optional(),
             weightsPerSet: z.array(z.number().nullable()).nullable().optional(),
+            repsPerSet: z.array(z.number().nullable()).nullable().optional(),
             extraParams: z.array(z.object({
               id: z.string(),
               label: z.string(),
@@ -1129,23 +1130,30 @@ export const patientsRouter = createTRPCRouter({
           feelScore: input.feelScore ?? null,
           notes: input.notes ?? undefined,
           exerciseLogs: {
-            create: input.exercises.map((ex) => ({
-              id: createId(),
-              exerciseId: ex.exerciseId,
-              setsCompleted: ex.setsCompleted ?? null,
-              repsCompleted: ex.repsCompleted ?? null,
-              repUnit: ex.repUnit ?? null,
-              painLevel: ex.painLevel ?? null,
-              weight: ex.weight ?? null,
-              weightsPerSet: ex.weightsPerSet ?? undefined,
-              extraParams: ex.extraParams ?? undefined,
-              supersetGroup: ex.supersetGroup ?? null,
-              phase: ex.phase ?? null,
-              // Epley-fallback server-side — zie src/lib/one-rep-max.ts
-              estimatedOneRepMax: ex.estimatedOneRepMax
-                ?? estimateOneRepMax(ex.weight, ex.repsCompleted),
-              painDuring: ex.painDuring ?? null,
-            })),
+            create: input.exercises.map((ex) => {
+              // Zelfde afleiding als patient.logSession: zwaarste set als
+              // legacy weight-paar wanneer alleen per-set arrays meekomen.
+              const top = deriveTopSet(ex.weightsPerSet, ex.repsPerSet)
+              const weight = ex.weight ?? top.weight
+              return {
+                id: createId(),
+                exerciseId: ex.exerciseId,
+                setsCompleted: ex.setsCompleted ?? null,
+                repsCompleted: ex.repsCompleted ?? null,
+                repUnit: ex.repUnit ?? null,
+                painLevel: ex.painLevel ?? null,
+                weight,
+                weightsPerSet: ex.weightsPerSet ?? undefined,
+                repsPerSet: ex.repsPerSet ?? undefined,
+                extraParams: ex.extraParams ?? undefined,
+                supersetGroup: ex.supersetGroup ?? null,
+                phase: ex.phase ?? null,
+                // Epley-fallback server-side — zie src/lib/one-rep-max.ts
+                estimatedOneRepMax: ex.estimatedOneRepMax
+                  ?? estimateOneRepMax(weight, top.reps ?? ex.repsCompleted),
+                painDuring: ex.painDuring ?? null,
+              }
+            }),
           },
         },
         select: { id: true },

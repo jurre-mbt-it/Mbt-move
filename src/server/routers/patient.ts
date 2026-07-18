@@ -18,7 +18,7 @@ import { auditLog } from '@/server/audit'
 import { signEducationFile } from '@/lib/education/storage'
 import { paceSecPerKm } from '@/lib/cardio-zones'
 import { parseStructured, flattenSteps, totalDurationSec, STEP_META } from '@/lib/cardio-workout'
-import { estimateOneRepMax } from '@/lib/one-rep-max'
+import { deriveTopSet, estimateOneRepMax } from '@/lib/one-rep-max'
 import { clampSessionDurationSec } from '@/lib/training-load'
 import { syncHashtagsForLog } from '@/server/tags'
 import type { PrismaClient } from '@prisma/client'
@@ -798,24 +798,31 @@ export const patientRouter = createTRPCRouter({
           feelScore: input.feelScore ?? null,
           notes: input.notes ?? undefined,
           exerciseLogs: {
-            create: input.exercises.map(ex => ({
-              exerciseId: ex.exerciseId,
-              setsCompleted: ex.setsCompleted ?? null,
-              repsCompleted: ex.repsCompleted ?? null,
-              repUnit: ex.repUnit ?? null,
-              painLevel: ex.painLevel ?? null,
-              weight: ex.weight ?? null,
-              weightsPerSet: ex.weightsPerSet ?? undefined,
-              repsPerSet: ex.repsPerSet ?? undefined,
-              extraParams: ex.extraParams && ex.extraParams.length > 0 ? ex.extraParams : undefined,
-              // Epley-fallback server-side: vóór deze fix werd 1RM alleen
-              // client-side berekend als program.trackOneRepMax aanstond —
-              // die vlag staat vrijwel nergens aan, dus 1RM-data bleef leeg
-              // terwijl gewicht + reps wél gelogd werden.
-              estimatedOneRepMax: ex.estimatedOneRepMax
-                ?? estimateOneRepMax(ex.weight, ex.repsCompleted),
-              painDuring: ex.painDuring ?? null,
-            })),
+            create: input.exercises.map(ex => {
+              // Legacy weight = zwaarste set, afgeleid als de client alleen
+              // per-set arrays stuurt (iOS-runner) — anders bleef de log
+              // onzichtbaar voor getLastWeights en rolde er geen 1RM uit.
+              const top = deriveTopSet(ex.weightsPerSet, ex.repsPerSet)
+              const weight = ex.weight ?? top.weight
+              return {
+                exerciseId: ex.exerciseId,
+                setsCompleted: ex.setsCompleted ?? null,
+                repsCompleted: ex.repsCompleted ?? null,
+                repUnit: ex.repUnit ?? null,
+                painLevel: ex.painLevel ?? null,
+                weight,
+                weightsPerSet: ex.weightsPerSet ?? undefined,
+                repsPerSet: ex.repsPerSet ?? undefined,
+                extraParams: ex.extraParams && ex.extraParams.length > 0 ? ex.extraParams : undefined,
+                // Epley-fallback server-side: vóór deze fix werd 1RM alleen
+                // client-side berekend als program.trackOneRepMax aanstond —
+                // die vlag staat vrijwel nergens aan, dus 1RM-data bleef leeg
+                // terwijl gewicht + reps wél gelogd werden.
+                estimatedOneRepMax: ex.estimatedOneRepMax
+                  ?? estimateOneRepMax(weight, top.reps ?? ex.repsCompleted),
+                painDuring: ex.painDuring ?? null,
+              }
+            }),
           },
         },
         select: { id: true },
@@ -1440,33 +1447,41 @@ export const patientRouter = createTRPCRouter({
         targetId = input.patientId
       }
 
+      // Bewust GEEN where op het legacy weight-veld: de iOS-runner stuurde
+      // een tijd alleen weightsPerSet (weight = null in de DB), waardoor die
+      // sessies hier onzichtbaar waren en de "LAATSTE"-hint een oude sessie
+      // liet zien. Het paar (gewicht, reps) komt nu uit de zwaarste set van
+      // de per-set arrays, met het legacy-veld als fallback — zo klopt de
+      // hint ook voor de al bestaande rijen zonder weight.
       const logs = await ctx.prisma.exerciseLog.findMany({
-        where: {
-          session: { patientId: targetId, status: 'COMPLETED' },
-          weight: { not: null, gt: 0 },
-        },
+        where: { session: { patientId: targetId, status: 'COMPLETED' } },
         orderBy: { session: { completedAt: 'desc' } },
         select: {
           exerciseId: true,
           weight: true,
           repsCompleted: true,
+          weightsPerSet: true,
+          repsPerSet: true,
           session: { select: { completedAt: true } },
         },
         take: 500, // genoeg voor recente historie
       })
 
-      // Dedupe — eerste (meest recente) per exerciseId wint
+      // Dedupe — de meest recente log MET gewicht per exerciseId wint
+      // (een recentere log zonder gewichten, bv. bodyweight, telt niet mee).
       const byExercise: Record<
         string,
         { weight: number; reps: number | null; date: string }
       > = {}
       for (const log of logs) {
-        if (!(log.exerciseId in byExercise) && log.weight !== null) {
-          byExercise[log.exerciseId] = {
-            weight: log.weight,
-            reps: log.repsCompleted,
-            date: (log.session.completedAt ?? new Date()).toISOString(),
-          }
+        if (log.exerciseId in byExercise) continue
+        const top = deriveTopSet(log.weightsPerSet, log.repsPerSet)
+        const weight = top.weight ?? (log.weight && log.weight > 0 ? log.weight : null)
+        if (weight == null) continue
+        byExercise[log.exerciseId] = {
+          weight,
+          reps: top.reps ?? log.repsCompleted,
+          date: (log.session.completedAt ?? new Date()).toISOString(),
         }
       }
 
