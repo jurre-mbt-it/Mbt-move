@@ -29,7 +29,7 @@ export async function notifyTrainingToday(patientId: string): Promise<void> {
     patientId,
     {
       title: 'Je training van vandaag',
-      body: 'Je oefeningen staan voor je klaar. Een goed moment om even aan de slag te gaan.',
+      body: 'Je hebt vandaag een training op het programma staan. Consistentie is enorm belangrijk voor je herstel en progressie.',
       data: { type: 'reminder-training' },
     },
     'reminder',
@@ -47,7 +47,7 @@ export async function notifyRecovery(patientId: string, level: 'good' | 'low'): 
         }
       : {
           title: 'Je herstel is wat lager',
-          body: 'Je lichaam heeft nog wat herstel nodig. Houd je training vandaag rustiger aan, dan bouw je gezond verder.',
+          body: 'Je lichaam heeft nog wat herstel nodig. Houd je training vandaag rustiger aan en geef je herstel de ruimte.',
         }
   await sendPush(patientId, { ...msg, data: { type: 'recovery', level } }, 'insight')
 }
@@ -71,7 +71,7 @@ export async function notifyRehabCriterion(patientId: string): Promise<void> {
     patientId,
     {
       title: 'Criterium behaald',
-      body: 'Je hebt een doel in je herstel gehaald. Mooi werk, je bent weer een stap verder.',
+      body: 'Je hebt een doel behaald. Mooi werk, je bent weer een stap verder in je herstel!',
       data: { type: 'rehab-criterion' },
     },
     'insight',
