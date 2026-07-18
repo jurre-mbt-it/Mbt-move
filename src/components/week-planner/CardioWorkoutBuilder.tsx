@@ -582,34 +582,73 @@ function StepEditor({
         )}
       </div>
 
-      {/* Doel */}
+      {/* Doel — op HR-zone óf op RPE (ervaren inspanning 1-10). */}
       <div>
-        <MetaLabel>{ramp ? 'Van zone' : 'Doel-zone'}</MetaLabel>
-        <ZonePicker
-          value={step.target.type === 'ZONE' ? step.target.zone : 2}
-          onChange={z => onPatch(step.id, {
-            target: step.target.type === 'ZONE' && step.target.toZone != null
-              ? { type: 'ZONE', zone: z, toZone: step.target.toZone }
-              : { type: 'ZONE', zone: z },
-          })}
-        />
-      </div>
-
-      {ramp && step.target.type === 'ZONE' && (
-        <div>
-          <MetaLabel>Naar zone</MetaLabel>
-          <ZonePicker
-            value={step.target.toZone ?? 4}
-            onChange={z => onPatch(step.id, { target: { type: 'ZONE', zone: (step.target as { zone: HRZone }).zone, toZone: z } })}
-          />
+        <div className="flex items-center justify-between">
+          <MetaLabel>Doel</MetaLabel>
+          <div className="flex gap-1">
+            {(['ZONE', 'RPE'] as const).map(mode => {
+              const active = step.target.type === mode
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => {
+                    if (step.target.type === mode) return
+                    // Wisselen van doel-type met een zinvolle startwaarde.
+                    onPatch(step.id, {
+                      target: mode === 'RPE'
+                        ? (ramp ? { type: 'RPE', min: 3, max: 7 } : { type: 'RPE', min: 5 })
+                        : (ramp ? { type: 'ZONE', zone: 2, toZone: 4 } : { type: 'ZONE', zone: 2 }),
+                    })
+                  }}
+                  className="px-2 py-0.5 rounded-md text-[10px] font-bold athletic-mono transition-colors"
+                  style={{
+                    background: active ? `${P.brand}22` : 'transparent',
+                    border: `1px solid ${active ? P.brand : P.line}`,
+                    color: active ? P.brand : P.inkMuted,
+                  }}
+                >
+                  {mode === 'ZONE' ? 'HR-ZONE' : 'RPE'}
+                </button>
+              )
+            })}
+          </div>
         </div>
-      )}
 
-      {step.target.type === 'ZONE' && (
-        <p className="text-[10px] leading-relaxed" style={{ color: P.inkDim }}>
-          {HR_ZONES[step.target.zone].description} · {HR_ZONES[step.target.zone].rpeFeel}
-        </p>
-      )}
+        {step.target.type === 'ZONE' ? (
+          <>
+            <MetaLabel style={{ marginTop: 8 }}>{ramp ? 'Van zone' : 'Doel-zone'}</MetaLabel>
+            <ZonePicker
+              value={step.target.zone}
+              onChange={z => onPatch(step.id, {
+                target: step.target.type === 'ZONE' && step.target.toZone != null
+                  ? { type: 'ZONE', zone: z, toZone: step.target.toZone }
+                  : { type: 'ZONE', zone: z },
+              })}
+            />
+            {ramp && step.target.toZone != null && (
+              <>
+                <MetaLabel style={{ marginTop: 8 }}>Naar zone</MetaLabel>
+                <ZonePicker
+                  value={step.target.toZone}
+                  onChange={z => onPatch(step.id, { target: { type: 'ZONE', zone: (step.target as { zone: HRZone }).zone, toZone: z } })}
+                />
+              </>
+            )}
+            <p className="text-[10px] leading-relaxed mt-1.5" style={{ color: P.inkDim }}>
+              {HR_ZONES[step.target.zone].description} · {HR_ZONES[step.target.zone].rpeFeel}
+            </p>
+          </>
+        ) : (
+          <RpePicker
+            ramp={ramp}
+            min={step.target.type === 'RPE' ? step.target.min : 5}
+            max={step.target.type === 'RPE' ? step.target.max : undefined}
+            onChange={(min, max) => onPatch(step.id, { target: max != null ? { type: 'RPE', min, max } : { type: 'RPE', min } })}
+          />
+        )}
+      </div>
 
       <div>
         <MetaLabel>Notitie (optioneel)</MetaLabel>
@@ -644,5 +683,53 @@ function ZonePicker({ value, onChange }: { value: HRZone; onChange: (z: HRZone) 
         </button>
       ))}
     </div>
+  )
+}
+
+/** RPE-gevoel bij een waarde 1-10 (Borg CR10-achtig). */
+function rpeFeel(v: number): string {
+  if (v <= 2) return 'zeer licht'
+  if (v <= 4) return 'licht'
+  if (v <= 6) return 'matig'
+  if (v <= 8) return 'zwaar'
+  return 'maximaal'
+}
+
+/** RPE-doel: één waarde 1-10, of bij een ramp een van→naar-bereik. */
+function RpePicker({ ramp, min, max, onChange }: {
+  ramp: boolean
+  min: number
+  max?: number
+  onChange: (min: number, max?: number) => void
+}) {
+  const clamp = (n: number) => Math.max(1, Math.min(10, n))
+  const Stepper = ({ label, value, set }: { label?: string; value: number; set: (v: number) => void }) => (
+    <div className="flex-1">
+      {label && <MetaLabel style={{ marginTop: 8 }}>{label}</MetaLabel>}
+      <div className="flex items-center gap-2 mt-1.5">
+        <button type="button" onClick={() => set(clamp(value - 1))}
+          className="w-7 h-7 rounded-md text-sm font-bold" style={{ border: `1px solid ${P.line}`, color: P.ink }}>−</button>
+        <div className="flex-1 text-center athletic-mono text-sm font-bold" style={{ color: P.brand }}>
+          RPE {value}
+        </div>
+        <button type="button" onClick={() => set(clamp(value + 1))}
+          className="w-7 h-7 rounded-md text-sm font-bold" style={{ border: `1px solid ${P.line}`, color: P.ink }}>+</button>
+      </div>
+    </div>
+  )
+  return (
+    <>
+      {ramp ? (
+        <div className="flex gap-3">
+          <Stepper label="Van RPE" value={min} set={v => onChange(v, Math.max(v, max ?? v))} />
+          <Stepper label="Naar RPE" value={max ?? min} set={v => onChange(Math.min(min, v), v)} />
+        </div>
+      ) : (
+        <Stepper value={min} set={v => onChange(v)} />
+      )}
+      <p className="text-[10px] leading-relaxed mt-1.5" style={{ color: P.inkDim }}>
+        Ervaren inspanning (1-10) · {ramp ? `${rpeFeel(min)} → ${rpeFeel(max ?? min)}` : rpeFeel(min)}
+      </p>
+    </>
   )
 }
