@@ -124,6 +124,19 @@ function mondayOf(d: Date): Date {
 function addDays(d: Date, n: number): Date {
   const r = new Date(d); r.setDate(r.getDate() + n); return r
 }
+/**
+ * ISO 8601-weeknummer (1–53): de échte kalenderweek, tellend vanaf januari.
+ * Voor de week-rail-weergave zodat die gelijk loopt met een gewone kalender
+ * i.p.v. de programma-relatieve week 1 (die toevallig in juni kan beginnen).
+ */
+function isoWeekOf(d: Date): number {
+  const x = startOfDay(d)
+  const dow = (x.getDay() + 6) % 7 // 0 = maandag
+  x.setDate(x.getDate() - dow + 3) // donderdag van deze week bepaalt het jaar
+  const ft = startOfDay(new Date(x.getFullYear(), 0, 4))
+  ft.setDate(ft.getDate() - (((ft.getDay() + 6) % 7)) + 3)
+  return 1 + Math.round((x.getTime() - ft.getTime()) / (7 * 86_400_000))
+}
 function sameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear()
     && a.getMonth() === b.getMonth()
@@ -2771,7 +2784,7 @@ function WeekPlannerContent() {
                   {weekNum !== null ? (
                     <>
                       <span className="athletic-mono text-[10px] font-bold" style={{ color: P.inkMuted }}>
-                        W{weekNum}
+                        W{isoWeekOf(rowMonday)}
                       </span>
                       {meta?.isDeload && (
                         <span title="Deload-week">
@@ -2817,7 +2830,7 @@ function WeekPlannerContent() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="w-60">
                           <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                            Week {weekNum}
+                            Week {isoWeekOf(rowMonday)}
                           </DropdownMenuLabel>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onSelect={() => setWeekMetaOpen(weekNum)} className="gap-2 text-xs">
