@@ -19,6 +19,9 @@ export const dailyGoalsRouter = createTRPCRouter({
       trainMinGoal: g?.trainMinGoal ?? null,
       stepsGoal: g?.stepsGoal ?? null,
       sleepMinGoal: g?.sleepMinGoal ?? null,
+      // Is er ooit opgeslagen? Stuurt de eenmalige onboarding-stap in de app
+      // (ook "alles automatisch" opslaan telt als geconfigureerd).
+      configured: g != null,
     }
   }),
 
