@@ -51,7 +51,8 @@ export function MfaEnrollForm() {
 
         const { data, error } = await supabase.auth.mfa.enroll({
           factorType: 'totp',
-          friendlyName: 'MBT Gym Authenticator',
+          issuer: 'BASE',
+          friendlyName: 'BASE Authenticator',
         })
 
         if (error) {
