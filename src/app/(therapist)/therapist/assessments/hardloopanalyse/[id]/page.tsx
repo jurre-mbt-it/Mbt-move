@@ -51,6 +51,9 @@ export default function HardloopanalyseEditorPage({ params }: { params: Promise<
     therapistComments: '',
     nextMoment: '',
   })
+  // Opmerking per loopmetric (key = METRICS[].key) — zodat je ook bij de
+  // metrics per test kunt duiden, niet alleen onderaan.
+  const [metricComments, setMetricComments] = useState<Record<string, string>>({})
   const [advice, setAdvice] = useState<Array<{ title: string; body: string }>>([])
   const [loadedId, setLoadedId] = useState<string | null>(null)
 
@@ -69,6 +72,7 @@ export default function HardloopanalyseEditorPage({ params }: { params: Promise<
       therapistComments: analysis.therapistComments ?? '',
       nextMoment: analysis.nextMoment ?? '',
     })
+    setMetricComments(analysis.metricComments ?? {})
     setAdvice(analysis.advice.map((a) => ({ title: a.title, body: a.body })))
     setLoadedId(analysis.id)
   }, [analysis, loadedId])
@@ -105,6 +109,13 @@ export default function HardloopanalyseEditorPage({ params }: { params: Promise<
       dutyFactor: numOrNull(meta.dutyFactor),
       therapistComments: meta.therapistComments || null,
       nextMoment: meta.nextMoment || null,
+      // Lege opmerkingen niet bewaren; null = alle metric-opmerkingen wissen.
+      metricComments: (() => {
+        const filled = Object.fromEntries(
+          Object.entries(metricComments).filter(([, v]) => v.trim()),
+        )
+        return Object.keys(filled).length > 0 ? filled : null
+      })(),
       ...(status ? { status } : {}),
     })
     setAdviceM.mutate({ analysisId: id, advice: advice.filter((a) => a.title.trim() || a.body.trim()) })
@@ -167,18 +178,33 @@ export default function HardloopanalyseEditorPage({ params }: { params: Promise<
           </div>
         </Tile>
 
-        {/* Loopmetrics */}
+        {/* Loopmetrics — waarde + opmerking per metric */}
         <Tile>
           <MetaLabel>03 · Loopmetrics</MetaLabel>
-          <div className="grid grid-cols-3 gap-3 mt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
             {METRICS.map((m) => (
-              <Labeled key={m.key} label={`${m.label} (${m.unit})`}>
-                <DarkInput
-                  type="number"
-                  value={meta[m.key]}
-                  onChange={(e) => setMeta({ ...meta, [m.key]: e.target.value })}
-                />
-              </Labeled>
+              <div key={m.key} className="flex gap-2 items-start">
+                <div style={{ flex: '0 0 96px' }}>
+                  <MetaLabel>{m.label} ({m.unit})</MetaLabel>
+                  <div className="mt-1">
+                    <DarkInput
+                      type="number"
+                      value={meta[m.key]}
+                      onChange={(e) => setMeta({ ...meta, [m.key]: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <MetaLabel>Opmerking</MetaLabel>
+                  <div className="mt-1">
+                    <DarkInput
+                      value={metricComments[m.key] ?? ''}
+                      onChange={(e) => setMetricComments((c) => ({ ...c, [m.key]: e.target.value }))}
+                      placeholder="bv. te laag t.o.v. cadans-doel"
+                    />
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
         </Tile>

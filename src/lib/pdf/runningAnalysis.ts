@@ -50,6 +50,7 @@ export type RunningAnalysisForPdf = {
   groundContact: number | null
   flightTime: number | null
   dutyFactor: number | null
+  metricComments: Record<string, string> | null
   therapistComments: string | null
   nextMoment: string | null
   patient: { name: string | null; email: string; dateOfBirth: Date | string | null }
@@ -157,11 +158,13 @@ function renderSideRow(it: ItemInput): string {
 function renderMetrics(a: RunningAnalysisForPdf): string {
   const tiles = METRICS.map((m) => {
     const value = a[m.key]
+    const note = a.metricComments?.[m.key]?.trim()
     return `
       <div class="ra-metric">
         <div class="ra-metric__label">${esc(m.label)}</div>
         <div class="ra-metric__value">${value == null ? '—' : esc(formatNumber(value))}</div>
         <div class="ra-metric__unit">${esc(m.unit)}</div>
+        ${note ? `<div class="ra-metric__comment">${esc(note)}</div>` : ''}
       </div>
     `
   }).join('')
@@ -360,6 +363,7 @@ const RUNNING_CSS = `
   .ra-metric__label { font-family: ui-monospace, Menlo, monospace; font-size: 8px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #8A9594; }
   .ra-metric__value { font-weight: 900; font-size: 28px; letter-spacing: -0.03em; line-height: 1.1; color: #0A0E0F; }
   .ra-metric__unit { font-family: ui-monospace, Menlo, monospace; font-size: 9px; color: #8A9594; }
+  .ra-metric__comment { font-size: 9px; color: #4A5454; line-height: 1.35; margin-top: 5px; }
 
   /* Opmerkingen / vervolg */
   .ra-h2 { display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: #0A0E0F; margin: 0 0 10px 0; }

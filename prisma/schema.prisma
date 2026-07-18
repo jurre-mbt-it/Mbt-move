@@ -2233,6 +2233,10 @@ model RunningAnalysis {
   groundContact     Float? // seconde
   flightTime        Float? // seconde
   dutyFactor        Float? // ratio
+  // Opmerking per loopmetric — { cadence: "…", strideLength: "…", … }.
+  // Zo kan de therapeut ook bij de metrics per test duiden, niet alleen
+  // onderaan in de slottekst.
+  metricComments    Json?
   // Slottekst
   therapistComments String?
   nextMoment        String? // "Over 6 weken · medio juli 2026"

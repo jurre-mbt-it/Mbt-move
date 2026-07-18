@@ -7,6 +7,7 @@
  * catalogus in `@/lib/running-analysis/catalog`.
  */
 import { z } from 'zod'
+import { Prisma } from '@prisma/client'
 import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { auditLog } from '@/server/audit'
@@ -111,7 +112,9 @@ export const runningAnalysisRouter = createTRPCRouter({
       })
       if (!a) throw new TRPCError({ code: 'NOT_FOUND' })
       await assertTreating(ctx.prisma, ctx.user, a.patientId)
-      return a
+      // metricComments (Json) plat teruggeven: de recursieve Prisma-JsonValue
+      // blaast de tRPC-inferentie op (TS2589), zelfde valkuil als cardioParams.
+      return { ...a, metricComments: (a.metricComments ?? null) as Record<string, string> | null }
     }),
 
   create: runningProcedure
@@ -168,6 +171,10 @@ export const runningAnalysisRouter = createTRPCRouter({
         groundContact: z.number().nullable().optional(),
         flightTime: z.number().nullable().optional(),
         dutyFactor: z.number().nullable().optional(),
+        // Opmerking per loopmetric: { <metricKey>: tekst }. Losse string-record
+        // (geen enum-key: dat blaast de tRPC-inferentie op — TS2589). De keys
+        // zijn onze zes vaste metrics; lege waarden filtert de UI eruit.
+        metricComments: z.record(z.string(), z.string().max(2000)).nullable().optional(),
         therapistComments: z.string().max(4000).nullable().optional(),
         nextMoment: z.string().max(2000).nullable().optional(),
         status: z.enum(['DRAFT', 'FINAL']).optional(),
@@ -175,11 +182,15 @@ export const runningAnalysisRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { id, performedAt, ...rest } = input
+      const { id, performedAt, metricComments, ...rest } = input
       await assertTreating(ctx.prisma, ctx.user, await analysisPatientId(ctx.prisma, id))
       await ctx.prisma.runningAnalysis.update({
         where: { id },
-        data: { ...rest, ...(performedAt ? { performedAt: new Date(performedAt) } : {}) },
+        data: {
+          ...rest,
+          ...(performedAt ? { performedAt: new Date(performedAt) } : {}),
+          ...(metricComments !== undefined ? { metricComments: metricComments ?? Prisma.JsonNull } : {}),
+        },
       })
       return { ok: true }
     }),

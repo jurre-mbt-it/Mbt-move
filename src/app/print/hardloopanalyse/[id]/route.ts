@@ -46,7 +46,12 @@ export async function GET(
     req,
   })
 
-  const html = renderRunningAnalysisPdfHtml({ analysis, autoPrint: true })
+  // metricComments (Json) shallow casten naar de platte vorm die de renderer
+  // verwacht — Prisma levert het als recursieve JsonValue.
+  const html = renderRunningAnalysisPdfHtml({
+    analysis: { ...analysis, metricComments: (analysis.metricComments ?? null) as Record<string, string> | null },
+    autoPrint: true,
+  })
 
   return new NextResponse(html, {
     headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'private, no-store' },
