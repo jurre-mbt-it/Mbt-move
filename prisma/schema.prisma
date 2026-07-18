@@ -383,6 +383,7 @@ model User {
   // Push-notificaties (mobiele app)
   pushTokens             PushToken[]
   notificationPreference NotificationPreference?
+  dailyGoal              DailyGoal?
 
   @@index([deletedAt])
   @@map("users")
@@ -2561,4 +2562,26 @@ model NotificationPreference {
   updatedAt       DateTime @updatedAt
 
   @@map("notification_preferences")
+}
+
+/// Persoonlijke dagdoelen voor de activiteitsringen (mobiele app). Elke null
+/// betekent "automatisch": de client valt dan terug op de slimme default
+/// (mediaan van 30 dagen wearable-data / persoonlijke slaapbehoefte). De
+/// gebruiker stelt ze in bij onboarding en kan ze aanpassen via de
+/// dagdoelen-kaart of instellingen.
+model DailyGoal {
+  id           String   @id @default(cuid())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String   @unique
+  /// Actieve energie per dag (kcal).
+  kcalGoal     Int?
+  /// Trainingsminuten per dag.
+  trainMinGoal Int?
+  /// Stappen per dag.
+  stepsGoal    Int?
+  /// Slaap per nacht (minuten).
+  sleepMinGoal Int?
+  updatedAt    DateTime @updatedAt
+
+  @@map("daily_goals")
 }
