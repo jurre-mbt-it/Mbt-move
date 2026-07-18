@@ -271,6 +271,63 @@ type PlannerCardioParams = {
 
 type ItemKind = 'PROGRAM' | 'WORKOUT' | 'REST' | 'NOTE' | 'TEST' | 'EVENT'
 
+// ─── Gelogde-training-weergave (tegels + weektotalen) ────────────────────────
+
+/** Wat er ná het loggen op een tegel verschijnt (afstand/duur/tempo/RPE/gevoel). */
+type LoggedInfo = {
+  kind: 'cardio' | 'strength'
+  activity?: string | null
+  distanceM?: number | null
+  durationSec?: number | null
+  rpe?: number | null
+  feel?: number | null
+}
+
+function fmtClock(sec: number): string {
+  const h = Math.floor(sec / 3600)
+  const m = Math.floor((sec % 3600) / 60)
+  const s2 = Math.round(sec % 60)
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s2).padStart(2, '0')}`
+  return `${m}:${String(s2).padStart(2, '0')} min`
+}
+
+function fmtKmVal(m: number): string {
+  return `${(m / 1000).toFixed(2).replace('.', ',').replace(/,?0+$/, '')} km`
+}
+
+/** Tempo (min/km) — alleen zinvol bij afstand + duur. */
+function paceLabelFor(distanceM: number | null | undefined, durationSec: number | null | undefined): string | null {
+  if (!distanceM || !durationSec || distanceM < 100) return null
+  const secPerKm = durationSec / (distanceM / 1000)
+  const m = Math.floor(secPerKm / 60)
+  const s2 = Math.round(secPerKm % 60)
+  return `${m}:${String(s2).padStart(2, '0')} /km`
+}
+
+/** RPE-band zoals in trainingskalenders: cijfer + woord + kleur. */
+function rpeMeta(rpe: number): { label: string; color: string; bg: string } {
+  if (rpe >= 8) return { label: 'Max', color: P.danger, bg: 'rgba(248,113,113,0.16)' }
+  if (rpe >= 6) return { label: 'Zwaar', color: P.gold, bg: 'rgba(244,194,97,0.16)' }
+  if (rpe >= 4) return { label: 'Gemiddeld', color: P.ice, bg: 'rgba(147,197,253,0.14)' }
+  return { label: 'Licht', color: P.lime, bg: 'rgba(190,242,100,0.12)' }
+}
+
+/** feelScore 1–5 → emoji + woord (zelfde schaal als de sessie-afronding). */
+const FEEL_META: Record<number, { emoji: string; label: string }> = {
+  1: { emoji: '😖', label: 'Slecht' },
+  2: { emoji: '🙁', label: 'Matig' },
+  3: { emoji: '🙂', label: 'Normaal' },
+  4: { emoji: '😄', label: 'Goed' },
+  5: { emoji: '🤩', label: 'Top' },
+}
+
+/** Sport-groepen voor de weektotalen. */
+function activityGroup(activity: string | null | undefined): 'fiets' | 'hardlopen' | 'overig' {
+  if (activity === 'CYCLING' || activity === 'WATTBIKE' || activity === 'ASSAULT_BIKE') return 'fiets'
+  if (activity === 'RUNNING') return 'hardlopen'
+  return 'overig'
+}
+
 type ScheduleItem = {
   id: string
   order: number
@@ -536,10 +593,12 @@ function MarkerIcon({ kind, size = 11 }: { kind: ItemKind; size?: number }) {
 }
 
 function ItemTile({
-  item, status, onRemove, onClick, readOnly, isOpen,
+  item, status, logged, onRemove, onClick, readOnly, isOpen,
 }: {
   item: ScheduleItem
   status: ItemStatus
+  /** Gelogde data (afstand/duur/RPE/gevoel) — alleen getoond als gedaan/deels. */
+  logged?: LoggedInfo | null
   onRemove: () => void
   /** Klik op de tile (niet op de X). Alleen actief als sessie-details bestaan. */
   onClick?: () => void
@@ -634,6 +693,49 @@ function ItemTile({
           </button>
         )}
       </div>
+      {/* Gelogde data — afstand · duur · tempo + RPE/gevoel-chips, zoals in
+          trainingskalenders. Alleen bij een gedane (of deels gedane) workout. */}
+      {logged && (status === 'completed' || status === 'partial') && (() => {
+        const statLine = [
+          logged.distanceM ? fmtKmVal(logged.distanceM) : null,
+          logged.durationSec ? fmtClock(logged.durationSec) : null,
+          logged.kind === 'cardio' ? paceLabelFor(logged.distanceM, logged.durationSec) : null,
+        ].filter(Boolean).join(' · ')
+        const feel = logged.feel != null ? FEEL_META[logged.feel] : null
+        if (!statLine && logged.rpe == null && !feel) return null
+        return (
+          <div className="px-2 pb-1.5 pt-0.5 min-w-0">
+            {statLine && (
+              <div className="athletic-mono truncate" style={{ color: P.ink, fontSize: 10, fontWeight: 700 }}>
+                {statLine}
+              </div>
+            )}
+            {(logged.rpe != null || feel) && (
+              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                {logged.rpe != null && (() => {
+                  const m = rpeMeta(logged.rpe)
+                  return (
+                    <span
+                      className="athletic-mono inline-flex items-center gap-1"
+                      style={{
+                        background: m.bg, color: m.color, fontSize: 9, fontWeight: 900,
+                        letterSpacing: '0.06em', padding: '1px 6px', borderRadius: 999,
+                      }}
+                    >
+                      {logged.rpe} {m.label.toUpperCase()}
+                    </span>
+                  )
+                })()}
+                {feel && (
+                  <span style={{ fontSize: 9, color: P.inkMuted }}>
+                    {feel.emoji} {feel.label}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })()}
       {previewLine && (
         <div className="px-2 pb-1 pt-0.5 min-w-0">
           <div className="text-[9px] leading-tight truncate" style={{ color: P.inkMuted }}>{previewLine}</div>
@@ -697,13 +799,123 @@ function SelectionDragHandle({ isos }: { isos: string[] }) {
   )
 }
 
+// ─── Weektotalen (rechterkolom): gepland vs. gelogd per sport ────────────────
+
+type TotCardio = { completedAt: string | Date; activity: string; durationSec: number; distanceM: number | null }
+type TotSession = { scheduledAt: string | Date; completedAt: string | Date | null; duration: number | null }
+
+function WeekTotals({ dates, itemsFor, cardio, sessions }: {
+  dates: Date[]
+  itemsFor: (d: Date) => ScheduleItem[]
+  cardio: TotCardio[]
+  sessions: TotSession[]
+}) {
+  const isoSet = new Set(dates.map(isoDate))
+  const inWeek = (d: string | Date) => isoSet.has(isoDate(new Date(d)))
+
+  // Gelogd, per sport-groep
+  const log = {
+    fiets: { m: 0, sec: 0, n: 0 },
+    hardlopen: { m: 0, sec: 0, n: 0 },
+    overig: { m: 0, sec: 0, n: 0 },
+  }
+  for (const c of cardio) {
+    if (!inWeek(c.completedAt)) continue
+    const g = log[activityGroup(c.activity)]
+    g.m += c.distanceM ?? 0
+    g.sec += c.durationSec
+    g.n++
+  }
+  const krachtLogs = sessions.filter(se => se.completedAt && inWeek(se.scheduledAt))
+  const krachtSec = krachtLogs.reduce((t, se) => t + (se.duration ?? 0), 0)
+
+  // Gepland — alleen échte planner-items; gelogde synthetics zouden dubbel tellen.
+  const plan = { fiets: 0, hardlopen: 0, overig: 0, krachtN: 0, krachtSec: 0 }
+  for (const d of dates) {
+    for (const it of itemsFor(d)) {
+      if (!isWorkoutKind(it.kind)) continue
+      if (it.id.startsWith('sessionlog-') || it.id.startsWith('cardiolog-')) continue
+      if (it.quickCategory === 'CARDIO') {
+        const sec = it.plannedDurationSec ?? it.cardioParams?.durationSec ?? it.quickDurationSec ?? 0
+        plan[activityGroup(it.cardioParams?.activity ?? it.quickActivity ?? null)] += sec
+      } else {
+        plan.krachtN++
+        plan.krachtSec += it.plannedDurationSec ?? it.quickDurationSec ?? 0
+      }
+    }
+  }
+
+  const sportRow = (
+    key: 'fiets' | 'hardlopen' | 'overig',
+    Icon: (p: { size?: number }) => React.ReactNode,
+    label: string,
+  ) => {
+    const l = log[key]
+    const p2 = plan[key]
+    if (l.n === 0 && p2 === 0) return null
+    return (
+      <div key={key} className="py-1.5 border-b last:border-b-0" style={{ borderColor: P.line }}>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span style={{ color: P.inkMuted }} className="shrink-0"><Icon size={11} /></span>
+          <span className="athletic-mono text-[9px] tracking-wider truncate" style={{ color: P.inkDim }}>
+            {label} · plan {p2 > 0 ? fmtClock(p2) : '—'}
+          </span>
+        </div>
+        <div className="athletic-mono text-[10px] font-bold mt-0.5 pl-[17px]" style={{ color: l.n > 0 ? P.ink : P.inkDim }}>
+          {l.n > 0
+            ? [l.m > 0 ? fmtKmVal(l.m) : null, fmtClock(l.sec)].filter(Boolean).join(' · ')
+            : 'niets gelogd'}
+        </div>
+        {key === 'hardlopen' && l.m > 0 && (
+          <div className="athletic-mono text-[9px] pl-[17px]" style={{ color: P.inkMuted }}>
+            {paceLabelFor(l.m, l.sec)}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const leeg =
+    log.fiets.n + log.hardlopen.n + log.overig.n + krachtLogs.length === 0 &&
+    plan.fiets + plan.hardlopen + plan.overig + plan.krachtN === 0
+
+  return (
+    <div className="border-l px-2 py-1 min-w-0" style={{ borderColor: P.line, background: P.surfaceLow }}>
+      {leeg ? (
+        <div className="athletic-mono text-[9px] pt-1" style={{ color: P.inkDim }}>—</div>
+      ) : (
+        <>
+          {sportRow('fiets', CARDIO_ICON_MAP.CYCLING ?? IconCardio, 'FIETS')}
+          {sportRow('hardlopen', CARDIO_ICON_MAP.RUNNING ?? IconCardio, 'LOPEN')}
+          {sportRow('overig', IconCardio, 'OVERIG')}
+          {(krachtLogs.length > 0 || plan.krachtN > 0) && (
+            <div className="py-1.5">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span style={{ color: P.inkMuted }} className="shrink-0"><IconStrength size={11} /></span>
+                <span className="athletic-mono text-[9px] tracking-wider truncate" style={{ color: P.inkDim }}>
+                  KRACHT · plan {plan.krachtN > 0 ? `${plan.krachtN}×` : '—'}
+                </span>
+              </div>
+              <div className="athletic-mono text-[10px] font-bold mt-0.5 pl-[17px]" style={{ color: krachtLogs.length > 0 ? P.ink : P.inkDim }}>
+                {krachtLogs.length > 0
+                  ? `${krachtLogs.length}×${krachtSec > 0 ? ` · ${fmtClock(krachtSec)}` : ''}`
+                  : 'niets gelogd'}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 // ─── Dag-cel (droppable + selectie + +menu) ──────────────────────────────────
 
 function DayCell({
   date, inMonth, isToday, info, weekLabel,
   selected, onSelectStart, onSelectEnter,
   onAddWorkout, onAddTemplate, onCopyDay,
-  onItemClick, onRemoveItem, statusFor, sessionIdFor, openItemId,
+  onItemClick, onRemoveItem, statusFor, sessionIdFor, loggedFor, openItemId,
 }: {
   date: Date
   inMonth: boolean
@@ -720,6 +932,7 @@ function DayCell({
   onRemoveItem: (item: ScheduleItem, dayId: string | null) => void
   statusFor: (date: Date, item: ScheduleItem) => ItemStatus
   sessionIdFor: (date: Date, item: ScheduleItem) => string | null
+  loggedFor: (date: Date, item: ScheduleItem) => LoggedInfo | null
   openItemId: string | null
 }) {
   const iso = isoDate(date)
@@ -766,6 +979,7 @@ function DayCell({
         {items.map(item => {
           const sId = sessionIdFor(date, item)
           const status = statusFor(date, item)
+          const logged = loggedFor(date, item)
           const realItem = !item.id.startsWith('legacy-')
             && !item.id.startsWith('sessionlog-')
             && !item.id.startsWith('cardiolog-')
@@ -776,6 +990,7 @@ function DayCell({
             <ItemTile
               item={item}
               status={status}
+              logged={logged}
               onRemove={() => onRemoveItem(item, dayId)}
               // Markeringen (rustdag/notitie/test/doel) hebben geen oefeningen
               // of cardio, dus het detail-paneel heeft ze niets te tonen.
@@ -1564,6 +1779,8 @@ function WeekPlannerContent() {
     duration: number | null
     programId: string | null
     programName: string | null
+    exertionLevel: number | null
+    feelScore: number | null
   }> }
   // CardioLogs in hetzelfde bereik — cardio wordt apart gelogd (CardioLog
   // i.p.v. SessionLog) en moet geplande cardio-items kunnen afvinken.
@@ -1590,7 +1807,7 @@ function WeekPlannerContent() {
 
   // Map (programId, dateISO) → { status, sessionId }. sessionId wordt
   // gebruikt voor de session-detail modal wanneer therapeut op een tile klikt.
-  type SessionMatch = { status: ItemStatus; sessionId: string | null }
+  type SessionMatch = { status: ItemStatus; sessionId: string | null; cardioId?: string | null }
   const sessionByKey = useMemo(() => {
     const todayStart = startOfDay(new Date())
     const map = new Map<string, SessionMatch>()
@@ -1678,6 +1895,34 @@ function WeekPlannerContent() {
     }
     if (!item.programId) return adhocStatusById.get(item.id)?.sessionId ?? null
     return sessionByKey.get(`${item.programId}|${isoDate(date)}`)?.sessionId ?? null
+  }
+
+  /** Gelogde data (afstand/duur/RPE/gevoel) voor een tegel — voor de rijke
+   *  weergave ná het loggen, zoals in trainingskalenders. */
+  function loggedInfoFor(date: Date, item: ScheduleItem): LoggedInfo | null {
+    if (!isWorkoutKind(item.kind)) return null
+    // Ad-hoc cardio-tegel: het log-id zit in het tile-id.
+    if (item.id.startsWith('cardiolog-')) {
+      const c = cardioRaw.find(x => x.id === item.id.slice('cardiolog-'.length))
+      return c
+        ? { kind: 'cardio', activity: c.activity, distanceM: c.distanceM, durationSec: c.durationSec, rpe: c.rpe }
+        : null
+    }
+    // Gepland cardio-item met gematchte CardioLog (adhoc-matching).
+    const adhoc = adhocStatusById.get(item.id)
+    if (adhoc?.cardioId) {
+      const c = cardioRaw.find(x => x.id === adhoc.cardioId)
+      if (c) return { kind: 'cardio', activity: c.activity, distanceM: c.distanceM, durationSec: c.durationSec, rpe: c.rpe }
+    }
+    // Kracht/programma: de gekoppelde SessionLog.
+    const sid = sessionIdFor(date, item)
+    if (sid) {
+      const sLog = sessionsRaw.find(x => x.id === sid)
+      if (sLog?.completedAt) {
+        return { kind: 'strength', durationSec: sLog.duration, rpe: sLog.exertionLevel, feel: sLog.feelScore }
+      }
+    }
+    return null
   }
 
   // Schedule dag-info gemapt op ISO-datum.
@@ -1807,7 +2052,7 @@ function WeekPlannerContent() {
           // gepland (de cardio-speler logt de echte verstreken tijd).
           const plannedSec = item.cardioParams?.durationSec ?? item.quickDurationSec
           const partial = !!plannedSec && log.durationSec < plannedSec * 0.8
-          adhocStatusById.set(item.id, { status: partial ? 'partial' : 'completed', sessionId: null })
+          adhocStatusById.set(item.id, { status: partial ? 'partial' : 'completed', sessionId: null, cardioId: log.id })
         } else {
           const log = looseSessions.find(s => !consumedSessionIds.has(s.id))
           if (!log) continue
@@ -2469,7 +2714,7 @@ function WeekPlannerContent() {
         )}
         <div className="rounded-2xl overflow-hidden" style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}>
           {/* Day-of-week header row */}
-          <div className="grid grid-cols-[40px_repeat(7,1fr)] border-b" style={{ borderColor: P.line }}>
+          <div className="grid grid-cols-[40px_repeat(7,1fr)_168px] border-b" style={{ borderColor: P.line }}>
             <div />
             {DAY_LABELS_SHORT.map(d => (
               <div
@@ -2480,6 +2725,12 @@ function WeekPlannerContent() {
                 {d}
               </div>
             ))}
+            <div
+              className="athletic-mono px-2 py-1.5 text-[10px] tracking-widest font-bold border-l"
+              style={{ color: P.inkMuted, borderColor: P.line }}
+            >
+              WEEKTOTAAL
+            </div>
           </div>
 
           {/* 6 week rows */}
@@ -2505,10 +2756,10 @@ function WeekPlannerContent() {
             return (
               <div
                 key={wIdx}
-                className="grid grid-cols-[40px_repeat(7,1fr)] border-b last:border-b-0"
+                className="grid grid-cols-[40px_repeat(7,1fr)_168px] border-b last:border-b-0"
                 style={{
                   borderColor: P.line,
-                  minHeight: 130,
+                  minHeight: 176,
                   borderLeft: accent ? `3px solid ${accent}` : `3px solid transparent`,
                   background: accent ? `linear-gradient(90deg, ${accent}0D, transparent 12%)` : undefined,
                 }}
@@ -2633,10 +2884,17 @@ function WeekPlannerContent() {
                       onRemoveItem={handleRemoveItem}
                       statusFor={statusFor}
                       sessionIdFor={sessionIdFor}
+                      loggedFor={loggedInfoFor}
                       openItemId={detailItem?.item.id ?? null}
                     />
                   )
                 })}
+                <WeekTotals
+                  dates={week}
+                  itemsFor={(d) => dateMap.get(isoDate(d))?.items ?? []}
+                  cardio={cardioRaw}
+                  sessions={sessionsRaw}
+                />
               </div>
             )
           })}

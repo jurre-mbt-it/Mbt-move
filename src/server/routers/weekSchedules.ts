@@ -597,6 +597,10 @@ export const weekSchedulesRouter = createTRPCRouter({
           completedAll: true,
           duration: true,
           programId: true,
+          // RPE + gevoel van de sessie — voor de gelogde-training-tegels en
+          // weektotalen in de planner.
+          exertionLevel: true,
+          feelScore: true,
           // Identiteit i.p.v. de (programId, datum)-heuristiek: welke geplande
           // workout is hiermee afgevinkt? Null voor oude sessies en voor
           // clients die het item nog niet meesturen (iOS).
@@ -617,6 +621,8 @@ export const weekSchedulesRouter = createTRPCRouter({
           completedAll: s.completedAll,
           duration: s.duration,
           programId: s.programId,
+          exertionLevel: s.exertionLevel,
+          feelScore: s.feelScore,
           weekScheduleDayItemId: s.weekScheduleDayItemId,
           programName: s.program?.name ?? null,
           weekdayIndex,
