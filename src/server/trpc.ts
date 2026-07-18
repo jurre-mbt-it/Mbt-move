@@ -212,7 +212,7 @@ const DPA_EXEMPT_PREFIXES = ['dpa.', 'auth.', 'invite.'] as const
 const DPA_REQUIRED_MESSAGE =
   'Accepteer eerst de verwerkersovereenkomst (AVG) om verder te gaan.'
 
-const dpaGuard = t.middleware(({ ctx, path, next }) => {
+const dpaGuard = t.middleware(async ({ ctx, path, next }) => {
   const u = ctx.user
   if (
     u &&
@@ -220,6 +220,21 @@ const dpaGuard = t.middleware(({ ctx, path, next }) => {
     u.dpaAcceptedVersion !== DPA_VERSION &&
     !DPA_EXEMPT_PREFIXES.some((p) => path.startsWith(p))
   ) {
+    // De gecachete user kan tot 60s achterlopen op dpa.accept — en de cache is
+    // per serverless instantie, dus de invalidateUserCache() uit dpa.accept
+    // raakt andere instanties niet. Direct na acceptatie 403'en zou de
+    // dagdoelen-onboarding en de eerste dashboard-loads breken. Daarom vóór
+    // het blokkeren één verse DB-read — alleen in dit pad, dus goedkoop.
+    const fresh = await ctx.prisma.user.findUnique({
+      where: { id: u.id },
+      select: { dpaAcceptedVersion: true },
+    })
+    if (fresh?.dpaAcceptedVersion === DPA_VERSION) {
+      // Cache-entry op deze instantie is aantoonbaar staal — opruimen zodat
+      // volgende calls meteen de juiste status zien.
+      invalidateUserCache(u.supabaseUserId)
+      return next()
+    }
     throw new TRPCError({ code: 'FORBIDDEN', message: DPA_REQUIRED_MESSAGE })
   }
   return next()

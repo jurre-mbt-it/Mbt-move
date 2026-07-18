@@ -536,6 +536,17 @@ export const inviteRouter = createTRPCRouter({
         })
       }
 
+      // Geslaagde send (e-mail + geboortejaar klopten) → teller terug naar 0.
+      // `attempts` telt élke request-poging, ook legitieme her-verzendingen
+      // (mail in spam, code verlopen). Zonder reset zat een echte patiënt na
+      // 5 keer "stuur mij een code" permanent vast op max-attempts, terwijl de
+      // teller bedoeld is tegen geboortejaar-raden — dat pad blijft gewoon
+      // optellen, want daar komt de flow nooit tot hier.
+      await ctx.prisma.inviteCode.update({
+        where: { id: invite.id },
+        data: { attempts: 0 },
+      })
+
       return { ok: true, delivered: true }
     }),
 
