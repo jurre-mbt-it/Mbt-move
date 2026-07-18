@@ -257,6 +257,34 @@ export const weekSchedulesRouter = createTRPCRouter({
       const id = createId()
       const { patientId, days, startDate, endDate, ...rest } = input
       await assertPatientLink(ctx.prisma, ctx.user, patientId)
+
+      // Idempotent per (patiënt, maandag). De planners riepen create aan per
+      // losse dag-actie; bij een verouderde client-state leverde dat meerdere
+      // week-rijen op dezelfde maandag op (in prod tot 9 per week), wat o.a.
+      // "plak week" brak. Bestaat er al een toegankelijke niet-template week
+      // op deze maandag, geef die dan terug i.p.v. een duplicaat te maken.
+      if (patientId && startDate && !input.isTemplate) {
+        const monday = mondayKeyOf(new Date(startDate))
+        const isAdmin = ctx.user.role === 'ADMIN'
+        const scopeFilter = isAdmin
+          ? {}
+          : {
+              OR: [
+                { creatorId: ctx.user.id },
+                ...(ctx.user.practiceId ? [{ practiceId: ctx.user.practiceId }] : []),
+              ],
+            }
+        const bestaande = await ctx.prisma.weekSchedule.findMany({
+          where: { patientId, isTemplate: false, startDate: { not: null }, ...scopeFilter },
+          include: {
+            days: { include: { program: { select: { id: true, name: true } } }, orderBy: { dayOfWeek: 'asc' } },
+          },
+          orderBy: { createdAt: 'asc' },
+        })
+        const match = bestaande.find(w => w.startDate && mondayKeyOf(w.startDate) === monday)
+        if (match) return match
+      }
+
       return ctx.prisma.weekSchedule.create({
         data: {
           id,
@@ -1504,26 +1532,37 @@ export const weekSchedulesRouter = createTRPCRouter({
         },
         orderBy: { startDate: 'asc' },
       })
+      // Meerdere week-rijen kunnen dezelfde maandag delen (historische
+      // duplicaten doordat elke losse dag-actie een eigen `create` deed; in
+      // prod bestaan weken met tot 9 rijen). De kalender-clients voegen die
+      // rijen visueel samen, dus kopiëren we ze hier óók samengevoegd. De
+      // vorige `find` pakte alleen de eerste rij, waardoor "plak week" maar
+      // een deel van de week meenam — vaak alleen maandag.
       const onMonday = (m: string) =>
-        candidates.find(w => mondayKeyOf(w.startDate!) === m)
+        candidates.filter(w => mondayKeyOf(w.startDate!) === m)
 
-      const source = onMonday(fromMonday)
-      if (!source) throw new TRPCError({ code: 'NOT_FOUND', message: 'Bron-week niet gevonden' })
+      const sources = onMonday(fromMonday)
+      if (sources.length === 0) throw new TRPCError({ code: 'NOT_FOUND', message: 'Bron-week niet gevonden' })
+      // Primaire rij levert naam + periodiserings-meta; de rest alleen items.
+      const source = sources[0]
 
-      let target = onMonday(toMonday) ?? null
+      const targets = onMonday(toMonday)
+      let target = targets[0] ?? null
 
       // Als doel-week bestaat met content → afhankelijk van `replace`.
       if (target) {
-        const hasContent = target.days.some(d => d.items.length > 0 || d.programId !== null)
+        const hasContent = targets.some(t => t.days.some(d => d.items.length > 0 || d.programId !== null))
         if (hasContent && !input.replace) {
           throw new TRPCError({
             code: 'CONFLICT',
             message: 'Doel-week bevat al items. Stel replace=true om te overschrijven.',
           })
         }
-        // Wis alle bestaande items op alle dagen.
+        // Wis alle bestaande items op alle dagen — ook op duplicaat-rijen van
+        // dezelfde maandag, anders blijft daar content staan die de kalender
+        // bij de doelweek optelt.
         await ctx.prisma.weekScheduleDayItem.deleteMany({
-          where: { day: { weekScheduleId: target.id } },
+          where: { day: { weekScheduleId: { in: targets.map(t => t.id) } } },
         })
       } else {
         // Maak een nieuwe doel-week aan (kopie van source-naam + 7 dagen leeg).
@@ -1564,19 +1603,29 @@ export const weekSchedulesRouter = createTRPCRouter({
       // Kopieer item-voor-item via copyItemToDay: createMany kan geen geneste
       // relaties aanmaken, waardoor de vorige versie stil de inline oefeningen
       // en cardioParams liet vallen bij het dupliceren van een week.
+      // Over ALLE bron-rijen heen; een doorlopende order-teller per dag houdt
+      // de volgorde stabiel (it.order zou over rijen heen botsen).
       let copied = 0
-      for (const sDay of source.days) {
-        const tDayId = targetDayMap.get(sDay.dayOfWeek)
-        if (!tDayId) continue
-        for (const it of sDay.items) {
-          await copyItemToDay(ctx.prisma, it, tDayId, it.order)
-          copied++
+      const orderByDay = new Map<number, number>()
+      for (const src of sources) {
+        for (const sDay of src.days) {
+          const tDayId = targetDayMap.get(sDay.dayOfWeek)
+          if (!tDayId) continue
+          for (const it of sDay.items) {
+            const ord = orderByDay.get(sDay.dayOfWeek) ?? 0
+            await copyItemToDay(ctx.prisma, it, tDayId, ord)
+            orderByDay.set(sDay.dayOfWeek, ord + 1)
+            copied++
+          }
         }
       }
       const creates = { length: copied }
-      // Sync legacy programId voor alle doel-dagen na de bulk create.
-      for (const td of target.days) {
-        await syncDayProgramId(ctx.prisma, td.id)
+      // Sync legacy programId voor alle doel-dagen na de bulk create — ook op
+      // duplicaat-doelrijen, waar replace zojuist de items heeft gewist.
+      for (const t of (targets.length > 0 ? targets : [target])) {
+        for (const td of t.days) {
+          await syncDayProgramId(ctx.prisma, td.id)
+        }
       }
 
       // Periodiserings-metadata op de doel-week zetten. Expliciete input wint;
@@ -1599,14 +1648,17 @@ export const weekSchedulesRouter = createTRPCRouter({
       // per dag hersyncen en de periodiserings-meta terug naar neutraal — de
       // week is verhuisd, er blijft een lege kalenderweek achter.
       if (input.move) {
+        // Alle bron-rijen van deze maandag leegmaken, niet alleen de primaire.
         await ctx.prisma.weekScheduleDayItem.deleteMany({
-          where: { day: { weekScheduleId: source.id } },
+          where: { day: { weekScheduleId: { in: sources.map(s => s.id) } } },
         })
-        for (const sDay of source.days) {
-          await syncDayProgramId(ctx.prisma, sDay.id)
+        for (const src of sources) {
+          for (const sDay of src.days) {
+            await syncDayProgramId(ctx.prisma, sDay.id)
+          }
         }
-        await ctx.prisma.weekSchedule.update({
-          where: { id: source.id },
+        await ctx.prisma.weekSchedule.updateMany({
+          where: { id: { in: sources.map(s => s.id) } },
           data: { isDeload: false, phaseType: null, targetLoad: null, weekNote: null },
         })
       }
