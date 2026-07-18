@@ -2036,6 +2036,23 @@ export const patientRouter = createTRPCRouter({
       }))
     }),
 
+  /**
+   * Totale sessie-telling voor de "TOTAL · all-time logged"-tegel. Los van
+   * getSessionHistory: die is gemaximeerd op 100 rijen, waardoor de teller op
+   * het dashboard stil bleef staan zodra een patiënt daar overheen ging.
+   * Zelfde filter (COMPLETED, zonder tendinopathie-dagrondes).
+   */
+  getSessionStats: protectedProcedure.query(async ({ ctx }) => {
+    const total = await ctx.prisma.sessionLog.count({
+      where: {
+        patientId: ctx.user.id,
+        status: 'COMPLETED',
+        NOT: { program: { tendinopathyMode: true, dailyTarget: { not: null } } },
+      },
+    })
+    return { total }
+  }),
+
   // ── Eigen kalender: gepland + gelogd binnen een datum-range ──────────────
   // Voor de atleet-kalender (maandweergave): alle eigen SessionLogs en
   // CardioLogs in de range, plus de week-schedules met items zodat de client
@@ -2246,6 +2263,11 @@ export const patientRouter = createTRPCRouter({
           setsCompleted: l.setsCompleted,
           repsCompleted: l.repsCompleted,
           weight: l.weight,
+          // Per-set detail: stond al in de select maar werd hier weggelaten,
+          // waardoor de historie nooit "42,5×10 · 45×8" kon tonen.
+          weightsPerSet: l.weightsPerSet,
+          repsPerSet: l.repsPerSet,
+          repUnit: l.repUnit,
           painLevel: l.painLevel,
           painDuring: l.painDuring,
           supersetGroup: l.supersetGroup,
