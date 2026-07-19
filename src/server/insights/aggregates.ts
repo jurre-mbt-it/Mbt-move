@@ -188,6 +188,7 @@ export async function buildPatientAggregates(
     exerciseAggregates,
     overallAvgExercisePain: mean(allExercisePainLevels),
     loadFormHistory: loadCurve.points.map((p) => p.form),
+    loadCalibrationReady: loadCurve.calibration.status === 'ready',
     loadAcwr: loadCurve.acwr,
   }
 }

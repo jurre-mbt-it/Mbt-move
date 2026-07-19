@@ -60,6 +60,50 @@ const TAU_FATIGUE = 7
 const TAU_CHRONIC = 28 // EWMA-ACWR: acute 7d vs chronisch 28d
 
 /**
+ * IJkperiode voor nieuwe gebruikers. Zonder historie start het model op nul:
+ * de eerste trainingsweek leest dan als "van 0 naar 100" en de vorm duikt
+ * direct het rood in, puur omdat het model het startniveau nog niet kent.
+ * Tot er minstens CALIBRATION_MIN_DAYS dagen historie én
+ * CALIBRATION_MIN_SESSIONS gelogde sessies zijn is het zone-oordeel niet
+ * betrouwbaar; consumers tonen dan de gelogde belasting zonder oordeel.
+ */
+export const CALIBRATION_MIN_DAYS = 7
+export const CALIBRATION_MIN_SESSIONS = 3
+
+export type LoadSeed = { date: string; value: number }
+
+/**
+ * Startniveau ("basis-fitheid") uit de eerste trainingen: gemiddelde dagload
+ * over de eerste 14 kalenderdagen vanaf de eerste log (of korter als er nog
+ * geen 14 dagen zijn). buildLoadCurve gebruikt dit als beginwaarde voor
+ * fitness én fatigue op de eerste trainingsdag, zodat de vorm rond 0 start en
+ * het model vanaf dan afwijkingen van het eigen startniveau meet in plaats
+ * van een opstart-vanaf-nul die vals als overreaching leest.
+ *
+ * null bij minder dan CALIBRATION_MIN_SESSIONS gelogde sessies: dan is er
+ * geen zinvol startniveau te bepalen (consumers verbergen het oordeel dan toch).
+ */
+export function baselineSeed(loads: DailyLoad[], to: Date): LoadSeed | null {
+  const active = loads.filter((l) => l.load > 0)
+  if (active.length < CALIBRATION_MIN_SESSIONS) return null
+  let first = active[0].date
+  for (const l of active) if (l.date < first) first = l.date
+
+  const firstDate = new Date(`${first}T00:00:00`)
+  const windowEnd = new Date(firstDate)
+  windowEnd.setDate(windowEnd.getDate() + 13)
+  const end = new Date(to)
+  end.setHours(0, 0, 0, 0)
+  const capped = windowEnd < end ? windowEnd : end
+  const cappedIso = isoDay(capped)
+  const days = Math.floor((capped.getTime() - firstDate.getTime()) / 86_400_000) + 1
+
+  let sum = 0
+  for (const l of active) if (l.date <= cappedIso) sum += l.load
+  return { date: first, value: sum / Math.max(1, days) }
+}
+
+/**
  * Bovengrens op één sessieduur (seconden). Vangt de doorgelopen-timer-bug:
  * een sessie die "voltooid" wordt weggeschreven nadat de app uren/dagen open
  * bleef staan, krijgt anders een absurde duur (bv. 76 u) die als enorme sRPE
@@ -114,8 +158,18 @@ export function edwardsTrimp(
  * Bouw de dagelijkse curve over [from..to] (inclusief). `loads` mag sparse
  * zijn; dagen zonder training tellen als 0 (verval). Begin `from` ruim vóór
  * het weergavevenster (≥ 42 dagen warm-up) zodat de EWMA's ingelopen zijn.
+ *
+ * `seed` (baselineSeed) zet fitness en fatigue op de eerste trainingsdag op
+ * het startniveau in plaats van 0. Zonder seed geldt het oude gedrag; met een
+ * seed-datum vóór `from` idem (kan alleen bij aanroep buiten computeLoadCurve,
+ * dat fetcht vanaf `from`).
  */
-export function buildLoadCurve(loads: DailyLoad[], from: Date, to: Date): LoadPoint[] {
+export function buildLoadCurve(
+  loads: DailyLoad[],
+  from: Date,
+  to: Date,
+  seed?: LoadSeed | null,
+): LoadPoint[] {
   const byDate = new Map<string, number>()
   for (const l of loads) {
     byDate.set(l.date, (byDate.get(l.date) ?? 0) + l.load)
@@ -132,6 +186,10 @@ export function buildLoadCurve(loads: DailyLoad[], from: Date, to: Date): LoadPo
   while (cursor <= end) {
     const iso = isoDay(cursor)
     const load = byDate.get(iso) ?? 0
+    if (seed && iso === seed.date) {
+      fitness = seed.value
+      fatigue = seed.value
+    }
     // EWMA met λ = 1/τ (TrainingPeaks-conventie)
     fitness = fitness + (load - fitness) / TAU_FITNESS
     fatigue = fatigue + (load - fatigue) / TAU_FATIGUE

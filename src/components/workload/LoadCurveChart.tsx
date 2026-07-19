@@ -13,7 +13,7 @@
 
 import { useState } from 'react'
 import {
-  ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ReferenceLine, ReferenceArea, ReferenceDot, ResponsiveContainer,
 } from 'recharts'
 import {
@@ -59,6 +59,14 @@ export type LoadCurveData = ModalityCurve & {
   strength?: ModalityCurve
   cardio?: (ModalityCurve & { trimp: number | null; hrSessionCount: number })
   firstSessionAt?: string | null
+  /** IJkperiode (server): 'building' = gelogde belasting tonen zonder zone-oordeel. */
+  calibration?: {
+    status: 'building' | 'ready'
+    daysLogged: number
+    daysNeeded: number
+    sessionsLogged: number
+    sessionsNeeded: number
+  }
 }
 
 type Modality = 'all' | 'strength' | 'cardio'
@@ -96,6 +104,7 @@ export function LoadCurveChart({ data, compact = false }: { data: LoadCurveData;
     ...p,
     dag: p.date.slice(8, 10) + '/' + p.date.slice(5, 7),
     Vorm: p.form,
+    Belasting: p.load, // dag-totaal sRPE — de staafjes tijdens de ijkperiode
   }))
 
   // Lege aanloop (geen activiteit) wegsnijden zodat we op de actieve periode
@@ -113,6 +122,59 @@ export function LoadCurveChart({ data, compact = false }: { data: LoadCurveData;
   const clamp = (v: number) => (v === Infinity ? hi : v === -Infinity ? lo : v)
 
   const lastDag = chartData[chartData.length - 1]?.dag
+
+  // ── IJkperiode: gelogde belasting tonen, zone-oordeel nog niet ──────────
+  // Zonder bekend startniveau leest de eerste week als "van 0 naar 100" en
+  // duikt de vorm vals het rood in. We laten daarom wél zien wat er gelogd is
+  // (dagstaafjes), maar geen zones, status of vorm-lijn tot de ijk klaar is.
+  if (data.calibration && data.calibration.status !== 'ready') {
+    const cal = data.calibration
+    const dag = Math.min(cal.daysLogged + 1, cal.daysNeeded)
+    return (
+      <Tile>
+        <div className="space-y-3">
+          <div>
+            <MetaLabel>BELASTING · KRACHT + CARDIO</MetaLabel>
+            <div className="flex items-center gap-2 mt-1.5">
+              <span
+                className="athletic-mono px-2 py-0.5 rounded-md"
+                style={{
+                  background: `${P.inkMuted}1A`,
+                  border: `1px solid ${P.inkMuted}55`,
+                  color: P.inkMuted,
+                  fontSize: 11,
+                  fontWeight: 900,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                IJkperiode · dag {dag}/{cal.daysNeeded}
+              </span>
+            </div>
+          </div>
+          <p style={{ color: P.inkMuted, fontSize: 12, lineHeight: 1.5 }}>
+            We hebben eerst {cal.daysNeeded} dagen en {cal.sessionsNeeded} trainingen nodig om je
+            startniveau te bepalen. Je zit op dag {dag} en hebt{' '}
+            {Math.min(cal.sessionsLogged, cal.sessionsNeeded)} van de {cal.sessionsNeeded} trainingen
+            gelogd. Tot die tijd zie je hieronder alleen je gelogde belasting, nog zonder zone-oordeel.
+          </p>
+          <ResponsiveContainer width="100%" height={compact ? 200 : 260}>
+            <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+              <CartesianGrid {...DARK_CHART_STYLES.grid} />
+              <XAxis dataKey="dag" {...DARK_CHART_STYLES.axis} interval="preserveStartEnd" minTickGap={28} />
+              <YAxis {...DARK_CHART_STYLES.axis} width={42} />
+              <Tooltip content={<DarkChartTooltip />} />
+              <Bar dataKey="Belasting" fill={P.inkMuted} radius={[3, 3, 0, 0]} maxBarSize={18} />
+            </ComposedChart>
+          </ResponsiveContainer>
+          <p style={{ color: P.inkDim, fontSize: 11, lineHeight: 1.5 }}>
+            Elke staaf is de trainingsbelasting van één dag (duur × zwaarte). Na de ijkperiode
+            verschijnen hier je vorm-lijn en de belasting-zones.
+          </p>
+        </div>
+      </Tile>
+    )
+  }
 
   return (
     <Tile>

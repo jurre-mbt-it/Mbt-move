@@ -49,6 +49,8 @@ export interface PatientAggregates {
   overallAvgExercisePain: number | null
   /** Vorm (fitheid − vermoeidheid, fitness-fatigue model) laatste 14 dagen, oudste eerst. */
   loadFormHistory: number[]
+  /** false tijdens de ijkperiode (te weinig dagen/sessies) — dan geen load-oordelen. */
+  loadCalibrationReady: boolean
   /** EWMA-ACWR (7d/28d) op vandaag — null bij te weinig historie. */
   loadAcwr: number | null
 }

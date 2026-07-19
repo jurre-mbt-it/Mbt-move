@@ -19,7 +19,10 @@
  */
 import type { PrismaClient } from '@prisma/client'
 import {
+  baselineSeed,
   buildLoadCurve,
+  CALIBRATION_MIN_DAYS,
+  CALIBRATION_MIN_SESSIONS,
   clampSessionDurationSec,
   computeConsistency,
   edwardsTrimp,
@@ -63,6 +66,21 @@ export type CardioCurve = ModalityCurve & {
   hrSessionCount: number     // cardio-sessies in het venster met HR-data
 }
 
+/**
+ * IJkperiode: pas na genoeg kalenderdagen én sessies is een zone-oordeel
+ * zinvol. Status 'building' = alle consumers (web + iOS) tonen de gelogde
+ * belasting zonder oordeel (geen zones, geen dagadvies, geen overload-insight)
+ * en leggen uit dat we eerst het startniveau bepalen. Eén centrale definitie,
+ * zodat de drempels niet per scherm uiteenlopen.
+ */
+export type LoadCalibration = {
+  status: 'building' | 'ready'
+  daysLogged: number       // = historyDays (dagen sinds eerste log)
+  daysNeeded: number       // CALIBRATION_MIN_DAYS
+  sessionsLogged: number   // gelogde sessies (kracht + cardio, volledige fetch)
+  sessionsNeeded: number   // CALIBRATION_MIN_SESSIONS
+}
+
 export type LoadCurveResult = ModalityCurve & {
   /**
    * Vroegste gelogde sessie binnen de opgehaalde periode (incl. warm-up), ISO.
@@ -79,6 +97,7 @@ export type LoadCurveResult = ModalityCurve & {
   cardio: CardioCurve        // alleen cardio (CardioLog)
   /** Adherentie over het volledige venster (kracht + cardio samen). */
   consistency: Consistency
+  calibration: LoadCalibration
 }
 
 // Prisma-client of transaction-client — alleen de twee findMany's nodig.
@@ -171,10 +190,25 @@ export async function computeLoadCurve(
     ? Math.max(0, Math.floor((to.getTime() - new Date(firstSessionAt).getTime()) / 86_400_000))
     : 0
 
+  // Sessies over de volledige fetch (incl. warm-up), net als historyDays —
+  // de ijk gaat over "hoeveel weten we van deze persoon", niet over het venster.
+  const sessionsLogged = [...strengthLoads, ...cardioLoads].filter((l) => l.load > 0).length
+  const calibration: LoadCalibration = {
+    status:
+      historyDays >= CALIBRATION_MIN_DAYS && sessionsLogged >= CALIBRATION_MIN_SESSIONS
+        ? 'ready'
+        : 'building',
+    daysLogged: historyDays,
+    daysNeeded: CALIBRATION_MIN_DAYS,
+    sessionsLogged,
+    sessionsNeeded: CALIBRATION_MIN_SESSIONS,
+  }
+
   return {
     ...combined,
     firstSessionAt,
     historyDays,
+    calibration,
     strength,
     cardio: {
       ...cardioBase,
@@ -192,7 +226,11 @@ function buildModality(
   to: Date,
   sessionCount: number,
 ): ModalityCurve {
-  const all = buildLoadCurve(loads, from, to)
+  // Seed: start fitness/fatigue op het eigen startniveau (gemiddelde dagload
+  // van de eerste 14 dagen) i.p.v. op 0. Zonder seed leest de eerste
+  // trainingsweek als een enorme piek (vorm diep negatief) terwijl het model
+  // simpelweg het startniveau nog niet kende.
+  const all = buildLoadCurve(loads, from, to, baselineSeed(loads, to))
   const points = all.slice(WARMUP_DAYS) // warm-up wegsnijden
   const today = points[points.length - 1] ?? null
   return {

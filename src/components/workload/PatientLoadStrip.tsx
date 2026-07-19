@@ -27,10 +27,8 @@ const STATUS_COLORS: Record<LoadStatusKey, string> = {
   ontraind: P.gold,
 }
 
-// Drempel voor een betrouwbaar beeld: genoeg sessies én genoeg kalendertijd,
-// zodat de chronische EWMA gezet is en de ratio niet vals hoog uitslaat.
-const MIN_SESSIONS = 8
-const MIN_HISTORY_DAYS = 21
+// De betrouwbaarheids-drempel komt centraal van de server (calibration op de
+// loadCurve): 7 dagen historie + 3 sessies, dezelfde gate als in de iOS-app.
 
 export function PatientLoadStrip({ patientId }: { patientId: string }) {
   const { data, isLoading } = trpc.patients.loadCurve.useQuery(
@@ -51,12 +49,14 @@ export function PatientLoadStrip({ patientId }: { patientId: string }) {
   // Niets gelogd → geen tegel, houd het start-scherm rustig.
   if (!data || data.sessionCount === 0) return null
 
-  const reliable = data.sessionCount >= MIN_SESSIONS && data.historyDays >= MIN_HISTORY_DAYS
+  const cal = data.calibration
+  const reliable = cal.status === 'ready'
 
   const href = `/therapist/patients/${patientId}/progress`
 
-  // ── Beeld nog in opbouw: neutraal, geen kleur-oordeel ──────────────────
+  // ── IJkperiode: neutraal, geen kleur-oordeel ───────────────────────────
   if (!reliable) {
+    const dag = Math.min(cal.daysLogged + 1, cal.daysNeeded)
     return (
       <Link href={href} className="block athletic-tap">
         <div
@@ -68,13 +68,14 @@ export function PatientLoadStrip({ patientId }: { patientId: string }) {
             <div>
               <MetaLabel>Belasting</MetaLabel>
               <div style={{ color: P.inkMuted, fontSize: 14, fontWeight: 700, marginTop: 1 }}>
-                Beeld nog in opbouw
+                IJkperiode loopt
               </div>
             </div>
           </div>
           <p style={{ color: P.inkDim, fontSize: 12, lineHeight: 1.45, marginTop: 7 }}>
-            {data.sessionCount} sessie{data.sessionCount === 1 ? '' : 's'} in beeld — vanaf {MIN_SESSIONS} sessies
-            en {MIN_HISTORY_DAYS} dagen historie tonen we de belasting-zone.
+            Dag {dag} van {cal.daysNeeded}, {Math.min(cal.sessionsLogged, cal.sessionsNeeded)} van{' '}
+            {cal.sessionsNeeded} trainingen gelogd. Zodra dat vol is bepalen we het startniveau en
+            tonen we de belasting-zone.
           </p>
         </div>
       </Link>

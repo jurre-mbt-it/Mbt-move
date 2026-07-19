@@ -23,6 +23,11 @@ export const overloadRisk: Evaluator = (agg, rule) => {
   }
   const feelLow = cfg.feelLow ?? 2.5
 
+  // IJkperiode: het model kent het startniveau nog niet, dus een diepe vorm
+  // is dan een opstart-artefact en geen overreaching. Geen melding (en dus
+  // ook geen load-push via daily-reminders) tot de ijk klaar is.
+  if (!agg.loadCalibrationReady) return null
+
   const hist = agg.loadFormHistory
   if (!hist || hist.length === 0) return null
 
