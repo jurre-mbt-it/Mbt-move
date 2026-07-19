@@ -85,20 +85,26 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, candidates: 0, sent: 0 })
     }
 
-    // Idempotentie: wat is er vandaag al verstuurd (per categorie-type)?
+    // Idempotentie: wat is er vandaag al ÉCHT gepusht (per categorie-type)?
+    // Rijen met `data.pushed === false` (bv. onderdrukt door quiet hours)
+    // tellen niet mee — anders blokkeert een stille 07:00-rij de 09:00-push.
+    // Legacy-rijen zonder vlag tellen wél mee (die waren vermoedelijk gepusht).
     const sentToday = await prisma.notification.findMany({
       where: {
         userId: { in: patientIds },
         createdAt: { gte: todayMidnight },
         type: { in: ['push.reminder', 'push.insight'] },
       },
-      select: { userId: true, type: true },
+      select: { userId: true, type: true, data: true },
     })
+    const delivered = sentToday.filter(
+      (n) => (n.data as { pushed?: boolean } | null)?.pushed !== false,
+    )
     const alreadyReminder = new Set(
-      sentToday.filter((n) => n.type === 'push.reminder').map((n) => n.userId),
+      delivered.filter((n) => n.type === 'push.reminder').map((n) => n.userId),
     )
     const alreadyInsight = new Set(
-      sentToday.filter((n) => n.type === 'push.insight').map((n) => n.userId),
+      delivered.filter((n) => n.type === 'push.insight').map((n) => n.userId),
     )
 
     // 1. Wie heeft vandaag training op de week-planner staan?

@@ -70,7 +70,29 @@ export async function sendPush(
   category: PushCategory,
 ): Promise<void> {
   try {
-    // 1. In-app notificatie — altijd, ongeacht push-voorkeur.
+    // 1. Beslis éérst of er echt gepusht gaat worden, zodat de in-app rij dat
+    //    kan vastleggen als `data.pushed`. De daily-reminders-cron gebruikt die
+    //    vlag voor zijn idempotentie-check: een insight die tijdens quiet hours
+    //    is onderdrukt (pushed: false) telt dan niet als "vandaag al verstuurd"
+    //    en wordt bij de 09:00-run alsnog gepusht — voorheen blokkeerde zo'n
+    //    stille rij de push voor de rest van de dag.
+    const prefs = await prisma.notificationPreference.findUnique({ where: { userId } })
+    let willPush = true
+    if (prefs?.pushEnabled === false) willPush = false
+    else if (prefs && !categoryEnabled(prefs.categories, category)) willPush = false
+    else if (!URGENT_CATEGORIES.includes(category)) {
+      // Quiet hours gelden alleen voor niet-urgente categorieën.
+      const start = prefs?.quietHoursStart ?? DEFAULT_QUIET_START
+      const end = prefs?.quietHoursEnd ?? DEFAULT_QUIET_END
+      if (withinWindow(amsMinutesOfDay(new Date()), start, end)) willPush = false
+    }
+
+    const tokens = willPush
+      ? await prisma.pushToken.findMany({ where: { userId }, select: { token: true } })
+      : []
+    if (willPush && tokens.length === 0) willPush = false
+
+    // 2. In-app notificatie — altijd, ongeacht push-voorkeur.
     await prisma.notification
       .create({
         data: {
@@ -78,29 +100,13 @@ export async function sendPush(
           title: message.title,
           body: message.body,
           type: `push.${category}`,
-          data: (message.data ?? {}) as Prisma.InputJsonValue,
+          data: { ...(message.data ?? {}), pushed: willPush } as Prisma.InputJsonValue,
         },
       })
       .catch(() => {})
 
-    // 2. Voorkeuren.
-    const prefs = await prisma.notificationPreference.findUnique({ where: { userId } })
-    if (prefs?.pushEnabled === false) return
-    if (prefs && !categoryEnabled(prefs.categories, category)) return
-
-    // 3. Quiet hours (alleen niet-urgente categorieën).
-    if (!URGENT_CATEGORIES.includes(category)) {
-      const start = prefs?.quietHoursStart ?? DEFAULT_QUIET_START
-      const end = prefs?.quietHoursEnd ?? DEFAULT_QUIET_END
-      if (withinWindow(amsMinutesOfDay(new Date()), start, end)) return
-    }
-
-    // 4. Tokens ophalen en afleveren.
-    const tokens = await prisma.pushToken.findMany({
-      where: { userId },
-      select: { token: true },
-    })
-    if (tokens.length === 0) return
+    // 3. Afleveren.
+    if (!willPush) return
     await deliver(
       tokens.map((t) => t.token),
       message,
