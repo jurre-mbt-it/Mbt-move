@@ -8,7 +8,7 @@
 
 import type { MuscleRegion } from './exercise-constants'
 
-// Backwards-compat alias voor de bestaande signatuur.
+// Lokale alias — de mapping-tabellen zijn in regio-termen geschreven.
 type MuscleGroup = MuscleRegion
 
 // ── Types ────────────────────────────────────────────────────────────────────

@@ -48,11 +48,6 @@ export const MUSCLE_REGIONS = [
 
 export type MuscleRegion = (typeof MUSCLE_REGIONS)[number]
 
-// Backwards-compat alias: overal in de codebase betekent "muscle group" nu
-// "region". Behoud de naam zodat bestaande imports blijven werken.
-export const MUSCLE_GROUPS = MUSCLE_REGIONS
-export type MuscleGroup = MuscleRegion
-
 export const COLLECTION_COLORS = [
   '#4ECDC4', // MBT groen
   '#60a5fa', // blauw

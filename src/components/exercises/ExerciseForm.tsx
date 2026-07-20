@@ -11,7 +11,7 @@ import {
   EXERCISE_CATEGORIES,
   BODY_REGIONS,
   DIFFICULTIES,
-  type MuscleGroup,
+  type MuscleRegion,
 } from '@/lib/exercise-constants'
 import {
   estimateMuscleStrain,
@@ -45,7 +45,7 @@ interface ExerciseFormData {
   tips: string[]
   tags: string[]
   isPublic: boolean
-  muscleLoads: Partial<Record<MuscleGroup, number>>
+  muscleLoads: Partial<Record<MuscleRegion, number>>
   easierVariantId: string | null
   harderVariantId: string | null
   loadType: string

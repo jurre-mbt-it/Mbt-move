@@ -1,11 +1,11 @@
 'use client'
 
-import { MUSCLE_GROUPS, type MuscleGroup } from '@/lib/exercise-constants'
+import { MUSCLE_REGIONS, type MuscleRegion } from '@/lib/exercise-constants'
 import { P } from '@/components/dark-ui'
 
 interface MuscleLoadSlidersProps {
-  value: Partial<Record<MuscleGroup, number>>
-  onChange: (v: Partial<Record<MuscleGroup, number>>) => void
+  value: Partial<Record<MuscleRegion, number>>
+  onChange: (v: Partial<Record<MuscleRegion, number>>) => void
 }
 
 const LOAD_LABELS = ['', 'LICHT', 'MATIG', 'GEMIDDELD', 'HOOG', 'MAX']
@@ -13,7 +13,7 @@ const LOAD_LABELS = ['', 'LICHT', 'MATIG', 'GEMIDDELD', 'HOOG', 'MAX']
 const LOAD_COLORS = ['', P.ice, P.limeMid, P.lime, P.gold, P.orange]
 
 export function MuscleLoadSliders({ value, onChange }: MuscleLoadSlidersProps) {
-  const handleChange = (muscle: MuscleGroup, load: number) => {
+  const handleChange = (muscle: MuscleRegion, load: number) => {
     if (load === 0) {
       const next = { ...value }
       delete next[muscle]
@@ -43,7 +43,7 @@ export function MuscleLoadSliders({ value, onChange }: MuscleLoadSlidersProps) {
       </p>
 
       <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-        {MUSCLE_GROUPS.map(muscle => {
+        {MUSCLE_REGIONS.map(muscle => {
           const load = value[muscle] ?? 0
           const color = LOAD_COLORS[load] ?? LOAD_COLORS[0]
           const label = LOAD_LABELS[load] ?? ''
