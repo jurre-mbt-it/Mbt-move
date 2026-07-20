@@ -28,6 +28,11 @@ import {
   nlDayRange,
 } from '@/lib/tendinopathy'
 import { dateKey } from '@/lib/week-dates'
+import {
+  computeMuscleFatigue,
+  type StrengthStimulus,
+  type CardioStimulus,
+} from '@/lib/muscle-fatigue'
 import type { PrismaClient } from '@prisma/client'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -2339,6 +2344,83 @@ export const patientRouter = createTRPCRouter({
         }]
       })
     )
+  }),
+
+  // Per-regio spiervermoeidheid over de laatste 7 dagen. Trekt ZOWEL
+  // krachtsessies (sessionLog + exerciseLogs → Exercise-metadata) ALS cardio
+  // (cardioLog) door hetzelfde fatigue-model. Compute gebeurt server-side; de
+  // client rendert alleen de status-lijst. Vervangt getRecoverySessions.
+  muscleFatigue: protectedProcedure.query(async ({ ctx }) => {
+    const since = new Date()
+    since.setDate(since.getDate() - 7)
+
+    // ── Kracht ───────────────────────────────────────────────────────────────
+    const sessions = await ctx.prisma.sessionLog.findMany({
+      where: {
+        patientId: ctx.user!.id,
+        status: 'COMPLETED',
+        completedAt: { gte: since },
+      },
+      include: {
+        exerciseLogs: {
+          select: {
+            exerciseId: true,
+            setsCompleted: true,
+            repsCompleted: true,
+            repUnit: true,
+            painLevel: true,
+          },
+        },
+      },
+      orderBy: { completedAt: 'desc' },
+    })
+
+    const exerciseIds = [
+      ...new Set(sessions.flatMap((s) => s.exerciseLogs.map((el) => el.exerciseId))),
+    ]
+
+    const exercises = exerciseIds.length
+      ? await ctx.prisma.exercise.findMany({
+          where: { id: { in: exerciseIds } },
+          include: { muscleLoads: true },
+        })
+      : []
+    const exMap = new Map(exercises.map((e) => [e.id, e]))
+
+    const strength: StrengthStimulus[] = sessions.flatMap((session) =>
+      session.exerciseLogs.flatMap((log) => {
+        const ex = exMap.get(log.exerciseId)
+        if (!ex) return []
+        return [{
+          muscleLoads: muscleLoadsRecord(ex),
+          sets: log.setsCompleted ?? 3,
+          reps: log.repsCompleted ?? 10,
+          repUnit: log.repUnit ?? 'reps',
+          completedAt: session.completedAt ?? session.scheduledAt,
+          rpe: session.exertionLevel ?? undefined,
+          painLevel: log.painLevel ?? session.painLevel ?? undefined,
+          movementPattern: ex.movementPattern,
+          loadType: ex.loadType,
+          category: ex.category,
+        }]
+      }),
+    )
+
+    // ── Cardio ───────────────────────────────────────────────────────────────
+    const cardioLogs = await ctx.prisma.cardioLog.findMany({
+      where: { patientId: ctx.user!.id, completedAt: { gte: since } },
+      select: { activity: true, durationSec: true, rpe: true, zone: true, completedAt: true },
+    })
+
+    const cardio: CardioStimulus[] = cardioLogs.map((c) => ({
+      activity: c.activity,
+      durationMin: (c.durationSec ?? 0) / 60,
+      completedAt: c.completedAt,
+      rpe: c.rpe ?? undefined,
+      hrZone: c.zone ?? undefined,
+    }))
+
+    return computeMuscleFatigue(strength, cardio)
   }),
 
   // ── Therapist-access consent (Phase C) ──────────────────────────────────
