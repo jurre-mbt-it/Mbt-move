@@ -13,6 +13,7 @@
  */
 
 import { useMemo, useState } from 'react'
+import { notFound } from 'next/navigation'
 import {
   computeMuscleFatigue,
   type StrengthStimulus,
@@ -77,6 +78,12 @@ type Entry =
 let nextId = 1
 
 export default function MuscleFatigueSimulatorPage() {
+  // Dev-tool: niet bereikbaar in productie.
+  if (process.env.NODE_ENV === 'production') notFound()
+  return <Simulator />
+}
+
+function Simulator() {
   const [entries, setEntries] = useState<Entry[]>([
     { kind: 'strength', id: nextId++, hoursAgo: 18, preset: STRENGTH_PRESETS[0] },
     { kind: 'strength', id: nextId++, hoursAgo: 18, preset: STRENGTH_PRESETS[1] },
@@ -183,7 +190,7 @@ export default function MuscleFatigueSimulatorPage() {
             </div>
             <MuscleStatusListView states={states} />
             <p style={{ color: '#658180', fontSize: 11, lineHeight: 1.5, marginTop: 14 }}>
-              Herstelde regio's (≥95%) vallen weg. Cardio belast de benen mee: een duurloop meer dan een fietsrit. Kleuren: groen hersteld → goud → oranje → rood zwaar belast.
+              Herstelde regio&apos;s (≥95%) vallen weg. Cardio belast de benen mee: een duurloop meer dan een fietsrit. Kleuren: groen hersteld → goud → oranje → rood zwaar belast.
             </p>
           </div>
         </div>
