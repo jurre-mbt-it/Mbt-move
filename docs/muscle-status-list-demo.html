@@ -1,0 +1,63 @@
+<meta charset="utf-8"><title>Status per spiergroep — voorbeeld</title>
+<style>
+  :root { color-scheme: dark; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0E2729; color:#F5F2ED; font-family:-apple-system,'Segoe UI',sans-serif; padding:32px 20px 48px; }
+  .wrap { max-width:520px; margin:0 auto; }
+  h1 { font-size:19px; font-weight:700; letter-spacing:.5px; text-align:center; }
+  .sub { text-align:center; color:#8b94a7; font-size:13px; margin-top:6px; margin-bottom:22px; }
+  .scen { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-bottom:24px; }
+  .sub { color:#9EB5B3; }
+  .scen button { background:#15363A; border:1px solid rgba(212,232,230,0.08); color:#9EB5B3; border-radius:999px;
+    padding:8px 15px; font-size:12.5px; cursor:pointer; transition:border-color .15s, color .15s; }
+  .scen button:hover { border-color:#E87A55; }
+  .scen button.active { background:#E87A55; border-color:#E87A55; color:#0E2729; font-weight:600; }
+  .panel { background:#15363A; border-radius:10px; padding:16px 18px; }
+  .panel h2 { font-size:10px; letter-spacing:2px; color:#9EB5B3; font-weight:700;
+    font-family:ui-monospace,'JetBrains Mono',Menlo,monospace; text-transform:uppercase; margin-bottom:14px; }
+  .row { display:flex; align-items:center; gap:10px; font-size:13px; line-height:18px;
+    padding-top:8px; border-top:1px solid rgba(212,232,230,0.08); }
+  .row:first-child { border-top:none; }
+  .row .dot { width:10px; height:10px; border-radius:50%; flex:none; }
+  .row .nm { flex:1; color:#F5F2ED; }
+  .row .pc { font-variant-numeric:tabular-nums; font-size:13px; font-weight:900; letter-spacing:.5px;
+    font-family:ui-monospace,'JetBrains Mono',Menlo,monospace; }
+  .bar { height:5px; border-radius:3px; background:#1C4448; margin:6px 0 8px 20px; overflow:hidden; }
+  .bar i { display:block; height:100%; border-radius:3px; transition:width .4s, background .4s; }
+  .empty { color:#9EB5B3; font-size:13px; padding:6px 0 2px; }
+  .note { max-width:520px; margin:22px auto 0; color:#658180; font-size:12px; line-height:1.55; text-align:center; }
+</style>
+<div class="wrap">
+  <h1>STATUS PER SPIERGROEP</h1>
+  <div class="sub">Voorbeeld van de lijst zoals die op het dashboard komt. Geen anatomie-figuur.</div>
+  <div class="scen" id="scen"></div>
+  <div class="panel">
+    <h2>STATUS PER SPIERGROEP</h2>
+    <div id="list"></div>
+  </div>
+  <div class="note">De kleur en het percentage komen straks uit <code>patient.muscleFatigue</code>
+  (recoveryPercent 0–100). Herstelde spieren vallen weg uit de lijst; meest vermoeide staat bovenaan.</div>
+</div>
+<script>
+const SCEN = [
+  {key:'legday', label:'Zware leg-day (gisteren)', data:{Quadriceps:18, Glutes:34, Hamstrings:38, Onderrug:56, Kuiten:62, Core:68, 'Onderbeen (voor)':80}},
+  {key:'run', label:'60 min hardlopen (vandaag)', data:{Kuiten:52, 'Onderbeen (voor)':64, Quadriceps:70, Hamstrings:74, Glutes:80, Core:90}},
+  {key:'upper', label:'Bovenlichaam (2 dagen terug)', data:{Borst:55, Lats:58, Triceps:60, Biceps:64, Schouders:66, Bovenrug:72}},
+  {key:'fresh', label:'Volledig hersteld', data:{}},
+]
+const color = p => p>=80?'#5FD08A':p>=55?'#F5B942':p>=30?'#E87A55':'#F87171'
+function apply(s){
+  const list = document.getElementById('list'); list.innerHTML=''
+  const rows = Object.entries(s.data).filter(([,p])=>p<95).sort((a,b)=>a[1]-b[1])
+  if(!rows.length){ list.innerHTML='<div class="empty">Alles hersteld — klaar om te trainen.</div>'; return }
+  for(const [nm,p] of rows){
+    const d=document.createElement('div')
+    d.innerHTML=`<div class="row"><span class="dot" style="background:${color(p)}"></span><span class="nm">${nm}</span><span class="pc">${p}%</span></div><div class="bar"><i style="width:${p}%;background:${color(p)}"></i></div>`
+    list.appendChild(d)
+  }
+}
+const sb=document.getElementById('scen')
+SCEN.forEach((s,i)=>{ const b=document.createElement('button'); b.textContent=s.label
+  b.onclick=()=>{ sb.querySelectorAll('button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); apply(s) }
+  sb.appendChild(b); if(i===0){ b.classList.add('active'); apply(s) } })
+</script>

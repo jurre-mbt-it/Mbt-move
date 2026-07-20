@@ -27,32 +27,31 @@ export const DIFFICULTIES = [
   { value: 'ADVANCED',     label: 'Advanced' },
 ] as const
 
-export const MUSCLE_GROUPS = [
-  'Quadriceps',
-  'Hamstrings',
-  'Glutes',
-  'Calves',
+// De 12 spierregio's — één vocabulaire voor tagging, muscleLoads-sleutels,
+// het fatigue-model (τ per regio) en de status-lijst. Vervangt de oude 22
+// granulaire MUSCLE_GROUPS (zie docs/plan-muscle-fatigue-v2.md §1.0).
+// Volgorde = top-to-bottom voor de UI.
+export const MUSCLE_REGIONS = [
+  'Nek',
+  'Schouders',
+  'Borst',
+  'Armen',
+  'Bovenrug',
   'Core',
   'Onderrug',
-  'Bovenrug',
-  'Lats',
-  'Borst',
-  'Schouders anterieur',
-  'Schouders lateraal',
-  'Schouders posterieur',
-  'Biceps',
-  'Triceps',
-  'Onderarmen',
-  'Hip flexors',
-  'Adductoren',
-  'Abductoren',
-  'Rotatorcuff',
-  'Diepe halsflexoren',
-  'Tibialis anterior',
-  'Intrinsieke voetspieren',
+  'Glutes',
+  'Quadriceps',
+  'Hamstrings',
+  'Onderbeen',
+  'Voeten',
 ] as const
 
-export type MuscleGroup = (typeof MUSCLE_GROUPS)[number]
+export type MuscleRegion = (typeof MUSCLE_REGIONS)[number]
+
+// Backwards-compat alias: overal in de codebase betekent "muscle group" nu
+// "region". Behoud de naam zodat bestaande imports blijven werken.
+export const MUSCLE_GROUPS = MUSCLE_REGIONS
+export type MuscleGroup = MuscleRegion
 
 export const COLLECTION_COLORS = [
   '#4ECDC4', // MBT groen

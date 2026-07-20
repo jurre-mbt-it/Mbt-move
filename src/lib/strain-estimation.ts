@@ -6,7 +6,10 @@
  * serves as a sensible starting point. The therapist can then adjust.
  */
 
-import type { MuscleGroup } from './exercise-constants'
+import type { MuscleRegion } from './exercise-constants'
+
+// Backwards-compat alias voor de bestaande signatuur.
+type MuscleGroup = MuscleRegion
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,12 +37,15 @@ export interface StrainEstimationInput {
 
 type MuscleRole = 'primary' | 'secondary'
 
+// Movement → regio-mapping. Afgeleid uit de oude 22-groep-doelen via de
+// migratiemap (docs/plan-muscle-fatigue-v2.md §1.0); waar meerdere oude
+// spieren op één regio vielen is gededupt met primary-voorrang.
 const MOVEMENT_MUSCLES: Record<MovementPattern, Array<[MuscleGroup, MuscleRole]>> = {
   SQUAT: [
     ['Quadriceps', 'primary'],
     ['Glutes', 'primary'],
     ['Core', 'secondary'],
-    ['Calves', 'secondary'],
+    ['Onderbeen', 'secondary'],
     ['Hamstrings', 'secondary'],
   ],
   LUNGE: [
@@ -47,8 +53,7 @@ const MOVEMENT_MUSCLES: Record<MovementPattern, Array<[MuscleGroup, MuscleRole]>
     ['Glutes', 'primary'],
     ['Hamstrings', 'secondary'],
     ['Core', 'secondary'],
-    ['Calves', 'secondary'],
-    ['Hip flexors', 'secondary'],
+    ['Onderbeen', 'secondary'],
   ],
   HINGE: [
     ['Hamstrings', 'primary'],
@@ -59,26 +64,22 @@ const MOVEMENT_MUSCLES: Record<MovementPattern, Array<[MuscleGroup, MuscleRole]>
   ],
   PUSH_HORIZONTAL: [
     ['Borst', 'primary'],
-    ['Triceps', 'secondary'],
-    ['Schouders anterieur', 'secondary'],
+    ['Armen', 'secondary'],
+    ['Schouders', 'secondary'],
   ],
   PUSH_VERTICAL: [
-    ['Schouders anterieur', 'primary'],
-    ['Schouders lateraal', 'secondary'],
-    ['Triceps', 'secondary'],
+    ['Schouders', 'primary'],
+    ['Armen', 'secondary'],
     ['Core', 'secondary'],
   ],
   PULL_HORIZONTAL: [
     ['Bovenrug', 'primary'],
-    ['Biceps', 'secondary'],
-    ['Schouders posterieur', 'secondary'],
-    ['Onderarmen', 'secondary'],
+    ['Armen', 'secondary'],
+    ['Schouders', 'secondary'],
   ],
   PULL_VERTICAL: [
-    ['Lats', 'primary'],
-    ['Biceps', 'secondary'],
-    ['Bovenrug', 'secondary'],
-    ['Onderarmen', 'secondary'],
+    ['Bovenrug', 'primary'],
+    ['Armen', 'secondary'],
   ],
   HIP_THRUST: [
     ['Glutes', 'primary'],
@@ -86,21 +87,19 @@ const MOVEMENT_MUSCLES: Record<MovementPattern, Array<[MuscleGroup, MuscleRole]>
     ['Core', 'secondary'],
   ],
   CALF_RAISE: [
-    ['Calves', 'primary'],
+    ['Onderbeen', 'primary'],
   ],
   CORE: [
     ['Core', 'primary'],
-    ['Hip flexors', 'secondary'],
     ['Onderrug', 'secondary'],
   ],
   ROTATION: [
     ['Core', 'primary'],
-    ['Schouders posterieur', 'secondary'],
+    ['Schouders', 'secondary'],
     ['Onderrug', 'secondary'],
   ],
   ISOLATION_UPPER: [
-    ['Biceps', 'primary'],
-    ['Onderarmen', 'secondary'],
+    ['Armen', 'primary'],
   ],
   ISOLATION_LOWER: [
     ['Quadriceps', 'primary'],
@@ -108,8 +107,8 @@ const MOVEMENT_MUSCLES: Record<MovementPattern, Array<[MuscleGroup, MuscleRole]>
   ],
   CARRY: [
     ['Core', 'primary'],
-    ['Onderarmen', 'primary'],
-    ['Schouders lateraal', 'secondary'],
+    ['Armen', 'primary'],
+    ['Schouders', 'secondary'],
     ['Bovenrug', 'secondary'],
     ['Glutes', 'secondary'],
   ],
@@ -118,25 +117,25 @@ const MOVEMENT_MUSCLES: Record<MovementPattern, Array<[MuscleGroup, MuscleRole]>
     ['Glutes', 'primary'],
     ['Hamstrings', 'secondary'],
     ['Core', 'secondary'],
-    ['Schouders anterieur', 'secondary'],
+    ['Schouders', 'secondary'],
     ['Bovenrug', 'secondary'],
   ],
 }
 
-// ── Body region → muscle fallback (when no movement pattern is set) ──────────
+// ── Body region → regio fallback (when no movement pattern is set) ───────────
 
 const BODY_REGION_MUSCLES: Record<string, MuscleGroup[]> = {
-  KNEE:      ['Quadriceps', 'Hamstrings', 'Calves'],
-  HIP:       ['Glutes', 'Hip flexors', 'Adductoren', 'Abductoren'],
-  SHOULDER:  ['Schouders anterieur', 'Schouders lateraal', 'Schouders posterieur', 'Rotatorcuff'],
-  BACK:      ['Bovenrug', 'Onderrug', 'Lats'],
-  ANKLE:     ['Calves'],
-  FOOT:      ['Calves'],
+  KNEE:      ['Quadriceps', 'Hamstrings', 'Onderbeen'],
+  HIP:       ['Glutes', 'Core', 'Quadriceps'],
+  SHOULDER:  ['Schouders'],
+  BACK:      ['Bovenrug', 'Onderrug'],
+  ANKLE:     ['Onderbeen'],
+  FOOT:      ['Onderbeen', 'Voeten'],
   LUMBAR:    ['Onderrug', 'Core'],
   THORACIC:  ['Bovenrug', 'Core'],
-  CERVICAL:  ['Bovenrug'],
-  ELBOW:     ['Biceps', 'Triceps', 'Onderarmen'],
-  WRIST:     ['Onderarmen'],
+  CERVICAL:  ['Nek'],
+  ELBOW:     ['Armen'],
+  WRIST:     ['Armen'],
   FULL_BODY: ['Quadriceps', 'Glutes', 'Core', 'Bovenrug'],
 }
 
@@ -217,8 +216,7 @@ export function estimateMuscleStrain(
   if (input.category === 'PLYOMETRICS') {
     // Plyometrics increases strain on lower body muscles
     const lowerMuscles = new Set([
-      'Quadriceps', 'Hamstrings', 'Glutes', 'Calves', 'Hip flexors',
-      'Adductoren', 'Abductoren',
+      'Quadriceps', 'Hamstrings', 'Glutes', 'Onderbeen',
     ])
     for (const muscle of Object.keys(result)) {
       if (lowerMuscles.has(muscle)) {

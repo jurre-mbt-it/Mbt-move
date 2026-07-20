@@ -62,3 +62,6 @@ ds-bundle/
 .design-sync/node_modules
 .design-sync/fonts/
 scripts/backups/
+
+# Muscle-loads backfill audit (generated from live DB, review artifact)
+muscle-loads-audit.json

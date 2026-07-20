@@ -1,6 +1,7 @@
 import { PrismaClient, UserRole, ExerciseCategory, BodyRegion, LoadType, MovementPattern } from '@prisma/client'
 import { STANDARD_EXERCISES } from './seed-exercises'
 import { PROGRESSION_CHAINS } from './exercise-progressions'
+import { collapseMuscleLoadsToRegions } from '../src/lib/muscle-region-map'
 import { seedClinicalTests } from '../scripts/seed-clinical-tests'
 import { seedTestCatalog } from '../scripts/seed-test-catalog'
 import { PrismaPg } from '@prisma/adapter-pg'
@@ -229,9 +230,13 @@ async function main() {
           defaultRepUnit: stdEx.defaultRepUnit ?? 'reps',
           defaultExtraParams: (stdEx.defaultExtraParams ?? []) as unknown as object,
           muscleLoads: {
-            create: Object.entries(stdEx.muscleLoads).map(([muscle, load]) => ({
+            // Collapse de bron-belastingen naar de 12 regio's (max per regio),
+            // zodat verse DB's meteen in de nieuwe vocabulaire starten.
+            create: Object.entries(
+              collapseMuscleLoadsToRegions(stdEx.muscleLoads).regions,
+            ).map(([muscle, load]) => ({
               muscle,
-              load,
+              load: load as number,
             })),
           },
         },
@@ -255,9 +260,13 @@ async function main() {
           isPublic: true,
           createdById: admin.id,
           muscleLoads: {
-            create: Object.entries(stdEx.muscleLoads).map(([muscle, load]) => ({
+            // Collapse de bron-belastingen naar de 12 regio's (max per regio),
+            // zodat verse DB's meteen in de nieuwe vocabulaire starten.
+            create: Object.entries(
+              collapseMuscleLoadsToRegions(stdEx.muscleLoads).regions,
+            ).map(([muscle, load]) => ({
               muscle,
-              load,
+              load: load as number,
             })),
           },
         },

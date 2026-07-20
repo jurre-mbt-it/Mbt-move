@@ -31,7 +31,8 @@ The current per-muscle system has three problems:
 
 **Goal:** one shared per-muscle *dose* function, an accumulating
 exponential-decay fatigue model, cardio feeding the legs modality-weighted,
-and a clean data seam for the new human-body heatmap (Jurre builds the SVG).
+surfaced as a per-muscle-group **status list** (no anatomy figure — see
+Phase 2 for that decision).
 
 **Non-goals (do NOT touch):**
 - The whole-body TSB / load-curve / sRPE system (`training-load.ts`,
@@ -43,6 +44,61 @@ and a clean data seam for the new human-body heatmap (Jurre builds the SVG).
 ---
 
 ## 1. The model
+
+### 1.0 Muscle regions — the authoritative vocabulary (NEW, supersedes the 22 groups)
+
+**Decision (2026-07-20, Jurre):** exercises are tagged against a fixed set of
+**muscle regions**, not the old 22 granular groups. These regions are the
+`muscleLoads` keys, the exercise-form options, the engine's per-region τ, and
+the status-list rows — one vocabulary end to end. This replaces both
+`MUSCLE_GROUPS` (the 22-group list in `exercise-constants.ts`) and the
+`DISPLAY_GROUPS` idea from earlier drafts.
+
+**The 12 regions** (`MUSCLE_REGIONS`, top-to-bottom order for the UI):
+
+```
+Nek · Schouders · Borst · Armen · Bovenrug · Core · Onderrug ·
+Glutes · Quadriceps · Hamstrings · Onderbeen · Voeten
+```
+
+Jurre gave 11 (Nek, Schouders, Armen, Bovenrug, Onderrug, Glutes, Core,
+Quadriceps, Hamstrings, Onderbeen, Voeten). **`Borst` was added** so chest
+exercises (bench, push-up, dip, chest press) have a home — without it they
+would be untaggable. If Jurre wants Borst merged elsewhere, it is a one-line
+change; until told otherwise, ship 12.
+
+`Armen` intentionally merges biceps + triceps + forearms (Jurre's
+simplification — arm detail is not clinically tracked here). `Nek` and `Voeten`
+are new, useful for neck/foot rehab.
+
+**Migration map — old 22 group → new region** (drives the data backfill in
+Phase 0.5). Where two old muscles collapse into one region, the region's load =
+**max** of the members:
+
+| old group | → region |
+|-----------|----------|
+| Quadriceps | Quadriceps |
+| Adductoren | Quadriceps |
+| Hamstrings | Hamstrings |
+| Glutes | Glutes |
+| Abductoren | Glutes |
+| Calves | Onderbeen |
+| Tibialis anterior | Onderbeen |
+| Intrinsieke voetspieren | Voeten |
+| Core | Core |
+| Hip flexors | Core |
+| Onderrug | Onderrug |
+| Bovenrug | Bovenrug |
+| Lats | Bovenrug |
+| Borst | Borst |
+| Schouders anterieur / lateraal / posterieur | Schouders |
+| Rotatorcuff | Schouders |
+| Biceps / Triceps / Onderarmen | Armen |
+| Diepe halsflexoren | Nek |
+
+Everywhere below that says "muscle" / `MuscleGroup` now means "region" /
+`MuscleRegion`. The τ table (1.2) and cardio profiles (1.4) are already written
+in region terms.
 
 ### 1.1 Per-muscle dose (strength)
 
@@ -94,22 +150,32 @@ L(muscle) = Σ_i  muscleDose_i × exp( −Δt_i / τ_i )
   τ_i = τ_base(muscle) × (0.8 + 0.2 × damageFactor_i)
   ```
 
-  `τ_base` by muscle group (hours):
+  `τ_base` by **region** (hours):
 
-  | tier | τ_base | muscles |
-  |------|--------|---------|
-  | large | 40 | Quadriceps, Hamstrings, Glutes, Borst, Bovenrug, Lats, Onderrug |
-  | medium | 28 | Calves, Core, Schouders anterieur, Schouders lateraal, Schouders posterieur, Biceps, Triceps, Hip flexors, Adductoren, Abductoren |
-  | small | 20 | Onderarmen, Rotatorcuff, Diepe halsflexoren, Tibialis anterior, Intrinsieke voetspieren |
+  | region | τ_base | tier |
+  |--------|--------|------|
+  | Quadriceps | 40 | large |
+  | Hamstrings | 40 | large |
+  | Glutes | 40 | large |
+  | Borst | 40 | large |
+  | Bovenrug | 40 | large |
+  | Onderrug | 36 | large-ish |
+  | Onderbeen | 28 | medium |
+  | Core | 28 | medium |
+  | Schouders | 28 | medium |
+  | Armen | 24 | medium-small |
+  | Nek | 24 | medium-small |
+  | Voeten | 18 | small |
 
-  Any muscle not listed → default 28 (medium). Define this as an explicit
-  `Record<MuscleGroup, number>` so all 22 are covered; assert coverage in a test.
+  Define as an explicit `Record<MuscleRegion, number>` covering all 12 regions;
+  a unit test asserts every `MUSCLE_REGIONS` entry has a τ_base (no default
+  fallback needed — the set is closed).
 
 ### 1.3 damageFactor (the science piece), derived from Exercise metadata
 
 Pure function of fields **already on `Exercise`**: `movementPattern`,
-`loadType`, `category`, plus the log's `repUnit`. No DB column, no migration.
-Mirrors how `src/lib/strain-estimation.ts` already reads these enums.
+`loadType`, `category`, plus the log's `repUnit`. No DB column, no schema
+migration. Mirrors how `src/lib/strain-estimation.ts` already reads these enums.
 
 ```
 base by movementPattern:
@@ -176,24 +242,24 @@ cardioMuscleDose(muscle) = profileWeight(activity, muscle)
   | SWIMMING | 0.60 | |
   | OTHER | 0.70 | generic |
 
-- **profileWeight** — muscle → weight (involvement-equivalent units). Define
-  as `Partial<Record<MuscleGroup, number>>` per activity; muscles absent = 0.
+- **profileWeight** — region → weight (involvement-equivalent units). Define
+  as `Partial<Record<MuscleRegion, number>>` per activity; regions absent = 0.
 
-  | activity | profile (muscle: weight) |
+  | activity | profile (region: weight) |
   |----------|--------------------------|
-  | RUNNING | Quadriceps 2, Hamstrings 2, Calves 2.5, Glutes 1.5, Core 1, Tibialis anterior 1 |
-  | WALKING | Quadriceps 1, Calves 1, Glutes 1, Hamstrings 0.5 |
-  | CYCLING | Quadriceps 2.5, Glutes 1.5, Calves 1, Hamstrings 1 |
-  | WATTBIKE | Quadriceps 2.5, Glutes 1.5, Calves 1, Hamstrings 1 |
-  | ASSAULT_BIKE | Quadriceps 2, Glutes 1.5, Calves 1, Hamstrings 1, Lats 0.5, Schouders anterieur 0.5 |
-  | CROSSTRAINER | Quadriceps 2, Glutes 1.5, Hamstrings 1, Calves 1 |
-  | ROWING | Quadriceps 2, Glutes 1.5, Hamstrings 1, Bovenrug 1.5, Lats 1, Core 1 |
-  | SKIERG | Lats 1.5, Triceps 1, Core 1.5, Bovenrug 1 |
-  | STAIRCLIMBER | Quadriceps 2, Glutes 2, Calves 1.5, Hamstrings 1 |
-  | SWIMMING | Lats 1.5, Schouders posterieur 1, Bovenrug 1, Core 1 |
+  | RUNNING | Quadriceps 2, Hamstrings 2, Onderbeen 2.5, Glutes 1.5, Core 1 |
+  | WALKING | Quadriceps 1, Onderbeen 1, Glutes 1, Hamstrings 0.5 |
+  | CYCLING | Quadriceps 2.5, Glutes 1.5, Onderbeen 1, Hamstrings 1 |
+  | WATTBIKE | Quadriceps 2.5, Glutes 1.5, Onderbeen 1, Hamstrings 1 |
+  | ASSAULT_BIKE | Quadriceps 2, Glutes 1.5, Onderbeen 1, Hamstrings 1, Armen 0.5, Schouders 0.5 |
+  | CROSSTRAINER | Quadriceps 2, Glutes 1.5, Hamstrings 1, Onderbeen 1 |
+  | ROWING | Quadriceps 2, Glutes 1.5, Hamstrings 1, Bovenrug 1.5, Core 1, Armen 0.5 |
+  | SKIERG | Bovenrug 1.5, Armen 1, Core 1.5 |
+  | STAIRCLIMBER | Quadriceps 2, Glutes 2, Onderbeen 1.5, Hamstrings 1 |
+  | SWIMMING | Bovenrug 1.5, Schouders 1, Core 1 |
   | OTHER | Quadriceps 1, Core 0.5 |
 
-  τ for cardio doses: use `τ_base(muscle) × (0.8 + 0.2 × cardioDamageFactor)`,
+  τ for cardio doses: use `τ_base(region) × (0.8 + 0.2 × cardioDamageFactor)`,
   same formula as strength.
 
 ### 1.5 Fatigue → recovery percent (UI value)
@@ -239,10 +305,10 @@ Assume τ as tabled, L_FULL = 18.
    intensity: rpe3 → 0.55+0.09×(3−5)=0.37→clamp 0.4, cardioDamage 0.60.
    dose = 2.5×1.0×0.4×0.6 = 0.60. Δt=2h → L≈0.57 → **97% (recovered).** ✓
    Negligible, as intended.
-6. **Hard 60-min run, rpe 7.** Calves: profile 2.5, durationFactor 2.0,
+6. **Hard 60-min run, rpe 7.** Onderbeen: profile 2.5, durationFactor 2.0,
    intensity 0.73, cardioDamage 1.30. dose = 2.5×2.0×0.73×1.30 = 4.75.
    Quadriceps: 2×2.0×0.73×1.30 = 3.80. Δt=2h.
-   Calves τ=28×(0.8+0.2×1.3)=29.7 → L≈4.44 → **75% (recovering).**
+   Onderbeen τ=28×(0.8+0.2×1.3)=29.7 → L≈4.44 → **75% (recovering).**
    Quads τ=41.2 → L≈3.62 → **80% (recovered/border).** ✓ Running loads the
    legs meaningfully; more than cycling. Exactly the requested behaviour.
 
@@ -304,17 +370,20 @@ export function cardioMuscleDoses(c: CardioStimulus): Record<string, number>
 export function damageFactor(input): number
 export function tauFor(muscle: string, damage: number): number
 ```
-Put every constant table from section 1 here as named `const` objects.
-Add a `MUSCLE_TAU_BASE: Record<MuscleGroup, number>` covering all 22 groups
-from `MUSCLE_GROUPS` in `src/lib/exercise-constants.ts`.
+Put every constant table from section 1 here as named `const` objects. Define
+`MUSCLE_REGIONS` (the 12 regions, section 1.0) and
+`MUSCLE_TAU_BASE: Record<MuscleRegion, number>` covering all 12. `MuscleRegion`
+is the union type; it lives in (or is re-exported from)
+`src/lib/exercise-constants.ts` since the exercise form and seed data use it too
+(see Phase 0.5).
 
 Keep `getMuscleFatigueColor(percent)` + `getMuscleFatigueLabel(percent)` here
-too, but see section 6 on colours (orange house style, NOT the old lime).
+too — colours per section 6 (iOS brand tokens).
 
 **Create `src/lib/__tests__/muscle-fatigue.test.ts`** — encode the six worked
 examples from 1.6 as assertions, plus:
-- a test asserting every muscle in `MUSCLE_GROUPS` has a `τ_base` entry.
-- a test that MOBILITY / involvement-0 muscles produce no state.
+- a test asserting every region in `MUSCLE_REGIONS` has a `τ_base` entry (12/12).
+- a test that MOBILITY / involvement-0 regions produce no state.
 - a monotonicity test: same stimulus, larger Δt → higher recoveryPercent.
 
 **Test runner:** the repo has **no test runner configured** (no vitest/jest in
@@ -324,6 +393,57 @@ no DOM). Keep it minimal — this is the first test in the repo, do not drag in 
 big setup. If adding a runner is considered scope-creep at execution time,
 fall back to a `src/lib/muscle-fatigue.selfcheck.ts` script run via
 `npx tsx` that throws on mismatch, and note it — but vitest is preferred.
+
+### Phase 0.5 — Muscle-region tagging vocabulary + existing-exercise audit
+
+This moves exercise tagging from the 22 granular groups to the 12 regions
+(section 1.0). It must land **before Phase 1** so the endpoint reads
+region-keyed `muscleLoads`. No Prisma **schema** migration (the
+`muscle_loads.muscle` column stays `String`); there is one **data backfill** of
+existing rows.
+
+1. **Vocabulary.** In `src/lib/exercise-constants.ts` replace `MUSCLE_GROUPS`
+   (22) with `MUSCLE_REGIONS` (the 12, section 1.0 order) and the
+   `MuscleRegion` type. Grep every consumer of `MUSCLE_GROUPS` / `MuscleGroup`
+   and update: `MuscleLoadSliders.tsx`, `ExerciseForm.tsx`, `MuscleBalancePanel`
+   `MUSCLE_PAIRS`, `programs/types.ts`, `exercises.ts`, seed files, and the
+   mobile read-only display later (section 8). List found here:
+   `grep -rn "MUSCLE_GROUPS\|MuscleGroup" src prisma`.
+
+2. **Exercise form UI.** `MuscleLoadSliders.tsx` now renders 12 region sliders
+   (1–5). Keep the "primary/secondary" auto-estimate. Order them per
+   `MUSCLE_REGIONS`.
+
+3. **Auto-estimator.** `src/lib/strain-estimation.ts` maps `movementPattern` →
+   muscles via `MOVEMENT_MUSCLES` (22) and `BODY_REGION_MUSCLES`. Rewrite both
+   to output **regions**. This is mechanical: apply the section-1.0 migration
+   map to the existing targets (e.g. a SQUAT that hit Quadriceps/Glutes/Core
+   still hits those regions; a PULL that hit Lats now hits Bovenrug). Keep the
+   primary=3/secondary=2 + modifier logic.
+
+4. **Data backfill (existing exercises).** Write
+   `scripts/migrate-muscle-loads-to-regions.ts` (Prisma, one-off, follows the
+   pattern of other `scripts/*.ts`; DB access per the repo's DIRECT_URL setup).
+   For each `Exercise`: read its `muscle_loads` rows, map each `muscle` through
+   the section-1.0 table to a region, collapse to region → **max** member load,
+   then replace the rows (respect `@@unique([exerciseId, muscle])`). Idempotent:
+   running twice yields the same 12-region rows. Log a summary
+   (exercises touched, rows before/after).
+
+5. **Audit "adjust if needed".** After the backfill, cross-check each exercise:
+   recompute the region estimate from `strain-estimation` (step 3) and compare
+   to the collapsed values; **log** exercises where they diverge by ≥2 on any
+   region or where the backfill produced an empty map, into a
+   `muscle-loads-audit.json` for Jurre/therapist review. Do NOT silently
+   overwrite therapist-set loads — the audit is a review list, not an
+   auto-fix. (This is the "geevalueerd en aangepast indien nodig" step: the
+   script surfaces the candidates; a human confirms.)
+
+6. **Seed data.** Update `prisma/seed-exercises.ts` (and any other seed with
+   `muscleLoads`) to region keys so fresh DBs start correct.
+
+Verify: `npx tsc --noEmit` clean, exercise create/edit shows 12 region sliders,
+backfill script runs idempotently on a copy, audit file generated.
 
 ### Phase 1 — server endpoint
 
@@ -349,18 +469,40 @@ the client just renders.
 Do NOT delete `getRecoverySessions` yet — Phase 3 removes it once nothing
 references it.
 
-### Phase 2 — the body heatmap (data wired, SVG seam for Jurre)
+### Phase 2 — the "status per muscle group" list (NO anatomy figure)
 
-**Create `src/components/recovery/MuscleHeatmap.tsx`** — a client component
-that calls `trpc.patient.muscleFatigue.useQuery()` and renders per-muscle
-state. Build it so the **visual body SVG is a clearly-marked seam** Jurre fills
-in:
-- Export a typed prop contract: `MuscleHeatmapBody({ states, onMuscleHover })`
-  where `states: Record<MuscleGroup, MuscleFatigueState>`.
-- Provide a temporary fallback list/grid rendering (muscle name + coloured
-  chip + percent) so the feature is testable before the SVG exists.
-- Leave a `// TODO(jurre): human-body SVG goes here, consume `states` + colour
-  helper` marker and a short prop-shape comment so the handoff is unambiguous.
+**Decision (final, 2026-07-20):** the anatomy body figure is dropped. We tried
+a raster heatmap and a vector-contour heatmap over AI-generated body renders;
+both were rejected as not good enough / not worth the fragility. The feature is
+a **plain per-muscle-group status list** — the panel already shown in the demo.
+Do NOT build a body figure, SVG map, or masks. There are no body assets in the
+repo (any `public/body/*` or `scripts/body-masks/*` were removed).
+
+**What to build.** A single component that lists each fatigued **region** as a
+row: a coloured status dot, the region name, the recovery percentage, and a
+thin progress bar underneath tinted the same colour. Reference layout is in the
+demo panel (and the screenshot Jurre approved): rows sorted **worst first**
+(lowest recoveryPercent at top), heading "STATUS PER SPIERGROEP".
+
+Rows to show:
+- Only regions with a stimulus in the last 7 days (i.e. those
+  `computeMuscleFatigue` returns) AND `recoveryPercent < 95` — a region that is
+  essentially recovered drops off the list rather than cluttering it.
+- If none qualify, show an empty state: "Alles hersteld — klaar om te trainen."
+  (tone-of-voice compliant, keep it plain).
+
+**No display-grouping layer needed.** Because tagging is already in the 12
+regions (Phase 0.5), the engine returns region-keyed states and the list shows
+them 1:1. There is no 22→N collapse, no `DISPLAY_GROUPS`, no figure/region map —
+that complexity is gone. Just sort `computeMuscleFatigue`'s output and render.
+
+**Create `src/components/recovery/MuscleStatusList.tsx`** implementing the
+above, fed by `trpc.patient.muscleFatigue.useQuery()`. Style with the app's
+dark-ui card conventions and the orange house palette (section 6 colours).
+Keep it self-contained and reusable — it will also be embedded elsewhere later.
+Interaction is minimal: no hover, no tooltip, no SVG. Optionally show the
+recovery ETA text (e.g. "~1d 4u") from `hoursRemaining` per row if it reads
+well, but the % + bar is the core.
 
 Mount it on the **patient dashboard** (`src/app/(patient)/patient/dashboard/`)
 and the **athlete dashboard** (`src/app/(athlete)/athlete/dashboard/`). Place
@@ -368,6 +510,77 @@ it where the old readiness tile would have gone; match the surrounding
 dark-ui/card styling. Follow the "This is NOT the Next.js you know" note in
 AGENTS.md — read the relevant guide in `node_modules/next/dist/docs/` before
 writing route/server-component code.
+
+Visual reference: `docs/muscle-status-list-demo.html` — the approved list
+layout (heading, rows, dot + name + % + bar, worst-first, recovered rows
+dropped). It is a layout reference only; the exact styling must match the iOS
+app brand per the spec below.
+
+#### Design spec — match the iOS app brand (final)
+
+The list must look like it belongs in the **iOS app** (`mbt-gym-mobile`). The
+per-muscle status **colours may differ** from the app's semantic colours —
+that colour coding is a functional distinction and Jurre approved it — but
+every other design choice (surface, typography, spacing, heading, bar) must
+follow the iOS design system. Both the web component (built now) and the iOS
+component (iOS follow-up, section 8) use the same brand so they read as one product.
+
+**Brand tokens** — source of truth is `mbt-gym-mobile/constants/theme.ts`
+(object `P`). The iOS app is force-dark, petrol-green with orange accent. Use
+these exact values (web: as CSS/theme constants; iOS: import `P` directly):
+
+| role | token | hex |
+|------|-------|-----|
+| app background | `P.bg` | `#0E2729` |
+| card surface | `P.surface` | `#15363A` |
+| bar track / elevated | `P.surfaceHi` | `#1C4448` |
+| hairline border | `P.line` | `rgba(212,232,230,0.08)` |
+| primary text (crème) | `P.ink` | `#F5F2ED` |
+| muted text | `P.inkMuted` | `#9EB5B3` |
+| **brand accent (orange)** | `P.lime` *(legacy key, value is orange)* | `#E87A55` |
+
+Spacing scale (`Spacing`): xs4 sm8 md12 lg16 xl24. Radius (`Radius`): md10 lg14.
+
+**Typography** (fonts already loaded in the iOS app; the web app must use the
+same families — confirm they are available in `mbt-gym`, otherwise ship the
+`assets/fonts` and register them):
+- Section heading ("kicker"): `fontFamily: JetBrainsMonoMedium, fontSize: 10,
+  fontWeight: 700, letterSpacing: 2, textTransform: uppercase, color:
+  P.inkMuted`. On iOS this is the existing `<Kicker>` from
+  `@/components/dark-ui` — reuse it, do not restyle.
+- Row muscle name (body): `fontFamily: InterTight, fontSize: 13, lineHeight:
+  18, color: P.ink`.
+- Percentage value: `fontFamily: JetBrainsMonoMedium, fontSize: 13,
+  fontWeight: 900, letterSpacing: 0.5`, colour = the row's status colour,
+  right-aligned.
+
+**Card**: `backgroundColor: P.surface, borderRadius: Radius.md (10), padding:
+Spacing.md (12)`. No shadow (the app uses tint + hairline, never elevation).
+Heading is a `<Kicker>STATUS PER SPIERGROEP</Kicker>` at the top.
+
+**Row** — follow the existing `critRow` pattern
+(`mbt-gym-mobile/components/rehab-section.tsx:354-357`): `flexDirection: row,
+alignItems: center, gap: 10, paddingVertical: 8`, rows separated by a top
+`hairline` border in `P.line`. Layout: 10px status dot (`borderRadius: 5`,
+colour = status) · muscle name (`flex: 1`) · percentage (mono, right). A thin
+bar sits beneath each row.
+
+**Bar** — reuse the `MiniBar` pattern
+(`mbt-gym-mobile/components/health-ui.tsx:184-190`): track `height: 5,
+borderRadius: 3, backgroundColor: P.surfaceHi, overflow: hidden`; fill `width:
+${pct}%, height: 100%, borderRadius: 3, backgroundColor: <status colour>`.
+
+**Closest existing analog to copy from:** `mbt-gym-mobile/components/
+load-split.tsx` (`ModalityLoadCard`) — already renders coloured-dot + mono
+label + coloured value + thin fill bar on a `P.surface` card. Match its rhythm.
+
+**iOS primitives to reuse (Phase 8, don't rebuild):** `Kicker`, `Tile` from
+`@/components/dark-ui`; `MiniBar` from `@/components/health-ui`; `ThemedText`
+from `@/components/themed-text`; tokens `P, Font, Spacing, Radius` from
+`@/constants/theme`.
+
+**Status colour ramp** — see section 6; it is aligned to the iOS palette tokens
+so it feels native while staying a distinct functional scale.
 
 ### Phase 3 — retire the orphan + share the dose in the program builder
 
@@ -390,13 +603,12 @@ writing route/server-component code.
 3. **Remove the dead v1 system** once Phase 2 renders and nothing imports it:
    - delete `src/lib/recovery-estimation.ts`
    - delete `src/components/recovery/RecoveryPanel.tsx` and
-     `src/components/recovery/BodyFigure.tsx` (Jurre's new heatmap replaces
-     these; confirm with Jurre first if unsure — BodyFigure may be a useful
-     starting point for the new SVG, in which case keep it and refactor).
+     `src/components/recovery/BodyFigure.tsx` (both orphaned already; the new
+     status list replaces them — no body figure is being kept).
    - remove `patient.getRecoverySessions` and its `.invalidate()` call sites
      (5 of them: patient/athlete session pages, cardio pages). Replace the
      invalidations with `patient.muscleFatigue.invalidate()` so logging a
-     session or a cardio session refreshes the heatmap.
+     session or a cardio session refreshes the status list.
 
    Grep to confirm zero references before deleting:
    `grep -rn "getRecoverySessions\|recovery-estimation\|RecoveryPanel\|BodyFigure" src`.
@@ -414,7 +626,7 @@ log cardio session  ──┘        │  pulls sessionLog+exerciseLogs+Exercise
                     computeMuscleFatigue()  (src/lib/muscle-fatigue.ts)
                                │  per-muscle L = Σ dose·exp(−Δt/τ)
                                ▼
-              MuscleHeatmap.tsx ──► [Jurre's human-body SVG]
+        MuscleStatusList.tsx ──► rows per display group (worst-first)
 program builder ─► strengthMuscleDose() (same fn) ─► balance + weekly sets
 ```
 
@@ -426,13 +638,17 @@ program builder ─► strengthMuscleDose() (same fn) ─► balance + weekly se
 - [ ] `npm run lint` passes.
 - [ ] `npm test` (vitest) green — all six calibration examples within ±3pp,
       plus coverage/monotonicity/mobility tests.
-- [ ] Manual: log a heavy leg strength session → dashboard heatmap shows quads
-      fatigued (red/orange). Wait/adjust `completedAt` in a seed to +48h →
-      recovering.
-- [ ] Manual: log a 60-min RUNNING cardio session → calves/quads move toward
-      recovering. Log a 30-min easy CYCLING → legs stay near-fresh. This is the
-      core acceptance for Jurre's cardio request.
-- [ ] Grep confirms the v1 orphan is fully removed, no dangling imports.
+- [ ] Manual: log a heavy leg strength session → dashboard status list shows
+      Quadriceps at the top, fatigued (red/orange). Wait/adjust `completedAt` in
+      a seed to +48h → recovering.
+- [ ] Manual: log a 60-min RUNNING cardio session → Onderbeen/Quadriceps move
+      toward recovering. Log a 30-min easy CYCLING → legs stay near-fresh. This
+      is the core acceptance for Jurre's cardio request.
+- [ ] Phase 0.5: exercise create/edit shows exactly the 12 region sliders; the
+      `muscle_loads` backfill ran idempotently on a copy (rerun = no change);
+      `muscle-loads-audit.json` generated for Jurre to review.
+- [ ] Grep confirms no lingering `MUSCLE_GROUPS`/`MuscleGroup` references and the
+      v1 orphan is fully removed, no dangling imports.
 - [ ] `npm run check:mirror` still passes (we touched nothing mirrored, but the
       cardio constants live near mirrored files — confirm no drift).
 
@@ -440,17 +656,20 @@ program builder ─► strengthMuscleDose() (same fn) ─► balance + weekly se
 
 ## 5. House rules to honour (from AGENTS.md + memory)
 
-- **No DB migration** in this plan. If you find yourself writing SQL, stop and
-  re-read 1.3/1.4 — everything derives from existing columns. (If a genuine
-  need for a cached `damageFactor` column appears, that is a separate RLS-gated
-  migration per the "RLS on every new public table" rule — but it is NOT needed
-  here.)
-- **Colours: orange house style, not lime.** The old `recovery-estimation.ts`
-  used lime `#BEF264` etc. House accent is orange `#e87a55` (see
-  `docs/tone-of-voice.md` and memory). For a fatigue scale, propose:
-  recovered = calm teal/green, recovering = gold/amber, fatigued = orange→red
-  (`#e87a55` → `#F87171`). Final palette is Jurre's call on the heatmap; expose
-  the helper but let the SVG own the exact ramp.
+- **No Prisma *schema* migration** in this plan. The engine (damageFactor, τ,
+  cardio) derives from existing columns; `muscle_loads.muscle` stays a
+  `String`. There IS one **data backfill** (Phase 0.5) that rewrites existing
+  `muscle_loads` rows from the 22 groups to the 12 regions — a one-off
+  `scripts/*.ts`, not a schema change. Run it against a copy first. Do not add
+  new tables/columns (if you ever think you need one, you don't — re-read 1.0
+  and 0.5).
+- **Colours: use the iOS brand tokens.** Not lime (the old
+  `recovery-estimation.ts` lime `#BEF264` is dead). The status ramp is aligned
+  to `mbt-gym-mobile/constants/theme.ts` so it feels native: recovered =
+  `P.green #5FD08A`, recovering = `P.gold #F5B942`, loaded = accent orange
+  `#E87A55`, heavily loaded = `P.danger #F87171`. See section 6 for the exact
+  helper. (Jurre approved that the per-muscle colours are their own distinct
+  functional scale, separate from other semantic colours.)
 - **Tone of voice.** Any UI copy/labels: read `docs/tone-of-voice.md`, match
   register, honour the AI-language blacklist (no em-dashes, no hollow marketing
   words). Muscle-state labels stay short and clinical
@@ -466,17 +685,19 @@ program builder ─► strengthMuscleDose() (same fn) ─► balance + weekly se
 ## 6. Colour + label helpers (spec)
 
 ```ts
-// recoveryPercent → colour (orange house family; Jurre may override on SVG)
+// recoveryPercent → colour. Aligned to iOS brand tokens (mbt-gym-mobile
+// constants/theme.ts) so web and iOS read identically.
 getMuscleFatigueColor(p):
-  p ≥ 80 → '#0D9488'  // teal, recovered
-  p ≥ 60 → '#5EEAD4'  // light teal
-  p ≥ 45 → '#F4C261'  // gold, recovering
-  p ≥ 25 → '#E87A55'  // house orange, loaded
-  else   → '#F87171'  // red, heavily loaded
+  p ≥ 80 → '#5FD08A'  // P.green — recovered
+  p ≥ 55 → '#F5B942'  // P.gold — recovering
+  p ≥ 30 → '#E87A55'  // accent orange (P.lime) — loaded
+  else   → '#F87171'  // P.danger — heavily loaded
 
 getMuscleFatigueLabel(p):  // keep existing Dutch wording
-  ≥80 'Hersteld' · ≥60 'Bijna hersteld' · ≥45 'Herstellende' · ≥25 'Vermoeid' · else 'Zwaar belast'
+  ≥80 'Hersteld' · ≥55 'Herstellende' · ≥30 'Vermoeid' · else 'Zwaar belast'
 ```
+Status enum (`MuscleFatigueStatus`) stays 3-way — recovered ≥80, recovering
+≥45, else fatigued (section 1.5); the colour helper just has finer bands.
 
 ---
 
@@ -507,7 +728,11 @@ muscle-map display. Follow-up will:
   (add it to `npm run check:mirror`) or is served from the API to avoid drift.
   Recommendation: serve computed states from the API (single source), do not
   duplicate the maths.
-- add the body heatmap to the mobile dashboard.
+- add the muscle-status list to the mobile dashboard, built natively from the
+  primitives named in the Phase 2 design spec (`Kicker`, `Tile`, `MiniBar`,
+  `ThemedText`, tokens `P/Font/Spacing/Radius`) and the `critRow` row pattern.
+  Because the web component was already built to the iOS brand tokens, this is
+  a near-1:1 visual port — the web version is the reference.
 
 Do this only after web is shipped and the constants have been validated on real
 logged data.
@@ -516,11 +741,16 @@ logged data.
 
 ## 9. Order of operations for Opus (tl;dr)
 
-1. Phase 0: `muscle-fatigue.ts` + vitest tests. Get all six calibration
-   examples green. **Do not proceed until green.**
-2. Phase 1: `patient.muscleFatigue` endpoint pulling strength + cardio.
-3. Phase 2: `MuscleHeatmap.tsx` with fallback rendering + SVG seam, mounted on
-   both dashboards.
-4. Phase 3: share `strengthMuscleDose` into the program builder, add weekly-sets
+1. Phase 0: `muscle-fatigue.ts` (with `MUSCLE_REGIONS` + region τ) + vitest
+   tests. Get all six calibration examples green. **Do not proceed until green.**
+2. Phase 0.5: switch exercise tagging to the 12 regions — constants, form
+   sliders, auto-estimator, seed data, and the `muscle_loads` data backfill +
+   audit file. tsc clean, backfill idempotent on a copy.
+3. Phase 1: `patient.muscleFatigue` endpoint pulling strength + cardio,
+   returning region-keyed states.
+4. Phase 2: `MuscleStatusList.tsx` (region rows, worst-first, no figure, iOS
+   brand styling per the Phase 2 design spec), mounted on both dashboards.
+5. Phase 3: share `strengthMuscleDose` into the program builder, add weekly-sets
    guardrail, delete the v1 orphan, re-point invalidations.
-5. Run the full verification checklist. Report the calibration test output.
+6. Run the full verification checklist. Report the calibration test output and
+   the exercise-audit summary.
