@@ -13,8 +13,10 @@
  */
 
 import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { trpc } from '@/lib/trpc/client'
 import { ChevronLeft, ChevronRight, X, Clock, Flame, MapPin, HeartPulse } from 'lucide-react'
+import { formatSetsReps } from '@/lib/prescription'
 import {
   P,
   Kicker,
@@ -572,7 +574,7 @@ export default function AthleteSchedulePage() {
       </div>
 
       {detail && (
-        <EventDetailSheet event={detail} dateLabel={`${DAY_NAMES[(selectedDate.getDay() + 6) % 7]} ${selectedDate.getDate()} ${MONTH_LABELS_NL[selectedDate.getMonth()]}`} onClose={() => setDetail(null)} />
+        <EventDetailSheet event={detail} isToday={isToday} dateLabel={`${DAY_NAMES[(selectedDate.getDay() + 6) % 7]} ${selectedDate.getDate()} ${MONTH_LABELS_NL[selectedDate.getMonth()]}`} onClose={() => setDetail(null)} />
       )}
     </div>
   )
@@ -726,13 +728,16 @@ function EventCard({ event, onClick }: { event: CalEvent; onClick: () => void })
 
 function EventDetailSheet({
   event,
+  isToday,
   dateLabel,
   onClose,
 }: {
   event: CalEvent
+  isToday: boolean
   dateLabel: string
   onClose: () => void
 }) {
+  const router = useRouter()
   const color = eventColor(event)
   // Oefening-details alleen ophalen voor gelogde kracht-sessies.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -740,6 +745,37 @@ function EventDetailSheet({
     { sessionId: event.id },
     { enabled: event.kind === 'session', staleTime: 60_000 },
   ) as { data: SessionDetailData | undefined; isLoading: boolean }
+
+  // Inhoud van een gepland item — zodat je vóór het starten ziet wat er op de
+  // rol staat. eslint-disable want de tRPC-hook is hier los getypeerd.
+  const plannedItemId = event.kind === 'planned' ? event.itemId : null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const contentQuery = (trpc.patient.getTodayExercises.useQuery as any)(
+    { itemId: plannedItemId ?? undefined },
+    { enabled: event.kind === 'planned' && event.hasExercises && !!plannedItemId, staleTime: 60_000 },
+  ) as {
+    data:
+      | { exercises: { exerciseId: string; name: string; sets: number; reps: number; repUnit?: string; supersetGroup?: string | null }[] }
+      | undefined
+    isLoading: boolean
+  }
+
+  // Startknop voor een gepland item. Vandaag → direct; andere dag → bevestigen.
+  const startPlanned = () => {
+    if (event.kind !== 'planned' || !event.itemId) return
+    const target =
+      event.category === 'CARDIO'
+        ? `/athlete/cardio/new?itemId=${event.itemId}`
+        : event.hasExercises || event.programId
+          ? `/athlete/session?itemId=${event.itemId}`
+          : null
+    if (!target) return
+    if (isToday || window.confirm(`Deze training staat gepland voor ${dateLabel.toLowerCase()}. Wil je hem nu doen?`)) {
+      router.push(target)
+    }
+  }
+  const canStartPlanned =
+    event.kind === 'planned' && !!event.itemId && (event.category === 'CARDIO' || event.hasExercises || !!event.programId)
 
   return (
     <div className="fixed inset-0 z-50 flex items-end" role="dialog" aria-label={event.name}>
@@ -810,6 +846,44 @@ function EventDetailSheet({
               <StatChip icon={<Clock className="w-3.5 h-3.5" />} label={fmtDuration(event.durationSec)} />
             )}
           </div>
+
+          {/* Gepland item: inhoud-preview + starten (vandaag direct, andere dag met bevestiging) */}
+          {event.kind === 'planned' && (
+            <>
+              {event.hasExercises &&
+                (contentQuery.isLoading ? (
+                  <MetaLabel>INHOUD LADEN…</MetaLabel>
+                ) : contentQuery.data && contentQuery.data.exercises.length > 0 ? (
+                  <div className="space-y-2">
+                    <MetaLabel>OEFENINGEN</MetaLabel>
+                    {contentQuery.data.exercises.map(ex => (
+                      <div
+                        key={`${ex.exerciseId}-${ex.name}`}
+                        className="flex items-center gap-3 rounded-xl"
+                        style={{ background: P.surfaceLow, border: `1px solid ${P.line}`, padding: '10px 12px' }}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="truncate" style={{ color: P.ink, fontSize: 13, fontWeight: 800 }}>
+                            {ex.supersetGroup ? `${ex.supersetGroup} · ` : ''}{ex.name}
+                          </p>
+                          <p
+                            className="athletic-mono"
+                            style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.1em', marginTop: 2, textTransform: 'uppercase' }}
+                          >
+                            {formatSetsReps(ex.sets, null, ex.reps, null, ex.repUnit)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null)}
+              {canStartPlanned && (
+                <DarkButton onClick={startPlanned} variant="primary" className="w-full">
+                  Start →
+                </DarkButton>
+              )}
+            </>
+          )}
 
           {/* Kracht-sessie: gelogde oefeningen */}
           {event.kind === 'session' && (
