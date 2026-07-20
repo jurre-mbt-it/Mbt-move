@@ -6,7 +6,7 @@
  * - getActiveProgram    → full program for schedule / program-detail page
  * - logSession          → save completed session + exercise logs
  * - getSessionHistory   → history / dashboard last session
- * - getRecoverySessions → muscle recovery calculation input
+ * - muscleFatigue       → per-region fatigue (strength + cardio, 7d)
  */
 
 import { z } from 'zod'
@@ -2296,60 +2296,12 @@ export const patientRouter = createTRPCRouter({
       return computeLoadCurve(ctx.prisma, ctx.user.id, input?.days ?? 120)
     }),
 
-  // ── Recovery sessions — with muscle loads (ExerciseSession[]) ─────────────
-
-  getRecoverySessions: protectedProcedure.query(async ({ ctx }) => {
-    const since = new Date()
-    since.setDate(since.getDate() - 7)
-
-    const sessions = await ctx.prisma.sessionLog.findMany({
-      where: {
-        patientId: ctx.user.id,
-        status: 'COMPLETED',
-        completedAt: { gte: since },
-      },
-      include: {
-        exerciseLogs: { select: { exerciseId: true, setsCompleted: true, repsCompleted: true, painLevel: true } },
-      },
-      orderBy: { completedAt: 'desc' },
-    })
-
-    // Collect all unique exercise IDs
-    const exerciseIds = [
-      ...new Set(sessions.flatMap(s => s.exerciseLogs.map(el => el.exerciseId))),
-    ]
-
-    if (exerciseIds.length === 0) return []
-
-    const exercises = await ctx.prisma.exercise.findMany({
-      where: { id: { in: exerciseIds } },
-      include: { muscleLoads: true },
-    })
-
-    const exMap = new Map(exercises.map(e => [e.id, e]))
-
-    return sessions.flatMap(session =>
-      session.exerciseLogs.flatMap(log => {
-        const ex = exMap.get(log.exerciseId)
-        if (!ex) return []
-        return [{
-          exerciseId: log.exerciseId,
-          muscleLoads: muscleLoadsRecord(ex),
-          sets: log.setsCompleted ?? 3,
-          reps: log.repsCompleted ?? 10,
-          repUnit: 'reps',
-          completedAt: session.completedAt ?? session.scheduledAt,
-          painLevel: log.painLevel ?? session.painLevel ?? undefined,
-          rpe: session.exertionLevel ?? undefined,
-        }]
-      })
-    )
-  }),
+  // ── Per-regio spiervermoeidheid (kracht + cardio) ────────────────────────
 
   // Per-regio spiervermoeidheid over de laatste 7 dagen. Trekt ZOWEL
   // krachtsessies (sessionLog + exerciseLogs → Exercise-metadata) ALS cardio
   // (cardioLog) door hetzelfde fatigue-model. Compute gebeurt server-side; de
-  // client rendert alleen de status-lijst. Vervangt getRecoverySessions.
+  // client rendert alleen de status-lijst.
   muscleFatigue: protectedProcedure.query(async ({ ctx }) => {
     const since = new Date()
     since.setDate(since.getDate() - 7)

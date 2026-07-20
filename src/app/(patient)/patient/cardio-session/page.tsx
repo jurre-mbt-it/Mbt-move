@@ -411,7 +411,7 @@ export default function CardioSessionPage() {
       })
       await Promise.all([
         utils.patient.getSessionHistory.invalidate(),
-        utils.patient.getRecoverySessions.invalidate(),
+        utils.patient.muscleFatigue.invalidate(),
       ])
       if (data.painLevel >= 5) {
         toast.error('Pijn gemeld aan therapeut. Volgende sessie wordt herhaald.')

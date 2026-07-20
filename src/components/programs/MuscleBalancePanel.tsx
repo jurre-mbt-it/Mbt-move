@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import type { BuilderExercise } from './types'
 import { AlertTriangle } from 'lucide-react'
+import { strengthMuscleDose } from '@/lib/muscle-fatigue'
 
 interface Props {
   exercises: BuilderExercise[]
@@ -10,13 +11,16 @@ interface Props {
   currentWeek: number
 }
 
+// Antagonist-paren in de 12-regio-vocabulaire (§1.0).
 const MUSCLE_PAIRS: [string, string][] = [
-  ['Quadriceps',   'Hamstrings'],
-  ['Borst',        'Bovenrug'],
-  ['Biceps',       'Triceps'],
-  ['Schouders anterieur', 'Schouders posterieur'],
-  ['Adductoren',   'Abductoren'],
+  ['Quadriceps', 'Hamstrings'],
+  ['Borst',      'Bovenrug'],
+  ['Core',       'Onderrug'],
 ]
+
+// Evidence-range harde sets per spiergroep per week (Schoenfeld 2017).
+const WEEKLY_SETS_MIN = 10
+const WEEKLY_SETS_MAX = 20
 
 const LOAD_COLORS = [
   '', '#c6f7f2', '#5eead4', '#e87a55', '#0D9488', '#134E4A',
@@ -28,32 +32,35 @@ export function MuscleBalancePanel({ exercises, currentDay, currentWeek }: Props
   const totals = useMemo(() => {
     const acc: Record<string, number> = {}
     for (const ex of dayExercises) {
-      // Spier-belasting = muscleLoad × sets × repFactor × weightFactor
-      //  - repFactor: lage reps = zwaarder (spierkracht), hoge reps = lichter
-      //  - weightFactor: extra gewicht in kg uit extraParams
-      // Blijft in-balans zodat gewicht een redelijke boost geeft zonder
-      // bodyweight-oefeningen marginaal te maken.
-      const reps = ex.reps ?? 10
-      const repFactor =
-        reps <= 5 ? 1.4 :
-        reps <= 8 ? 1.2 :
-        reps <= 12 ? 1.0 :
-        reps <= 20 ? 0.85 :
-        0.75
-      const weightParam = ex.extraParams?.find(p =>
-        /gewicht|weight|kg/i.test(p.label) && typeof p.value === 'number',
-      )
-      const weightKg = typeof weightParam?.value === 'number' ? weightParam.value : 0
-      const weightFactor = 1 + Math.min(weightKg / 60, 1.5) // cap bij +150%
-
-      const effectiveLoad = ex.sets * repFactor * weightFactor
-
-      for (const [muscle, load] of Object.entries(ex.muscleLoads ?? {})) {
-        acc[muscle] = (acc[muscle] ?? 0) + (load * effectiveLoad)
+      // Dezelfde dose-functie als de logged-fatigue-engine, zodat geplande
+      // belasting en gelogde vermoeidheid dezelfde taal spreken. BuilderExercise
+      // heeft geen movementPattern/loadType → damageFactor valt terug op 1.0.
+      const stim = {
+        muscleLoads: ex.muscleLoads ?? {},
+        sets: ex.sets,
+        reps: ex.reps ?? 10,
+        repUnit: ex.repUnit ?? 'reps',
+        completedAt: new Date(), // niet gebruikt voor de dose zelf
+      }
+      for (const muscle of Object.keys(ex.muscleLoads ?? {})) {
+        acc[muscle] = (acc[muscle] ?? 0) + strengthMuscleDose(stim, muscle)
       }
     }
     return acc
   }, [dayExercises])
+
+  // Wekelijkse "harde sets" per spiergroep (involvement ≥ 3) over de hele week.
+  // Dit is de maat waarin therapeuten redeneren (Schoenfeld 2017: ~10-20/week).
+  const weeklyHardSets = useMemo(() => {
+    const acc: Record<string, number> = {}
+    for (const ex of exercises) {
+      if (ex.week !== currentWeek) continue
+      for (const [muscle, load] of Object.entries(ex.muscleLoads ?? {})) {
+        if (load >= 3) acc[muscle] = (acc[muscle] ?? 0) + ex.sets
+      }
+    }
+    return Object.entries(acc).sort(([, a], [, b]) => b - a)
+  }, [exercises, currentWeek])
 
   const maxLoad = Math.max(...Object.values(totals), 1)
 
@@ -120,6 +127,36 @@ export function MuscleBalancePanel({ exercises, currentDay, currentWeek }: Props
             ))}
           </div>
           <span className="text-[10px] text-muted-foreground shrink-0">zwaar</span>
+        </div>
+      )}
+
+      {/* Wekelijkse harde sets per spiergroep (Schoenfeld 10-20/week) */}
+      {weeklyHardSets.length > 0 && (
+        <div className="px-3 py-2 border-t shrink-0 space-y-1">
+          <p
+            className="text-xs font-semibold text-muted-foreground uppercase tracking-wide"
+            title="Harde sets = sets van oefeningen met belasting ≥ 3 voor die spiergroep, opgeteld over de hele week. Richtlijn 10-20 sets per spiergroep per week (Schoenfeld 2017)."
+          >
+            Harde sets · week {currentWeek}
+          </p>
+          {weeklyHardSets.map(([muscle, sets]) => {
+            const color =
+              sets < WEEKLY_SETS_MIN ? '#f59e0b' :
+              sets <= WEEKLY_SETS_MAX ? '#10b981' :
+              '#e87a55'
+            const state =
+              sets < WEEKLY_SETS_MIN ? 'onder' :
+              sets <= WEEKLY_SETS_MAX ? 'op peil' :
+              'hoog'
+            return (
+              <div key={muscle} className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground truncate">{muscle}</span>
+                <span className="shrink-0 ml-1 font-semibold" style={{ color }}>
+                  {sets} · {state}
+                </span>
+              </div>
+            )
+          })}
         </div>
       )}
 

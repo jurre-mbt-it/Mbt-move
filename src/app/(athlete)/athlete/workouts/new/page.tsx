@@ -214,7 +214,7 @@ function NewWorkoutPageInner() {
         })),
       })
       await Promise.all([
-        utils.patient.getRecoverySessions.invalidate(),
+        utils.patient.muscleFatigue.invalidate(),
         utils.patient.getSessionHistory.invalidate(),
       ])
       router.push('/athlete/dashboard')

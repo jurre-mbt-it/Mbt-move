@@ -181,7 +181,7 @@ function AthleteCardioLogPageInner() {
       })
       await Promise.all([
         utils.patient.getSessionHistory.invalidate(),
-        utils.patient.getRecoverySessions.invalidate(),
+        utils.patient.muscleFatigue.invalidate(),
       ])
       toast.success('Cardio-sessie opgeslagen!')
       router.push('/athlete/dashboard')
