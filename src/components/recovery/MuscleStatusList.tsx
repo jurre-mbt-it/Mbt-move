@@ -4,6 +4,7 @@ import { trpc } from '@/lib/trpc/client'
 import {
   getMuscleFatigueColor,
   formatHoursRemaining,
+  type MuscleFatigueState,
 } from '@/lib/muscle-fatigue'
 
 /**
@@ -30,10 +31,26 @@ const IOS = {
 
 const MONO = "var(--font-mono-athletic), ui-monospace, 'JetBrains Mono', Menlo, monospace"
 
+/** Data-container: haalt de per-regio fatigue op en rendert de view. */
 export function MuscleStatusList() {
   const { data, isLoading } = trpc.patient.muscleFatigue.useQuery()
+  return <MuscleStatusListView states={data ?? []} isLoading={isLoading} />
+}
 
-  const rows = (data ?? [])
+/**
+ * Presentatie-component. Neemt ruwe fatigue-states, filtert herstelde regio's
+ * (≥95%) weg, sorteert meest-vermoeid-eerst en rendert de lijst. Losgekoppeld
+ * van de query zodat de simulator (src/app/simulator/muscle-fatigue) hetzelfde
+ * component met de echte engine kan voeden.
+ */
+export function MuscleStatusListView({
+  states,
+  isLoading = false,
+}: {
+  states: MuscleFatigueState[]
+  isLoading?: boolean
+}) {
+  const rows = states
     .filter((s) => s.recoveryPercent < 95)
     .sort((a, b) => a.recoveryPercent - b.recoveryPercent)
 
