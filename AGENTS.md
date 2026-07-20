@@ -135,3 +135,10 @@ de RLS-migratie meesturen. Vangnet bij drift:
 `supabase/migrations/20260521_force_rls_all_public.sql` is idempotent en
 zet RLS + `default_deny` op elke tabel die het mist (geen DROP). Check de
 staat met een query op `pg_class.relrowsecurity` voor `public`-tabellen.
+
+## Tone of voice
+
+Bij het schrijven of herschrijven van tekst voor dit product (UI-copy, notificaties,
+marketing, blogs, patiëntadviezen, e-mails): volg `docs/tone-of-voice.md` en match
+het juiste register. De AI-taal-blacklist daarin is hard (o.a. geen em-dashes, geen
+holle marketingwoorden, geen slogan-antitheses).
