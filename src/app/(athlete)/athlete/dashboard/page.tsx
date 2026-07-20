@@ -6,6 +6,7 @@ import { trpc } from '@/lib/trpc/client'
 import { wearablesEnabledForRole } from '@/lib/wearables-access'
 import { createClient } from '@/lib/supabase/client'
 import { WeeklyTrendChart } from '@/components/charts/WeeklyTrendChart'
+import { MuscleStatusList } from '@/components/recovery/MuscleStatusList'
 import {
   P,
   Kicker,
@@ -344,6 +345,11 @@ export default function AthleteDashboard() {
         {/* ── Wekelijkse trend (RPE + pijn) ─────────────── */}
         <div className="pt-2">
           <WeeklyTrendChart sessions={sessionHistory ?? []} />
+        </div>
+
+        {/* ── Per-regio spiervermoeidheid (kracht + cardio, 7 dagen) ── */}
+        <div className="pt-2">
+          <MuscleStatusList />
         </div>
 
         {/* ── Last session recap ────────────────────────── */}

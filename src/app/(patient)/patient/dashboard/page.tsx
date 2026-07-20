@@ -16,6 +16,7 @@ import {
   WeekProgress,
 } from '@/components/dark-ui'
 import { WeeklyTrendChart } from '@/components/charts/WeeklyTrendChart'
+import { MuscleStatusList } from '@/components/recovery/MuscleStatusList'
 import { ConsentPopup } from '@/components/research/ConsentPopup'
 import { DpaPopup } from '@/components/dpa/DpaPopup'
 
@@ -314,9 +315,10 @@ export default function PatientDashboard() {
           bar={P.danger}
         />
 
-        {/* Recovery + workload panels tijdelijk uit — berekening klopt nog
-            niet helemaal. Vervangen door weekly RPE + pijn-grafiek. */}
         <WeeklyTrendChart sessions={sessionHistory ?? []} />
+
+        {/* Per-regio spiervermoeidheid (kracht + cardio, laatste 7 dagen). */}
+        <MuscleStatusList />
 
         {/* Last session */}
         {lastSession && (
