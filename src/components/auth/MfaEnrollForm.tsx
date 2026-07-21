@@ -142,10 +142,37 @@ export function MfaEnrollForm() {
         </h1>
         <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
           {required
-            ? 'Voor toegang tot patiëntgegevens is tweetraps-verificatie verplicht. Scan de QR-code met je authenticator-app om door te gaan.'
-            : 'Scan de QR-code met je authenticator-app (bijv. Google Authenticator, Authy of 1Password)'}
+            ? 'Voor toegang tot patiëntgegevens is tweetraps-verificatie verplicht. Je hebt er een authenticator-app op je telefoon voor nodig.'
+            : 'Je hebt hier een authenticator-app op je telefoon voor nodig.'}
         </MetaLabel>
       </div>
+
+      <Tile>
+        <MetaLabel style={{ marginBottom: 8 }}>ZO STEL JE HET IN</MetaLabel>
+        <ol
+          style={{
+            color: P.inkMuted,
+            fontSize: 13,
+            lineHeight: 1.65,
+            paddingLeft: 18,
+            margin: 0,
+            listStyle: 'decimal',
+          }}
+        >
+          <li>
+            Installeer een authenticator-app op je telefoon, bijvoorbeeld Google Authenticator,
+            Authy of 1Password.
+          </li>
+          <li style={{ marginTop: 6 }}>
+            Open die app en kies daarbinnen &lsquo;scan QR-code&rsquo;. Scan de code{' '}
+            <strong style={{ color: P.ink }}>niet</strong> met de camera-app van je telefoon: die
+            stuurt je door naar je instellingen en dan krijg je geen code te zien.
+          </li>
+          <li style={{ marginTop: 6 }}>
+            Typ de 6 cijfers die de app laat zien hieronder over.
+          </li>
+        </ol>
+      </Tile>
 
       {factorData && (
         <Tile>
@@ -161,8 +188,33 @@ export function MfaEnrollForm() {
               />
             </div>
 
+            {/* Stelt de gebruiker dit in óp de telefoon zelf, dan is scannen
+                onmogelijk. De otpauth-URI opent de authenticator-app direct.
+                Bewust een gewone <a>: next/link probeert client-side te
+                navigeren en kan niet met een niet-http schema overweg. */}
+            <a
+              href={factorData.totp.uri}
+              className="athletic-tap mbt-btn-hover inline-flex items-center justify-center rounded-xl font-extrabold"
+              style={{
+                backgroundColor: P.surface,
+                color: P.ink,
+                border: `1px solid ${P.lineStrong}`,
+                padding: '14px 20px',
+                fontSize: 15,
+                letterSpacing: '0.04em',
+                minHeight: 48,
+                textDecoration: 'none',
+              }}
+            >
+              Open direct in je authenticator-app
+            </a>
+            <MetaLabel style={{ marginTop: -8, textTransform: 'none', fontWeight: 500, lineHeight: 1.5 }}>
+              Gebruik deze knop als je dit op je telefoon zelf instelt. Dan hoef je niets te
+              scannen.
+            </MetaLabel>
+
             <div>
-              <MetaLabel style={{ marginBottom: 6 }}>HANDMATIGE INVOER</MetaLabel>
+              <MetaLabel style={{ marginBottom: 6 }}>LUKT SCANNEN NIET? VOER DEZE SLEUTEL HANDMATIG IN</MetaLabel>
               <code
                 className="block text-center break-all rounded-lg px-3 py-2"
                 style={{
