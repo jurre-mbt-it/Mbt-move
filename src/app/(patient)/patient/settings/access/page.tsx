@@ -22,6 +22,8 @@ type Relation = {
   status: 'PENDING' | 'APPROVED' | 'DECLINED' | 'REVOKED'
   requestedAt: Date | string | null
   respondedAt: Date | string | null
+  /** 'coach' of 'therapeut' — bepaalt het woord in de kaart. */
+  roleLabel?: 'coach' | 'therapeut'
   therapist: {
     id: string
     name: string | null
@@ -81,8 +83,8 @@ export default function AccessPage() {
             GEGEVENS ZIEN?
           </h1>
           <p style={{ color: P.inkMuted, fontSize: 13, lineHeight: '19px', marginTop: 4 }}>
-            Therapeuten die je gekoppeld hebben vragen eerst toestemming. Jij beslist wie
-            je schema, pijn en voortgang mag zien.
+            Je coach of therapeut vraagt eerst toestemming. Jij beslist wie je schema, pijn
+            en voortgang mag zien.
           </p>
         </div>
 
@@ -95,7 +97,8 @@ export default function AccessPage() {
         {!isLoading && relations.length === 0 && (
           <Tile>
             <p style={{ color: P.inkMuted, fontSize: 13, textAlign: 'center', padding: 12 }}>
-              Nog geen koppelingen. Zodra een therapeut je uitnodigt verschijnt hier een verzoek.
+              Nog geen koppelingen. Zodra een coach of therapeut je uitnodigt verschijnt hier een
+              verzoek.
             </p>
           </Tile>
         )}
@@ -231,6 +234,11 @@ function RelationCard({
             </span>
           </div>
           <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 2 }}>{copy.desc}</p>
+          {/* Coach of therapeut: het label komt van de server, want een atleet
+              kan aan allebei gekoppeld zijn. */}
+          <p className="athletic-mono" style={{ color: P.inkDim, fontSize: 10, letterSpacing: '0.14em', marginTop: 2 }}>
+            {relation.roleLabel === 'coach' ? 'COACH' : 'THERAPEUT'}
+          </p>
           {t.specialty && (
             <p className="athletic-mono" style={{ color: P.inkDim, fontSize: 11, letterSpacing: '0.04em', textTransform: 'none', fontWeight: 500, marginTop: 2 }}>
               {t.specialty}

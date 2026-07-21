@@ -14,7 +14,7 @@ import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import {
   createTRPCRouter,
-  therapistProcedure,
+  coachStaffProcedure,
   adminProcedure,
 } from '@/server/trpc'
 
@@ -55,7 +55,7 @@ export const insightsRouter = createTRPCRouter({
    * Dashboard voor ingelogde therapeut: alle OPEN insights voor patiënten
    * met wie ze een actieve behandelrelatie hebben, gesorteerd op urgentie + datum.
    */
-  getDashboard: therapistProcedure.query(async ({ ctx }) => {
+  getDashboard: coachStaffProcedure.query(async ({ ctx }) => {
     const patientIds =
       ctx.user.role === 'ADMIN'
         ? undefined
@@ -121,7 +121,7 @@ export const insightsRouter = createTRPCRouter({
   }),
 
   /** Tijdlijn per patiënt — alle insights + acties, nieuwste eerst. */
-  getPatientTimeline: therapistProcedure
+  getPatientTimeline: coachStaffProcedure
     .input(z.object({ patientId: z.string() }))
     .query(async ({ ctx, input }) => {
       await assertTreating(ctx.prisma, ctx.user, input.patientId)
@@ -161,7 +161,7 @@ export const insightsRouter = createTRPCRouter({
     }),
 
   /** Aantal open signalen per patiënt — voor kalender-chip en dashboards. */
-  countOpenForPatient: therapistProcedure
+  countOpenForPatient: coachStaffProcedure
     .input(z.object({ patientId: z.string() }))
     .query(async ({ ctx, input }) => {
       await assertTreating(ctx.prisma, ctx.user, input.patientId)
@@ -180,7 +180,7 @@ export const insightsRouter = createTRPCRouter({
     }),
 
   /** Status voor activation-toggle op patient detail. */
-  getStatus: therapistProcedure
+  getStatus: coachStaffProcedure
     .input(z.object({ patientId: z.string() }))
     .query(async ({ ctx, input }) => {
       await assertTreating(ctx.prisma, ctx.user, input.patientId)
@@ -196,7 +196,7 @@ export const insightsRouter = createTRPCRouter({
       }
     }),
 
-  activateForPatient: therapistProcedure
+  activateForPatient: coachStaffProcedure
     .input(z.object({ patientId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await assertTreating(ctx.prisma, ctx.user, input.patientId)
@@ -227,7 +227,7 @@ export const insightsRouter = createTRPCRouter({
       return { ok: true }
     }),
 
-  deactivateForPatient: therapistProcedure
+  deactivateForPatient: coachStaffProcedure
     .input(z.object({ patientId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await assertTreating(ctx.prisma, ctx.user, input.patientId)
@@ -247,7 +247,7 @@ export const insightsRouter = createTRPCRouter({
     }),
 
   /** Therapeut logt actie op insight. note is ALTIJD optioneel. */
-  act: therapistProcedure
+  act: coachStaffProcedure
     .input(
       z.object({
         insightId: z.string(),
@@ -311,7 +311,7 @@ export const insightsRouter = createTRPCRouter({
     }),
 
   /** Therapeut voorkeuren (signals, thresholds, quiet hours). */
-  getPrefs: therapistProcedure.query(async ({ ctx }) => {
+  getPrefs: coachStaffProcedure.query(async ({ ctx }) => {
     const prefs = await ctx.prisma.therapistInsightPref.findUnique({
       where: { therapistId: ctx.user.id },
     })
@@ -324,7 +324,7 @@ export const insightsRouter = createTRPCRouter({
     }
   }),
 
-  updatePrefs: therapistProcedure
+  updatePrefs: coachStaffProcedure
     .input(
       z.object({
         signalsEnabled: z.record(z.string(), z.boolean()).optional(),
@@ -357,7 +357,7 @@ export const insightsRouter = createTRPCRouter({
     }),
 
   /** Bezwaar registreren — admin OF actieve behandelend therapeut. */
-  registerPatientObjection: therapistProcedure
+  registerPatientObjection: coachStaffProcedure
     .input(z.object({ patientId: z.string(), note: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       // admin OR treating therapist

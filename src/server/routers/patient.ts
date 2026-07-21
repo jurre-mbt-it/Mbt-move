@@ -2390,6 +2390,7 @@ export const patientRouter = createTRPCRouter({
             email: true,
             specialty: true,
             avatarUrl: true,
+            role: true,
           },
         },
       },
@@ -2404,6 +2405,9 @@ export const patientRouter = createTRPCRouter({
       requestedAt: r.requestedAt,
       respondedAt: r.respondedAt,
       therapist: r.therapist,
+      // Een atleet kan aan een coach én aan een therapeut gekoppeld zijn.
+      // De client toont het juiste woord op basis van dit label.
+      roleLabel: r.therapist.role === 'COACH' ? ('coach' as const) : ('therapeut' as const),
     }))
   }),
 

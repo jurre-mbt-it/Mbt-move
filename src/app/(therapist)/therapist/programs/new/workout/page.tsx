@@ -31,6 +31,7 @@ import {
 } from '@/lib/cardio-workout'
 import { computeHrZones } from '@/lib/cardio-zones'
 import { trpc } from '@/lib/trpc/client'
+import { usePortal } from '@/lib/portal'
 import { CARDIO_ICON_MAP } from '@/components/icons'
 import { CardioWorkoutBuilder } from '@/components/week-planner/CardioWorkoutBuilder'
 import {
@@ -111,6 +112,7 @@ function BlocksBar({ blocks }: { blocks: WorkoutBlock[] }) {
 }
 
 function WorkoutBuilderContent() {
+  const portal = usePortal()
   const router = useRouter()
   const searchParams = useSearchParams()
   const prePatientId = searchParams.get('patientId') ?? ''
@@ -167,7 +169,7 @@ function WorkoutBuilderContent() {
       })
       await utils.programs.list.invalidate()
       toast.success('Cardio-programma opgeslagen!')
-      router.push(`/therapist/programs/${created.id}/edit`)
+      router.push(`${portal.base}/programs/${created.id}/edit`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Opslaan mislukt')
     }
@@ -181,7 +183,7 @@ function WorkoutBuilderContent() {
         {/* Header */}
         <div className="flex items-center gap-3">
           <Link
-            href="/therapist/programs"
+            href={`${portal.base}/programs`}
             className="athletic-mono"
             style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.16em' }}
           >

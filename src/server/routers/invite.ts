@@ -32,6 +32,8 @@ import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
 import {
   createTRPCRouter,
   therapistProcedure,
+  coachStaffProcedure,
+  mfaCoachStaffProcedure,
   mfaTherapistProcedure,
   publicProcedure,
   protectedProcedure,
@@ -59,7 +61,7 @@ export const inviteRouter = createTRPCRouter({
    * Therapeut nodigt een patiënt uit met e-mail + naam + geboortedatum.
    * De InviteCode dient als whitelist + identity-factor voor `/login/code`.
    */
-  create: mfaTherapistProcedure
+  create: mfaCoachStaffProcedure
     .input(
       z.object({
         email: z.string().email('Ongeldig e-mailadres'),
@@ -68,10 +70,26 @@ export const inviteRouter = createTRPCRouter({
           (v) => !Number.isNaN(Date.parse(v)),
           'Ongeldige geboortedatum',
         ),
-        role: z.enum(['PATIENT', 'ATHLETE']).default('PATIENT'),
+        role: z.enum(['PATIENT', 'ATHLETE', 'COACH']).default('PATIENT'),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      // Wie mag wie uitnodigen. Server-side afgedwongen, niet alleen in de UI:
+      //  - COACH nodigt uitsluitend atleten uit (geen patiënten: dat is
+      //    praktijk-zorg, en geen coaches: dat is accountbeheer).
+      //  - Een coach-account aanmaken mag alleen de admin.
+      if (ctx.user!.role === 'COACH' && input.role !== 'ATHLETE') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Als coach kun je alleen atleten uitnodigen.',
+        })
+      }
+      if (input.role === 'COACH' && ctx.user!.role !== 'ADMIN') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Alleen een beheerder kan een coach-account aanmaken.',
+        })
+      }
       const rl = await rateLimit('invite.create', ctx.user!.id, RATE_LIMITS.inviteCreate)
       if (!rl.ok) {
         await auditLog({
@@ -96,7 +114,12 @@ export const inviteRouter = createTRPCRouter({
         where: { email },
         select: { role: true },
       })
-      if (existingForEmail && (existingForEmail.role === 'THERAPIST' || existingForEmail.role === 'ADMIN')) {
+      if (
+        existingForEmail &&
+        (existingForEmail.role === 'THERAPIST' ||
+          existingForEmail.role === 'ADMIN' ||
+          existingForEmail.role === 'COACH')
+      ) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'Dit e-mailadres is al in gebruik door een ander account.',
@@ -147,7 +170,15 @@ export const inviteRouter = createTRPCRouter({
       // therapist-koppeling hebben (= veilig om programma's voor te maken).
       let patientUserId: string | null = null
 
-      if ((input.role === 'PATIENT' || input.role === 'ATHLETE')) {
+      if (input.role === 'COACH') {
+        const existingCoach = await ctx.prisma.user.findUnique({ where: { email } })
+        if (!existingCoach) {
+          // practiceId blijft bewust null: een coach hoort nooit bij een praktijk.
+          await ctx.prisma.user.create({
+            data: { email, name: input.name.trim(), role: 'COACH', dateOfBirth: dob, practiceId: null },
+          })
+        }
+      } else if (input.role === 'PATIENT' || input.role === 'ATHLETE') {
         const existingUser = await ctx.prisma.user.findUnique({ where: { email } })
         if (existingUser) {
           // Bestaande user: alleen pre-link aanmaken als deze user al aan
@@ -359,7 +390,7 @@ export const inviteRouter = createTRPCRouter({
   /**
    * Therapeut lijst alle invites die hij heeft gestuurd.
    */
-  listMine: therapistProcedure.query(async ({ ctx }) => {
+  listMine: coachStaffProcedure.query(async ({ ctx }) => {
     return ctx.prisma.inviteCode.findMany({
       where: { invitedById: ctx.user!.id },
       orderBy: { createdAt: 'desc' },
@@ -382,7 +413,7 @@ export const inviteRouter = createTRPCRouter({
   /**
    * Therapeut trekt een nog niet gebruikte invite in.
    */
-  revoke: therapistProcedure
+  revoke: coachStaffProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const invite = await ctx.prisma.inviteCode.findUnique({
@@ -594,7 +625,19 @@ export const inviteRouter = createTRPCRouter({
     let user
     if (existingUser) {
       // Voor THERAPIST/ADMIN: weiger silently — invite was niet voor hen.
-      if (existingUser.role === 'THERAPIST' || existingUser.role === 'ADMIN') {
+      //
+      // COACH ligt subtieler: `invite.create` maakt de coach-row zelf al aan
+      // (nog zonder supabaseUserId), dus die row hoort hier juist gebonden te
+      // worden. Alleen dát geval mag door; een coach-account dat al een
+      // binding heeft, of een invite met een andere rol, wordt geweigerd —
+      // anders kan een openstaande atleet-invite een coach-account kapen.
+      const isCoachRedeemingOwnInvite =
+        existingUser.role === 'COACH' && invite.role === 'COACH' && !existingUser.supabaseUserId
+      if (
+        existingUser.role === 'THERAPIST' ||
+        existingUser.role === 'ADMIN' ||
+        (existingUser.role === 'COACH' && !isCoachRedeemingOwnInvite)
+      ) {
         return { ok: true, alreadyFinalized: true, skipped: 'role-mismatch' as const }
       }
       // Backfill supabaseUserId als de bestaande row nog geen binding had.

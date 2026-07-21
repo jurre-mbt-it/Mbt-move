@@ -3,6 +3,7 @@
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { trpc } from '@/lib/trpc/client'
+import { usePortal } from '@/lib/portal'
 import { toast } from 'sonner'
 import {
   DarkButton,
@@ -40,6 +41,7 @@ export default function PatientsPage() {
 
 function PatientsPageInner() {
   const router = useRouter()
+  const portal = usePortal()
   const searchParams = useSearchParams()
   const initialFilter = (searchParams.get('filter') as QuickFilter | null) ?? 'all'
   const [search, setSearch] = useState('')
@@ -206,9 +208,9 @@ function PatientsPageInner() {
                 <Tile
                   key={patient.id}
                   accentBar={accent}
-                  onClick={() => router.push(`/therapist/patients/${patient.id}`)}
+                  onClick={() => router.push(`${portal.patients}/${patient.id}`)}
                   prefetch={() => {
-                    router.prefetch(`/therapist/patients/${patient.id}`)
+                    router.prefetch(`${portal.patients}/${patient.id}`)
                     utils.patients.get.prefetch({ id: patient.id })
                   }}
                 >
@@ -336,9 +338,9 @@ function PatientsPageInner() {
                         <DarkButton
                           variant="secondary"
                           size="sm"
-                          onClick={() => router.push(`/therapist/programs/${patient.programId}/edit`)}
+                          onClick={() => router.push(`${portal.base}/programs/${patient.programId}/edit`)}
                           prefetch={() => {
-                            router.prefetch(`/therapist/programs/${patient.programId}/edit`)
+                            router.prefetch(`${portal.base}/programs/${patient.programId}/edit`)
                             if (patient.programId) utils.programs.get.prefetch({ id: patient.programId })
                           }}
                         >
@@ -348,7 +350,7 @@ function PatientsPageInner() {
                         <DarkButton
                           variant="primary"
                           size="sm"
-                          onClick={() => router.push(`/therapist/programs/new?patientId=${patient.id}`)}
+                          onClick={() => router.push(`${portal.base}/programs/new?patientId=${patient.id}`)}
                         >
                           + Programma
                         </DarkButton>
@@ -445,7 +447,7 @@ function PatientsPageInner() {
                         const pid = inviteResult.patientUserId!
                         setInviteOpen(false)
                         resetInviteForm()
-                        router.push(`/therapist/programs/new?patientId=${pid}`)
+                        router.push(`${portal.base}/programs/new?patientId=${pid}`)
                       }}
                     >
                       → Maak nu een programma voor deze patiënt

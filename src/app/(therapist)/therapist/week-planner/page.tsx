@@ -17,6 +17,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { trpc } from '@/lib/trpc/client'
+import { usePortal } from '@/lib/portal'
 import { toast } from 'sonner'
 import {
   ChevronLeft, ChevronRight, Plus, X, MoreHorizontal,
@@ -1130,6 +1131,7 @@ function ItemDetailContent({
   copying: boolean
   savingExercises: boolean
 }) {
+  const portal = usePortal()
   const { item, date, sessionId } = detail
   const isProgram = !!item.programId
   const category: Category = item.quickCategory ?? 'STRENGTH'
@@ -1226,7 +1228,7 @@ function ItemDetailContent({
             <DarkButton
               variant="secondary"
               size="sm"
-              href={item.programId ? `/therapist/programs/${item.programId}/edit` : undefined}
+              href={item.programId ? `${portal.base}/programs/${item.programId}/edit` : undefined}
             >
               <Pencil className="w-3.5 h-3.5 mr-1.5" /> Snel bewerken
             </DarkButton>
@@ -1580,6 +1582,7 @@ export default function WeekPlannerPage() {
 }
 
 function WeekPlannerContent() {
+  const portal = usePortal()
   const router = useRouter()
   const searchParams = useSearchParams()
   const utils = trpc.useUtils()
@@ -1619,7 +1622,7 @@ function WeekPlannerContent() {
       if (patch.month) p.set('month', patch.month)
       else p.delete('month')
     }
-    router.replace(`/therapist/week-planner?${p.toString()}`)
+    router.replace(`${portal.base}/week-planner?${p.toString()}`)
   }
   function navMonth(delta: number) {
     const d = new Date(year, month0 + delta, 1)

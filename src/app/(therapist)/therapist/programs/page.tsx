@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
+import { usePortal } from '@/lib/portal'
 import { toast } from 'sonner'
 import { IconCardio } from '@/components/icons'
 import {
@@ -80,6 +81,7 @@ function ProgramsPageFallback() {
 }
 
 function ProgramsPageInner() {
+  const portal = usePortal()
   const router = useRouter()
   const searchParams = useSearchParams()
   const tab = readTab(searchParams)
@@ -89,7 +91,7 @@ function ProgramsPageInner() {
     if (next === 'templates') sp.set('tab', 'templates')
     else sp.delete('tab')
     const qs = sp.toString()
-    router.replace(qs ? `/therapist/programs?${qs}` : '/therapist/programs', { scroll: false })
+    router.replace(qs ? `${portal.base}/programs?${qs}` : `${portal.base}/programs`, { scroll: false })
   }
 
   return (
@@ -104,12 +106,12 @@ function ProgramsPageInner() {
             </MetaLabel>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <DarkButton variant="secondary" size="sm" href="/therapist/programs/new/workout">
+            <DarkButton variant="secondary" size="sm" href={`${portal.base}/programs/new/workout`}>
               <span className="inline-flex items-center gap-1.5">
                 <IconCardio size={14} /> Nieuw Cardio
               </span>
             </DarkButton>
-            <DarkButton variant="primary" size="sm" href="/therapist/programs/new">
+            <DarkButton variant="primary" size="sm" href={`${portal.base}/programs/new`}>
               + Nieuw Kracht
             </DarkButton>
           </div>
@@ -148,6 +150,7 @@ function ProgramsPageInner() {
 // (creator/admin). Zelf-verbergend: leeg → niets tonen (geen ruis voor
 // therapeuten zonder eigen programma's).
 function MyOwnProgramsPanel() {
+  const portal = usePortal()
   const utils = trpc.useUtils()
   const { data: me } = trpc.auth.getMe.useQuery()
   const selfId = me?.id ?? null
@@ -199,7 +202,7 @@ function MyOwnProgramsPanel() {
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <DarkButton variant="secondary" size="sm" href={`/therapist/programs/${p.id}/edit`}>
+                <DarkButton variant="secondary" size="sm" href={`${portal.base}/programs/${p.id}/edit`}>
                   Bekijk
                 </DarkButton>
                 <DarkButton
@@ -222,6 +225,7 @@ function MyOwnProgramsPanel() {
 // ─── Tab 1: lopende programma's ──────────────────────────────────────────────
 
 function ActiveProgramsPanel() {
+  const portal = usePortal()
   const router = useRouter()
   const utils = trpc.useUtils()
   const { data: rawData, isLoading } = trpc.programs.list.useQuery(
@@ -266,7 +270,7 @@ function ActiveProgramsPanel() {
       await utils.programs.list.invalidate()
       toast.success('Programma gedupliceerd')
       setDuplicateTarget(null)
-      router.push(`/therapist/programs/${created.id}/edit`)
+      router.push(`${portal.base}/programs/${created.id}/edit`)
     } catch {
       toast.error('Dupliceren mislukt')
     }
@@ -320,7 +324,7 @@ function ActiveProgramsPanel() {
         <Tile>
           <div className="py-12 flex flex-col items-center gap-3 text-center">
             <p style={{ color: P.inkMuted, fontSize: 13 }}>Nog geen programma&apos;s</p>
-            <DarkButton variant="secondary" size="sm" href="/therapist/programs/new">
+            <DarkButton variant="secondary" size="sm" href={`${portal.base}/programs/new`}>
               + Programma aanmaken
             </DarkButton>
           </div>
@@ -401,6 +405,7 @@ function ProgramCard({
   onDuplicate: () => void
   onDelete: () => void
 }) {
+  const portal = usePortal()
   const status = STATUS_COLORS[program.status] ?? STATUS_COLORS.DRAFT
   const [expanded, setExpanded] = useState(false)
   const utils = trpc.useUtils()
@@ -478,7 +483,7 @@ function ProgramCard({
           <DarkButton
             variant="secondary"
             size="sm"
-            href={`/therapist/programs/${program.id}/edit`}
+            href={`${portal.base}/programs/${program.id}/edit`}
             prefetch={() => utils.programs.get.prefetch({ id: program.id })}
           >
             Wijzig
@@ -687,6 +692,7 @@ function ProgramExercisePreview({ programId }: { programId: string }) {
 // ─── Tab 2: schema-bibliotheek ───────────────────────────────────────────────
 
 function TemplateLibraryPanel() {
+  const portal = usePortal()
   const router = useRouter()
   const utils = trpc.useUtils()
   const { data: rawTemplates, isLoading } = trpc.programs.list.useQuery(
@@ -731,7 +737,7 @@ function TemplateLibraryPanel() {
       await utils.programs.list.invalidate()
       toast.success('Programma gekopieerd naar patiënt')
       setCopyTarget(null)
-      router.push(`/therapist/programs/${created.id}/edit`)
+      router.push(`${portal.base}/programs/${created.id}/edit`)
     } catch {
       toast.error('Kopiëren mislukt')
     }
@@ -870,6 +876,7 @@ function TemplateLibraryPanel() {
 }
 
 function LibraryCard({ program, onCopy }: { program: Program; onCopy: () => void }) {
+  const portal = usePortal()
   const categoryMatch = program.name.match(/^\[([^\]]+)\]/)
   const category = categoryMatch?.[1]
   const displayName = categoryMatch
@@ -951,7 +958,7 @@ function LibraryCard({ program, onCopy }: { program: Program; onCopy: () => void
           <DarkButton
             variant="secondary"
             size="sm"
-            href={`/therapist/programs/${program.id}/edit`}
+            href={`${portal.base}/programs/${program.id}/edit`}
             prefetch={() => utils.programs.get.prefetch({ id: program.id })}
           >
             ✎

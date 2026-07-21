@@ -78,7 +78,7 @@ async function resolveThreadPatient(
     if (user.role !== 'ATHLETE') throw new TRPCError({ code: 'FORBIDDEN' })
     return user.id
   }
-  if (user.role !== 'THERAPIST' && user.role !== 'ADMIN') {
+  if (user.role !== 'THERAPIST' && user.role !== 'COACH' && user.role !== 'ADMIN') {
     throw new TRPCError({ code: 'FORBIDDEN' })
   }
   // Zelfde toegangsmodel als hasPatientAccess in patients.ts, plus de
@@ -249,7 +249,7 @@ export const messagesRouter = createTRPCRouter({
 
   // ── Therapeut-inbox: draden met laatste bericht + ongelezen-telling ───────
   inbox: protectedProcedure.query(async ({ ctx }) => {
-    if (ctx.user.role !== 'THERAPIST' && ctx.user.role !== 'ADMIN') {
+    if (ctx.user.role !== 'THERAPIST' && ctx.user.role !== 'COACH' && ctx.user.role !== 'ADMIN') {
       throw new TRPCError({ code: 'FORBIDDEN' })
     }
     const accessiblePatient = {
@@ -327,7 +327,8 @@ export const messagesRouter = createTRPCRouter({
 
   // ── Ongelezen-totaal voor de therapeut (sidebar-badge) ────────────────────
   unreadTotal: protectedProcedure.query(async ({ ctx }) => {
-    if (ctx.user.role !== 'THERAPIST' && ctx.user.role !== 'ADMIN') return 0
+    if (ctx.user.role !== 'THERAPIST' && ctx.user.role !== 'COACH' && ctx.user.role !== 'ADMIN')
+      return 0
     return ctx.prisma.message.count({
       where: {
         fromPatient: true,

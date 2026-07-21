@@ -11,6 +11,9 @@ enum UserRole {
   THERAPIST
   PATIENT
   ATHLETE
+  /// Coach: eigen atleten, eigen trainingsplannen, NOOIT aan een praktijk
+  /// gekoppeld (practiceId blijft null). Zie docs/plan-coach-role-20260721.md.
+  COACH
 }
 
 enum AppointmentStatus {

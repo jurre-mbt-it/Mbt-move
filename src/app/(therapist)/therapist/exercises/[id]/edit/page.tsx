@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ExerciseForm } from '@/components/exercises/ExerciseForm'
 import { trpc } from '@/lib/trpc/client'
+import { usePortal } from '@/lib/portal'
 import { Kicker, MetaLabel, P } from '@/components/dark-ui'
 
 interface Props {
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function EditExercisePage({ params }: Props) {
+  const portal = usePortal()
   const { id } = use(params)
   const { data: exercise, isLoading } = trpc.exercises.get.useQuery({ id })
 
@@ -55,7 +57,7 @@ export default function EditExercisePage({ params }: Props) {
     <div className="max-w-2xl w-full flex flex-col gap-6">
       <div className="flex flex-col gap-3">
         <Link
-          href="/therapist/exercises"
+          href={`${portal.base}/exercises`}
           className="athletic-mono"
           style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.16em' }}
         >

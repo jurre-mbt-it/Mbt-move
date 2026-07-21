@@ -34,6 +34,7 @@ export function reportLoginSuccess(): void {
 function roleDashboard(role?: string | null): string {
   if (role === 'PATIENT') return '/patient/dashboard'
   if (role === 'ATHLETE') return '/athlete/dashboard'
+  if (role === 'COACH') return '/coach/dashboard'
   return '/therapist/dashboard'
 }
 

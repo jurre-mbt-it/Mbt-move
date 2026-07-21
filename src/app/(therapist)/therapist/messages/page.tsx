@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
+import { usePortal } from '@/lib/portal'
 import { ChevronRight, MessageSquare } from 'lucide-react'
 import { Display, Kicker, MetaLabel, P, Tile } from '@/components/dark-ui'
 
@@ -15,6 +16,7 @@ function fmtWhen(iso: string): string {
 }
 
 export default function TherapistMessagesPage() {
+  const portal = usePortal()
   const { data: inbox, isLoading } = trpc.messages.inbox.useQuery(undefined, {
     refetchInterval: 30_000,
   })
@@ -49,7 +51,7 @@ export default function TherapistMessagesPage() {
           {inbox.map(t => (
             <Link
               key={t.patientId}
-              href={`/therapist/messages/${t.patientId}`}
+              href={`${portal.base}/messages/${t.patientId}`}
               className="mbt-card-hover athletic-tap flex items-center gap-3 rounded-2xl px-4 py-3.5 w-full"
               style={{
                 background: P.surface,

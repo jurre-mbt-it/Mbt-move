@@ -10,6 +10,10 @@ type AccessUser = { id: string; role: string; practiceId: string | null }
  * zelfde praktijk als de patiënt. ADMIN mag altijd; een gebruiker mag altijd
  * bij zijn eigen dossier.
  *
+ * COACH (zie docs/plan-coach-role-20260721.md) mag ALLEEN via een directe
+ * koppeling. Een coach hoort nooit een practiceId te hebben; de praktijk-tak
+ * is voor die rol hard uitgezet.
+ *
  * KRITIEK — de praktijk-tak geldt ALLEEN voor THERAPIST/ADMIN. Patiënten en
  * atleten krijgen bij invite dezelfde `practiceId` als hun therapeut; zonder
  * deze rol-check zou een patiënt/atleet via de praktijk-tak bij het dossier
@@ -23,7 +27,13 @@ export async function hasPatientAccess(
 ): Promise<boolean> {
   if (user.role === 'ADMIN') return true
   if (patientId === user.id) return true
-  if (user.role !== 'THERAPIST') return false
+  if (user.role !== 'THERAPIST' && user.role !== 'COACH') return false
+  // COACH heeft per definitie practiceId null, dus de praktijk-tak valt voor
+  // een coach altijd weg: alleen een directe koppeling geeft toegang. Die
+  // eigenschap wordt hieronder expliciet afgedwongen i.p.v. impliciet
+  // vertrouwd, zodat een per ongeluk gevulde practiceId geen praktijk-brede
+  // inzage oplevert.
+  const viaPractice = user.role === 'THERAPIST' && user.practiceId ? [{ practiceId: user.practiceId }] : []
   const found = await prisma.user.findFirst({
     where: {
       id: patientId,
@@ -33,7 +43,7 @@ export async function hasPatientAccess(
             some: { therapistId: user.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
           },
         },
-        ...(user.practiceId ? [{ practiceId: user.practiceId }] : []),
+        ...viaPractice,
       ],
     },
     select: { id: true },

@@ -42,7 +42,7 @@ async function hasPatientAccess(
 ): Promise<boolean> {
   if (patientId === user.id) return true
   if (user.role === 'ADMIN') return true
-  if (user.role !== 'THERAPIST') return false
+  if (user.role !== 'THERAPIST' && user.role !== 'COACH') return false
   const found = await prisma.user.findFirst({
     where: {
       id: patientId,
@@ -52,7 +52,9 @@ async function hasPatientAccess(
             some: { therapistId: user.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
           },
         },
-        ...(user.practiceId ? [{ practiceId: user.practiceId }] : []),
+        // Praktijk-tak alleen voor therapeuten; een coach komt uitsluitend
+        // via de directe koppeling binnen.
+        ...(user.role === 'THERAPIST' && user.practiceId ? [{ practiceId: user.practiceId }] : []),
       ],
     },
     select: { id: true },

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useMemo } from 'react'
 import { trpc } from '@/lib/trpc/client'
+import { usePortal } from '@/lib/portal'
 import { Display, Kicker, MetaLabel, P, Tile } from '@/components/dark-ui'
 import { InsightCard, type InsightCardData } from '@/components/insights/InsightCard'
 
@@ -14,6 +15,7 @@ const URGENCY_ORDER: Record<string, number> = {
 }
 
 export default function SignalsDashboardPage() {
+  const portal = usePortal()
   const { data, isLoading, refetch } = trpc.insights.getDashboard.useQuery()
 
   const insights = (data?.insights ?? []) as unknown as InsightCardData[]
@@ -106,7 +108,7 @@ export default function SignalsDashboardPage() {
                 {silentPatients.map((p) => (
                   <Link
                     key={p.patientId}
-                    href={`/therapist/patients/${p.patientId}`}
+                    href={`${portal.patients}/${p.patientId}`}
                     className="athletic-mono inline-flex items-center gap-2 px-3 py-2 rounded-lg"
                     style={{
                       background: P.surfaceHi,

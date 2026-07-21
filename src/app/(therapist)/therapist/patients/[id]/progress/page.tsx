@@ -7,6 +7,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { trpc } from '@/lib/trpc/client'
+import { usePortal } from '@/lib/portal'
 import { HR_ZONES, type HRZone, CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
 import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
 import { LoadCurveChart } from '@/components/workload/LoadCurveChart'
@@ -125,6 +126,7 @@ function WellnessReadinessStrip({ checks }: {
 }
 
 export default function PatientProgressPage({ params }: { params: Promise<{ id: string }> }) {
+  const portal = usePortal()
   const { id } = use(params)
   const { data: patient } = trpc.patients.get.useQuery({ id })
   const { data: progress, isLoading } = trpc.patients.getProgress.useQuery({ patientId: id })
@@ -230,7 +232,7 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
       <div className="max-w-3xl mx-auto px-4 pt-10 pb-8 space-y-5">
         {/* Back */}
         <Link
-          href={`/therapist/patients/${id}`}
+          href={`${portal.patients}/${id}`}
           className="athletic-mono inline-flex items-center gap-1.5"
           style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.16em' }}
         >

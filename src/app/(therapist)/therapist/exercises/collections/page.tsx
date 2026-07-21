@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { COLLECTION_COLORS } from '@/lib/exercise-constants'
 import { trpc } from '@/lib/trpc/client'
+import { usePortal } from '@/lib/portal'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
@@ -20,6 +21,7 @@ import {
 } from '@/components/dark-ui'
 
 export default function CollectionsPage() {
+  const portal = usePortal()
   const utils = trpc.useUtils()
 
   const { data: collections = [], isLoading: collectionsLoading } = trpc.exercises.listCollections.useQuery()
@@ -108,7 +110,7 @@ export default function CollectionsPage() {
     <div className="max-w-5xl w-full flex flex-col gap-6">
       <div className="flex flex-col gap-3">
         <Link
-          href="/therapist/exercises"
+          href={`${portal.base}/exercises`}
           className="athletic-mono"
           style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.16em' }}
         >
@@ -234,7 +236,7 @@ export default function CollectionsPage() {
                       Geen oefeningen in deze collectie
                     </p>
                     <DarkButton
-                      href="/therapist/exercises"
+                      href={`${portal.base}/exercises`}
                       variant="secondary"
                       size="sm"
                       className="mt-3"

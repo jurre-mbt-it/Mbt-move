@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
+import { usePortal, type Portal } from '@/lib/portal'
 import {
   ActionTile,
   DarkButton,
@@ -34,17 +35,17 @@ const URGENCY_CONFIG: Record<string, { color: string; bg: string; label: string 
  * voortgangspagina (load-curve), pijn op de signalen-tab, therapietrouw op
  * de historie-tab.
  */
-function signalHref(i: { signalType: string; patientId: string }): string {
+function signalHref(portal: Portal, i: { signalType: string; patientId: string }): string {
   switch (i.signalType) {
     case 'deload_needed':
     case 'overload_risk':
     case 'plateau':
     case 'ready_for_progression':
-      return `/therapist/patients/${i.patientId}/progress`
+      return `${portal.patients}/${i.patientId}/progress`
     case 'adherence_drop':
-      return `/therapist/patients/${i.patientId}?tab=geschiedenis`
+      return `${portal.patients}/${i.patientId}?tab=geschiedenis`
     default:
-      return `/therapist/patients/${i.patientId}?tab=signalen`
+      return `${portal.patients}/${i.patientId}?tab=signalen`
   }
 }
 
@@ -60,14 +61,14 @@ const ACTIVITY_CONFIG: Record<
   pain: { Icon: IconWarning, label: 'Pijnmelding', tint: P.orange },
 }
 
-function activityHref(a: { type: ActivityType; patientId: string }): string {
+function activityHref(portal: Portal, a: { type: ActivityType; patientId: string }): string {
   switch (a.type) {
     case 'wellness':
-      return `/therapist/patients/${a.patientId}/progress`
+      return `${portal.patients}/${a.patientId}/progress`
     case 'pain':
-      return `/therapist/patients/${a.patientId}?tab=signalen`
+      return `${portal.patients}/${a.patientId}?tab=signalen`
     default:
-      return `/therapist/patients/${a.patientId}?tab=geschiedenis`
+      return `${portal.patients}/${a.patientId}?tab=geschiedenis`
   }
 }
 
@@ -206,6 +207,7 @@ function timeAgo(d: Date | string, now: number): string {
 }
 
 export default function TherapistDashboard() {
+  const portal = usePortal()
   // "Nu" + dag/weekgrenzen één keer vastleggen bij mount (lazy initializer)
   // zodat de render puur blijft en de query-keys stabiel zijn.
   const [{ now, dayStart, weekStart }] = useState(() => {
@@ -297,7 +299,7 @@ export default function TherapistDashboard() {
           therapist/admin. Patiënten-dossiers zijn gevoelige medische data. */}
       {me?.mfaEnforcementPending && (
         <Link
-          href="/therapist/settings/security"
+          href={`${portal.base}/settings/security`}
           className="group block rounded-2xl transition-colors"
           style={{
             background: 'rgba(248,113,113,0.08)',
@@ -353,7 +355,7 @@ export default function TherapistDashboard() {
           value={signalsLoading ? '…' : insights.length}
           tint={insights.length === 0 ? P.lime : hasUrgent ? P.danger : P.gold}
           sub={insights.length === 0 ? 'Alles rustig' : 'Vragen om actie'}
-          href="/therapist/signals"
+          href={`${portal.base}/signals`}
         />
         <MetricTile
           label="Deze week"
@@ -374,7 +376,7 @@ export default function TherapistDashboard() {
                   : P.danger
           }
           sub="Gepland vs. gelogd · 14d"
-          href="/therapist/patients"
+          href={`${portal.patients}`}
         />
         <MetricTile
           label="Stil"
@@ -392,7 +394,7 @@ export default function TherapistDashboard() {
         <div className="flex items-center justify-between">
           <Kicker>Vraagt aandacht</Kicker>
           <Link
-            href="/therapist/signals"
+            href={`${portal.base}/signals`}
             className="athletic-mono"
             style={{ color: P.brand, fontSize: 11, letterSpacing: '0.12em' }}
           >
@@ -402,7 +404,7 @@ export default function TherapistDashboard() {
         {topSignals.map((i) => {
             const cfg = URGENCY_CONFIG[i.urgency] ?? URGENCY_CONFIG.MEDIUM
             return (
-              <Tile key={i.id} href={signalHref(i)} accentBar={cfg.color}>
+              <Tile key={i.id} href={signalHref(portal, i)} accentBar={cfg.color}>
                 <div className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -446,7 +448,7 @@ export default function TherapistDashboard() {
               {silent.map((p) => (
                 <Link
                   key={p.patientId}
-                  href={`/therapist/patients/${p.patientId}`}
+                  href={`${portal.patients}/${p.patientId}`}
                   className="athletic-mono athletic-tap inline-flex items-center gap-2 px-3 py-2 rounded-lg"
                   style={{
                     background: P.surfaceHi,
@@ -486,7 +488,7 @@ export default function TherapistDashboard() {
           {reviewDuePrograms.map((r) => (
             <Tile
               key={r.programId}
-              href={`/therapist/patients/${r.patientId}?tab=programmas`}
+              href={`${portal.patients}/${r.patientId}?tab=programmas`}
               accentBar={P.gold}
             >
               <div className="flex items-center gap-3">
@@ -549,8 +551,8 @@ export default function TherapistDashboard() {
                       key={s.id}
                       href={
                         done
-                          ? `/therapist/patients/${s.patientId}?tab=geschiedenis`
-                          : `/therapist/patients/${s.patientId}`
+                          ? `${portal.patients}/${s.patientId}?tab=geschiedenis`
+                          : `${portal.patients}/${s.patientId}`
                       }
                       className="athletic-tap flex items-center gap-3 py-2.5"
                       style={{
@@ -681,25 +683,25 @@ export default function TherapistDashboard() {
           <Kicker>Snelle acties</Kicker>
           <div className="flex flex-col gap-1">
           <ActionTile
-            href="/therapist/programs/new"
+            href={`${portal.base}/programs/new`}
             label="Nieuw programma"
             sub="Strength / cardio / walk-run"
             bar={P.brand}
           />
           <ActionTile
-            href="/therapist/exercises/new"
+            href={`${portal.base}/exercises/new`}
             label="Nieuwe oefening"
             sub="Toevoegen aan bibliotheek"
             bar={P.ice}
           />
           <ActionTile
-            href="/therapist/week-planner"
+            href={`${portal.base}/week-planner`}
             label="Weekschema"
             sub="Plan programmas in"
             bar={P.gold}
           />
           <ActionTile
-            href="/therapist/patients"
+            href={`${portal.patients}`}
             label="Patiënt uitnodigen"
             sub="Nieuwe patiënt aanmaken"
             bar={P.purple}
@@ -911,7 +913,7 @@ export default function TherapistDashboard() {
                 <DarkButton
                   variant="secondary"
                   size="sm"
-                  href={activityHref(selectedActivity)}
+                  href={activityHref(portal, selectedActivity)}
                   prefetch={() => utils.patients.get.prefetch({ id: selectedActivity.patientId })}
                 >
                   Open patiëntdossier →

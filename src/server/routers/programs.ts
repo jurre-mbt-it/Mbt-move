@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { createTRPCRouter, therapistProcedure, creatorProcedure } from '@/server/trpc'
+import { createTRPCRouter, coachStaffProcedure, creatorProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
 import { Prisma } from '@prisma/client'
 import type { PrismaClient } from '@prisma/client'
@@ -473,7 +473,7 @@ export const programsRouter = createTRPCRouter({
    * het openen van de builder meteen een concept aanmaakte; wie terug-tikte
    * liet er zo één achter. Query voor de opruim-banner in de programma-lijst.
    */
-  emptyDrafts: therapistProcedure.query(async ({ ctx }) => {
+  emptyDrafts: coachStaffProcedure.query(async ({ ctx }) => {
     const empty = await ctx.prisma.program.findMany({
       where: EMPTY_DRAFT_WHERE(ctx.user!.id),
       select: { id: true, name: true, createdAt: true },
@@ -483,7 +483,7 @@ export const programsRouter = createTRPCRouter({
   }),
 
   /** Verwijder alle (nu nog steeds) lege concepten — zie emptyDrafts. */
-  cleanupEmptyDrafts: therapistProcedure.mutation(async ({ ctx }) => {
+  cleanupEmptyDrafts: coachStaffProcedure.mutation(async ({ ctx }) => {
     // Her-evalueren op het moment van verwijderen: een concept dat inmiddels
     // inhoud kreeg valt automatisch buiten de filter.
     const empty = await ctx.prisma.program.findMany({
@@ -565,7 +565,7 @@ export const programsRouter = createTRPCRouter({
    * weken) ongewijzigd. Scope = eigen programma's + die van praktijk-collega's.
    * Voedt het therapeut-dashboard en de signalen-melding.
    */
-  reviewDue: therapistProcedure.query(async ({ ctx }) => {
+  reviewDue: coachStaffProcedure.query(async ({ ctx }) => {
     const isAdmin = ctx.user!.role === 'ADMIN'
     const practiceId = ctx.user!.practiceId
     const ownership = isAdmin

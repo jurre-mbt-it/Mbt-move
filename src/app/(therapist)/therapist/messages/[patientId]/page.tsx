@@ -3,6 +3,7 @@
 import { use } from 'react'
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
+import { usePortal } from '@/lib/portal'
 import { ChevronLeft } from 'lucide-react'
 import { Kicker, P } from '@/components/dark-ui'
 import { MessageThread } from '@/components/messages/MessageThread'
@@ -12,6 +13,7 @@ export default function TherapistMessageThreadPage({
 }: {
   params: Promise<{ patientId: string }>
 }) {
+  const portal = usePortal()
   const { patientId } = use(params)
   const { data: patient } = trpc.patients.get.useQuery({ id: patientId })
 
@@ -24,7 +26,7 @@ export default function TherapistMessageThreadPage({
     >
       <div className="px-4 sm:px-6 pt-4 pb-3 flex items-center gap-3" style={{ borderBottom: `1px solid ${P.line}` }}>
         <Link
-          href="/therapist/messages"
+          href={`${portal.base}/messages`}
           className="athletic-tap p-2 -ml-2 rounded-lg"
           style={{ color: P.ink }}
           aria-label="Terug naar berichten"
@@ -39,7 +41,7 @@ export default function TherapistMessageThreadPage({
         </div>
         {patient && (
           <Link
-            href={`/therapist/patients/${patientId}`}
+            href={`${portal.patients}/${patientId}`}
             className="athletic-tap athletic-mono ml-auto shrink-0 rounded-full"
             style={{
               padding: '6px 12px',

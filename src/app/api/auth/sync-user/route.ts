@@ -54,7 +54,8 @@ export async function POST(request: Request) {
       // therapist/admin-email registreert vóór de bulk-backfill-SQL draait,
       // die identiteit claimen (account-takeover). THERAPIST/ADMIN-rows moeten
       // hun supabaseUserId al via de bulk-backfill hebben.
-      const isHighValue = existing.role === 'THERAPIST' || existing.role === 'ADMIN'
+      const isHighValue =
+        existing.role === 'THERAPIST' || existing.role === 'ADMIN' || existing.role === 'COACH'
       if (!existing.supabaseUserId && !isHighValue) {
         try {
           await prisma.user.update({

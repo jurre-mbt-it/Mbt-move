@@ -10,7 +10,7 @@
  * eigen watch mogen koppelen. Server (router + API-routes) én client
  * (dashboard-tegels, therapeut-tab, mobiele health-tab) lezen allemaal deze gate.
  */
-export const WEARABLES_ALLOWED_ROLES = ['ADMIN', 'THERAPIST', 'ATHLETE'] as const
+export const WEARABLES_ALLOWED_ROLES = ['ADMIN', 'THERAPIST', 'ATHLETE', 'COACH'] as const
 
 export function wearablesEnabledForRole(role: string | null | undefined): boolean {
   return !!role && (WEARABLES_ALLOWED_ROLES as readonly string[]).includes(role)
