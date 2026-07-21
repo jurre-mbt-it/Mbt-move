@@ -782,6 +782,75 @@ export const patientsRouter = createTRPCRouter({
       return { ok: true }
     }),
 
+  /**
+   * Co-monitoring: een therapeut laten meekijken bij een atleet.
+   *
+   * De coach begeleidt de training, de fysiotherapeut kijkt mee op het
+   * klinische deel. De koppeling wordt als PENDING aangemaakt; de atleet
+   * keurt hem goed via de bestaande consent-flow in zijn instellingen. Zo
+   * beslist de atleet zelf wie zijn dossier ziet, en niet de coach.
+   *
+   * v1 werkt alleen met een therapeut die al een account heeft. Iemand van
+   * buiten uitnodigen zou betekenen dat we een therapeut-account aanmaken op
+   * gezag van een coach, en dat hoort bij de beheerder.
+   */
+  inviteCoMonitor: mfaCoachStaffProcedure
+    .input(z.object({ patientId: z.string(), email: z.string().email('Ongeldig e-mailadres') }))
+    .mutation(async ({ ctx, input }) => {
+      if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.patientId))) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Atleet niet gevonden of geen toegang.' })
+      }
+      const email = input.email.toLowerCase().trim()
+      const therapist = await ctx.prisma.user.findUnique({
+        where: { email },
+        select: { id: true, name: true, email: true, role: true },
+      })
+      if (!therapist || therapist.role !== 'THERAPIST') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Geen therapeut gevonden met dit e-mailadres. Vraag de beheerder om een account.',
+        })
+      }
+      if (therapist.id === ctx.user.id) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Je kunt jezelf niet uitnodigen.' })
+      }
+
+      const existing = await ctx.prisma.patientTherapist.findUnique({
+        where: { therapistId_patientId: { therapistId: therapist.id, patientId: input.patientId } },
+        select: { id: true, status: true, isActive: true },
+      })
+      if (existing && existing.isActive && existing.status !== 'DECLINED') {
+        return { ok: true, alreadyLinked: true, status: existing.status }
+      }
+
+      const relation = existing
+        ? await ctx.prisma.patientTherapist.update({
+            where: { id: existing.id },
+            data: { status: 'PENDING', isActive: true, requestedAt: new Date(), respondedAt: null },
+          })
+        : await ctx.prisma.patientTherapist.create({
+            data: {
+              therapistId: therapist.id,
+              patientId: input.patientId,
+              status: 'PENDING',
+              isActive: true,
+              requestedAt: new Date(),
+            },
+          })
+
+      await auditLog({
+        event: 'CO_MONITOR_REQUESTED',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        resource: 'PatientTherapist',
+        resourceId: relation.id,
+        metadata: { therapistId: therapist.id, patientId: input.patientId, via: 'coach-co-monitor' },
+        req: ctx.req,
+      })
+
+      return { ok: true, alreadyLinked: false, status: 'PENDING' as const, therapistName: therapist.name }
+    }),
+
   changeRole: mfaTherapistProcedure
     .input(z.object({
       id: z.string(),

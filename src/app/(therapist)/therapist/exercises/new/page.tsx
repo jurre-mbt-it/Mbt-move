@@ -1,15 +1,17 @@
 import Link from 'next/link'
+import { usePortal } from '@/lib/portal'
 import { ExerciseForm } from '@/components/exercises/ExerciseForm'
 import { Kicker, MetaLabel, P } from '@/components/dark-ui'
 
 export const metadata = { title: 'Nieuwe oefening – MBT Gym' }
 
 export default function NewExercisePage() {
+  const portal = usePortal()
   return (
     <div className="max-w-2xl w-full flex flex-col gap-6">
       <div className="flex flex-col gap-3">
         <Link
-          href="/therapist/exercises"
+          href={`${portal.base}/exercises`}
           className="athletic-mono"
           style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.16em' }}
         >

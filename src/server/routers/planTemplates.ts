@@ -131,7 +131,11 @@ export const planTemplatesRouter = createTRPCRouter({
       goal: t.goal,
       weeks: t.weeks,
       practiceId: t.practiceId,
-      isGlobalSeed: t.practiceId === null,
+      /** Van mij? Bepaalt of je 'm mag hernoemen of verwijderen. */
+      isOwn: t.creatorId === ctx.user.id,
+      // Een coach-plan heeft óók practiceId null. Zonder de creator-check zou
+      // een coach zijn eigen plannen als "globale seed" gelabeld zien.
+      isGlobalSeed: t.practiceId === null && t.creatorId !== ctx.user.id,
       sessionCount: t.schedules.reduce(
         (sum, s) => sum + s.days.reduce((d, day) => d + day.items.length, 0),
         0,

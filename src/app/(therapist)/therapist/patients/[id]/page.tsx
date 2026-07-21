@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { trpc } from '@/lib/trpc/client'
+import { usePortal } from '@/lib/portal'
 import {
   DarkButton,
   DarkInput,
@@ -20,6 +21,7 @@ import {
   Tile,
 } from '@/components/dark-ui'
 import { AssignFromTemplateDialog } from '@/components/patients/AssignFromTemplateDialog'
+import { CoMonitorDialog } from '@/components/patients/CoMonitorDialog'
 import { PerformerToggle, type PerformerFilter } from '@/components/patients/PerformerToggle'
 import { InsightActivationToggle } from '@/components/insights/InsightActivationToggle'
 import { InsightTimeline } from '@/components/insights/InsightTimeline'
@@ -61,6 +63,7 @@ export default function PatientDetailPage({
   params: Promise<{ id: string }>
   searchParams: Promise<{ tab?: string }>
 }) {
+  const portal = usePortal()
   const { id } = use(params)
   // Deep-link vanaf het dashboard: /patients/[id]?tab=signalen opent direct
   // de juiste tab. Ongeldige waardes vallen terug op 'profiel'.
@@ -139,6 +142,7 @@ export default function PatientDetailPage({
     expiresAt: string | Date
     error: string | null
   } | null>(null)
+  const [coMonitorOpen, setCoMonitorOpen] = useState(false)
   const resendInvite = trpc.invite.resend.useMutation({
     onSuccess: (res) => {
       if (res.mailDelivered) {
@@ -207,7 +211,7 @@ export default function PatientDetailPage({
       <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
         <div className="max-w-2xl mx-auto px-4 pt-16 pb-8 text-center space-y-4">
           <p style={{ color: P.inkMuted }}>Patiënt niet gevonden of geen toegang.</p>
-          <DarkButton variant="secondary" href="/therapist/patients">
+          <DarkButton variant="secondary" href={`${portal.patients}`}>
             Terug naar patiënten
           </DarkButton>
         </div>
@@ -227,7 +231,7 @@ export default function PatientDetailPage({
       <div className="max-w-2xl mx-auto px-4 pt-10 pb-8 space-y-5">
         {/* Back */}
         <Link
-          href="/therapist/patients"
+          href={`${portal.patients}`}
           className="athletic-mono inline-flex items-center gap-1.5"
           style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.16em' }}
         >
@@ -267,12 +271,16 @@ export default function PatientDetailPage({
 
         {/* Actions */}
         <div className="flex flex-wrap gap-2">
-          <DarkButton
-            variant="primary"
-            href={`/therapist/treatment/${patient.id}`}
-          >
-            ▶ Start behandeling
-          </DarkButton>
+          {/* Behandelen is voorbehouden aan de therapeut; een coach ziet het
+              dossier wel, maar logt geen behandelsessies. */}
+          {!portal.isCoach && (
+            <DarkButton
+              variant="primary"
+              href={`${portal.base}/treatment/${patient.id}`}
+            >
+              ▶ Start behandeling
+            </DarkButton>
+          )}
           <DarkButton
             variant="secondary"
             disabled={resendInvite.isPending}
@@ -283,7 +291,7 @@ export default function PatientDetailPage({
           </DarkButton>
           <DarkButton
             variant="secondary"
-            href={`/therapist/week-planner?patientId=${patient.id}`}
+            href={`${portal.base}/week-planner?patientId=${patient.id}`}
           >
             <span className="inline-flex items-center gap-1.5"><IconCalendar size={15} /> Weekschema</span>
           </DarkButton>
@@ -291,9 +299,16 @@ export default function PatientDetailPage({
           {patient.role === 'ATHLETE' && (
             <DarkButton
               variant="secondary"
-              href={`/therapist/messages/${patient.id}`}
+              href={`${portal.base}/messages/${patient.id}`}
             >
               Berichten
+            </DarkButton>
+          )}
+          {/* Co-monitoring: een fysiotherapeut laten meekijken. De atleet
+              keurt die koppeling zelf goed. */}
+          {portal.isCoach && (
+            <DarkButton variant="secondary" onClick={() => setCoMonitorOpen(true)}>
+              Therapeut laten meekijken
             </DarkButton>
           )}
           {/* Programma's. Een patient kan er meerdere naast elkaar hebben
@@ -303,7 +318,7 @@ export default function PatientDetailPage({
           {patient.programId && (
             <DarkButton
               variant="secondary"
-              href={`/therapist/programs/${patient.programId}/edit`}
+              href={`${portal.base}/programs/${patient.programId}/edit`}
             >
               Programma
             </DarkButton>
@@ -316,7 +331,7 @@ export default function PatientDetailPage({
           </DarkButton>
           <DarkButton
             variant="secondary"
-            href={`/therapist/programs/new?patientId=${patient.id}`}
+            href={`${portal.base}/programs/new?patientId=${patient.id}`}
           >
             + Programma toevoegen
           </DarkButton>
@@ -571,7 +586,7 @@ export default function PatientDetailPage({
               <DarkButton
                 variant="secondary"
                 size="sm"
-                href={`/therapist/programs/new?patientId=${patient.id}`}
+                href={`${portal.base}/programs/new?patientId=${patient.id}`}
               >
                 + Nieuw
               </DarkButton>
@@ -583,7 +598,7 @@ export default function PatientDetailPage({
                   <DarkButton
                     variant="primary"
                     size="sm"
-                    onClick={() => router.push(`/therapist/programs/new?patientId=${patient.id}`)}
+                    onClick={() => router.push(`${portal.base}/programs/new?patientId=${patient.id}`)}
                   >
                     + Programma aanmaken
                   </DarkButton>
@@ -708,7 +723,7 @@ export default function PatientDetailPage({
                               : '—'}
                           </p>
                           <Link
-                            href={`/therapist/patients/${id}/sessions/${session.id}/edit`}
+                            href={`${portal.patients}/${id}/sessions/${session.id}/edit`}
                             className="athletic-mono"
                             style={{
                               color: P.brand,
@@ -811,7 +826,11 @@ export default function PatientDetailPage({
 
           {/* ── TAB: Revalidatie (stoplicht-tracker) ──────────────── */}
           <TabsContent value="revalidatie" className="space-y-4">
-            <RehabActivationToggle patientId={patient.id} patientName={patient.name} />
+            {/* Een protocol activeren of wisselen is een klinisch besluit en
+                blijft bij de therapeut. De coach leest de tracker wel mee. */}
+            {!portal.isCoach && (
+              <RehabActivationToggle patientId={patient.id} patientName={patient.name} />
+            )}
             <RehabTracker patientId={patient.id} />
           </TabsContent>
 
@@ -830,7 +849,7 @@ export default function PatientDetailPage({
           {/* ── TAB: Voortgang ───────────────────────────────────── */}
           <TabsContent value="voortgang">
             <Tile
-              href={`/therapist/patients/${patient.id}/progress`}
+              href={`${portal.patients}/${patient.id}/progress`}
               accentBar={P.brand}
             >
               <div className="flex items-center gap-3">
@@ -866,6 +885,14 @@ export default function PatientDetailPage({
           )}
         </Tabs>
       </div>
+
+      {coMonitorOpen && (
+        <CoMonitorDialog
+          patientId={patient.id}
+          patientName={patient.name ?? 'deze atleet'}
+          onClose={() => setCoMonitorOpen(false)}
+        />
+      )}
     </div>
   )
 }
@@ -990,6 +1017,7 @@ function ProgramTile({
   patientId: string
   dimmed?: boolean
 }) {
+  const portal = usePortal()
   const progStatus = STATUS_CONFIG[prog.status] ?? STATUS_CONFIG.DRAFT
   const accent = STATUS_ACCENT[prog.status] ?? P.inkDim
   // Controle-signaal: actief programma dat langer dan de drempel
@@ -1002,7 +1030,7 @@ function ProgramTile({
     <div style={{ opacity: dimmed ? 0.55 : 1 }}>
       <Tile accentBar={reviewDue ? P.gold : accent}>
         <div className="flex items-center gap-3">
-          <Link href={`/therapist/programs/${prog.id}/edit`} className="flex-1 min-w-0 cursor-pointer">
+          <Link href={`${portal.base}/programs/${prog.id}/edit`} className="flex-1 min-w-0 cursor-pointer">
             <p
               style={{
                 color: P.ink,
@@ -1075,6 +1103,7 @@ function ProgramActions({
   patientId: string
   reviewDue?: boolean
 }) {
+  const portal = usePortal()
   const utils = trpc.useUtils()
   const invalidate = () => {
     utils.programs.list.invalidate()
@@ -1158,7 +1187,7 @@ function ProgramActions({
       <DarkButton
         variant="secondary"
         size="sm"
-        href={`/therapist/programs/${programId}/edit`}
+        href={`${portal.base}/programs/${programId}/edit`}
       >
         Wijzig
       </DarkButton>

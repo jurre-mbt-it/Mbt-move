@@ -3,6 +3,7 @@
 import { useRef, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import type { LucideIcon } from 'lucide-react'
 import {
   LayoutDashboard,
   Users,
@@ -28,7 +29,9 @@ import { trpc } from '@/lib/trpc/client'
 import { setPersonalMode } from '@/lib/personal-mode-client'
 import { P } from '@/components/dark-ui'
 
-const navItems = [
+export type SidebarNavItem = { href: string; label: string; icon: LucideIcon }
+
+const THERAPIST_NAV: SidebarNavItem[] = [
   { href: '/therapist/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/therapist/patients', label: 'Patiënten', icon: Users },
   { href: '/therapist/messages', label: 'Berichten', icon: MessageSquare },
@@ -41,6 +44,44 @@ const navItems = [
   { href: '/therapist/test-reports', label: 'Testrapport', icon: FileText },
   { href: '/therapist/cohort', label: 'Cohort', icon: BarChart3 },
 ]
+
+/**
+ * Coach-variant: dezelfde shell, zonder de klinische onderdelen (tests,
+ * testrapporten, assessment, cohort). Zie docs/plan-coach-role-20260721.md.
+ */
+const COACH_NAV: SidebarNavItem[] = [
+  { href: '/coach/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/coach/athletes', label: 'Atleten', icon: Users },
+  { href: '/coach/messages', label: 'Berichten', icon: MessageSquare },
+  { href: '/coach/signals', label: 'Signalen', icon: AlertCircle },
+  { href: '/coach/programs', label: "Programma's", icon: ClipboardList },
+  { href: '/coach/programs/new', label: 'Builder', icon: Blocks },
+  { href: '/coach/week-planner', label: 'Weekschema', icon: CalendarDays },
+  { href: '/coach/plans', label: 'Trainingsplannen', icon: FileText },
+  { href: '/coach/exercises', label: 'Oefeningen', icon: Dumbbell },
+]
+
+/** Nav + labels per portaal. De coach-shell hergebruikt deze zijbalk. */
+export const SIDEBAR_VARIANTS = {
+  therapist: {
+    nav: THERAPIST_NAV,
+    portalLabel: 'CLINICIAN PORTAL',
+    messagesHref: '/therapist/messages',
+    programsNewHref: '/therapist/programs/new',
+    settingsHref: '/therapist/settings',
+    showAssessment: true,
+  },
+  coach: {
+    nav: COACH_NAV,
+    portalLabel: 'COACH PORTAL',
+    messagesHref: '/coach/messages',
+    programsNewHref: '/coach/programs/new',
+    settingsHref: '/coach/settings',
+    showAssessment: false,
+  },
+} as const
+
+export type SidebarVariant = keyof typeof SIDEBAR_VARIANTS
 
 // Ingeklapt-voorkeur als externe store (localStorage) via
 // useSyncExternalStore — SSR rendert uitgeklapt (server-snapshot), client
@@ -65,7 +106,9 @@ function storeCollapsed(v: boolean) {
   collapseListeners.forEach(l => l())
 }
 
-export function TherapistSidebar() {
+export function TherapistSidebar({ variant = 'therapist' }: { variant?: SidebarVariant } = {}) {
+  const cfg = SIDEBAR_VARIANTS[variant]
+  const navItems = cfg.nav
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -77,7 +120,7 @@ export function TherapistSidebar() {
     refetchInterval: 60_000,
   })
   const isAdmin = me?.role === 'ADMIN'
-  const canUseAssessment = !!assessmentAccess?.hasAccess
+  const canUseAssessment = cfg.showAssessment && !!assessmentAccess?.hasAccess
 
   const collapsed = useSyncExternalStore(subscribeCollapsed, getCollapsedSnapshot, () => false)
 
@@ -186,7 +229,7 @@ export function TherapistSidebar() {
               className="athletic-mono mt-2"
               style={{ color: P.inkDim, fontSize: 10, letterSpacing: '0.2em' }}
             >
-              CLINICIAN PORTAL
+              {cfg.portalLabel}
             </p>
           </>
         )}
@@ -221,7 +264,7 @@ export function TherapistSidebar() {
             >
               <span className="relative shrink-0 inline-flex">
                 <Icon className="w-4.5 h-4.5" />
-                {href === '/therapist/messages' && unreadMessages > 0 && collapsed && (
+                {href === cfg.messagesHref && unreadMessages > 0 && collapsed && (
                   <span
                     aria-hidden
                     className="absolute -top-1 -right-1 w-2 h-2 rounded-full"
@@ -230,7 +273,7 @@ export function TherapistSidebar() {
                 )}
               </span>
               {!collapsed && label}
-              {href === '/therapist/messages' && unreadMessages > 0 && !collapsed && (
+              {href === cfg.messagesHref && unreadMessages > 0 && !collapsed && (
                 <span
                   className="athletic-mono ml-auto rounded-full flex items-center justify-center"
                   style={{ minWidth: 20, height: 20, padding: '0 6px', background: P.brand, color: P.bg, fontSize: 10, fontWeight: 900 }}
@@ -294,7 +337,7 @@ export function TherapistSidebar() {
         </button>
         {me?.id && (
           <Link
-            href={`/therapist/programs/new?patientId=${me.id}`}
+            href={`${cfg.programsNewHref}?patientId=${me.id}`}
             onClick={expandGuard}
             className={rowClass()}
             title={collapsed ? 'Nieuw schema voor mezelf' : undefined}
@@ -304,18 +347,20 @@ export function TherapistSidebar() {
             {!collapsed && 'Nieuw schema voor mezelf'}
           </Link>
         )}
+        {variant === 'therapist' && (
+          <Link
+            href="/therapist/release-notes"
+            onClick={expandGuard}
+            className={rowClass()}
+            title={collapsed ? 'Wat is nieuw' : undefined}
+            style={{ color: P.inkMuted }}
+          >
+            <Sparkles className="w-4.5 h-4.5 shrink-0" />
+            {!collapsed && 'Wat is nieuw'}
+          </Link>
+        )}
         <Link
-          href="/therapist/release-notes"
-          onClick={expandGuard}
-          className={rowClass()}
-          title={collapsed ? 'Wat is nieuw' : undefined}
-          style={{ color: P.inkMuted }}
-        >
-          <Sparkles className="w-4.5 h-4.5 shrink-0" />
-          {!collapsed && 'Wat is nieuw'}
-        </Link>
-        <Link
-          href="/therapist/settings"
+          href={cfg.settingsHref}
           onClick={expandGuard}
           className={rowClass()}
           title={collapsed ? 'Instellingen' : undefined}

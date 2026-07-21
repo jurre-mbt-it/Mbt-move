@@ -7,6 +7,7 @@ import { Layers } from 'lucide-react'
 import { ProgramBuilder } from '@/components/programs/ProgramBuilder'
 import { CardioWorkoutBuilder } from '@/components/week-planner/CardioWorkoutBuilder'
 import { trpc } from '@/lib/trpc/client'
+import { usePortal } from '@/lib/portal'
 import { notFound } from 'next/navigation'
 import type { BuilderExercise, BuilderResource } from '@/components/programs/types'
 import {
@@ -89,6 +90,7 @@ type EditProgram = {
  * scherm waar de workout onzichtbaar en onbewerkbaar was.
  */
 function CardioEditView({ id, program }: { id: string; program: EditProgram }) {
+  const portal = usePortal()
   const utils = trpc.useUtils()
   const saveProgram = trpc.programs.save.useMutation()
   const [builderOpen, setBuilderOpen] = useState(false)
@@ -120,7 +122,7 @@ function CardioEditView({ id, program }: { id: string; program: EditProgram }) {
       <div className="max-w-2xl mx-auto px-4 pt-10 pb-16 space-y-5">
         <div className="flex items-center gap-3">
           <Link
-            href="/therapist/programs"
+            href={`${portal.base}/programs`}
             className="athletic-mono"
             style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.16em' }}
           >

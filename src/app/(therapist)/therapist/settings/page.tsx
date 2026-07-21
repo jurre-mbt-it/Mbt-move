@@ -4,10 +4,12 @@ import { useRouter } from 'next/navigation'
 import { ActionTile, DarkButton, Kicker, MetaLabel, P } from '@/components/dark-ui'
 import { createClient } from '@/lib/supabase/client'
 import { trpc } from '@/lib/trpc/client'
+import { usePortal } from '@/lib/portal'
 import { PrefToggleTile } from '@/components/settings/PrefToggleTile'
 import { PREF_REST_TIMER_ENABLED } from '@/hooks/useLocalPref'
 
 export default function SettingsPage() {
+  const portal = usePortal()
   const router = useRouter()
   const { data: mfa } = trpc.auth.mfaStatus.useQuery()
   const { data: me } = trpc.auth.getMe.useQuery()
@@ -57,33 +59,33 @@ export default function SettingsPage() {
 
       <div className="flex flex-col gap-2">
         <ActionTile
-          href="/therapist/settings/profile"
+          href={`${portal.base}/settings/profile`}
           label="Profiel"
           sub="Naam, functietitel en telefoon"
           bar={P.lime}
         />
         {me?.practiceId && (
           <ActionTile
-            href="/therapist/settings/practice"
+            href={`${portal.base}/settings/practice`}
             label="Praktijkprofiel"
             sub={me.isPracticeOwner ? 'Adres, logo en email-footer' : 'Bekijken (alleen eigenaar mag bewerken)'}
             bar={P.lime}
           />
         )}
         <ActionTile
-          href="/therapist/settings/security"
+          href={`${portal.base}/settings/security`}
           label="Beveiliging & MFA"
           sub={mfaSub}
           bar={mfaBar}
         />
         <ActionTile
-          href="/therapist/settings/parameters"
+          href={`${portal.base}/settings/parameters`}
           label="Parameters"
           sub="Aangepaste meetparameters voor programma's"
           bar={P.ice}
         />
         <ActionTile
-          href="/therapist/settings/tag-vocabulary"
+          href={`${portal.base}/settings/tag-vocabulary`}
           label="Klacht-tags"
           sub="Suggestielijst voor #hashtags bij het loggen"
           bar={P.ice}

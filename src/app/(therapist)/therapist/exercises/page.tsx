@@ -12,6 +12,7 @@ import {
   DIFFICULTIES,
 } from '@/lib/exercise-constants'
 import { trpc } from '@/lib/trpc/client'
+import { usePortal } from '@/lib/portal'
 import { IconFolder } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import {
@@ -41,6 +42,7 @@ type ExerciseItem = {
 }
 
 export default function ExercisesPage() {
+  const portal = usePortal()
   const router = useRouter()
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [query, setQuery] = useState('')
@@ -113,7 +115,7 @@ export default function ExercisesPage() {
       difficulty: ex.difficulty,
       videoUrl: ex.videoUrl,
       muscleLoads: ex.muscleLoads,
-      editHref: `/therapist/exercises/${ex.id}/edit`,
+      editHref: `${portal.base}/exercises/${ex.id}/edit`,
     })
   }
 
@@ -127,7 +129,7 @@ export default function ExercisesPage() {
         <div className="flex items-center justify-between">
           <Kicker>Collecties</Kicker>
           <Link
-            href="/therapist/exercises/collections"
+            href={`${portal.base}/exercises/collections`}
             className="athletic-tap w-6 h-6 rounded flex items-center justify-center"
             style={{ color: P.inkMuted, fontSize: 18, lineHeight: 1 }}
           >
@@ -179,7 +181,7 @@ export default function ExercisesPage() {
 
         <div className="pt-2" style={{ borderTop: `1px solid ${P.line}` }}>
           <Link
-            href="/therapist/exercises/collections"
+            href={`${portal.base}/exercises/collections`}
             className="athletic-mono"
             style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.12em' }}
           >
@@ -245,14 +247,14 @@ export default function ExercisesPage() {
           </div>
           <div className="flex items-center gap-2">
             <DarkButton
-              href="/therapist/exercises/collections"
+              href={`${portal.base}/exercises/collections`}
               size="sm"
               variant="secondary"
             >
               <span className="hidden sm:inline">Collecties</span>
               <span className="sm:hidden inline-flex"><IconFolder size={16} /></span>
             </DarkButton>
-            <DarkButton href="/therapist/exercises/new" size="sm">
+            <DarkButton href={`${portal.base}/exercises/new`} size="sm">
               + <span className="hidden sm:inline ml-1">Nieuwe oefening</span>
             </DarkButton>
           </div>
@@ -467,7 +469,7 @@ export default function ExercisesPage() {
                 exercise={ex}
                 onPreview={() => openPreview(ex)}
                 onToggleFavorite={(id) => toggleFavorite.mutate({ exerciseId: id })}
-                onQuickAdd={(id) => router.push(`/therapist/programs/new?addExerciseId=${id}`)}
+                onQuickAdd={(id) => router.push(`${portal.base}/programs/new?addExerciseId=${id}`)}
               />
             ))}
           </div>
@@ -560,7 +562,7 @@ export default function ExercisesPage() {
                     )}
                   </div>
                   <Link
-                    href={`/therapist/exercises/${ex.id}/edit`}
+                    href={`${portal.base}/exercises/${ex.id}/edit`}
                     onClick={e => e.stopPropagation()}
                     onPointerEnter={() => utils.exercises.get.prefetch({ id: ex.id })}
                     onFocus={() => utils.exercises.get.prefetch({ id: ex.id })}

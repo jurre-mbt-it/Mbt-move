@@ -37,6 +37,9 @@ export type AuditEvent =
   | 'CARDIO_SESSION_LOGGED'
   | 'PAIN_REPORTED'
   | 'CONSENT_CHANGED'
+  // Een coach vraagt een therapeut om mee te kijken bij een atleet; de
+  // atleet keurt de koppeling zelf goed (co-monitoring).
+  | 'CO_MONITOR_REQUESTED'
   | 'DPA_ACCEPTED'
   | 'GHV_ACCEPTED'
   // GDPR
