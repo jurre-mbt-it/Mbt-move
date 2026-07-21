@@ -30,7 +30,11 @@ const createId = () => crypto.randomUUID()
  */
 function scopeFor(user: { id: string; role: string; practiceId: string | null }) {
   if (user.role === 'COACH') return [{ practiceId: null, creatorId: user.id }]
-  return user.practiceId ? [{ practiceId: null }, { practiceId: user.practiceId }] : [{ practiceId: null }]
+  // "Globale seed" = geen praktijk EN niet van een coach. Zonder die tweede
+  // voorwaarde ziet elke therapeut de plannen van elke coach: een coach-plan
+  // heeft immers óók practiceId null.
+  const seeds = { practiceId: null, creator: { role: { not: 'COACH' as const } } }
+  return user.practiceId ? [seeds, { practiceId: user.practiceId }] : [seeds]
 }
 
 /**
@@ -40,14 +44,16 @@ function scopeFor(user: { id: string; role: string; practiceId: string | null })
  */
 function assertCanEdit(
   user: { id: string; role: string; practiceId: string | null },
-  tpl: { practiceId: string | null; creatorId?: string },
+  tpl: { practiceId: string | null; creatorId?: string; creator?: { role: string } | null },
 ) {
   if (user.role === 'ADMIN') return
   if (user.role === 'COACH') {
     if (tpl.creatorId === user.id) return
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Geen toegang tot dit plan' })
   }
-  if (tpl.practiceId === null) return
+  // Seed-tak, maar niet voor plannen van een coach: die zijn privé, ook al
+  // hebben ze geen praktijk.
+  if (tpl.practiceId === null && tpl.creator?.role !== 'COACH') return
   if (user.practiceId && tpl.practiceId === user.practiceId) return
   throw new TRPCError({ code: 'FORBIDDEN', message: 'Geen toegang tot dit plan' })
 }
@@ -524,7 +530,7 @@ export const planTemplatesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const tpl = await ctx.prisma.weekPlanTemplate.findUnique({
         where: { id: input.id },
-        select: { practiceId: true, creatorId: true },
+        select: { practiceId: true, creatorId: true, creator: { select: { role: true } } },
       })
       if (!tpl) throw new TRPCError({ code: 'NOT_FOUND' })
       assertCanEdit(ctx.user, tpl)
@@ -537,7 +543,7 @@ export const planTemplatesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const tpl = await ctx.prisma.weekPlanTemplate.findUnique({
         where: { id: input.id },
-        select: { practiceId: true, creatorId: true },
+        select: { practiceId: true, creatorId: true, creator: { select: { role: true } } },
       })
       if (!tpl) throw new TRPCError({ code: 'NOT_FOUND' })
       assertCanEdit(ctx.user, tpl)
