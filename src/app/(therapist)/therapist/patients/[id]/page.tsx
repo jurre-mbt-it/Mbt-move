@@ -22,6 +22,7 @@ import {
 } from '@/components/dark-ui'
 import { AssignFromTemplateDialog } from '@/components/patients/AssignFromTemplateDialog'
 import { CoMonitorDialog } from '@/components/patients/CoMonitorDialog'
+import { UnlinkDialog } from '@/components/patients/UnlinkDialog'
 import { MonthSummary } from '@/components/patients/MonthSummary'
 import { PerformerToggle, type PerformerFilter } from '@/components/patients/PerformerToggle'
 import { InsightActivationToggle } from '@/components/insights/InsightActivationToggle'
@@ -144,6 +145,7 @@ export default function PatientDetailPage({
     error: string | null
   } | null>(null)
   const [coMonitorOpen, setCoMonitorOpen] = useState(false)
+  const [unlinkOpen, setUnlinkOpen] = useState(false)
   const resendInvite = trpc.invite.resend.useMutation({
     onSuccess: (res) => {
       if (res.mailDelivered) {
@@ -310,6 +312,14 @@ export default function PatientDetailPage({
           {portal.isCoach && (
             <DarkButton variant="secondary" onClick={() => setCoMonitorOpen(true)}>
               Therapeut laten meekijken
+            </DarkButton>
+          )}
+          {/* Loslaten kan alleen je eigen koppeling raken; de atleet houdt zijn
+              account en zijn data. Alleen in het coach-portaal, want in de
+              praktijk loopt afsluiten via de patiëntadministratie. */}
+          {portal.isCoach && (
+            <DarkButton variant="secondary" onClick={() => setUnlinkOpen(true)}>
+              Koppeling verbreken
             </DarkButton>
           )}
           {/* Programma's. Een patient kan er meerdere naast elkaar hebben
@@ -895,6 +905,15 @@ export default function PatientDetailPage({
           patientId={patient.id}
           patientName={patient.name ?? 'deze atleet'}
           onClose={() => setCoMonitorOpen(false)}
+        />
+      )}
+
+      {unlinkOpen && (
+        <UnlinkDialog
+          patientId={patient.id}
+          patientName={patient.name ?? 'deze atleet'}
+          onClose={() => setUnlinkOpen(false)}
+          onDone={() => router.push(portal.patients)}
         />
       )}
     </div>

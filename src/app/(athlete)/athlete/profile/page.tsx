@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { trpc } from '@/lib/trpc/client'
+import { AccessRelations } from '@/components/access/AccessRelations'
 import { computeHrZones } from '@/lib/cardio-zones'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -197,6 +198,14 @@ export default function AthleteProfilePage() {
 
         {/* HR-profiel — voedt de auto-berekende cardio-zones */}
         <HrProfileCard />
+
+        {/* Wie mag jouw gegevens zien. Stond eerder alleen in de patiënt-
+            omgeving, waardoor een atleet een openstaand verzoek van een coach
+            of therapeut nooit kon goedkeuren. */}
+        <div className="flex flex-col gap-2">
+          <Kicker>Wie mag jouw gegevens zien</Kicker>
+          <AccessRelations />
+        </div>
 
         <DarkButton variant="secondary" onClick={handleSignOut} className="w-full">
           UITLOGGEN

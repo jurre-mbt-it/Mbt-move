@@ -1073,7 +1073,12 @@ export const patientsRouter = createTRPCRouter({
       return { success: true }
     }),
 
-  delete: mfaTherapistProcedure
+  /**
+   * Eigen koppeling verbreken. Ook voor een coach: hij kan atleten uitnodigen,
+   * dus hij moet ze ook kunnen loslaten. De query hieronder is al gebonden aan
+   * `therapistId: ctx.user.id`, dus je raakt nooit de koppeling van een ander.
+   */
+  delete: mfaCoachStaffProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       // Alleen actieve relaties (APPROVED of PENDING) mogen via deze knop
