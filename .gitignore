@@ -65,3 +65,7 @@ scripts/backups/
 
 # Muscle-loads backfill audit (generated from live DB, review artifact)
 muscle-loads-audit.json
+exercise-content-final.json
+exercise-content-backup-*.json
+tone-scan.json
+emdash-changes.json
