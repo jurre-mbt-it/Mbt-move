@@ -25,7 +25,7 @@ import { DPA_VERSION } from '@/lib/dpa-constants'
 import { GHV_VERSION } from '@/lib/ghv-constants'
 import { isPersonalModeEnabled } from './personal-mode'
 
-export type RequiredRole = 'THERAPIST' | 'ADMIN' | 'PATIENT' | 'ATHLETE'
+export type RequiredRole = 'THERAPIST' | 'ADMIN' | 'PATIENT' | 'ATHLETE' | 'COACH'
 
 export type SessionUser = {
   id: string
@@ -44,6 +44,7 @@ const ROLE_HOME: Record<RequiredRole, string> = {
   THERAPIST: '/therapist/dashboard',
   PATIENT: '/patient/dashboard',
   ATHLETE: '/athlete/dashboard',
+  COACH: '/coach/dashboard',
 }
 
 /** Rollen die de DPA (Verwerkingsovereenkomst) moeten accepteren vóór ze

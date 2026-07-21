@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { createTRPCRouter, therapistProcedure, protectedProcedure } from '@/server/trpc'
+import { createTRPCRouter, coachStaffProcedure, protectedProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
 import { mondayKey, mondayKeyOf, addDaysKey, amsMidnight, weeksBetween, isDateKey } from '@/lib/week-dates'
 import { parseStructured, legacySummaryFields, structuredLoad } from '@/lib/cardio-workout'
@@ -37,10 +37,14 @@ async function assertPatientLink(
   // Defense-in-depth: de praktijk-tak mag ALLEEN voor THERAPIST gelden
   // (patiënten/atleten delen de practiceId). Self- en admin-toegang zijn
   // hierboven al afgehandeld; vangnet tegen toekomstige regressie.
-  if (user.role !== 'THERAPIST') {
+  if (user.role !== 'THERAPIST' && user.role !== 'COACH') {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Geen actieve koppeling met deze patiënt' })
   }
-  // Toegang = directe PatientTherapist-relatie OF zelfde praktijk.
+  // Toegang = directe PatientTherapist-relatie OF zelfde praktijk. De
+  // praktijk-tak geldt alleen voor een therapeut; een coach heeft geen
+  // praktijk en komt uitsluitend via de directe koppeling binnen.
+  const viaPractice =
+    user.role === 'THERAPIST' && user.practiceId ? [{ practiceId: user.practiceId }] : []
   const ok = await prisma.user.findFirst({
     where: {
       id: patientId,
@@ -50,7 +54,7 @@ async function assertPatientLink(
             some: { therapistId: user.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
           },
         },
-        ...(user.practiceId ? [{ practiceId: user.practiceId }] : []),
+        ...viaPractice,
       ],
     },
     select: { id: true },
@@ -165,7 +169,7 @@ async function syncDayProgramId(prisma: PrismaClient, dayId: string) {
 }
 
 export const weekSchedulesRouter = createTRPCRouter({
-  list: therapistProcedure
+  list: coachStaffProcedure
     .input(z.object({ patientId: z.string().optional(), isTemplate: z.boolean().optional() }).optional())
     .query(async ({ ctx, input }) => {
       const isAdmin = ctx.user.role === 'ADMIN'
@@ -204,7 +208,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       })
     }),
 
-  get: therapistProcedure
+  get: coachStaffProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const ws = await ctx.prisma.weekSchedule.findUnique({
@@ -243,7 +247,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       return ws
     }),
 
-  create: therapistProcedure
+  create: coachStaffProcedure
     .input(z.object({
       name: z.string().min(1).max(200),
       description: z.string().max(2000).optional(),
@@ -306,7 +310,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       })
     }),
 
-  save: therapistProcedure
+  save: coachStaffProcedure
     .input(z.object({
       id: z.string(),
       name: z.string().min(1).max(200),
@@ -432,7 +436,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       })
     }),
 
-  delete: therapistProcedure
+  delete: coachStaffProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const existing = await ctx.prisma.weekSchedule.findFirst({ where: { id: input.id, creatorId: ctx.user.id } })
@@ -445,7 +449,7 @@ export const weekSchedulesRouter = createTRPCRouter({
    * Maakt het week-schedule automatisch aan als 't nog niet bestaat.
    * Geeft `programId: null` mee om de dag leeg te maken.
    */
-  setDayProgram: therapistProcedure
+  setDayProgram: coachStaffProcedure
     .input(z.object({
       patientId: z.string(),
       dayOfWeek: z.number().int().min(0).max(6),
@@ -527,7 +531,7 @@ export const weekSchedulesRouter = createTRPCRouter({
    * Volledige details van één SessionLog — voor de detail-popup in
    * de week-planner. Inclusief exerciseLogs + namen van de oefeningen.
    */
-  sessionDetails: therapistProcedure
+  sessionDetails: coachStaffProcedure
     .input(z.object({ sessionId: z.string() }))
     .query(async ({ ctx, input }) => {
       const session = await ctx.prisma.sessionLog.findUnique({
@@ -580,7 +584,7 @@ export const weekSchedulesRouter = createTRPCRouter({
    * de week-planner alleen 'deze week' tonen voor patienten zonder
    * Program of WeekSchedule.
    */
-  firstActivityDate: therapistProcedure
+  firstActivityDate: coachStaffProcedure
     .input(z.object({ patientId: z.string() }))
     .query(async ({ ctx, input }) => {
       await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
@@ -598,7 +602,7 @@ export const weekSchedulesRouter = createTRPCRouter({
    * wat gepland was, wat afgerond is, en welke eigen workouts erbij
    * gedaan zijn.
    */
-  sessionsInRange: therapistProcedure
+  sessionsInRange: coachStaffProcedure
     .input(z.object({
       patientId: z.string(),
       from: z.string(), // ISO timestamp — start van de week (Ma 00:00 local)
@@ -663,7 +667,7 @@ export const weekSchedulesRouter = createTRPCRouter({
    * (CardioLog i.p.v. SessionLog) — de week-planner gebruikt dit om geplande
    * cardio-items af te vinken en ad-hoc cardio als tile te tonen.
    */
-  cardioInRange: therapistProcedure
+  cardioInRange: coachStaffProcedure
     .input(z.object({
       patientId: z.string(),
       from: z.string(), // ISO timestamp — inclusief
@@ -697,7 +701,7 @@ export const weekSchedulesRouter = createTRPCRouter({
    * programId IS NULL). Voor de week-planner-overview zodat ad-hoc
    * trainingen ook zichtbaar zijn naast de geplande programma's.
    */
-  recentExtraSessions: therapistProcedure
+  recentExtraSessions: coachStaffProcedure
     .input(z.object({
       patientId: z.string(),
       days: z.number().int().min(1).max(120).default(30),
@@ -746,7 +750,7 @@ export const weekSchedulesRouter = createTRPCRouter({
    * een patient. Maakt de week-rij aan als die nog niet bestaat (7 lege dagen),
    * zodat je een fase kunt plannen vóór er workouts in staan.
    */
-  setWeekMeta: therapistProcedure
+  setWeekMeta: coachStaffProcedure
     .input(z.object({
       patientId: z.string(),
       weekNumber: z.number().int().min(1),
@@ -803,7 +807,7 @@ export const weekSchedulesRouter = createTRPCRouter({
   /**
    * Verwijder één weekNumber voor een patient.
    */
-  deleteWeek: therapistProcedure
+  deleteWeek: coachStaffProcedure
     .input(z.object({
       patientId: z.string(),
       weekNumber: z.number().int().min(1),
@@ -902,7 +906,7 @@ export const weekSchedulesRouter = createTRPCRouter({
    * Merged met bestaande schedule: overschrijft de geselecteerde dagen, laat andere dagen
    * intact. Als er nog geen schedule bestaat voor de patient, wordt er eentje aangemaakt.
    */
-  scheduleProgram: therapistProcedure
+  scheduleProgram: coachStaffProcedure
     .input(
       z.object({
         programId: z.string(),
@@ -1032,7 +1036,7 @@ export const weekSchedulesRouter = createTRPCRouter({
    * UI-laag mapt later van programId naar items voor de oude shape; nieuwe UI
    * gebruikt items[] direct.
    */
-  listWithItems: therapistProcedure
+  listWithItems: coachStaffProcedure
     .input(z.object({ patientId: z.string().optional(), isTemplate: z.boolean().optional() }).optional())
     .query(async ({ ctx, input }) => {
       const isAdmin = ctx.user.role === 'ADMIN'
@@ -1078,7 +1082,7 @@ export const weekSchedulesRouter = createTRPCRouter({
    * te vermijden). Client groepeert op itemId. cardioParams wordt hier
    * gecast naar een begrensd type (geen recursief Prisma JsonValue → geen TS2589).
    */
-  listItemContents: therapistProcedure
+  listItemContents: coachStaffProcedure
     .input(z.object({ patientId: z.string() }))
     .query(async ({ ctx, input }) => {
       await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
@@ -1141,7 +1145,7 @@ export const weekSchedulesRouter = createTRPCRouter({
    * Server bepaalt `order` automatisch (laatste positie binnen die dag).
    * Authorisatie: alleen owner van het schedule of ADMIN of zelfde-praktijk.
    */
-  addItem: therapistProcedure
+  addItem: coachStaffProcedure
     .input(z.discriminatedUnion('kind', [
       z.object({
         kind: z.literal('program'),
@@ -1270,7 +1274,7 @@ export const weekSchedulesRouter = createTRPCRouter({
     }),
 
   /** Velden van een item bewerken (naam, duur, notes, order). */
-  updateItem: therapistProcedure
+  updateItem: coachStaffProcedure
     .input(z.object({
       id: z.string(),
       quickName: z.string().min(1).max(120).optional(),
@@ -1310,7 +1314,7 @@ export const weekSchedulesRouter = createTRPCRouter({
    * quick-item uit naam/categorie/duur en liet de oefeningen, de cardio-blokken,
    * de activiteit en de geplande belasting vallen.
    */
-  duplicateItem: therapistProcedure
+  duplicateItem: coachStaffProcedure
     .input(z.object({ itemId: z.string(), toDayId: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const item = await ctx.prisma.weekScheduleDayItem.findUnique({
@@ -1348,7 +1352,7 @@ export const weekSchedulesRouter = createTRPCRouter({
     }),
 
   /** Item verwijderen. */
-  removeItem: therapistProcedure
+  removeItem: coachStaffProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const item = await ctx.prisma.weekScheduleDayItem.findUnique({
@@ -1376,7 +1380,7 @@ export const weekSchedulesRouter = createTRPCRouter({
    * maar `day.programId` heeft een legacy waarde. Klik op X in de UI roept
    * deze procedure aan ipv removeItem.
    */
-  clearLegacyDay: therapistProcedure
+  clearLegacyDay: coachStaffProcedure
     .input(z.object({ dayId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const day = await ctx.prisma.weekScheduleDay.findUnique({
@@ -1405,7 +1409,7 @@ export const weekSchedulesRouter = createTRPCRouter({
    * Input is een list van (itemId, dayId, order). UI gebruikt dit voor
    * drag-drop binnen een dag én tussen dagen.
    */
-  reorderItems: therapistProcedure
+  reorderItems: coachStaffProcedure
     .input(z.object({
       moves: z.array(z.object({
         itemId: z.string(),
@@ -1459,7 +1463,7 @@ export const weekSchedulesRouter = createTRPCRouter({
    * Doel-week behoudt eigen bestaande items NIET — wordt vervangen indien `replace=true`,
    * anders wordt er een 409 teruggegeven als doel niet leeg is.
    */
-  duplicateWeek: therapistProcedure
+  duplicateWeek: coachStaffProcedure
     .input(z.object({
       patientId: z.string(),
       /**
@@ -1672,7 +1676,7 @@ export const weekSchedulesRouter = createTRPCRouter({
    * week-planner: de UI mapt elke bron-dag naar een doel-datum (zelfde offset)
    * en levert de paren als (fromDayId → toDayId) aan.
    */
-  copyDayItems: therapistProcedure
+  copyDayItems: coachStaffProcedure
     .input(z.object({
       pairs: z.array(z.object({
         fromDayId: z.string(),
@@ -1739,7 +1743,7 @@ export const weekSchedulesRouter = createTRPCRouter({
    * quick-items worden een leeg sjabloon (naam ingevuld) dat de therapeut later
    * vult in de programma-editor.
    */
-  saveItemAsTemplate: therapistProcedure
+  saveItemAsTemplate: coachStaffProcedure
     .input(z.object({
       itemId: z.string(),
       name: z.string().min(1).optional(),
@@ -1890,7 +1894,7 @@ export const weekSchedulesRouter = createTRPCRouter({
    * Vervang de inline-oefeningen van een quick-workout-item (replace-all). De
    * UI beheert de lijst lokaal en slaat 'm in één keer op. Volgorde = array-index.
    */
-  setItemExercises: therapistProcedure
+  setItemExercises: coachStaffProcedure
     .input(z.object({
       itemId: z.string(),
       exercises: z.array(z.object({
@@ -2006,7 +2010,7 @@ export const weekSchedulesRouter = createTRPCRouter({
     }),
 
   /** Zet/wis de cardio-parameters (JSON) van een quick CARDIO-workout-item. */
-  setItemCardio: therapistProcedure
+  setItemCardio: coachStaffProcedure
     .input(z.object({
       itemId: z.string(),
       // JSON-blob. Twee vormen leven hier naast elkaar:

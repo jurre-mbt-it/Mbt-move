@@ -265,10 +265,17 @@ const MFA_CHALLENGE_MESSAGE =
  * check sluit dat server-side. Patiënten/atleten en nog-niet-geënrolde staff
  * (mfaEnabled=false, sessie blijft aal1) worden niet geraakt.
  */
+/**
+ * Rollen met inzage in gezondheidsdata van anderen. COACH hoort hierbij: een
+ * coach ziet het dossier van zijn atleten, dus gelden dezelfde MFA-eisen als
+ * voor een therapeut.
+ */
+const STAFF_ROLES: ReadonlySet<string> = new Set(['THERAPIST', 'ADMIN', 'COACH'])
+
 function assertMfaSatisfied(ctx: Context) {
   const u = ctx.user
   if (!u) return
-  const isStaff = u.role === 'THERAPIST' || u.role === 'ADMIN'
+  const isStaff = STAFF_ROLES.has(u.role)
   if (isStaff && u.mfaEnabled && ctx.aal !== 'aal2') {
     throw new TRPCError({ code: 'FORBIDDEN', message: MFA_CHALLENGE_MESSAGE })
   }
@@ -288,7 +295,7 @@ const MFA_ENROLL_REQUIRED_MESSAGE =
 function assertStaffMfaEnrolled(ctx: Context) {
   const u = ctx.user
   if (!u) return
-  if ((u.role === 'THERAPIST' || u.role === 'ADMIN') && !u.mfaEnabled) {
+  if (STAFF_ROLES.has(u.role) && !u.mfaEnabled) {
     throw new TRPCError({ code: 'FORBIDDEN', message: MFA_ENROLL_REQUIRED_MESSAGE })
   }
 }
@@ -302,10 +309,28 @@ export const therapistProcedure = protectedProcedure.use(({ ctx, next }) => {
   return next({ ctx })
 })
 
+/**
+ * Therapeut, coach of admin. Voor de gedeelde begeleidingsfuncties: atleten
+ * inzien/monitoren, programma's, weekschema's, plan-sjablonen, berichten.
+ *
+ * NIET gebruiken voor klinische schrijf-acties (behandeling loggen,
+ * assessments, test-reports, revalidatie-protocol, hardloopanalyse) — die
+ * blijven op `therapistProcedure`. Zie docs/plan-coach-role-20260721.md.
+ */
+export const coachStaffProcedure = protectedProcedure.use(({ ctx, next }) => {
+  const role = ctx.user!.role
+  if (role !== 'THERAPIST' && role !== 'COACH' && role !== 'ADMIN') {
+    throw new TRPCError({ code: 'FORBIDDEN' })
+  }
+  assertStaffMfaEnrolled(ctx)
+  assertMfaSatisfied(ctx)
+  return next({ ctx })
+})
+
 /** Therapist OR Athlete — both can create exercises */
 export const creatorProcedure = protectedProcedure.use(({ ctx, next }) => {
   const role = ctx.user!.role
-  if (role !== 'THERAPIST' && role !== 'ATHLETE' && role !== 'ADMIN') {
+  if (role !== 'THERAPIST' && role !== 'ATHLETE' && role !== 'COACH' && role !== 'ADMIN') {
     throw new TRPCError({ code: 'FORBIDDEN' })
   }
   // Staff (THERAPIST/ADMIN) moet geënrold zijn; ATHLETE valt hierbuiten.
@@ -345,6 +370,18 @@ export const mfaRequiredProcedure = protectedProcedure.use(async ({ ctx, next })
  * Therapist OR admin met MFA aan. Gebruik voor gevoelige therapist-mutations
  * zoals patient-delete, program-delete, invite-create, role-changes.
  */
+/** Zelfde MFA-eis als mfaTherapistProcedure, maar ook voor een coach. */
+export const mfaCoachStaffProcedure = coachStaffProcedure.use(async ({ ctx, next }) => {
+  const user = await ctx.prisma.user.findUnique({
+    where: { id: ctx.user!.id },
+    select: { mfaEnabled: true },
+  })
+  if (!user?.mfaEnabled) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: MFA_REQUIRED_MESSAGE })
+  }
+  return next({ ctx })
+})
+
 export const mfaTherapistProcedure = therapistProcedure.use(async ({ ctx, next }) => {
   const user = await ctx.prisma.user.findUnique({
     where: { id: ctx.user!.id },

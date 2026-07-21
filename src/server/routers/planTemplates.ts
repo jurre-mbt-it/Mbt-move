@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { createTRPCRouter, therapistProcedure } from '@/server/trpc'
+import { createTRPCRouter, coachStaffProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
 import type { PrismaClient } from '@prisma/client'
 import { copyItemToDay, COPY_ITEM_INCLUDE } from './weekSchedules'
@@ -20,17 +20,33 @@ const createId = () => crypto.randomUUID()
  */
 
 // ── Scope ────────────────────────────────────────────────────────────────
-/** Reads: globale seeds (practiceId NULL) + eigen praktijk. Zie testReports.ts. */
-function practiceScope(practiceId: string | null) {
-  return practiceId ? [{ practiceId: null }, { practiceId }] : [{ practiceId: null }]
+/**
+ * Reads: globale seeds (practiceId NULL) + eigen praktijk. Zie testReports.ts.
+ *
+ * Een COACH hoort niet bij een praktijk. Zonder eigen tak zou die alleen de
+ * globale seeds zien en zouden zijn eigen plannen (die immers practiceId null
+ * krijgen) bij álle praktijken opduiken. Daarom scopet een coach op zijn eigen
+ * `creatorId`: globale seeds lezen mag, de rest is van hemzelf.
+ */
+function scopeFor(user: { id: string; role: string; practiceId: string | null }) {
+  if (user.role === 'COACH') return [{ practiceId: null, creatorId: user.id }]
+  return user.practiceId ? [{ practiceId: null }, { practiceId: user.practiceId }] : [{ practiceId: null }]
 }
 
-/** Writes: globale seeds zijn in de single-clinic realiteit ook bewerkbaar. */
+/**
+ * Writes: globale seeds zijn in de single-clinic realiteit ook bewerkbaar door
+ * een therapeut. Een coach mag uitsluitend zijn eigen plannen bewerken; anders
+ * zou hij via de seed-tak de sjablonen van de praktijk kunnen aanpassen.
+ */
 function assertCanEdit(
-  user: { role: string; practiceId: string | null },
-  tpl: { practiceId: string | null },
+  user: { id: string; role: string; practiceId: string | null },
+  tpl: { practiceId: string | null; creatorId?: string },
 ) {
   if (user.role === 'ADMIN') return
+  if (user.role === 'COACH') {
+    if (tpl.creatorId === user.id) return
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Geen toegang tot dit plan' })
+  }
   if (tpl.practiceId === null) return
   if (user.practiceId && tpl.practiceId === user.practiceId) return
   throw new TRPCError({ code: 'FORBIDDEN', message: 'Geen toegang tot dit plan' })
@@ -43,7 +59,7 @@ async function assertPatientLink(
 ) {
   if (user.role === 'ADMIN') return
   if (patientId === user.id) return
-  if (user.role !== 'THERAPIST') {
+  if (user.role !== 'THERAPIST' && user.role !== 'COACH') {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Geen actieve koppeling met deze patiënt' })
   }
   const ok = await prisma.user.findFirst({
@@ -51,7 +67,8 @@ async function assertPatientLink(
       id: patientId,
       OR: [
         { patientTherapists: { some: { therapistId: user.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } } } },
-        ...(user.practiceId ? [{ practiceId: user.practiceId }] : []),
+        // Praktijk-tak alleen voor therapeuten; een coach heeft geen praktijk.
+        ...(user.role === 'THERAPIST' && user.practiceId ? [{ practiceId: user.practiceId }] : []),
       ],
     },
     select: { id: true },
@@ -84,9 +101,9 @@ const modeEnum = z.enum(['merge', 'replace'])
 
 export const planTemplatesRouter = createTRPCRouter({
   /** Sjablonen van eigen praktijk + globale seeds, met korte samenvatting. */
-  list: therapistProcedure.query(async ({ ctx }) => {
+  list: coachStaffProcedure.query(async ({ ctx }) => {
     const templates = await ctx.prisma.weekPlanTemplate.findMany({
-      where: { OR: practiceScope(ctx.user.practiceId) },
+      where: { OR: scopeFor(ctx.user) },
       orderBy: [{ updatedAt: 'desc' }],
       include: {
         schedules: {
@@ -131,11 +148,11 @@ export const planTemplatesRouter = createTRPCRouter({
   }),
 
   /** Volledig sjabloon incl. weken/dagen/items — voor beheer en preview. */
-  get: therapistProcedure
+  get: coachStaffProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const tpl = await ctx.prisma.weekPlanTemplate.findFirst({
-        where: { id: input.id, OR: practiceScope(ctx.user.practiceId) },
+        where: { id: input.id, OR: scopeFor(ctx.user) },
         include: {
           schedules: {
             orderBy: { weekNumber: 'asc' },
@@ -167,7 +184,7 @@ export const planTemplatesRouter = createTRPCRouter({
    * dit is ook de enige betrouwbare sleutel. Schedules die dezelfde maandag
    * delen worden samengevoegd tot één sjabloon-week.
    */
-  saveFromWeeks: therapistProcedure
+  saveFromWeeks: coachStaffProcedure
     .input(z.object({
       patientId: z.string(),
       /** ISO-dagen (YYYY-MM-DD); de maandagen eromheen bepalen het bereik. */
@@ -301,7 +318,7 @@ export const planTemplatesRouter = createTRPCRouter({
    * (botst met Function.prototype.apply) en laat de router al bij het opbouwen
    * crashen.
    */
-  applyToPatient: therapistProcedure
+  applyToPatient: coachStaffProcedure
     .input(z.object({
       templateId: z.string(),
       patientId: z.string(),
@@ -314,7 +331,7 @@ export const planTemplatesRouter = createTRPCRouter({
       await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
 
       const tpl = await ctx.prisma.weekPlanTemplate.findFirst({
-        where: { id: input.templateId, OR: practiceScope(ctx.user.practiceId) },
+        where: { id: input.templateId, OR: scopeFor(ctx.user) },
         include: {
           schedules: {
             orderBy: { weekNumber: 'asc' },
@@ -493,7 +510,7 @@ export const planTemplatesRouter = createTRPCRouter({
       }
     }),
 
-  update: therapistProcedure
+  update: coachStaffProcedure
     .input(z.object({
       id: z.string(),
       name: z.string().min(1).max(200).optional(),
@@ -503,7 +520,7 @@ export const planTemplatesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const tpl = await ctx.prisma.weekPlanTemplate.findUnique({
         where: { id: input.id },
-        select: { practiceId: true },
+        select: { practiceId: true, creatorId: true },
       })
       if (!tpl) throw new TRPCError({ code: 'NOT_FOUND' })
       assertCanEdit(ctx.user, tpl)
@@ -511,12 +528,12 @@ export const planTemplatesRouter = createTRPCRouter({
       return ctx.prisma.weekPlanTemplate.update({ where: { id }, data })
     }),
 
-  delete: therapistProcedure
+  delete: coachStaffProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const tpl = await ctx.prisma.weekPlanTemplate.findUnique({
         where: { id: input.id },
-        select: { practiceId: true },
+        select: { practiceId: true, creatorId: true },
       })
       if (!tpl) throw new TRPCError({ code: 'NOT_FOUND' })
       assertCanEdit(ctx.user, tpl)

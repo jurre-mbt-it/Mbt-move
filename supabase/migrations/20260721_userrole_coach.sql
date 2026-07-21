@@ -1,0 +1,11 @@
+-- COACH-rol: coaching-omgeving naast de praktijk (zie docs/plan-coach-role-20260721.md).
+--
+-- Een coach is een User met role = 'COACH' en practiceId = NULL. Doordat een
+-- coach nooit een praktijk heeft, blijven alle praktijk-takken in de
+-- toegangschecks vanzelf dicht: een coach ziet uitsluitend expliciet
+-- gekoppelde atleten (PatientTherapist), en praktijk-therapeuten zien
+-- coach-atleten niet.
+--
+-- LET OP: ALTER TYPE ... ADD VALUE moet in een eigen migratie/transactie, en
+-- moet gedraaid zijn VOORDAT code deployt die 'COACH' schrijft.
+ALTER TYPE "UserRole" ADD VALUE IF NOT EXISTS 'COACH';

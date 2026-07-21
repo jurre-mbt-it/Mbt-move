@@ -2,7 +2,14 @@ import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
 import type { PrismaClient } from '@prisma/client'
-import { createTRPCRouter, therapistProcedure, mfaTherapistProcedure } from '@/server/trpc'
+import {
+  createTRPCRouter,
+  therapistProcedure,
+  coachStaffProcedure,
+  mfaCoachStaffProcedure,
+  mfaTherapistProcedure,
+} from '@/server/trpc'
+import { hasPatientAccess } from '@/server/lib/patient-access'
 import { auditLog } from '@/server/audit'
 import { deriveTopSet, estimateOneRepMax } from '@/lib/one-rep-max'
 import { clampSessionDurationSec } from '@/lib/training-load'
@@ -18,41 +25,11 @@ const PENDING_INVITE_NOTE = 'Aangemaakt via invite — wacht op acceptatie'
 
 /**
  * Toegang tot een patient = directe PatientTherapist-koppeling, OF dezelfde
- * praktijk als de patient. ADMIN krijgt altijd toegang.
+ * praktijk als de patient (therapeut). Coaches: alleen directe koppeling.
+ * De regel zelf staat in src/server/lib/patient-access.ts — niet dupliceren.
  */
-async function hasPatientAccess(
-  prisma: PrismaClient,
-  user: { id: string; role: string; practiceId: string | null },
-  patientId: string,
-): Promise<boolean> {
-  if (user.role === 'ADMIN') return true
-  // Defense-in-depth: de praktijk-tak hieronder mag ALLEEN voor THERAPIST gelden
-  // (patiënten/atleten delen de practiceId van hun therapeut). Vangnet tegen
-  // toekomstige regressie mocht een non-therapist deze helper ooit bereiken.
-  if (user.role !== 'THERAPIST') return false
-  const found = await prisma.user.findFirst({
-    where: {
-      id: patientId,
-      OR: [
-        {
-          patientTherapists: {
-            some: {
-              therapistId: user.id,
-              isActive: true,
-              status: { in: ['APPROVED', 'PENDING'] },
-            },
-          },
-        },
-        ...(user.practiceId ? [{ practiceId: user.practiceId }] : []),
-      ],
-    },
-    select: { id: true },
-  })
-  return !!found
-}
-
 export const patientsRouter = createTRPCRouter({
-  list: therapistProcedure.query(async ({ ctx }) => {
+  list: coachStaffProcedure.query(async ({ ctx }) => {
     // Zichtbaar = directe koppeling (PatientTherapist) OF zelfde praktijk.
     // Dat laatste laat collega-therapeuten binnen één praktijk elkaars
     // patiënten zien zonder aparte invite.
@@ -176,7 +153,7 @@ export const patientsRouter = createTRPCRouter({
     })
   }),
 
-  get: therapistProcedure
+  get: coachStaffProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const me = ctx.user
@@ -285,7 +262,7 @@ export const patientsRouter = createTRPCRouter({
     }),
 
   // ── Belasting-curve van een patiënt (fitness-fatigue, kracht + cardio) ───
-  loadCurve: therapistProcedure
+  loadCurve: coachStaffProcedure
     .input(z.object({
       patientId: z.string(),
       days: z.number().int().min(28).max(365).default(120),
@@ -304,7 +281,7 @@ export const patientsRouter = createTRPCRouter({
    * één call i.p.v. N per-patiënt queries. Scope = zelfde als patients.list
    * (directe koppeling OF zelfde praktijk).
    */
-  therapistDashboard: therapistProcedure
+  therapistDashboard: coachStaffProcedure
     .input(z.object({
       // Lokale grenzen van de client — server doet geen tijdzone-aannames
       // (zelfde patroon als weekSchedules.sessionsInRange).
@@ -583,7 +560,7 @@ export const patientsRouter = createTRPCRouter({
    * zijbalk op het dashboard. Discriminated union op `type`, zelfde shapes
    * als recentSessions/recentCardioSessions zodat de UI-weergave matcht.
    */
-  activityDetail: therapistProcedure
+  activityDetail: coachStaffProcedure
     .input(z.object({
       type: z.enum(['strength', 'cardio', 'wellness', 'pain']),
       id: z.string(),
@@ -756,7 +733,7 @@ export const patientsRouter = createTRPCRouter({
    * private notities van de behandelend therapeut. Toegankelijk voor de
    * gekoppelde therapeut of een collega binnen dezelfde praktijk.
    */
-  update: therapistProcedure
+  update: coachStaffProcedure
     .input(z.object({
       id: z.string(),
       name: z.string().min(1, 'Naam is verplicht').optional(),
@@ -867,7 +844,7 @@ export const patientsRouter = createTRPCRouter({
    * Supabase-auth-user van een bestaande patiënt verwijderen — een gevoelige
    * actie die niet onder de MFA-drempel uit mag.
    */
-  invite: mfaTherapistProcedure
+  invite: mfaCoachStaffProcedure
     .input(
       z.object({
         email: z.string().email('Ongeldig e-mailadres'),
@@ -986,7 +963,7 @@ export const patientsRouter = createTRPCRouter({
     }),
 
   // MFA vereist: verwijdert de bestaande Supabase-auth-user vóór her-invite.
-  resendInvite: mfaTherapistProcedure
+  resendInvite: mfaCoachStaffProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const relation = await ctx.prisma.patientTherapist.findFirst({
@@ -1356,7 +1333,7 @@ export const patientsRouter = createTRPCRouter({
    * Uitgebreide patient-dashboard data voor therapist: sessie-historie,
    * load-metrics bron, frequentie en meest-gedane oefeningen.
    */
-  getDashboardData: therapistProcedure
+  getDashboardData: coachStaffProcedure
     .input(z.object({ patientId: z.string() }))
     .query(async ({ ctx, input }) => {
       if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.patientId))) {
@@ -1450,7 +1427,7 @@ export const patientsRouter = createTRPCRouter({
   // De patiënt kan via "Pijn rapporteren" een NRS-melding insturen. Die werd
   // wél opgeslagen (PainEntry) maar nergens aan de therapeut getoond — dit is
   // het lees-pad zodat de melding daadwerkelijk bij de behandelaar landt.
-  getPainEntries: therapistProcedure
+  getPainEntries: coachStaffProcedure
     .input(
       z.object({
         patientId: z.string(),
@@ -1488,7 +1465,7 @@ export const patientsRouter = createTRPCRouter({
     }),
 
   // ── Voortgangsdata voor therapist ────────────────────────────────────────
-  getProgress: therapistProcedure
+  getProgress: coachStaffProcedure
     .input(z.object({ patientId: z.string() }))
     .query(async ({ ctx, input }) => {
       if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.patientId))) {
@@ -1582,7 +1559,7 @@ export const patientsRouter = createTRPCRouter({
   // Eerder leverde deze endpoint PII van alle patiënten in de DB op — zie
   // security review #6.
   /** Laatste N gelogde sessies van deze patient, voor de geschiedenis-tab. */
-  recentSessions: therapistProcedure
+  recentSessions: coachStaffProcedure
     .input(z.object({
       patientId: z.string(),
       limit: z.number().int().min(1).max(50).default(5),
@@ -1684,7 +1661,7 @@ export const patientsRouter = createTRPCRouter({
    * recentSessions omdat cardio in een eigen tabel (CardioLog) zit met een
    * andere shape (tijd/afstand/tempo/HR/zone i.p.v. sets/reps/gewicht).
    */
-  recentCardioSessions: therapistProcedure
+  recentCardioSessions: coachStaffProcedure
     .input(z.object({
       patientId: z.string(),
       limit: z.number().int().min(1).max(50).default(10),
@@ -1741,7 +1718,7 @@ export const patientsRouter = createTRPCRouter({
       }))
     }),
 
-  search: therapistProcedure
+  search: coachStaffProcedure
     .input(z.object({ query: z.string().optional() }))
     .query(async ({ ctx, input }) => {
       const baseWhere = {
