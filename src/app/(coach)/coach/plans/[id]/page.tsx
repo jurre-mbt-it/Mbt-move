@@ -198,7 +198,10 @@ function AddItemDialog({
   const [mode, setMode] = useState<'quick' | 'program'>('quick')
   const [name, setName] = useState('')
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]['value']>('STRENGTH')
-  const [minutes, setMinutes] = useState(45)
+  // Zie de opmerking bij het weken-veld: tijdens het typen niet klemmen,
+  // anders kun je het veld niet leegmaken om een ander getal in te tikken.
+  const [minutesText, setMinutesText] = useState('45')
+  const minutes = Math.min(600, Math.max(1, Number(minutesText) || 1))
   const [programId, setProgramId] = useState('')
 
   // Cast naar de minimale vorm: het volle programma-type is een diep geneste
@@ -295,8 +298,9 @@ function AddItemDialog({
                     type="number"
                     min={1}
                     max={600}
-                    value={minutes}
-                    onChange={(e) => setMinutes(Number(e.target.value))}
+                    value={minutesText}
+                    onChange={(e) => setMinutesText(e.target.value)}
+                    onBlur={() => setMinutesText(String(minutes))}
                   />
                 </div>
               </div>

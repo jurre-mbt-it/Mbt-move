@@ -282,7 +282,11 @@ function NewPlanDialog({ onClose }: { onClose: () => void }) {
   const router = useRouter()
   const utils = trpc.useUtils()
   const [name, setName] = useState('')
-  const [weeks, setWeeks] = useState(4)
+  // Als tekst bijhouden, niet als getal: klemmen tijdens het typen maakt het
+  // veld onbruikbaar (je kunt de bestaande cijfers niet weg, en "12" achter een
+  // "1" werd 112 en dus 24). Klemmen gebeurt bij verlaten en bij opslaan.
+  const [weeksText, setWeeksText] = useState('4')
+  const weeks = Math.min(24, Math.max(1, Number(weeksText) || 1))
 
   const create = trpc.planTemplates.createEmpty.useMutation({
     onSuccess: (r) => {
@@ -326,8 +330,9 @@ function NewPlanDialog({ onClose }: { onClose: () => void }) {
               type="number"
               min={1}
               max={24}
-              value={weeks}
-              onChange={(e) => setWeeks(Math.min(24, Math.max(1, Number(e.target.value) || 1)))}
+              value={weeksText}
+              onChange={(e) => setWeeksText(e.target.value)}
+              onBlur={() => setWeeksText(String(weeks))}
             />
           </div>
           <div className="flex justify-end gap-2">
