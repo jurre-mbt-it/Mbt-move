@@ -152,6 +152,34 @@ function startOfDayUTCLocal(dateStr: string): Date {
 
 type Db = Pick<PrismaClient, 'wearableConnection' | 'cardioLog' | 'sleepEntry' | 'vitalsEntry' | 'stressEntry' | 'user'>
 
+/**
+ * Max-HR bepalen met een extra vangnet. `resolveMaxHr` kent alleen het profiel
+ * (expliciete max-HR) en de leeftijd; ontbreken die allebei, dan viel de hele
+ * dag-hartslag stil weg en kreeg zo'n gebruiker nooit stress-data. Als laatste
+ * redmiddel nemen we de hoogst GEMETEN workout-hartslag. Boven 210 bpm gaan we
+ * uit van een sensor-artefact en negeren we de waarde.
+ */
+async function resolveMaxHrWithMeasured(
+  prisma: Db,
+  userId: string,
+  profile: { maxHeartRate: number | null; restingHeartRate: number | null; dateOfBirth: Date | null } | null,
+): Promise<{ maxHr: number; method: string } | null> {
+  const fromProfile = resolveMaxHr({
+    maxHeartRate: profile?.maxHeartRate,
+    restingHeartRate: profile?.restingHeartRate,
+    dateOfBirth: profile?.dateOfBirth,
+  })
+  if (fromProfile) return fromProfile
+
+  const measured = await prisma.cardioLog.findFirst({
+    where: { patientId: userId, maxHeartRate: { gte: 120, lte: 210 } },
+    orderBy: { maxHeartRate: 'desc' },
+    select: { maxHeartRate: true },
+  })
+  if (measured?.maxHeartRate) return { maxHr: measured.maxHeartRate, method: 'MEASURED' }
+  return null
+}
+
 export async function ingestWearableData(
   prisma: Db,
   userId: string,
@@ -323,12 +351,15 @@ export async function ingestWearableData(
   }
 
   // ── Stress → StressEntry (server-side %HRR, HRmax uit profiel/leeftijd) ───
-  // Alleen als we een max-HR kunnen bepalen (expliciet of via geboortedatum).
-  const maxHrRes = resolveMaxHr({
-    maxHeartRate: profile?.maxHeartRate,
-    restingHeartRate: profile?.restingHeartRate,
-    dateOfBirth: profile?.dateOfBirth,
-  })
+  // Zonder max-HR kunnen we geen %HRR rekenen. Dat is nu een expliciete,
+  // zichtbare uitkomst i.p.v. stil verlies (zie resolveMaxHrWithMeasured).
+  const maxHrRes = await resolveMaxHrWithMeasured(prisma, userId, profile)
+  if (!maxHrRes && payload.hrIntraday.length > 0) {
+    console.warn(
+      '[wearables] dag-hartslag overgeslagen: geen max-HR te bepalen (geen profiel-max, geen geboortedatum, geen gemeten workout-HR)',
+      { userId, days: payload.hrIntraday.length },
+    )
+  }
   if (maxHrRes && payload.hrIntraday.length > 0) {
     // Rust-HR per dag uit de meegestuurde vitals (valt anders terug op dag-p10).
     const restByDay = new Map<string, number>()
