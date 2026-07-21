@@ -17,7 +17,7 @@ export const adminRouter = createTRPCRouter({
     .input(
       z
         .object({
-          role: z.enum(['PATIENT', 'ATHLETE', 'THERAPIST', 'ADMIN']).optional(),
+          role: z.enum(['PATIENT', 'ATHLETE', 'THERAPIST', 'COACH', 'ADMIN']).optional(),
           query: z.string().optional(),
           practiceId: z.string().nullable().optional(),
         })
@@ -58,7 +58,7 @@ export const adminRouter = createTRPCRouter({
     .input(
       z.object({
         userId: z.string(),
-        role: z.enum(['PATIENT', 'ATHLETE', 'THERAPIST', 'ADMIN']),
+        role: z.enum(['PATIENT', 'ATHLETE', 'THERAPIST', 'COACH', 'ADMIN']),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -71,7 +71,10 @@ export const adminRouter = createTRPCRouter({
       }
       const updated = await ctx.prisma.user.update({
         where: { id: input.userId },
-        data: { role: input.role },
+        // Een coach hoort nooit bij een praktijk: bij het omzetten naar COACH
+        // halen we de praktijk-koppeling weg, anders zou de praktijk-tak in
+        // de toegangschecks alsnog kunnen gaan gelden.
+        data: { role: input.role, ...(input.role === 'COACH' ? { practiceId: null } : {}) },
         select: { id: true, name: true, email: true, role: true, supabaseUserId: true },
       })
 

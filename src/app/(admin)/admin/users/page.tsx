@@ -19,7 +19,7 @@ import {
   Tile,
 } from '@/components/dark-ui'
 
-const ROLES = ['PATIENT', 'ATHLETE', 'THERAPIST', 'ADMIN'] as const
+const ROLES = ['PATIENT', 'ATHLETE', 'THERAPIST', 'COACH', 'ADMIN'] as const
 
 export default function AdminUsersPage() {
   const [query, setQuery] = useState('')
