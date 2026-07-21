@@ -379,6 +379,7 @@ model User {
   vitalsEntries       VitalsEntry[]
   readinessSnapshots  ReadinessSnapshot[]
   stressEntries       StressEntry[]
+  exertionEntries     ExertionEntry[]
 
   // Push-notificaties (mobiele app)
   pushTokens             PushToken[]
@@ -2428,6 +2429,32 @@ model VitalsEntry {
 /// periodes uitgesloten. On-device berekend uit HealthKit HR-samples en compact
 /// gesynct (dag-gemiddelde + gedownsamplede intraday-serie + tijd-in-band). Puur
 /// welzijnssignaal, geen diagnose. Zie research-memo stress-meter.
+/// Dag-belasting uit continue hartslag ("exertion"): Edwards-TRIMP over het
+/// hele etmaal, INCLUSIEF workout-minuten. Bewust los van StressEntry, die
+/// juist alleen de rust-periodes meet. Losse readout naast de sRPE-curve —
+/// niet als invoer daarvoor gebruiken (andere eenheid + dubbeltelling).
+model ExertionEntry {
+  id          String        @id @default(cuid())
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  date        DateTime // start-of-day, uniek per user
+  trimp       Int // Edwards-TRIMP over de dag (a.u.)
+  activeSec   Int // seconden op of boven zone 1
+  timeInZones Json // { "1": sec, … "5": sec }
+  /// Ruwe bin→seconden (bin = ondergrens in bpm, stap 5). Bewaard zodat we
+  /// kunnen herberekenen als de max-hartslag van de gebruiker wijzigt.
+  hrHistogram Json?
+  /// Welke max-HR is gebruikt; maakt achteraf traceerbaar hoe de zones vielen.
+  maxHrUsed   Int?
+  source      WorkoutSource @default(APPLE_WATCH)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("exertion_entries")
+}
+
 model StressEntry {
   id               String        @id @default(cuid())
   user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)

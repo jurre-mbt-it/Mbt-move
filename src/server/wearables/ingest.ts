@@ -12,6 +12,7 @@ import { z } from 'zod'
 import type { PrismaClient, CardioActivity } from '@prisma/client'
 import { aggregateNight, sleepQualityScore, type SleepSegment } from '@/lib/sleep-metrics'
 import { resolveMaxHr } from '@/lib/cardio-zones'
+import { computeExertionDay } from '@/lib/exertion'
 import { computeStressDay } from '@/lib/stress'
 import { findCrossSourceDuplicate, enrichExistingLog } from '@/server/wearables/dedupe'
 
@@ -117,11 +118,17 @@ const MAX_HR_DAYS = 200
 
 // Intraday HR voor de stress-meter: compacte buckets (avg bpm per venster,
 // workouts al client-side uitgesloten). m = minuut van de dag (0–1439).
+//
+// `histogram` is een aparte, additieve kijk op dezelfde dag: seconden per
+// bpm-bin over het HELE etmaal, workouts INBEGREPEN. Daaruit rekenen we de
+// dag-belasting (exertion/TRIMP). Optioneel, zodat oudere app-versies blijven
+// werken; die sturen alleen `buckets`.
 const hrDaySchema = z.object({
   date: z.string(), // yyyy-mm-dd
   buckets: z
     .array(z.object({ m: z.number().int().min(0).max(1439), bpm: z.number().min(20).max(240) }))
     .max(96),
+  histogram: z.record(z.string(), z.number().min(0).max(86_400)).optional(),
 })
 
 export const syncPayloadSchema = z.object({
@@ -150,7 +157,7 @@ function startOfDayUTCLocal(dateStr: string): Date {
   return new Date(y, (m ?? 1) - 1, d ?? 1, 0, 0, 0, 0)
 }
 
-type Db = Pick<PrismaClient, 'wearableConnection' | 'cardioLog' | 'sleepEntry' | 'vitalsEntry' | 'stressEntry' | 'user'>
+type Db = Pick<PrismaClient, 'wearableConnection' | 'cardioLog' | 'sleepEntry' | 'vitalsEntry' | 'stressEntry' | 'exertionEntry' | 'user'>
 
 /**
  * Max-HR bepalen met een extra vangnet. `resolveMaxHr` kent alleen het profiel
@@ -381,6 +388,34 @@ export async function ingestWearableData(
         source: 'APPLE_WATCH' as const,
       }
       await prisma.stressEntry.upsert({
+        where: { userId_date: { userId, date } },
+        update: data,
+        create: { id: createId(), userId, date, ...data },
+      })
+      affected.add(date.getTime())
+    }
+
+    // ── Exertion → ExertionEntry (dag-belasting uit het bpm-histogram) ──────
+    // Andere bron dan stress hierboven: dit histogram bevat het HELE etmaal,
+    // workout-minuten inbegrepen. Losse readout; gaat bewust NIET de sRPE-curve
+    // in (andere eenheid + zou gelogde trainingen dubbel tellen).
+    for (const day of payload.hrIntraday) {
+      if (!day.histogram) continue
+      const ex = computeExertionDay(day.histogram, {
+        maxHeartRate: maxHrRes.maxHr,
+        restingHeartRate: restByDay.get(day.date) ?? profile?.restingHeartRate ?? null,
+      })
+      if (!ex) continue
+      const date = startOfDayUTCLocal(day.date)
+      const data = {
+        trimp: ex.trimp,
+        activeSec: ex.activeSec,
+        timeInZones: ex.timeInZones,
+        hrHistogram: day.histogram,
+        maxHrUsed: maxHrRes.maxHr,
+        source: 'APPLE_WATCH' as const,
+      }
+      await prisma.exertionEntry.upsert({
         where: { userId_date: { userId, date } },
         update: data,
         create: { id: createId(), userId, date, ...data },
