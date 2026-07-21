@@ -45,6 +45,33 @@ opzettelijk; documenteer hier áls je het wijzigt:
   wat heeft gedaan. Patroon: `hasPatientAccess()` in `patients.ts` of
   inline `OR: [{ patientTherapists: { some: ... } }, { practiceId: user.practiceId }]`.
 
+## De COACH-rol staat bewust BUITEN de praktijk
+
+Een coach is een `User` met `role = 'COACH'` en **altijd** `practiceId = null`
+(zie docs/plan-coach-role-20260721.md). Daardoor valt elke praktijk-tak in de
+toegangschecks voor die rol vanzelf weg: een coach ziet uitsluitend atleten
+waarmee een directe `PatientTherapist`-koppeling bestaat, en praktijk-
+therapeuten zien coach-atleten niet.
+
+Vertrouw daarbij niet op de lege `practiceId`, maar bind de praktijk-tak
+expliciet aan `role === 'THERAPIST'`. Dat staat zo in `hasPatientAccess()`
+(src/server/lib/patient-access.ts) en in de kopieën in `wearables.ts`,
+`weekSchedules.ts` en `planTemplates.ts`.
+
+Twee gevolgen om te onthouden:
+
+- **Plan-sjablonen**: `practiceId NULL` betekende "globale seed". Een
+  coach-plan heeft óók practiceId null, dus scopet `scopeFor()` een coach op
+  zijn eigen `creatorId`. Zonder dat lekken coach-plannen naar alle praktijken.
+- **Procedures**: gedeelde begeleidingsfuncties draaien op
+  `coachStaffProcedure` (therapeut/coach/admin). Klinische schrijf-acties
+  (behandeling loggen, assessments, test-reports, rehab, hardloopanalyse)
+  blijven op `therapistProcedure`. Een coach mág wel álles lezen.
+
+Web-UI: het `(coach)`-segment is een dunne re-export van de therapeut-
+pagina's. Links lopen via `usePortal()` (src/lib/portal.ts) — hardcode nooit
+`/therapist/...` in een pagina die beide portalen delen.
+
 Wat *wél* per-therapeut afgeschermd blijft:
 
 - **Therapist-notities op `PatientTherapist`** — privé per relatie, niet
