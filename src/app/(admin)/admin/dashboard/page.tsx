@@ -13,6 +13,7 @@ const quickLinks = [
   { href: '/therapist/patients', label: 'Patiënten', description: 'Beheer patiënten en hun programma\'s', bar: P.purple },
   { href: '/therapist/exercises', label: 'Oefeningen', description: 'Oefeningenbibliotheek beheren', bar: P.gold },
   { href: '/therapist/programs', label: "Programma's", description: "Revalidatieprogramma's beheren", bar: P.ice },
+  { href: '/coach/dashboard', label: 'Coach-portaal', description: 'Meekijken in de coaching-omgeving: atleten en trainingsplannen', bar: P.lime },
   { href: '/admin/research', label: 'Research data', description: 'Geanonimiseerde onderzoeksdata & export', bar: P.danger },
   { href: '/admin/shop', label: 'Shop', description: "Consumenten-producten: schema's verkopen + publiceren", bar: P.gold },
 ]

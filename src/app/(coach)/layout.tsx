@@ -7,12 +7,12 @@ import { requireRole } from '@/lib/auth/require-role'
 
 /**
  * Coach-portaal: dezelfde shell als de therapeut, met een smallere navigatie.
- * Bewust GEEN ADMIN in de guard: een admin heeft zijn eigen portaal, en zo
- * blijft dit segment één rol met één set rechten. Zie
+ * ADMIN mag meekijken, net als in het therapeut-portaal, zodat beheer en
+ * support niet van rol hoeven te wisselen. Zie
  * docs/plan-coach-role-20260721.md.
  */
 export default async function CoachLayout({ children }: { children: React.ReactNode }) {
-  await requireRole(['COACH'])
+  await requireRole(['COACH', 'ADMIN'])
 
   return (
     <div
