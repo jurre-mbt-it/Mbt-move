@@ -39,6 +39,7 @@ const THERAPIST_NAV: SidebarNavItem[] = [
   { href: '/therapist/programs', label: "Programma's", icon: ClipboardList },
   { href: '/therapist/programs/new', label: 'Builder', icon: Blocks },
   { href: '/therapist/week-planner', label: 'Weekschema', icon: CalendarDays },
+  { href: '/therapist/plans', label: 'Trainingsplannen', icon: FileText },
   { href: '/therapist/exercises', label: 'Oefeningen', icon: Dumbbell },
   { href: '/therapist/tests', label: 'Tests', icon: Stethoscope },
   { href: '/therapist/test-reports', label: 'Testrapport', icon: FileText },

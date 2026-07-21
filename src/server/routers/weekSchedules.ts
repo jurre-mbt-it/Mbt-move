@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { createTRPCRouter, coachStaffProcedure, protectedProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
+import { assertPlanAccess } from '@/server/lib/plan-access'
 import { mondayKey, mondayKeyOf, addDaysKey, amsMidnight, weeksBetween, isDateKey } from '@/lib/week-dates'
 import { parseStructured, legacySummaryFields, structuredLoad } from '@/lib/cardio-workout'
 import { durationFromExercises } from '@/lib/planned-load'
@@ -1037,7 +1038,12 @@ export const weekSchedulesRouter = createTRPCRouter({
    * gebruikt items[] direct.
    */
   listWithItems: coachStaffProcedure
-    .input(z.object({ patientId: z.string().optional(), isTemplate: z.boolean().optional() }).optional())
+    .input(z.object({
+      patientId: z.string().optional(),
+      isTemplate: z.boolean().optional(),
+      /** Sjabloon-weken van één trainingsplan (planTemplates.createEmpty). */
+      planTemplateId: z.string().optional(),
+    }).optional())
     .query(async ({ ctx, input }) => {
       const isAdmin = ctx.user.role === 'ADMIN'
       const practiceId = ctx.user.practiceId
@@ -1051,6 +1057,7 @@ export const weekSchedulesRouter = createTRPCRouter({
           ...ownership,
           ...(input?.patientId !== undefined ? { patientId: input.patientId } : {}),
           ...(input?.isTemplate !== undefined ? { isTemplate: input.isTemplate } : {}),
+          ...(input?.planTemplateId !== undefined ? { planTemplateId: input.planTemplateId } : {}),
         },
         include: {
           patient: { select: { id: true, name: true, email: true } },
@@ -1083,11 +1090,20 @@ export const weekSchedulesRouter = createTRPCRouter({
    * gecast naar een begrensd type (geen recursief Prisma JsonValue → geen TS2589).
    */
   listItemContents: coachStaffProcedure
-    .input(z.object({ patientId: z.string() }))
+    .input(z.object({ patientId: z.string(), planTemplateId: z.string().optional() }))
     .query(async ({ ctx, input }) => {
-      await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
+      // Twee bronnen: de weken van een patiënt, of de sjabloon-weken van een
+      // trainingsplan. Elk met zijn eigen toegangscheck.
+      if (input.planTemplateId) {
+        await assertPlanAccess(ctx.prisma, ctx.user, input.planTemplateId)
+      } else {
+        await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
+      }
+      const where = input.planTemplateId
+        ? { day: { weekSchedule: { planTemplateId: input.planTemplateId } } }
+        : { day: { weekSchedule: { patientId: input.patientId } } }
       const items = await ctx.prisma.weekScheduleDayItem.findMany({
-        where: { day: { weekSchedule: { patientId: input.patientId } } },
+        where,
         select: {
           id: true,
           cardioParams: true,

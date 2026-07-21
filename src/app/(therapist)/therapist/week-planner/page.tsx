@@ -2647,11 +2647,29 @@ function WeekPlannerContent() {
 
       {!selectedPatientId ? (
         <Tile>
-          <div className="flex items-center gap-3 py-6 text-center justify-center">
-            <Building2 className="w-5 h-5 opacity-50" />
-            <span className="text-sm" style={{ color: P.inkMuted }}>
-              Kies een patiënt om hun planner te zien
-            </span>
+          <div className="flex flex-col sm:flex-row items-center gap-4 py-5 px-2">
+            <div
+              className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: 'rgba(232,122,85,0.12)', border: '1px solid rgba(232,122,85,0.30)' }}
+            >
+              <CalendarRange className="w-5 h-5" style={{ color: P.brand }} />
+            </div>
+            <div className="flex-1 min-w-0 text-center sm:text-left">
+              <p className="text-sm font-semibold" style={{ color: P.ink }}>
+                Kies iemand hierboven, of bouw eerst een los schema
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: P.inkMuted }}>
+                Deze kalender hoort bij één persoon. Wil je een schema maken dat je later aan
+                meerdere mensen geeft, begin dan met een trainingsplan: dat bouw je op genummerde
+                weken, zonder datums.
+              </p>
+            </div>
+            <DarkButton
+              onClick={() => router.push(`${portal.base}/plans`)}
+              className="gap-1.5 text-xs shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" /> Trainingsplan maken
+            </DarkButton>
           </div>
         </Tile>
       ) : (

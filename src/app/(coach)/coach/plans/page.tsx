@@ -45,6 +45,7 @@ export default function CoachPlansPage() {
   const router = useRouter()
   const [q, setQ] = useState('')
   const [applyFor, setApplyFor] = useState<{ id: string; name: string; weeks: number } | null>(null)
+  const [newOpen, setNewOpen] = useState(false)
 
   const { data: plans, isLoading } = trpc.planTemplates.list.useQuery()
 
@@ -67,9 +68,14 @@ export default function CoachPlansPage() {
             Meerweekse schema&rsquo;s die je op de kalender van een atleet zet
           </MetaLabel>
         </div>
-        <DarkButton variant="primary" href={`${portal.base}/week-planner`}>
-          Plan bouwen in de weekplanner
-        </DarkButton>
+        <div className="flex flex-wrap gap-2">
+          <DarkButton variant="primary" onClick={() => setNewOpen(true)}>
+            Nieuw plan
+          </DarkButton>
+          <DarkButton variant="secondary" href={`${portal.base}/week-planner`}>
+            Naar de weekplanner
+          </DarkButton>
+        </div>
       </div>
 
       <DarkInput
@@ -85,7 +91,7 @@ export default function CoachPlansPage() {
           <p style={{ color: P.inkMuted, fontSize: 14, lineHeight: 1.6 }}>
             {plans?.length
               ? 'Geen plan gevonden met die zoekterm.'
-              : 'Je hebt nog geen plannen. Bouw een paar weken in de weekplanner en sla ze daar op als plan. Daarna zet je ze hier in één keer op de kalender van een atleet.'}
+              : 'Je hebt nog geen plannen. Begin met Nieuw plan: je bouwt de weken zonder dat er al een atleet aan hangt, en zet het daarna in één keer op de kalender van wie je wilt.'}
           </p>
         </Tile>
       ) : (
@@ -123,9 +129,9 @@ export default function CoachPlansPage() {
                 <DarkButton
                   variant="secondary"
                   size="sm"
-                  onClick={() => router.push(`${portal.base}/week-planner`)}
+                  onClick={() => router.push(`${portal.base}/plans/${t.id}`)}
                 >
-                  Bekijken
+                  Bewerken
                 </DarkButton>
               </div>
             </Tile>
@@ -136,6 +142,8 @@ export default function CoachPlansPage() {
       {applyFor && (
         <ApplyToAthletesDialog plan={applyFor} onClose={() => setApplyFor(null)} />
       )}
+
+      {newOpen && <NewPlanDialog onClose={() => setNewOpen(false)} />}
     </div>
   )
 }
@@ -263,6 +271,79 @@ function ApplyToAthletesDialog({
             </DarkButton>
           </div>
         </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** Leeg plan van N weken; daarna open je meteen de editor. */
+function NewPlanDialog({ onClose }: { onClose: () => void }) {
+  const portal = usePortal()
+  const router = useRouter()
+  const utils = trpc.useUtils()
+  const [name, setName] = useState('')
+  const [weeks, setWeeks] = useState(4)
+
+  const create = trpc.planTemplates.createEmpty.useMutation({
+    onSuccess: (r) => {
+      utils.planTemplates.list.invalidate()
+      toast.success(`${r.name} aangemaakt`, { description: `${r.weeks} lege weken klaar om te vullen.` })
+      router.push(`${portal.base}/plans/${r.id}`)
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Nieuw trainingsplan</DialogTitle>
+          <DialogDescription>
+            Je bouwt de weken zonder atleet. Zodra het plan staat, zet je het op de kalender van
+            een of meer atleten.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (name.trim()) create.mutate({ name: name.trim(), weeks })
+          }}
+        >
+          <div>
+            <MetaLabel>Naam</MetaLabel>
+            <DarkInput
+              autoFocus
+              placeholder="Bijvoorbeeld: Opbouw 10 km"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div>
+            <MetaLabel>Aantal weken</MetaLabel>
+            <DarkInput
+              type="number"
+              min={1}
+              max={24}
+              value={weeks}
+              onChange={(e) => setWeeks(Math.min(24, Math.max(1, Number(e.target.value) || 1)))}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <DarkButton variant="secondary" type="button" onClick={onClose}>
+              Annuleren
+            </DarkButton>
+            <DarkButton
+              variant="primary"
+              type="submit"
+              disabled={!name.trim() || create.isPending}
+              loading={create.isPending}
+            >
+              Aanmaken
+            </DarkButton>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   )

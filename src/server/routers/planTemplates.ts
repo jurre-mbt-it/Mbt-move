@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { createTRPCRouter, coachStaffProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
+import { planScope } from '@/server/lib/plan-access'
 import type { PrismaClient } from '@prisma/client'
 import { copyItemToDay, COPY_ITEM_INCLUDE } from './weekSchedules'
 import { mondayKey, mondayKeyOf, addDaysKey, amsMidnight, isDateKey } from '@/lib/week-dates'
@@ -28,14 +29,7 @@ const createId = () => crypto.randomUUID()
  * krijgen) bij álle praktijken opduiken. Daarom scopet een coach op zijn eigen
  * `creatorId`: globale seeds lezen mag, de rest is van hemzelf.
  */
-function scopeFor(user: { id: string; role: string; practiceId: string | null }) {
-  if (user.role === 'COACH') return [{ practiceId: null, creatorId: user.id }]
-  // "Globale seed" = geen praktijk EN niet van een coach. Zonder die tweede
-  // voorwaarde ziet elke therapeut de plannen van elke coach: een coach-plan
-  // heeft immers óók practiceId null.
-  const seeds = { practiceId: null, creator: { role: { not: 'COACH' as const } } }
-  return user.practiceId ? [seeds, { practiceId: user.practiceId }] : [seeds]
-}
+const scopeFor = planScope
 
 /**
  * Writes: globale seeds zijn in de single-clinic realiteit ook bewerkbaar door
@@ -194,6 +188,53 @@ export const planTemplatesRouter = createTRPCRouter({
    * dit is ook de enige betrouwbare sleutel. Schedules die dezelfde maandag
    * delen worden samengevoegd tot één sjabloon-week.
    */
+  /**
+   * Een leeg plan met N sjabloon-weken. Hiermee kun je een schema bouwen
+   * zónder het eerst op de kalender van een atleet te zetten: de weken zijn
+   * gewone WeekSchedule-rijen met isTemplate = true en een planTemplateId, dus
+   * de weekplanner kan ze bewerken en `applyToPatient` kan ze later kopiëren.
+   */
+  createEmpty: coachStaffProcedure
+    .input(z.object({
+      name: z.string().min(1).max(200),
+      weeks: z.number().int().min(1).max(24).default(1),
+      goal: z.string().max(500).optional(),
+      description: z.string().max(2000).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const tpl = await ctx.prisma.weekPlanTemplate.create({
+        data: {
+          name: input.name.trim(),
+          weeks: input.weeks,
+          goal: input.goal?.trim() || null,
+          description: input.description?.trim() || null,
+          creatorId: ctx.user.id,
+          // Coaches horen niet bij een praktijk; hun plannen blijven privé via
+          // de creator-check in scopeFor().
+          practiceId: ctx.user.practiceId ?? null,
+        },
+      })
+
+      for (let w = 1; w <= input.weeks; w++) {
+        await ctx.prisma.weekSchedule.create({
+          data: {
+            id: createId(),
+            name: input.weeks === 1 ? input.name.trim() : `${input.name.trim()} — week ${w}`,
+            isTemplate: true,
+            weekNumber: w,
+            planTemplateId: tpl.id,
+            creatorId: ctx.user.id,
+            practiceId: ctx.user.practiceId ?? null,
+            days: {
+              create: Array.from({ length: 7 }, (_, i) => ({ id: createId(), dayOfWeek: i })),
+            },
+          },
+        })
+      }
+
+      return { id: tpl.id, name: tpl.name, weeks: input.weeks }
+    }),
+
   saveFromWeeks: coachStaffProcedure
     .input(z.object({
       patientId: z.string(),
