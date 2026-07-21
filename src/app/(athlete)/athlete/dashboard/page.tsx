@@ -347,11 +347,6 @@ export default function AthleteDashboard() {
           <WeeklyTrendChart sessions={sessionHistory ?? []} />
         </div>
 
-        {/* ── Per-regio spiervermoeidheid (kracht + cardio, 7 dagen) ── */}
-        <div className="pt-2">
-          <MuscleStatusList />
-        </div>
-
         {/* ── Last session recap ────────────────────────── */}
         {lastSession && (
           <Tile accentBar={P.lime}>
@@ -398,6 +393,12 @@ export default function AthleteDashboard() {
             </div>
           </Tile>
         )}
+
+        {/* ── Per-regio spiervermoeidheid (kracht + cardio, 7 dagen) ──
+            Onderaan en standaard ingeklapt: verdiepende info. */}
+        <div className="pt-2">
+          <MuscleStatusList collapsible />
+        </div>
       </div>
     </div>
   )

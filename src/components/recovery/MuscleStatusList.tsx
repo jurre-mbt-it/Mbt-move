@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { trpc } from '@/lib/trpc/client'
 import {
   getMuscleFatigueColor,
@@ -32,9 +33,11 @@ const IOS = {
 const MONO = "var(--font-mono-athletic), ui-monospace, 'JetBrains Mono', Menlo, monospace"
 
 /** Data-container: haalt de per-regio fatigue op en rendert de view. */
-export function MuscleStatusList() {
+export function MuscleStatusList({ collapsible = false }: { collapsible?: boolean }) {
   const { data, isLoading } = trpc.patient.muscleFatigue.useQuery()
-  return <MuscleStatusListView states={data ?? []} isLoading={isLoading} />
+  return (
+    <MuscleStatusListView states={data ?? []} isLoading={isLoading} collapsible={collapsible} />
+  )
 }
 
 /**
@@ -46,13 +49,29 @@ export function MuscleStatusList() {
 export function MuscleStatusListView({
   states,
   isLoading = false,
+  collapsible = false,
 }: {
   states: MuscleFatigueState[]
   isLoading?: boolean
+  /** Toont de lijst als in-/uitklapbaar blok; standaard dicht. */
+  collapsible?: boolean
 }) {
+  const [open, setOpen] = useState(false)
+
   const rows = states
     .filter((s) => s.recoveryPercent < 95)
     .sort((a, b) => a.recoveryPercent - b.recoveryPercent)
+
+  const headingStyle = {
+    fontFamily: MONO,
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    color: IOS.inkMuted,
+  } as const
+
+  const showBody = !collapsible || open
 
   return (
     <div
@@ -62,21 +81,46 @@ export function MuscleStatusListView({
         padding: '16px 18px',
       }}
     >
-      <h2
-        style={{
-          fontFamily: MONO,
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: 2,
-          textTransform: 'uppercase',
-          color: IOS.inkMuted,
-          marginBottom: 14,
-        }}
-      >
-        Status per spiergroep
-      </h2>
+      {collapsible ? (
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          style={{
+            ...headingStyle,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            width: '100%',
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            marginBottom: showBody ? 14 : 0,
+          }}
+        >
+          <span style={{ flex: 1, textAlign: 'left' }}>Status per spiergroep</span>
+          {!open && !isLoading && rows.length > 0 && (
+            <span style={{ color: getMuscleFatigueColor(rows[0].recoveryPercent) }}>
+              {rows.length} belast
+            </span>
+          )}
+          <span
+            aria-hidden
+            style={{
+              fontSize: 9,
+              transition: 'transform .15s',
+              transform: open ? 'rotate(180deg)' : 'none',
+            }}
+          >
+            ▼
+          </span>
+        </button>
+      ) : (
+        <h2 style={{ ...headingStyle, marginBottom: 14 }}>Status per spiergroep</h2>
+      )}
 
-      {isLoading ? (
+      {!showBody ? null : isLoading ? (
         <div style={{ color: IOS.inkMuted, fontSize: 13, padding: '6px 0 2px' }}>
           Laden…
         </div>

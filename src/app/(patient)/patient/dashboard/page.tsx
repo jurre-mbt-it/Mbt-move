@@ -317,9 +317,6 @@ export default function PatientDashboard() {
 
         <WeeklyTrendChart sessions={sessionHistory ?? []} />
 
-        {/* Per-regio spiervermoeidheid (kracht + cardio, laatste 7 dagen). */}
-        <MuscleStatusList />
-
         {/* Last session */}
         {lastSession && (
           <Tile href="/patient/history">
@@ -361,6 +358,10 @@ export default function PatientDashboard() {
             </span>
           </Tile>
         )}
+
+        {/* Per-regio spiervermoeidheid (kracht + cardio, laatste 7 dagen).
+            Onderaan en standaard ingeklapt: verdiepende info, geen dagelijkse blikvanger. */}
+        <MuscleStatusList collapsible />
       </div>
     </DarkScreen>
   )
