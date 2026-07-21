@@ -3,6 +3,7 @@ import { TRPCError } from '@trpc/server'
 import type { PrismaClient } from '@prisma/client'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { computeReadinessFor } from '@/server/readiness'
+import { exertionScore } from '@/lib/exertion'
 import { wearablesEnabledForRole } from '@/lib/wearables-access'
 import { auditLog } from '@/server/audit'
 import { buildAuthorizeUrl, encryptToken, isStravaConfigured, openTokens } from '@/server/wearables/strava/config'
@@ -88,7 +89,7 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
   const stressSince = startOfDay()
   stressSince.setDate(stressSince.getDate() - STRESS_DAYS)
 
-  const [connection, readiness, sleep, vitals, activities, trend, stress] = await Promise.all([
+  const [connection, readiness, sleep, vitals, activities, trend, stress, exertion] = await Promise.all([
     prisma.wearableConnection.findUnique({
       where: { userId_provider: { userId, provider: 'APPLE_HEALTH' } },
       select: { provider: true, deviceModel: true, enabled: true, lastSyncAt: true, connectedAt: true },
@@ -115,6 +116,11 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
     prisma.stressEntry.findMany({
       where: { userId, date: { gte: stressSince } },
       orderBy: { date: 'asc' },
+    }),
+    prisma.exertionEntry.findMany({
+      where: { userId, date: { gte: stressSince } },
+      orderBy: { date: 'asc' },
+      select: { date: true, trimp: true, activeSec: true, timeInZones: true },
     }),
   ])
 
@@ -182,6 +188,17 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
       restingHeartRate: s.restingHeartRate,
       samples: s.samples as unknown,
       timeInBands: s.timeInBands as unknown,
+    })),
+    // Dag-belasting uit continue hartslag (hele etmaal, workouts inbegrepen).
+    // Losse readout naast de sRPE-curve, zie src/lib/exertion.ts. De 0-100
+    // schaal rekenen we hier zodat de app die logica niet hoeft te dupliceren:
+    // elke dag afgezet tegen de p90 van de dagen ervóór.
+    exertion: exertion.map((e, i) => ({
+      date: isoDay(e.date),
+      trimp: e.trimp,
+      activeSec: e.activeSec,
+      timeInZones: e.timeInZones as unknown,
+      score: exertionScore(e.trimp, exertion.slice(0, i).map(p => p.trimp)),
     })),
   }
 }
