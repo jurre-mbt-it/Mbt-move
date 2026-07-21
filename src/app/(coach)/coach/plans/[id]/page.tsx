@@ -18,6 +18,7 @@ import { toast } from 'sonner'
 import { Plus, Trash2, ChevronLeft } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
 import { usePortal } from '@/lib/portal'
+import { CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
 import {
   DarkButton,
   DarkDialog as Dialog,
@@ -44,6 +45,16 @@ const CATEGORIES = [
   { value: 'PLYOMETRICS', label: 'Plyometrie' },
   { value: 'STABILITY', label: 'Stabiliteit' },
 ] as const
+
+/**
+ * Bij cardio bepaalt de soort activiteit wat het is: fietsen, roeien, zwemmen.
+ * Dezelfde lijst als in de weekplanner, zodat een plan-item en een gepland
+ * item in de kalender hetzelfde heten. "Overig" is de plek voor mixed cardio
+ * of iets wat er niet tussen staat; de naam die je zelf typt blijft leidend.
+ */
+const CARDIO_ACTIVITY_OPTIONS = (
+  Object.entries(CARDIO_ACTIVITIES) as [CardioActivityKey, { label: string }][]
+).map(([value, meta]) => ({ value, label: meta.label }))
 
 type AddTarget = { dayId: string; weekNumber: number; dayOfWeek: number }
 
@@ -198,6 +209,7 @@ function AddItemDialog({
   const [mode, setMode] = useState<'quick' | 'program'>('quick')
   const [name, setName] = useState('')
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]['value']>('STRENGTH')
+  const [activity, setActivity] = useState<CardioActivityKey>('RUNNING')
   // Zie de opmerking bij het weken-veld: tijdens het typen niet klemmen,
   // anders kun je het veld niet leegmaken om een ander getal in te tikken.
   const [minutesText, setMinutesText] = useState('45')
@@ -230,6 +242,8 @@ function AddItemDialog({
         quickCategory: category,
         quickName: name.trim(),
         quickDurationSec: Math.max(1, Math.round(minutes)) * 60,
+        // Alleen zinvol bij cardio; de server negeert 'm bij de rest.
+        ...(category === 'CARDIO' ? { quickActivity: activity } : {}),
       })
     }
   }
@@ -283,7 +297,15 @@ function AddItemDialog({
                   <MetaLabel>Soort</MetaLabel>
                   <DarkSelect
                     value={category}
-                    onChange={(e) => setCategory(e.target.value as typeof category)}
+                    onChange={(e) => {
+                      const next = e.target.value as typeof category
+                      setCategory(next)
+                      // Naam nog leeg? Vul 'm vast met de activiteit, zodat je
+                      // niet zelf "Fietsen" hoeft te typen om iets te zien staan.
+                      if (next === 'CARDIO' && !name.trim()) {
+                        setName(CARDIO_ACTIVITIES[activity].label)
+                      }
+                    }}
                   >
                     {CATEGORIES.map((c) => (
                       <option key={c.value} value={c.value}>
@@ -304,6 +326,31 @@ function AddItemDialog({
                   />
                 </div>
               </div>
+
+              {category === 'CARDIO' && (
+                <div>
+                  <MetaLabel>Activiteit</MetaLabel>
+                  <DarkSelect
+                    value={activity}
+                    onChange={(e) => {
+                      const next = e.target.value as CardioActivityKey
+                      const wasDefaultName = name.trim() === CARDIO_ACTIVITIES[activity].label
+                      setActivity(next)
+                      if (!name.trim() || wasDefaultName) setName(CARDIO_ACTIVITIES[next].label)
+                    }}
+                  >
+                    {CARDIO_ACTIVITY_OPTIONS.map((a) => (
+                      <option key={a.value} value={a.value}>
+                        {a.label}
+                      </option>
+                    ))}
+                  </DarkSelect>
+                  <p className="mt-1.5 text-xs" style={{ color: P.inkDim, lineHeight: 1.5 }}>
+                    Staat het er niet tussen? Kies Overig en zet zelf de naam erbij,
+                    bijvoorbeeld mixed cardio of een circuit.
+                  </p>
+                </div>
+              )}
             </>
           ) : (
             <div>
