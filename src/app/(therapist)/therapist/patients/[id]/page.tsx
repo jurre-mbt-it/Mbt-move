@@ -22,6 +22,7 @@ import {
 } from '@/components/dark-ui'
 import { AssignFromTemplateDialog } from '@/components/patients/AssignFromTemplateDialog'
 import { CoMonitorDialog } from '@/components/patients/CoMonitorDialog'
+import { MonthSummary } from '@/components/patients/MonthSummary'
 import { PerformerToggle, type PerformerFilter } from '@/components/patients/PerformerToggle'
 import { InsightActivationToggle } from '@/components/insights/InsightActivationToggle'
 import { InsightTimeline } from '@/components/insights/InsightTimeline'
@@ -623,6 +624,9 @@ export default function PatientDetailPage({
 
           {/* ── TAB: Geschiedenis ─────────────────────────────────── */}
           <TabsContent value="geschiedenis" className="space-y-3">
+            {/* Wat heeft deze persoon deze maand gedaan, en hoeveel daarvan
+                stond gepland. De lijst eronder is het detail. */}
+            <MonthSummary patientId={patient.id} />
             {cardioSessions.length > 0 && (
               <div className="space-y-2">
                 <MetaLabel>CARDIO · LAATSTE {cardioSessions.length}</MetaLabel>

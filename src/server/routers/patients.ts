@@ -11,6 +11,7 @@ import {
 } from '@/server/trpc'
 import { hasPatientAccess } from '@/server/lib/patient-access'
 import { auditLog } from '@/server/audit'
+import { amsMidnight, dateKey } from '@/lib/week-dates'
 import { deriveTopSet, estimateOneRepMax } from '@/lib/one-rep-max'
 import { clampSessionDurationSec } from '@/lib/training-load'
 import { syncHashtagsForLog } from '@/server/tags'
@@ -1496,6 +1497,133 @@ export const patientsRouter = createTRPCRouter({
   // De patiënt kan via "Pijn rapporteren" een NRS-melding insturen. Die werd
   // wél opgeslagen (PainEntry) maar nergens aan de therapeut getoond — dit is
   // het lees-pad zodat de melding daadwerkelijk bij de behandelaar landt.
+  /**
+   * Maandoverzicht van één persoon: totalen, de verdeling per dag, en hoeveel
+   * van het geplande werk daadwerkelijk is gedaan.
+   *
+   * Drie bronnen die niet dubbel mogen tellen: in-app gelogde (kracht)sessies
+   * uit SessionLog, cardio uit CardioLog (inclusief wat van de watch of Strava
+   * binnenkomt), en het geplande werk uit de weekplanner. Een cardio-sessie die
+   * via de planner is gestart staat in CardioLog, niet in SessionLog, dus de
+   * twee overlappen niet.
+   *
+   * `month` is YYYY-MM en wordt in NL-tijd uitgerekend (zie AGENTS.md: nooit
+   * in UTC, anders schuift de eerste of laatste dag een maand op).
+   */
+  monthlySummary: coachStaffProcedure
+    .input(z.object({
+      patientId: z.string(),
+      month: z.string().regex(/^\d{4}-\d{2}$/, 'Ongeldige maand'),
+    }))
+    .query(async ({ ctx, input }) => {
+      if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.patientId))) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Niet gevonden of geen toegang.' })
+      }
+      const [y, m] = input.month.split('-').map(Number)
+      const from = amsMidnight(`${input.month}-01`)
+      const nextMonth = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`
+      const to = amsMidnight(nextMonth)
+
+      const [sessions, cardio, plannedItems] = await Promise.all([
+        ctx.prisma.sessionLog.findMany({
+          where: {
+            patientId: input.patientId,
+            status: 'COMPLETED',
+            completedAt: { gte: from, lt: to },
+          },
+          select: { completedAt: true, duration: true },
+        }),
+        ctx.prisma.cardioLog.findMany({
+          where: { patientId: input.patientId, completedAt: { gte: from, lt: to } },
+          select: {
+            completedAt: true,
+            activity: true,
+            durationSec: true,
+            distanceM: true,
+            calories: true,
+          },
+        }),
+        ctx.prisma.weekScheduleDayItem.findMany({
+          where: {
+            kind: { in: ['PROGRAM', 'WORKOUT'] },
+            day: { weekSchedule: { patientId: input.patientId, isTemplate: false } },
+          },
+          select: { id: true, day: { select: { dayOfWeek: true, weekSchedule: { select: { startDate: true } } } } },
+        }),
+      ])
+
+      // Per dag optellen. `bucket` groepeert de activiteit tot wat je in een
+      // maandoverzicht wilt onderscheiden; de rest valt onder "overig".
+      type Bucket = 'strength' | 'run' | 'bike' | 'other'
+      const bucketOf = (activity: string): Bucket =>
+        activity === 'RUNNING' ? 'run'
+          : activity === 'CYCLING' || activity === 'WATTBIKE' || activity === 'ASSAULT_BIKE' ? 'bike'
+            : 'other'
+
+      const days = new Map<string, Record<Bucket, { min: number; m: number; kcal: number; n: number }>>()
+      const empty = (): Record<Bucket, { min: number; m: number; kcal: number; n: number }> => ({
+        strength: { min: 0, m: 0, kcal: 0, n: 0 },
+        run: { min: 0, m: 0, kcal: 0, n: 0 },
+        bike: { min: 0, m: 0, kcal: 0, n: 0 },
+        other: { min: 0, m: 0, kcal: 0, n: 0 },
+      })
+      const add = (date: Date, b: Bucket, min: number, meters: number, kcal: number) => {
+        const key = dateKey(date)
+        const row = days.get(key) ?? empty()
+        row[b].min += min
+        row[b].m += meters
+        row[b].kcal += kcal
+        row[b].n += 1
+        days.set(key, row)
+      }
+
+      for (const s of sessions) {
+        if (!s.completedAt) continue
+        // duration is seconden; null = niet geklokt, telt wel als sessie mee.
+        add(s.completedAt, 'strength', Math.round((s.duration ?? 0) / 60), 0, 0)
+      }
+      for (const c of cardio) {
+        add(
+          c.completedAt,
+          bucketOf(c.activity),
+          Math.round(c.durationSec / 60),
+          c.distanceM ?? 0,
+          c.calories ?? 0,
+        )
+      }
+
+      // Gepland in deze maand: de weekplanner ankert op de maandag van de week,
+      // dus de datum van een item is die maandag plus zijn dagnummer.
+      let planned = 0
+      for (const it of plannedItems) {
+        const start = it.day.weekSchedule.startDate
+        if (!start) continue
+        const d = new Date(start)
+        d.setDate(d.getDate() + it.day.dayOfWeek)
+        if (d >= from && d < to) planned += 1
+      }
+
+      const totalSessions = sessions.length + cardio.length
+      const totals = {
+        sessions: totalSessions,
+        minutes: [...days.values()].reduce(
+          (sum, r) => sum + r.strength.min + r.run.min + r.bike.min + r.other.min,
+          0,
+        ),
+        distanceM: cardio.reduce((sum, c) => sum + (c.distanceM ?? 0), 0),
+        kcal: cardio.reduce((sum, c) => sum + (c.calories ?? 0), 0),
+        planned,
+      }
+
+      return {
+        month: input.month,
+        totals,
+        days: [...days.entries()]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([date, r]) => ({ date, ...r })),
+      }
+    }),
+
   getPainEntries: coachStaffProcedure
     .input(
       z.object({
