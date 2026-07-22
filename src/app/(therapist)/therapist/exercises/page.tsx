@@ -1,16 +1,18 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Heart } from 'lucide-react'
 import { ExerciseCard } from '@/components/exercises/ExerciseCard'
+import { MarkMatch } from '@/components/exercises/MarkMatch'
 import { ExerciseVideoModal, type ExerciseForModal } from '@/components/exercises/ExerciseVideoModal'
 import {
   EXERCISE_CATEGORIES,
   BODY_REGIONS,
   DIFFICULTIES,
 } from '@/lib/exercise-constants'
+import { keepPreviousData } from '@tanstack/react-query'
 import { trpc } from '@/lib/trpc/client'
 import { usePortal } from '@/lib/portal'
 import { IconFolder } from '@/components/icons'
@@ -55,9 +57,33 @@ export default function ExercisesPage() {
   const [modalExercise, setModalExercise] = useState<ExerciseForModal | null>(null)
 
   const utils = trpc.useUtils()
-  const { data: exercises = [], isLoading } = trpc.exercises.list.useQuery(undefined, {
-    staleTime: 30_000,
-  })
+
+  // De zoekopdracht hoort op de server: die kent naast de letterlijke tekst ook
+  // typefouten ("squad" → Squat) en synoniemen via tags. Even wachten met
+  // versturen, anders gaat er per toetsaanslag een query uit.
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query.trim()), 200)
+    return () => clearTimeout(t)
+  }, [query])
+
+  const [suggestOpen, setSuggestOpen] = useState(false)
+  const { data: suggesties = [] } = trpc.exercises.suggest.useQuery(
+    { query: debouncedQuery },
+    { enabled: debouncedQuery.length >= 2, staleTime: 60_000 },
+  )
+
+  // Elke zoekterm is een eigen cache-sleutel. Zonder `keepPreviousData` klapt
+  // de pagina bij elke toetsaanslag terug naar het laadscherm; nu blijft de
+  // vorige uitslag staan tot de nieuwe binnen is.
+  const lijstQuery = trpc.exercises.list.useQuery(
+    { query: debouncedQuery.length >= 2 ? debouncedQuery : undefined },
+    { staleTime: 30_000, placeholderData: keepPreviousData },
+  )
+
+  const lijstData = lijstQuery.data as ExerciseItem[] | undefined
+  const exercises: ExerciseItem[] = useMemo(() => lijstData ?? [], [lijstData])
+  const isLoading = lijstQuery.isLoading
 
   const toggleFavorite = trpc.exercises.toggleFavorite.useMutation({
     onSuccess: () => {
@@ -83,9 +109,10 @@ export default function ExercisesPage() {
   }, [collectionExercises])
 
   const filtered = useMemo(() => {
-    return (exercises as ExerciseItem[]).filter((ex) => {
-      if (query && !ex.name.toLowerCase().includes(query.toLowerCase()) &&
-          !(ex.tags ?? []).some((t: string) => t.includes(query.toLowerCase()))) return false
+    return exercises.filter((ex) => {
+      // Bewust géén filter op naam meer: de server heeft al gezocht, inclusief
+      // typefouten en tag-synoniemen. Hier nog eens op `includes` filteren
+      // gooide precies die treffers weg (op "squad" bleef er niets over).
       if (selectedCategory && ex.category !== selectedCategory) return false
       if (selectedRegion && !(ex.bodyRegion as string[]).includes(selectedRegion)) return false
       if (selectedDifficulty && ex.difficulty !== selectedDifficulty) return false
@@ -95,9 +122,29 @@ export default function ExercisesPage() {
       if (favoritesOnly && !ex.isFavorite) return false
       return true
     })
-  }, [exercises, query, selectedCategory, selectedRegion, selectedDifficulty, activeCollection, collectionExerciseIds, favoritesOnly])
+  }, [exercises, selectedCategory, selectedRegion, selectedDifficulty, activeCollection, collectionExerciseIds, favoritesOnly])
 
-  const favoritesCount = (exercises as ExerciseItem[]).filter((ex) => ex.isFavorite).length
+  /**
+   * Staat er een letterlijke treffer tussen? Zo niet, dan komt de lijst puur
+   * uit gelijkenis (typefouten en tag-verwantschap). Dat is nuttig, maar het
+   * moet er wel bij staan: "rekken" lijkt volgens trigram-gelijkenis op de tag
+   * "trekken", en dan krijg je roei-oefeningen op een zoekterm voor rekken.
+   */
+  const directeTreffer = useMemo(() => {
+    const q = debouncedQuery.trim().toLowerCase()
+    if (q.length < 2) return true
+    // Op tags kijken we naar woordbegin en niet naar "bevat": de tag "trekken"
+    // bevat letterlijk "rekken", en dan zou een zoektocht naar rekken zichzelf
+    // als directe treffer bestempelen.
+    const woordBegin = (tekst: string) =>
+      tekst.toLowerCase().split(/[^a-z0-9]+/i).some(w => w.startsWith(q))
+    return filtered.some(ex =>
+      ex.name.toLowerCase().includes(q) ||
+      (ex.tags ?? []).some((t: string) => woordBegin(t)),
+    )
+  }, [filtered, debouncedQuery])
+
+  const favoritesCount = exercises.filter((ex) => ex.isFavorite).length
   const activeFilterCount = [selectedCategory, selectedRegion, selectedDifficulty].filter(Boolean).length
 
   const clearFilters = () => {
@@ -244,6 +291,11 @@ export default function ExercisesPage() {
               {' · '}
               Klik op een kaart voor de video
             </p>
+            {!directeTreffer && filtered.length > 0 && (
+              <p style={{ color: P.gold, fontSize: 12, marginTop: 4 }}>
+                Geen oefening met &ldquo;{debouncedQuery}&rdquo; in de naam of tags. Dit lijkt erop.
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <DarkButton
@@ -266,16 +318,46 @@ export default function ExercisesPage() {
             <DarkInput
               placeholder="Zoek oefeningen, tags…"
               value={query}
-              onChange={e => setQuery(e.target.value)}
+              onChange={e => { setQuery(e.target.value); setSuggestOpen(true) }}
+              onFocus={() => setSuggestOpen(true)}
+              onBlur={() => setSuggestOpen(false)}
             />
             {query && (
               <button
                 className="absolute right-3 top-1/2 -translate-y-1/2"
-                onClick={() => setQuery('')}
+                onClick={() => { setQuery(''); setSuggestOpen(false) }}
                 style={{ color: P.inkMuted, fontSize: 16 }}
               >
                 ×
               </button>
+            )}
+
+            {/* Woordsuggesties: welke woorden bestaan er in de bibliotheek,
+                zodat je je zoekterm kunt afmaken voordat je verder typt. */}
+            {suggestOpen && suggesties.length > 0 && (
+              <div
+                className="absolute left-0 right-0 top-full mt-1 z-30 rounded-xl overflow-hidden"
+                style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}` }}
+              >
+                <div className="athletic-mono text-[9px] px-3 pt-2 pb-1" style={{ color: P.inkDim }}>
+                  Gerelateerde zoekopties
+                </div>
+                {suggesties.map(w => (
+                  <button
+                    key={w}
+                    type="button"
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => { setQuery(w); setSuggestOpen(false) }}
+                    className="w-full text-left px-3 py-2 transition-colors"
+                    style={{ color: P.ink, fontSize: 13, background: 'transparent' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(212,232,230,0.06)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                  >
+                    <strong style={{ fontWeight: 700 }}>{w.slice(0, query.trim().length)}</strong>
+                    {w.slice(query.trim().length)}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
 
@@ -466,6 +548,7 @@ export default function ExercisesPage() {
             {filtered.map((ex) => (
               <ExerciseCard
                 key={ex.id}
+                query={query}
                 exercise={ex}
                 onPreview={() => openPreview(ex)}
                 onToggleFavorite={(id) => toggleFavorite.mutate({ exerciseId: id })}
@@ -498,7 +581,9 @@ export default function ExercisesPage() {
                     {ex.name[0]}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p style={{ color: P.ink, fontSize: 14, fontWeight: 600 }}>{ex.name}</p>
+                    <p style={{ color: P.ink, fontSize: 14, fontWeight: 600 }}>
+                      <MarkMatch text={ex.name} query={query} />
+                    </p>
                     <p
                       className="truncate"
                       style={{ color: P.inkMuted, fontSize: 12 }}

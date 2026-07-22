@@ -422,6 +422,46 @@ export const exercisesRouter = createTRPCRouter({
       return { success: true }
     }),
 
+  /**
+   * Zoeksuggesties terwijl je typt: losse woorden uit oefeningnamen en tags die
+   * beginnen met wat er staat. Typ "adduc" en je krijgt "adductoren",
+   * "adductie" — zodat je ziet welke woorden er in de bibliotheek bestaan
+   * voordat je verder typt.
+   *
+   * Bewust woorden en geen hele oefeningnamen: een suggestie is bedoeld om je
+   * zoekterm af te maken, niet om de resultatenlijst te dupliceren die er
+   * onder al staat.
+   */
+  suggest: protectedProcedure
+    .input(z.object({ query: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const q = input.query.trim().toLowerCase()
+      if (q.length < 2) return []
+
+      // Alleen suggesties uit oefeningen die deze gebruiker ook mag zien.
+      const practiceId = ctx.user!.practiceId ?? null
+      const rows = await ctx.prisma.$queryRaw<Array<{ woord: string; n: bigint }>>`
+        WITH zichtbaar AS (
+          SELECT name, tags FROM public.exercises
+          WHERE "createdById" = ${ctx.user!.id}
+             OR "isPublic" = true
+             OR ("practiceId" IS NOT NULL AND "practiceId" = ${practiceId})
+        ), woorden AS (
+          SELECT lower(w) AS woord FROM zichtbaar,
+            unnest(regexp_split_to_array(name, '[^[:alnum:]]+')) AS w
+          UNION ALL
+          SELECT lower(t) AS woord FROM zichtbaar, unnest(tags) AS t
+        )
+        SELECT woord, count(*) AS n
+        FROM woorden
+        WHERE woord LIKE ${q + '%'} AND length(woord) > length(${q})
+        GROUP BY woord
+        ORDER BY n DESC, length(woord) ASC
+        LIMIT 5
+      `
+      return rows.map(r => r.woord)
+    }),
+
   // ── Collections CRUD ────────────────────────────────────────────────────
 
   listCollections: protectedProcedure

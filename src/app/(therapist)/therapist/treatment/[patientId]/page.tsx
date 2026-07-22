@@ -1751,6 +1751,10 @@ function ExercisePicker({
 
   const exercises: ExerciseRow[] = collectionId ? collectionExercises : searchResults
 
+  // Binnen een collectie zoekt de server niet mee (die query haalt de hele
+  // collectie op), dus filtert de client daar wél. Buiten een collectie heeft
+  // de server al gezocht — daar niet nogmaals filteren, dat zou de treffers op
+  // typefouten en tag-synoniemen wegvegen.
   const filtered = collectionId && query.trim()
     ? exercises.filter((ex) => ex.name.toLowerCase().includes(query.toLowerCase()))
     : exercises

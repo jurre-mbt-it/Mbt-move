@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { EXERCISE_CATEGORIES, DIFFICULTIES } from '@/lib/exercise-constants'
 import { cn } from '@/lib/utils'
+import { MarkMatch } from '@/components/exercises/MarkMatch'
 
 interface ExerciseCardProps {
   exercise: {
@@ -36,6 +37,8 @@ interface ExerciseCardProps {
   /** Quick-add → handler krijgt de exercise-id. Toont Physitrack-stijl + bolletje
    *  rechtsonder op de thumbnail. */
   onQuickAdd?: (id: string) => void
+  /** Wat er getypt is, om het overeenkomende stuk in de naam te markeren. */
+  query?: string
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -54,6 +57,7 @@ export function ExerciseCard({
   onPreview,
   onToggleFavorite,
   onQuickAdd,
+  query,
 }: ExerciseCardProps) {
   const category = EXERCISE_CATEGORIES.find(c => c.value === exercise.category)
   const difficulty = DIFFICULTIES.find(d => d.value === exercise.difficulty)
@@ -176,7 +180,9 @@ export function ExerciseCard({
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-sm truncate">{exercise.name}</h3>
+            <h3 className="font-semibold text-sm truncate">
+              <MarkMatch text={exercise.name} query={query ?? ''} />
+            </h3>
             {exercise.description && (
               <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{exercise.description}</p>
             )}
