@@ -25,6 +25,14 @@ export const PHASE_TYPES: PhaseType[] = [
 
 type PhaseMeta = { label: string; short: string; color: string; description: string }
 
+/**
+ * LET OP: de kalender in de weekplanner gebruikt deze kleuren NIET meer. Vier
+ * van de vijf waren identiek aan iets anders op datzelfde scherm (Opbouw =
+ * "voltooid", Intensivering = "bezig", Deload = mobiliteit, Taper = cardio),
+ * waardoor één kalender veertien tinten telde en geen enkele nog iets zei. De
+ * fase staat daar nu als naam in de weekrail. Deze kleuren blijven voor
+ * grafieken en rapporten, waar ze wél de enige kleurtaal zijn.
+ */
 export const PHASE_META: Record<PhaseType, PhaseMeta> = {
   ACCUMULATION: {
     label: 'Opbouw',

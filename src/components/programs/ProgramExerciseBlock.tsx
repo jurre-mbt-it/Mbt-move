@@ -30,11 +30,8 @@ import { NumericInput } from '@/components/ui/numeric-input'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { CustomParameter } from './types'
+import { CATEGORY_COLORS } from '@/lib/palette'
 
-const CATEGORY_COLORS: Record<string, string> = {
-  STRENGTH: '#5FD08A', MOBILITY: '#7FB0D8', PLYOMETRICS: '#F5B942',
-  CARDIO: '#F0796C', STABILITY: '#45A8A2',
-}
 
 interface LibraryExerciseLike {
   id: string

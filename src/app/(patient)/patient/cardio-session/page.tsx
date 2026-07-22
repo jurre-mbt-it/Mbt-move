@@ -10,18 +10,18 @@ import {
 } from 'lucide-react'
 import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, HR_ZONES, HRZone } from '@/lib/cardio-constants'
 import { CARDIO_ICON_MAP, IconRunning, IconWalking, IconWarning, IconFinishFlag, IconCheck } from '@/components/icons'
-import { P, Kicker, MetaLabel, Tile, DarkButton, DarkInput, CATEGORY_COLORS } from '@/components/dark-ui'
+import { P, Kicker, MetaLabel, Tile, DarkButton, DarkInput, ZONE_COLORS } from '@/components/dark-ui'
 import { trpc } from '@/lib/trpc/client'
 
 type SessionPhase = 'IDLE' | 'ACTIVE' | 'PAUSED' | 'DONE'
 
-// HR zone colors — use CATEGORY_COLORS Z1-Z5
+// HR zone colors — zie ZONE_COLORS in lib/palette
 const ZONE_COLOR_MAP: Record<HRZone, string> = {
-  1: CATEGORY_COLORS.Z1,
-  2: CATEGORY_COLORS.Z2,
-  3: CATEGORY_COLORS.Z3,
-  4: CATEGORY_COLORS.Z4,
-  5: CATEGORY_COLORS.Z5,
+  1: ZONE_COLORS.Z1,
+  2: ZONE_COLORS.Z2,
+  3: ZONE_COLORS.Z3,
+  4: ZONE_COLORS.Z4,
+  5: ZONE_COLORS.Z5,
 }
 
 // ── Audio cue helper ──────────────────────────────────────────────────────────

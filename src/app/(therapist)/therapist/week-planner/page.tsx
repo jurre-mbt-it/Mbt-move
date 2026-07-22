@@ -68,35 +68,21 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
+import { CATEGORY_COLORS } from '@/lib/palette'
+import { useCategoryColors } from '@/lib/useCategoryColors'
+import {
+  CATEGORY_LABELS,
+  CategoryIcon,
+  QuickExerciseBuilder,
+  toItemExercisePayload,
+  type ItemExercise,
+} from '@/components/week-planner/QuickExerciseBuilder'
+import { LOAD_UITLEG } from '@/lib/training-load'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Category = 'STRENGTH' | 'MOBILITY' | 'PLYOMETRICS' | 'CARDIO' | 'STABILITY'
 
-const CATEGORY_LABELS: Record<Category, string> = {
-  STRENGTH: 'Kracht',
-  MOBILITY: 'Mobiliteit',
-  PLYOMETRICS: 'Plyometrie',
-  CARDIO: 'Cardio',
-  STABILITY: 'Stabiliteit',
-}
-const CATEGORY_COLORS: Record<Category, string> = {
-  STRENGTH: '#5FD08A',
-  MOBILITY: '#7FB0D8',
-  PLYOMETRICS: '#F5B942',
-  CARDIO: '#F0796C',
-  STABILITY: '#45A8A2',
-}
-function CategoryIcon({ category, size = 14 }: { category: Category; size?: number }) {
-  const props = { size, className: undefined as string | undefined }
-  switch (category) {
-    case 'STRENGTH': return <IconStrength {...props} />
-    case 'MOBILITY': return <IconMobility {...props} />
-    case 'PLYOMETRICS': return <IconPlyometrics {...props} />
-    case 'CARDIO': return <IconCardio {...props} />
-    case 'STABILITY': return <IconCore {...props} />
-  }
-}
 
 const MONTH_LABELS_NL = [
   'Januari', 'Februari', 'Maart', 'April', 'Mei', 'Juni',
@@ -211,67 +197,10 @@ function PatientPicker({
 
 // ─── Item tile ────────────────────────────────────────────────────────────────
 
-type ItemExercise = {
-  id: string
-  exerciseId: string
-  exerciseName: string
-  exerciseCategory: string
-  sets: number
-  reps: number
-  repUnit: string
-  restTime: number | null
-  /**
-   * Het voorschrift. Deze builder zet het niet, maar het kómt hier wel binnen
-   * (via listItemContents) zodra een plan-sjabloon of een kopie het meebrengt.
-   * setItemExercises vervangt de hele lijst, dus wat we niet terugsturen is
-   * weg — vandaar dat dit meereist ook al tonen we het hier niet.
-   */
-  notes?: string | null
-  setsMax?: number | null
-  repsMax?: number | null
-  intensityType?: string
-  intensityMin?: number | null
-  intensityMax?: number | null
-  intensityText?: string | null
-  supersetGroup?: string | null
-  supersetOrder?: number
-  extraParams?: ItemExerciseParam[]
-}
 
-type ItemExerciseParam = {
-  id?: string
-  label: string
-  type?: string
-  value?: string | number | null
-  valueMax?: string | number | null
-  unit?: string
-  options?: string[]
-  min?: number
-  max?: number
-}
 
 /** Alles wat setItemExercises accepteert — één plek, zodat een nieuw veld niet
  *  bij de volgende opslag stil verdwijnt. */
-function toItemExercisePayload(e: ItemExercise) {
-  return {
-    exerciseId: e.exerciseId,
-    sets: e.sets,
-    reps: e.reps,
-    repUnit: e.repUnit,
-    restTime: e.restTime,
-    notes: e.notes ?? null,
-    setsMax: e.setsMax ?? null,
-    repsMax: e.repsMax ?? null,
-    intensityType: (e.intensityType ?? 'NONE') as
-      'NONE' | 'RPE' | 'PERCENT_1RM' | 'RELATIVE_DAILY_MAX' | 'TECHNIQUE' | 'TEXT',
-    intensityMin: e.intensityMin ?? null,
-    intensityMax: e.intensityMax ?? null,
-    intensityText: e.intensityText ?? null,
-    supersetGroup: e.supersetGroup ?? null,
-    supersetOrder: e.supersetOrder,
-    extraParams: e.extraParams ?? [],
-  }
-}
 
 // Cardio-parameters van een quick CARDIO-workout (los opgeslagen als JSON).
 type PlannerCardioParams = {
@@ -381,13 +310,10 @@ type ItemStatus = 'scheduled' | 'completed' | 'partial' | 'missed' | 'in_progres
 // Status leidt de tile-kleur: gepland = neutraal/wit, voltooid = groen,
 // deels (eerder gestopt) = oranje, gemist (verleden + niet gedaan) = rood.
 // Categorie blijft herkenbaar via het icoon.
-const STATUS_COLORS: Record<ItemStatus, string> = {
-  scheduled: 'rgba(212,232,230,0.09)',
-  completed: 'rgba(95,208,138,0.14)',  // lime tint
-  partial:   'rgba(238,132,71,0.16)',   // orange tint
-  missed:    'rgba(240,121,108,0.14)',  // danger red tint
-  in_progress: 'rgba(245,185,66,0.16)', // gold/amber tint
-}
+// Het vlak van een tegel is altijd neutraal. Kleur zit op de 3px-rand (status)
+// en het icoon (soort) — twee smalle vlakken. Toen de status ook het hele vlak
+// vulde, telde één kalender veertien tinten en werd het onleesbaar.
+const TILE_BG = P.surface
 const STATUS_BORDER: Record<ItemStatus, string> = {
   scheduled: 'rgba(212,232,230,0.5)',
   completed: P.lime,
@@ -401,37 +327,26 @@ const STATUS_BORDER: Record<ItemStatus, string> = {
  * en de tegelkleuren zijn pas een taal als ergens staat wat ze betekenen.
  */
 function CalendarLegend() {
-  const swatch = (status: ItemStatus, label: string) => (
-    <span key={label} className="flex items-center gap-1 shrink-0">
-      <span
-        className="rounded-sm"
-        style={{
-          width: 10,
-          height: 10,
-          background: STATUS_COLORS[status],
-          borderLeft: `3px solid ${STATUS_BORDER[status]}`,
-        }}
-      />
-      <span className="athletic-mono text-[9px] tracking-wider" style={{ color: P.inkDim }}>
-        {label}
-      </span>
-    </span>
-  )
   return (
     <div
-      className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2 border-t"
+      className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 border-t"
       style={{ borderColor: P.line, background: P.surfaceLow }}
     >
-      {swatch('scheduled', 'GEPLAND')}
-      {swatch('in_progress', 'BEZIG')}
-      {swatch('completed', 'GEDAAN')}
-      {swatch('partial', 'DEELS')}
-      {swatch('missed', 'GEMIST')}
+      {/* De statuskleuren staan al boven de kalender; hier alleen wat daar niet
+          staat: dat een tegel twee dingen tegelijk zegt, en wat de twee getallen
+          in de weekrail betekenen. */}
       <span className="athletic-mono text-[9px] tracking-wider" style={{ color: P.inkDim }}>
-        3/8 = GEDANE VAN GEPLANDE WORKOUTS
+        Rand = status · icoon = soort training
       </span>
       <span className="athletic-mono text-[9px] tracking-wider" style={{ color: P.inkDim }}>
-        ~1041 = GEPLANDE WEEKBELASTING IN sRPE, ~ = DEELS GESCHAT
+        3/8 = gedane van geplande workouts
+      </span>
+      <span
+        className="athletic-mono text-[9px] tracking-wider"
+        style={{ color: P.inkDim }}
+        title={LOAD_UITLEG}
+      >
+        ~1041 AU = geplande weekbelasting
       </span>
     </div>
   )
@@ -458,12 +373,12 @@ function WeekLoadBar({
   const color =
     verdict === 'over' ? P.brand
     : verdict === 'under' ? P.inkDim
-    : verdict === 'on_target' ? PHASE_META.ACCUMULATION.color
+    : verdict === 'on_target' ? P.lime
     : P.inkMuted
   const pct = target && target > 0 ? Math.min(100, (planned / (target * 1.25)) * 100) : 0
   const title = target
-    ? `Gepland ${planned} van ${target} sRPE-punten${estimated ? ' (deels geschat)' : ''}`
-    : `Gepland ${planned} sRPE-punten${estimated ? ' (deels geschat)' : ''} — geen weekdoel gezet`
+    ? `Gepland ${planned} van ${target} AU${estimated ? ' (deels geschat)' : ''}. ${LOAD_UITLEG}`
+    : `Gepland ${planned} AU${estimated ? ' (deels geschat)' : ''}, geen weekdoel gezet. ${LOAD_UITLEG}`
 
   return (
     <span className="flex flex-col items-center gap-0.5 w-full px-1" title={title}>
@@ -484,118 +399,6 @@ function WeekLoadBar({
         {estimated ? '~' : ''}{planned}
       </span>
     </span>
-  )
-}
-
-/**
- * Detailpaneel voor één kalender-item. Toont de geplande inhoud (programma-
- * oefeningen of snelle-workout-velden) + acties (snel bewerken, opslaan als
- * schema, kopiëren). Als er een gelogde sessie bij hoort, staat de uitgevoerde
- * data read-only eronder. Herbruikt in zij-paneel (desktop) en modal (mobiel).
- */
-// Inline oefening-builder voor een quick-workout: categorie-gefilterde kiezer +
-// per oefening sets×reps. Beheert een lokale lijst en slaat in één keer op.
-function QuickExerciseBuilder({
-  item, defaultCategory, onSave, saving,
-}: {
-  item: ScheduleItem
-  defaultCategory: Category
-  onSave: (exercises: ReturnType<typeof toItemExercisePayload>[]) => Promise<void>
-  saving: boolean
-}) {
-  const [list, setList] = useState<ItemExercise[]>(item.exercises ?? [])
-  const [catFilter, setCatFilter] = useState<Category | null>(defaultCategory)
-  const [search, setSearch] = useState('')
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: candidates = [] } = (trpc.exercises.list.useQuery as any)(
-    { category: catFilter ?? undefined, query: search || undefined },
-    { staleTime: 30_000 },
-  ) as { data: Array<{ id: string; name: string; category: string }> }
-
-  const selectedIds = new Set(list.map(e => e.exerciseId))
-  const numStyle: React.CSSProperties = { background: P.surfaceHi, color: P.ink, border: `1px solid ${P.line}`, padding: '2px 4px' }
-
-  function add(ex: { id: string; name: string; category: string }) {
-    if (selectedIds.has(ex.id)) return
-    setList(l => [...l, {
-      id: `new-${ex.id}-${l.length}`, exerciseId: ex.id, exerciseName: ex.name,
-      exerciseCategory: ex.category, sets: 3, reps: 10, repUnit: 'reps', restTime: null,
-    }])
-  }
-  function update(i: number, patch: Partial<ItemExercise>) {
-    setList(l => l.map((e, idx) => idx === i ? { ...e, ...patch } : e))
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <MetaLabel>Oefeningen</MetaLabel>
-        <DarkButton
-          variant="primary" size="sm" disabled={saving}
-          onClick={() => onSave(list.map(toItemExercisePayload))}
-        >
-          {saving ? 'Opslaan…' : 'Opslaan'}
-        </DarkButton>
-      </div>
-
-      {list.length > 0 && (
-        <div className="space-y-1.5">
-          {list.map((e, i) => {
-            const c = CATEGORY_COLORS[(e.exerciseCategory as Category) ?? 'STRENGTH']
-            return (
-              <div key={e.id} className="rounded-lg p-2 flex items-center gap-1.5"
-                style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, borderLeft: `3px solid ${c}` }}>
-                <span className="flex-1 truncate text-xs" style={{ color: P.ink }}>{e.exerciseName}</span>
-                <input type="number" min={1} max={50} value={e.sets} aria-label="sets"
-                  onChange={ev => update(i, { sets: Math.max(1, Number(ev.target.value) || 1) })}
-                  className="w-10 text-center rounded text-xs" style={numStyle} />
-                <span className="text-[10px]" style={{ color: P.inkMuted }}>×</span>
-                <input type="number" min={1} max={999} value={e.reps} aria-label="reps"
-                  onChange={ev => update(i, { reps: Math.max(1, Number(ev.target.value) || 1) })}
-                  className="w-12 text-center rounded text-xs" style={numStyle} />
-                <button type="button" onClick={() => setList(l => l.filter((_, idx) => idx !== i))}
-                  className="text-[#9EB5B3] hover:text-[#F0796C] shrink-0"><X className="w-3.5 h-3.5" /></button>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Categorie-filter (standaard aan, uitklikbaar) */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {catFilter ? (
-          <button type="button" onClick={() => setCatFilter(null)}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"
-            style={{ background: `${CATEGORY_COLORS[catFilter]}20`, color: CATEGORY_COLORS[catFilter], border: `1px solid ${CATEGORY_COLORS[catFilter]}` }}>
-            {CATEGORY_LABELS[catFilter]} <X className="w-3 h-3" />
-          </button>
-        ) : (
-          <button type="button" onClick={() => setCatFilter(defaultCategory)}
-            className="px-2 py-0.5 rounded-full text-[11px]" style={{ color: P.inkMuted, border: `1px solid ${P.lineStrong}` }}>
-            Alle categorieën — klik voor {CATEGORY_LABELS[defaultCategory]}
-          </button>
-        )}
-      </div>
-      <div className="relative">
-        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <DarkInput value={search} onChange={e => setSearch(e.target.value)} placeholder="Zoek oefening…" className="pl-8" />
-      </div>
-      <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
-        {candidates.filter(c => !selectedIds.has(c.id)).slice(0, 40).map(c => {
-          const cat = (c.category as Category) ?? 'STRENGTH'
-          return (
-            <button key={c.id} type="button" onClick={() => add(c)}
-              className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-[#1C4448]"
-              style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}>
-              <span style={{ color: CATEGORY_COLORS[cat] }}><CategoryIcon category={cat} size={11} /></span>
-              <span className="flex-1 truncate text-xs" style={{ color: P.ink }}>{c.name}</span>
-              <Plus className="w-3.5 h-3.5" style={{ color: P.inkMuted }} />
-            </button>
-          )
-        })}
-      </div>
-    </div>
   )
 }
 
@@ -667,13 +470,14 @@ function ItemTile({
   const marker = isWorkoutKind(item.kind)
     ? null
     : MARKER_META[item.kind as Exclude<ItemKind, 'PROGRAM' | 'WORKOUT'>]
+  const catColors = useCategoryColors()
   const category: Category = item.quickCategory ?? 'STRENGTH'  // default voor program-link
-  // Kleur op een workout-tegel betekent één ding: de status. Het icoon kleurt
-  // dus mee met de rand en niet met de categorie — die is aan de vórm van het
-  // icoon te zien. Anders botsen de twee talen: kracht en "gedaan" zijn allebei
-  // groen, cardio en "gemist" allebei koraal, en dan leest een week vol gemiste
-  // trainingen als een week vol afgevinkte trainingen.
-  const color = marker ? marker.color : STATUS_BORDER[status]
+  // Twee talen op één tegel, bewust op verschillende plekken: de rand zegt hoe
+  // het ging (status), het icoon zegt wat het was (soort). Dat kan alleen omdat
+  // de soortkleuren koel en gedempt zijn en de statuskleuren warm — vallen ze
+  // samen, dan leest een week vol gemiste trainingen als een week vol
+  // afgevinkte. Zie de opmerking bij CATEGORY_COLORS in lib/palette.
+  const color = marker ? marker.color : catColors[category] ?? P.inkMuted
   const name = marker
     ? (item.kind === 'TEST' ? (item.testBattery?.name ?? 'Test') : (item.quickName ?? marker.label))
     : item.programId ? (item.program?.name ?? 'Programma') : (item.quickName ?? 'Workout')
@@ -688,7 +492,7 @@ function ItemTile({
   // Markeringen hebben geen status: een notitie of streefdatum in het verleden
   // is niet "gemist". Ze krijgen hun eigen rustige weergave i.p.v. de
   // status-kleuren van een workout.
-  const statusBg = marker ? 'transparent' : STATUS_COLORS[status]
+  const statusBg = marker ? 'transparent' : TILE_BG
   const statusBorder = marker ? marker.color : STATUS_BORDER[status]
   const isClickable = !!onClick
 
@@ -1178,11 +982,12 @@ function ItemDetailContent({
   copying: boolean
   savingExercises: boolean
 }) {
+  const catColors = useCategoryColors()
   const portal = usePortal()
   const { item, date, sessionId } = detail
   const isProgram = !!item.programId
   const category: Category = item.quickCategory ?? 'STRENGTH'
-  const color = CATEGORY_COLORS[category]
+  const color = catColors[category]
   const title = isProgram ? (item.program?.name ?? 'Programma') : (item.quickName ?? 'Workout')
 
   // `as any` op de query: het programs.get-returntype is extreem diep (incl.
@@ -1392,7 +1197,7 @@ function ItemDetailContent({
               <div className="space-y-1.5">
                 {programQuery.data.exercises.map(pe => {
                   const cat = (pe.exercise.category as Category) ?? 'STRENGTH'
-                  const c = CATEGORY_COLORS[cat]
+                  const c = catColors[cat]
                   const setLine = pe.sets && pe.reps ? `${pe.sets} × ${pe.reps}${pe.repUnit ? ` ${pe.repUnit}` : ''}` : pe.sets ? `${pe.sets} sets` : '—'
                   return (
                     <div
@@ -1420,7 +1225,7 @@ function ItemDetailContent({
             ) : (
               <QuickExerciseBuilder
                 key={item.id}
-                item={item}
+                initial={item.exercises ?? []}
                 defaultCategory={category}
                 saving={savingExercises}
                 onSave={(exercises) => onSaveExercises(item.id, exercises)}
@@ -1445,7 +1250,7 @@ function ItemDetailContent({
               <div className="space-y-1.5">
                 {sessionQuery.data.exerciseLogs.map(log => {
                   const cat = (log.exercise.category as Category) ?? 'STRENGTH'
-                  const c = CATEGORY_COLORS[cat]
+                  const c = catColors[cat]
                   const setLine = log.setsCompleted && log.repsCompleted
                     ? `${log.setsCompleted} × ${log.repsCompleted}`
                     : log.setsCompleted ? `${log.setsCompleted} sets`
@@ -1538,12 +1343,11 @@ function WeekMetaDialog({
                     title={PHASE_META[pt].description}
                     className="px-2.5 py-1 rounded-md text-xs font-semibold transition-colors flex items-center gap-1.5"
                     style={{
-                      background: active ? `${PHASE_META[pt].color}22` : 'transparent',
-                      color: active ? PHASE_META[pt].color : P.inkMuted,
-                      border: `1px solid ${active ? PHASE_META[pt].color : P.line}`,
+                      background: active ? `color-mix(in srgb, ${P.brand} 14%, transparent)` : 'transparent',
+                      color: active ? P.brand : P.inkMuted,
+                      border: `1px solid ${active ? P.brand : P.line}`,
                     }}
                   >
-                    <span className="w-2 h-2 rounded-full" style={{ background: PHASE_META[pt].color }} />
                     {PHASE_META[pt].label}
                   </button>
                 )
@@ -1558,7 +1362,7 @@ function WeekMetaDialog({
           >
             <span
               className="w-9 h-5 rounded-full relative transition-colors shrink-0"
-              style={{ background: isDeload ? PHASE_META.DELOAD.color : P.lineStrong }}
+              style={{ background: isDeload ? P.brand : P.lineStrong }}
             >
               <span
                 className="absolute top-0.5 w-4 h-4 rounded-full bg-[#F5F2ED] transition-transform"
@@ -1566,7 +1370,7 @@ function WeekMetaDialog({
               />
             </span>
             <span className="flex items-center gap-1.5 text-sm" style={{ color: P.ink }}>
-              <Moon className="w-3.5 h-3.5" style={{ color: PHASE_META.DELOAD.color }} />
+              <Moon className="w-3.5 h-3.5" style={{ color: P.inkMuted }} />
               Deload-week (herstel)
             </span>
           </button>
@@ -2760,19 +2564,6 @@ function WeekPlannerContent() {
           </Tile>
         )}
 
-        {/* Fase-legenda — alleen tonen zodra er weken zijn, zodat de kleur-
-            codering in de week-rail te lezen is. */}
-        {schedules.length > 0 && (
-          <div className="flex items-center gap-3 flex-wrap px-1">
-            <span className="athletic-mono text-[10px] tracking-wider" style={{ color: P.inkDim }}>FASES</span>
-            {PHASE_TYPES.map(pt => (
-              <span key={pt} className="flex items-center gap-1.5 text-[11px]" style={{ color: P.inkMuted }}>
-                <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: PHASE_META[pt].color }} />
-                {PHASE_META[pt].label}
-              </span>
-            ))}
-          </div>
-        )}
 
         {/* Selectie-toolbar: zichtbaar zodra er dagen geselecteerd zijn */}
         {selectedIsos.size > 0 && (
@@ -2835,7 +2626,7 @@ function WeekPlannerContent() {
             const phase = phaseMeta(meta?.phaseType)
             // Fase-kleur bepaalt een subtiele tint links op de rij; deload wint
             // qua kleur zodat een herstelweek altijd herkenbaar blauw is.
-            const accent = meta?.isDeload ? PHASE_META.DELOAD.color : phase?.color ?? null
+            const accent = meta?.isDeload || phase ? true : null
             return (
               <div
                 key={wIdx}
@@ -2843,8 +2634,9 @@ function WeekPlannerContent() {
                 style={{
                   borderColor: P.line,
                   minHeight: 176,
-                  borderLeft: accent ? `3px solid ${accent}` : `3px solid transparent`,
-                  background: accent ? `linear-gradient(90deg, ${accent}0D, transparent 12%)` : undefined,
+                  // Fase is géén kleur meer maar een naam in de rail; het randje
+                  // links markeert alleen dát er een fase op de week staat.
+                  borderLeft: `3px solid ${accent ? P.lineStrong : 'transparent'}`,
                 }}
               >
                 {/* Week-rail: nummer, fase-pill, deload, gepland/gedaan + menu */}
@@ -2856,20 +2648,22 @@ function WeekPlannerContent() {
                       </span>
                       {meta?.isDeload && (
                         <span title="Deload-week">
-                          <Moon className="w-3 h-3" style={{ color: PHASE_META.DELOAD.color }} />
+                          <Moon className="w-3 h-3" style={{ color: P.inkMuted }} />
                         </span>
                       )}
                       {phase && !meta?.isDeload && (
                         <span
-                          className="w-2 h-2 rounded-full"
-                          style={{ background: phase.color }}
+                          className="athletic-mono text-[8px] leading-tight text-center"
+                          style={{ color: P.inkMuted, letterSpacing: '0.04em' }}
                           title={`${phase.label} — ${phase.description}`}
-                        />
+                        >
+                          {phase.short}
+                        </span>
                       )}
                       {progress && progress.planned > 0 && (
                         <span
                           className="athletic-mono text-[9px]"
-                          style={{ color: progress.done >= progress.planned ? PHASE_META.ACCUMULATION.color : P.inkDim }}
+                          style={{ color: progress.done >= progress.planned ? P.lime : P.inkDim }}
                           title={`${progress.done} van ${progress.planned} geplande workouts gedaan`}
                         >
                           {progress.done}/{progress.planned}

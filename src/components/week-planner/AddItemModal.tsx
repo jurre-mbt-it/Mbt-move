@@ -27,6 +27,7 @@ import {
   CARDIO_ICON_MAP,
 } from '@/components/icons'
 import { CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
+import { CATEGORY_COLORS } from '@/lib/palette'
 import {
   DarkButton,
   DarkDialog as Dialog,
@@ -58,13 +59,6 @@ export type AddItemPayload =
 
 type ProgramListItem = { id: string; name: string; isTemplate?: boolean }
 
-const CATEGORY_COLORS: Record<Category, string> = {
-  STRENGTH: '#5FD08A',
-  MOBILITY: '#7FB0D8',
-  PLYOMETRICS: '#F5B942',
-  CARDIO: '#F0796C',
-  STABILITY: '#45A8A2',
-}
 
 /** Cardio-activiteiten onder "Aerobic": alles behalve de twee eigen tegels. */
 const AEROBIC_ACTIVITIES: CardioActivityKey[] = [

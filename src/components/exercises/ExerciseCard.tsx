@@ -14,6 +14,7 @@ import {
 import { EXERCISE_CATEGORIES, DIFFICULTIES } from '@/lib/exercise-constants'
 import { cn } from '@/lib/utils'
 import { MarkMatch } from '@/components/exercises/MarkMatch'
+import { CATEGORY_COLORS } from '@/lib/palette'
 
 interface ExerciseCardProps {
   exercise: {
@@ -41,13 +42,6 @@ interface ExerciseCardProps {
   query?: string
 }
 
-const CATEGORY_COLORS: Record<string, string> = {
-  STRENGTH:    '#5FD08A',
-  MOBILITY:    '#7FB0D8',
-  PLYOMETRICS: '#F5B942',
-  CARDIO:      '#F0796C',
-  STABILITY:   '#45A8A2',
-}
 
 const DIFFICULTY_DOTS = { BEGINNER: 1, INTERMEDIATE: 2, ADVANCED: 3 }
 

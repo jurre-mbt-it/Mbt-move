@@ -7,19 +7,13 @@ import { Button } from '@/components/ui/button'
 import { X, VideoOff, TrendingDown, TrendingUp, Lightbulb, Edit } from 'lucide-react'
 import Link from 'next/link'
 import { EXERCISE_CATEGORIES, DIFFICULTIES } from '@/lib/exercise-constants'
+import { CATEGORY_COLORS } from '@/lib/palette'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ReactPlayer = dynamic(() => import('react-player') as any, { ssr: false }) as any
 
 const MBT_GREEN = '#E87A55'
 
-const CATEGORY_COLORS: Record<string, string> = {
-  STRENGTH:    '#5FD08A',
-  MOBILITY:    '#7FB0D8',
-  PLYOMETRICS: '#F5B942',
-  CARDIO:      '#F0796C',
-  STABILITY:   '#45A8A2',
-}
 
 export type ExerciseForModal = {
   id?: string

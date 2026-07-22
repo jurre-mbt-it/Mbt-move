@@ -11,14 +11,8 @@ import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
+import { CATEGORY_COLORS } from '@/lib/palette'
 
-const CATEGORY_COLORS: Record<string, string> = {
-  STRENGTH:    '#5FD08A',
-  MOBILITY:    '#7FB0D8',
-  PLYOMETRICS: '#F5B942',
-  CARDIO:      '#F0796C',
-  STABILITY:   '#45A8A2',
-}
 
 interface LibraryExercise {
   id: string

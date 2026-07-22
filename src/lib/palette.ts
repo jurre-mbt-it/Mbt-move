@@ -57,15 +57,27 @@ export const DATA_COLORS = [
   '#D9C08A', // zand
 ] as const
 
-/** Kleur per oefencategorie en per hartslagzone — dezelfde tinten als in
- *  `lib/workout-constants` en `lib/cardio-constants`. */
-export const CATEGORY_COLORS = {
-  STRENGTH: DATA_COLORS[1],
-  MOBILITY: DATA_COLORS[5],
-  PLYO: DATA_COLORS[2],
-  CARDIO: DATA_COLORS[4],
-  STABILITY: DATA_COLORS[6],
-  // Hartslagzones: koel bij laag, warm bij hoog.
+/**
+ * Kleur per trainingssoort. Eén bron voor de hele app; de kalender, de
+ * oefeningkaarten en de kiezers lezen hier allemaal uit.
+ *
+ * Belangrijk: deze tinten mogen NIET samenvallen met de statuskleuren van de
+ * weekplanner (groen = gedaan, goud = bezig, oranje = deels, koraal = gemist).
+ * Op een kalendertegel dragen de twee namelijk allebei betekenis — de rand zegt
+ * hoe het ging, het icoon zegt wat het was — en vallen ze samen, dan leest een
+ * week vol gemiste trainingen als een week vol afgevinkte trainingen. Daarom
+ * koele en gedempte tinten hier, en de warme signaalkleuren voor status.
+ */
+export const CATEGORY_COLORS: Record<string, string> = {
+  STRENGTH:    '#9FCEC9', // mint
+  MOBILITY:    '#7FB0D8', // staalblauw
+  PLYOMETRICS: '#D9C08A', // zand
+  CARDIO:      '#45A8A2', // diep turquoise
+  STABILITY:   '#B9A6D4', // lila
+}
+
+/** Hartslagzones houden hun eigen oplopende reeks: koel bij laag, warm bij hoog. */
+export const ZONE_COLORS: Record<string, string> = {
   Z1: P.ice,
   Z2: P.lime,
   Z3: P.gold,

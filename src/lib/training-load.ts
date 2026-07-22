@@ -118,6 +118,16 @@ export function clampSessionDurationSec(sec: number | null | undefined): number 
   return Math.min(sec, MAX_SESSION_DURATION_SEC)
 }
 
+/**
+ * Uitleg van de eenheid, voor tooltips. Eén tekst, zodat AU overal hetzelfde
+ * betekent en de app hem niet op de ene plek "AU" en op de andere
+ * "sRPE-punten" noemt.
+ */
+export const LOAD_UITLEG =
+  'Belasting in AU: minuten × ervaren zwaarte (RPE), kracht en cardio bij elkaar opgeteld. ' +
+  'Ontbreekt de RPE bij een sessie, dan rekent de app met 5 (matig). ' +
+  'Het getal zegt op zichzelf weinig; de verandering ten opzichte van vorige week wel.'
+
 /** sRPE in arbitrary units; ontbrekende RPE → 5 (matig), zoals elders in de app. */
 export function sessionLoad(durationMinutes: number, rpe: number | null | undefined): number {
   return Math.max(0, durationMinutes) * (rpe ?? 5)

@@ -17,6 +17,7 @@
  */
 
 import { P, DATA_COLORS } from '@/lib/palette'
+import { LOAD_UITLEG } from '@/lib/training-load'
 
 export type CaseloadRow = {
   id: string
@@ -127,7 +128,10 @@ function Belasting({ row }: { row: CaseloadRow }) {
   return (
     <span className="inline-flex items-center gap-2">
       <Spark series={row.series} tint={spike ? P.brand : DATA_COLORS[0]} />
-      <span style={{ fontFamily: MONO, fontSize: 11.5, color: P.ink, fontVariantNumeric: 'tabular-nums' }}>
+      <span
+        style={{ fontFamily: MONO, fontSize: 11.5, color: P.ink, fontVariantNumeric: 'tabular-nums' }}
+        title={LOAD_UITLEG}
+      >
         {row.weekLoad} AU
       </span>
       {row.weekChangePct !== null && row.weekChangePct !== 0 && (
@@ -178,7 +182,7 @@ export function CaseloadTable({
       >
         <span />
         <span className="athletic-mono text-[9px]">Sporter</span>
-        <span className="athletic-mono text-[9px]">Belasting, 6 wk</span>
+        <span className="athletic-mono text-[9px]" title={LOAD_UITLEG}>Belasting, 6 wk</span>
         <span className="athletic-mono text-[9px]">Pijn</span>
         <span className="athletic-mono text-[9px]">Trouw</span>
         <span className="athletic-mono text-[9px]">Laatst</span>

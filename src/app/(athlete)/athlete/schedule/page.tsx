@@ -29,6 +29,7 @@ import {
 } from '@/components/icons'
 import { CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
 import { WeekPhaseLine } from '@/components/schedule/WeekPhaseLine'
+import { CATEGORY_COLORS } from '@/lib/palette'
 
 const mono =
   'var(--font-mono-athletic)'
@@ -37,13 +38,6 @@ const mono =
 
 type Category = 'STRENGTH' | 'MOBILITY' | 'PLYOMETRICS' | 'CARDIO' | 'STABILITY'
 
-const CATEGORY_COLORS: Record<Category, string> = {
-  STRENGTH: '#5FD08A',
-  MOBILITY: '#7FB0D8',
-  PLYOMETRICS: '#F5B942',
-  CARDIO: '#F0796C',
-  STABILITY: '#45A8A2',
-}
 const CATEGORY_LABELS: Record<Category, string> = {
   STRENGTH: 'Kracht',
   MOBILITY: 'Mobiliteit',

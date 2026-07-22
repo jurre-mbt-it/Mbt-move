@@ -20,7 +20,7 @@ import { P, DARK_CHART_COLORS } from '@/lib/palette'
 // Het palet leeft in `@/lib/palette` (plain module) en wordt hier alleen
 // doorgegeven, zodat bestaande imports uit `@/components/dark-ui` blijven
 // werken. Servercomponenten importeren rechtstreeks uit `@/lib/palette`.
-export { P, DATA_COLORS, CATEGORY_COLORS, DARK_CHART_COLORS } from '@/lib/palette'
+export { P, DATA_COLORS, CATEGORY_COLORS, ZONE_COLORS, DARK_CHART_COLORS } from '@/lib/palette'
 
 // ─── Screen wrapper ──────────────────────────────────────────────────────────
 
