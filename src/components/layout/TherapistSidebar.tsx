@@ -174,7 +174,7 @@ export function TherapistSidebar({ variant = 'therapist' }: { variant?: SidebarV
   return (
     <aside
       ref={asideRef}
-      className="min-h-screen flex flex-col shrink-0 border-r transition-[width] duration-300"
+      className="h-screen flex flex-col shrink-0 border-r transition-[width] duration-300"
       style={{
         width: collapsed ? 64 : 256,
         background: P.bg,
@@ -247,7 +247,11 @@ export function TherapistSidebar({ variant = 'therapist' }: { variant?: SidebarV
       </div>
 
       {/* Navigation */}
-      <nav className={cn('flex-1 p-3 flex flex-col gap-1 mbt-stagger', collapsed && 'px-2')}>
+      {/* Alles onder het logo schuift mee. Zonder dit is de onderkant van het
+          menu onbereikbaar op een laag scherm — de layout eromheen staat op
+          overflow-hidden, dus er valt niets terug te scrollen. */}
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+      <nav className={cn('p-3 flex flex-col gap-1 mbt-stagger', collapsed && 'px-2')}>
         {(() => {
           // Langste matchende href wint, zodat op /therapist/programs/new
           // alleen "Builder" oplicht en niet ook "Programma's".
@@ -401,6 +405,7 @@ export function TherapistSidebar({ variant = 'therapist' }: { variant?: SidebarV
           <LogOut className="w-4.5 h-4.5 shrink-0" />
           {!collapsed && 'Uitloggen'}
         </button>
+      </div>
       </div>
     </aside>
   )
