@@ -27,10 +27,20 @@ export type PushCategory = 'message' | 'schedule' | 'reminder' | 'insight'
  *  een nieuw schema is informatief en mag netjes wachten tot buiten de nacht. */
 const URGENT_CATEGORIES: readonly PushCategory[] = ['message']
 
+/**
+ * Uur (lokale tijd) waarop de ochtend-cron zijn meldingen stuurt.
+ *
+ * Staat hier en niet in de cron, omdat de quiet-hours-default eronder er hard
+ * aan vastzit: eindigt de stilte later dan dit uur, dan gooit `sendPush` de
+ * hele ochtendbatch weg — reminder en insight zijn niet-urgent en vallen dus
+ * onder quiet hours. Die twee getallen mogen nooit uit elkaar lopen.
+ */
+export const MORNING_PUSH_HOUR = 7
+
 /** Default quiet-hours voor niet-urgente pushes als de gebruiker niets instelde:
- *  niets tussen 21:00 en 08:00 (minuten na middernacht, lokale tijd). */
+ *  niets tussen 21:00 en de ochtend-push (minuten na middernacht, lokale tijd). */
 const DEFAULT_QUIET_START = 21 * 60
-const DEFAULT_QUIET_END = 8 * 60
+const DEFAULT_QUIET_END = MORNING_PUSH_HOUR * 60
 
 export type PushMessage = {
   title: string

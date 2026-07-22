@@ -1,5 +1,5 @@
 /**
- * Cron: dagelijkse ochtend-pushes (09:00 Amsterdam) naar iedereen met de app,
+ * Cron: dagelijkse ochtend-pushes (07:00 Amsterdam) naar iedereen met de app,
  * ongeacht rol — de signalen gaan altijd over de eigen data van de ontvanger,
  * dus een therapeut die zelf traint krijgt ze net zo goed als een patiënt.
  *
@@ -10,13 +10,18 @@
  *     (GREEN → goed hersteld, RED → wat lager); is die neutraal (AMBER/LEARNING)
  *     maar staat er een verse overload_risk-insight, dan de belasting-waarschuwing.
  *
- * DST-veilig: vercel.json draait dit op 07:00 én 08:00 UTC; de guard hieronder
- * laat alléén het uur dat in Amsterdam 09:00 is echt door (zomer 07:00 UTC,
- * winter 08:00 UTC). Idempotent per dag via de al-verstuurde notificaties.
+ * DST-veilig: vercel.json draait dit op 05:00 én 06:00 UTC; de guard hieronder
+ * laat alléén het uur dat in Amsterdam 07:00 is echt door (zomer 05:00 UTC,
+ * winter 06:00 UTC). Idempotent per dag via de al-verstuurde notificaties.
  *
- * Load lift bewust op deze 09:00-cron mee (niet op compute-insights om 06:00 UTC):
- * dat zou 's winters vóór 08:00 lokaal vallen en door de quiet-hours-default van
- * niet-urgente pushes gedropt worden.
+ * Het uur komt uit `MORNING_PUSH_HOUR` omdat de quiet-hours-default daar op
+ * eindigt. Zet dit uur nooit los: valt de cron vóór het einde van de stilte,
+ * dan dropt sendPush de hele batch (reminder en insight zijn niet-urgent).
+ *
+ * Beide databronnen draaien ruim hiervóór: sync-readiness om 03:00 UTC en
+ * compute-insights om 04:00 UTC, in beide seizoenen dus vóór 07:00 lokaal.
+ * Load lift bewust op deze cron mee in plaats van op compute-insights zelf,
+ * zodat de belasting-waarschuwing hetzelfde quiet-hours-venster volgt.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
@@ -27,12 +32,13 @@ import {
   notifyRecovery,
   notifyLoadWarning,
 } from '@/server/push/notify'
+import { MORNING_PUSH_HOUR } from '@/server/push/send'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-const REMINDER_HOUR = 9
+const REMINDER_HOUR = MORNING_PUSH_HOUR
 
 function amsHourOf(now: Date): number {
   const part = new Intl.DateTimeFormat('en-GB', {
@@ -51,11 +57,11 @@ export async function GET(req: NextRequest) {
   }
 
   const now = new Date()
-  // Alleen op het uur dat in Amsterdam 09:00 is. `?force=1` overslaat dit voor
+  // Alleen op het uur dat in Amsterdam 07:00 is. `?force=1` overslaat dit voor
   // handmatig testen (in prod alleen bereikbaar mét geldig CRON_SECRET).
   const force = req.nextUrl.searchParams.get('force') === '1'
   if (!force && amsHourOf(now) !== REMINDER_HOUR) {
-    return NextResponse.json({ ok: true, skipped: 'buiten venster (09:00 Amsterdam)' })
+    return NextResponse.json({ ok: true, skipped: 'buiten venster (07:00 Amsterdam)' })
   }
 
   const startedAt = Date.now()
@@ -99,7 +105,8 @@ export async function GET(req: NextRequest) {
 
     // Idempotentie: wat is er vandaag al ÉCHT gepusht (per categorie-type)?
     // Rijen met `data.pushed === false` (bv. onderdrukt door quiet hours)
-    // tellen niet mee — anders blokkeert een stille 07:00-rij de 09:00-push.
+    // tellen niet mee — anders blokkeert een melding die vannacht stil is
+    // weggeschreven de ochtendpush voor de rest van de dag.
     // Legacy-rijen zonder vlag tellen wél mee (die waren vermoedelijk gepusht).
     const sentToday = await prisma.notification.findMany({
       where: {
