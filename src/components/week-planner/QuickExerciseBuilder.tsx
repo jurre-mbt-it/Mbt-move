@@ -2,11 +2,12 @@
 
 /**
  * Oefeningen kiezen en instellen voor één workout: categorie-gefilterde kiezer
- * plus per oefening sets × reps, rusttijd, RPE en links/rechts. Houdt een eigen
- * lijst bij en slaat in één keer op via `weekSchedules.setItemExercises`.
+ * plus per oefening sets × reps (met bereik), rusttijd, RPE, RIR en
+ * links/rechts. Houdt een eigen lijst bij en slaat in één keer op via
+ * `weekSchedules.setItemExercises`.
  *
- * Bewust een deelverzameling van de volledige programma-builder: geen bereiken,
- * supersets of extra parameters. Die velden reizen wel mee als ze er al staan
+ * Bewust een deelverzameling van de volledige programma-builder: geen supersets,
+ * tempo of vrije parameters. Die velden reizen wel mee als ze er al staan
  * (setItemExercises vervangt de hele lijst), ze zijn hier alleen niet te zetten.
  *
  * Stond eerst in de weekplanner-pagina. Losgemaakt zodat de plan-editor er ook
@@ -15,7 +16,7 @@
  */
 
 import { useState } from 'react'
-import { Plus, Search, X } from 'lucide-react'
+import { Plus, Search, SlidersHorizontal, X } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
 import { DarkButton, DarkInput, MetaLabel, P } from '@/components/dark-ui'
 import { IconStrength, IconMobility, IconPlyometrics, IconCardio, IconCore } from '@/components/icons'
@@ -115,20 +116,90 @@ type Kandidaat = {
   isUnilateral?: boolean
 }
 
-/** Klein label-met-invoer chipje voor de tweede regel van een oefeningsrij. */
-function MiniVeld({ label, suffix, children }: {
+/** Chipje met label, invoer en optioneel een knop om er een bereik van te maken. */
+function MiniVeld({ label, suffix, isRange, onToggleRange, children }: {
   label: string
   suffix?: string
+  isRange?: boolean
+  onToggleRange?: () => void
   children: React.ReactNode
 }) {
   return (
-    <label className="inline-flex items-center gap-1 px-1.5 h-6 rounded"
-      style={{ border: `1px solid ${P.line}` }}>
-      <span className="text-[10px] font-semibold tracking-wide" style={{ color: P.inkDim }}>{label}</span>
+    <div className="inline-flex items-center gap-1 pl-1.5 pr-1 h-7 rounded"
+      style={{ border: `1px solid ${P.line}`, background: P.surfaceLow }}>
+      <span className="text-[10px] font-semibold tracking-wide shrink-0" style={{ color: P.inkDim }}>{label}</span>
       {children}
-      {suffix && <span className="text-[10px]" style={{ color: P.inkDim }}>{suffix}</span>}
-    </label>
+      {suffix && <span className="text-[10px] shrink-0" style={{ color: P.inkDim }}>{suffix}</span>}
+      {onToggleRange && (
+        <button type="button" onClick={onToggleRange} aria-pressed={!!isRange}
+          title={isRange ? 'Terug naar één waarde' : 'Bereik instellen (min – max)'}
+          className="w-5 h-5 rounded flex items-center justify-center shrink-0"
+          style={isRange
+            ? { color: P.brand, background: 'rgba(232,122,85,0.12)' }
+            : { color: P.inkDim }}>
+          <SlidersHorizontal className="w-3 h-3" />
+        </button>
+      )}
+    </div>
   )
+}
+
+/**
+ * Getalveld dat je écht leeg kunt maken. Een direct gecontroleerde
+ * `value={number}` sprong terug naar 1 zodra je het veld wiste, waardoor je
+ * "10" alleen kon vervangen door eerst achter de 1 te klikken. Daarom houdt dit
+ * veld tijdens het typen een eigen concept-string vast; pas als daar een geldig
+ * getal in staat gaat het naar boven.
+ *
+ * `nullable` bepaalt wat leeg betekent: bij rust/RPE/RIR is leeg een echte
+ * waarde (niets voorgeschreven), bij sets en reps niet — daar blijft het
+ * laatste getal staan zodra je het veld verlaat.
+ */
+function Num({ value, onChange, min, max, step, nullable, label, breed }: {
+  value: number | null
+  onChange: (v: number | null) => void
+  min: number
+  max: number
+  step?: number
+  nullable?: boolean
+  label: string
+  breed?: string
+}) {
+  const [concept, setConcept] = useState<string | null>(null)
+  const getoond = concept ?? (value == null ? '' : String(value))
+  return (
+    <input
+      type="number" inputMode="decimal" min={min} max={max} step={step}
+      value={getoond} placeholder={nullable ? '–' : ''} aria-label={label}
+      onChange={ev => {
+        const rauw = ev.target.value
+        setConcept(rauw)
+        if (rauw === '') { if (nullable) onChange(null); return }
+        const n = Number(rauw)
+        if (!Number.isFinite(n)) return
+        // Alle velden behalve RPE zijn op de server een integer; zonder deze
+        // afronding werd "3,5 sets" stil geweigerd bij het opslaan.
+        const afgerond = (step ?? 1) >= 1 ? Math.round(n) : n
+        onChange(Math.min(max, Math.max(min, afgerond)))
+      }}
+      onBlur={() => setConcept(null)}
+      className={`${breed ?? 'w-9'} text-center bg-transparent border-0 p-0 text-[11px] focus:outline-none`}
+      style={{ color: P.ink }}
+    />
+  )
+}
+
+/** Waarde van een extra parameter op label, of null. */
+function paramWaarde(e: ItemExercise, label: string): number | null {
+  const p = e.extraParams?.find(x => x.label === label)
+  const v = p?.value
+  return typeof v === 'number' ? v : typeof v === 'string' && v !== '' ? Number(v) : null
+}
+
+/** Zet of verwijdert een extra parameter, en laat de rest ongemoeid. */
+function metParam(e: ItemExercise, label: string, v: number | null): ItemExerciseParam[] {
+  const rest = (e.extraParams ?? []).filter(x => x.label !== label)
+  return v == null ? rest : [...rest, { id: label.toLowerCase(), label, type: 'number', value: v }]
 }
 
 export function QuickExerciseBuilder({
@@ -151,9 +222,6 @@ export function QuickExerciseBuilder({
   ) as { data: Kandidaat[] }
 
   const selectedIds = new Set(list.map(e => e.exerciseId))
-  const numStyle: React.CSSProperties = {
-    background: P.surfaceHi, color: P.ink, border: `1px solid ${P.line}`, padding: '2px 4px',
-  }
 
   function add(ex: Kandidaat) {
     if (selectedIds.has(ex.id)) return
@@ -203,17 +271,6 @@ export function QuickExerciseBuilder({
                     <CategoryIcon category={cat} size={12} />
                   </span>
                   <span className="flex-1 truncate text-xs" style={{ color: P.ink }}>{e.exerciseName}</span>
-                  <input type="number" min={1} max={50} value={e.sets} aria-label="sets"
-                    onChange={ev => update(i, { sets: Math.max(1, Number(ev.target.value) || 1) })}
-                    className="w-10 text-center rounded text-xs" style={numStyle} />
-                  <span className="text-[10px]" style={{ color: P.inkMuted }}>×</span>
-                  <input type="number" min={1} max={999} value={e.reps}
-                    aria-label={repBased ? 'herhalingen' : e.repUnit}
-                    onChange={ev => update(i, { reps: Math.max(1, Number(ev.target.value) || 1) })}
-                    className="w-12 text-center rounded text-xs" style={numStyle} />
-                  {!repBased && (
-                    <span className="text-[10px] shrink-0" style={{ color: P.inkDim }}>{e.repUnit}</span>
-                  )}
                   <button type="button" onClick={() => setList(l => l.filter((_, idx) => idx !== i))}
                     aria-label={`${e.exerciseName} verwijderen`}
                     style={{ color: P.inkMuted }} className="shrink-0 hover:!text-[#F0796C]">
@@ -222,47 +279,88 @@ export function QuickExerciseBuilder({
                 </div>
 
                 <div className="flex items-center gap-1 flex-wrap mt-1.5 pl-[18px]">
+                  <MiniVeld label="Set"
+                    isRange={e.setsMax != null}
+                    onToggleRange={() => update(i, {
+                      setsMax: e.setsMax == null ? Math.max((e.sets ?? 1) + 1, 2) : null,
+                    })}>
+                    <Num label="sets" value={e.sets} min={1} max={50}
+                      onChange={v => update(i, { sets: v ?? e.sets })} />
+                    {e.setsMax != null && (
+                      <>
+                        <span className="text-[10px]" style={{ color: P.inkDim }}>–</span>
+                        <Num label="sets max" value={e.setsMax ?? null} min={1} max={50}
+                          onChange={v => update(i, { setsMax: v ?? e.setsMax ?? null })} />
+                      </>
+                    )}
+                  </MiniVeld>
+
+                  <MiniVeld label={repBased ? 'Reps' : e.repUnit}
+                    isRange={e.repsMax != null}
+                    onToggleRange={() => update(i, {
+                      repsMax: e.repsMax == null ? Math.max((e.reps ?? 1) + 2, 2) : null,
+                    })}>
+                    <Num label="herhalingen" value={e.reps} min={1} max={999} breed="w-10"
+                      onChange={v => update(i, { reps: v ?? e.reps })} />
+                    {e.repsMax != null && (
+                      <>
+                        <span className="text-[10px]" style={{ color: P.inkDim }}>–</span>
+                        <Num label="herhalingen max" value={e.repsMax ?? null} min={1} max={999} breed="w-10"
+                          onChange={v => update(i, { repsMax: v ?? e.repsMax ?? null })} />
+                      </>
+                    )}
+                  </MiniVeld>
+
                   {repBased && (
                     <button type="button" aria-pressed={perZijde}
                       onClick={() => update(i, { repUnit: perZijde ? 'reps' : PER_SIDE_UNIT })}
-                      className="px-1.5 h-6 rounded text-[10px] font-semibold tracking-wide"
+                      className="px-2 h-7 rounded text-[10px] font-semibold tracking-wide shrink-0"
                       style={perZijde
                         ? { background: P.surfaceHi, color: P.ink, border: `1px solid ${P.lineStrong}` }
-                        : { background: 'transparent', color: P.inkDim, border: `1px solid ${P.line}` }}
+                        : { background: P.surfaceLow, color: P.inkDim, border: `1px solid ${P.line}` }}
                       title={perZijde
                         ? 'Per zijde: het aantal geldt links én rechts'
                         : 'Aanzetten voor oefeningen die je links en rechts doet'}>
                       L+R
                     </button>
                   )}
+
                   <MiniVeld label="Rust" suffix="s">
-                    <input type="number" min={0} max={600} step={15} value={e.restTime ?? ''}
-                      placeholder="–" aria-label="rusttijd in seconden"
-                      onChange={ev => update(i, {
-                        restTime: ev.target.value === '' ? null : Math.max(0, Number(ev.target.value) || 0),
-                      })}
-                      className="w-9 text-center bg-transparent border-0 p-0 text-[11px] focus:outline-none"
-                      style={{ color: P.ink }} />
+                    <Num label="rusttijd in seconden" value={e.restTime} min={0} max={600} step={15} nullable
+                      onChange={v => update(i, { restTime: v })} />
                   </MiniVeld>
+
                   {anderVoorschrift ? (
-                    <span className="px-1.5 h-6 inline-flex items-center rounded text-[10px]"
-                      style={{ color: P.inkMuted, border: `1px solid ${P.line}` }}>
+                    <span className="px-2 h-7 inline-flex items-center rounded text-[10px]"
+                      style={{ color: P.inkMuted, border: `1px solid ${P.line}`, background: P.surfaceLow }}>
                       {voorschrift || 'Voorschrift'}
                     </span>
                   ) : (
-                    <MiniVeld label="RPE">
-                      <input type="number" min={1} max={10} step={0.5} value={e.intensityMin ?? ''}
-                        placeholder="–" aria-label="RPE"
-                        onChange={ev => {
-                          const v = ev.target.value === '' ? null : Number(ev.target.value)
-                          update(i, v == null
-                            ? { intensityType: 'NONE', intensityMin: null, intensityMax: null }
-                            : { intensityType: 'RPE', intensityMin: Math.min(10, Math.max(1, v)), intensityMax: null })
-                        }}
-                        className="w-8 text-center bg-transparent border-0 p-0 text-[11px] focus:outline-none"
-                        style={{ color: P.ink }} />
+                    <MiniVeld label="RPE"
+                      isRange={e.intensityMax != null}
+                      onToggleRange={() => update(i, {
+                        intensityMax: e.intensityMax == null
+                          ? Math.min(10, (e.intensityMin ?? 7) + 1)
+                          : null,
+                      })}>
+                      <Num label="RPE" value={e.intensityMin ?? null} min={1} max={10} step={0.5} nullable
+                        onChange={v => update(i, v == null
+                          ? { intensityType: 'NONE', intensityMin: null, intensityMax: null }
+                          : { intensityType: 'RPE', intensityMin: v })} />
+                      {e.intensityMax != null && (
+                        <>
+                          <span className="text-[10px]" style={{ color: P.inkDim }}>–</span>
+                          <Num label="RPE max" value={e.intensityMax ?? null} min={1} max={10} step={0.5} nullable
+                            onChange={v => update(i, { intensityMax: v })} />
+                        </>
+                      )}
                     </MiniVeld>
                   )}
+
+                  <MiniVeld label="RIR">
+                    <Num label="reps in reserve" value={paramWaarde(e, 'RIR')} min={0} max={10} step={1} nullable
+                      onChange={v => update(i, { extraParams: metParam(e, 'RIR', v) })} />
+                  </MiniVeld>
                 </div>
               </div>
             )
