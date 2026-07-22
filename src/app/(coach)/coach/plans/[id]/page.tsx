@@ -19,6 +19,13 @@ import { Plus, Trash2, ChevronLeft } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
 import { usePortal } from '@/lib/portal'
 import { CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
+import { readWorkout, type StructuredCardio } from '@/lib/cardio-workout'
+import { CardioWorkoutBuilder } from '@/components/week-planner/CardioWorkoutBuilder'
+import {
+  QuickExerciseBuilder,
+  type Category,
+  type ItemExercise,
+} from '@/components/week-planner/QuickExerciseBuilder'
 import {
   DarkButton,
   DarkDialog as Dialog,
@@ -27,6 +34,7 @@ import {
   DarkDialogTitle as DialogTitle,
   DarkInput,
   DarkSelect,
+  DarkTextarea,
   Display,
   Kicker,
   MetaLabel,
@@ -34,6 +42,19 @@ import {
   SkeletonList,
   Tile,
 } from '@/components/dark-ui'
+
+/** Het item zoals `listWithItems` het teruggeeft — genoeg voor de editor. */
+type PlanItem = {
+  id: string
+  quickName: string | null
+  quickCategory: string | null
+  quickActivity: string | null
+  quickDurationSec: number | null
+  plannedDurationSec: number | null
+  plannedRpe: number | null
+  notes: string | null
+  program: { name: string } | null
+}
 
 const DAY_NAMES = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
 const DAY_SHORT = ['MA', 'DI', 'WO', 'DO', 'VR', 'ZA', 'ZO']
@@ -64,6 +85,7 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
   const router = useRouter()
   const utils = trpc.useUtils()
   const [addFor, setAddFor] = useState<AddTarget | null>(null)
+  const [editFor, setEditFor] = useState<PlanItem | null>(null)
 
   const { data: plans } = trpc.planTemplates.list.useQuery()
   const plan = useMemo(() => (plans ?? []).find((p) => p.id === planId) ?? null, [plans, planId])
@@ -144,13 +166,17 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
                         className="mb-1 flex items-start gap-1 rounded px-1.5 py-1"
                         style={{ background: P.surfaceHi }}
                       >
-                        <span
-                          className="min-w-0 flex-1 truncate"
+                        {/* Klikken opent de inhoud. Zonder dit kon je in een plan
+                            wel een workout neerzetten, maar er verder niets mee. */}
+                        <button
+                          type="button"
+                          onClick={() => setEditFor(item)}
+                          className="athletic-tap min-w-0 flex-1 truncate text-left"
                           style={{ color: P.ink, fontSize: 11 }}
-                          title={item.program?.name ?? item.quickName ?? 'Workout'}
+                          title={`${item.program?.name ?? item.quickName ?? 'Workout'} — klik om te bewerken`}
                         >
                           {item.program?.name ?? item.quickName ?? 'Workout'}
-                        </span>
+                        </button>
                         <button
                           type="button"
                           aria-label="Verwijderen"
@@ -182,6 +208,10 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
             </div>
           </Tile>
         ))
+      )}
+
+      {editFor && (
+        <PlanItemDialog item={editFor} planId={planId} onClose={() => setEditFor(null)} />
       )}
 
       {addFor && (
@@ -379,6 +409,207 @@ function AddItemDialog({
               Toevoegen
             </DarkButton>
           </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/**
+ * Eén item van een sjabloon-week bewerken. Een sjabloon-item is precies
+ * hetzelfde soort ding als een item in de week van een patiënt, dus het krijgt
+ * dezelfde bediening: naam, geplande belasting, notitie, en daaronder de
+ * inhoud — oefeningen, of de blokken van een cardio-workout.
+ *
+ * De server kon dit allang: `updateItem`, `setItemExercises` en `setItemCardio`
+ * werken op elk item, en `listItemContents` accepteert een planTemplateId.
+ * Alleen de bediening ontbrak, waardoor je in een plan wel een workout kon
+ * neerzetten maar er verder niets mee kon.
+ */
+function PlanItemDialog({
+  item, planId, onClose,
+}: {
+  item: {
+    id: string
+    quickName: string | null
+    quickCategory: string | null
+    quickActivity: string | null
+    quickDurationSec: number | null
+    plannedDurationSec: number | null
+    plannedRpe: number | null
+    notes: string | null
+    program: { name: string } | null
+  }
+  planId: string
+  onClose: () => void
+}) {
+  const utils = trpc.useUtils()
+  const isProgram = !!item.program
+  const category = (item.quickCategory ?? 'STRENGTH') as Category
+  const isCardio = category === 'CARDIO'
+
+  const [naam, setNaam] = useState(item.quickName ?? '')
+  // `plannedDurationSec` is het getal waar de belasting mee rekent; valt terug
+  // op wat er bij het toevoegen is ingetikt.
+  const [minuten, setMinuten] = useState(() => {
+    const sec = item.plannedDurationSec ?? item.quickDurationSec
+    return sec ? String(Math.round(sec / 60)) : ''
+  })
+  const [rpe, setRpe] = useState(item.plannedRpe != null ? String(item.plannedRpe) : '')
+  const [notitie, setNotitie] = useState(item.notes ?? '')
+  const [cardioOpen, setCardioOpen] = useState(false)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: contents = [] } = (trpc.weekSchedules.listItemContents.useQuery as any)(
+    { patientId: '', planTemplateId: planId },
+    { staleTime: 10_000 },
+  ) as { data: Array<{ id: string; exercises: ItemExercise[]; cardioParams: unknown }> }
+  const inhoud = contents.find((c) => c.id === item.id)
+  const workout = readWorkout(inhoud?.cardioParams)
+  /**
+   * Staat er inhoud, dan leidt de server de geplande duur daaruit af en
+   * overschrijft hij wat je hier intypt (`setItemExercises` en `setItemCardio`
+   * doen dat allebei). Een invulveld tonen dat stil wordt weggeschreven is
+   * misleidend, dus dan tonen we het afgeleide getal in plaats daarvan.
+   */
+  const heeftInhoud = (inhoud?.exercises?.length ?? 0) > 0 || !!workout
+
+  const ververs = () => {
+    utils.weekSchedules.listWithItems.invalidate({ planTemplateId: planId })
+    utils.weekSchedules.listItemContents.invalidate()
+  }
+
+  const update = trpc.weekSchedules.updateItem.useMutation({
+    onSuccess: () => { ververs(); toast.success('Opgeslagen') },
+    onError: (e) => toast.error(e.message),
+  })
+  const setExercises = trpc.weekSchedules.setItemExercises.useMutation({
+    onSuccess: () => { ververs(); toast.success('Oefeningen opgeslagen') },
+    onError: (e) => toast.error(e.message),
+  })
+  const setCardio = trpc.weekSchedules.setItemCardio.useMutation({
+    onSuccess: () => { ververs(); setCardioOpen(false); toast.success('Cardio opgeslagen') },
+    onError: (e) => toast.error(e.message),
+  })
+
+  if (cardioOpen) {
+    return (
+      <CardioWorkoutBuilder
+        initial={workout}
+        activity={(item.quickActivity as CardioActivityKey) ?? 'RUNNING'}
+        itemName={naam || 'Cardio'}
+        saving={setCardio.isPending}
+        onClose={() => setCardioOpen(false)}
+        onSave={async (w: StructuredCardio) => {
+          await setCardio.mutateAsync({
+            itemId: item.id,
+            cardioParams: w as unknown as Record<string, unknown>,
+          })
+        }}
+      />
+    )
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="max-h-[88vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{item.program?.name ?? (naam || 'Workout')}</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {isProgram ? (
+            <p style={{ color: P.inkMuted, fontSize: 13 }}>
+              Dit item verwijst naar een programma. De inhoud bewerk je in dat programma;
+              hier zet je alleen de geplande belasting en een notitie.
+            </p>
+          ) : (
+            <div className="space-y-1.5">
+              <MetaLabel>Naam</MetaLabel>
+              <DarkInput value={naam} onChange={(e) => setNaam(e.target.value)} placeholder="Naam van de workout" />
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1.5">
+              <MetaLabel>Duur (min)</MetaLabel>
+              {heeftInhoud ? (
+                <p style={{ color: P.ink, fontSize: 14, paddingTop: 8 }}>
+                  {minuten || '—'}{' '}
+                  <span style={{ color: P.inkDim, fontSize: 11 }}>uit de inhoud</span>
+                </p>
+              ) : (
+                <DarkInput
+                  type="number" min={1} max={600} value={minuten}
+                  onChange={(e) => setMinuten(e.target.value)} placeholder="45"
+                />
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <MetaLabel>RPE (1-10)</MetaLabel>
+              <DarkInput
+                type="number" min={1} max={10} value={rpe}
+                onChange={(e) => setRpe(e.target.value)} placeholder="7"
+              />
+            </div>
+          </div>
+          <p style={{ color: P.inkDim, fontSize: 11 }}>
+            {heeftInhoud
+              ? 'Duur × RPE is de geplande belasting in AU. De duur volgt uit de oefeningen of de cardio-blokken; verwijder je die, dan kun je hem weer zelf zetten.'
+              : 'Duur × RPE is de geplande belasting in AU. Zet je er inhoud in, dan neemt die de duur over.'}
+          </p>
+
+          <div className="space-y-1.5">
+            <MetaLabel>Notitie</MetaLabel>
+            <DarkTextarea
+              value={notitie} rows={3}
+              onChange={(e) => setNotitie(e.target.value)}
+              placeholder="Aandachtspunten voor deze training"
+            />
+          </div>
+
+          <DarkButton
+            variant="primary" size="sm" disabled={update.isPending}
+            onClick={() => update.mutate({
+              id: item.id,
+              ...(isProgram || !naam.trim() ? {} : { quickName: naam.trim() }),
+              ...(heeftInhoud
+                ? {}
+                : { plannedDurationSec: minuten ? Math.round(Number(minuten) * 60) : null }),
+              plannedRpe: rpe ? Number(rpe) : null,
+              notes: notitie.trim() || null,
+            })}
+          >
+            {update.isPending ? 'Opslaan…' : 'Opslaan'}
+          </DarkButton>
+
+          {!isProgram && (
+            <div className="pt-3 border-t" style={{ borderColor: P.line }}>
+              {isCardio ? (
+                <div className="space-y-2">
+                  <MetaLabel>Cardio-blokken</MetaLabel>
+                  <p style={{ color: P.inkMuted, fontSize: 12 }}>
+                    {workout
+                      ? `${workout.blocks.length} blok${workout.blocks.length === 1 ? '' : 'ken'} ingesteld.`
+                      : 'Nog geen blokken. Bouw een warming-up, intervallen en een cooling-down.'}
+                  </p>
+                  <DarkButton variant="secondary" size="sm" onClick={() => setCardioOpen(true)}>
+                    {workout ? 'Blokken bewerken' : 'Blokken bouwen'}
+                  </DarkButton>
+                </div>
+              ) : (
+                <QuickExerciseBuilder
+                  key={item.id}
+                  initial={inhoud?.exercises ?? []}
+                  defaultCategory={category}
+                  saving={setExercises.isPending}
+                  onSave={async (exercises) => {
+                    await setExercises.mutateAsync({ itemId: item.id, exercises })
+                  }}
+                />
+              )}
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
