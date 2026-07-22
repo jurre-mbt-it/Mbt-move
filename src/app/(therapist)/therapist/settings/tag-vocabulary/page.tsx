@@ -19,8 +19,10 @@ import {
   P,
   Tile,
 } from '@/components/dark-ui'
+import { usePortal } from '@/lib/portal'
 
 export default function TagVocabularyPage() {
+  const portal = usePortal()
   const utils = trpc.useUtils()
   const { data: items, isLoading } = trpc.tags.vocabulary.useQuery()
   const [draft, setDraft] = useState('')
@@ -47,7 +49,7 @@ export default function TagVocabularyPage() {
     <div className="max-w-2xl w-full flex flex-col gap-6">
       <div className="flex flex-col gap-3">
         <Link
-          href="/therapist/settings"
+          href={`${portal.base}/settings`}
           className="athletic-mono"
           style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.16em' }}
         >

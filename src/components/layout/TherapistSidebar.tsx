@@ -22,6 +22,7 @@ import {
   FileText,
   MessageSquare,
   PanelLeftClose,
+  ArrowLeftRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -62,7 +63,13 @@ const COACH_NAV: SidebarNavItem[] = [
   { href: '/coach/exercises', label: 'Oefeningen', icon: Dumbbell },
 ]
 
-/** Nav + labels per portaal. De coach-shell hergebruikt deze zijbalk. */
+/**
+ * Nav + labels per portaal. De coach-shell hergebruikt deze zijbalk.
+ *
+ * `otherPortal` is de heen-én-terugschakelaar voor admins, die in beide
+ * shells mag meekijken. Zonder die regel kom je vanuit /coach alleen terug
+ * via het admin-dashboard, of op mobiel helemaal niet.
+ */
 export const SIDEBAR_VARIANTS = {
   therapist: {
     nav: THERAPIST_NAV,
@@ -71,6 +78,7 @@ export const SIDEBAR_VARIANTS = {
     programsNewHref: '/therapist/programs/new',
     settingsHref: '/therapist/settings',
     showAssessment: true,
+    otherPortal: { href: '/coach/dashboard', label: 'Coach-portaal' },
   },
   coach: {
     nav: COACH_NAV,
@@ -79,6 +87,7 @@ export const SIDEBAR_VARIANTS = {
     programsNewHref: '/coach/programs/new',
     settingsHref: '/coach/settings',
     showAssessment: false,
+    otherPortal: { href: '/therapist/dashboard', label: 'Therapeut-portaal' },
   },
 } as const
 
@@ -314,16 +323,28 @@ export function TherapistSidebar({ variant = 'therapist' }: { variant?: SidebarV
         style={{ borderColor: P.lineStrong }}
       >
         {isAdmin && (
-          <Link
-            href="/admin/dashboard"
-            onClick={expandGuard}
-            className={rowClass()}
-            title={collapsed ? 'Admin' : undefined}
-            style={{ color: P.brand, fontWeight: 700 }}
-          >
-            <Shield className="w-4.5 h-4.5 shrink-0" />
-            {!collapsed && 'Admin'}
-          </Link>
+          <>
+            <Link
+              href={cfg.otherPortal.href}
+              onClick={expandGuard}
+              className={rowClass()}
+              title={collapsed ? cfg.otherPortal.label : undefined}
+              style={{ color: P.inkMuted, fontWeight: 700 }}
+            >
+              <ArrowLeftRight className="w-4.5 h-4.5 shrink-0" />
+              {!collapsed && cfg.otherPortal.label}
+            </Link>
+            <Link
+              href="/admin/dashboard"
+              onClick={expandGuard}
+              className={rowClass()}
+              title={collapsed ? 'Admin' : undefined}
+              style={{ color: P.brand, fontWeight: 700 }}
+            >
+              <Shield className="w-4.5 h-4.5 shrink-0" />
+              {!collapsed && 'Admin'}
+            </Link>
+          </>
         )}
         {/* Mijn training: therapeut kan zijn eigen schema's loggen en plannen. */}
         <button

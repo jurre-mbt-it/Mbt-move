@@ -10,9 +10,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Bell, Settings, LogOut, User, Dumbbell } from 'lucide-react'
+import { Bell, Settings, LogOut, User, Dumbbell, ArrowLeftRight } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { trpc } from '@/lib/trpc/client'
 import { setPersonalMode } from '@/lib/personal-mode-client'
 import Link from 'next/link'
 import { P } from '@/components/dark-ui'
@@ -29,10 +30,25 @@ export function Header({ title, userName, userEmail, userAvatar, settingsBase = 
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
-  // Header rendert alléén in de therapeut- en admin-shell, dus iedereen die hem
-  // ziet is THERAPIST/ADMIN. De persoonlijke-modus-switch tonen we daarom op
-  // padbasis (geen extra getMe-call nodig — dat scheelt een race bij hydratie).
+  // Header rendert in de therapeut-, coach- en admin-shell, dus iedereen die
+  // hem ziet is THERAPIST/COACH/ADMIN. De persoonlijke-modus-switch tonen we
+  // op padbasis, zodat die niet op een getMe-response hoeft te wachten.
   const isInTherapist = pathname?.startsWith('/therapist') ?? false
+  const isInCoach = pathname?.startsWith('/coach') ?? false
+
+  // Portaal-switch voor admins. Op mobiel is de zijbalk verborgen, dus dit is
+  // daar de enige uitgang uit de coach-shell terug naar het therapeut-portaal
+  // (en andersom). Alleen admins zien beide portalen; een echte coach of
+  // therapeut wordt door de role-guard toch teruggestuurd.
+  const { data: me } = trpc.auth.getMe.useQuery()
+  const otherPortal =
+    me?.role !== 'ADMIN'
+      ? null
+      : isInCoach
+        ? { href: '/therapist/dashboard', label: 'Therapeut-portaal' }
+        : isInTherapist
+          ? { href: '/coach/dashboard', label: 'Coach-portaal' }
+          : null
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -134,6 +150,17 @@ export function Header({ title, userName, userEmail, userAvatar, settingsBase = 
                 >
                   <Dumbbell className="w-4 h-4" />
                   Persoonlijke training
+                </DropdownMenuItem>
+              </>
+            )}
+            {otherPortal && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href={otherPortal.href} className="flex items-center gap-2 cursor-pointer">
+                    <ArrowLeftRight className="w-4 h-4" />
+                    {otherPortal.label}
+                  </Link>
                 </DropdownMenuItem>
               </>
             )}

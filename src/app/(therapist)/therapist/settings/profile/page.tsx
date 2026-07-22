@@ -8,9 +8,11 @@ import { createClient } from '@/lib/supabase/client'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
 import { IncompletePracticeBanner } from '@/components/practice/IncompletePracticeBanner'
+import { usePortal } from '@/lib/portal'
 
 export default function ProfilePage() {
   const router = useRouter()
+  const portal = usePortal()
   const utils = trpc.useUtils()
   const { data: me, isLoading } = trpc.auth.getMe.useQuery()
   const updateMutation = trpc.auth.updateProfile.useMutation({
@@ -58,7 +60,7 @@ export default function ProfilePage() {
   return (
     <div className="max-w-lg w-full flex flex-col gap-4">
       <Link
-        href="/therapist/settings"
+        href={`${portal.base}/settings`}
         className="athletic-mono"
         style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.16em' }}
       >
@@ -131,7 +133,7 @@ export default function ProfilePage() {
             <InfoRow
               label="Praktijk"
               value={me?.practiceId ? (me.practiceName ?? '—') : 'Niet gekoppeld'}
-              href={me?.practiceId ? '/therapist/settings/practice' : undefined}
+              href={me?.practiceId ? `${portal.base}/settings/practice` : undefined}
             />
             {me?.isPracticeOwner && (
               <InfoRow label="Rol in praktijk" value="Eigenaar" />

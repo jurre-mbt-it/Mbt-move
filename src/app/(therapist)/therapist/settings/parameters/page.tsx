@@ -27,6 +27,7 @@ import {
   P,
   Tile,
 } from '@/components/dark-ui'
+import { usePortal } from '@/lib/portal'
 
 const TYPE_LABELS: Record<ParamType, string> = {
   number: 'Getal',
@@ -137,6 +138,7 @@ function SortableParamCard({
 }
 
 export default function ParametersPage() {
+  const portal = usePortal()
   const { params, setParams } = useCustomParams()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<CustomParameter | null>(null)
@@ -215,7 +217,7 @@ export default function ParametersPage() {
     <div className="max-w-2xl w-full flex flex-col gap-6">
       <div className="flex flex-col gap-3">
         <Link
-          href="/therapist/programs"
+          href={`${portal.base}/programs`}
           className="athletic-mono"
           style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.16em' }}
         >

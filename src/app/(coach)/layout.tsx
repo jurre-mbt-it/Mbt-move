@@ -24,7 +24,7 @@ export default async function CoachLayout({ children }: { children: React.ReactN
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
+        <Header settingsBase="/coach/settings" />
         <main
           className="flex-1 overflow-y-auto px-4 pt-4 pb-24 md:px-8 md:pt-6 md:pb-8"
           style={{ background: '#0E2729' }}
