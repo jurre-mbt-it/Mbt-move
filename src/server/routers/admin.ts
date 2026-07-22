@@ -182,9 +182,26 @@ export const adminRouter = createTRPCRouter({
   // ── Practices ─────────────────────────────────────────────────────────
 
   listPractices: adminProcedure.query(async ({ ctx }) => {
+    // Expliciete select en geen `include`: anders reist `uiPrefs` mee, en dat is
+    // een recursief Json-type waar de tRPC-typeboom van omvalt (TS2589 in elk
+    // scherm dat de router aanraakt). Een lijst met praktijken heeft die blob
+    // sowieso niet nodig.
     const practices = await ctx.prisma.practice.findMany({
       orderBy: { createdAt: 'asc' },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        addressLine1: true,
+        addressLine2: true,
+        postalCode: true,
+        city: true,
+        country: true,
+        phone: true,
+        email: true,
+        website: true,
+        logoUrl: true,
+        agbCodePractice: true,
+        createdAt: true,
         _count: { select: { users: true } },
         users: {
           where: { isPracticeOwner: true },

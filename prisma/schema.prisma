@@ -239,6 +239,9 @@ model User {
   supabaseUserId String?   @unique
   name           String?
   role           UserRole  @default(PATIENT)
+  /// Persoonlijke weergavevoorkeuren. Alleen gebruikt als er geen praktijk is
+  /// (losse coach); anders wint `Practice.uiPrefs`.
+  uiPrefs        Json      @default("{}")
   avatarUrl      String?
   phone          String?
   dateOfBirth    DateTime?
@@ -544,6 +547,9 @@ model Practice {
   email             String?
   website           String?
   logoUrl           String?
+  /// Weergavevoorkeuren die voor iedereen in de praktijk gelden, zodat
+  /// collega's dezelfde kalender zien. Nu: { categoryColors: { STRENGTH: "#..." } }.
+  uiPrefs           Json         @default("{}")
   agbCodePractice   String?
   // Plain text, max 500 chars. Wordt onderaan de email-footer gerenderd in
   // kleinere grijze typografie. Geen HTML/markdown om XSS-risico in mail-
@@ -2567,7 +2573,7 @@ model PushToken {
   userId     String
   /// ExponentPushToken[xxxxxxxx]
   token      String   @unique
-  platform   String   // "ios" | "android"
+  platform   String // "ios" | "android"
   deviceName String?
   lastSeenAt DateTime @default(now())
   createdAt  DateTime @default(now())

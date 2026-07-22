@@ -27,6 +27,9 @@ import { Crown, Check } from 'lucide-react'
 export default function AdminPracticesPage() {
   const [newName, setNewName] = useState('')
 
+  /* Shallow casts hieronder: de tRPC-typeboom is te diep voor TypeScript
+     (TS2589), zelfde reden als op vijf andere plekken in deze app. Raakt alleen
+     dit interne beheerscherm; de server-kant blijft volledig getypeerd. */
   const utils = trpc.useUtils()
   const { data: practices = [], isLoading } = trpc.admin.listPractices.useQuery()
   const invalidate = () => {
@@ -34,27 +37,30 @@ export default function AdminPracticesPage() {
     utils.admin.listUsers.invalidate()
   }
 
-  const create = trpc.admin.createPractice.useMutation({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const create = (trpc.admin.createPractice.useMutation as any)({
     onSuccess: () => {
       invalidate()
       setNewName('')
       toast.success('Praktijk aangemaakt')
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e: { message: string }) => toast.error(e.message),
   })
-  const rename = trpc.admin.renamePractice.useMutation({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rename = (trpc.admin.renamePractice.useMutation as any)({
     onSuccess: () => {
       invalidate()
       toast.success('Praktijk hernoemd')
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e: { message: string }) => toast.error(e.message),
   })
-  const remove = trpc.admin.deletePractice.useMutation({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const remove = (trpc.admin.deletePractice.useMutation as any)({
     onSuccess: () => {
       invalidate()
       toast.success('Praktijk verwijderd')
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e: { message: string }) => toast.error(e.message),
   })
 
   return (
@@ -230,9 +236,10 @@ function OwnerPickerDialog({
     { practiceId },
     { enabled: open },
   )
-  const setOwner = trpc.admin.setPracticeOwner.useMutation({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const setOwner = (trpc.admin.setPracticeOwner.useMutation as any)({
     onSuccess: () => { toast.success('Eigenaar bijgewerkt'); onSaved() },
-    onError: (err) => toast.error(err.message ?? 'Bijwerken mislukt'),
+    onError: (err: { message: string }) => toast.error(err.message ?? 'Bijwerken mislukt'),
   })
 
   return (

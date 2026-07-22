@@ -85,6 +85,12 @@ export default function SettingsPage() {
           bar={P.ice}
         />
         <ActionTile
+          href={`${portal.base}/settings/kleuren`}
+          label="Kleuren"
+          sub="Kleur per trainingssoort in de kalender"
+          bar={P.ice}
+        />
+        <ActionTile
           href={`${portal.base}/settings/tag-vocabulary`}
           label="Klacht-tags"
           sub="Suggestielijst voor #hashtags bij het loggen"

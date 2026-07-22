@@ -125,6 +125,9 @@ export const authRouter = createTRPCRouter({
       const updated = await ctx.prisma.user.update({
         where: { id: ctx.user.id },
         data: { mfaEnabled: enabled },
+        // Expliciete select: zonder dit reist `uiPrefs` mee, een recursief
+        // Json-type waar de tRPC-typeboom van omvalt (TS2589).
+        select: { id: true, mfaEnabled: true },
       })
       // Context-cache verversen zodat de MFA-enroll-gate (assertStaffMfaEnrolled)
       // direct de nieuwe stand ziet i.p.v. tot 60s de oude te blijven gebruiken.
@@ -175,6 +178,10 @@ export const authRouter = createTRPCRouter({
       return ctx.prisma.user.update({
         where: { id: ctx.user.id },
         data,
+        select: {
+          id: true, name: true, firstName: true, lastName: true, email: true,
+          jobTitle: true, phone: true, avatarUrl: true,
+        },
       })
     }),
 
