@@ -13,7 +13,7 @@ import { hasPatientAccess } from '@/server/lib/patient-access'
 import { auditLog } from '@/server/audit'
 import { amsMidnight, dateKey } from '@/lib/week-dates'
 import { deriveTopSet, estimateOneRepMax } from '@/lib/one-rep-max'
-import { clampSessionDurationSec } from '@/lib/training-load'
+import { clampSessionDurationSec, sessionLoad } from '@/lib/training-load'
 import { syncHashtagsForLog } from '@/server/tags'
 
 const createId = () => crypto.randomUUID()
@@ -153,6 +153,161 @@ export const patientsRouter = createTRPCRouter({
       }
     })
   }),
+
+  /**
+   * Caseload voor de patiëntenlijst: dezelfde patiënten als `list`, plus per
+   * patiënt de belasting per week, de laatste pijnscore mét richting en het
+   * moment van de laatste activiteit.
+   *
+   * Bewust een aparte procedure. `list` voedt ook pickers, de weekplanner en
+   * het dashboard; die hoeven dit rekenwerk niet te dragen. En bewust één
+   * gebatchte call in plaats van `loadCurve` per rij: dat zou bij dertig
+   * patiënten dertig queries afvuren bij het openen van de pagina.
+   *
+   * De weekgrens komt van de client (maandag 00:00 lokaal) zodat de server geen
+   * tijdzone-aannames doet — zelfde patroon als `therapistDashboard`.
+   */
+  caseload: coachStaffProcedure
+    .input(z.object({
+      weekStart: z.string(),
+      weeks: z.number().int().min(4).max(12).default(6),
+    }))
+    .query(async ({ ctx, input }) => {
+      const me = ctx.user
+      const DAY = 24 * 60 * 60 * 1000
+      const weekStart = new Date(input.weekStart)
+      if (Number.isNaN(weekStart.getTime())) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Ongeldige weekgrens.' })
+      }
+      const weeks = input.weeks
+      const windowStart = new Date(weekStart.getTime() - (weeks - 1) * 7 * DAY)
+      const windowEnd = new Date(weekStart.getTime() + 7 * DAY)
+
+      // Scope gelijk aan `list`: eigen koppeling óf dezelfde praktijk.
+      const patients = await ctx.prisma.user.findMany({
+        where: {
+          role: { in: ['PATIENT', 'ATHLETE'] },
+          OR: [
+            {
+              patientTherapists: {
+                some: {
+                  therapistId: me.id,
+                  isActive: true,
+                  status: { in: ['APPROVED', 'PENDING'] },
+                },
+              },
+            },
+            ...(me.practiceId ? [{ practiceId: me.practiceId }] : []),
+          ],
+        },
+        select: { id: true },
+      })
+      const ids = patients.map(p => p.id)
+      if (ids.length === 0) return []
+
+      const painSince = new Date(Date.now() - 60 * DAY)
+
+      const [strengthLogs, cardioLogs, lastStrength, lastCardio, painEntries] = await Promise.all([
+        ctx.prisma.sessionLog.findMany({
+          where: {
+            patientId: { in: ids },
+            status: 'COMPLETED',
+            completedAt: { gte: windowStart, lt: windowEnd },
+          },
+          select: { patientId: true, completedAt: true, duration: true, exertionLevel: true },
+        }),
+        ctx.prisma.cardioLog.findMany({
+          where: { patientId: { in: ids }, completedAt: { gte: windowStart, lt: windowEnd } },
+          select: { patientId: true, completedAt: true, durationSec: true, rpe: true },
+        }),
+        // Laatste activiteit staat los van het venster: iemand die drie maanden
+        // stil is, moet "90 dagen" tonen en niet "nooit".
+        ctx.prisma.sessionLog.groupBy({
+          by: ['patientId'],
+          where: { patientId: { in: ids }, status: 'COMPLETED', completedAt: { not: null } },
+          _max: { completedAt: true },
+        }),
+        ctx.prisma.cardioLog.groupBy({
+          by: ['patientId'],
+          where: { patientId: { in: ids } },
+          _max: { completedAt: true },
+        }),
+        ctx.prisma.painEntry.findMany({
+          where: { userId: { in: ids }, reportedAt: { gte: painSince } },
+          select: { userId: true, nrs: true, reportedAt: true },
+          orderBy: { reportedAt: 'desc' },
+        }),
+      ])
+
+      /** In welke week-emmer valt dit moment? -1 = buiten het venster. */
+      const bucketOf = (d: Date) =>
+        Math.floor((d.getTime() - windowStart.getTime()) / (7 * DAY))
+
+      const series = new Map<string, number[]>()
+      const add = (patientId: string, at: Date | null, minutes: number, rpe: number | null) => {
+        if (!at) return
+        const b = bucketOf(at)
+        if (b < 0 || b >= weeks) return
+        const row = series.get(patientId) ?? Array<number>(weeks).fill(0)
+        row[b] += sessionLoad(minutes, rpe)
+        series.set(patientId, row)
+      }
+      for (const s of strengthLogs) {
+        add(s.patientId, s.completedAt, clampSessionDurationSec(s.duration) / 60, s.exertionLevel)
+      }
+      for (const c of cardioLogs) {
+        add(c.patientId, c.completedAt, clampSessionDurationSec(c.durationSec) / 60, c.rpe)
+      }
+
+      const lastById = new Map<string, Date>()
+      for (const g of [...lastStrength, ...lastCardio]) {
+        const at = g._max.completedAt
+        if (!at) continue
+        const cur = lastById.get(g.patientId)
+        if (!cur || at > cur) lastById.set(g.patientId, at)
+      }
+
+      // Pijn: laatste score, plus de richting t.o.v. de twee weken ervóór.
+      // ±2 op de NRS is de gangbare grens voor een verschil dat ertoe doet;
+      // daarbinnen noemen we het stabiel in plaats van een trend te suggereren.
+      const painByPatient = new Map<string, { nrs: number; at: Date; trend: 'up' | 'down' | 'flat' }>()
+      const grouped = new Map<string, Array<{ nrs: number; at: Date }>>()
+      for (const p of painEntries) {
+        const arr = grouped.get(p.userId) ?? []
+        arr.push({ nrs: p.nrs, at: p.reportedAt })
+        grouped.set(p.userId, arr)
+      }
+      for (const [patientId, entries] of grouped) {
+        const latest = entries[0]  // query is al aflopend gesorteerd
+        const from = new Date(latest.at.getTime() - 14 * DAY)
+        const before = entries.filter(e => e.at < latest.at && e.at >= from)
+        let trend: 'up' | 'down' | 'flat' = 'flat'
+        if (before.length > 0) {
+          const mean = before.reduce((t, e) => t + e.nrs, 0) / before.length
+          if (latest.nrs - mean >= 2) trend = 'up'
+          else if (mean - latest.nrs >= 2) trend = 'down'
+        }
+        painByPatient.set(patientId, { nrs: latest.nrs, at: latest.at, trend })
+      }
+
+      return ids.map(id => {
+        const row = series.get(id) ?? Array<number>(weeks).fill(0)
+        const rounded = row.map(v => Math.round(v))
+        const thisWeek = rounded[weeks - 1] ?? 0
+        const prevWeek = rounded[weeks - 2] ?? 0
+        return {
+          patientId: id,
+          series: rounded,
+          weekLoad: thisWeek,
+          /** Sprong t.o.v. vorige week in procenten. Null als er niets staat om
+           *  mee te vergelijken — dan is een percentage betekenisloos. */
+          weekChangePct:
+            prevWeek > 0 ? Math.round(((thisWeek - prevWeek) / prevWeek) * 100) : null,
+          pain: painByPatient.get(id) ?? null,
+          lastActivityAt: lastById.get(id) ?? null,
+        }
+      })
+    }),
 
   get: coachStaffProcedure
     .input(z.object({ id: z.string() }))

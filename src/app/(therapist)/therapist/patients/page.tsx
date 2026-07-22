@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState } from 'react'
+import { Suspense, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { trpc } from '@/lib/trpc/client'
 import { usePortal } from '@/lib/portal'
@@ -20,12 +20,33 @@ import {
   SkeletonList,
   Tile,
 } from '@/components/dark-ui'
+import { CaseloadTable, type CaseloadRow } from '@/components/patients/CaseloadTable'
 
-const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  ACTIVE:    { label: 'Actief',       bg: 'rgba(232,122,85,0.14)', text: P.lime },
-  DRAFT:     { label: 'Concept',      bg: 'rgba(245,185,66,0.14)',  text: P.gold },
-  COMPLETED: { label: 'Afgerond',     bg: 'rgba(212,232,230,0.06)', text: P.inkMuted },
-  ARCHIVED:  { label: 'Gearchiveerd', bg: 'rgba(212,232,230,0.06)', text: P.inkMuted },
+
+/** Compacte regel-actie: leest als een link, gedraagt zich als een knop. */
+function RowAction({ label, tint, onClick, onHover }: {
+  label: string
+  tint: string
+  onClick: () => void
+  onHover?: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onPointerEnter={onHover}
+      onFocus={onHover}
+      className="athletic-mono athletic-tap rounded px-2 py-1 whitespace-nowrap"
+      style={{
+        fontSize: 9.5,
+        color: tint,
+        border: `1px solid color-mix(in srgb, ${tint} 30%, transparent)`,
+        background: 'transparent',
+      }}
+    >
+      {label}
+    </button>
+  )
 }
 
 type QuickFilter = 'all' | 'active' | 'low-compliance'
@@ -60,6 +81,22 @@ function PatientsPageInner() {
   } | null>(null)
 
   const { data: patients = [], isLoading } = trpc.patients.list.useQuery()
+
+  // Belasting, pijn en laatste activiteit komen uit een aparte gebatchte query,
+  // zodat de pickers en de weekplanner die `patients.list` ook gebruiken dat
+  // rekenwerk niet dragen. De weekgrens gaat vanaf de client mee zodat de
+  // server geen tijdzone-aannames doet.
+  const weekStart = useMemo(() => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+    return d.toISOString()
+  }, [])
+  const { data: caseload = [] } = trpc.patients.caseload.useQuery(
+    { weekStart, weeks: 6 },
+    { staleTime: 60_000 },
+  )
+
   const utils = trpc.useUtils()
   const createInvite = trpc.invite.create.useMutation()
 
@@ -117,6 +154,54 @@ function PatientsPageInner() {
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       p.email.toLowerCase().includes(search.toLowerCase())
     )
+
+  /**
+   * De lijst samenstellen en op aandacht sorteren. Vier dingen vragen aandacht:
+   * pijn die is opgelopen, een weeksprong boven de 30%, zeven dagen of langer
+   * niets gelogd, en lage therapietrouw. Wie daaraan voldoet staat bovenaan,
+   * de rest op alfabet — zo is de bovenkant van het scherm je werklijst.
+   */
+  const rows: CaseloadRow[] = useMemo(() => {
+    const byId = new Map(caseload.map(c => [c.patientId, c]))
+    const DAY = 24 * 60 * 60 * 1000
+    return filtered
+      .map(p => {
+        const c = byId.get(p.id)
+        const last = c?.lastActivityAt ? new Date(c.lastActivityAt) : null
+        const silentDays = last
+          ? Math.max(0, Math.floor((Date.now() - last.getTime()) / DAY))
+          : null
+        const attention =
+          c?.pain?.trend === 'up' ||
+          (c?.weekChangePct != null && c.weekChangePct > 30) ||
+          (silentDays !== null && silentDays >= 7) ||
+          p.complianceLow
+        return {
+          id: p.id,
+          name: p.name,
+          avatarInitials: p.avatarInitials,
+          programId: p.programId,
+          programName: p.programName,
+          programStatus: p.programStatus,
+          weeksTotal: p.weeksTotal,
+          startDate: p.startDate,
+          compliancePercent: p.compliancePercent,
+          complianceLow: p.complianceLow,
+          series: c?.series ?? [],
+          weekLoad: c?.weekLoad ?? 0,
+          weekChangePct: c?.weekChangePct ?? null,
+          pain: c?.pain ?? null,
+          lastActivityAt: c?.lastActivityAt ?? null,
+          silentDays,
+          attention,
+        }
+      })
+      .sort((a, b) =>
+        a.attention === b.attention
+          ? a.name.localeCompare(b.name, 'nl')
+          : a.attention ? -1 : 1,
+      )
+  }, [filtered, caseload])
 
   return (
     <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
@@ -194,184 +279,50 @@ function PatientsPageInner() {
         {/* Loading state — skeleton in de vorm van de patiëntenlijst */}
         {isLoading && <SkeletonList count={6} />}
 
-        {/* Patient list */}
-        {!isLoading && (
-          <div className="space-y-3">
-            {filtered.map(patient => {
-              const status = patient.programStatus ? STATUS_CONFIG[patient.programStatus] : null
-              const accent =
-                patient.programStatus === 'ACTIVE' ? P.lime
-                : patient.programStatus === 'DRAFT' ? P.gold
-                : P.inkDim
-
-              return (
-                <Tile
-                  key={patient.id}
-                  accentBar={accent}
-                  onClick={() => router.push(`${portal.patients}/${patient.id}`)}
-                  prefetch={() => {
-                    router.prefetch(`${portal.patients}/${patient.id}`)
-                    utils.patients.get.prefetch({ id: patient.id })
+        {/* Caseload — één regel per sporter, gesorteerd op wie aandacht vraagt */}
+        {/* Bewust een klein tekstknopje per regel en geen gevulde knop: in een
+            lijst van veertien regels is een oranje vlak per rij het zwaarste
+            element op het scherm, en dan leidt de knop in plaats van de
+            gegevens. De hele regel is al klikbaar naar het dossier. */}
+        {!isLoading && rows.length > 0 && (
+          <CaseloadTable
+            rows={rows}
+            onOpen={id => router.push(`${portal.patients}/${id}`)}
+            onPrefetch={id => {
+              router.prefetch(`${portal.patients}/${id}`)
+              utils.patients.get.prefetch({ id })
+            }}
+            renderAction={row => (
+              row.programId ? (
+                <RowAction
+                  label="Programma"
+                  tint={P.inkMuted}
+                  onClick={() => router.push(`${portal.base}/programs/${row.programId}/edit`)}
+                  onHover={() => {
+                    router.prefetch(`${portal.base}/programs/${row.programId}/edit`)
+                    if (row.programId) utils.programs.get.prefetch({ id: row.programId })
                   }}
-                >
-                  <div className="flex items-start gap-3">
-                    {/* Avatar */}
-                    <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 athletic-mono"
-                      style={{ background: P.surfaceLow, color: P.brand, fontSize: 13, fontWeight: 900 }}
-                    >
-                      {patient.avatarInitials}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3
-                          style={{
-                            color: P.ink,
-                            fontSize: 14,
-                            fontWeight: 800,
-                            letterSpacing: '0.06em',
-                            textTransform: 'uppercase',
-                          }}
-                        >
-                          {patient.name}
-                        </h3>
-                        {patient.role === 'ATHLETE' && (
-                          <span
-                            className="athletic-mono"
-                            style={{
-                              background: `color-mix(in srgb, ${P.gold} 13%, transparent)`,
-                              color: P.gold,
-                              fontSize: 10,
-                              letterSpacing: '0.1em',
-                              padding: '2px 8px',
-                              borderRadius: 999,
-                              fontWeight: 800,
-                              textTransform: 'uppercase',
-                            }}
-                          >
-                            Atleet
-                          </span>
-                        )}
-                        {status && (
-                          <span
-                            className="athletic-mono"
-                            style={{
-                              background: status.bg,
-                              color: status.text,
-                              fontSize: 10,
-                              letterSpacing: '0.1em',
-                              padding: '2px 8px',
-                              borderRadius: 999,
-                              fontWeight: 800,
-                              textTransform: 'uppercase',
-                            }}
-                          >
-                            {status.label}
-                          </span>
-                        )}
-                        {patient.accessStatus === 'PENDING' && (
-                          <span
-                            className="athletic-mono"
-                            title="Patiënt heeft de uitnodiging nog niet geaccepteerd"
-                            style={{
-                              background: 'rgba(245, 185, 66, 0.15)',
-                              color: P.gold,
-                              fontSize: 10,
-                              letterSpacing: '0.1em',
-                              padding: '2px 8px',
-                              borderRadius: 999,
-                              fontWeight: 800,
-                              textTransform: 'uppercase',
-                            }}
-                          >
-                            Uitnodiging open
-                          </span>
-                        )}
-                        {patient.complianceLow && (
-                          <span
-                            className="athletic-mono"
-                            title={`${patient.complianceCompleted} van ${patient.complianceScheduled} sessies afgerond afgelopen 14 dagen`}
-                            style={{
-                              background: 'rgba(240,121,108,0.14)',
-                              color: P.danger,
-                              fontSize: 10,
-                              letterSpacing: '0.1em',
-                              padding: '2px 8px',
-                              borderRadius: 999,
-                              fontWeight: 800,
-                              textTransform: 'uppercase',
-                            }}
-                          >
-                            Lage trouw {Math.round((patient.compliancePercent ?? 0) * 100)}%
-                          </span>
-                        )}
-                      </div>
-
-                      <p
-                        className="athletic-mono truncate"
-                        style={{ color: P.inkMuted, fontSize: 11, marginTop: 2, letterSpacing: '0.03em' }}
-                      >
-                        {patient.email}
-                      </p>
-
-                      {patient.programName ? (
-                        <p
-                          className="athletic-mono truncate"
-                          style={{ color: P.inkMuted, fontSize: 11, marginTop: 3, letterSpacing: '0.03em' }}
-                        >
-                          {patient.programName}
-                        </p>
-                      ) : (
-                        <p
-                          className="athletic-mono truncate"
-                          style={{ color: P.inkDim, fontSize: 11, marginTop: 3, letterSpacing: '0.03em', fontStyle: 'italic' }}
-                        >
-                          Geen programma toegewezen
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex flex-col gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
-                      {patient.programId ? (
-                        <DarkButton
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => router.push(`${portal.base}/programs/${patient.programId}/edit`)}
-                          prefetch={() => {
-                            router.prefetch(`${portal.base}/programs/${patient.programId}/edit`)
-                            if (patient.programId) utils.programs.get.prefetch({ id: patient.programId })
-                          }}
-                        >
-                          Programma
-                        </DarkButton>
-                      ) : (
-                        <DarkButton
-                          variant="primary"
-                          size="sm"
-                          onClick={() => router.push(`${portal.base}/programs/new?patientId=${patient.id}`)}
-                        >
-                          + Programma
-                        </DarkButton>
-                      )}
-                    </div>
-                  </div>
-                </Tile>
+                />
+              ) : (
+                <RowAction
+                  label="+ Programma"
+                  tint={P.brand}
+                  onClick={() => router.push(`${portal.base}/programs/new?patientId=${row.id}`)}
+                />
               )
-            })}
-
-            {filtered.length === 0 && (
-              <Tile>
-                <div className="flex flex-col items-center justify-center py-8 text-center gap-3">
-                  <p style={{ color: P.inkMuted, fontSize: 13 }}>Geen patiënten gevonden</p>
-                  <DarkButton variant="secondary" size="sm" onClick={() => setInviteOpen(true)}>
-                    + Patiënt uitnodigen
-                  </DarkButton>
-                </div>
-              </Tile>
             )}
-          </div>
+          />
+        )}
+
+        {!isLoading && rows.length === 0 && (
+          <Tile>
+            <div className="flex flex-col items-center justify-center py-8 text-center gap-3">
+              <p style={{ color: P.inkMuted, fontSize: 13 }}>Geen patiënten gevonden</p>
+              <DarkButton variant="secondary" size="sm" onClick={() => setInviteOpen(true)}>
+                + Patiënt uitnodigen
+              </DarkButton>
+            </div>
+          </Tile>
         )}
 
         {/* Invite modal */}
