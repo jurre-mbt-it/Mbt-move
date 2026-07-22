@@ -189,7 +189,7 @@ function Simulator() {
               Live resultaat (echt component)
             </div>
             <MuscleStatusListView states={states} />
-            <p style={{ color: '#658180', fontSize: 11, lineHeight: 1.5, marginTop: 14 }}>
+            <p style={{ color: '#86A3A1', fontSize: 11, lineHeight: 1.5, marginTop: 14 }}>
               Herstelde regio&apos;s (≥95%) vallen weg. Cardio belast de benen mee: een duurloop meer dan een fietsrit. Kleuren: groen hersteld → goud → oranje → rood zwaar belast.
             </p>
           </div>

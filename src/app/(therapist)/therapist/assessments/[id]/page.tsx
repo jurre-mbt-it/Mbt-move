@@ -74,8 +74,8 @@ const SCORE_COLOR: Record<ScoreValue, string> = {
 
 const SCORE_BG: Record<ScoreValue, string> = {
   NOT_TESTED: P.surfaceHi,
-  FAIL: 'rgba(248,113,113,0.12)',
-  PARTIAL: 'rgba(244,194,97,0.14)',
+  FAIL: 'rgba(240,121,108,0.12)',
+  PARTIAL: 'rgba(245,185,66,0.14)',
   PASS: 'rgba(232,122,85,0.14)',
 }
 
@@ -411,7 +411,7 @@ function TestRow({
                 border: `1px solid ${currentScore === s ? SCORE_COLOR[s] : P.lineStrong}`,
                 fontSize: 11,
                 fontWeight: 900,
-                fontFamily: 'Menlo, monospace',
+                fontFamily: 'var(--font-mono-athletic)',
               }}
             >
               {s === 'FAIL' ? 'R' : s === 'PARTIAL' ? 'O' : 'G'}

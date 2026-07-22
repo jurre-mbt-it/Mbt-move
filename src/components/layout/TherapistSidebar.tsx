@@ -183,7 +183,7 @@ export function TherapistSidebar({ variant = 'therapist' }: { variant?: SidebarV
           onClick={toggleCollapsed}
           title="Menu inklappen"
           aria-label="Menu inklappen"
-          className="mbt-btn-hover athletic-tap absolute right-3 top-4 z-10 rounded-lg p-1.5 text-[#7B8889] hover:text-[#F5F7F6]"
+          className="mbt-btn-hover athletic-tap absolute right-3 top-4 z-10 rounded-lg p-1.5 text-[#9EB5B3] hover:text-[#F5F2ED]"
         >
           <PanelLeftClose className="h-4 w-4" />
         </button>

@@ -293,7 +293,7 @@ function CriterionRow({
             <span
               className="athletic-mono"
               style={{
-                background: 'rgba(244,194,97,0.2)',
+                background: 'rgba(245,185,66,0.2)',
                 color: P.gold,
                 fontSize: 9,
                 padding: '1px 6px',

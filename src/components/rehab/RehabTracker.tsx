@@ -25,8 +25,8 @@ const STATUS_COLOR: Record<StatusValue, string> = {
 }
 
 const STATUS_BG: Record<StatusValue, string> = {
-  NOT_MET: 'rgba(248,113,113,0.12)',
-  IN_PROGRESS: 'rgba(244,194,97,0.14)',
+  NOT_MET: 'rgba(240,121,108,0.12)',
+  IN_PROGRESS: 'rgba(245,185,66,0.14)',
   MET: 'rgba(232,122,85,0.14)',
 }
 
@@ -307,7 +307,7 @@ function PhaseCard({
               <span
                 className="athletic-mono"
                 style={{
-                  background: 'rgba(147,197,253,0.16)',
+                  background: 'rgba(159,206,201,0.16)',
                   color: P.ice,
                   fontSize: 9,
                   letterSpacing: '0.14em',
@@ -547,7 +547,7 @@ function CriterionRow({
               <span
                 className="athletic-mono"
                 style={{
-                  background: 'rgba(244,194,97,0.2)',
+                  background: 'rgba(245,185,66,0.2)',
                   color: P.gold,
                   fontSize: 9,
                   padding: '1px 6px',
@@ -821,7 +821,7 @@ function StatusChip({
         border: `1px solid ${active ? color : P.lineStrong}`,
         fontSize: 11,
         fontWeight: 900,
-        fontFamily: 'Menlo, monospace',
+        fontFamily: 'var(--font-mono-athletic)',
         letterSpacing: '0.04em',
         display: 'flex',
         alignItems: 'center',

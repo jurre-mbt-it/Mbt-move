@@ -22,8 +22,10 @@ const MUSCLE_PAIRS: [string, string][] = [
 const WEEKLY_SETS_MIN = 10
 const WEEKLY_SETS_MAX = 20
 
+// Belastingsschaal 1-5: koel bij weinig, warm bij veel. Alle vijf staan
+// leesbaar op petrol — ze dienen ook als tekstkleur bij het getal.
 const LOAD_COLORS = [
-  '', '#c6f7f2', '#5eead4', '#e87a55', '#0D9488', '#134E4A',
+  '', '#9FCEC9', '#5FD08A', '#F5B942', '#F09A4A', '#E87A55',
 ]
 
 export function MuscleBalancePanel({ exercises, currentDay, currentWeek }: Props) {
@@ -97,7 +99,7 @@ export function MuscleBalancePanel({ exercises, currentDay, currentWeek }: Props
           sorted.map(([muscle, load]) => {
             const pct = Math.round((load / maxLoad) * 100)
             const intensity = Math.min(5, Math.ceil((load / maxLoad) * 5))
-            const color = LOAD_COLORS[intensity] ?? '#e87a55'
+            const color = LOAD_COLORS[intensity] ?? '#E87A55'
 
             return (
               <div key={muscle} className="space-y-0.5">
@@ -105,7 +107,7 @@ export function MuscleBalancePanel({ exercises, currentDay, currentWeek }: Props
                   <span className="text-muted-foreground truncate">{muscle}</span>
                   <span className="font-semibold shrink-0 ml-1" style={{ color }}>{Math.round(load)}</span>
                 </div>
-                <div className="h-1.5 bg-[#1C2425] rounded-full overflow-hidden">
+                <div className="h-1.5 bg-[#1C4448] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-300"
                     style={{ width: `${pct}%`, background: color }}
@@ -141,9 +143,9 @@ export function MuscleBalancePanel({ exercises, currentDay, currentWeek }: Props
           </p>
           {weeklyHardSets.map(([muscle, sets]) => {
             const color =
-              sets < WEEKLY_SETS_MIN ? '#f59e0b' :
-              sets <= WEEKLY_SETS_MAX ? '#10b981' :
-              '#e87a55'
+              sets < WEEKLY_SETS_MIN ? '#F5B942' :
+              sets <= WEEKLY_SETS_MAX ? '#5FD08A' :
+              '#E87A55'
             const state =
               sets < WEEKLY_SETS_MIN ? 'onder' :
               sets <= WEEKLY_SETS_MAX ? 'op peil' :
@@ -163,7 +165,7 @@ export function MuscleBalancePanel({ exercises, currentDay, currentWeek }: Props
       {/* Imbalance warnings */}
       {imbalances.length > 0 && (
         <div className="px-3 py-2 border-t shrink-0 space-y-1.5">
-          <p className="text-xs font-semibold flex items-center gap-1" style={{ color: '#f59e0b' }}>
+          <p className="text-xs font-semibold flex items-center gap-1" style={{ color: '#F5B942' }}>
             <AlertTriangle className="w-3.5 h-3.5" />
             Onevenwichtigheden
           </p>
@@ -171,7 +173,7 @@ export function MuscleBalancePanel({ exercises, currentDay, currentWeek }: Props
             <div
               key={`${a}-${b}`}
               className="text-xs rounded px-2 py-1"
-              style={{ color: '#fbbf24', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)' }}
+              style={{ color: '#F5B942', background: 'rgba(245,185,66,0.10)', border: '1px solid rgba(245,185,66,0.25)' }}
               title="Meer dan 2× verschil in belasting tussen dit spierpaar op deze dag."
             >
               {a} vs {b}

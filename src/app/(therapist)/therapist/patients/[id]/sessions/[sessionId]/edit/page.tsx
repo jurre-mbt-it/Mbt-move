@@ -594,7 +594,7 @@ function EditExerciseTile({
             onClick={() => { setParamMenuOpen((v) => !v); setSupersetMenuOpen(false) }}
             className="athletic-mono athletic-tap px-2 py-1 rounded-full"
             style={{
-              background: P.surfaceHi, color: P.brand,
+              background: P.surfaceLow, color: P.brand,
               border: `1px dashed ${P.brand}`,
               fontSize: 10, letterSpacing: '0.08em', fontWeight: 800,
             }}

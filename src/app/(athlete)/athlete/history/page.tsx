@@ -11,7 +11,7 @@ import {
 } from '@/components/dark-ui'
 
 const mono =
-  'ui-monospace, Menlo, "SF Mono", "Cascadia Code", "Source Code Pro", monospace'
+  'var(--font-mono-athletic)'
 
 export default function AthleteHistoryPage() {
   const { data: sessions, isLoading } = trpc.patient.getSessionHistory.useQuery({ limit: 50 })

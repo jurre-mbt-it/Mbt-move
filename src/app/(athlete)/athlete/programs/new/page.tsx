@@ -13,7 +13,7 @@ export default function AthleteNewProgramPage() {
   return (
     <div
       className="athletic-dark flex flex-col overflow-hidden"
-      style={{ height: 'calc(100dvh - 4rem)', background: '#0A0E0F', color: '#F5F7F6' }}
+      style={{ height: 'calc(100dvh - 4rem)', background: '#0E2729', color: '#F5F2ED' }}
     >
       <div className="flex-1 overflow-hidden p-4 md:p-6">
         <Suspense>

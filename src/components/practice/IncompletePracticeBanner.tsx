@@ -59,15 +59,15 @@ export function IncompletePracticeBanner({
       <div
         className="flex items-start gap-2 rounded-lg p-3 text-xs"
         style={{
-          background: 'rgba(245,158,11,0.08)',
-          border: '1px solid rgba(245,158,11,0.30)',
-          color: '#F59E0B',
+          background: 'rgba(245,185,66,0.08)',
+          border: '1px solid rgba(245,185,66,0.30)',
+          color: '#F5B942',
         }}
       >
         <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
         <div className="flex-1">
           <p className="font-semibold">Praktijkgegevens incompleet</p>
-          <p className="opacity-90 mt-0.5" style={{ color: '#FCD34D' }}>{ownerCopy}</p>
+          <p className="opacity-90 mt-0.5" style={{ color: '#F5B942' }}>{ownerCopy}</p>
           {isOwner && practice && (
             <Link
               href="/therapist/settings/practice"
@@ -85,23 +85,23 @@ export function IncompletePracticeBanner({
     <div
       className="flex items-start gap-3 rounded-2xl p-4"
       style={{
-        background: 'rgba(245,158,11,0.06)',
-        border: '1px solid rgba(245,158,11,0.30)',
+        background: 'rgba(245,185,66,0.06)',
+        border: '1px solid rgba(245,185,66,0.30)',
       }}
     >
-      <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" style={{ color: '#F59E0B' }} />
+      <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" style={{ color: '#F5B942' }} />
       <div className="flex-1">
-        <p className="text-sm font-semibold" style={{ color: '#F59E0B' }}>
+        <p className="text-sm font-semibold" style={{ color: '#F5B942' }}>
           Praktijkgegevens incompleet
         </p>
-        <p className="text-xs mt-1" style={{ color: '#FCD34D' }}>
+        <p className="text-xs mt-1" style={{ color: '#F5B942' }}>
           {ownerCopy}
         </p>
         {isOwner && practice && (
           <Link
             href="/therapist/settings/practice"
             className="inline-block mt-2 text-xs font-semibold underline"
-            style={{ color: '#F59E0B' }}
+            style={{ color: '#F5B942' }}
           >
             Praktijkprofiel openen →
           </Link>

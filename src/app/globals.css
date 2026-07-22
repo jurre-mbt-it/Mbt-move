@@ -1,114 +1,153 @@
-/* Satoshi font — must be first import before Tailwind transforms */
-@import url('https://api.fontshare.com/v2/css?f[]=satoshi@700,500,400&display=swap');
-
 @import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
+/* ─── Huisfonts ───────────────────────────────────────────────────────────
+   Lokaal geserveerd (de CSP staat alleen `font-src 'self' data:` toe, dus een
+   extern gehost font laadt sowieso niet). Archivo is de tekstletter, Martian
+   Mono draagt alle labels en cijfers. */
+@font-face{
+  font-family:'Archivo';
+  src:url('/fonts/Archivo-Variable.woff2') format('woff2-variations');
+  font-weight:100 900; font-stretch:62% 125%; font-style:normal; font-display:swap;
+}
+@font-face{
+  font-family:'Martian';
+  src:url('/fonts/MartianMono-Variable.woff2') format('woff2-variations');
+  font-weight:100 800; font-stretch:75% 112.5%; font-style:normal; font-display:swap;
+}
+
 :root {
-  /* ─── Athletic-dark palette (MBT-Gym parity) ──────────────────────────
-     Whoop/Strava/Nike-stijl. Dark-first, electric lime accent.
-     Deze tokens leven naast de shadcn-tokens. De `--color-*` theme-mappings
-     worden in .athletic-dark overridden zodat bestaande shadcn-componenten
-     automatisch het nieuwe palet gebruiken wanneer de context dark is. */
-  --p-bg: #0A0E0F;
-  --p-surface: #141A1B;
-  --p-surface-hi: #1C2425;
-  --p-surface-low: #0F1415;
-  --p-line: rgba(255,255,255,0.06);
-  --p-line-strong: rgba(255,255,255,0.12);
-  --p-ink: #F5F7F6;
-  --p-ink-muted: #7B8889;
-  --p-ink-dim: #4A5454;
-  --p-lime: #BEF264;
-  --p-lime-dark: #65A30D;
-  --p-brand: #e87a55;
-  --p-brand-deep: #c9613f;
-  --p-danger: #F87171;
-  --p-danger-dark: #991B1B;
-  --p-gold: #F4C261;
-  --p-ice: #93C5FD;
-  --p-purple: #C084FC;
+  /* ─── Palet ───────────────────────────────────────────────────────────
+     Diep petrol met crème, oranje als merk- en signaalkleur, echt groen voor
+     "goed" en mint voor het koele accent. Dezelfde waarden staan in
+     `src/lib/palette.ts` voor de JS-kant; verander je er één, verander dan
+     allebei. De shadcn-tokens hieronder hangen er in `.athletic-dark` aan vast.
 
-  /* Monospace stack (Menlo-first to match iOS) */
-  --font-mono-athletic: Menlo, 'SF Mono', SFMono-Regular, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+     Blijf van kale hexcodes af in componenten: pak `P` of deze var(). */
+  --p-bg: #0E2729;
+  --p-surface: #15363A;
+  --p-surface-hi: #1C4448;
+  --p-surface-low: #081A1C;
+  --p-line: rgba(212,232,230,0.09);
+  --p-line-strong: rgba(212,232,230,0.20);
+  --p-ink: #F5F2ED;
+  --p-ink-muted: #9EB5B3;
+  --p-ink-dim: #86A3A1;
 
-  /* MBT Brand Colors — dark teal + seafoam palette (legacy — behouden voor transitie) */
-  --mbt-green: #4ECDC4;
-  --mbt-green-dark: #3BB8B0;
-  --mbt-green-light: #7EDCD6;
-  --mbt-dark: #1A3A3A;
+  /* "goed / hersteld / gehaald" — echt groen, geen electric lime.
+     De sleutels heten historisch `lime`; de kleur is groen. */
+  --p-lime: #5FD08A;
+  --p-lime-dark: #3FA968;
+  --p-lime-mid: #7ADCA0;
+  --p-lime-deep: #2E8F55;
 
-  /* shadcn/ui tokens */
-  --background: #FAFAFA;
-  --foreground: #1A3A3A;
-  --card: #FFFFFF;
-  --card-foreground: #1A3A3A;
-  --popover: #FFFFFF;
-  --popover-foreground: #1A3A3A;
-  --primary: #4ECDC4;
-  --primary-foreground: #FFFFFF;
-  --secondary: #F0F5F5;
-  --secondary-foreground: #1A3A3A;
-  --muted: #F0F5F5;
-  --muted-foreground: #5A7A7A;
-  --accent: #F0F5F5;
-  --accent-foreground: #1A3A3A;
-  --destructive: #EF4444;
-  --destructive-foreground: #FFFFFF;
-  --border: #D4E4E4;
-  --input: #D4E4E4;
-  --ring: #4ECDC4;
+  --p-brand: #E87A55;
+  --p-brand-deep: #C9613F;
+  --p-danger: #F0796C;
+  --p-danger-dark: #8E2F26;
+  --p-gold: #F5B942;
+  --p-gold-warm: #F09A4A;
+  --p-orange: #EE8447;
+  --p-ice: #9FCEC9;
+  --p-teal: #45A8A2;
+
+  /* ─── Dataramp ────────────────────────────────────────────────────────
+     Voor categorieën die naast elkaar leesbaar moeten zijn: collecties,
+     cardio-soorten, superset-groepen. Acht tinten die alle acht boven petrol
+     staan en niet uit de tailwind-standaarddoos komen. Volgorde is bewust:
+     buren verschillen genoeg in tint én helderheid. */
+  --p-data-1: #9FCEC9;  /* mint */
+  --p-data-2: #5FD08A;  /* groen */
+  --p-data-3: #F5B942;  /* goud */
+  --p-data-4: #E87A55;  /* brand-oranje */
+  --p-data-5: #F0796C;  /* koraal */
+  --p-data-6: #7FB0D8;  /* staalblauw */
+  --p-data-7: #45A8A2;  /* diep turquoise */
+  --p-data-8: #D9C08A;  /* zand */
+
+  /* Letterstapels */
+  --font-mono-athletic: 'Martian', ui-monospace, Menlo, 'SF Mono', SFMono-Regular, Monaco, monospace;
+  --font-athletic: 'Archivo', ui-sans-serif, system-ui, sans-serif;
+
+  /* MBT-huisstijl (legacy-namen, nu op het nieuwe palet) */
+  --mbt-green: #9FCEC9;
+  --mbt-green-dark: #45A8A2;
+  --mbt-green-light: #C3E2DE;
+  --mbt-dark: #0E2729;
+
+  /* shadcn/ui tokens — de app draait overal in de donkere context, dus deze
+     staan meteen op petrol in plaats van op een licht thema dat toch nooit
+     te zien is. */
+  --background: #0E2729;
+  --foreground: #F5F2ED;
+  --card: #15363A;
+  --card-foreground: #F5F2ED;
+  --popover: #15363A;
+  --popover-foreground: #F5F2ED;
+  --primary: #E87A55;
+  --primary-foreground: #0E2729;
+  --secondary: #1C4448;
+  --secondary-foreground: #F5F2ED;
+  --muted: #1C4448;
+  --muted-foreground: #9EB5B3;
+  --accent: #1C4448;
+  --accent-foreground: #F5F2ED;
+  --destructive: #F0796C;
+  --destructive-foreground: #0E2729;
+  --border: rgba(212,232,230,0.09);
+  --input: #1C4448;
+  --ring: #E87A55;
   --radius: 0.5rem;
 
-  /* Chart colors */
-  --chart-1: #4ECDC4;
-  --chart-2: #60a5fa;
-  --chart-3: #f59e0b;
-  --chart-4: #a78bfa;
-  --chart-5: #f87171;
+  /* Grafiekreeksen */
+  --chart-1: var(--p-data-1);
+  --chart-2: var(--p-data-6);
+  --chart-3: var(--p-data-3);
+  --chart-4: var(--p-data-7);
+  --chart-5: var(--p-data-5);
 
   /* Sidebar */
-  --sidebar: #1A3A3A;
-  --sidebar-foreground: #FAFAFA;
-  --sidebar-primary: #4ECDC4;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #2A4A4A;
-  --sidebar-accent-foreground: #FAFAFA;
-  --sidebar-border: #2A4A4A;
-  --sidebar-ring: #4ECDC4;
+  --sidebar: #0E2729;
+  --sidebar-foreground: #F5F2ED;
+  --sidebar-primary: #E87A55;
+  --sidebar-primary-foreground: #0E2729;
+  --sidebar-accent: #1C4448;
+  --sidebar-accent-foreground: #F5F2ED;
+  --sidebar-border: rgba(212,232,230,0.20);
+  --sidebar-ring: #E87A55;
 }
 
 .dark {
-  --background: #0F1F1F;
-  --foreground: #FAFAFA;
-  --card: #1A3A3A;
-  --card-foreground: #FAFAFA;
-  --popover: #1A3A3A;
-  --popover-foreground: #FAFAFA;
-  --primary: #4ECDC4;
-  --primary-foreground: #FFFFFF;
-  --secondary: #2A4A4A;
-  --secondary-foreground: #FAFAFA;
-  --muted: #2A4A4A;
-  --muted-foreground: #8AAFAF;
-  --accent: #2A4A4A;
-  --accent-foreground: #FAFAFA;
-  --destructive: #7F1D1D;
-  --destructive-foreground: #FAFAFA;
-  --border: #2A4A4A;
-  --input: #2A4A4A;
-  --ring: #4ECDC4;
+  --background: var(--p-bg);
+  --foreground: var(--p-ink);
+  --card: var(--p-surface);
+  --card-foreground: var(--p-ink);
+  --popover: var(--p-surface);
+  --popover-foreground: var(--p-ink);
+  --primary: var(--p-brand);
+  --primary-foreground: var(--p-bg);
+  --secondary: var(--p-surface-hi);
+  --secondary-foreground: var(--p-ink);
+  --muted: var(--p-surface-hi);
+  --muted-foreground: var(--p-ink-muted);
+  --accent: var(--p-surface-hi);
+  --accent-foreground: var(--p-ink);
+  --destructive: var(--p-danger);
+  --destructive-foreground: var(--p-bg);
+  --border: var(--p-line);
+  --input: var(--p-surface-hi);
+  --ring: var(--p-brand);
 
-  --sidebar: #0F1F1F;
-  --sidebar-foreground: #FAFAFA;
-  --sidebar-primary: #4ECDC4;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #1A3A3A;
-  --sidebar-accent-foreground: #FAFAFA;
-  --sidebar-border: #2A4A4A;
-  --sidebar-ring: #4ECDC4;
+  --sidebar: var(--p-bg);
+  --sidebar-foreground: var(--p-ink);
+  --sidebar-primary: var(--p-brand);
+  --sidebar-primary-foreground: var(--p-bg);
+  --sidebar-accent: var(--p-surface-hi);
+  --sidebar-accent-foreground: var(--p-ink);
+  --sidebar-border: var(--p-line-strong);
+  --sidebar-ring: var(--p-brand);
 }
 
 @theme inline {
@@ -144,8 +183,8 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --font-sans: 'Satoshi', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace;
+  --font-sans: 'Archivo', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Martian', ui-monospace, 'Cascadia Code', Menlo, monospace;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -160,12 +199,13 @@
    overscroll-areas niet wit flashen. `.athletic-dark` class op root
    overridet alle shadcn-tokens. */
 html, body {
-  background: #0A0E0F;
+  background: var(--p-bg);
 }
 
 body {
   color: var(--foreground);
-  font-family: 'Satoshi', ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-athletic);
+  font-stretch: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -213,20 +253,30 @@ body {
 /* ─── Utility classes voor athletic-dark typografie ─────────────────────── */
 .athletic-mono {
   font-family: var(--font-mono-athletic);
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums;
   letter-spacing: 0.1em;
   font-weight: 700;
   text-transform: uppercase;
 }
 
+/* Koppen staan breed en zwaar; de variabele as doet het werk, niet een
+   tweede letterfamilie. */
+.athletic-display,
+h1, h2, h3 {
+  font-family: var(--font-athletic);
+  font-stretch: 116%;
+  letter-spacing: -0.02em;
+}
+
 .athletic-display {
   font-weight: 900;
-  letter-spacing: -0.03em;
   color: var(--p-ink);
-  font-family: 'Satoshi', ui-sans-serif, system-ui, sans-serif;
 }
 
 .athletic-kicker {
   font-family: var(--font-mono-athletic);
+  font-stretch: 87.5%;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.2em;
@@ -236,6 +286,7 @@ body {
 
 .athletic-meta {
   font-family: var(--font-mono-athletic);
+  font-stretch: 87.5%;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.16em;
@@ -309,7 +360,7 @@ body {
 }
 @media (hover: hover) {
   .mbt-nav-hover:hover {
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: rgba(212, 232, 230, 0.06);
     transform: translateX(2px);
   }
 }
@@ -393,12 +444,12 @@ body {
   100% { background-position: -150% 0; }
 }
 .mbt-skeleton {
-  background-color: #1c2425; /* P.surfaceHi */
+  background-color: var(--p-surface-hi);
   background-image: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.055) 50%,
-    rgba(255, 255, 255, 0) 100%
+    rgba(212, 232, 230, 0) 0%,
+    rgba(212, 232, 230, 0.07) 50%,
+    rgba(212, 232, 230, 0) 100%
   );
   background-size: 200% 100%;
   background-repeat: no-repeat;

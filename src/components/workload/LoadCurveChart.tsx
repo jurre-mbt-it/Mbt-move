@@ -139,8 +139,8 @@ export function LoadCurveChart({ data, compact = false }: { data: LoadCurveData;
               <span
                 className="athletic-mono px-2 py-0.5 rounded-md"
                 style={{
-                  background: `${P.inkMuted}1A`,
-                  border: `1px solid ${P.inkMuted}55`,
+                  background: `color-mix(in srgb, ${P.inkMuted} 10%, transparent)`,
+                  border: `1px solid color-mix(in srgb, ${P.inkMuted} 33%, transparent)`,
                   color: P.inkMuted,
                   fontSize: 11,
                   fontWeight: 900,

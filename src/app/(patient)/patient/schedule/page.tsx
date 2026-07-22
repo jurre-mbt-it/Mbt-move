@@ -468,7 +468,7 @@ export default function PatientSchedulePage() {
                       className="rounded-2xl overflow-hidden"
                       style={{ border: `2px solid ${P.ice}`, background: P.surface }}
                     >
-                      <div className="px-3 py-1.5 flex items-center gap-1.5" style={{ background: 'rgba(147,197,253,0.12)' }}>
+                      <div className="px-3 py-1.5 flex items-center gap-1.5" style={{ background: 'rgba(159,206,201,0.12)' }}>
                         <span
                           className="athletic-mono"
                           style={{ color: P.ice, fontSize: 10, fontWeight: 900, letterSpacing: '0.16em' }}

@@ -21,7 +21,7 @@ export function VideoPlayer({ url, className }: VideoPlayerProps) {
 
   return (
     <div
-      className={`relative overflow-hidden rounded-xl bg-black ${className ?? ''}`}
+      className={`relative overflow-hidden rounded-xl bg-[#081A1C] ${className ?? ''}`}
       style={{ aspectRatio: '16/9' }}
     >
       {youtubeId ? (
@@ -41,7 +41,7 @@ export function VideoPlayer({ url, className }: VideoPlayerProps) {
           className="absolute inset-0 w-full h-full border-0"
         />
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center text-white/50 text-sm">
+        <div className="absolute inset-0 flex items-center justify-center text-[#86A3A1] text-sm">
           Geen geldige video URL
         </div>
       )}

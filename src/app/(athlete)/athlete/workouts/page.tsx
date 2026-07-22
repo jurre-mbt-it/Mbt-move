@@ -235,7 +235,7 @@ function WorkoutRow({
             className="flex items-center gap-2"
             style={{
               fontFamily:
-                'ui-monospace, Menlo, "SF Mono", "Cascadia Code", monospace',
+                'var(--font-mono-athletic)',
               fontSize: 10,
               letterSpacing: '0.14em',
               fontWeight: 700,

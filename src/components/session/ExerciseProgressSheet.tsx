@@ -8,7 +8,7 @@ import {
 import { P, Kicker, MetaLabel } from '@/components/dark-ui'
 
 const mono =
-  'ui-monospace, Menlo, "SF Mono", "Cascadia Code", "Source Code Pro", monospace'
+  'var(--font-mono-athletic)'
 
 /**
  * Voortgang van één oefening als bottom-sheet: zwaarste set (kg) en geschatte
@@ -89,16 +89,16 @@ export function ExerciseProgressSheet({
             <div style={{ width: '100%', height: 190, marginTop: 8 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
-                  <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <CartesianGrid stroke="rgba(212,232,230,0.05)" vertical={false} />
                   <XAxis
                     dataKey="label"
-                    tick={{ fill: '#7B8889', fontSize: 9, fontFamily: mono }}
-                    axisLine={{ stroke: 'rgba(255,255,255,0.12)' }}
+                    tick={{ fill: '#9EB5B3', fontSize: 9, fontFamily: mono }}
+                    axisLine={{ stroke: 'rgba(212,232,230,0.12)' }}
                     tickLine={false}
                     interval="preserveStartEnd"
                   />
                   <YAxis
-                    tick={{ fill: '#7B8889', fontSize: 9, fontFamily: mono }}
+                    tick={{ fill: '#9EB5B3', fontSize: 9, fontFamily: mono }}
                     axisLine={false}
                     tickLine={false}
                     domain={['auto', 'auto']}

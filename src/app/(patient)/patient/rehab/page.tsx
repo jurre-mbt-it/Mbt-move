@@ -20,8 +20,8 @@ const STATUS_COLOR: Record<StatusValue, string> = {
 }
 
 const STATUS_BG: Record<StatusValue, string> = {
-  NOT_MET: 'rgba(248,113,113,0.12)',
-  IN_PROGRESS: 'rgba(244,194,97,0.14)',
+  NOT_MET: 'rgba(240,121,108,0.12)',
+  IN_PROGRESS: 'rgba(245,185,66,0.14)',
   MET: 'rgba(232,122,85,0.14)',
 }
 
@@ -172,7 +172,7 @@ export default function PatientRehabPage() {
                         <span
                           className="athletic-mono"
                           style={{
-                            background: P.lime + '20',
+                            background: `color-mix(in srgb, ${P.lime} 13%, transparent)`,
                             color: P.lime,
                             fontSize: 10,
                             letterSpacing: '0.1em',

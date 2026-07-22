@@ -11,14 +11,14 @@ import { EXERCISE_CATEGORIES, DIFFICULTIES } from '@/lib/exercise-constants'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ReactPlayer = dynamic(() => import('react-player') as any, { ssr: false }) as any
 
-const MBT_GREEN = '#e87a55'
+const MBT_GREEN = '#E87A55'
 
 const CATEGORY_COLORS: Record<string, string> = {
-  STRENGTH:    '#BEF264',
-  MOBILITY:    '#60a5fa',
-  PLYOMETRICS: '#f59e0b',
-  CARDIO:      '#f87171',
-  STABILITY:   '#a78bfa',
+  STRENGTH:    '#5FD08A',
+  MOBILITY:    '#7FB0D8',
+  PLYOMETRICS: '#F5B942',
+  CARDIO:      '#F0796C',
+  STABILITY:   '#45A8A2',
 }
 
 export type ExerciseForModal = {
@@ -49,7 +49,7 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
 
   const categoryLabel = EXERCISE_CATEGORIES.find(c => c.value === exercise.category)?.label ?? exercise.category
   const difficultyLabel = DIFFICULTIES.find(d => d.value === exercise.difficulty)?.label ?? exercise.difficulty
-  const color = CATEGORY_COLORS[exercise.category ?? ''] ?? '#e87a55'
+  const color = CATEGORY_COLORS[exercise.category ?? ''] ?? '#E87A55'
 
   const primaryMuscles = exercise.muscleLoads
     ? Object.entries(exercise.muscleLoads)
@@ -67,7 +67,7 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
         {/* Video / placeholder */}
         <div className="relative">
           {exercise.videoUrl ? (
-            <div className="aspect-video bg-black">
+            <div className="aspect-video bg-[#081A1C]">
               <ReactPlayer
                 src={exercise.videoUrl}
                 width="100%"
@@ -77,9 +77,9 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
                 playIcon={
                   <div
                     className="w-14 h-14 rounded-full flex items-center justify-center"
-                    style={{ background: '#e87a55' }}
+                    style={{ background: '#E87A55' }}
                   >
-                    <span className="text-white text-xl ml-1">▶</span>
+                    <span className="text-[#F5F2ED] text-xl ml-1">▶</span>
                   </div>
                 }
               />
@@ -89,15 +89,15 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
               className="aspect-video flex flex-col items-center justify-center gap-2"
               style={{ background: `${color}15` }}
             >
-              <VideoOff className="w-8 h-8 text-[#7B8889]" />
-              <p className="text-sm text-[#7B8889]">Geen video beschikbaar</p>
+              <VideoOff className="w-8 h-8 text-[#9EB5B3]" />
+              <p className="text-sm text-[#9EB5B3]">Geen video beschikbaar</p>
             </div>
           )}
 
           {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-black/40 text-white hover:bg-black/60 transition-colors"
+            className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-[#081A1C]/55 text-[#F5F2ED] hover:bg-[#081A1C]/72 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -121,7 +121,7 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
             <div className="flex flex-wrap gap-1.5 mt-2">
               {exercise.category && (
                 <span
-                  className="text-xs font-semibold px-2 py-0.5 rounded-full text-white"
+                  className="text-xs font-semibold px-2 py-0.5 rounded-full text-[#0E2729]"
                   style={{ background: color }}
                 >
                   {categoryLabel}
@@ -140,13 +140,13 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
 
           {/* Description */}
           {exercise.description && (
-            <p className="text-sm text-[#7B8889] leading-relaxed">{exercise.description}</p>
+            <p className="text-sm text-[#9EB5B3] leading-relaxed">{exercise.description}</p>
           )}
 
           {/* Muscle groups */}
           {primaryMuscles.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-[#7B8889] uppercase tracking-wide mb-2">Spiergroepen</p>
+              <p className="text-xs font-semibold text-[#9EB5B3] uppercase tracking-wide mb-2">Spiergroepen</p>
               <div className="flex flex-wrap gap-1.5">
                 {primaryMuscles.map(([muscle, load]) => (
                   <div
@@ -173,13 +173,13 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
           {/* Coaching cues */}
           {exercise.coachingCues && exercise.coachingCues.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-[#7B8889] uppercase tracking-wide mb-2 flex items-center gap-1.5">
+              <p className="text-xs font-semibold text-[#9EB5B3] uppercase tracking-wide mb-2 flex items-center gap-1.5">
                 <Lightbulb className="w-3.5 h-3.5" style={{ color: MBT_GREEN }} />
                 Coaching cues
               </p>
               <ul className="space-y-1.5">
                 {exercise.coachingCues.map((cue, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-[#7B8889]">
+                  <li key={i} className="flex items-start gap-2 text-sm text-[#9EB5B3]">
                     <span className="font-bold mt-0.5 shrink-0" style={{ color: MBT_GREEN }}>·</span>
                     {cue}
                   </li>
@@ -192,9 +192,9 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
           {(exercise.easierVariant || exercise.harderVariant) && (
             <div className="space-y-1.5">
               {exercise.easierVariant && (
-                <div className="flex items-center gap-2 text-xs rounded-xl px-3 py-2" style={{ background: '#fefce8' }}>
-                  <TrendingDown className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                  <span className="text-amber-700">
+                <div className="flex items-center gap-2 text-xs rounded-xl px-3 py-2" style={{ background: 'rgba(245,185,66,0.10)' }}>
+                  <TrendingDown className="w-3.5 h-3.5 shrink-0" style={{ color: '#F5B942' }} />
+                  <span style={{ color: '#F5B942' }}>
                     <span className="font-semibold">Te moeilijk?</span> Probeer: {exercise.easierVariant}
                   </span>
                 </div>
@@ -202,7 +202,7 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
               {exercise.harderVariant && (
                 <div className="flex items-center gap-2 text-xs rounded-xl px-3 py-2" style={{ background: 'rgba(232,122,85,0.10)' }}>
                   <TrendingUp className="w-3.5 h-3.5 shrink-0" style={{ color: MBT_GREEN }} />
-                  <span style={{ color: '#e87a55' }}>
+                  <span style={{ color: '#E87A55' }}>
                     <span className="font-semibold">Te makkelijk?</span> Probeer: {exercise.harderVariant}
                   </span>
                 </div>

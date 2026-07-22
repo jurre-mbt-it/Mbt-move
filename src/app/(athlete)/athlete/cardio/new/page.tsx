@@ -229,7 +229,7 @@ function AthleteCardioLogPageInner() {
                   onClick={() => setDateStr(opt.value)}
                   className="athletic-tap rounded-full px-3 py-2"
                   style={{
-                    background: active ? P.brand + '22' : P.surfaceHi,
+                    background: active ? `color-mix(in srgb, ${P.brand} 13%, transparent)` : P.surfaceHi,
                     border: `1px solid ${active ? P.brand : P.line}`,
                     color: active ? P.brand : P.inkMuted,
                     fontSize: 12, fontWeight: 800,
@@ -272,7 +272,7 @@ function AthleteCardioLogPageInner() {
                   onClick={() => setActivity(key)}
                   className="athletic-tap flex flex-col items-center gap-1 rounded-xl py-2.5"
                   style={{
-                    background: active ? P.brand + '22' : P.surfaceHi,
+                    background: active ? `color-mix(in srgb, ${P.brand} 13%, transparent)` : P.surfaceHi,
                     border: `2px solid ${active ? P.brand : P.line}`,
                   }}
                 >

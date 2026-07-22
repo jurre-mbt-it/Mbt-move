@@ -47,12 +47,12 @@ export function sideVolumeFactor(unit: string | null | undefined): number {
 // Visual colors per superset group letter — athletic-dark palette: subtiele
 // gekleurde overlay op dark base, rand in accent-tint, tekst in lichte tint.
 export const SUPERSET_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  A: { bg: 'rgba(96,165,250,0.06)',  border: 'rgba(96,165,250,0.35)',  text: '#93C5FD' },
-  B: { bg: 'rgba(244,194,97,0.06)',  border: 'rgba(244,194,97,0.35)',  text: '#F4C261' },
-  C: { bg: 'rgba(167,139,250,0.06)', border: 'rgba(167,139,250,0.35)', text: '#C4B5FD' },
-  D: { bg: 'rgba(251,113,133,0.06)', border: 'rgba(251,113,133,0.35)', text: '#FDA4AF' },
-  E: { bg: 'rgba(134,239,172,0.06)', border: 'rgba(134,239,172,0.35)', text: '#86EFAC' },
-  F: { bg: 'rgba(251,146,60,0.06)',  border: 'rgba(251,146,60,0.35)',  text: '#FDBA74' },
+  A: { bg: 'rgba(159,206,201,0.07)', border: 'rgba(159,206,201,0.35)', text: '#9FCEC9' },
+  B: { bg: 'rgba(245,185,66,0.07)',  border: 'rgba(245,185,66,0.35)',  text: '#F5B942' },
+  C: { bg: 'rgba(127,176,216,0.07)', border: 'rgba(127,176,216,0.35)', text: '#7FB0D8' },
+  D: { bg: 'rgba(240,121,108,0.07)', border: 'rgba(240,121,108,0.35)', text: '#F0796C' },
+  E: { bg: 'rgba(95,208,138,0.07)',  border: 'rgba(95,208,138,0.35)',  text: '#5FD08A' },
+  F: { bg: 'rgba(217,192,138,0.07)', border: 'rgba(217,192,138,0.35)', text: '#D9C08A' },
 }
 
 export const SUPERSET_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F']

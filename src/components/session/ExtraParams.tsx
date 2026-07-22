@@ -7,7 +7,7 @@ import { STANDARD_PARAMS, REP_UNITS } from '@/lib/program-constants'
 import type { SessionParam } from '@/lib/session-sets'
 
 const mono =
-  'ui-monospace, Menlo, "SF Mono", "Cascadia Code", "Source Code Pro", monospace'
+  'var(--font-mono-athletic)'
 
 // Oplopende teller voor param-ids — puur genoeg voor de react-hooks-linter;
 // uniek binnen de sessie is voldoende (ids zijn alleen list-keys).
@@ -42,7 +42,7 @@ export function RepUnitPicker({ value, onChange }: { value: string; onChange: (u
               fontWeight: 800,
               textTransform: 'uppercase',
               background: active ? P.surfaceHi : 'transparent',
-              border: `1px solid ${active ? 'rgba(244,194,97,0.5)' : 'transparent'}`,
+              border: `1px solid ${active ? 'rgba(245,185,66,0.5)' : 'transparent'}`,
               color: active ? P.gold : P.inkMuted,
             }}
           >

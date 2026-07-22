@@ -157,7 +157,7 @@ export function ApplyPlanDialog({
                     onClick={() => setTemplateId(t.id)}
                     className="text-left rounded-lg p-2.5 transition-colors"
                     style={{
-                      background: active ? `${P.lime}0F` : P.surfaceLow,
+                      background: active ? `color-mix(in srgb, ${P.lime} 6%, transparent)` : P.surfaceLow,
                       border: `1px solid ${active ? P.lime : P.line}`,
                     }}
                   >
@@ -298,8 +298,8 @@ export function ApplyPlanDialog({
                 className="text-[11px] mt-3 p-2.5 rounded-lg leading-relaxed"
                 style={{
                   color: P.inkMuted,
-                  background: mode === 'replace' ? `${P.brand}12` : P.surfaceLow,
-                  border: `1px solid ${mode === 'replace' ? `${P.brand}66` : P.line}`,
+                  background: mode === 'replace' ? `color-mix(in srgb, ${P.brand} 7%, transparent)` : P.surfaceLow,
+                  border: `1px solid ${mode === 'replace' ? `color-mix(in srgb, ${P.brand} 40%, transparent)` : P.line}`,
                 }}
               >
                 {anchor === 'start' ? (

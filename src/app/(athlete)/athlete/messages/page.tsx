@@ -5,7 +5,7 @@ import { P, Kicker } from '@/components/dark-ui'
 import { MessageThread } from '@/components/messages/MessageThread'
 
 const mono =
-  'ui-monospace, Menlo, "SF Mono", "Cascadia Code", "Source Code Pro", monospace'
+  'var(--font-mono-athletic)'
 
 export default function AthleteMessagesPage() {
   return (

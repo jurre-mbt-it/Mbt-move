@@ -39,11 +39,11 @@ interface ExerciseCardProps {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  STRENGTH:    '#BEF264',
-  MOBILITY:    '#60a5fa',
-  PLYOMETRICS: '#f59e0b',
-  CARDIO:      '#f87171',
-  STABILITY:   '#a78bfa',
+  STRENGTH:    '#5FD08A',
+  MOBILITY:    '#7FB0D8',
+  PLYOMETRICS: '#F5B942',
+  CARDIO:      '#F0796C',
+  STABILITY:   '#45A8A2',
 }
 
 const DIFFICULTY_DOTS = { BEGINNER: 1, INTERMEDIATE: 2, ADVANCED: 3 }
@@ -57,7 +57,7 @@ export function ExerciseCard({
 }: ExerciseCardProps) {
   const category = EXERCISE_CATEGORIES.find(c => c.value === exercise.category)
   const difficulty = DIFFICULTIES.find(d => d.value === exercise.difficulty)
-  const color = CATEGORY_COLORS[exercise.category] ?? '#e87a55'
+  const color = CATEGORY_COLORS[exercise.category] ?? '#E87A55'
   const dots = DIFFICULTY_DOTS[exercise.difficulty as keyof typeof DIFFICULTY_DOTS] ?? 1
 
   const hasVideo = exercise.mediaType === 'YOUTUBE' || exercise.mediaType === 'VIMEO'
@@ -99,12 +99,12 @@ export function ExerciseCard({
 
         {/* Play overlay — shown on hover when onPreview is set */}
         {onPreview && hasVideo && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-all">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#081A1C]/0 group-hover:bg-[#081A1C]/45 transition-all">
             <div
               className="w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-              style={{ background: '#e87a55' }}
+              style={{ background: '#E87A55' }}
             >
-              <Play className="w-5 h-5 text-white ml-0.5" />
+              <Play className="w-5 h-5 text-[#F5F2ED] ml-0.5" />
             </div>
           </div>
         )}
@@ -112,7 +112,7 @@ export function ExerciseCard({
         {/* Category badge */}
         <div className="absolute top-2 left-2">
           <span
-            className="text-xs font-semibold px-2 py-0.5 rounded-full text-white"
+            className="text-xs font-semibold px-2 py-0.5 rounded-full text-[#0E2729]"
             style={{ background: color }}
           >
             {category?.label ?? exercise.category}
@@ -129,13 +129,13 @@ export function ExerciseCard({
               e.stopPropagation()
               onToggleFavorite(exercise.id, exercise.isFavorite ?? false)
             }}
-            className="absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center bg-black/40 hover:bg-black/60 transition-colors"
+            className="absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center bg-[#081A1C]/55 hover:bg-[#081A1C]/72 transition-colors"
           >
             <Heart
               className="w-4 h-4 transition-all"
               style={{
-                color: exercise.isFavorite ? '#f87171' : '#ffffff',
-                fill: exercise.isFavorite ? '#f87171' : 'transparent',
+                color: exercise.isFavorite ? '#F0796C' : '#F5F2ED',
+                fill: exercise.isFavorite ? '#F0796C' : 'transparent',
                 strokeWidth: exercise.isFavorite ? 2 : 1.8,
               }}
             />
@@ -143,7 +143,7 @@ export function ExerciseCard({
         )}
 
         {/* Difficulty dots — bottom-right zodat het hartje top-right kan staan */}
-        <div className="absolute bottom-2 right-2 flex gap-0.5 px-1.5 py-1 rounded-full bg-black/30">
+        <div className="absolute bottom-2 right-2 flex gap-0.5 px-1.5 py-1 rounded-full bg-[#081A1C]/45">
           {[1, 2, 3].map(n => (
             <span
               key={n}
@@ -166,7 +166,7 @@ export function ExerciseCard({
               onQuickAdd(exercise.id)
             }}
             className="absolute bottom-2 left-2 w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-md hover:scale-110 active:scale-95"
-            style={{ background: '#e87a55', color: '#0A0E0F' }}
+            style={{ background: '#E87A55', color: '#0E2729' }}
           >
             <Plus className="w-4 h-4" strokeWidth={3} />
           </button>

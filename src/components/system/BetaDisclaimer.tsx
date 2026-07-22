@@ -53,39 +53,39 @@ export function BetaDisclaimer() {
         onPointerDownOutside={e => e.preventDefault()}
         onEscapeKeyDown={e => e.preventDefault()}
       >
-        <div className="px-5 pt-6 pb-4" style={{ background: '#141A1B' }}>
+        <div className="px-5 pt-6 pb-4" style={{ background: '#15363A' }}>
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
-            style={{ background: '#1C2425', border: '1px solid #f59e0b' }}
+            style={{ background: '#1C4448', border: '1px solid #F5B942' }}
           >
-            <AlertTriangle className="w-5 h-5" style={{ color: '#f59e0b' }} />
+            <AlertTriangle className="w-5 h-5" style={{ color: '#F5B942' }} />
           </div>
-          <h2 className="text-lg font-bold leading-tight" style={{ color: '#F5F7F6' }}>
+          <h2 className="text-lg font-bold leading-tight" style={{ color: '#F5F2ED' }}>
             Beta-versie
           </h2>
-          <p className="text-sm mt-1" style={{ color: '#7B8889' }}>
+          <p className="text-sm mt-1" style={{ color: '#9EB5B3' }}>
             MBT Gym is op dit moment in beta. Lees de voorwaarden hieronder
             en geef akkoord om door te gaan.
           </p>
         </div>
 
-        <div className="px-5 py-4 space-y-3 text-sm" style={{ background: '#0F1517', color: '#D4DAD8' }}>
+        <div className="px-5 py-4 space-y-3 text-sm" style={{ background: '#081A1C', color: '#F5F2ED' }}>
           <p>
             Door gebruik te maken van MBT Gym ga je ermee akkoord dat:
           </p>
-          <ul className="list-disc pl-5 space-y-1.5" style={{ color: '#9BA8A6' }}>
+          <ul className="list-disc pl-5 space-y-1.5" style={{ color: '#9EB5B3' }}>
             <li>De software actief in ontwikkeling is — er kunnen bugs of fouten optreden.</li>
             <li>Data verloren kan gaan tijdens deploys, migraties of incidenten.</li>
-            <li>De applicatie <strong style={{ color: '#F5F7F6' }}>niet de leidende bron</strong> is voor klinische beslissingen — verifieer kritieke informatie altijd in jouw eigen systeem.</li>
+            <li>De applicatie <strong style={{ color: '#F5F2ED' }}>niet de leidende bron</strong> is voor klinische beslissingen — verifieer kritieke informatie altijd in jouw eigen systeem.</li>
             <li>Je incidenten en bugs zo snel mogelijk meldt zodat we ze kunnen fixen.</li>
           </ul>
         </div>
 
-        <div className="px-5 py-4 flex flex-col gap-2" style={{ background: '#141A1B' }}>
+        <div className="px-5 py-4 flex flex-col gap-2" style={{ background: '#15363A' }}>
           <Button
             onClick={handleAccept}
             className="w-full font-semibold"
-            style={{ background: '#e87a55', color: '#0A0E0F' }}
+            style={{ background: '#E87A55', color: '#0E2729' }}
           >
             Ik begrijp het en ga akkoord
           </Button>
@@ -93,7 +93,7 @@ export function BetaDisclaimer() {
             variant="ghost"
             onClick={handleLogout}
             className="w-full text-xs gap-1.5"
-            style={{ color: '#7B8889' }}
+            style={{ color: '#9EB5B3' }}
           >
             <LogOut className="w-3 h-3" /> Uitloggen
           </Button>

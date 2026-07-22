@@ -61,8 +61,8 @@ function DayDropZone({
       ref={setNodeRef}
       className={cn(
         'min-h-24 rounded-xl p-2 transition-colors',
-        isOver ? 'bg-[#e87a5510] border-2 border-dashed border-[#e87a55]' : 'border-2 border-dashed border-transparent',
-        isEmpty && !isOver && 'border-[rgba(255,255,255,0.12)] border-dashed'
+        isOver ? 'bg-[#e87a5510] border-2 border-dashed border-[#E87A55]' : 'border-2 border-dashed border-transparent',
+        isEmpty && !isOver && 'border-[rgba(212,232,230,0.12)] border-dashed'
       )}
     >
       {isEmpty && !isOver && (
@@ -79,8 +79,8 @@ function DayDropZone({
 // ─── Drag overlay mini-card ────────────────────────────────────────────────────
 function DragOverlayCard({ name }: { name: string }) {
   return (
-    <div className="bg-[#141A1B] border rounded-lg shadow-xl px-3 py-2 text-sm font-semibold flex items-center gap-2 opacity-95">
-      <div className="w-2 h-2 rounded-full bg-[#e87a55]" />
+    <div className="bg-[#15363A] border rounded-lg shadow-xl px-3 py-2 text-sm font-semibold flex items-center gap-2 opacity-95">
+      <div className="w-2 h-2 rounded-full bg-[#E87A55]" />
       {name}
     </div>
   )
@@ -1188,7 +1188,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             onClick={() => setProgram(p => ({ ...p, currentWeek: w }))}
             className={cn(
               'px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
-              program.currentWeek === w ? 'bg-[#e87a55] text-white' : 'text-muted-foreground hover:bg-[#1C2425]'
+              program.currentWeek === w ? 'bg-[#E87A55] text-[#0E2729]' : 'text-muted-foreground hover:bg-[#1C4448]'
             )}
           >
             W{w}
@@ -1197,7 +1197,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             <button
               onClick={(e) => { e.stopPropagation(); removeWeek(w) }}
               title={`Week ${w} verwijderen`}
-              className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full hidden group-hover/week:flex items-center justify-center bg-[#1C2425] border border-[rgba(255,255,255,0.15)] text-[#7B8889] hover:text-red-400 hover:border-red-400/50"
+              className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full hidden group-hover/week:flex items-center justify-center bg-[#1C4448] border border-[rgba(212,232,230,0.15)] text-[#9EB5B3] hover:text-[#F0796C] hover:border-[#F0796C]/50"
             >
               <X className="w-2 h-2" strokeWidth={3} />
             </button>
@@ -1208,13 +1208,13 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         <button
           onClick={() => setProgram(p => ({ ...p, weeks: p.weeks + 1, currentWeek: p.weeks + 1 }))}
           title="Week toevoegen"
-          className="px-1.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:bg-[#1C2425] flex items-center gap-1"
+          className="px-1.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:bg-[#1C4448] flex items-center gap-1"
         >
           <Plus className="w-3.5 h-3.5" />
           <span className="hidden lg:inline">Week</span>
         </button>
       )}
-      <div className="w-px h-5 mx-1 bg-[rgba(255,255,255,0.10)]" />
+      <div className="w-px h-5 mx-1 bg-[rgba(212,232,230,0.10)]" />
     </div>
   )
 
@@ -1234,7 +1234,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       <div className="flex flex-col h-full -m-4 md:-m-6">
 
         {/* ── Top bar ── */}
-        <div className="flex items-center gap-2 px-3 md:px-4 py-2.5 border-b bg-[#141A1B] shrink-0">
+        <div className="flex items-center gap-2 px-3 md:px-4 py-2.5 border-b bg-[#15363A] shrink-0">
           <button onClick={() => router.push(backHref)} className="text-muted-foreground hover:text-foreground shrink-0">
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -1247,7 +1247,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             placeholder={program.isTemplate ? 'Naam van sjabloon…' : 'Naam programma…'}
             className={cn(
               'h-8 text-sm font-semibold border-0 shadow-none focus-visible:ring-0 px-0 min-w-0',
-              !program.name.trim() && 'placeholder:text-amber-400'
+              !program.name.trim() && 'placeholder:text-[#F5B942]'
             )}
           />
 
@@ -1257,9 +1257,9 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             <span
               className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full"
               style={{
-                background: 'rgba(123,136,137,0.15)',
-                color: '#7B8889',
-                border: '1px solid rgba(123,136,137,0.30)',
+                background: 'rgba(158,181,179,0.15)',
+                color: '#9EB5B3',
+                border: '1px solid rgba(158,181,179,0.30)',
                 letterSpacing: '0.05em',
               }}
               title="Dit programma is een sjabloon en niet aan een patiënt gekoppeld."
@@ -1275,8 +1275,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                   className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full transition-colors hover:opacity-80"
                   style={
                     currentPatientFirstName
-                      ? { background: 'rgba(78,205,196,0.12)', color: '#4ECDC4', border: '1px solid rgba(78,205,196,0.35)', letterSpacing: '0.05em' }
-                      : { background: 'rgba(245,158,11,0.10)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.30)', letterSpacing: '0.05em' }
+                      ? { background: 'rgba(159,206,201,0.12)', color: '#9FCEC9', border: '1px solid rgba(159,206,201,0.35)', letterSpacing: '0.05em' }
+                      : { background: 'rgba(245,185,66,0.10)', color: '#F5B942', border: '1px solid rgba(245,185,66,0.30)', letterSpacing: '0.05em' }
                   }
                   title={
                     currentPatientFirstName
@@ -1303,9 +1303,9 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                       onSelect={() => setProgram(prev => ({ ...prev, patientId: p.id }))}
                       className="flex items-center gap-2 text-sm"
                     >
-                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: program.patientId === p.id ? '#4ECDC4' : '#4A5454' }} />
+                      <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: program.patientId === p.id ? '#9FCEC9' : '#86A3A1' }} />
                       <span className="truncate">{p.name ?? p.email ?? 'Onbekende patiënt'}</span>
-                      {program.patientId === p.id && <Check className="w-3 h-3 ml-auto text-[#4ECDC4]" />}
+                      {program.patientId === p.id && <Check className="w-3 h-3 ml-auto text-[#9FCEC9]" />}
                     </DropdownMenuItem>
                   ))
                 )}
@@ -1330,10 +1330,10 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full"
               style={
                 currentStatus === 'ACTIVE'
-                  ? { background: 'rgba(232,122,85,0.12)', color: '#e87a55', border: '1px solid rgba(232,122,85,0.35)' }
+                  ? { background: 'rgba(232,122,85,0.12)', color: '#E87A55', border: '1px solid rgba(232,122,85,0.35)' }
                   : currentStatus === 'COMPLETED' || currentStatus === 'ARCHIVED'
-                  ? { background: 'rgba(123,136,137,0.15)', color: '#7B8889', border: '1px solid rgba(123,136,137,0.30)' }
-                  : { background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.35)' }
+                  ? { background: 'rgba(158,181,179,0.15)', color: '#9EB5B3', border: '1px solid rgba(158,181,179,0.30)' }
+                  : { background: 'rgba(245,185,66,0.12)', color: '#F5B942', border: '1px solid rgba(245,185,66,0.35)' }
               }
               title={
                 currentStatus === 'ACTIVE'
@@ -1349,9 +1349,9 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                 className="w-1.5 h-1.5 rounded-full"
                 style={{
                   background:
-                    currentStatus === 'ACTIVE' ? '#e87a55'
-                    : currentStatus === 'DRAFT' ? '#f59e0b'
-                    : '#7B8889',
+                    currentStatus === 'ACTIVE' ? '#E87A55'
+                    : currentStatus === 'DRAFT' ? '#F5B942'
+                    : '#9EB5B3',
                 }}
               />
               {currentStatus === 'ACTIVE' ? 'Live'
@@ -1389,13 +1389,13 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               <><Loader2 className="w-3 h-3 animate-spin opacity-50 text-muted-foreground" /><span className="text-muted-foreground">Wijzigingen…</span></>
             )}
             {autosave.status === 'saved' && (
-              <><Check className="w-3 h-3" style={{ color: '#e87a55' }} /><span className="text-muted-foreground">Opgeslagen</span></>
+              <><Check className="w-3 h-3" style={{ color: '#E87A55' }} /><span className="text-muted-foreground">Opgeslagen</span></>
             )}
             {autosave.status === 'error' && (
               <button
                 type="button"
                 onClick={() => { void autosave.saveNow() }}
-                className="flex items-center gap-1 text-red-400 hover:text-red-300"
+                className="flex items-center gap-1 text-[#F0796C] hover:text-[#F59B92]"
               >
                 <AlertCircle className="w-3 h-3" /> Opslaan mislukt — opnieuw
               </button>
@@ -1406,8 +1406,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             className="gap-1.5 h-7 text-xs shrink-0"
             style={
               currentStatus === 'ACTIVE'
-                ? { background: 'transparent', color: '#e87a55', border: '1px solid rgba(232,122,85,0.35)' }
-                : { background: '#e87a55' }
+                ? { background: 'transparent', color: '#E87A55', border: '1px solid rgba(232,122,85,0.35)' }
+                : { background: '#E87A55' }
             }
             onClick={handleDeploy}
             disabled={saving || !program.name.trim()}
@@ -1431,7 +1431,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         </div>
 
         {/* ── Program settings bar: tendinopathy toggle ── */}
-        <div className="flex items-center gap-3 px-3 md:px-4 py-1.5 border-b bg-[#1C2425] shrink-0">
+        <div className="flex items-center gap-3 px-3 md:px-4 py-1.5 border-b bg-[#1C4448] shrink-0">
           <button
             type="button"
             onClick={() => setProgram(p => ({ ...p, tendinopathyMode: !p.tendinopathyMode }))}
@@ -1439,27 +1439,27 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           >
             <div
               className="w-8 h-4 rounded-full relative transition-colors flex items-center"
-              style={{ background: program.tendinopathyMode ? '#e87a55' : '#4A5454' }}
+              style={{ background: program.tendinopathyMode ? '#E87A55' : '#86A3A1' }}
             >
               <div
-                className="w-3 h-3 bg-white rounded-full absolute shadow transition-transform"
+                className="w-3 h-3 bg-[#F5F2ED] rounded-full absolute shadow transition-transform"
                 style={{ transform: program.tendinopathyMode ? 'translateX(18px)' : 'translateX(2px)' }}
               />
             </div>
-            <span className={program.tendinopathyMode ? 'text-[#e87a55] font-semibold' : 'text-muted-foreground'}>
+            <span className={program.tendinopathyMode ? 'text-[#E87A55] font-semibold' : 'text-muted-foreground'}>
               Tendinopathie pijn tracking
             </span>
           </button>
           <div className="relative group">
-            <Info className="w-3.5 h-3.5 text-[#7B8889] cursor-help" />
-            <div className="absolute left-5 top-0 z-50 w-64 hidden group-hover:block bg-[#e87a55] text-white text-xs rounded-lg px-3 py-2 shadow-xl">
+            <Info className="w-3.5 h-3.5 text-[#9EB5B3] cursor-help" />
+            <div className="absolute left-5 top-0 z-50 w-64 hidden group-hover:block bg-[#E87A55] text-[#0E2729] text-xs rounded-lg px-3 py-2 shadow-xl">
               Voor peesproblematiek (achilles, patella, RC): splitst pijn in tijdens vs 24u erna + ochtend stijfheid. Gebruikt Silbernagel-protocol grenzen.
             </div>
           </div>
           {program.tendinopathyMode && (
             <span
               className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
-              style={{ background: '#e87a5522', color: '#e87a55' }}
+              style={{ background: '#e87a5522', color: '#E87A55' }}
             >
               Actief voor alle oefeningen
             </span>
@@ -1480,14 +1480,14 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                   const v = e.target.value
                   setProgram(p => ({ ...p, dailyTarget: v === '' ? null : Math.max(1, Math.min(10, Number(v))) }))
                 }}
-                className="w-12 h-6 text-center text-xs font-bold bg-[#1C2425] rounded border border-[rgba(255,255,255,0.10)] focus:outline-none focus:ring-1 focus:ring-[#e87a55]"
+                className="w-12 h-6 text-center text-xs font-bold bg-[#1C4448] rounded border border-[rgba(212,232,230,0.10)] focus:outline-none focus:ring-1 focus:ring-[#E87A55]"
                 title="Aantal keer per dag dat de patiënt elke oefening doet"
               />
               <span className="text-[10px] text-muted-foreground">/ dag</span>
             </div>
           )}
 
-          <div className="w-px h-4 bg-[rgba(255,255,255,0.08)] mx-1 hidden sm:block" />
+          <div className="w-px h-4 bg-[rgba(212,232,230,0.08)] mx-1 hidden sm:block" />
 
           {/* 1RM toggle */}
           <button
@@ -1497,27 +1497,27 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           >
             <div
               className="w-8 h-4 rounded-full relative transition-colors flex items-center"
-              style={{ background: program.trackOneRepMax ? '#e87a55' : '#4A5454' }}
+              style={{ background: program.trackOneRepMax ? '#E87A55' : '#86A3A1' }}
             >
               <div
-                className="w-3 h-3 bg-white rounded-full absolute shadow transition-transform"
+                className="w-3 h-3 bg-[#F5F2ED] rounded-full absolute shadow transition-transform"
                 style={{ transform: program.trackOneRepMax ? 'translateX(18px)' : 'translateX(2px)' }}
               />
             </div>
-            <span className={program.trackOneRepMax ? 'text-[#e87a55] font-semibold' : 'text-muted-foreground'}>
+            <span className={program.trackOneRepMax ? 'text-[#E87A55] font-semibold' : 'text-muted-foreground'}>
               1RM tracking
             </span>
           </button>
           {program.trackOneRepMax && (
             <span
               className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
-              style={{ background: '#e87a5522', color: '#e87a55' }}
+              style={{ background: '#e87a5522', color: '#E87A55' }}
             >
               Epley per sessie
             </span>
           )}
 
-          <div className="w-px h-4 bg-[rgba(255,255,255,0.08)] mx-1 hidden sm:block" />
+          <div className="w-px h-4 bg-[rgba(212,232,230,0.08)] mx-1 hidden sm:block" />
 
           {/* Flexibele week-toggle — patient kan elke dag het programma starten;
               klaar zodra weeklyTarget keer voltooid binnen één week (Mo-Su). */}
@@ -1535,14 +1535,14 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           >
             <div
               className="w-8 h-4 rounded-full relative transition-colors flex items-center"
-              style={{ background: program.flexibleSchedule ? '#e87a55' : '#4A5454' }}
+              style={{ background: program.flexibleSchedule ? '#E87A55' : '#86A3A1' }}
             >
               <div
-                className="w-3 h-3 bg-white rounded-full absolute shadow transition-transform"
+                className="w-3 h-3 bg-[#F5F2ED] rounded-full absolute shadow transition-transform"
                 style={{ transform: program.flexibleSchedule ? 'translateX(18px)' : 'translateX(2px)' }}
               />
             </div>
-            <span className={program.flexibleSchedule ? 'text-[#e87a55] font-semibold' : 'text-muted-foreground'}>
+            <span className={program.flexibleSchedule ? 'text-[#E87A55] font-semibold' : 'text-muted-foreground'}>
               Flexibele week
             </span>
           </button>
@@ -1558,13 +1558,13 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                   const v = e.target.value
                   setProgram(p => ({ ...p, weeklyTarget: v === '' ? null : Math.max(1, Math.min(14, Number(v))) }))
                 }}
-                className="w-12 h-6 text-center text-xs font-bold bg-[#1C2425] rounded border border-[rgba(255,255,255,0.10)] focus:outline-none focus:ring-1 focus:ring-[#e87a55]"
+                className="w-12 h-6 text-center text-xs font-bold bg-[#1C4448] rounded border border-[rgba(212,232,230,0.10)] focus:outline-none focus:ring-1 focus:ring-[#E87A55]"
               />
               <span className="text-[10px] text-muted-foreground">/ week</span>
             </div>
           )}
 
-          <div className="w-px h-4 bg-[rgba(255,255,255,0.08)] mx-1 hidden sm:block" />
+          <div className="w-px h-4 bg-[rgba(212,232,230,0.08)] mx-1 hidden sm:block" />
 
           {/* Controle-interval — na hoeveel weken zónder wijziging de therapeut
               een controle-signaal krijgt. Leeg = standaard 8 weken. */}
@@ -1580,12 +1580,12 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                 const v = e.target.value
                 setProgram(p => ({ ...p, reviewAfterWeeks: v === '' ? null : Math.max(1, Math.min(104, Number(v))) }))
               }}
-              className="w-12 h-6 text-center text-xs font-bold bg-[#1C2425] rounded border border-[rgba(255,255,255,0.10)] focus:outline-none focus:ring-1 focus:ring-[#e87a55]"
+              className="w-12 h-6 text-center text-xs font-bold bg-[#1C4448] rounded border border-[rgba(212,232,230,0.10)] focus:outline-none focus:ring-1 focus:ring-[#E87A55]"
             />
             <span className="text-[10px] text-muted-foreground">weken</span>
             <div className="relative group">
-              <Info className="w-3.5 h-3.5 text-[#7B8889] cursor-help" />
-              <div className="absolute left-5 top-0 z-50 w-64 hidden group-hover:block bg-[#e87a55] text-white text-xs rounded-lg px-3 py-2 shadow-xl">
+              <Info className="w-3.5 h-3.5 text-[#9EB5B3] cursor-help" />
+              <div className="absolute left-5 top-0 z-50 w-64 hidden group-hover:block bg-[#E87A55] text-[#0E2729] text-xs rounded-lg px-3 py-2 shadow-xl">
                 Na zoveel weken zonder wijziging krijg je een signaal om het schema te controleren. Leeg = standaard 8 weken. Elke aanpassing reset de teller.
               </div>
             </div>
@@ -1594,7 +1594,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           {/* Destination toggle — bepaalt of Opslaan naar deze patiënt of de
               bibliotheek gaat. Zonder patiënt is alleen "Bibliotheek" mogelijk. */}
           <div className="ml-auto hidden md:flex items-center gap-1">
-            <span className="athletic-mono text-[10px] tracking-wider text-[#7B8889] mr-1">
+            <span className="athletic-mono text-[10px] tracking-wider text-[#9EB5B3] mr-1">
               OPSLAAN ALS
             </span>
             <button
@@ -1603,9 +1603,9 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               disabled={!program.patientId}
               className="athletic-tap px-2.5 py-0.5 rounded text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
-                background: !program.isTemplate && program.patientId ? '#e87a55' : 'transparent',
-                color: !program.isTemplate && program.patientId ? '#0F1516' : '#7B8889',
-                border: '1px solid rgba(255,255,255,0.12)',
+                background: !program.isTemplate && program.patientId ? '#E87A55' : 'transparent',
+                color: !program.isTemplate && program.patientId ? '#081A1C' : '#9EB5B3',
+                border: '1px solid rgba(212,232,230,0.12)',
                 letterSpacing: '0.04em',
               }}
               title={!program.patientId ? 'Eerst een patiënt koppelen' : 'Alleen voor deze patiënt'}
@@ -1617,9 +1617,9 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               onClick={() => setProgram(p => ({ ...p, isTemplate: true }))}
               className="athletic-tap px-2.5 py-0.5 rounded text-[11px] font-bold transition-colors"
               style={{
-                background: program.isTemplate ? '#e87a55' : 'transparent',
-                color: program.isTemplate ? '#0F1516' : '#7B8889',
-                border: '1px solid rgba(255,255,255,0.12)',
+                background: program.isTemplate ? '#E87A55' : 'transparent',
+                color: program.isTemplate ? '#081A1C' : '#9EB5B3',
+                border: '1px solid rgba(212,232,230,0.12)',
                 letterSpacing: '0.04em',
               }}
               title="Deel met de hele praktijk-bibliotheek"
@@ -1630,14 +1630,14 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         </div>
 
         {/* Mobile action row: week tabs + balance toggle */}
-        <div className="flex md:hidden items-center gap-1 px-3 py-2 border-b bg-[#141A1B] overflow-x-auto">
+        <div className="flex md:hidden items-center gap-1 px-3 py-2 border-b bg-[#15363A] overflow-x-auto">
           {weeks.map(w => (
             <button
               key={w}
               onClick={() => setProgram(p => ({ ...p, currentWeek: w }))}
               className={cn(
                 'shrink-0 px-3 py-1 rounded text-xs font-medium transition-colors',
-                program.currentWeek === w ? 'bg-[#e87a55] text-white' : 'text-muted-foreground bg-[#1C2425]'
+                program.currentWeek === w ? 'bg-[#E87A55] text-[#0E2729]' : 'text-muted-foreground bg-[#1C4448]'
               )}
             >
               Week {w}
@@ -1646,7 +1646,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           {program.weeks < 8 && (
             <button
               onClick={() => setProgram(p => ({ ...p, weeks: p.weeks + 1 }))}
-              className="shrink-0 px-2 py-1 rounded text-xs text-muted-foreground bg-[#1C2425]"
+              className="shrink-0 px-2 py-1 rounded text-xs text-muted-foreground bg-[#1C4448]"
             >
               + Week
             </button>
@@ -1654,13 +1654,13 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           <div className="ml-auto flex items-center gap-1 shrink-0">
             <button
               onClick={() => setMobileBalanceOpen(true)}
-              className="p-1.5 rounded bg-[#1C2425] text-muted-foreground"
+              className="p-1.5 rounded bg-[#1C4448] text-muted-foreground"
             >
               <BarChart2 className="w-4 h-4" />
             </button>
             <button
               onClick={() => setPreviewOpen(true)}
-              className="p-1.5 rounded bg-[#1C2425] text-muted-foreground"
+              className="p-1.5 rounded bg-[#1C4448] text-muted-foreground"
             >
               <Eye className="w-4 h-4" />
             </button>
@@ -1693,17 +1693,17 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                       onClick={() => setProgram(p => ({ ...p, currentDay: d }))}
                       className={cn(
                         'shrink-0 flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-colors',
-                        program.currentDay === d ? 'text-white' : 'text-muted-foreground hover:bg-[#1C2425]'
+                        program.currentDay === d ? 'text-[#0E2729]' : 'text-muted-foreground hover:bg-[#1C4448]'
                       )}
-                      style={program.currentDay === d ? { background: '#e87a55' } : {}}
+                      style={program.currentDay === d ? { background: '#E87A55' } : {}}
                     >
                       {DAY_LABELS[d - 1]}
                       {count > 0 && (
                         <span
                           className="text-xs rounded-full px-1.5 py-0"
                           style={{
-                            background: program.currentDay === d ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.12)',
-                            color: program.currentDay === d ? '#fff' : '#7B8889',
+                            background: program.currentDay === d ? 'rgba(14,39,41,0.22)' : 'rgba(212,232,230,0.12)',
+                            color: program.currentDay === d ? '#0E2729' : '#9EB5B3',
                           }}
                         >
                           {count}
@@ -1716,7 +1716,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                 {program.daysPerWeek < 7 && (
                   <button
                     onClick={() => setProgram(p => ({ ...p, daysPerWeek: p.daysPerWeek + 1 }))}
-                    className="shrink-0 px-2 py-1.5 rounded-lg text-xs md:text-sm text-muted-foreground hover:bg-[#1C2425] flex items-center gap-1"
+                    className="shrink-0 px-2 py-1.5 rounded-lg text-xs md:text-sm text-muted-foreground hover:bg-[#1C4448] flex items-center gap-1"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Dag</span>
@@ -1730,7 +1730,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                       type="button"
                       onClick={toggleExpandAllForDay}
                       title={allDayExpanded ? 'Alles inklappen' : 'Alles uitklappen'}
-                      className="h-7 px-2 rounded-lg text-xs text-muted-foreground hover:bg-[#1C2425] flex items-center gap-1 transition-colors"
+                      className="h-7 px-2 rounded-lg text-xs text-muted-foreground hover:bg-[#1C4448] flex items-center gap-1 transition-colors"
                     >
                       {allDayExpanded
                         ? <ChevronsDownUp className="w-3.5 h-3.5" />
@@ -1853,16 +1853,16 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                   {dayResources.map(r => (
                     <div
                       key={r.uid}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-[#141A1B]"
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-[#15363A]"
                     >
                       <div
                         className="w-2 h-2 rounded-full shrink-0"
-                        style={{ background: r.format === 'PDF' ? '#60a5fa' : '#e87a55' }}
+                        style={{ background: r.format === 'PDF' ? '#7FB0D8' : '#E87A55' }}
                       />
                       <span className="flex-1 truncate text-sm font-medium">{r.title}</span>
                       <span
                         className="text-[9px] font-bold tracking-wider shrink-0"
-                        style={{ color: r.format === 'PDF' ? '#60a5fa' : '#e87a55' }}
+                        style={{ color: r.format === 'PDF' ? '#7FB0D8' : '#E87A55' }}
                       >
                         {r.format}
                       </span>
@@ -1885,7 +1885,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               <Button
                 onClick={() => setMobileLibraryOpen(true)}
                 className="w-12 h-12 rounded-full shadow-lg"
-                style={{ background: '#e87a55' }}
+                style={{ background: '#E87A55' }}
               >
                 <Plus className="w-5 h-5" />
               </Button>
@@ -1952,9 +1952,9 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                   onClick={() => setMobileCategory(mobileCategory === c.value ? null : c.value)}
                   className={cn(
                     'shrink-0 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
-                    mobileCategory === c.value ? 'text-white border-transparent' : 'border-[rgba(255,255,255,0.12)] text-muted-foreground bg-[#141A1B]'
+                    mobileCategory === c.value ? 'text-[#0E2729] border-transparent' : 'border-[rgba(212,232,230,0.12)] text-muted-foreground bg-[#15363A]'
                   )}
-                  style={mobileCategory === c.value ? { background: '#e87a55' } : {}}
+                  style={mobileCategory === c.value ? { background: '#E87A55' } : {}}
                 >
                   {c.label}
                 </button>
@@ -1984,16 +1984,16 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                     className={cn(
                       'w-full flex items-center gap-3 px-3 py-3 rounded-xl border text-left transition-all',
                       selected
-                        ? 'border-[#e87a55] bg-[rgba(232,122,85,0.12)]'
-                        : 'border-[rgba(255,255,255,0.06)] bg-[#141A1B] hover:border-[rgba(255,255,255,0.12)]'
+                        ? 'border-[#E87A55] bg-[rgba(232,122,85,0.12)]'
+                        : 'border-[rgba(212,232,230,0.06)] bg-[#15363A] hover:border-[rgba(212,232,230,0.12)]'
                     )}
                   >
                     <div
                       className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ background: { STRENGTH: '#BEF264', MOBILITY: '#60a5fa', PLYOMETRICS: '#f59e0b', CARDIO: '#f87171', STABILITY: '#a78bfa' }[ex.category] ?? '#BEF264' }}
+                      style={{ background: { STRENGTH: '#5FD08A', MOBILITY: '#7FB0D8', PLYOMETRICS: '#F5B942', CARDIO: '#F0796C', STABILITY: '#45A8A2' }[ex.category] ?? '#5FD08A' }}
                     />
                     <span className="flex-1 text-sm font-medium">{ex.name}</span>
-                    {selected && <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: '#e87a55' }} />}
+                    {selected && <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: '#E87A55' }} />}
                   </button>
                 )
               })
@@ -2004,7 +2004,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           <div className="px-4 py-3 border-t shrink-0">
             <Button
               className="w-full gap-2"
-              style={{ background: '#e87a55' }}
+              style={{ background: '#E87A55' }}
               disabled={mobileSelected.size === 0}
               onClick={() => {
                 const source = libraryExercises
@@ -2056,8 +2056,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                     key={t.id}
                     type="button"
                     onClick={() => handleImportTemplate(t.id)}
-                    className="w-full text-left p-2.5 rounded-lg border hover:border-[#e87a55]/40 transition-colors"
-                    style={{ borderColor: 'rgba(255,255,255,0.10)' }}
+                    className="w-full text-left p-2.5 rounded-lg border hover:border-[#E87A55]/40 transition-colors"
+                    style={{ borderColor: 'rgba(212,232,230,0.10)' }}
                   >
                     <p className="text-sm font-medium truncate">{t.name}</p>
                     <p className="text-xs text-muted-foreground">
@@ -2067,7 +2067,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                 ))}
             </div>
             {exercises.length > 0 && (
-              <p className="text-[11px] text-amber-500/90">
+              <p className="text-[11px] text-[#F5B942]">
                 <IconWarning size={13} className="inline-block mr-1 align-[-2px]" /> Huidige oefeningen worden vervangen door de template.
               </p>
             )}
@@ -2088,7 +2088,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             <div>
               <Label className="text-xs">Naam template</Label>
               <input
-                className="w-full mt-1.5 h-9 rounded-md border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#e87a55]"
+                className="w-full mt-1.5 h-9 rounded-md border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#E87A55]"
                 value={templateName}
                 onChange={e => setTemplateName(e.target.value)}
                 placeholder={program.name}
@@ -2105,10 +2105,10 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                     className={cn(
                       'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
                       templateCategory === cat
-                        ? 'text-white border-transparent'
-                        : 'border-[rgba(255,255,255,0.12)] text-muted-foreground hover:border-[rgba(255,255,255,0.2)]'
+                        ? 'text-[#0E2729] border-transparent'
+                        : 'border-[rgba(212,232,230,0.12)] text-muted-foreground hover:border-[rgba(212,232,230,0.2)]'
                     )}
-                    style={templateCategory === cat ? { background: '#e87a55' } : {}}
+                    style={templateCategory === cat ? { background: '#E87A55' } : {}}
                   >
                     {cat}
                   </button>
@@ -2117,7 +2117,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             </div>
             <div className="flex gap-2 pt-1">
               <Button
-                style={{ background: '#e87a55' }}
+                style={{ background: '#E87A55' }}
                 onClick={handleSaveAsTemplate}
                 disabled={templateSaving}
                 className="flex-1"
@@ -2156,12 +2156,12 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                           <span className="text-xs text-muted-foreground">{dayExs.length} oef.</span>
                         </div>
                         {dayExs.length === 0 ? (
-                          <p className="text-xs text-zinc-300 italic">Rustdag</p>
+                          <p className="text-xs text-[#9EB5B3] italic">Rustdag</p>
                         ) : (
                           dayExs.map((ex, i) => (
                             <div key={ex.uid} className="text-xs space-y-0.5">
                               <div className="flex items-center gap-1.5">
-                                <span className="text-[#7B8889] w-4 shrink-0">{i + 1}.</span>
+                                <span className="text-[#9EB5B3] w-4 shrink-0">{i + 1}.</span>
                                 <span className="font-medium truncate">{ex.name}</span>
                               </div>
                               <div className="pl-5 text-muted-foreground">
@@ -2170,7 +2170,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                               {ex.extraParams.length > 0 && (
                                 <div className="pl-5 flex flex-wrap gap-1">
                                   {ex.extraParams.map(p => (
-                                    <span key={p.id} className="bg-[#1C2425] rounded px-1.5 py-0.5 text-xs">
+                                    <span key={p.id} className="bg-[#1C4448] rounded px-1.5 py-0.5 text-xs">
                                       {p.label}: {p.value}{p.unit}
                                     </span>
                                   ))}
@@ -2269,12 +2269,12 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                         className="flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors"
                         style={
                           deployPatientId === p.id
-                            ? { borderColor: '#4ECDC4', background: 'rgba(78,205,196,0.10)' }
-                            : { borderColor: 'rgba(255,255,255,0.10)' }
+                            ? { borderColor: '#9FCEC9', background: 'rgba(159,206,201,0.10)' }
+                            : { borderColor: 'rgba(212,232,230,0.10)' }
                         }
                       >
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: '#1C2425' }}>
-                          <User className="w-3.5 h-3.5 text-[#7B8889]" />
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: '#1C4448' }}>
+                          <User className="w-3.5 h-3.5 text-[#9EB5B3]" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{p.name ?? 'Onbekende patiënt'}</p>
@@ -2282,7 +2282,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                             <p className="text-[11px] text-muted-foreground truncate">{p.email}</p>
                           )}
                         </div>
-                        {deployPatientId === p.id && <Check className="w-3.5 h-3.5 text-[#4ECDC4]" />}
+                        {deployPatientId === p.id && <Check className="w-3.5 h-3.5 text-[#9FCEC9]" />}
                       </div>
                     </button>
                   ))
@@ -2301,8 +2301,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                     className="flex items-start gap-2 cursor-pointer select-none rounded-lg px-3 py-2 border transition-colors"
                     style={
                       deploySendEmail
-                        ? { borderColor: '#4ECDC4', background: 'rgba(78,205,196,0.10)' }
-                        : { borderColor: 'rgba(255,255,255,0.10)' }
+                        ? { borderColor: '#9FCEC9', background: 'rgba(159,206,201,0.10)' }
+                        : { borderColor: 'rgba(212,232,230,0.10)' }
                     }
                   >
                     <input
@@ -2311,7 +2311,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                       checked={deploySendEmail}
                       onChange={() => setDeploySendEmail(true)}
                       disabled={deployBusy}
-                      className="mt-0.5 w-4 h-4 accent-[#4ECDC4] shrink-0"
+                      className="mt-0.5 w-4 h-4 accent-[#9FCEC9] shrink-0"
                     />
                     <div className="flex-1 text-xs">
                       <p className="font-semibold">Patient op de hoogte brengen</p>
@@ -2324,8 +2324,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                     className="flex items-start gap-2 cursor-pointer select-none rounded-lg px-3 py-2 border transition-colors"
                     style={
                       !deploySendEmail
-                        ? { borderColor: '#4ECDC4', background: 'rgba(78,205,196,0.10)' }
-                        : { borderColor: 'rgba(255,255,255,0.10)' }
+                        ? { borderColor: '#9FCEC9', background: 'rgba(159,206,201,0.10)' }
+                        : { borderColor: 'rgba(212,232,230,0.10)' }
                     }
                   >
                     <input
@@ -2334,7 +2334,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                       checked={!deploySendEmail}
                       onChange={() => setDeploySendEmail(false)}
                       disabled={deployBusy}
-                      className="mt-0.5 w-4 h-4 accent-[#4ECDC4] shrink-0"
+                      className="mt-0.5 w-4 h-4 accent-[#9FCEC9] shrink-0"
                     />
                     <div className="flex-1 text-xs">
                       <p className="font-semibold">Alleen opslaan, geen mail</p>
@@ -2372,13 +2372,13 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                 niet voor "stuur update-mail" op een al-actief programma waar het
                 originele programma al een patient-kopie is. */}
             {currentStatus === 'DRAFT' && !program.isTemplate && (
-              <label className="flex items-start gap-2 cursor-pointer select-none rounded-lg p-2 -mx-2 hover:bg-[rgba(255,255,255,0.03)]">
+              <label className="flex items-start gap-2 cursor-pointer select-none rounded-lg p-2 -mx-2 hover:bg-[rgba(212,232,230,0.03)]">
                 <input
                   type="checkbox"
                   checked={deploySaveAsTemplate}
                   onChange={(e) => setDeploySaveAsTemplate(e.target.checked)}
                   disabled={deployBusy}
-                  className="mt-0.5 w-4 h-4 accent-[#e87a55] shrink-0"
+                  className="mt-0.5 w-4 h-4 accent-[#E87A55] shrink-0"
                 />
                 <div className="flex-1 text-xs">
                   <p className="font-semibold">Ook opslaan als sjabloon in bibliotheek</p>
@@ -2398,7 +2398,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               </Button>
               <Button
                 className="flex-1 gap-2"
-                style={{ background: '#e87a55', color: '#0A0E0F' }}
+                style={{ background: '#E87A55', color: '#0E2729' }}
                 disabled={!deployPatientId || deployBusy}
                 onClick={confirmDeploy}
               >
@@ -2471,7 +2471,7 @@ function CopyMenu({
         type="button"
         onClick={() => setOpen(true)}
         title="Kopieer deze dag of week"
-        className="shrink-0 flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:bg-[#1C2425] transition-colors"
+        className="shrink-0 flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:bg-[#1C4448] transition-colors"
       >
         <Copy className="w-3.5 h-3.5" />
         <span className="hidden sm:inline">Kopieer</span>
@@ -2490,18 +2490,18 @@ function CopyMenu({
         style={{
           top: menuPos.top,
           right: menuPos.right,
-          background: '#141A1B',
-          border: '1px solid rgba(255,255,255,0.12)',
+          background: '#15363A',
+          border: '1px solid rgba(212,232,230,0.12)',
           minWidth: 280,
         }}
       >
-          <div className="flex border-b" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+          <div className="flex border-b" style={{ borderColor: 'rgba(212,232,230,0.08)' }}>
             <button
               type="button"
               onClick={() => setMode('day')}
               className={cn(
                 'flex-1 px-3 py-2 text-xs font-bold tracking-wider uppercase transition-colors',
-                mode === 'day' ? 'text-[#e87a55]' : 'text-muted-foreground',
+                mode === 'day' ? 'text-[#E87A55]' : 'text-muted-foreground',
               )}
               style={mode === 'day' ? { background: 'rgba(232,122,85,0.08)' } : {}}
             >
@@ -2512,7 +2512,7 @@ function CopyMenu({
               onClick={() => setMode('week')}
               className={cn(
                 'flex-1 px-3 py-2 text-xs font-bold tracking-wider uppercase transition-colors',
-                mode === 'week' ? 'text-[#e87a55]' : 'text-muted-foreground',
+                mode === 'week' ? 'text-[#E87A55]' : 'text-muted-foreground',
               )}
               style={mode === 'week' ? { background: 'rgba(232,122,85,0.08)' } : {}}
             >
@@ -2552,12 +2552,12 @@ function CopyMenu({
                               'aspect-square rounded text-[10px] font-bold transition-colors flex flex-col items-center justify-center',
                               isCurrent
                                 ? 'opacity-30 cursor-not-allowed'
-                                : 'hover:bg-[#e87a55] hover:text-black',
+                                : 'hover:bg-[#E87A55] hover:text-[#0E2729]',
                             )}
                             style={{
-                              background: cnt > 0 ? 'rgba(232,122,85,0.08)' : 'rgba(255,255,255,0.04)',
-                              color: cnt > 0 ? '#e87a55' : '#7B8889',
-                              border: '1px solid rgba(255,255,255,0.08)',
+                              background: cnt > 0 ? 'rgba(232,122,85,0.08)' : 'rgba(212,232,230,0.04)',
+                              color: cnt > 0 ? '#E87A55' : '#9EB5B3',
+                              border: '1px solid rgba(212,232,230,0.08)',
                             }}
                           >
                             <span>D{d}</span>
@@ -2581,8 +2581,8 @@ function CopyMenu({
                         onCopyWeek(w)
                         setOpen(false)
                       }}
-                      className="flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium hover:bg-[#1C2425] transition-colors"
-                      style={{ color: '#F5F7F6' }}
+                      className="flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium hover:bg-[#1C4448] transition-colors"
+                      style={{ color: '#F5F2ED' }}
                     >
                       <span>Week {w}</span>
                       <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -2610,7 +2610,7 @@ function CopyMenu({
         type="button"
         onClick={() => setOpen(false)}
         className="shrink-0 flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
-        style={{ background: '#1C2425', color: '#e87a55' }}
+        style={{ background: '#1C4448', color: '#E87A55' }}
       >
         <Copy className="w-3.5 h-3.5" />
         <span className="hidden sm:inline">Kopieer</span>

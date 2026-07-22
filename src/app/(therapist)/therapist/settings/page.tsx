@@ -114,7 +114,7 @@ export default function SettingsPage() {
               href="/admin/rehab-protocols"
               label="Revalidatie-protocollen"
               sub="Protocol-catalog + criteria bewerken"
-              bar={P.purple}
+              bar={P.teal}
             />
           </>
         )}

@@ -13,12 +13,12 @@ import { sendMail, escapeHtml } from '@/server/mail'
 import { getAppUrl } from '@/lib/app-url'
 
 const BRAND = {
-  bg: '#0A0E0F',
-  surface: '#141A1B',
-  ink: '#F5F7F6',
-  inkMuted: '#7B8889',
-  lime: '#e87a55',
-  danger: '#F87171',
+  bg: '#0E2729',
+  surface: '#15363A',
+  ink: '#F5F2ED',
+  inkMuted: '#9EB5B3',
+  lime: '#E87A55',
+  danger: '#F0796C',
 }
 
 function isWithinQuietHours(now: Date, start: number | null, end: number | null): boolean {

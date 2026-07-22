@@ -6,11 +6,11 @@ import { trpc } from '@/lib/trpc/client'
 const quickLinks = [
   { href: '/admin/users', label: 'Users & rollen', description: 'Wijs rollen toe + koppel aan praktijk', bar: P.brand },
   { href: '/admin/practices', label: 'Praktijken', description: 'Multi-tenant groepen beheren', bar: P.ice },
-  { href: '/admin/rehab-protocols', label: 'Revalidatie-protocollen', description: 'Protocol-catalog + criteria bewerken', bar: P.purple },
+  { href: '/admin/rehab-protocols', label: 'Revalidatie-protocollen', description: 'Protocol-catalog + criteria bewerken', bar: P.teal },
   { href: '/admin/education', label: 'Educatie', description: "Video's en PDF's voor patiënten (bv. ACL-traject)", bar: P.ice },
   { href: '/admin/cohort', label: 'Cohort analytics', description: 'Platform-aggregaten — alleen patiënten die expliciet hebben opt-ingenomen', bar: P.brand },
   { href: '/admin/dpa', label: 'DPA-status', description: 'Acceptatie verwerkersovereenkomst per patiënt/atleet + CSV-export', bar: P.gold },
-  { href: '/therapist/patients', label: 'Patiënten', description: 'Beheer patiënten en hun programma\'s', bar: P.purple },
+  { href: '/therapist/patients', label: 'Patiënten', description: 'Beheer patiënten en hun programma\'s', bar: P.teal },
   { href: '/therapist/exercises', label: 'Oefeningen', description: 'Oefeningenbibliotheek beheren', bar: P.gold },
   { href: '/therapist/programs', label: "Programma's", description: "Revalidatieprogramma's beheren", bar: P.ice },
   { href: '/coach/dashboard', label: 'Coach-portaal', description: 'Meekijken in de coaching-omgeving: atleten en trainingsplannen', bar: P.lime },

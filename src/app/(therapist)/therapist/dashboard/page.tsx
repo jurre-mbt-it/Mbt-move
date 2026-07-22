@@ -24,10 +24,10 @@ import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, type CardioActivityKey, type Cardi
 import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
 
 const URGENCY_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
-  CRITICAL: { color: P.danger, bg: 'rgba(248,113,113,0.18)', label: 'Kritiek' },
-  HIGH: { color: P.orange, bg: 'rgba(244,150,68,0.15)', label: 'Hoog' },
-  MEDIUM: { color: P.gold, bg: 'rgba(244,194,97,0.14)', label: 'Middel' },
-  LOW: { color: P.ice, bg: 'rgba(147,197,253,0.15)', label: 'Laag' },
+  CRITICAL: { color: P.danger, bg: 'rgba(240,121,108,0.18)', label: 'Kritiek' },
+  HIGH: { color: P.orange, bg: 'rgba(240,154,74,0.15)', label: 'Hoog' },
+  MEDIUM: { color: P.gold, bg: 'rgba(245,185,66,0.14)', label: 'Middel' },
+  LOW: { color: P.ice, bg: 'rgba(159,206,201,0.15)', label: 'Laag' },
 }
 
 /**
@@ -302,7 +302,7 @@ export default function TherapistDashboard() {
           href={`${portal.base}/settings/security`}
           className="group block rounded-2xl transition-colors"
           style={{
-            background: 'rgba(248,113,113,0.08)',
+            background: 'rgba(240,121,108,0.08)',
             border: `1px solid ${P.danger}`,
             padding: 16,
           }}
@@ -497,7 +497,7 @@ export default function TherapistDashboard() {
                     <span
                       className="athletic-mono"
                       style={{
-                        background: 'rgba(244,194,97,0.14)',
+                        background: 'rgba(245,185,66,0.14)',
                         color: P.gold,
                         fontSize: 10,
                         padding: '3px 9px',
@@ -704,7 +704,7 @@ export default function TherapistDashboard() {
             href={`${portal.patients}`}
             label="Patiënt uitnodigen"
             sub="Nieuwe patiënt aanmaken"
-            bar={P.purple}
+            bar={P.teal}
           />
           </div>
         </div>

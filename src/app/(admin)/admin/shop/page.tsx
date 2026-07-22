@@ -120,7 +120,7 @@ export default function AdminShopPage() {
                 >
                   <span
                     className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-md"
-                    style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(255,255,255,0.85)' }}
+                    style={{ background: 'rgba(0,0,0,0.45)', color: 'rgba(212,232,230,0.85)' }}
                   >
                     <KindIcon size={12} />
                   </span>
@@ -137,7 +137,7 @@ export default function AdminShopPage() {
                     {soldOut && (
                       <span
                         className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-                        style={{ color: '#f87171', background: P.surfaceHi }}
+                        style={{ color: '#F0796C', background: P.surfaceHi }}
                       >
                         Uitverkocht
                       </span>
@@ -145,7 +145,7 @@ export default function AdminShopPage() {
                     {lowStock && (
                       <span
                         className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-                        style={{ color: '#fbbf24', background: P.surfaceHi }}
+                        style={{ color: '#F5B942', background: P.surfaceHi }}
                       >
                         Nog {p.stockQty} op voorraad
                       </span>
@@ -170,7 +170,7 @@ export default function AdminShopPage() {
                 <div className="flex gap-3 shrink-0">
                   <Link
                     href={`/programma/${p.slug}`}
-                    className="text-sm hover:text-white transition-colors"
+                    className="text-sm hover:text-[#F5F2ED] transition-colors"
                     style={{ color: P.inkMuted }}
                   >
                     Preview

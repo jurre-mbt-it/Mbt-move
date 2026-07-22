@@ -906,7 +906,7 @@ export default function TreatmentPage({
                 </SortableSingle>
               )
             }
-            const colors = SUPERSET_COLORS[item.group] ?? { bg: 'rgba(255,255,255,0.04)', border: P.lineStrong, text: P.ink }
+            const colors = SUPERSET_COLORS[item.group] ?? { bg: 'rgba(212,232,230,0.04)', border: P.lineStrong, text: P.ink }
             const groupPhase: SessionPhase = item.rows[0]?.phase ?? 'MAIN'
             return (
               <SortableGroup key={`group-${item.group}`} id={`${groupPhase}-group-${item.group}`}>
@@ -1528,7 +1528,7 @@ function ExerciseTile({
             onClick={() => { setParamMenuOpen((v) => !v); setSupersetMenuOpen(false) }}
             className="athletic-mono athletic-tap px-2 py-1 rounded-full"
             style={{
-              background: P.surfaceHi, color: P.brand,
+              background: P.surfaceLow, color: P.brand,
               border: `1px dashed ${P.brand}`,
               fontSize: 10, letterSpacing: '0.08em', fontWeight: 800,
             }}
@@ -2111,9 +2111,9 @@ function PreviousSessionPanel({
                 <span
                   className="athletic-mono px-2 py-1 rounded"
                   style={{
-                    background: 'rgba(248,113,113,0.10)',
+                    background: 'rgba(240,121,108,0.10)',
                     color: P.danger,
-                    border: `1px solid rgba(248,113,113,0.30)`,
+                    border: `1px solid rgba(240,121,108,0.30)`,
                     fontSize: 10, letterSpacing: '0.08em', fontWeight: 800,
                   }}
                 >
@@ -2124,9 +2124,9 @@ function PreviousSessionPanel({
                 <span
                   className="athletic-mono px-2 py-1 rounded"
                   style={{
-                    background: 'rgba(244,194,97,0.10)',
+                    background: 'rgba(245,185,66,0.10)',
                     color: P.gold,
-                    border: `1px solid rgba(244,194,97,0.30)`,
+                    border: `1px solid rgba(245,185,66,0.30)`,
                     fontSize: 10, letterSpacing: '0.08em', fontWeight: 800,
                   }}
                 >
@@ -2137,9 +2137,9 @@ function PreviousSessionPanel({
                 <span
                   className="athletic-mono px-2 py-1 rounded"
                   style={{
-                    background: 'rgba(132,204,22,0.10)',
+                    background: 'rgba(46,143,85,0.10)',
                     color: P.lime,
-                    border: `1px solid rgba(132,204,22,0.30)`,
+                    border: `1px solid rgba(46,143,85,0.30)`,
                     fontSize: 10, letterSpacing: '0.08em', fontWeight: 800,
                   }}
                 >
@@ -2385,7 +2385,7 @@ function FinishSessionModal({
               <span
                 aria-hidden
                 className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
-                style={{ background: 'rgba(244,194,97,0.12)', color: P.gold, fontSize: 14 }}
+                style={{ background: 'rgba(245,185,66,0.12)', color: P.gold, fontSize: 14 }}
               >
                 <IconLightning size={14} />
               </span>
@@ -2415,7 +2415,7 @@ function FinishSessionModal({
                     <span
                       aria-hidden
                       className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
-                      style={{ background: 'rgba(248,113,113,0.12)', color: P.danger, fontSize: 14 }}
+                      style={{ background: 'rgba(240,121,108,0.12)', color: P.danger, fontSize: 14 }}
                     >
                       <IconHeart size={14} />
                     </span>
@@ -2441,7 +2441,7 @@ function FinishSessionModal({
                 onClick={onTogglePain}
                 className="athletic-mono athletic-tap w-full rounded-lg py-2.5 flex items-center justify-center gap-2"
                 style={{
-                  background: P.surfaceHi,
+                  background: P.surfaceLow,
                   color: P.danger,
                   border: `1px dashed ${P.danger}`,
                   fontSize: 11, letterSpacing: '0.1em', fontWeight: 800,

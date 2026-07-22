@@ -23,9 +23,9 @@ import {
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
   ACTIVE:    { label: 'Actief',       bg: 'rgba(232,122,85,0.14)', text: P.lime },
-  DRAFT:     { label: 'Concept',      bg: 'rgba(244,194,97,0.14)',  text: P.gold },
-  COMPLETED: { label: 'Afgerond',     bg: 'rgba(255,255,255,0.06)', text: P.inkMuted },
-  ARCHIVED:  { label: 'Gearchiveerd', bg: 'rgba(255,255,255,0.06)', text: P.inkMuted },
+  DRAFT:     { label: 'Concept',      bg: 'rgba(245,185,66,0.14)',  text: P.gold },
+  COMPLETED: { label: 'Afgerond',     bg: 'rgba(212,232,230,0.06)', text: P.inkMuted },
+  ARCHIVED:  { label: 'Gearchiveerd', bg: 'rgba(212,232,230,0.06)', text: P.inkMuted },
 }
 
 type QuickFilter = 'all' | 'active' | 'low-compliance'
@@ -218,7 +218,7 @@ function PatientsPageInner() {
                     {/* Avatar */}
                     <div
                       className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 athletic-mono"
-                      style={{ background: P.surfaceHi, color: P.brand, fontSize: 13, fontWeight: 900 }}
+                      style={{ background: P.surfaceLow, color: P.brand, fontSize: 13, fontWeight: 900 }}
                     >
                       {patient.avatarInitials}
                     </div>
@@ -240,7 +240,7 @@ function PatientsPageInner() {
                           <span
                             className="athletic-mono"
                             style={{
-                              background: P.gold + '20',
+                              background: `color-mix(in srgb, ${P.gold} 13%, transparent)`,
                               color: P.gold,
                               fontSize: 10,
                               letterSpacing: '0.1em',
@@ -275,7 +275,7 @@ function PatientsPageInner() {
                             className="athletic-mono"
                             title="Patiënt heeft de uitnodiging nog niet geaccepteerd"
                             style={{
-                              background: 'rgba(244, 194, 97, 0.15)',
+                              background: 'rgba(245, 185, 66, 0.15)',
                               color: P.gold,
                               fontSize: 10,
                               letterSpacing: '0.1em',
@@ -293,7 +293,7 @@ function PatientsPageInner() {
                             className="athletic-mono"
                             title={`${patient.complianceCompleted} van ${patient.complianceScheduled} sessies afgerond afgelopen 14 dagen`}
                             style={{
-                              background: 'rgba(248,113,113,0.14)',
+                              background: 'rgba(240,121,108,0.14)',
                               color: P.danger,
                               fontSize: 10,
                               letterSpacing: '0.1em',

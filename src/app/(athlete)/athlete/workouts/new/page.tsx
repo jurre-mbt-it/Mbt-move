@@ -39,7 +39,7 @@ type RealExercise = {
 }
 
 const mono =
-  'ui-monospace, Menlo, "SF Mono", "Cascadia Code", "Source Code Pro", monospace'
+  'var(--font-mono-athletic)'
 
 function categoryColor(cat: string): string {
   return (CATEGORY_COLORS as Record<string, string>)[cat] ?? P.lime
@@ -541,7 +541,7 @@ function NewWorkoutPageInner() {
               <div
                 className="flex items-center gap-2 rounded-full"
                 style={{
-                  background: paused ? P.purple : P.brand,
+                  background: paused ? P.teal : P.brand,
                   color: P.bg,
                   padding: '6px 14px',
                   fontFamily: mono,

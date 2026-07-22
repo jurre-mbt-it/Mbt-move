@@ -6,7 +6,7 @@ import { Plus, X, Send, Dumbbell, CalendarCheck } from 'lucide-react'
 import { P, MetaLabel, DarkTextarea } from '@/components/dark-ui'
 
 const mono =
-  'ui-monospace, Menlo, "SF Mono", "Cascadia Code", "Source Code Pro", monospace'
+  'var(--font-mono-athletic)'
 
 /** Koppeling die aan het volgende bericht hangt (sessie en/of oefening). */
 type PendingLink = {
@@ -310,7 +310,7 @@ export function MessageThread({
               width: 44,
               height: 44,
               background: body.trim() && !send.isPending ? P.brand : P.surfaceHi,
-              color: body.trim() && !send.isPending ? '#fff' : P.inkDim,
+              color: body.trim() && !send.isPending ? P.bg : P.inkDim,
               border: `1.5px solid ${body.trim() && !send.isPending ? P.brand : P.line}`,
               fontFamily: mono,
             }}

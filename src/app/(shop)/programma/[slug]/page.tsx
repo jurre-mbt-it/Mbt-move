@@ -57,7 +57,7 @@ export default async function ProductDetailPage({
     <div className="mx-auto max-w-6xl px-5 py-12">
       <Link
         href="/shop"
-        className="text-sm transition-colors hover:text-white"
+        className="text-sm transition-colors hover:text-[#F5F2ED]"
         style={{ color: P.inkMuted }}
       >
         ← Terug naar de shop
@@ -78,7 +78,7 @@ export default async function ProductDetailPage({
             {!product.heroImageUrl && (
               <span
                 className="absolute bottom-4 left-5 text-xs font-bold uppercase tracking-[0.22em]"
-                style={{ color: 'rgba(255,255,255,0.42)' }}
+                style={{ color: 'rgba(212,232,230,0.42)' }}
               >
                 MBT·Gym
               </span>
@@ -89,7 +89,7 @@ export default async function ProductDetailPage({
             {!isProgram && (
               <span
                 className="rounded-full px-3 py-1 text-xs font-semibold"
-                style={{ background: P.surfaceHi, color: P.brand, border: `1px solid ${P.line}` }}
+                style={{ background: P.surfaceLow, color: P.brand, border: `1px solid ${P.line}` }}
               >
                 {KIND_LABELS[product.kind]}
               </span>
@@ -97,7 +97,7 @@ export default async function ProductDetailPage({
             {product.level && (
               <span
                 className="rounded-full px-3 py-1 text-xs font-semibold"
-                style={{ background: P.surfaceHi, color: P.brand, border: `1px solid ${P.line}` }}
+                style={{ background: P.surfaceLow, color: P.brand, border: `1px solid ${P.line}` }}
               >
                 {LEVEL_LABELS[product.level]}
               </span>
@@ -175,7 +175,7 @@ export default async function ProductDetailPage({
                   href={product.previewVideoUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-8 inline-flex items-center gap-2 text-sm font-medium transition-colors hover:text-white"
+                  className="mt-8 inline-flex items-center gap-2 text-sm font-medium transition-colors hover:text-[#F5F2ED]"
                   style={{ color: P.brand }}
                 >
                   ▶ Bekijk een preview-video

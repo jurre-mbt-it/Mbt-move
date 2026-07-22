@@ -2,15 +2,15 @@
  *  (nog) geen afbeelding heeft. Geeft elke kaart een eigen, premium-ogende
  *  kleurstelling op basis van de slug — zelfde product = zelfde gradient. */
 
-// On-brand: warme oranje/amber-tonen (MBT-Gym brand) + één gedempt staalblauw
-// voor variatie. Geen lime/paars — dat past niet bij de huisstijl.
+// Diep petrol als basis, warme merktonen als uitloop, plus één turquoise voor
+// variatie. Geen kleuren buiten het palet.
 const PAIRS: Array<[string, string]> = [
-  ['#15110E', '#c9613f'], // diep → brand-oranje (deep)
-  ['#14100F', '#9a3412'], // diep → warm roest
-  ['#15120B', '#F39644'], // diep → amber/goud
-  ['#121516', '#e87a55'], // diep → brand
-  ['#130F0D', '#b45309'], // diep → amber-bruin
-  ['#0E1417', '#3b6ea5'], // diep → gedempt staalblauw (variatie)
+  ['#081A1C', '#C9613F'], // petrol → brand-oranje (deep)
+  ['#0B2022', '#A85434'], // petrol → warm roest
+  ['#081A1C', '#F09A4A'], // petrol → amber/goud
+  ['#0B2022', '#E87A55'], // petrol → brand
+  ['#081A1C', '#B4763A'], // petrol → amber-bruin
+  ['#0B2022', '#45A8A2'], // petrol → diep turquoise (variatie)
 ]
 
 export function heroGradient(seed: string): string {

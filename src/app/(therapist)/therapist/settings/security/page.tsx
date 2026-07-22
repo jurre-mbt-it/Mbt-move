@@ -182,7 +182,7 @@ export default function SecuritySettingsPage() {
           {confirmRegen && !shownCodes && (
             <div
               className="mt-4 rounded-lg p-3 space-y-3"
-              style={{ border: `1px solid ${P.danger}`, background: 'rgba(248,113,113,0.08)' }}
+              style={{ border: `1px solid ${P.danger}`, background: 'rgba(240,121,108,0.08)' }}
             >
               <p style={{ color: P.danger, fontSize: 13, lineHeight: 1.5 }}>
                 Dit maakt je huidige backup-codes ongeldig. Zeker weten?

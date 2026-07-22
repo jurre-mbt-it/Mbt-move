@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#0A0E0F',
+  themeColor: '#0E2729',
   colorScheme: 'dark',
 }
 
@@ -39,9 +39,9 @@ export default function RootLayout({
           theme="dark"
           toastOptions={{
             style: {
-              background: '#141A1B',
-              color: '#F5F7F6',
-              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'var(--p-surface)',
+              color: 'var(--p-ink)',
+              border: '1px solid var(--p-line-strong)',
             },
           }}
         />

@@ -81,7 +81,7 @@ export function IntervalEditor({
             <button
               onClick={() => remove(i)}
               className="athletic-tap shrink-0 rounded-lg flex items-center justify-center"
-              style={{ width: 36, height: 36, background: P.surfaceHi, color: P.danger, border: `1px solid ${P.line}` }}
+              style={{ width: 36, height: 36, background: P.surfaceLow, color: P.danger, border: `1px solid ${P.line}` }}
               aria-label="Verwijder blok"
             >
               <Trash2 className="w-4 h-4" />

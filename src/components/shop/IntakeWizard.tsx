@@ -235,7 +235,7 @@ export function IntakeWizard() {
                 type="checkbox"
                 checked={consent}
                 onChange={(e) => setConsent(e.target.checked)}
-                className="mt-1 h-4 w-4 shrink-0 accent-[#e87a55]"
+                className="mt-1 h-4 w-4 shrink-0 accent-[#E87A55]"
               />
               <span className="text-sm" style={{ color: P.inkMuted }}>
                 Ik ga ermee akkoord dat MBT mijn antwoorden gebruikt om mij een passend programma te
@@ -271,7 +271,7 @@ export function IntakeWizard() {
                           e.target.checked ? [...c, f.id] : c.filter((x) => x !== f.id),
                         )
                       }
-                      className="mt-1 h-4 w-4 shrink-0 accent-[#e87a55]"
+                      className="mt-1 h-4 w-4 shrink-0 accent-[#E87A55]"
                     />
                     <span className="text-sm" style={{ color: P.ink }}>
                       {f.label}
@@ -296,7 +296,7 @@ export function IntakeWizard() {
               <button
                 key={opt.value}
                 onClick={() => choose(opt)}
-                className="text-left rounded-xl px-4 py-3.5 text-[15px] font-medium transition-colors hover:border-[#e87a55]"
+                className="text-left rounded-xl px-4 py-3.5 text-[15px] font-medium transition-colors hover:border-[#E87A55]"
                 style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
               >
                 {opt.label}

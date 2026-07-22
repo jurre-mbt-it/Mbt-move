@@ -184,7 +184,7 @@ export function MfaEnrollForm() {
                 width={200}
                 height={200}
                 className="rounded-lg"
-                style={{ border: `1px solid ${P.line}`, background: '#fff', padding: 4 }}
+                style={{ border: `1px solid ${P.line}`, background: '#fff', padding: 4 /* wit blijft: anders leest de camera de QR niet */ }}
               />
             </div>
 
@@ -221,7 +221,7 @@ export function MfaEnrollForm() {
                   background: P.surfaceLow,
                   color: P.ink,
                   fontSize: 11,
-                  fontFamily: '"SF Mono", Menlo, monospace',
+                  fontFamily: 'var(--font-mono-athletic)',
                   letterSpacing: '0.06em',
                   border: `1px solid ${P.line}`,
                   lineHeight: 1.6,

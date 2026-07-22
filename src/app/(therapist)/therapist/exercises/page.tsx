@@ -286,9 +286,9 @@ export default function ExercisesPage() {
             aria-label={favoritesOnly ? 'Toon alle oefeningen' : 'Toon alleen favorieten'}
             className="athletic-tap inline-flex items-center gap-1.5 px-3 py-2 rounded-xl transition-colors"
             style={{
-              background: favoritesOnly ? 'rgba(248,113,113,0.12)' : 'transparent',
-              border: `1px solid ${favoritesOnly ? '#f87171' : P.lineStrong}`,
-              color: favoritesOnly ? '#f87171' : P.inkMuted,
+              background: favoritesOnly ? 'rgba(240,121,108,0.12)' : 'transparent',
+              border: `1px solid ${favoritesOnly ? '#F0796C' : P.lineStrong}`,
+              color: favoritesOnly ? '#F0796C' : P.inkMuted,
               fontSize: 12,
               fontWeight: 800,
               letterSpacing: '0.04em',
@@ -297,7 +297,7 @@ export default function ExercisesPage() {
             <Heart
               className="w-3.5 h-3.5"
               style={{
-                fill: favoritesOnly ? '#f87171' : 'transparent',
+                fill: favoritesOnly ? '#F0796C' : 'transparent',
                 strokeWidth: 2,
               }}
             />
@@ -516,14 +516,14 @@ export default function ExercisesPage() {
                       aria-label={ex.isFavorite ? 'Verwijder uit favorieten' : 'Voeg toe aan favorieten'}
                       className="athletic-tap w-7 h-7 rounded-full flex items-center justify-center"
                       style={{
-                        background: ex.isFavorite ? 'rgba(248,113,113,0.12)' : P.surfaceHi,
+                        background: ex.isFavorite ? 'rgba(240,121,108,0.12)' : P.surfaceHi,
                       }}
                     >
                       <Heart
                         className="w-3.5 h-3.5"
                         style={{
-                          color: ex.isFavorite ? '#f87171' : P.inkMuted,
-                          fill: ex.isFavorite ? '#f87171' : 'transparent',
+                          color: ex.isFavorite ? '#F0796C' : P.inkMuted,
+                          fill: ex.isFavorite ? '#F0796C' : 'transparent',
                           strokeWidth: 2,
                         }}
                       />

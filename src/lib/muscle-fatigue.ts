@@ -347,7 +347,7 @@ export function getMuscleFatigueColor(p: number): string {
   if (p >= 80) return '#5FD08A' // P.green — recovered
   if (p >= 55) return '#F5B942' // P.gold — recovering
   if (p >= 30) return '#E87A55' // accent orange (P.lime) — loaded
-  return '#F87171' // P.danger — heavily loaded
+  return '#F0796C' // P.danger — heavily loaded
 }
 
 export function getMuscleFatigueLabel(p: number): string {

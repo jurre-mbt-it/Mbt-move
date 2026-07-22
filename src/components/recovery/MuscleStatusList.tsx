@@ -30,7 +30,7 @@ const IOS = {
   inkMuted: '#9EB5B3',
 } as const
 
-const MONO = "var(--font-mono-athletic), ui-monospace, 'JetBrains Mono', Menlo, monospace"
+const MONO = 'var(--font-mono-athletic)'
 
 /** Data-container: haalt de per-regio fatigue op en rendert de view. */
 export function MuscleStatusList({ collapsible = false }: { collapsible?: boolean }) {

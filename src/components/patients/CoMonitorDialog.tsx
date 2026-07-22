@@ -77,7 +77,7 @@ export function CoMonitorDialog({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
-            <p className="mt-2 text-xs" style={{ color: '#7B8889', lineHeight: 1.6 }}>
+            <p className="mt-2 text-xs" style={{ color: '#9EB5B3', lineHeight: 1.6 }}>
               De therapeut moet al een account hebben. Is dat niet zo, vraag de beheerder dan om er
               een aan te maken.
             </p>

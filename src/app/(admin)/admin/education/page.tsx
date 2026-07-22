@@ -267,7 +267,7 @@ export default function AdminEducationPage() {
                       if (confirm(`"${r.title}" verwijderen?`)) del.mutate({ id: r.id })
                     }}
                     className="p-2 rounded-lg shrink-0"
-                    style={{ color: P.danger ?? '#ef4444' }}
+                    style={{ color: P.danger ?? '#F0796C' }}
                     aria-label="Verwijderen"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -393,7 +393,7 @@ export default function AdminEducationPage() {
                         fontSize: 10,
                         letterSpacing: '0.08em',
                         fontWeight: 700,
-                        background: active ? P.lime + '22' : P.surface,
+                        background: active ? `color-mix(in srgb, ${P.lime} 13%, transparent)` : P.surface,
                         color: active ? P.lime : P.inkMuted,
                         border: `1px solid ${active ? P.lime : 'transparent'}`,
                       }}

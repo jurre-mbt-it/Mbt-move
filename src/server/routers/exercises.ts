@@ -434,7 +434,7 @@ export const exercisesRouter = createTRPCRouter({
       return collections.map(c => ({
         id: c.id,
         name: c.name,
-        color: c.color ?? '#4ECDC4',
+        color: c.color ?? '#9FCEC9',
         count: c._count.items,
       }))
     }),
@@ -442,7 +442,7 @@ export const exercisesRouter = createTRPCRouter({
   createCollection: therapistProcedure
     .input(z.object({
       name: z.string().min(1),
-      color: z.string().default('#4ECDC4'),
+      color: z.string().default('#9FCEC9'),
     }))
     .mutation(async ({ ctx, input }) => {
       const collection = await ctx.prisma.exerciseCollection.create({

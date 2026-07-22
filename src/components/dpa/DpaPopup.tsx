@@ -52,25 +52,25 @@ export function DpaPopup() {
         onEscapeKeyDown={e => e.preventDefault()}
       >
         {/* Header */}
-        <div className="px-5 pt-6 pb-4" style={{ background: '#141A1B' }}>
+        <div className="px-5 pt-6 pb-4" style={{ background: '#15363A' }}>
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
-            style={{ background: '#1C2425', border: '1px solid #e87a55' }}
+            style={{ background: '#1C4448', border: '1px solid #E87A55' }}
           >
-            <FileText className="w-5 h-5" style={{ color: '#e87a55' }} />
+            <FileText className="w-5 h-5" style={{ color: '#E87A55' }} />
           </div>
-          <h2 className="text-lg font-bold leading-tight" style={{ color: '#F5F7F6' }}>
+          <h2 className="text-lg font-bold leading-tight" style={{ color: '#F5F2ED' }}>
             Verwerkingsovereenkomst
           </h2>
-          <p className="text-sm mt-1" style={{ color: '#7B8889' }}>
+          <p className="text-sm mt-1" style={{ color: '#9EB5B3' }}>
             Movement Based Therapy verwerkt uw persoonsgegevens als verwerkingsverantwoordelijke.
             Lees de overeenkomst en geef akkoord om door te gaan.
           </p>
         </div>
 
         {/* Body */}
-        <div className="px-5 py-4 space-y-3" style={{ background: '#0A0E0F' }}>
-          <p className="text-sm font-semibold" style={{ color: '#F5F7F6' }}>Samenvatting</p>
+        <div className="px-5 py-4 space-y-3" style={{ background: '#0E2729' }}>
+          <p className="text-sm font-semibold" style={{ color: '#F5F2ED' }}>Samenvatting</p>
           <ul className="space-y-2">
             {[
               'Uw gegevens worden verwerkt voor fysiotherapeutische behandeling',
@@ -79,10 +79,10 @@ export function DpaPopup() {
               'U heeft recht op inzage, correctie en dataportabiliteit',
               'U kunt een klacht indienen bij de Autoriteit Persoonsgegevens',
             ].map((item, i) => (
-              <li key={i} className="flex items-start gap-2.5 text-sm" style={{ color: '#7B8889' }}>
+              <li key={i} className="flex items-start gap-2.5 text-sm" style={{ color: '#9EB5B3' }}>
                 <CheckCircle2
                   className="w-4 h-4 mt-0.5 shrink-0"
-                  style={{ color: '#e87a55' }}
+                  style={{ color: '#E87A55' }}
                 />
                 <span>{item}</span>
               </li>
@@ -92,23 +92,23 @@ export function DpaPopup() {
           <Link
             href="/patient/legal/dpa"
             className="text-xs flex items-center gap-1 mt-2"
-            style={{ color: '#e87a55' }}
+            style={{ color: '#E87A55' }}
             target="_blank"
           >
             <FileText className="w-3.5 h-3.5" />
             Volledig document lezen
           </Link>
 
-          <p className="text-xs" style={{ color: '#4A5454' }}>
+          <p className="text-xs" style={{ color: '#86A3A1' }}>
             Versie v1.0 · U kunt dit later bekijken via Instellingen → Privacy
           </p>
         </div>
 
         {/* Actions */}
-        <div className="px-5 pb-6 space-y-2" style={{ background: '#0A0E0F' }}>
+        <div className="px-5 pb-6 space-y-2" style={{ background: '#0E2729' }}>
           <Button
             className="w-full font-semibold"
-            style={{ background: '#e87a55', color: '#0A0E0F', height: 48 }}
+            style={{ background: '#E87A55', color: '#0E2729', height: 48 }}
             onClick={() => accept.mutate()}
             disabled={accept.isPending}
           >
@@ -117,7 +117,7 @@ export function DpaPopup() {
           <button
             onClick={handleLogout}
             className="w-full flex items-center justify-center gap-1.5 text-sm py-2"
-            style={{ color: '#7B8889' }}
+            style={{ color: '#9EB5B3' }}
           >
             <LogOut className="w-3.5 h-3.5" />
             Uitloggen

@@ -79,7 +79,7 @@ export default function PatientSettingsPage() {
           href="/patient/settings/data-rights"
           label="Mijn data downloaden of verwijderen"
           sub="AVG art. 15, 17 en 20 — export of vergeetverzoek"
-          bar={P.purple}
+          bar={P.teal}
         />
       </div>
     </DarkScreen>

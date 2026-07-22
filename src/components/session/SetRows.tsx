@@ -11,7 +11,7 @@ import {
 import { isPerSideUnit } from '@/lib/program-constants'
 
 const mono =
-  'ui-monospace, Menlo, "SF Mono", "Cascadia Code", "Source Code Pro", monospace'
+  'var(--font-mono-athletic)'
 
 /**
  * Set-rijen — de gedeelde log-UI van de sessie-runners (atleet, quick workout,
@@ -68,18 +68,18 @@ export function SetRows({
               className="flex items-center gap-2 rounded-xl px-3 py-2 transition-all"
               style={{
                 background: s.done
-                  ? 'rgba(190,242,100,0.06)'
+                  ? 'rgba(95,208,138,0.06)'
                   : isActive
                     ? P.surfaceHi
                     : P.surfaceLow,
                 border: `1px solid ${
                   s.done
-                    ? 'rgba(190,242,100,0.35)'
+                    ? 'rgba(95,208,138,0.35)'
                     : isActive
-                      ? 'rgba(244,194,97,0.5)'
+                      ? 'rgba(245,185,66,0.5)'
                       : P.line
                 }`,
-                boxShadow: isActive ? '0 0 0 1px rgba(244,194,97,0.2)' : undefined,
+                boxShadow: isActive ? '0 0 0 1px rgba(245,185,66,0.2)' : undefined,
                 opacity: isUpcoming ? 0.55 : 1,
               }}
             >
@@ -123,7 +123,7 @@ export function SetRows({
                   width: 44,
                   height: 40,
                   background: s.done ? P.lime : 'transparent',
-                  border: `1.5px solid ${s.done ? P.lime : isActive ? 'rgba(244,194,97,0.6)' : P.lineStrong}`,
+                  border: `1.5px solid ${s.done ? P.lime : isActive ? 'rgba(245,185,66,0.6)' : P.lineStrong}`,
                   color: s.done ? P.bg : isActive ? P.gold : P.inkDim,
                 }}
               >

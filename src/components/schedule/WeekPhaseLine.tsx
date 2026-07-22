@@ -31,8 +31,8 @@ export function WeekPhaseLine({ variant = 'line' }: { variant?: 'line' | 'deload
       <div
         className="flex items-center gap-2 rounded-lg px-3 py-2"
         style={{
-          background: 'rgba(96,165,250,0.08)',
-          border: '1px solid rgba(96,165,250,0.22)',
+          background: 'rgba(127,176,216,0.08)',
+          border: '1px solid rgba(127,176,216,0.22)',
         }}
       >
         <Moon className="w-3.5 h-3.5 shrink-0" style={{ color: PHASE_META.DELOAD.color }} />

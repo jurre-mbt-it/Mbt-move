@@ -105,7 +105,7 @@ export default function AdminCohortPage() {
         <MetricTile
           label="Cardio"
           value={isLoading ? '…' : data?.totalCardioSessions ?? 0}
-          tint={P.purple}
+          tint={P.teal}
         />
       </div>
 

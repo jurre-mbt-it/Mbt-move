@@ -81,11 +81,11 @@ const CATEGORY_LABELS: Record<Category, string> = {
   STABILITY: 'Stabiliteit',
 }
 const CATEGORY_COLORS: Record<Category, string> = {
-  STRENGTH: '#BEF264',
-  MOBILITY: '#60a5fa',
-  PLYOMETRICS: '#f59e0b',
-  CARDIO: '#f87171',
-  STABILITY: '#a78bfa',
+  STRENGTH: '#5FD08A',
+  MOBILITY: '#7FB0D8',
+  PLYOMETRICS: '#F5B942',
+  CARDIO: '#F0796C',
+  STABILITY: '#45A8A2',
 }
 function CategoryIcon({ category, size = 14 }: { category: Category; size?: number }) {
   const props = { size, className: undefined as string | undefined }
@@ -321,10 +321,10 @@ function paceLabelFor(distanceM: number | null | undefined, durationSec: number 
 
 /** RPE-band zoals in trainingskalenders: cijfer + woord + kleur. */
 function rpeMeta(rpe: number): { label: string; color: string; bg: string } {
-  if (rpe >= 8) return { label: 'Max', color: P.danger, bg: 'rgba(248,113,113,0.16)' }
-  if (rpe >= 6) return { label: 'Zwaar', color: P.gold, bg: 'rgba(244,194,97,0.16)' }
-  if (rpe >= 4) return { label: 'Gemiddeld', color: P.ice, bg: 'rgba(147,197,253,0.14)' }
-  return { label: 'Licht', color: P.lime, bg: 'rgba(190,242,100,0.12)' }
+  if (rpe >= 8) return { label: 'Max', color: P.danger, bg: 'rgba(240,121,108,0.16)' }
+  if (rpe >= 6) return { label: 'Zwaar', color: P.gold, bg: 'rgba(245,185,66,0.16)' }
+  if (rpe >= 4) return { label: 'Gemiddeld', color: P.ice, bg: 'rgba(159,206,201,0.14)' }
+  return { label: 'Licht', color: P.lime, bg: 'rgba(95,208,138,0.12)' }
 }
 
 /** feelScore 1–5 → eigen mood-icoon + woord — zelfde set en labels als de
@@ -371,9 +371,9 @@ const isWorkoutKind = (k: ItemKind) => WORKOUT_KINDS.includes(k)
 /** Niet-workout items: eigen kleur, icoon en onderschrift. */
 const MARKER_META: Record<Exclude<ItemKind, 'PROGRAM' | 'WORKOUT'>, { color: string; label: string }> = {
   REST:  { color: P.inkDim, label: 'geen belasting' },
-  NOTE:  { color: '#F4C261', label: 'notitie' },
+  NOTE:  { color: '#F5B942', label: 'notitie' },
   TEST:  { color: P.ink,    label: 'testbatterij' },
-  EVENT: { color: '#BEF264', label: 'streefdatum' },
+  EVENT: { color: '#5FD08A', label: 'streefdatum' },
 }
 
 type ItemStatus = 'scheduled' | 'completed' | 'partial' | 'missed' | 'in_progress'
@@ -382,14 +382,14 @@ type ItemStatus = 'scheduled' | 'completed' | 'partial' | 'missed' | 'in_progres
 // deels (eerder gestopt) = oranje, gemist (verleden + niet gedaan) = rood.
 // Categorie blijft herkenbaar via het icoon.
 const STATUS_COLORS: Record<ItemStatus, string> = {
-  scheduled: 'rgba(255,255,255,0.09)',
-  completed: 'rgba(190,242,100,0.14)',  // lime tint
-  partial:   'rgba(249,115,22,0.16)',   // orange tint
-  missed:    'rgba(248,113,113,0.14)',  // danger red tint
-  in_progress: 'rgba(244,194,97,0.16)', // gold/amber tint
+  scheduled: 'rgba(212,232,230,0.09)',
+  completed: 'rgba(95,208,138,0.14)',  // lime tint
+  partial:   'rgba(238,132,71,0.16)',   // orange tint
+  missed:    'rgba(240,121,108,0.14)',  // danger red tint
+  in_progress: 'rgba(245,185,66,0.16)', // gold/amber tint
 }
 const STATUS_BORDER: Record<ItemStatus, string> = {
-  scheduled: 'rgba(255,255,255,0.5)',
+  scheduled: 'rgba(212,232,230,0.5)',
   completed: P.lime,
   partial:   P.orange,
   missed:    P.danger,
@@ -513,7 +513,7 @@ function QuickExerciseBuilder({
                   onChange={ev => update(i, { reps: Math.max(1, Number(ev.target.value) || 1) })}
                   className="w-12 text-center rounded text-xs" style={numStyle} />
                 <button type="button" onClick={() => setList(l => l.filter((_, idx) => idx !== i))}
-                  className="text-zinc-400 hover:text-red-400 shrink-0"><X className="w-3.5 h-3.5" /></button>
+                  className="text-[#9EB5B3] hover:text-[#F0796C] shrink-0"><X className="w-3.5 h-3.5" /></button>
               </div>
             )
           })}
@@ -544,7 +544,7 @@ function QuickExerciseBuilder({
           const cat = (c.category as Category) ?? 'STRENGTH'
           return (
             <button key={c.id} type="button" onClick={() => add(c)}
-              className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-[#1C2425]"
+              className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-[#1C4448]"
               style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}>
               <span style={{ color: CATEGORY_COLORS[cat] }}><CategoryIcon category={cat} size={11} /></span>
               <span className="flex-1 truncate text-xs" style={{ color: P.ink }}>{c.name}</span>
@@ -702,7 +702,7 @@ function ItemTile({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onRemove() }}
-            className="opacity-0 group-hover/tile:opacity-100 pointer-coarse:opacity-60 transition-opacity shrink-0 text-zinc-400 hover:text-red-400"
+            className="opacity-0 group-hover/tile:opacity-100 pointer-coarse:opacity-60 transition-opacity shrink-0 text-[#9EB5B3] hover:text-[#F0796C]"
             title="Verwijder"
           >
             <X className="w-3 h-3" />
@@ -1311,7 +1311,7 @@ function ItemDetailContent({
                       onClick={() => setERpe(n)}
                       className="w-6 h-6 rounded-md text-[11px] font-semibold transition-colors"
                       style={{
-                        background: eRpe === n ? `${P.lime}22` : 'transparent',
+                        background: eRpe === n ? `color-mix(in srgb, ${P.lime} 13%, transparent)` : 'transparent',
                         color: eRpe === n ? P.lime : P.inkMuted,
                         border: `1px solid ${eRpe === n ? P.lime : P.line}`,
                       }}
@@ -1514,7 +1514,7 @@ function WeekMetaDialog({
               style={{ background: isDeload ? PHASE_META.DELOAD.color : P.lineStrong }}
             >
               <span
-                className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform"
+                className="absolute top-0.5 w-4 h-4 rounded-full bg-[#F5F2ED] transition-transform"
                 style={{ transform: isDeload ? 'translateX(18px)' : 'translateX(2px)' }}
               />
             </span>
@@ -2843,10 +2843,10 @@ function WeekPlannerContent() {
                         <DropdownMenuTrigger asChild>
                           <button
                             type="button"
-                            className="p-1 rounded hover:bg-[rgba(255,255,255,0.05)]"
+                            className="p-1 rounded hover:bg-[rgba(212,232,230,0.05)]"
                             title={`Week ${weekNum} acties`}
                           >
-                            <MoreHorizontal className="w-3.5 h-3.5 text-zinc-300" />
+                            <MoreHorizontal className="w-3.5 h-3.5 text-[#9EB5B3]" />
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="w-60">

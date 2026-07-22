@@ -86,7 +86,7 @@ export function Header({ title, userName, userEmail, userAvatar, settingsBase = 
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="athletic-tap relative p-2 rounded-lg transition-colors hover:bg-white/5"
+              className="athletic-tap relative p-2 rounded-lg transition-colors hover:bg-[rgba(212,232,230,0.06)]"
               style={{ color: P.inkMuted }}
             >
               <Bell className="w-5 h-5" />

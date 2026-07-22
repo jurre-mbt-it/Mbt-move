@@ -106,7 +106,7 @@ export default function CoachPlansPage() {
                 {t.isGlobalSeed && (
                   <span
                     className="athletic-mono shrink-0 rounded px-2 py-1"
-                    style={{ background: 'rgba(255,255,255,0.06)', color: P.inkMuted, fontSize: 10 }}
+                    style={{ background: 'rgba(212,232,230,0.06)', color: P.inkMuted, fontSize: 10 }}
                   >
                     VOORBEELD
                   </span>

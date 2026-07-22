@@ -189,7 +189,7 @@ function FeedbackModal({
         {highPain && (
           <div
             className="mt-2 p-2 rounded-lg flex gap-2"
-            style={{ background: 'rgba(248,113,113,0.10)', border: `1px solid ${P.danger}33`, color: P.danger, fontSize: 11 }}
+            style={{ background: 'rgba(240,121,108,0.10)', border: `1px solid color-mix(in srgb, ${P.danger} 20%, transparent)`, color: P.danger, fontSize: 11 }}
           >
             <IconWarning size={16} />
             <span>Pijn &gt; 5/10 — Volgende sessie wordt herhaald. Therapeut wordt op de hoogte gesteld.</span>
@@ -554,7 +554,7 @@ export default function CardioSessionPage() {
                   className="w-3 h-3 rounded-full transition-all"
                   style={{
                     background: i < currentIntervalIdx
-                      ? (iv.type === 'RUN' ? P.lime + '88' : P.ice + '88')
+                      ? (iv.type === 'RUN' ? `color-mix(in srgb, ${P.lime} 53%, transparent)` : `color-mix(in srgb, ${P.ice} 53%, transparent)`)
                       : i === currentIntervalIdx
                         ? (iv.type === 'RUN' ? P.lime : P.ice)
                         : P.surfaceHi,

@@ -193,8 +193,8 @@ function AccessCodeInner() {
                     color: P.danger,
                     fontSize: 12,
                     letterSpacing: '0.04em',
-                    background: 'rgba(248,113,113,0.08)',
-                    border: `1px solid ${P.danger}33`,
+                    background: 'rgba(240,121,108,0.08)',
+                    border: `1px solid color-mix(in srgb, ${P.danger} 20%, transparent)`,
                   }}
                 >
                   {error}
@@ -226,7 +226,7 @@ function AccessCodeInner() {
                     letterSpacing: '0.4em',
                     fontWeight: 900,
                     height: 64,
-                    fontFamily: 'ui-monospace, Menlo, monospace',
+                    fontFamily: 'var(--font-mono-athletic)',
                   }}
                   maxLength={6}
                   required
@@ -241,7 +241,7 @@ function AccessCodeInner() {
                     fontSize: 12,
                     letterSpacing: '0.04em',
                     background: 'rgba(232,122,85,0.08)',
-                    border: `1px solid ${P.lime}33`,
+                    border: `1px solid color-mix(in srgb, ${P.lime} 20%, transparent)`,
                   }}
                 >
                   {info}
@@ -255,8 +255,8 @@ function AccessCodeInner() {
                     color: P.danger,
                     fontSize: 12,
                     letterSpacing: '0.04em',
-                    background: 'rgba(248,113,113,0.08)',
-                    border: `1px solid ${P.danger}33`,
+                    background: 'rgba(240,121,108,0.08)',
+                    border: `1px solid color-mix(in srgb, ${P.danger} 20%, transparent)`,
                   }}
                 >
                   {error}

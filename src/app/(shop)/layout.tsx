@@ -28,21 +28,21 @@ export default async function ShopLayout({
 
       <header
         className="sticky top-0 z-20 border-b backdrop-blur"
-        style={{ borderColor: P.line, background: 'rgba(10,14,15,0.82)' }}
+        style={{ borderColor: P.line, background: 'rgba(14,39,41,0.82)' }}
       >
         <div className="mx-auto max-w-6xl flex items-center justify-between px-5 h-16">
           <Link href="/shop" className="font-bold tracking-tight text-lg">
             MBT<span style={{ color: P.brand }}>·</span>Gym
           </Link>
           <nav className="flex items-center gap-6 text-sm" style={{ color: P.inkMuted }}>
-            <Link href="/shop" className="hover:text-white transition-colors">
+            <Link href="/shop" className="hover:text-[#F5F2ED] transition-colors">
               Programma&apos;s
             </Link>
-            <Link href="/intake" className="hover:text-white transition-colors">
+            <Link href="/intake" className="hover:text-[#F5F2ED] transition-colors">
               Vind jouw schema
             </Link>
             {user ? (
-              <Link href="/mijn-programmas" className="hover:text-white transition-colors">
+              <Link href="/mijn-programmas" className="hover:text-[#F5F2ED] transition-colors">
                 Mijn programma&apos;s
               </Link>
             ) : (

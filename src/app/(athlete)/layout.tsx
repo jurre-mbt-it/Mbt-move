@@ -15,7 +15,7 @@ export default async function AthleteLayout({
   return (
     <div
       className="athletic-dark min-h-screen pb-16 overflow-x-hidden w-full"
-      style={{ background: '#0A0E0F', color: '#F5F7F6' }}
+      style={{ background: '#0E2729', color: '#F5F2ED' }}
     >
       {session.isTherapistPersonalMode && <PersonalModeBanner />}
       <main className="w-full overflow-x-hidden"><PageTransition>{children}</PageTransition></main>

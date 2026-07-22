@@ -73,7 +73,7 @@ export function AthleteBottomNav({ personalMode = false }: { personalMode?: bool
       {/* Overlay */}
       {drawerOpen && (
         <div
-          className="mbt-backdrop fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+          className="mbt-backdrop fixed inset-0 z-40 bg-[#081A1C]/72 backdrop-blur-sm"
           onClick={() => setDrawerOpen(false)}
         />
       )}
@@ -175,7 +175,7 @@ export function AthleteBottomNav({ personalMode = false }: { personalMode?: bool
       {quickOpen && (
         <div className="fixed inset-0 z-50 flex items-end" role="dialog" aria-label="Snel loggen">
           <div
-            className="mbt-backdrop absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="mbt-backdrop absolute inset-0 bg-[#081A1C]/72 backdrop-blur-sm"
             onClick={() => setQuickOpen(false)}
           />
           <div

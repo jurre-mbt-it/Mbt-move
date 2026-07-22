@@ -17,7 +17,7 @@ import {
 } from '@/components/dark-ui'
 
 const mono =
-  'ui-monospace, Menlo, "SF Mono", "Cascadia Code", "Source Code Pro", monospace'
+  'var(--font-mono-athletic)'
 
 function categoryColor(cat: string): string {
   return (CATEGORY_COLORS as Record<string, string>)[cat] ?? P.lime

@@ -290,7 +290,7 @@ function ChartBody({ days, maxSrpe }: { days: DayStats[]; maxSrpe: number }) {
             fontSize={9}
             fontWeight={700}
             fill={d.isToday ? P.brand : P.inkMuted}
-            style={{ fontFamily: 'ui-monospace, Menlo, monospace', letterSpacing: '0.06em' }}
+            style={{ fontFamily: 'var(--font-mono-athletic)', letterSpacing: '0.06em' }}
           >
             {d.label}
           </text>

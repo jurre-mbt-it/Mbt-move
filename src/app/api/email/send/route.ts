@@ -111,13 +111,13 @@ export async function POST(req: NextRequest) {
   // Brand-kleuren — exact dezelfde palette als de rest van de app + de
   // bestaande inviteMail (zie src/server/mail.ts).
   const BRAND = {
-    bg: '#0A0E0F',
-    surface: '#141A1B',
-    surfaceHi: '#1C2425',
-    ink: '#F5F7F6',
-    inkMuted: '#7B8889',
-    lime: '#e87a55',
-    line: 'rgba(255,255,255,0.12)',
+    bg: '#0E2729',
+    surface: '#15363A',
+    surfaceHi: '#1C4448',
+    ink: '#F5F2ED',
+    inkMuted: '#9EB5B3',
+    lime: '#E87A55',
+    line: 'rgba(212,232,230,0.20)',
   }
 
   const accessCodeBlock = safeCode

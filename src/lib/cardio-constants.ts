@@ -49,14 +49,14 @@ export const CARDIO_PROTOCOLS: Record<CardioProtocolKey, {
   hasIntervals: boolean
   color: string
 }> = {
-  STEADY_STATE:       { label: 'Steady State',        description: 'Constante intensiteit gedurende de hele training', hasIntervals: false, color: '#3ECF6A' },
-  INTERVALS:          { label: 'Intervallen',          description: 'Afwisseling van hoge en lage intensiteit', hasIntervals: true,  color: '#f59e0b' },
-  TEMPO:              { label: 'Tempo',                description: 'Comfortabel hard tempo, net onder drempelwaarde', hasIntervals: false, color: '#6366f1' },
-  FARTLEK:            { label: 'Fartlek',              description: 'Vrije intervallen op gevoel, wisselend tempo', hasIntervals: false, color: '#ec4899' },
-  ZONE_TRAINING:      { label: 'Zontraining',          description: 'Training in een specifieke hartslagzone', hasIntervals: false, color: '#14b8a6' },
-  THRESHOLD:          { label: 'Drempeltraining',      description: 'Training op of net onder de anaerobe drempel', hasIntervals: false, color: '#ef4444' },
-  LONG_SLOW_DISTANCE: { label: 'Lange Duurloop (LSD)', description: 'Lage intensiteit, lange duur — opbouw aerobe basis', hasIntervals: false, color: '#84cc16' },
-  WALK_RUN:           { label: 'Walk-Run',             description: 'Afwisseling lopen en wandelen — return-to-running', hasIntervals: true,  color: '#0ea5e9' },
+  STEADY_STATE:       { label: 'Steady State',        description: 'Constante intensiteit gedurende de hele training', hasIntervals: false, color: '#5FD08A' },
+  INTERVALS:          { label: 'Intervallen',          description: 'Afwisseling van hoge en lage intensiteit', hasIntervals: true,  color: '#F5B942' },
+  TEMPO:              { label: 'Tempo',                description: 'Comfortabel hard tempo, net onder drempelwaarde', hasIntervals: false, color: '#7FB0D8' },
+  FARTLEK:            { label: 'Fartlek',              description: 'Vrije intervallen op gevoel, wisselend tempo', hasIntervals: false, color: '#D9C08A' },
+  ZONE_TRAINING:      { label: 'Zontraining',          description: 'Training in een specifieke hartslagzone', hasIntervals: false, color: '#45A8A2' },
+  THRESHOLD:          { label: 'Drempeltraining',      description: 'Training op of net onder de anaerobe drempel', hasIntervals: false, color: '#F0796C' },
+  LONG_SLOW_DISTANCE: { label: 'Lange Duurloop (LSD)', description: 'Lage intensiteit, lange duur — opbouw aerobe basis', hasIntervals: false, color: '#9FCEC9' },
+  WALK_RUN:           { label: 'Walk-Run',             description: 'Afwisseling lopen en wandelen — return-to-running', hasIntervals: true,  color: '#E87A55' },
 }
 
 // ── Hartslagzones ─────────────────────────────────────────────────────────────
@@ -72,11 +72,11 @@ export const HR_ZONES: Record<HRZone, {
   bg: string
   rpeFeel: string
 }> = {
-  1: { label: 'Zone 1 — Herstel',         description: 'Actief herstel, zeer lage intensiteit',  minPct: 50, maxPct: 60, color: '#3b82f6', bg: '#dbeafe', rpeFeel: 'RPE 1-2 — Zeer licht' },
-  2: { label: 'Zone 2 — Aerobe basis',    description: 'Vetverbranding, aerobe opbouw',          minPct: 60, maxPct: 70, color: '#22c55e', bg: '#dcfce7', rpeFeel: 'RPE 3-4 — Licht' },
-  3: { label: 'Zone 3 — Tempo',           description: 'Comfortabel intensief, aerobe drempel',  minPct: 70, maxPct: 80, color: '#eab308', bg: '#fef9c3', rpeFeel: 'RPE 5-6 — Matig' },
-  4: { label: 'Zone 4 — Drempel',         description: 'Anaerobe drempel, hoog intensief',       minPct: 80, maxPct: 90, color: '#f97316', bg: '#ffedd5', rpeFeel: 'RPE 7-8 — Hard' },
-  5: { label: 'Zone 5 — VO2max',          description: 'Maximale inspanning, korte duur',        minPct: 90, maxPct: 100, color: '#ef4444', bg: '#fee2e2', rpeFeel: 'RPE 9-10 — Maximaal' },
+  1: { label: 'Zone 1 — Herstel',         description: 'Actief herstel, zeer lage intensiteit',  minPct: 50, maxPct: 60, color: '#9FCEC9', bg: 'rgba(159,206,201,0.12)', rpeFeel: 'RPE 1-2 — Zeer licht' },
+  2: { label: 'Zone 2 — Aerobe basis',    description: 'Vetverbranding, aerobe opbouw',          minPct: 60, maxPct: 70, color: '#5FD08A', bg: 'rgba(95,208,138,0.12)',  rpeFeel: 'RPE 3-4 — Licht' },
+  3: { label: 'Zone 3 — Tempo',           description: 'Comfortabel intensief, aerobe drempel',  minPct: 70, maxPct: 80, color: '#F5B942', bg: 'rgba(245,185,66,0.12)',  rpeFeel: 'RPE 5-6 — Matig' },
+  4: { label: 'Zone 4 — Drempel',         description: 'Anaerobe drempel, hoog intensief',       minPct: 80, maxPct: 90, color: '#EE8447', bg: 'rgba(238,132,71,0.12)',  rpeFeel: 'RPE 7-8 — Hard' },
+  5: { label: 'Zone 5 — VO2max',          description: 'Maximale inspanning, korte duur',        minPct: 90, maxPct: 100, color: '#F0796C', bg: 'rgba(240,121,108,0.12)', rpeFeel: 'RPE 9-10 — Maximaal' },
 }
 
 /** Bereken maximale hartslag (220 - leeftijd) */

@@ -163,7 +163,7 @@ export function LoginForm() {
                   letterSpacing: '0.4em',
                   fontWeight: 900,
                   height: 64,
-                  fontFamily: 'ui-monospace, Menlo, monospace',
+                  fontFamily: 'var(--font-mono-athletic)',
                 }}
               />
             </label>
@@ -172,7 +172,7 @@ export function LoginForm() {
               <div
                 className="rounded-xl px-4 py-3 text-sm"
                 style={{
-                  background: 'rgba(248,113,113,0.08)',
+                  background: 'rgba(240,121,108,0.08)',
                   color: P.danger,
                   border: `1px solid ${P.danger}`,
                 }}
@@ -231,7 +231,7 @@ export function LoginForm() {
               <div
                 className="rounded-xl px-4 py-3 text-sm"
                 style={{
-                  background: 'rgba(248,113,113,0.08)',
+                  background: 'rgba(240,121,108,0.08)',
                   color: P.danger,
                   border: `1px solid ${P.danger}`,
                 }}

@@ -15,32 +15,12 @@ import * as TabsPrimitive from '@radix-ui/react-tabs'
 import * as SelectPrimitive from '@radix-ui/react-select'
 import { Check, ChevronDown, Search, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { P, DARK_CHART_COLORS } from '@/lib/palette'
 
-// Palette constants — synchroon met globals.css `:root --p-*` en `constants/theme.ts` in mbt-gym
-export const P = {
-  bg: '#0A0E0F',
-  surface: '#141A1B',
-  surfaceHi: '#1C2425',
-  surfaceLow: '#0F1415',
-  line: 'rgba(255,255,255,0.06)',
-  lineStrong: 'rgba(255,255,255,0.12)',
-  ink: '#F5F7F6',
-  inkMuted: '#7B8889',
-  inkDim: '#4A5454',
-  lime: '#BEF264',
-  limeDark: '#65A30D',
-  limeMid: '#D4EC6C',
-  limeDeep: '#84CC16',
-  brand: '#e87a55',
-  brandDeep: '#c9613f',
-  danger: '#F87171',
-  dangerDark: '#991B1B',
-  gold: '#F4C261',
-  goldWarm: '#F39644',
-  orange: '#F97316',
-  ice: '#93C5FD',
-  purple: '#C084FC',
-} as const
+// Het palet leeft in `@/lib/palette` (plain module) en wordt hier alleen
+// doorgegeven, zodat bestaande imports uit `@/components/dark-ui` blijven
+// werken. Servercomponenten importeren rechtstreeks uit `@/lib/palette`.
+export { P, DATA_COLORS, CATEGORY_COLORS, DARK_CHART_COLORS } from '@/lib/palette'
 
 // ─── Screen wrapper ──────────────────────────────────────────────────────────
 
@@ -257,7 +237,7 @@ export function Tile({
         <span
           aria-hidden
           className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100"
-          style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
+          style={{ backgroundColor: 'rgba(212,232,230,0.06)' }}
         />
       )}
     </Wrapper>
@@ -620,22 +600,18 @@ export function PulsingDot({
   )
 }
 
-// ─── Recovery bar (gesegmenteerd, rood→amber→lime) ──────────────────────────
+// ─── Recovery bar (gesegmenteerd, koraal→goud→groen) ────────────────────────
 
+// Vier toestanden in plaats van een vloeiend verloop: tussen goud en groen
+// mengen levert een olijfkleur op die niet in het palet zit. Dezelfde grenzen
+// als `getMuscleFatigueColor` in lib/muscle-fatigue, zodat een balk en een
+// spierstatus bij hetzelfde percentage dezelfde kleur tonen.
 function interpolateRecoveryColor(pct: number): string {
   const clamped = Math.max(0, Math.min(100, pct))
-  if (clamped <= 50) {
-    const t = clamped / 50
-    const r = Math.round(248 + (244 - 248) * t)
-    const g = Math.round(113 + (194 - 113) * t)
-    const b = Math.round(113 + (97 - 113) * t)
-    return `rgb(${r},${g},${b})`
-  }
-  const t = (clamped - 50) / 50
-  const r = Math.round(244 + (190 - 244) * t)
-  const g = Math.round(194 + (242 - 194) * t)
-  const b = Math.round(97 + (100 - 97) * t)
-  return `rgb(${r},${g},${b})`
+  if (clamped >= 80) return P.lime
+  if (clamped >= 55) return P.gold
+  if (clamped >= 30) return P.brand
+  return P.danger
 }
 
 export function RecoveryBar({
@@ -804,20 +780,6 @@ export const DarkSelect = React.forwardRef<
 })
 
 // ─── Category kleuren (gekoppeld aan oefening-type, HR-zones, etc.) ────────
-
-export const CATEGORY_COLORS = {
-  STRENGTH: P.lime,
-  MOBILITY: P.ice,
-  PLYO: P.gold,
-  CARDIO: P.danger,
-  STABILITY: P.purple,
-  // HR zones
-  Z1: P.ice,
-  Z2: P.lime,
-  Z3: P.gold,
-  Z4: P.orange,
-  Z5: P.danger,
-} as const
 
 // ─── Dialog (radix-based, dark-themed) ──────────────────────────────────────
 
@@ -1093,21 +1055,6 @@ export const DarkTabsContent = React.forwardRef<
 
 // ─── Chart helpers (recharts-agnostic theming) ──────────────────────────────
 
-export const DARK_CHART_COLORS = {
-  primary: P.lime,
-  secondary: P.ice,
-  warning: P.gold,
-  danger: P.danger,
-  accent: P.purple,
-  grid: P.line,
-  gridStrong: P.lineStrong,
-  axis: P.inkDim,
-  label: P.inkMuted,
-  tooltipBg: P.surfaceHi,
-  tooltipBorder: P.lineStrong,
-  tooltipText: P.ink,
-} as const
-
 /**
  * Tokens die je kunt doorgeven aan recharts primitives.
  * Gebruik: `<CartesianGrid {...DARK_CHART_STYLES.grid} />` of los per prop.
@@ -1292,7 +1239,7 @@ export function DarkMenuSelect({
       <SelectPrimitive.Trigger
         aria-label={ariaLabel}
         className={cn(
-          'mbt-btn-hover inline-flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm outline-none transition-colors focus:ring-2 focus:ring-[#e87a55]/40 disabled:opacity-50 disabled:pointer-events-none data-[placeholder]:text-[#7B8889]',
+          'mbt-btn-hover inline-flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm outline-none transition-colors focus:ring-2 focus:ring-[var(--p-brand)]/40 disabled:opacity-50 disabled:pointer-events-none data-[placeholder]:text-[var(--p-ink-muted)]',
           className,
         )}
         style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
@@ -1481,12 +1428,12 @@ function DarkSearchSelect({
         onClick={() => setOpen((o) => !o)}
         onKeyDown={onTriggerKeyDown}
         className={cn(
-          'mbt-btn-hover inline-flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm outline-none transition-colors focus:ring-2 focus:ring-[#e87a55]/40 disabled:opacity-50 disabled:pointer-events-none',
+          'mbt-btn-hover inline-flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm outline-none transition-colors focus:ring-2 focus:ring-[var(--p-brand)]/40 disabled:opacity-50 disabled:pointer-events-none',
           className,
         )}
         style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
       >
-        <span className={cn('truncate', !selected && 'text-[#7B8889]')}>
+        <span className={cn('truncate', !selected && 'text-[var(--p-ink-muted)]')}>
           {selected ? selected.label : placeholder}
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
@@ -1521,7 +1468,7 @@ function DarkSearchSelect({
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onInputKeyDown}
               placeholder={searchPlaceholder}
-              className="w-full bg-transparent text-sm outline-none placeholder:text-[#7B8889]"
+              className="w-full bg-transparent text-sm outline-none placeholder:text-[var(--p-ink-muted)]"
               style={{ color: P.ink }}
             />
             {query && (

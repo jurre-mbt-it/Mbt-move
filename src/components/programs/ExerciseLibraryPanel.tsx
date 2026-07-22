@@ -13,11 +13,11 @@ import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
 
 const CATEGORY_COLORS: Record<string, string> = {
-  STRENGTH:    '#BEF264',
-  MOBILITY:    '#60a5fa',
-  PLYOMETRICS: '#f59e0b',
-  CARDIO:      '#f87171',
-  STABILITY:   '#a78bfa',
+  STRENGTH:    '#5FD08A',
+  MOBILITY:    '#7FB0D8',
+  PLYOMETRICS: '#F5B942',
+  CARDIO:      '#F0796C',
+  STABILITY:   '#45A8A2',
 }
 
 interface LibraryExercise {
@@ -51,7 +51,7 @@ function DraggableLibraryItem({
   })
 
   const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined
-  const color = CATEGORY_COLORS[exercise.category] ?? '#e87a55'
+  const color = CATEGORY_COLORS[exercise.category] ?? '#E87A55'
 
   return (
     <div
@@ -60,11 +60,11 @@ function DraggableLibraryItem({
       {...attributes}
       {...listeners}
       className={cn(
-        'group flex items-center gap-2 px-2 py-2 rounded-lg border bg-[#141A1B] transition-all text-sm touch-none',
-        isDragging ? 'opacity-40 shadow-lg cursor-grabbing' : 'hover:border-[rgba(255,255,255,0.16)] hover:bg-[#1C2425] cursor-grab'
+        'group flex items-center gap-2 px-2 py-2 rounded-lg border bg-[#15363A] transition-all text-sm touch-none',
+        isDragging ? 'opacity-40 shadow-lg cursor-grabbing' : 'hover:border-[rgba(212,232,230,0.16)] hover:bg-[#1C4448] cursor-grab'
       )}
     >
-      <GripVertical className="w-3.5 h-3.5 text-zinc-300 shrink-0" />
+      <GripVertical className="w-3.5 h-3.5 text-[#9EB5B3] shrink-0" />
 
       <div
         className="w-2 h-2 rounded-full shrink-0"
@@ -78,8 +78,8 @@ function DraggableLibraryItem({
         aria-label={`Voeg ${exercise.name} toe aan programma`}
         onPointerDown={e => e.stopPropagation()}
         onClick={() => onAdd(exercise)}
-        className="w-6 h-6 rounded-full flex items-center justify-center transition-colors shrink-0 hover:bg-[#e87a55] hover:text-[#0A0E0F]"
-        style={{ background: 'rgba(232,122,85,0.12)', color: '#e87a55', border: '1px solid rgba(232,122,85,0.30)' }}
+        className="w-6 h-6 rounded-full flex items-center justify-center transition-colors shrink-0 hover:bg-[#E87A55] hover:text-[#0E2729]"
+        style={{ background: 'rgba(232,122,85,0.12)', color: '#E87A55', border: '1px solid rgba(232,122,85,0.30)' }}
       >
         <Plus className="w-3.5 h-3.5" />
       </button>
@@ -102,9 +102,9 @@ function ResourceLibraryItem({
   resource: LibraryResource
   onAdd: (r: LibraryResource) => void
 }) {
-  const color = resource.format === 'PDF' ? '#60a5fa' : '#e87a55'
+  const color = resource.format === 'PDF' ? '#7FB0D8' : '#E87A55'
   return (
-    <div className="group flex items-center gap-2 px-2 py-2 rounded-lg border bg-[#141A1B] text-sm hover:border-[rgba(255,255,255,0.16)] hover:bg-[#1C2425]">
+    <div className="group flex items-center gap-2 px-2 py-2 rounded-lg border bg-[#15363A] text-sm hover:border-[rgba(212,232,230,0.16)] hover:bg-[#1C4448]">
       <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
       <span className="flex-1 truncate font-medium text-xs">{resource.title}</span>
       <span className="text-[9px] font-bold tracking-wider shrink-0" style={{ color }}>
@@ -114,8 +114,8 @@ function ResourceLibraryItem({
         type="button"
         aria-label={`Voeg ${resource.title} toe aan programma`}
         onClick={() => onAdd(resource)}
-        className="w-6 h-6 rounded-full flex items-center justify-center transition-colors shrink-0 hover:bg-[#e87a55] hover:text-[#0A0E0F]"
-        style={{ background: 'rgba(232,122,85,0.12)', color: '#e87a55', border: '1px solid rgba(232,122,85,0.30)' }}
+        className="w-6 h-6 rounded-full flex items-center justify-center transition-colors shrink-0 hover:bg-[#E87A55] hover:text-[#0E2729]"
+        style={{ background: 'rgba(232,122,85,0.12)', color: '#E87A55', border: '1px solid rgba(232,122,85,0.30)' }}
       >
         <Plus className="w-3.5 h-3.5" />
       </button>
@@ -175,10 +175,10 @@ export function ExerciseLibraryPanel({ onAdd, exercises: propExercises, onAddRes
               className={cn(
                 'flex-1 px-2 py-1.5 rounded-lg text-xs font-bold transition-colors border',
                 tab === key
-                  ? 'text-[#0A0E0F] border-transparent'
-                  : 'border-[rgba(255,255,255,0.12)] text-muted-foreground hover:border-[rgba(255,255,255,0.2)] bg-[#141A1B]',
+                  ? 'text-[#0E2729] border-transparent'
+                  : 'border-[rgba(212,232,230,0.12)] text-muted-foreground hover:border-[rgba(212,232,230,0.2)] bg-[#15363A]',
               )}
-              style={tab === key ? { background: '#e87a55' } : {}}
+              style={tab === key ? { background: '#E87A55' } : {}}
             >
               {label}
             </button>
@@ -249,8 +249,8 @@ export function ExerciseLibraryPanel({ onAdd, exercises: propExercises, onAddRes
               className={cn(
                 'px-1.5 py-0.5 rounded text-xs font-medium transition-colors border',
                 category === c.value
-                  ? 'text-white border-transparent'
-                  : 'border-[rgba(255,255,255,0.12)] text-muted-foreground hover:border-[rgba(255,255,255,0.2)] bg-[#141A1B]'
+                  ? 'text-[#0E2729] border-transparent'
+                  : 'border-[rgba(212,232,230,0.12)] text-muted-foreground hover:border-[rgba(212,232,230,0.2)] bg-[#15363A]'
               )}
               style={category === c.value ? { background: CATEGORY_COLORS[c.value] } : {}}
             >
@@ -271,13 +271,13 @@ export function ExerciseLibraryPanel({ onAdd, exercises: propExercises, onAddRes
 
         {/* Quick-add: wanneer er niks matcht en er is een zoekterm */}
         {query.trim().length >= 2 && filtered.length === 0 && (
-          <div className="mt-2 p-2 rounded border border-dashed" style={{ borderColor: '#e87a55' }}>
+          <div className="mt-2 p-2 rounded border border-dashed" style={{ borderColor: '#E87A55' }}>
             {!quickAddCategory ? (
               <button
                 type="button"
                 onClick={() => setQuickAddCategory('STRENGTH')}
-                className="w-full text-xs text-left px-2 py-1.5 rounded hover:bg-white/5"
-                style={{ color: '#e87a55', fontWeight: 700 }}
+                className="w-full text-xs text-left px-2 py-1.5 rounded hover:bg-[rgba(212,232,230,0.06)]"
+                style={{ color: '#E87A55', fontWeight: 700 }}
               >
                 + Voeg &ldquo;{query.trim()}&rdquo; toe als nieuwe oefening
               </button>
@@ -291,7 +291,7 @@ export function ExerciseLibraryPanel({ onAdd, exercises: propExercises, onAddRes
                       onClick={() => setQuickAddCategory(c.value)}
                       className={cn(
                         'px-1.5 py-0.5 rounded text-xs font-medium border',
-                        quickAddCategory === c.value ? 'text-white border-transparent' : 'border-[rgba(255,255,255,0.12)] text-muted-foreground',
+                        quickAddCategory === c.value ? 'text-[#0E2729] border-transparent' : 'border-[rgba(212,232,230,0.12)] text-muted-foreground',
                       )}
                       style={quickAddCategory === c.value ? { background: CATEGORY_COLORS[c.value] } : {}}
                     >
@@ -339,7 +339,7 @@ export function ExerciseLibraryPanel({ onAdd, exercises: propExercises, onAddRes
                       }
                     }}
                     className="px-2 py-1 rounded text-xs font-bold"
-                    style={{ background: '#e87a55', color: '#0A0E0F' }}
+                    style={{ background: '#E87A55', color: '#0E2729' }}
                   >
                     TOEVOEGEN
                   </button>

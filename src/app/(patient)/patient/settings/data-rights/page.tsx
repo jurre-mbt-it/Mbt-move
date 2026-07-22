@@ -181,7 +181,7 @@ export default function DataRightsPage() {
         </Tile>
 
         {/* Toegangslogboek tile — Wabvpz art. 15j */}
-        <Tile accentBar={P.purple}>
+        <Tile accentBar={P.teal}>
           <Kicker>INZAGE · WABVPZ 15J</Kicker>
           <h2
             style={{

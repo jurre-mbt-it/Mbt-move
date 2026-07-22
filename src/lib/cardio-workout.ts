@@ -109,7 +109,7 @@ export function targetColor(t: StepTarget): string {
     const z = (Math.min(5, Math.max(1, Math.round(t.min / 2))) || 1) as HRZone
     return HR_ZONES[z].color
   }
-  return '#7B8889'
+  return '#9EB5B3'
 }
 
 /** Relatieve hoogte 0..1 voor de grafiek. */

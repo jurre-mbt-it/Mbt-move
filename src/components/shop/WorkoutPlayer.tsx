@@ -71,7 +71,7 @@ export function WorkoutPlayer({ slug }: { slug: string }) {
     <Shell>
       <Link
         href="/mijn-programmas"
-        className="text-sm transition-colors hover:text-white"
+        className="text-sm transition-colors hover:text-[#F5F2ED]"
         style={{ color: P.inkMuted }}
       >
         ← Mijn programma&apos;s
@@ -196,7 +196,7 @@ export function WorkoutPlayer({ slug }: { slug: string }) {
                       <div className="px-3 pb-3">
                         <div
                           className="relative w-full overflow-hidden rounded-lg"
-                          style={{ aspectRatio: '16 / 9', background: '#000' }}
+                          style={{ aspectRatio: '16 / 9', background: P.surfaceLow }}
                         >
                           <iframe
                             src={youtubeEmbed(yid)}

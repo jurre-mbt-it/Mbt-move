@@ -75,12 +75,12 @@ export async function sendMail(msg: MailMessage): Promise<MailResult> {
 // ─── Branded templates ──────────────────────────────────────────────────────
 
 const MBT_BRAND = {
-  bg: '#0A0E0F',
-  surface: '#141A1B',
-  ink: '#F5F7F6',
-  inkMuted: '#7B8889',
-  lime: '#e87a55',
-  line: 'rgba(255,255,255,0.12)',
+  bg: '#0E2729',
+  surface: '#15363A',
+  ink: '#F5F2ED',
+  inkMuted: '#9EB5B3',
+  lime: '#E87A55',
+  line: 'rgba(212,232,230,0.20)',
 }
 
 function layout(innerHtml: string): string {

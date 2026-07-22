@@ -284,7 +284,7 @@ export default function PatientDashboard() {
               href={`/patient/program/${p.id}`}
               label={p.name}
               sub={`Week ${p.currentWeek}/${p.weeks} · ${p.daysPerWeek}×/week`}
-              bar={P.purple}
+              bar={P.teal}
             />
           ))
         ) : activeProgram?.id ? (
@@ -292,7 +292,7 @@ export default function PatientDashboard() {
             href={`/patient/program/${activeProgram.id}`}
             label="Mijn programma"
             sub={`${activeProgram.name ?? ''} · alle weken bekijken`}
-            bar={P.purple}
+            bar={P.teal}
           />
         ) : null}
 

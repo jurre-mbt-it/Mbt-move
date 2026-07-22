@@ -48,15 +48,17 @@ export const MUSCLE_REGIONS = [
 
 export type MuscleRegion = (typeof MUSCLE_REGIONS)[number]
 
+// Gelijk aan `--p-data-*` in globals.css. Deze waarden komen in de database
+// terecht (kleur van een collectie), dus het blijven kale hexcodes.
 export const COLLECTION_COLORS = [
-  '#4ECDC4', // MBT groen
-  '#60a5fa', // blauw
-  '#f59e0b', // amber
-  '#a78bfa', // paars
-  '#f87171', // rood
-  '#34d399', // emerald
-  '#fb923c', // oranje
-  '#e879f9', // fuchsia
+  '#9FCEC9', // mint
+  '#5FD08A', // groen
+  '#F5B942', // goud
+  '#E87A55', // brand-oranje
+  '#F0796C', // koraal
+  '#7FB0D8', // staalblauw
+  '#45A8A2', // diep turquoise
+  '#D9C08A', // zand
 ] as const
 
 // MOCK_EXERCISES verwijderd — alle oefeningen komen nu uit de database via tRPC

@@ -22,8 +22,8 @@ const P = {
   brandDeep: '#C9613F',
   gold: '#F5B942',            // goud / amber
   ice: '#9FCEC9',             // mint — vervangt het koude blauw
-  danger: '#F87171',
-  purple: '#9FCEC9',          // (legacy sleutel) → mint; app kent geen paars
+  danger: '#F0796C',
+  teal: '#45A8A2',          // (legacy sleutel) → mint; app kent geen paars
 }
 
 // Merk-fonts, gematcht op de iOS-app: JetBrains Mono voor labels/meters,
@@ -108,7 +108,7 @@ export default function GymLandingPage() {
         .mbt-hero-word[data-accent="lime"]:hover { color: ${P.brand}; }
         .mbt-hero-word[data-accent="ice"]:hover { color: ${P.ice}; }
         .mbt-hero-word[data-accent="gold"]:hover { color: ${P.gold}; }
-        .mbt-hero-word[data-accent="purple"]:hover { color: ${P.purple}; }
+        .mbt-hero-word[data-accent="purple"]:hover { color: ${P.teal}; }
 
         /* Nav link underline sweep */
         .mbt-nav-link { position: relative; transition: color 180ms ease; }
@@ -319,7 +319,7 @@ function PrimaryCTA({
       className="mbt-cta"
       style={{
         background: P.brand,
-        color: '#0A0E0F',
+        color: '#0E2729',
         padding: '16px 24px',
         borderRadius: 12,
         fontFamily: mono,
@@ -1002,7 +1002,7 @@ function MockWorkoutScreen() {
       <div
         style={{
           background: P.brand,
-          color: '#0A0E0F',
+          color: '#0E2729',
           borderRadius: 14,
           padding: '14px 16px',
           textAlign: 'center',
@@ -1311,7 +1311,7 @@ function WeekChangeMeter() {
           inset: '18px 0',
           borderRadius: 999,
           background:
-            'linear-gradient(90deg, #F87171 0%, #F5B942 25%, #E87A55 40%, #E87A55 65%, #F5B942 80%, #F87171 100%)',
+            'linear-gradient(90deg, #F0796C 0%, #F5B942 25%, #E87A55 40%, #E87A55 65%, #F5B942 80%, #F0796C 100%)',
           opacity: 0.9,
         }}
       />
@@ -1424,7 +1424,7 @@ function ForWhoSection() {
   return (
     <section style={{ borderTop: `1px solid ${P.line}` }}>
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '96px 24px' }}>
-        <Kicker color={P.purple}>VOOR WIE</Kicker>
+        <Kicker color={P.teal}>VOOR WIE</Kicker>
         <h2
           style={{
             fontSize: 'clamp(40px, 6vw, 72px)',

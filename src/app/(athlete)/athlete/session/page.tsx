@@ -89,7 +89,7 @@ const CATEGORY_LABELS_NL: Record<string, string> = {
 }
 
 const mono =
-  'ui-monospace, Menlo, "SF Mono", "Cascadia Code", "Source Code Pro", monospace'
+  'var(--font-mono-athletic)'
 
 type SessionState = 'ready' | 'active' | 'done'
 
@@ -851,7 +851,7 @@ function AthleteSessionPageInner() {
                       <div
                         className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
                         style={{
-                          background: P.surfaceHi,
+                          background: P.surfaceLow,
                           border: `1px solid ${P.line}`,
                           color: P.brand,
                           fontFamily: mono,
@@ -1355,7 +1355,7 @@ function AthleteSessionPageInner() {
               {prescLabel && (
                 <span
                   className="athletic-mono rounded-full"
-                  style={{ padding: '4px 10px', border: `1px solid ${P.brand}55`, color: P.brand, fontSize: 9, letterSpacing: '0.14em', fontWeight: 800 }}
+                  style={{ padding: '4px 10px', border: `1px solid color-mix(in srgb, ${P.brand} 33%, transparent)`, color: P.brand, fontSize: 9, letterSpacing: '0.14em', fontWeight: 800 }}
                 >
                   {prescLabel.toUpperCase()}{targetKgLabel ? ` · ${targetKgLabel.toUpperCase()}` : ''}
                 </span>
@@ -1382,7 +1382,7 @@ function AthleteSessionPageInner() {
               {current.videoUrl && (
                 <span
                   className="athletic-mono rounded-full inline-flex items-center gap-1"
-                  style={{ padding: '4px 10px', border: '1px solid rgba(147,197,253,0.35)', color: P.ice, fontSize: 9, letterSpacing: '0.14em', fontWeight: 700 }}
+                  style={{ padding: '4px 10px', border: '1px solid rgba(159,206,201,0.35)', color: P.ice, fontSize: 9, letterSpacing: '0.14em', fontWeight: 700 }}
                 >
                   <Play className="w-2.5 h-2.5" fill="currentColor" />
                   VIDEO
@@ -1644,7 +1644,7 @@ function VideoModal({
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="aspect-video bg-black">
+        <div className="aspect-video bg-[#081A1C]">
           <ReactPlayer
             src={url}
             width="100%"
@@ -1734,7 +1734,7 @@ function ExerciseRow({
       >
         <Heart
           className="w-4 h-4"
-          style={{ color: isFav ? '#f87171' : P.inkMuted, fill: isFav ? '#f87171' : 'transparent' }}
+          style={{ color: isFav ? '#F0796C' : P.inkMuted, fill: isFav ? '#F0796C' : 'transparent' }}
         />
       </button>
       {!alreadyAdded && <Plus className="w-4 h-4 shrink-0" style={{ color: P.inkMuted }} />}
@@ -1790,7 +1790,7 @@ function AddExerciseSheet({
               style={{
                 padding: '5px 11px',
                 border: `1px solid ${active ? P.brand : P.lineStrong}`,
-                background: active ? `${P.brand}1f` : 'transparent',
+                background: active ? `color-mix(in srgb, ${P.brand} 12%, transparent)` : 'transparent',
                 color: active ? P.brand : P.inkMuted,
                 fontSize: 9,
                 letterSpacing: '0.12em',
@@ -2034,7 +2034,7 @@ function QuickEditRow({
       <div className="flex items-center gap-3">
         <div
           className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: P.surfaceHi, border: `1px solid ${P.line}`, color: P.brand, fontFamily: mono, fontSize: 13, fontWeight: 900 }}
+          style={{ background: P.surfaceLow, border: `1px solid ${P.line}`, color: P.brand, fontFamily: mono, fontSize: 13, fontWeight: 900 }}
         >
           {index + 1}
         </div>
@@ -2282,7 +2282,7 @@ function QuickFinishModal({
               <span
                 aria-hidden
                 className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
-                style={{ background: 'rgba(244,194,97,0.12)', color: P.gold }}
+                style={{ background: 'rgba(245,185,66,0.12)', color: P.gold }}
               >
                 <IconLightning size={14} />
               </span>
@@ -2304,7 +2304,7 @@ function QuickFinishModal({
                     <span
                       aria-hidden
                       className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
-                      style={{ background: 'rgba(248,113,113,0.12)', color: P.danger }}
+                      style={{ background: 'rgba(240,121,108,0.12)', color: P.danger }}
                     >
                       <IconHeart size={14} />
                     </span>
@@ -2326,7 +2326,7 @@ function QuickFinishModal({
                 type="button"
                 onClick={onTogglePain}
                 className="athletic-mono athletic-tap w-full rounded-lg py-2.5 flex items-center justify-center gap-2"
-                style={{ background: P.surfaceHi, color: P.danger, border: `1px dashed ${P.danger}`, fontSize: 11, letterSpacing: '0.1em', fontWeight: 800 }}
+                style={{ background: P.surfaceLow, color: P.danger, border: `1px dashed ${P.danger}`, fontSize: 11, letterSpacing: '0.1em', fontWeight: 800 }}
               >
                 <IconHeart size={13} /> + PIJN TOEVOEGEN
               </button>

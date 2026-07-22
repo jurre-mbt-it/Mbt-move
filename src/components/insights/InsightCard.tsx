@@ -6,10 +6,10 @@ import { DarkButton, P, Tile } from '@/components/dark-ui'
 import { toast } from 'sonner'
 
 const URGENCY_CONFIG: Record<string, { bg: string; color: string; label: string; accent: string }> = {
-  CRITICAL: { bg: 'rgba(248,113,113,0.18)', color: P.danger, label: 'Kritiek', accent: P.danger },
-  HIGH: { bg: 'rgba(244,150,68,0.15)', color: P.orange, label: 'Hoog', accent: P.orange },
-  MEDIUM: { bg: 'rgba(244,194,97,0.14)', color: P.gold, label: 'Middel', accent: P.gold },
-  LOW: { bg: 'rgba(147,197,253,0.15)', color: P.ice, label: 'Laag', accent: P.ice },
+  CRITICAL: { bg: 'rgba(240,121,108,0.18)', color: P.danger, label: 'Kritiek', accent: P.danger },
+  HIGH: { bg: 'rgba(240,154,74,0.15)', color: P.orange, label: 'Hoog', accent: P.orange },
+  MEDIUM: { bg: 'rgba(245,185,66,0.14)', color: P.gold, label: 'Middel', accent: P.gold },
+  LOW: { bg: 'rgba(159,206,201,0.15)', color: P.ice, label: 'Laag', accent: P.ice },
 }
 
 const SIGNAL_LABEL: Record<string, string> = {

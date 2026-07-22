@@ -421,7 +421,7 @@ export function ProductWizard({
             >
               <span
                 className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl transition-colors"
-                style={{ background: P.surfaceHi, color: P.brand }}
+                style={{ background: P.surfaceLow, color: P.brand }}
               >
                 <Icon size={22} />
               </span>
@@ -466,7 +466,7 @@ export function ProductWizard({
         >
           <span
             className="mr-2 hidden sm:inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide shrink-0"
-            style={{ background: P.surfaceHi, color: P.brand }}
+            style={{ background: P.surfaceLow, color: P.brand }}
           >
             {KIND_LABELS[editor.kind]}
           </span>
@@ -905,7 +905,7 @@ export function ProductWizard({
               {!editor.heroImageUrl.trim() && (
                 <span
                   className="absolute bottom-3 left-4 text-[10px] font-bold uppercase tracking-[0.22em]"
-                  style={{ color: 'rgba(255,255,255,0.42)' }}
+                  style={{ color: 'rgba(212,232,230,0.42)' }}
                 >
                   MBT·Gym
                 </span>
@@ -962,7 +962,7 @@ export function ProductWizard({
               href={`/programma/${editor.slug}`}
               target="_blank"
               rel="noreferrer"
-              className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium transition-colors hover:text-white"
+              className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium transition-colors hover:text-[#F5F2ED]"
               style={{ color: P.inkMuted }}
             >
               <ExternalLink size={13} /> Open productpagina in nieuw tabblad

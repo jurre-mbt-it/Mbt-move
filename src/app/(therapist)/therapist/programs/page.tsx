@@ -33,10 +33,10 @@ const DAY_LABELS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const LIBRARY_CATEGORIES = ['Alle', 'Knie', 'Schouder', 'Rug', 'Heup', 'Enkel', 'Full Body', 'Revalidatie', 'Preventie']
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; label: string; accent: string }> = {
-  ACTIVE:    { bg: 'rgba(190,242,100,0.14)', text: P.lime,     label: 'Actief',       accent: P.lime },
-  DRAFT:     { bg: 'rgba(244,194,97,0.14)',  text: P.gold,     label: 'Concept',      accent: P.gold },
-  COMPLETED: { bg: 'rgba(255,255,255,0.06)', text: P.inkMuted, label: 'Afgerond',     accent: P.inkDim },
-  ARCHIVED:  { bg: 'rgba(255,255,255,0.06)', text: P.inkMuted, label: 'Gearchiveerd', accent: P.inkDim },
+  ACTIVE:    { bg: 'rgba(95,208,138,0.14)', text: P.lime,     label: 'Actief',       accent: P.lime },
+  DRAFT:     { bg: 'rgba(245,185,66,0.14)',  text: P.gold,     label: 'Concept',      accent: P.gold },
+  COMPLETED: { bg: 'rgba(212,232,230,0.06)', text: P.inkMuted, label: 'Afgerond',     accent: P.inkDim },
+  ARCHIVED:  { bg: 'rgba(212,232,230,0.06)', text: P.inkMuted, label: 'Gearchiveerd', accent: P.inkDim },
 }
 
 type Program = {
@@ -301,7 +301,7 @@ function ActiveProgramsPanel() {
           disabled={cleanupMutation.isPending}
           className="w-full flex items-center gap-3 rounded-xl text-left athletic-tap"
           style={{
-            background: 'rgba(244,194,97,0.08)',
+            background: 'rgba(245,185,66,0.08)',
             border: `1px solid ${P.gold}`,
             padding: '12px 14px',
             opacity: cleanupMutation.isPending ? 0.6 : 1,
@@ -372,7 +372,7 @@ function ActiveProgramsPanel() {
                 id="asTemplate"
                 checked={duplicateAsTemplate}
                 onChange={e => setDuplicateAsTemplate(e.target.checked)}
-                className="accent-[#e87a55]"
+                className="accent-[#E87A55]"
               />
               <label htmlFor="asTemplate" style={{ color: P.ink, fontSize: 13 }}>
                 Opslaan als template
@@ -493,7 +493,7 @@ function ProgramCard({
             onClick={onDelete}
             title="Verwijderen"
             className="athletic-tap w-8 h-8 rounded-lg flex items-center justify-center"
-            style={{ background: P.surfaceHi, color: P.danger, fontSize: 14 }}
+            style={{ background: P.surfaceLow, color: P.danger, fontSize: 14 }}
           >
             ✕
           </button>

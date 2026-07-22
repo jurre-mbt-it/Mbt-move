@@ -29,31 +29,31 @@ export const PHASE_META: Record<PhaseType, PhaseMeta> = {
   ACCUMULATION: {
     label: 'Opbouw',
     short: 'Opbouw',
-    color: '#86EFAC', // groen — volume opbouwen
+    color: '#5FD08A', // groen — volume opbouwen
     description: 'Volume opbouwen, matige intensiteit',
   },
   INTENSIFICATION: {
     label: 'Intensivering',
     short: 'Intens.',
-    color: '#F4C261', // amber — intensiteit omhoog
+    color: '#F5B942', // goud — intensiteit omhoog
     description: 'Intensiteit omhoog, volume omlaag',
   },
   REALIZATION: {
     label: 'Realisatie',
     short: 'Piek',
-    color: '#e87a55', // brand — pieken/testen
+    color: '#E87A55', // brand — pieken/testen
     description: 'Pieken, testen, wedstrijdvorm',
   },
   DELOAD: {
     label: 'Deload',
     short: 'Deload',
-    color: '#60a5fa', // blauw — herstel
+    color: '#7FB0D8', // staalblauw — herstel
     description: 'Herstelweek, minder volume en intensiteit',
   },
   TAPER: {
     label: 'Taper',
     short: 'Taper',
-    color: '#a78bfa', // paars — afbouwen richting piek
+    color: '#45A8A2', // turquoise — afbouwen richting piek
     description: 'Afbouwen richting een piekmoment',
   },
 }

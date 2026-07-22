@@ -13,7 +13,7 @@ export default function AthleteNewExercisePage() {
           className="inline-flex items-center gap-1"
           style={{
             fontFamily:
-              'ui-monospace, Menlo, "SF Mono", "Cascadia Code", monospace',
+              'var(--font-mono-athletic)',
             fontSize: 11,
             letterSpacing: '0.16em',
             fontWeight: 800,

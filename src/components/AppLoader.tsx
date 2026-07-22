@@ -6,11 +6,11 @@
  * de (webview-)app.
  */
 
-const BG = '#0A0E0F'
-const SURFACE_LOW = '#0F1415'
-const INK_MUTED = '#7B8889'
-const BRAND = '#e87a55'
-const LIME = '#BEF264'
+const BG = '#0E2729'
+const SURFACE_LOW = '#081A1C'
+const INK_MUTED = '#9EB5B3'
+const BRAND = '#E87A55'
+const LIME = '#5FD08A'
 
 // Oplopende doelhoogtes (%) — leest als progressieve overbelasting: elke set
 // iets zwaarder dan de vorige.
@@ -31,7 +31,7 @@ export function AppLoader() {
         alignItems: 'center',
         justifyContent: 'center',
         gap: 28,
-        fontFamily: 'Satoshi, ui-sans-serif, system-ui, sans-serif',
+        fontFamily: "'Archivo', ui-sans-serif, system-ui, sans-serif",
       }}
     >
       <style>{`
@@ -79,7 +79,7 @@ export function AppLoader() {
             right: 0,
             bottom: 0,
             height: 1,
-            background: 'rgba(255,255,255,0.10)',
+            background: 'rgba(212,232,230,0.10)',
           }}
         />
         {BARS.map((h, i) => {
@@ -147,7 +147,7 @@ export function AppLoader() {
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
           <span
             style={{
-              color: '#F5F7F6',
+              color: '#F5F2ED',
               fontSize: 26,
               fontWeight: 900,
               letterSpacing: '-0.04em',
@@ -161,7 +161,7 @@ export function AppLoader() {
               fontSize: 15,
               fontWeight: 900,
               letterSpacing: '0.18em',
-              fontFamily: 'ui-monospace, Menlo, monospace',
+              fontFamily: "'Martian', ui-monospace, Menlo, monospace",
             }}
           >
             GYM
@@ -173,7 +173,7 @@ export function AppLoader() {
             fontSize: 10,
             fontWeight: 700,
             letterSpacing: '0.28em',
-            fontFamily: 'ui-monospace, Menlo, monospace',
+            fontFamily: "'Martian', ui-monospace, Menlo, monospace",
             background: SURFACE_LOW,
             padding: '3px 10px',
             borderRadius: 999,

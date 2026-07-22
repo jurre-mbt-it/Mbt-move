@@ -190,7 +190,7 @@ export default function PatientProgramPage() {
           {isFutureWeek && (
             <div
               className="flex items-center gap-2 p-3 rounded-xl"
-              style={{ background: 'rgba(244,194,97,0.10)', color: P.gold, border: `1px solid ${P.gold}33` }}
+              style={{ background: 'rgba(245,185,66,0.10)', color: P.gold, border: `1px solid color-mix(in srgb, ${P.gold} 20%, transparent)` }}
             >
               <Lock className="w-4 h-4 shrink-0" />
               <span style={{ fontSize: 13 }}>
@@ -243,7 +243,7 @@ export default function PatientProgramPage() {
                       style={{
                         color: P.lime,
                         background: 'rgba(232,122,85,0.10)',
-                        border: `1px solid ${P.lime}33`,
+                        border: `1px solid color-mix(in srgb, ${P.lime} 20%, transparent)`,
                         fontSize: 10,
                         fontWeight: 900,
                         letterSpacing: '0.12em',

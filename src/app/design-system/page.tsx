@@ -5,7 +5,6 @@
  */
 import {
   ActionTile,
-  CATEGORY_COLORS,
   DarkButton,
   DarkHeader,
   DarkInput,
@@ -16,12 +15,12 @@ import {
   Kicker,
   MetaLabel,
   MetricTile,
-  P,
   PulsingDot,
   RecoveryBar,
   Tile,
   WeekProgress,
 } from '@/components/dark-ui'
+import { P, DATA_COLORS, CATEGORY_COLORS } from '@/lib/palette'
 import { notFound } from 'next/navigation'
 import { WeeklyLoadChart } from '@/components/workload/WeeklyLoadChart'
 
@@ -55,7 +54,28 @@ export default function DesignSystemPage() {
                   className="athletic-mono text-[10px]"
                   style={{ color: P.inkDim, textTransform: 'none' }}
                 >
-                  {String(hex)}
+                  {hex}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Dataramp — categorieën die naast elkaar leesbaar moeten zijn */}
+        <section className="flex flex-col gap-3">
+          <Kicker>Dataramp</Kicker>
+          <div className="grid grid-cols-8 gap-2">
+            {DATA_COLORS.map((hex, i) => (
+              <div key={hex} className="flex flex-col gap-1">
+                <div
+                  className="h-10 rounded-lg"
+                  style={{ backgroundColor: hex, border: `1px solid ${P.line}` }}
+                />
+                <span
+                  className="athletic-mono text-[10px]"
+                  style={{ color: P.inkDim, textTransform: 'none' }}
+                >
+                  {i + 1}
                 </span>
               </div>
             ))}

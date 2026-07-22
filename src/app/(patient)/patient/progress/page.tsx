@@ -497,7 +497,7 @@ export default function ProgressPage() {
                   {/* morningStiffness — purple */}
                   <polyline
                     fill="none"
-                    stroke={P.purple}
+                    stroke={P.teal}
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -536,7 +536,7 @@ export default function ProgressPage() {
                   >
                     <span
                       className="w-2 h-2 rounded-full inline-block"
-                      style={{ backgroundColor: P.purple }}
+                      style={{ backgroundColor: P.teal }}
                     />
                     OCHTEND
                   </span>

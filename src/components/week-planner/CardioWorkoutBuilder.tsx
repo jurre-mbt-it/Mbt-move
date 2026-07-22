@@ -604,7 +604,7 @@ function StepEditor({
                   }}
                   className="px-2 py-0.5 rounded-md text-[10px] font-bold athletic-mono transition-colors"
                   style={{
-                    background: active ? `${P.brand}22` : 'transparent',
+                    background: active ? `color-mix(in srgb, ${P.brand} 13%, transparent)` : 'transparent',
                     border: `1px solid ${active ? P.brand : P.line}`,
                     color: active ? P.brand : P.inkMuted,
                   }}

@@ -17,7 +17,7 @@ export default async function CoachLayout({ children }: { children: React.ReactN
   return (
     <div
       className="athletic-dark flex h-screen overflow-hidden"
-      style={{ background: '#0A0E0F', color: '#F5F7F6' }}
+      style={{ background: '#0E2729', color: '#F5F2ED' }}
     >
       <div className="hidden md:flex">
         <TherapistSidebar variant="coach" />
@@ -27,7 +27,7 @@ export default async function CoachLayout({ children }: { children: React.ReactN
         <Header />
         <main
           className="flex-1 overflow-y-auto px-4 pt-4 pb-24 md:px-8 md:pt-6 md:pb-8"
-          style={{ background: '#0A0E0F' }}
+          style={{ background: '#0E2729' }}
         >
           <PageTransition>{children}</PageTransition>
         </main>

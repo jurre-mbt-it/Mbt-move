@@ -9,11 +9,11 @@ export const WORKOUT_TYPES = EXERCISE_CATEGORIES.map(cat => ({
     : cat.value === 'PLYOMETRICS' ? 'Explosieve kracht'
     : cat.value === 'CARDIO' ? 'Cardio & uithoudingsvermogen'
     : 'Stabiliteit & balans',
-  color: cat.value === 'STRENGTH' ? '#4ECDC4'
-    : cat.value === 'MOBILITY' ? '#60a5fa'
-    : cat.value === 'PLYOMETRICS' ? '#f97316'
-    : cat.value === 'CARDIO' ? '#ef4444'
-    : '#a78bfa',
+  color: cat.value === 'STRENGTH' ? '#9FCEC9'
+    : cat.value === 'MOBILITY' ? '#7FB0D8'
+    : cat.value === 'PLYOMETRICS' ? '#EE8447'
+    : cat.value === 'CARDIO' ? '#F0796C'
+    : '#45A8A2',
 }))
 
 export interface WorkoutSet {

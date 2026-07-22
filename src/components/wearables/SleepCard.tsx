@@ -12,7 +12,7 @@ import { sleepBand, sleepConsistency, type SleepStage } from '@/lib/sleep-metric
 
 const STAGE_COLOR: Record<Exclude<SleepStage, 'inBed'>, string> = {
   deep: P.lime,
-  rem: P.purple,
+  rem: P.teal,
   light: P.ice,
   awake: P.gold,
 }

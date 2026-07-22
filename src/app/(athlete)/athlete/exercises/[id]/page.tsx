@@ -15,7 +15,7 @@ import {
 } from '@/components/dark-ui'
 
 const mono =
-  'ui-monospace, Menlo, "SF Mono", "Cascadia Code", "Source Code Pro", monospace'
+  'var(--font-mono-athletic)'
 
 const CATEGORY_LABEL: Record<string, string> = {
   STRENGTH: 'KRACHT',
@@ -217,7 +217,7 @@ export default function AthleteExerciseDetailPage({ params }: Props) {
               <div
                 className="rounded-xl overflow-hidden"
                 style={{
-                  background: '#000',
+                  background: P.surfaceLow,
                   aspectRatio: '16 / 9',
                   border: `1px solid ${P.lineStrong}`,
                 }}

@@ -217,7 +217,7 @@ function RecentOrders() {
                 <button
                   onClick={() => send.mutate({ orderId: o.id })}
                   disabled={send.isPending}
-                  className="text-sm transition-colors hover:text-white disabled:opacity-50"
+                  className="text-sm transition-colors hover:text-[#F5F2ED] disabled:opacity-50"
                   style={{ color: P.inkMuted }}
                 >
                   E-mails versturen

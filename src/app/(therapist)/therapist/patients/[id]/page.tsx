@@ -39,9 +39,9 @@ import { CARDIO_ICON_MAP, IconMail, IconCalendar, IconClipboard } from '@/compon
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
   ACTIVE:    { label: 'Actief',       bg: 'rgba(232,122,85,0.14)', text: P.lime },
-  DRAFT:     { label: 'Concept',      bg: 'rgba(244,194,97,0.14)',  text: P.gold },
-  COMPLETED: { label: 'Afgerond',     bg: 'rgba(255,255,255,0.06)', text: P.inkMuted },
-  ARCHIVED:  { label: 'Gearchiveerd', bg: 'rgba(255,255,255,0.06)', text: P.inkMuted },
+  DRAFT:     { label: 'Concept',      bg: 'rgba(245,185,66,0.14)',  text: P.gold },
+  COMPLETED: { label: 'Afgerond',     bg: 'rgba(212,232,230,0.06)', text: P.inkMuted },
+  ARCHIVED:  { label: 'Gearchiveerd', bg: 'rgba(212,232,230,0.06)', text: P.inkMuted },
 }
 
 const STATUS_ACCENT: Record<string, string> = {
@@ -434,7 +434,7 @@ export default function PatientDetailPage({
           <MetricTile
             label="Programma duur"
             value={patient.weeksTotal ? `${patient.weeksTotal}w` : '—'}
-            tint={P.purple}
+            tint={P.teal}
           />
           <MetricTile
             label="Startdatum"
@@ -679,7 +679,7 @@ export default function PatientDetailPage({
                             <span className="athletic-mono" style={{ color: P.gold, fontSize: 10, letterSpacing: '0.06em' }}>RPE {c.rpe}</span>
                           )}
                           {c.painLevel != null && (
-                            <span className="athletic-mono" style={{ background: c.painLevel >= 6 ? 'rgba(248,113,113,0.15)' : 'rgba(232,122,85,0.14)', color: c.painLevel >= 6 ? P.danger : P.lime, fontSize: 10, padding: '2px 8px', borderRadius: 999, fontWeight: 800 }}>
+                            <span className="athletic-mono" style={{ background: c.painLevel >= 6 ? 'rgba(240,121,108,0.15)' : 'rgba(232,122,85,0.14)', color: c.painLevel >= 6 ? P.danger : P.lime, fontSize: 10, padding: '2px 8px', borderRadius: 999, fontWeight: 800 }}>
                               NRS {c.painLevel}
                             </span>
                           )}
@@ -772,7 +772,7 @@ export default function PatientDetailPage({
                           <span
                             className="athletic-mono"
                             style={{
-                              background: session.painLevel >= 6 ? 'rgba(248,113,113,0.15)' : 'rgba(232,122,85,0.14)',
+                              background: session.painLevel >= 6 ? 'rgba(240,121,108,0.15)' : 'rgba(232,122,85,0.14)',
                               color: session.painLevel >= 6 ? P.danger : P.lime,
                               fontSize: 10,
                               padding: '2px 8px',
@@ -978,7 +978,7 @@ function PainReports({ patientId }: { patientId: string }) {
                   <span
                     className="athletic-mono rounded-md px-2 py-0.5"
                     style={{
-                      background: high ? 'rgba(248,113,113,0.15)' : 'rgba(244,194,97,0.14)',
+                      background: high ? 'rgba(240,121,108,0.15)' : 'rgba(245,185,66,0.14)',
                       color: high ? P.danger : P.gold,
                       fontSize: 11,
                       fontWeight: 800,
@@ -1078,7 +1078,7 @@ function ProgramTile({
               <span
                 className="inline-flex items-center gap-1.5 mt-2"
                 style={{
-                  background: 'rgba(244,194,97,0.12)',
+                  background: 'rgba(245,185,66,0.12)',
                   color: P.gold,
                   border: `1px solid ${P.gold}`,
                   borderRadius: 999,

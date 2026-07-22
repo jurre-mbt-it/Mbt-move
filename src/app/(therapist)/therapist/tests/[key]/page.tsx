@@ -152,7 +152,7 @@ export default function ClinicalTestDetailPage({
           <StatTile
             label="Bronnen"
             value={String(test.sourcePmids.length)}
-            tint={P.purple}
+            tint={P.teal}
           />
         </div>
 

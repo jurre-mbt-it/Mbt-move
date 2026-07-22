@@ -160,7 +160,7 @@ function FeedbackModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end">
-      <div className="absolute inset-0 bg-black/60" onClick={onSave} />
+      <div className="absolute inset-0 bg-[#081A1C]/72" onClick={onSave} />
       <div
         className="relative w-full rounded-t-3xl px-5 pt-5 pb-8 space-y-5"
         style={{ background: P.surface, maxWidth: 480, margin: '0 auto', border: `1px solid ${P.line}` }}
@@ -259,7 +259,7 @@ function FeedbackModal({
               <div
                 className="mt-2 rounded-xl px-3 py-2"
                 style={{
-                  background: (feedback.painDuring ?? 0) > 7 ? 'rgba(248,113,113,0.10)' : 'rgba(244,194,97,0.10)',
+                  background: (feedback.painDuring ?? 0) > 7 ? 'rgba(240,121,108,0.10)' : 'rgba(245,185,66,0.10)',
                   color: (feedback.painDuring ?? 0) > 7 ? P.danger : P.gold,
                   fontSize: 12,
                   fontWeight: 600,
@@ -387,7 +387,7 @@ function MinutePicker({
         className="absolute top-0 bottom-0 left-0 pointer-events-none"
         style={{
           width: 32,
-          background: `linear-gradient(to right, ${P.surface}, rgba(20,26,27,0))`,
+          background: `linear-gradient(to right, ${P.surface}, rgba(21,54,58,0))`,
           zIndex: 1,
         }}
       />
@@ -396,7 +396,7 @@ function MinutePicker({
         className="absolute top-0 bottom-0 right-0 pointer-events-none"
         style={{
           width: 32,
-          background: `linear-gradient(to left, ${P.surface}, rgba(20,26,27,0))`,
+          background: `linear-gradient(to left, ${P.surface}, rgba(21,54,58,0))`,
           zIndex: 1,
         }}
       />
@@ -1491,7 +1491,7 @@ function SessionPageInner() {
           <div
             className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 athletic-mono transition-all"
             style={{
-              background: isDone ? P.lime : allSetsDone && !isDone ? P.lime + '33' : P.surfaceHi,
+              background: isDone ? P.lime : allSetsDone && !isDone ? `color-mix(in srgb, ${P.lime} 20%, transparent)` : P.surfaceHi,
               color: isDone ? P.bg : P.inkMuted,
               fontSize: 12,
               fontWeight: 900,
@@ -1533,8 +1533,8 @@ function SessionPageInner() {
                       className="flex items-center justify-between px-4 rounded-xl"
                       style={{
                         height: 44,
-                        background: s.done ? P.lime + '15' : P.surfaceHi,
-                        border: `1px solid ${s.done ? P.lime + '33' : P.line}`,
+                        background: s.done ? `color-mix(in srgb, ${P.lime} 8%, transparent)` : P.surfaceHi,
+                        border: `1px solid ${s.done ? `color-mix(in srgb, ${P.lime} 20%, transparent)` : P.line}`,
                       }}
                     >
                       <span
@@ -1576,7 +1576,7 @@ function SessionPageInner() {
           <div className="px-4 pb-4 pt-3 space-y-4" style={{ borderTop: `1px solid ${P.line}` }}>
             {/* Video player */}
             {e.videoUrl && (
-              <div className="rounded-2xl overflow-hidden bg-black aspect-video">
+              <div className="rounded-2xl overflow-hidden bg-[#081A1C] aspect-video">
                 <ReactPlayer
                   src={e.videoUrl}
                   width="100%"
@@ -1601,7 +1601,7 @@ function SessionPageInner() {
                 className="rounded-2xl px-4 py-3"
                 style={{
                   background: isCustom ? 'rgba(232,122,85,0.08)' : P.surfaceHi,
-                  border: `1px solid ${isCustom ? P.brand + '55' : P.line}`,
+                  border: `1px solid ${isCustom ? `color-mix(in srgb, ${P.brand} 33%, transparent)` : P.line}`,
                 }}
               >
                 {isCustom && (
@@ -1630,7 +1630,7 @@ function SessionPageInner() {
               {prescLabel && (
                 <span
                   className="athletic-mono rounded-full"
-                  style={{ padding: '4px 10px', border: `1px solid ${P.brand}55`, color: P.brand, fontSize: 9, letterSpacing: '0.14em', fontWeight: 800 }}
+                  style={{ padding: '4px 10px', border: `1px solid color-mix(in srgb, ${P.brand} 33%, transparent)`, color: P.brand, fontSize: 9, letterSpacing: '0.14em', fontWeight: 800 }}
                 >
                   {prescLabel.toUpperCase()}{targetKgLabel ? ` · ${targetKgLabel.toUpperCase()}` : ''}
                 </span>
@@ -1657,7 +1657,7 @@ function SessionPageInner() {
               {doneSets > 0 && (
                 <span
                   className="athletic-mono rounded-full"
-                  style={{ padding: '4px 10px', border: '1px solid rgba(190,242,100,0.35)', color: P.lime, fontSize: 9, letterSpacing: '0.14em', fontWeight: 700 }}
+                  style={{ padding: '4px 10px', border: '1px solid rgba(95,208,138,0.35)', color: P.lime, fontSize: 9, letterSpacing: '0.14em', fontWeight: 700 }}
                 >
                   {doneSets}/{entries.length} KLAAR
                 </span>
@@ -1738,7 +1738,7 @@ function SessionPageInner() {
                 <div
                   className="flex items-center gap-2 rounded-2xl px-4 py-2.5"
                   style={{
-                    background: isPR ? P.lime + '22' : P.surfaceHi,
+                    background: isPR ? `color-mix(in srgb, ${P.lime} 13%, transparent)` : P.surfaceHi,
                     border: isPR ? `1.5px solid ${P.lime}` : `1.5px solid ${P.line}`,
                   }}
                 >
@@ -1803,7 +1803,7 @@ function SessionPageInner() {
                 {variants.easier && (
                   <div
                     className="flex items-center gap-2 rounded-xl px-3 py-2"
-                    style={{ background: 'rgba(244,194,97,0.10)' }}
+                    style={{ background: 'rgba(245,185,66,0.10)' }}
                   >
                     <TrendingDown className="w-3.5 h-3.5 shrink-0" style={{ color: P.gold }} />
                     <span style={{ color: P.gold, fontSize: 12 }}>

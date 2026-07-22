@@ -24,13 +24,13 @@ export type OrderForEmail = {
 }
 
 const BRAND = {
-  bg: '#0A0E0F',
-  surface: '#141A1B',
-  surfaceHi: '#1C2425',
-  ink: '#F5F7F6',
-  inkMuted: '#7B8889',
-  brand: '#e87a55',
-  line: 'rgba(255,255,255,0.12)',
+  bg: '#0E2729',
+  surface: '#15363A',
+  surfaceHi: '#1C4448',
+  ink: '#F5F2ED',
+  inkMuted: '#9EB5B3',
+  brand: '#E87A55',
+  line: 'rgba(212,232,230,0.20)',
 }
 
 function escapeHtml(input: string): string {

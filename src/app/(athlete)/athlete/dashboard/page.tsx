@@ -31,7 +31,7 @@ const DAY_NAMES = [
 ]
 
 const mono =
-  'ui-monospace, Menlo, "SF Mono", "Cascadia Code", "Source Code Pro", monospace'
+  'var(--font-mono-athletic)'
 
 export default function AthleteDashboard() {
   const [userName, setUserName] = useState('')
@@ -316,7 +316,7 @@ export default function AthleteDashboard() {
             label="GESCHIEDENIS"
             sub="Al je sessies terugzien"
             href="/athlete/history"
-            bar={P.purple}
+            bar={P.teal}
           />
           <ActionTile
             label="QUICK WORKOUT"

@@ -259,7 +259,7 @@ function AssignmentCard({
             onClick={onDelete}
             title="Verwijderen"
             className="athletic-tap w-full px-2 py-1 rounded-md text-xs"
-            style={{ background: P.surfaceHi, color: P.danger }}
+            style={{ background: P.surfaceLow, color: P.danger }}
           >
             Verwijder
           </button>
