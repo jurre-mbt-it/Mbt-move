@@ -79,6 +79,12 @@ export default function SettingsPage() {
           bar={mfaBar}
         />
         <ActionTile
+          href={`${portal.base}/settings/meldingen`}
+          label="Meldingen"
+          sub="Pushmeldingen op je telefoon · testmelding versturen"
+          bar={P.ice}
+        />
+        <ActionTile
           href={`${portal.base}/settings/parameters`}
           label="Parameters"
           sub="Aangepaste meetparameters voor programma's"

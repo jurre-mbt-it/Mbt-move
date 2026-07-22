@@ -1,7 +1,9 @@
 /**
- * Cron: dagelijkse ochtend-pushes (09:00 Amsterdam) naar patiënten met de app.
+ * Cron: dagelijkse ochtend-pushes (09:00 Amsterdam) naar iedereen met de app,
+ * ongeacht rol — de signalen gaan altijd over de eigen data van de ontvanger,
+ * dus een therapeut die zelf traint krijgt ze net zo goed als een patiënt.
  *
- * Per patiënt maximaal:
+ * Per ontvanger maximaal:
  *   - REMINDER: "je training van vandaag" als er vandaag een PROGRAM/WORKOUT-item
  *     op de week-planner staat.
  *   - INSIGHT (max één): het herstel-signaal uit de readiness-band van vandaag
@@ -67,7 +69,15 @@ export async function GET(req: NextRequest) {
     const yesterdayMidnight = amsMidnight(addDaysKey(todayKey, -1))
     const todayDow = Math.round((todayMidnight.getTime() - weekMonday.getTime()) / 86_400_000)
 
-    // Kandidaten: alleen patiënten/atleten met minstens één geregistreerd device.
+    // Kandidaten: iedereen met minstens één geregistreerd device, ongeacht rol.
+    //
+    // Bewust géén rolfilter: alle drie de signalen hieronder kijken naar de
+    // EIGEN data van de ontvanger (eigen weekschema, eigen readiness, eigen
+    // insight), dus een therapeut die zelf traint (zie therapist personal mode)
+    // hoort ze net zo goed te krijgen als een patiënt. Met de oude filter op
+    // PATIENT/ATHLETE kreeg een therapeut of admin nooit iets, ook niet over de
+    // eigen training. Wie niets in de eigen agenda heeft staan en geen wearable
+    // draagt, krijgt vanzelf nog steeds niets — de queries leveren dan leeg op.
     const tokenRows = await prisma.pushToken.findMany({
       select: { userId: true },
       distinct: ['userId'],
@@ -76,12 +86,14 @@ export async function GET(req: NextRequest) {
     if (tokenUserIds.length === 0) {
       return NextResponse.json({ ok: true, candidates: 0, sent: 0 })
     }
-    const patients = await prisma.user.findMany({
-      where: { id: { in: tokenUserIds }, role: { in: ['PATIENT', 'ATHLETE'] } },
+    // Via `user` (niet rechtstreeks de token-ids) zodat de soft-delete-extension
+    // verwijderde accounts eruit filtert.
+    const recipients = await prisma.user.findMany({
+      where: { id: { in: tokenUserIds } },
       select: { id: true },
     })
-    const patientIds = patients.map((p) => p.id)
-    if (patientIds.length === 0) {
+    const recipientIds = recipients.map((p) => p.id)
+    if (recipientIds.length === 0) {
       return NextResponse.json({ ok: true, candidates: 0, sent: 0 })
     }
 
@@ -91,7 +103,7 @@ export async function GET(req: NextRequest) {
     // Legacy-rijen zonder vlag tellen wél mee (die waren vermoedelijk gepusht).
     const sentToday = await prisma.notification.findMany({
       where: {
-        userId: { in: patientIds },
+        userId: { in: recipientIds },
         createdAt: { gte: todayMidnight },
         type: { in: ['push.reminder', 'push.insight'] },
       },
@@ -114,7 +126,7 @@ export async function GET(req: NextRequest) {
         items: { some: { kind: { in: ['PROGRAM', 'WORKOUT'] } } },
         weekSchedule: {
           isTemplate: false,
-          patientId: { in: patientIds },
+          patientId: { in: recipientIds },
           startDate: { gte: weekMonday, lt: nextMonday },
         },
       },
@@ -126,7 +138,7 @@ export async function GET(req: NextRequest) {
 
     // 2. Herstel-band van vandaag (nieuwste snapshot per user).
     const snapshots = await prisma.readinessSnapshot.findMany({
-      where: { userId: { in: patientIds }, date: { gte: yesterdayMidnight } },
+      where: { userId: { in: recipientIds }, date: { gte: yesterdayMidnight } },
       orderBy: { date: 'desc' },
       select: { userId: true, band: true },
     })
@@ -138,7 +150,7 @@ export async function GET(req: NextRequest) {
     // 3. Verse overload_risk-insights van vandaag.
     const loadInsights = await prisma.insight.findMany({
       where: {
-        patientId: { in: patientIds },
+        patientId: { in: recipientIds },
         signalType: 'overload_risk',
         status: 'OPEN',
         createdAt: { gte: todayMidnight },
@@ -151,7 +163,7 @@ export async function GET(req: NextRequest) {
     let recoverySent = 0
     let loadSent = 0
 
-    for (const id of patientIds) {
+    for (const id of recipientIds) {
       // Training-reminder.
       if (trainingToday.has(id) && !alreadyReminder.has(id)) {
         await notifyTrainingToday(id)
@@ -177,7 +189,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       elapsedMs: Date.now() - startedAt,
-      candidates: patientIds.length,
+      candidates: recipientIds.length,
       trainingSent,
       recoverySent,
       loadSent,

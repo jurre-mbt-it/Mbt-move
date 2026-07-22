@@ -8,7 +8,10 @@
  */
 import { z } from 'zod'
 import { Prisma } from '@prisma/client'
+import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
+import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
+import { deliverToTokens, fetchReceipts } from '@/server/push/send'
 
 const categoriesSchema = z.object({
   message: z.boolean().optional(),
@@ -113,4 +116,74 @@ export const pushRouter = createTRPCRouter({
       })
       return { ok: true }
     }),
+
+  // ── Geregistreerde devices van de caller ────────────────────────────────────
+  /** Toont waar meldingen heen zouden gaan. Geen tokens naar de client: die
+   *  horen niet in een browser thuis en zeggen de gebruiker niets. */
+  devices: protectedProcedure.query(async ({ ctx }) => {
+    const devices = await ctx.prisma.pushToken.findMany({
+      where: { userId: ctx.user.id },
+      select: { id: true, platform: true, deviceName: true, lastSeenAt: true, createdAt: true },
+      orderBy: { lastSeenAt: 'desc' },
+    })
+    return devices
+  }),
+
+  // ── Testmelding naar de eigen devices ───────────────────────────────────────
+  /**
+   * Stuurt een melding naar de eigen toestellen en rapporteert wat er onderweg
+   * gebeurde. Bewust langs voorkeuren en quiet hours heen: de gebruiker vraagt
+   * hier expliciet om, en het doel is de keten testen (server → Expo → Apple →
+   * toestel). Staat de master-switch uit, dan zegt het antwoord dat erbij —
+   * anders lijkt het alsof alles werkt terwijl echte meldingen geblokkeerd zijn.
+   */
+  sendTest: protectedProcedure.mutation(async ({ ctx }) => {
+    const rl = await rateLimit('push.sendTest', ctx.user.id, RATE_LIMITS.pushTest)
+    if (!rl.ok) throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
+
+    const tokens = await ctx.prisma.pushToken.findMany({
+      where: { userId: ctx.user.id },
+      select: { token: true },
+    })
+    if (tokens.length === 0) {
+      return {
+        devices: 0,
+        delivered: 0,
+        pushEnabled: true,
+        errors: [] as string[],
+        removedTokens: 0,
+        receiptErrors: [] as string[],
+      }
+    }
+
+    const prefs = await ctx.prisma.notificationPreference.findUnique({
+      where: { userId: ctx.user.id },
+    })
+
+    const result = await deliverToTokens(
+      tokens.map((t) => t.token),
+      {
+        title: 'Testmelding',
+        body: 'Als je dit ziet, komen pushmeldingen aan op dit toestel.',
+        data: { type: 'test' },
+      },
+    )
+
+    // Apple meldt een geweigerde push pas in het ontvangstbewijs. Even wachten
+    // levert een veel bruikbaarder antwoord dan "aangenomen door Expo".
+    let receiptErrors: string[] = []
+    if (result.ticketIds.length > 0) {
+      await new Promise((r) => setTimeout(r, 2500))
+      receiptErrors = (await fetchReceipts(result.ticketIds)).errors
+    }
+
+    return {
+      devices: tokens.length,
+      delivered: result.delivered,
+      pushEnabled: prefs?.pushEnabled ?? true,
+      errors: result.errors,
+      removedTokens: result.removedTokens,
+      receiptErrors,
+    }
+  }),
 })
