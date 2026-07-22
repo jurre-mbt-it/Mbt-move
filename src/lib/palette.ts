@@ -13,10 +13,12 @@
  * niet opgelost.
  */
 export const P = {
+  // Vlakken van donker naar licht: bg → surfaceLow → surface → surfaceHi.
+  // surfaceLow is verdiept binnen een kaart en ligt dus bóven de pagina.
   bg: '#0E2729',
+  surfaceLow: '#123033',
   surface: '#15363A',
   surfaceHi: '#1C4448',
-  surfaceLow: '#081A1C',
   line: 'rgba(212,232,230,0.09)',
   lineStrong: 'rgba(212,232,230,0.20)',
   ink: '#F5F2ED',

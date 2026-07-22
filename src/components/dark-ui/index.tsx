@@ -509,17 +509,26 @@ export function DarkButton({
   /** Op hover + focus aangeroepen — warm de doelpagina (route + data). */
   prefetch?: () => void
 }) {
-  const bg =
-    variant === 'primary'
+  // Uitgeschakeld krijgt een eigen vlakke kleur in plaats van halve dekking:
+  // oranje of koraal op 50% over petrol wordt een modderige bruine tint, en die
+  // leest als kapot in plaats van als "kan nu niet". Tijdens `loading` houdt de
+  // knop wél zijn kleur — hij is bezig, niet uit.
+  const off = disabled && !loading
+  const bg = off
+    ? P.surfaceHi
+    : variant === 'primary'
       ? P.brand
       : variant === 'danger'
         ? P.danger
         : variant === 'ghost'
           ? 'transparent'
           : P.surface
-  const fg =
-    variant === 'primary' ? P.bg : variant === 'danger' ? P.bg : P.ink
-  const border = variant === 'secondary' || variant === 'ghost' ? P.lineStrong : 'transparent'
+  const fg = off
+    ? P.inkDim
+    : variant === 'primary' ? P.bg : variant === 'danger' ? P.bg : P.ink
+  const border = off
+    ? P.line
+    : variant === 'secondary' || variant === 'ghost' ? P.lineStrong : 'transparent'
   const pad =
     size === 'sm'
       ? '10px 14px'
@@ -530,7 +539,8 @@ export function DarkButton({
 
   const baseClass = cn(
     'athletic-tap mbt-btn-hover inline-flex items-center justify-center rounded-xl font-extrabold',
-    (disabled || loading) && 'opacity-50 pointer-events-none',
+    (disabled || loading) && 'pointer-events-none',
+    loading && 'opacity-70',
     className,
   )
   const baseStyle: React.CSSProperties = {

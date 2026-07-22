@@ -217,7 +217,7 @@ export default function AthleteExerciseDetailPage({ params }: Props) {
               <div
                 className="rounded-xl overflow-hidden"
                 style={{
-                  background: P.surfaceLow,
+                  background: '#000',
                   aspectRatio: '16 / 9',
                   border: `1px solid ${P.lineStrong}`,
                 }}

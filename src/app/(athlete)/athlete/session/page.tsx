@@ -1644,7 +1644,7 @@ function VideoModal({
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="aspect-video bg-[#081A1C]">
+        <div className="aspect-video bg-black">
           <ReactPlayer
             src={url}
             width="100%"

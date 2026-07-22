@@ -1246,8 +1246,14 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             }}
             placeholder={program.isTemplate ? 'Naam van sjabloon…' : 'Naam programma…'}
             className={cn(
-              'h-8 text-sm font-semibold border-0 shadow-none focus-visible:ring-0 px-0 min-w-0',
-              !program.name.trim() && 'placeholder:text-[#F5B942]'
+              // Dit veld moet als titel lezen, niet als invoervak: geen rand,
+              // geen vulling, geen padding. Zonder bg-transparent erft het de
+              // veldkleur en staat er een blok om de titel.
+              // De placeholder blijft gedempt. In goud las hij als een ingevulde
+              // naam, en hij stond naast twee gouden pillen die iets anders
+              // zeggen. Dat je nog een naam moet invullen, zegt de uitgeschakelde
+              // Deployen-knop al.
+              'h-8 text-sm font-semibold border-0 bg-transparent shadow-none focus-visible:ring-0 px-0 min-w-0',
             )}
           />
 
@@ -1405,9 +1411,14 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             size="sm"
             className="gap-1.5 h-7 text-xs shrink-0"
             style={
-              currentStatus === 'ACTIVE'
-                ? { background: 'transparent', color: '#E87A55', border: '1px solid rgba(232,122,85,0.35)' }
-                : { background: '#E87A55' }
+              // Uitgeschakeld krijgt een eigen vlakke kleur. De standaard
+              // 50% dekking maakt van het oranje een modderige bruine tint die
+              // eerder kapot lijkt dan uitgeschakeld.
+              saving || !program.name.trim()
+                ? { background: '#1C4448', color: '#86A3A1', border: '1px solid rgba(212,232,230,0.09)', opacity: 1 }
+                : currentStatus === 'ACTIVE'
+                  ? { background: 'transparent', color: '#E87A55', border: '1px solid rgba(232,122,85,0.35)' }
+                  : { background: '#E87A55' }
             }
             onClick={handleDeploy}
             disabled={saving || !program.name.trim()}

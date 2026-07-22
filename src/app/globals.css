@@ -26,10 +26,15 @@
      allebei. De shadcn-tokens hieronder hangen er in `.athletic-dark` aan vast.
 
      Blijf van kale hexcodes af in componenten: pak `P` of deze var(). */
+  /* De vier vlakken lopen van donker naar licht: bg → surface-low → surface →
+     surface-hi. `surface-low` is een verdiept vlak binnen een kaart en hoort
+     dus tussen de pagina en de kaart te liggen, niet eronder. Ligt het lager
+     dan `bg`, dan slaan roosters en ingelegde panelen als zwarte gaten in de
+     pagina — precies wat er in de weekplanner misging. */
   --p-bg: #0E2729;
+  --p-surface-low: #123033;
   --p-surface: #15363A;
   --p-surface-hi: #1C4448;
-  --p-surface-low: #081A1C;
   --p-line: rgba(212,232,230,0.09);
   --p-line-strong: rgba(212,232,230,0.20);
   --p-ink: #F5F2ED;
@@ -255,21 +260,27 @@ body {
   font-family: var(--font-mono-athletic);
   font-stretch: 87.5%;
   font-variant-numeric: tabular-nums;
+  /* Martian Mono zet op dezelfde px 16% breder en 12% hoger dan de Menlo-stack
+     die hier eerst stond, dus elk label werd fors groter zonder dat er een
+     fontSize veranderde. Dit trekt de x-hoogte terug naar die van de oude
+     stack, zodat de honderden inline fontSize-waardes in de app weer kloppen. */
+  font-size-adjust: 0.55;
   letter-spacing: 0.1em;
   font-weight: 700;
   text-transform: uppercase;
 }
 
-/* Koppen staan breed en zwaar; de variabele as doet het werk, niet een
-   tweede letterfamilie. */
-.athletic-display,
-h1, h2, h3 {
+/* Displaykoppen staan breed en zwaar; de variabele as doet het werk, niet een
+   tweede letterfamilie.
+
+   Bewust alléén op `.athletic-display` en niet op elke h1/h2/h3: een `h3` is in
+   deze app vaak een klein label in een lijstregel, en die werd op 116% breedte
+   een kop die niet bij zijn 14px past. Wil je een kop breed, gebruik dan de
+   `Display`-component. */
+.athletic-display {
   font-family: var(--font-athletic);
   font-stretch: 116%;
   letter-spacing: -0.02em;
-}
-
-.athletic-display {
   font-weight: 900;
   color: var(--p-ink);
 }
@@ -277,6 +288,7 @@ h1, h2, h3 {
 .athletic-kicker {
   font-family: var(--font-mono-athletic);
   font-stretch: 87.5%;
+  font-size-adjust: 0.55;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.2em;
@@ -287,6 +299,7 @@ h1, h2, h3 {
 .athletic-meta {
   font-family: var(--font-mono-athletic);
   font-stretch: 87.5%;
+  font-size-adjust: 0.55;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.16em;

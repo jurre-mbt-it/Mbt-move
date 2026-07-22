@@ -21,7 +21,7 @@ export function VideoPlayer({ url, className }: VideoPlayerProps) {
 
   return (
     <div
-      className={`relative overflow-hidden rounded-xl bg-[#081A1C] ${className ?? ''}`}
+      className={`relative overflow-hidden rounded-xl bg-black ${className ?? ''}`}
       style={{ aspectRatio: '16/9' }}
     >
       {youtubeId ? (

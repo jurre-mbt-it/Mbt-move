@@ -395,6 +395,48 @@ const STATUS_BORDER: Record<ItemStatus, string> = {
   missed:    P.danger,
   in_progress: P.gold,
 }
+/**
+ * Uitleg onder de kalender. De rail links toont twee getallen die zonder
+ * bijschrift niet te raden zijn (gedaan/gepland en de geplande weekbelasting),
+ * en de tegelkleuren zijn pas een taal als ergens staat wat ze betekenen.
+ */
+function CalendarLegend() {
+  const swatch = (status: ItemStatus, label: string) => (
+    <span key={label} className="flex items-center gap-1 shrink-0">
+      <span
+        className="rounded-sm"
+        style={{
+          width: 10,
+          height: 10,
+          background: STATUS_COLORS[status],
+          borderLeft: `3px solid ${STATUS_BORDER[status]}`,
+        }}
+      />
+      <span className="athletic-mono text-[9px] tracking-wider" style={{ color: P.inkDim }}>
+        {label}
+      </span>
+    </span>
+  )
+  return (
+    <div
+      className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2 border-t"
+      style={{ borderColor: P.line, background: P.surfaceLow }}
+    >
+      {swatch('scheduled', 'GEPLAND')}
+      {swatch('in_progress', 'BEZIG')}
+      {swatch('completed', 'GEDAAN')}
+      {swatch('partial', 'DEELS')}
+      {swatch('missed', 'GEMIST')}
+      <span className="athletic-mono text-[9px] tracking-wider" style={{ color: P.inkDim }}>
+        3/8 = GEDANE VAN GEPLANDE WORKOUTS
+      </span>
+      <span className="athletic-mono text-[9px] tracking-wider" style={{ color: P.inkDim }}>
+        ~1041 = GEPLANDE WEEKBELASTING IN sRPE, ~ = DEELS GESCHAT
+      </span>
+    </div>
+  )
+}
+
 const STATUS_TITLES: Record<ItemStatus, string | undefined> = {
   scheduled: undefined,
   completed: 'Voltooid — klik voor details',
@@ -626,7 +668,12 @@ function ItemTile({
     ? null
     : MARKER_META[item.kind as Exclude<ItemKind, 'PROGRAM' | 'WORKOUT'>]
   const category: Category = item.quickCategory ?? 'STRENGTH'  // default voor program-link
-  const color = marker ? marker.color : CATEGORY_COLORS[category]
+  // Kleur op een workout-tegel betekent één ding: de status. Het icoon kleurt
+  // dus mee met de rand en niet met de categorie — die is aan de vórm van het
+  // icoon te zien. Anders botsen de twee talen: kracht en "gedaan" zijn allebei
+  // groen, cardio en "gemist" allebei koraal, en dan leest een week vol gemiste
+  // trainingen als een week vol afgevinkte trainingen.
+  const color = marker ? marker.color : STATUS_BORDER[status]
   const name = marker
     ? (item.kind === 'TEST' ? (item.testBattery?.name ?? 'Test') : (item.quickName ?? marker.label))
     : item.programId ? (item.program?.name ?? 'Programma') : (item.quickName ?? 'Workout')
@@ -2934,6 +2981,7 @@ function WeekPlannerContent() {
               </div>
             )
           })}
+          <CalendarLegend />
         </div>
         </>
       )}

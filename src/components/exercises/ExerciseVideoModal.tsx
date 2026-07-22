@@ -67,7 +67,7 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
         {/* Video / placeholder */}
         <div className="relative">
           {exercise.videoUrl ? (
-            <div className="aspect-video bg-[#081A1C]">
+            <div className="aspect-video bg-black">
               <ReactPlayer
                 src={exercise.videoUrl}
                 width="100%"

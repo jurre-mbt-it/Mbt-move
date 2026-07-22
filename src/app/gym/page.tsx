@@ -10,7 +10,7 @@ const P = {
   bg: '#0E2729',              // diep petrol — app background
   surface: '#15363A',         // tile surface
   surfaceHi: '#1C4448',       // elevated / hover
-  surfaceLow: '#081A1C',      // recessed
+  surfaceLow: '#123033',      // recessed
   line: 'rgba(212,232,230,0.08)',
   lineStrong: 'rgba(212,232,230,0.18)',
   ink: '#F5F2ED',             // crème — primary text

@@ -196,7 +196,7 @@ export function WorkoutPlayer({ slug }: { slug: string }) {
                       <div className="px-3 pb-3">
                         <div
                           className="relative w-full overflow-hidden rounded-lg"
-                          style={{ aspectRatio: '16 / 9', background: P.surfaceLow }}
+                          style={{ aspectRatio: '16 / 9', background: '#000' }}
                         >
                           <iframe
                             src={youtubeEmbed(yid)}

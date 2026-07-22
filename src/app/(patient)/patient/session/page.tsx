@@ -1576,7 +1576,7 @@ function SessionPageInner() {
           <div className="px-4 pb-4 pt-3 space-y-4" style={{ borderTop: `1px solid ${P.line}` }}>
             {/* Video player */}
             {e.videoUrl && (
-              <div className="rounded-2xl overflow-hidden bg-[#081A1C] aspect-video">
+              <div className="rounded-2xl overflow-hidden bg-black aspect-video">
                 <ReactPlayer
                   src={e.videoUrl}
                   width="100%"
