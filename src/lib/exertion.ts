@@ -21,6 +21,20 @@ import { edwardsTrimp } from './training-load'
 /** Bin-breedte van het hartslag-histogram in bpm. */
 export const HR_BIN_BPM = 5
 
+/**
+ * Lichte band ónder Edwards-zone 1: dagelijkse activiteit (lopen, staan,
+ * rondlopen op werk) zit bij fitte mensen ruim onder 50% HRmax en zou anders
+ * volledig wegvallen — dan is de dag-readout weer alleen een trainingslog.
+ * Vanaf 20% van de hartslagreserve (Karvonen) telt tijd mee met een klein
+ * gewicht; gekalibreerd tegen Athlytic op echte dagen (2026-07-23): een
+ * kantoordag-tot-de-middag kwam hiermee op ~0,8 op de 0-10-schaal waar
+ * Athlytic 0,9 gaf, een volle rustige dag op ~2,3.
+ */
+export const LIGHT_HRR_FLOOR = 0.2
+export const LIGHT_WEIGHT = 0.3
+/** Fallback-ondergrens zonder bekende rust-HR: 40% HRmax. */
+export const LIGHT_PCTMAX_FLOOR = 0.4
+
 /** { ondergrens-van-de-bin (bpm) → seconden }, bv. { "120": 480 }. */
 export type BpmHistogram = Record<string, number>
 
@@ -54,10 +68,20 @@ export function computeExertionDay(
   if (!computed) return null
 
   const zones = computed.zones
-  const restFloor = zones[0].minBpm
+  const zone1Floor = zones[0].minBpm
+  // Ondergrens van de lichte band: 20% HRR als de rust-HR bekend is, anders
+  // 40% HRmax. De HRR-variant personaliseert: bij iemand met een hoge rust-HR
+  // schuift de band mee omhoog zodat stilzitten nooit meetelt.
+  const rest = profile.restingHeartRate ?? 0
+  const maxHr = zones[zones.length - 1].maxBpm
+  const lightFloor =
+    rest > 0 && rest < maxHr
+      ? rest + LIGHT_HRR_FLOOR * (maxHr - rest)
+      : LIGHT_PCTMAX_FLOOR * maxHr
 
   const timeInZones: Record<string, number> = {}
   let activeSec = 0
+  let lightMin = 0
 
   for (const [binKey, rawSec] of Object.entries(hist)) {
     const bin = Number(binKey)
@@ -66,7 +90,16 @@ export function computeExertionDay(
 
     // Midden van de bin als representatieve hartslag.
     const bpm = bin + HR_BIN_BPM / 2
-    if (bpm < restFloor) continue
+    if (bpm < lightFloor) continue
+
+    if (bpm < zone1Floor) {
+      // Lichte band: onder sleutel '0' in timeInZones (edwardsTrimp negeert
+      // die), gewogen bijdrage rekenen we hieronder zelf bij.
+      timeInZones['0'] = (timeInZones['0'] ?? 0) + sec
+      activeSec += sec
+      lightMin += sec / 60
+      continue
+    }
 
     let zone = 5
     for (const z of zones) {
@@ -81,8 +114,7 @@ export function computeExertionDay(
   }
 
   if (activeSec <= 0) return null
-  const trimp = edwardsTrimp(timeInZones)
-  if (trimp == null) return null
+  const trimp = Math.round((edwardsTrimp(timeInZones) ?? 0) + LIGHT_WEIGHT * lightMin)
 
   return { timeInZones, trimp, activeSec: Math.round(activeSec) }
 }

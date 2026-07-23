@@ -401,11 +401,13 @@ export async function ingestWearableData(
     // in (andere eenheid + zou gelogde trainingen dubbel tellen).
     for (const day of payload.hrIntraday) {
       if (!day.histogram) continue
+      // Ook een dag zonder meetbare belasting opslaan (trimp 0): dan blijft
+      // het histogram bewaard en is de dag herberekenbaar bij een latere
+      // formule-wijziging. Stil overslaan gooide eerder hele dagen weg.
       const ex = computeExertionDay(day.histogram, {
         maxHeartRate: maxHrRes.maxHr,
         restingHeartRate: restByDay.get(day.date) ?? profile?.restingHeartRate ?? null,
-      })
-      if (!ex) continue
+      }) ?? { trimp: 0, activeSec: 0, timeInZones: {} }
       const date = startOfDayUTCLocal(day.date)
       const data = {
         trimp: ex.trimp,
