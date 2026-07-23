@@ -460,11 +460,14 @@ function PlanItemDialog({
   const [cardioOpen, setCardioOpen] = useState(false)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: contents = [] } = (trpc.weekSchedules.listItemContents.useQuery as any)(
+  const { data: contents = [], isFetched: contentsLoaded } = (trpc.weekSchedules.listItemContents.useQuery as any)(
     { patientId: '', planTemplateId: planId },
     { staleTime: 10_000 },
-  ) as { data: Array<{ id: string; exercises: ItemExercise[]; cardioParams: unknown }> }
-  const inhoud = contents.find((c) => c.id === item.id)
+  ) as { data: Array<{ itemId: string; exercises: ItemExercise[]; cardioParams: unknown }>; isFetched: boolean }
+  // De server geeft `itemId` terug, geen `id` — matchen op `id` liet `inhoud`
+  // altijd undefined, waardoor de builder leeg opende en opslaan bestaande
+  // oefeningen/cardio wiste (setItemExercises is replace-all).
+  const inhoud = contents.find((c) => c.itemId === item.id)
   const workout = readWorkout(inhoud?.cardioParams)
   /**
    * Staat er inhoud, dan leidt de server de geplande duur daaruit af en
@@ -495,6 +498,9 @@ function PlanItemDialog({
   if (cardioOpen) {
     return (
       <CardioWorkoutBuilder
+        // Zelfde reden als bij de QuickExerciseBuilder: remount zodra de
+        // inhoud geladen is, anders opent de bouwer met lege blokken.
+        key={`${item.id}:${contentsLoaded ? 'c' : 'l'}`}
         initial={workout}
         activity={(item.quickActivity as CardioActivityKey) ?? 'RUNNING'}
         itemName={naam || 'Cardio'}
@@ -599,7 +605,10 @@ function PlanItemDialog({
                 </div>
               ) : (
                 <QuickExerciseBuilder
-                  key={item.id}
+                  // Neem de laad-status in de key: de builder kopieert `initial`
+                  // eenmalig in useState en remount niet als listItemContents
+                  // later binnenkomt. Zonder dit opent hij leeg bij een trage query.
+                  key={`${item.id}:${contentsLoaded ? 'c' : 'l'}`}
                   initial={inhoud?.exercises ?? []}
                   defaultCategory={category}
                   saving={setExercises.isPending}
