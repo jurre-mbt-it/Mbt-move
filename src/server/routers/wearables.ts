@@ -202,6 +202,17 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
       timeInZones: e.timeInZones as unknown,
       score: exertionScore(e.trimp, exertion.slice(0, i).map(p => p.trimp)),
     })),
+    // Doelbereik voor vandaag op dezelfde 0-10 schaal, meeschuivend met het
+    // herstel (zie de uitleg in de app: goed hersteld → meer ruimte, slecht
+    // hersteld → het bereik zakt). Lineair in de readiness-score; zonder
+    // readiness valt het bereik weg en toont de app alleen de balk.
+    exertionTarget:
+      readiness.score == null
+        ? null
+        : {
+            min: Math.round((1.5 + 0.03 * readiness.score) * 10) / 10,
+            max: Math.round((2.5 + 0.055 * readiness.score) * 10) / 10,
+          },
   }
 }
 

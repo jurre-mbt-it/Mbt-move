@@ -45,7 +45,12 @@ export function computeExertionDay(
   profile: HrProfile,
 ): ExertionDay | null {
   if (!hist || typeof hist !== 'object') return null
-  const computed = computeHrZones(profile)
+  // Edwards-TRIMP is gedefinieerd op %HRmax-zones (50-60% t/m 90-100%), dus
+  // rust-HR bewust NIET meegeven: computeHrZones zou anders Karvonen pakken en
+  // de ondergrens naar ~64% HRmax schuiven (max 200 + rust 55 → vloer 128 bpm).
+  // Daarmee valt alle dagelijkse activiteit weg en blijven alleen trainingen
+  // over — precies wat deze hele-dag-readout juist wél moet vangen.
+  const computed = computeHrZones({ ...profile, restingHeartRate: null })
   if (!computed) return null
 
   const zones = computed.zones

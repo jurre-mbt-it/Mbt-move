@@ -240,6 +240,7 @@ export function mockOverview(days = 30, end: Date = new Date()) {
     activities,
     stress: [],
     exertion: [],
+    exertionTarget: null,
   }
 }
 
