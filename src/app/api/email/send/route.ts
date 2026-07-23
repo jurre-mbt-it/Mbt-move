@@ -1,8 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { renderEmailFooter } from '@/server/email/footer'
 import { getAppUrl } from '@/lib/app-url'
+import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
+
+// Zelfde soort caps als de tRPC-inputs: begrensde velden zodat een
+// gecompromitteerd account geen multi-megabyte-mails door Resend pompt.
+const bodySchema = z.object({
+  to: z.string().email().max(320),
+  patientName: z.string().min(1).max(200),
+  programName: z.string().min(1).max(200),
+  accessCode: z.string().max(50).optional(),
+  startDate: z.string().max(40).optional(),
+  extraInstructions: z.string().max(2000).optional(),
+})
 
 function escapeHtml(input: string): string {
   return input
@@ -38,22 +51,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const body = await req.json().catch(() => ({}))
-  const { to, patientName, programName, accessCode, startDate, extraInstructions } = body
+  const limit = await rateLimit('emailSend', caller.id, RATE_LIMITS.emailSend)
+  if (!limit.ok) {
+    return NextResponse.json({ error: limit.message }, { status: 429 })
+  }
 
-  if (!to || !patientName || !programName) {
-    return NextResponse.json({ error: 'Ontbrekende velden' }, { status: 400 })
+  const parsed = bodySchema.safeParse(await req.json().catch(() => ({})))
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Ongeldige of ontbrekende velden' }, { status: 400 })
   }
-  if (typeof to !== 'string' || typeof patientName !== 'string' ||
-      typeof programName !== 'string') {
-    return NextResponse.json({ error: 'Ongeldige velden' }, { status: 400 })
-  }
-  if (accessCode !== undefined && typeof accessCode !== 'string') {
-    return NextResponse.json({ error: 'Ongeldige toegangscode' }, { status: 400 })
-  }
-  if (extraInstructions !== undefined && typeof extraInstructions !== 'string') {
-    return NextResponse.json({ error: 'Ongeldige instructies' }, { status: 400 })
-  }
+  const { to, patientName, programName, accessCode, startDate, extraInstructions } = parsed.data
 
   // Caller mag alleen mailen naar een patient waar 'ie aan gekoppeld is
   // (admin mag alles).
@@ -85,7 +92,6 @@ export async function POST(req: NextRequest) {
     ? new Date(startDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
     : 'Zo snel mogelijk'
 
-  const safePatientFull = escapeHtml(patientName)
   const safePatientFirst = escapeHtml(patientName.split(' ')[0] || patientName)
   const safeProgram = escapeHtml(programName)
   const safeStart = escapeHtml(startFormatted)
@@ -231,7 +237,9 @@ export async function POST(req: NextRequest) {
           ?? process.env.RESEND_FROM_EMAIL
           ?? 'MBT Gym <noreply@mbt-gym.nl>',
         to,
-        subject: `Je revalidatieprogramma is klaar · ${programName}`,
+        // Newlines eruit: een regelovergang in een subject-veld is een klassieke
+        // header-injection-vector bij mail-API's.
+        subject: `Je revalidatieprogramma is klaar · ${programName.replace(/[\r\n]+/g, ' ').trim()}`,
         html,
       }),
     })

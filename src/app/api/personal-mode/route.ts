@@ -18,10 +18,17 @@ export async function POST(req: Request) {
     res.cookies.set(PERSONAL_MODE_COOKIE, '1', {
       path: '/',
       sameSite: 'lax',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
       maxAge: 60 * 60 * 24 * 30, // 30 dagen
     })
   } else {
-    res.cookies.set(PERSONAL_MODE_COOKIE, '', { path: '/', maxAge: 0 })
+    res.cookies.set(PERSONAL_MODE_COOKIE, '', {
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 0,
+    })
   }
   return res
 }

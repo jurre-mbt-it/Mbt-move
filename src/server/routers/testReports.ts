@@ -378,7 +378,11 @@ export const testReportsRouter = createTRPCRouter({
 
       let spec
       if (input.catalogItemId) {
-        const c = await ctx.prisma.testCatalogItem.findUnique({ where: { id: input.catalogItemId } })
+        // Praktijk-scope óók hier: zonder dit is elk catalogus-item van elke
+        // praktijk via een geraden id in een eigen rapport te kopiëren.
+        const c = await ctx.prisma.testCatalogItem.findFirst({
+          where: { id: input.catalogItemId, OR: practiceScope(ctx.user.practiceId) },
+        })
         if (!c) throw new TRPCError({ code: 'NOT_FOUND', message: 'Test niet in catalogus' })
         spec = specFromCatalog(c)
       } else {
@@ -399,8 +403,8 @@ export const testReportsRouter = createTRPCRouter({
     .input(z.object({ reportId: z.string(), batteryId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await assertTreating(ctx.prisma, ctx.user, await reportPatientId(ctx.prisma, input.reportId))
-      const battery = await ctx.prisma.testBattery.findUnique({
-        where: { id: input.batteryId },
+      const battery = await ctx.prisma.testBattery.findFirst({
+        where: { id: input.batteryId, OR: practiceScope(ctx.user.practiceId) },
         include: { items: { orderBy: { order: 'asc' }, include: { catalogItem: true } } },
       })
       if (!battery) throw new TRPCError({ code: 'NOT_FOUND' })

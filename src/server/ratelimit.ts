@@ -181,5 +181,6 @@ export const RATE_LIMITS = {
   loginLog:           { max: 12, windowSec: 600,  message: 'Te veel login-registraties.' },
   cspReport:          { max: 60, windowSec: 600,  message: 'Te veel CSP-reports.' },
   messageSend:        { max: 120, windowSec: 3600, message: 'Te veel berichten. Probeer het later opnieuw.' },
+  emailSend:          { max: 60, windowSec: 3600, message: 'Te veel e-mails verstuurd. Probeer het later opnieuw.' },
   pushTest:           { max: 10, windowSec: 600,  message: 'Te veel testmeldingen. Wacht een paar minuten.' },
 } as const
