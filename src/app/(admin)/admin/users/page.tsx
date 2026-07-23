@@ -71,6 +71,13 @@ export default function AdminUsersPage() {
     },
     onError: (e) => toast.error(e.message),
   })
+  const resetMfa = trpc.admin.resetMfa.useMutation({
+    onSuccess: () => {
+      utils.admin.listUsers.invalidate()
+      toast.success('MFA gereset. De gebruiker doorloopt bij de volgende login opnieuw de 2FA-setup.')
+    },
+    onError: (e) => toast.error(e.message),
+  })
 
   return (
     <DarkScreen>
@@ -194,6 +201,27 @@ export default function AdminUsersPage() {
                         }
                       >
                         {u.canUseAssessment ? 'AAN' : 'UIT'}
+                      </DarkButton>
+                    </div>
+                  )}
+                  {u.mfaEnabled && (
+                    <div className="flex flex-col gap-1">
+                      <MetaLabel>2FA</MetaLabel>
+                      <DarkButton
+                        size="sm"
+                        variant="secondary"
+                        disabled={resetMfa.isPending}
+                        onClick={() => {
+                          const ok = window.confirm(
+                            `2FA resetten voor ${u.email}?\n\n` +
+                            `De authenticator-koppeling en backup-codes worden verwijderd. ` +
+                            `De gebruiker stelt bij de volgende login opnieuw 2FA in. ` +
+                            `Doe dit alleen als je zeker weet dat het verzoek echt van deze persoon komt.`,
+                          )
+                          if (ok) resetMfa.mutate({ userId: u.id })
+                        }}
+                      >
+                        Reset
                       </DarkButton>
                     </div>
                   )}

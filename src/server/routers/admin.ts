@@ -5,7 +5,9 @@ import {
   createTRPCRouter,
   adminProcedure,
   mfaAdminProcedure,
+  invalidateUserCache,
 } from '@/server/trpc'
+import { auditLog } from '@/server/audit'
 
 /**
  * Admin-only router. Beheer van users, rollen en praktijken.
@@ -177,6 +179,85 @@ export const adminRouter = createTRPCRouter({
       await ctx.prisma.user.delete({ where: { id: target.id } })
 
       return { ok: true, deletedEmail: target.email, deletedRole: target.role }
+    }),
+
+  /**
+   * Admin-geassisteerde MFA-reset: het herstelpad voor een therapeut die z'n
+   * authenticator kwijt is. Verwijdert de TOTP-factoren bij Supabase, wist de
+   * backup-codes en zet mfaEnabled uit; bij de eerstvolgende login stuurt de
+   * enroll-gate (require-role.ts / assertStaffMfaEnrolled) de gebruiker
+   * automatisch opnieuw door de MFA-setup. Bewust alleen voor ánderen: je
+   * eigen factoren beheer je via /mfa, en zo kan een gekaapte admin-sessie
+   * dit endpoint niet gebruiken om de eigen tweede factor te slopen.
+   */
+  resetMfa: mfaAdminProcedure
+    .input(z.object({ userId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.userId === ctx.user.id) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Je eigen MFA beheer je via de beveiligingsinstellingen.',
+        })
+      }
+
+      const target = await ctx.prisma.user.findUnique({
+        where: { id: input.userId },
+        select: { id: true, email: true, role: true, supabaseUserId: true },
+      })
+      if (!target) throw new TRPCError({ code: 'NOT_FOUND', message: 'Gebruiker niet gevonden.' })
+
+      const supabaseAdmin = createSupabaseAdminClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      )
+
+      // Email-match alleen als fallback voor legacy rows zonder supabaseUserId
+      // (zelfde patroon als deleteUser hierboven).
+      let supaUserId = target.supabaseUserId
+      if (!supaUserId) {
+        const { data: sb } = await supabaseAdmin.auth.admin.listUsers()
+        supaUserId = sb.users.find((u) => u.email === target.email)?.id ?? null
+      }
+
+      let factorsRemoved = 0
+      if (supaUserId) {
+        const { data, error } = await supabaseAdmin.auth.admin.mfa.listFactors({
+          userId: supaUserId,
+        })
+        if (error) {
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message })
+        }
+        for (const factor of data?.factors ?? []) {
+          const { error: delError } = await supabaseAdmin.auth.admin.mfa.deleteFactor({
+            id: factor.id,
+            userId: supaUserId,
+          })
+          if (delError) {
+            throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: delError.message })
+          }
+          factorsRemoved++
+        }
+      }
+
+      // Oude backup-codes zijn na een reset waardeloos én gevaarlijk (wie de
+      // telefoon vond, kan het briefje ook hebben) — dus weg ermee.
+      await ctx.prisma.mfaBackupCode.deleteMany({ where: { userId: target.id } })
+      await ctx.prisma.user.update({
+        where: { id: target.id },
+        data: { mfaEnabled: false },
+        select: { id: true },
+      })
+      if (supaUserId) invalidateUserCache(supaUserId)
+
+      await auditLog({
+        event: 'MFA_RESET_BY_ADMIN',
+        userId: target.id,
+        actorEmail: ctx.user.email,
+        metadata: { targetEmail: target.email, targetRole: target.role, factorsRemoved },
+        req: ctx.req,
+      })
+
+      return { ok: true, factorsRemoved }
     }),
 
   // ── Practices ─────────────────────────────────────────────────────────

@@ -50,6 +50,7 @@ export type AuditEvent =
   // Admin
   | 'ROLE_CHANGED'
   | 'PRACTICE_CHANGED'
+  | 'MFA_RESET_BY_ADMIN'
   // Rate-limit
   | 'RATE_LIMIT_HIT'
 
