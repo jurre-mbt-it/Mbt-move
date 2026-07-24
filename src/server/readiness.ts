@@ -19,6 +19,30 @@ type Db = Pick<PrismaClient, 'vitalsEntry' | 'sleepEntry' | 'wellnessCheck' | 'r
 
 const HISTORY_DAYS = 70 // genoeg voor de 60-daagse normaal-band + marge
 
+/**
+ * Venster (dagen terug vanaf `date`) dat computeReadinessFor nodig heeft.
+ * Geëxporteerd zodat callers die rows voorladen (wearables-router) weten hoe
+ * ver terug ze minimaal moeten ophalen.
+ */
+export const READINESS_HISTORY_DAYS = HISTORY_DAYS
+
+/** Minimale rij-vormen voor voorgeladen data (zie computeReadinessFor). */
+export type ReadinessVitalsRow = {
+  date: Date
+  hrv: number | null
+  restingHeartRate: number | null
+  respiratoryRate: number | null
+  wristTempDeviation: number | null
+}
+export type ReadinessSleepRow = {
+  date: Date
+  qualityScore: number | null
+  asleepMin: number | null
+  deepMin: number | null
+  remMin: number | null
+  efficiency: number | null
+}
+
 function isoDay(d: Date): string {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -32,33 +56,46 @@ function startOfDay(d = new Date()): Date {
   return r
 }
 
-/** Bereken readiness voor `date` (default vandaag) zonder op te slaan. */
+/**
+ * Bereken readiness voor `date` (default vandaag) zonder op te slaan.
+ *
+ * `preloaded`: al-opgehaalde sleep/vitals-rijen (oplopend op datum gesorteerd,
+ * minimaal READINESS_HISTORY_DAYS terug dekkend) — de wearables-router geeft
+ * die mee zodat dezelfde tabellen niet dubbel gelezen worden. Het datumvenster
+ * wordt hier alsnog toegepast, dus een ruimere set is prima.
+ */
 export async function computeReadinessFor(
   prisma: Db,
   userId: string,
   date: Date = new Date(),
+  preloaded?: { vitals: ReadinessVitalsRow[]; sleep: ReadinessSleepRow[] },
 ): Promise<ReadinessResult> {
   const target = startOfDay(date)
   const since = new Date(target)
   since.setDate(since.getDate() - HISTORY_DAYS)
+  const inWindow = (d: Date) => d >= since && d <= target
 
   const [vitalsRows, sleepRows, wellness] = await Promise.all([
-    prisma.vitalsEntry.findMany({
-      where: { userId, date: { gte: since, lte: target } },
-      orderBy: { date: 'asc' },
-      select: {
-        date: true, hrv: true, restingHeartRate: true,
-        respiratoryRate: true, wristTempDeviation: true,
-      },
-    }),
-    prisma.sleepEntry.findMany({
-      where: { userId, date: { gte: since, lte: target } },
-      orderBy: { date: 'asc' },
-      select: {
-        date: true, qualityScore: true,
-        asleepMin: true, deepMin: true, remMin: true, efficiency: true,
-      },
-    }),
+    preloaded
+      ? preloaded.vitals.filter(v => inWindow(v.date))
+      : prisma.vitalsEntry.findMany({
+          where: { userId, date: { gte: since, lte: target } },
+          orderBy: { date: 'asc' },
+          select: {
+            date: true, hrv: true, restingHeartRate: true,
+            respiratoryRate: true, wristTempDeviation: true,
+          },
+        }),
+    preloaded
+      ? preloaded.sleep.filter(s => inWindow(s.date))
+      : prisma.sleepEntry.findMany({
+          where: { userId, date: { gte: since, lte: target } },
+          orderBy: { date: 'asc' },
+          select: {
+            date: true, qualityScore: true,
+            asleepMin: true, deepMin: true, remMin: true, efficiency: true,
+          },
+        }),
     prisma.wellnessCheck.findUnique({
       where: { userId_date: { userId, date: target } },
       select: { sleep: true, soreness: true, fatigue: true, mood: true, stress: true },

@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import type { PrismaClient } from '@prisma/client'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
-import { computeReadinessFor } from '@/server/readiness'
+import { computeReadinessFor, READINESS_HISTORY_DAYS } from '@/server/readiness'
 import { exertionScore } from '@/lib/exertion'
 import { wearablesEnabledForRole } from '@/lib/wearables-access'
 import { auditLog } from '@/server/audit'
@@ -91,20 +91,43 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
   const stressSince = startOfDay()
   stressSince.setDate(stressSince.getDate() - STRESS_DAYS)
 
-  const [connection, readiness, sleep, vitals, activities, trend, stress, exertion] = await Promise.all([
+  // Slaap en vitals éénmaal ophalen over het ruimste venster: readiness kijkt
+  // READINESS_HISTORY_DAYS (70d) terug, het overzicht zelf 30d. We fetchen 70d
+  // en filteren het overzicht in-memory — voorheen las computeReadinessFor
+  // dezelfde tabellen nogmaals voor een overlappend venster.
+  const historySince = startOfDay()
+  historySince.setDate(historySince.getDate() - READINESS_HISTORY_DAYS)
+  const wideSince = new Date(Math.min(sleepSince.getTime(), vitalsSince.getTime(), historySince.getTime()))
+
+  const sleepPromise = prisma.sleepEntry.findMany({
+    where: { userId, date: { gte: wideSince } },
+    orderBy: { date: 'asc' },
+    select: {
+      date: true, startAt: true, endAt: true, inBedMin: true, asleepMin: true,
+      awakeMin: true, lightMin: true, deepMin: true, remMin: true,
+      efficiency: true, latencyMin: true, qualityScore: true, stages: true,
+    },
+  })
+  const vitalsPromise = prisma.vitalsEntry.findMany({
+    where: { userId, date: { gte: wideSince } },
+    orderBy: { date: 'asc' },
+    select: {
+      date: true, hrv: true, hrvType: true, restingHeartRate: true,
+      respiratoryRate: true, wristTempDeviation: true, steps: true,
+      activeEnergyKcal: true, basalEnergyKcal: true, vo2Max: true,
+    },
+  })
+
+  const [connection, readiness, sleepAll, vitalsAll, activities, trend, stress, exertion] = await Promise.all([
     prisma.wearableConnection.findUnique({
       where: { userId_provider: { userId, provider: 'APPLE_HEALTH' } },
       select: { provider: true, deviceModel: true, enabled: true, lastSyncAt: true, connectedAt: true },
     }),
-    computeReadinessFor(prisma, userId),
-    prisma.sleepEntry.findMany({
-      where: { userId, date: { gte: sleepSince } },
-      orderBy: { date: 'asc' },
-    }),
-    prisma.vitalsEntry.findMany({
-      where: { userId, date: { gte: vitalsSince } },
-      orderBy: { date: 'asc' },
-    }),
+    Promise.all([vitalsPromise, sleepPromise]).then(([vitalsRows, sleepRows]) =>
+      computeReadinessFor(prisma, userId, new Date(), { vitals: vitalsRows, sleep: sleepRows }),
+    ),
+    sleepPromise,
+    vitalsPromise,
     prisma.cardioLog.findMany({
       where: { patientId: userId, source: { in: ['APPLE_WATCH', 'STRAVA'] } },
       orderBy: { completedAt: 'desc' },
@@ -118,6 +141,7 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
     prisma.stressEntry.findMany({
       where: { userId, date: { gte: stressSince } },
       orderBy: { date: 'asc' },
+      select: { date: true, avgScore: true, restingHeartRate: true, samples: true, timeInBands: true },
     }),
     prisma.exertionEntry.findMany({
       where: { userId, date: { gte: stressSince } },
@@ -125,6 +149,10 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
       select: { date: true, trimp: true, activeSec: true, timeInZones: true },
     }),
   ])
+
+  // Het overzicht toont een korter venster dan de readiness-historie.
+  const sleep = sleepAll.filter(s => s.date >= sleepSince)
+  const vitals = vitalsAll.filter(v => v.date >= vitalsSince)
 
   return {
     connection: connection

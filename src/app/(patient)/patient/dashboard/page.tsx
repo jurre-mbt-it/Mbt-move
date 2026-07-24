@@ -23,8 +23,10 @@ import { DpaPopup } from '@/components/dpa/DpaPopup'
 const DAY_LABELS = ['MA', 'DI', 'WO', 'DO', 'VR', 'ZA', 'ZO']
 
 export default function PatientDashboard() {
+  // Bewust GEEN getActiveProgram hier: die laadt het volledige programma-blob
+  // (alle weken/dagen/oefeningen). Het dashboard heeft alleen id/naam/
+  // daysPerWeek nodig en die zitten al in getTodayExercises' program.
   const { data: sessionData } = trpc.patient.getTodayExercises.useQuery()
-  const { data: activeProgram } = trpc.patient.getActiveProgram.useQuery()
   const { data: activePrograms } = trpc.patient.getActivePrograms.useQuery()
   const { data: sessionHistory } = trpc.patient.getSessionHistory.useQuery({ limit: 20 })
 
@@ -51,14 +53,14 @@ export default function PatientDashboard() {
   // de noemer — daysPerWeek blijft daar op de builder-default staan.
   const weekCompleted =
     sessionHistory?.filter((s) => {
-      if (activeProgram?.id && s.programId !== activeProgram.id) return false
+      if (program?.id && s.programId !== program.id) return false
       const d = new Date(s.completedAt)
       const weekStart = new Date()
       weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1)
       weekStart.setHours(0, 0, 0, 0)
       return d >= weekStart
     }).length ?? 0
-  const weekTotal = program?.weeklyTarget ?? activeProgram?.daysPerWeek ?? 0
+  const weekTotal = program?.weeklyTarget ?? program?.daysPerWeek ?? 0
 
   const jsDay = new Date().getDay() // 0=Sun
   const todayIndex = jsDay === 0 ? 6 : jsDay - 1 // Mon=0..Sun=6
@@ -287,11 +289,11 @@ export default function PatientDashboard() {
               bar={P.teal}
             />
           ))
-        ) : activeProgram?.id ? (
+        ) : program?.id ? (
           <ActionTile
-            href={`/patient/program/${activeProgram.id}`}
+            href={`/patient/program/${program.id}`}
             label="Mijn programma"
-            sub={`${activeProgram.name ?? ''} · alle weken bekijken`}
+            sub={`${program.name} · alle weken bekijken`}
             bar={P.teal}
           />
         ) : null}
