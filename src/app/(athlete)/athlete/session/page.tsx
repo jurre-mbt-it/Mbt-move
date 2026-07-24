@@ -561,11 +561,11 @@ function AthleteSessionPageInner() {
 
   async function handleFinish() {
     setError(null)
-    // Duur: in quick-mode de (aanpasbare) ingevulde minuten, anders de live tijd.
-    const durationSeconds = isQuickMode
-      ? Math.max(1, Math.round(Number(durationInput) || Math.max(1, Math.round(elapsed / 60)))) * 60
-      : Math.max(elapsed, 1)
-    const painLevel = isQuickMode ? (painEnabled ? (sessionPain ?? 0) : 0) : sessionPain
+    // Beide flows ronden af via de popup: duur = de (aanpasbare) ingevulde
+    // minuten, met de live-getelde tijd als vangnet bij lege/onzinnige invoer.
+    const inputMin = Math.round(Number(durationInput))
+    const durationSeconds = inputMin >= 1 ? inputMin * 60 : Math.max(elapsed, 1)
+    const painLevel = painEnabled ? (sessionPain ?? 0) : 0
     try {
       await logSession.mutateAsync({
         programId: isQuickMode ? undefined : sessionData?.program?.id,
@@ -1117,106 +1117,43 @@ function AthleteSessionPageInner() {
             )
           })()}
 
-          {/* RPE — verplicht voor workload */}
-          <div className="text-left">
-            <div className="flex items-baseline justify-between mb-2">
-              <p style={{ color: P.ink, fontSize: 13, fontWeight: 700 }}>
-                Hoe zwaar voelde de sessie?
-              </p>
-              <span
-                className="athletic-mono"
-                style={{
-                  color: sessionRpe !== null ? P.brand : P.inkMuted,
-                  fontSize: 13,
-                  fontWeight: 900,
-                }}
-              >
-                {sessionRpe !== null ? `${sessionRpe}/10` : '—'}
-              </span>
-            </div>
-            <div className="flex gap-1">
-              {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setSessionRpe(sessionRpe === n ? null : n)}
-                  className="athletic-tap flex-1 rounded-lg athletic-mono transition-all"
-                  style={{
-                    height: 44,
-                    background: sessionRpe === n ? P.brand : P.surfaceHi,
-                    color: sessionRpe === n ? P.bg : P.inkMuted,
-                    fontSize: 12,
-                    fontWeight: 900,
-                  }}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-            <p style={{ color: P.inkMuted, fontSize: 10, marginTop: 6 }}>
-              1 = heel licht · 10 = maximaal
-            </p>
-          </div>
-
-          {/* Pijn-score (0-10) — optioneel */}
-          <div className="text-left">
-            <div className="flex items-baseline justify-between mb-2">
-              <p style={{ color: P.ink, fontSize: 13, fontWeight: 700 }}>
-                Pijn tijdens de sessie
-              </p>
-              <span
-                className="athletic-mono"
-                style={{
-                  color: sessionPain !== null ? P.danger : P.inkMuted,
-                  fontSize: 13,
-                  fontWeight: 900,
-                }}
-              >
-                {sessionPain !== null ? `${sessionPain}/10` : 'Geen'}
-              </span>
-            </div>
-            <div className="flex gap-1">
-              {Array.from({ length: 11 }, (_, i) => i).map(n => {
-                // Heatmap: groen → goud → rood. 0-2 groen, 3-5 goud, 6-10 rood.
-                const baseColor = n < 3 ? P.lime : n < 6 ? P.gold : P.danger
-                const selected = sessionPain === n
-                return (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setSessionPain(selected ? null : n)}
-                    className="athletic-tap flex-1 rounded-lg athletic-mono transition-all"
-                    style={{
-                      height: 36,
-                      background: selected ? baseColor : `${baseColor}1F`,
-                      color: selected ? P.bg : baseColor,
-                      border: selected
-                        ? `2px solid ${baseColor}`
-                        : `1px solid ${baseColor}33`,
-                      fontSize: 11,
-                      fontWeight: 900,
-                    }}
-                  >
-                    {n}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {error && (
-            <p style={{ color: P.danger, fontSize: 13 }}>{error}</p>
-          )}
+          {/* Afronden loopt via dezelfde popup als de quick workout:
+              RPE, gevoel, optionele pijn, aanpasbare duur en notities. */}
           <DarkButton
             variant="primary"
             size="lg"
-            disabled={logSession.isPending}
-            onClick={handleFinish}
+            onClick={() => {
+              setDurationInput(String(Math.max(1, Math.round(elapsed / 60))))
+              setPainEnabled(sessionPain != null)
+              setFinishOpen(true)
+            }}
             className="w-full"
           >
-            {logSession.isPending ? 'OPSLAAN…' : 'OPSLAAN & AFSLUITEN'}
+            SESSIE AFRONDEN
           </DarkButton>
         </div>
+
+        {finishOpen && (
+          <QuickFinishModal
+            durationMin={Math.max(1, Math.round(elapsed / 60))}
+            durationInput={durationInput}
+            onDurationChange={setDurationInput}
+            exertionLevel={sessionRpe}
+            onExertionChange={setSessionRpe}
+            feelScore={feelScore}
+            onFeelChange={setFeelScore}
+            painEnabled={painEnabled}
+            onTogglePain={() => setPainEnabled(v => !v)}
+            painLevel={sessionPain}
+            onPainChange={setSessionPain}
+            notes={notes}
+            onNotesChange={setNotes}
+            error={error}
+            loading={logSession.isPending}
+            onCancel={() => setFinishOpen(false)}
+            onSubmit={handleFinish}
+          />
+        )}
       </div>
     )
   }
