@@ -5,9 +5,16 @@
  * per signaal + 30-daagse trend. Voedt op de hybride score uit
  * src/lib/readiness.ts. Bij < baseline-drempel toont 'ie de LEARNING-staat.
  */
-import { AreaChart, Area, YAxis, ResponsiveContainer } from 'recharts'
+import dynamic from 'next/dynamic'
 import { Tile, Kicker, MetaLabel, P } from '@/components/dark-ui'
 import type { Contributor, ReadinessBandKey, ReadinessResult } from '@/lib/readiness'
+
+// Recharts lazy laden: de sparkline is het enige chart-deel van deze tegel en
+// hoort niet in de initiële bundle. Container reserveert de hoogte al.
+const ReadinessTrendChart = dynamic(
+  () => import('./ReadinessTrendChart').then(m => m.ReadinessTrendChart),
+  { ssr: false, loading: () => null },
+)
 
 const BAND_COLOR: Record<ReadinessBandKey, string> = {
   GREEN: P.lime,
@@ -66,22 +73,7 @@ export function ReadinessCard({
       {/* Trend-sparkline */}
       {trend.length >= 3 && score != null && (
         <div className="mt-4" style={{ height: 44 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={trend} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-              <defs>
-                <linearGradient id="readinessTrend" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={color} stopOpacity={0.35} />
-                  <stop offset="100%" stopColor={color} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <YAxis hide domain={[0, 100]} />
-              <Area
-                type="monotone" dataKey="score" stroke={color} strokeWidth={2}
-                fill="url(#readinessTrend)" isAnimationActive animationDuration={600}
-                dot={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          <ReadinessTrendChart trend={trend} color={color} />
         </div>
       )}
 

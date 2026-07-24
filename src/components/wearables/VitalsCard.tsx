@@ -7,8 +7,15 @@
  * niet een ruw getal om mee te benchmarken.
  */
 import { useMemo } from 'react'
-import { LineChart, Line, YAxis, ResponsiveContainer } from 'recharts'
+import dynamic from 'next/dynamic'
 import { Tile, Kicker, MetaLabel, P } from '@/components/dark-ui'
+
+// Recharts lazy laden: de mini-sparklines zijn het enige chart-deel van deze
+// tegel. De containers reserveren de hoogte al, dus geen aparte fallback.
+const VitalsSparkline = dynamic(
+  () => import('./VitalsSparkline').then(m => m.VitalsSparkline),
+  { ssr: false, loading: () => null },
+)
 
 type VitalsDto = {
   date: string
@@ -91,12 +98,11 @@ function Metric({
         </span>
       </div>
       <div style={{ height: 26, marginTop: 4 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
-            <YAxis hide domain={['dataMin - 2', 'dataMax + 2']} />
-            <Line type="monotone" dataKey="v" stroke={tint === P.inkMuted ? P.inkDim : tint} strokeWidth={1.5} dot={false} isAnimationActive animationDuration={500} />
-          </LineChart>
-        </ResponsiveContainer>
+        <VitalsSparkline
+          data={chartData}
+          stroke={tint === P.inkMuted ? P.inkDim : tint}
+          domain={['dataMin - 2', 'dataMax + 2']}
+        />
       </div>
     </div>
   )
@@ -123,12 +129,11 @@ function TempMetric({ rows }: { rows: VitalsDto[] }) {
         </span>
       </div>
       <div style={{ height: 26, marginTop: 4 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
-            <YAxis hide domain={['dataMin - 0.3', 'dataMax + 0.3']} />
-            <Line type="monotone" dataKey="v" stroke={tint === P.inkMuted ? P.inkDim : tint} strokeWidth={1.5} dot={false} isAnimationActive animationDuration={500} />
-          </LineChart>
-        </ResponsiveContainer>
+        <VitalsSparkline
+          data={chartData}
+          stroke={tint === P.inkMuted ? P.inkDim : tint}
+          domain={['dataMin - 0.3', 'dataMax + 0.3']}
+        />
       </div>
     </div>
   )
