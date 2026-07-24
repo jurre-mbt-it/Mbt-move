@@ -18,16 +18,19 @@ export const REP_UNITS = [
   { value: 'reps',       label: 'reps'       },
   { value: 'reps/zijde', label: 'reps/zijde' },
   { value: 'sec',        label: 'sec'        },
+  { value: 'sec/zijde',  label: 'sec/zijde'  },
   { value: 'min',        label: 'min'        },
   { value: 'm',          label: 'm'          },
 ]
 
 /**
- * Eenheid voor "per zijde" (unilateraal): het opgegeven aantal geldt per kant,
+ * Eenheden voor "per zijde" (unilateraal): het opgegeven aantal geldt per kant,
  * de patiënt doet links én rechts. Eén keer "set voltooien" dekt beide zijden.
  * Symmetrisch — geen aparte links/rechts-registratie (bewust simpel gehouden).
+ * `sec/zijde` is de tijd-variant (bv. side plank: 30 sec per kant).
  */
 export const PER_SIDE_UNIT = 'reps/zijde'
+export const PER_SIDE_SEC_UNIT = 'sec/zijde'
 
 /** Telt de eenheid als herhalingen (reps of reps/zijde), niet tijd/afstand? null = legacy = reps. */
 export function isRepBasedUnit(unit: string | null | undefined): boolean {
@@ -36,7 +39,7 @@ export function isRepBasedUnit(unit: string | null | undefined): boolean {
 
 /** Wordt de oefening per zijde uitgevoerd (links + rechts)? */
 export function isPerSideUnit(unit: string | null | undefined): boolean {
-  return unit === PER_SIDE_UNIT
+  return unit === PER_SIDE_UNIT || unit === PER_SIDE_SEC_UNIT
 }
 
 /** Volumefactor: per zijde telt dubbel (L+R = 2×), anders 1×. 1RM blíjft de per-zijde-waarde gebruiken. */

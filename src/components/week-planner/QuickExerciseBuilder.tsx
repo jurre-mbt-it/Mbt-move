@@ -21,7 +21,7 @@ import { trpc } from '@/lib/trpc/client'
 import { DarkButton, DarkInput, MetaLabel, P } from '@/components/dark-ui'
 import { IconStrength, IconMobility, IconPlyometrics, IconCardio, IconCore } from '@/components/icons'
 import { useCategoryColors } from '@/lib/useCategoryColors'
-import { PER_SIDE_UNIT, isRepBasedUnit, isPerSideUnit } from '@/lib/program-constants'
+import { PER_SIDE_UNIT, PER_SIDE_SEC_UNIT, isRepBasedUnit, isPerSideUnit } from '@/lib/program-constants'
 import { formatPrescription, toPrescription } from '@/lib/prescription'
 
 export type Category = 'STRENGTH' | 'MOBILITY' | 'PLYOMETRICS' | 'CARDIO' | 'STABILITY'
@@ -229,10 +229,12 @@ export function QuickExerciseBuilder({
     // als "sec", en die zou hier niet stilletjes 10 herhalingen moeten worden.
     // Staat 'ie als unilateraal genoteerd, dan begint 'ie ook per zijde.
     const unit = ex.defaultRepUnit ?? 'reps'
-    const start = ex.isUnilateral && isRepBasedUnit(unit) ? PER_SIDE_UNIT : unit
+    const start = ex.isUnilateral && isRepBasedUnit(unit) ? PER_SIDE_UNIT
+      : ex.isUnilateral && unit === 'sec' ? PER_SIDE_SEC_UNIT
+      : unit
     setList(l => [...l, {
       id: `new-${ex.id}-${l.length}`, exerciseId: ex.id, exerciseName: ex.name,
-      exerciseCategory: ex.category, sets: 3, reps: start === 'sec' ? 30 : 10,
+      exerciseCategory: ex.category, sets: 3, reps: start.startsWith('sec') ? 30 : 10,
       repUnit: start, restTime: null,
     }])
   }
@@ -311,9 +313,14 @@ export function QuickExerciseBuilder({
                     )}
                   </MiniVeld>
 
-                  {repBased && (
+                  {(repBased || e.repUnit === 'sec' || e.repUnit === PER_SIDE_SEC_UNIT) && (
                     <button type="button" aria-pressed={perZijde}
-                      onClick={() => update(i, { repUnit: perZijde ? 'reps' : PER_SIDE_UNIT })}
+                      onClick={() => update(i, {
+                        // Toggle behoudt de soort eenheid: reps↔reps/zijde, sec↔sec/zijde.
+                        repUnit: perZijde
+                          ? (e.repUnit === PER_SIDE_SEC_UNIT ? 'sec' : 'reps')
+                          : (e.repUnit === 'sec' ? PER_SIDE_SEC_UNIT : PER_SIDE_UNIT),
+                      })}
                       className="px-2 h-7 rounded text-[10px] font-semibold tracking-wide shrink-0"
                       style={perZijde
                         ? { background: P.surfaceHi, color: P.ink, border: `1px solid ${P.lineStrong}` }

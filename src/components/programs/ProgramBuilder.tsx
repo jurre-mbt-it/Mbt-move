@@ -380,10 +380,10 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         ...(p as object),
         id: `p-${Date.now()}-${i}`, // nieuwe instance-id zodat update-by-id niet kruist met andere exercises
       })) as BuilderExercise['extraParams']
-    const inheritedRepUnit = (ex.defaultRepUnit === 'sec' || ex.defaultRepUnit === 'min')
+    const inheritedRepUnit = (ex.defaultRepUnit === 'sec' || ex.defaultRepUnit === 'sec/zijde' || ex.defaultRepUnit === 'min')
       ? ex.defaultRepUnit
       : 'reps'
-    const inheritedReps = inheritedRepUnit === 'sec' ? 30 : 10
+    const inheritedReps = inheritedRepUnit.startsWith('sec') ? 30 : 10
     const newEx: BuilderExercise = {
       uid: `uid-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       exerciseId: ex.id,
@@ -577,12 +577,12 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           ...(p as object),
           id: `p-${Date.now()}-${i}`,
         })) as BuilderExercise['extraParams']
-      const inheritedRepUnit = (exWithDefaults.defaultRepUnit === 'sec' || exWithDefaults.defaultRepUnit === 'min')
+      const inheritedRepUnit = (exWithDefaults.defaultRepUnit === 'sec' || exWithDefaults.defaultRepUnit === 'sec/zijde' || exWithDefaults.defaultRepUnit === 'min')
         ? exWithDefaults.defaultRepUnit
         : 'reps'
       // Voor seconden-oefeningen (plank/wall sit/etc) wil je niet een
       // standaard van 10 reps; zet een zinvolle hold-duur als startwaarde.
-      const inheritedReps = inheritedRepUnit === 'sec' ? 30 : 10
+      const inheritedReps = inheritedRepUnit.startsWith('sec') ? 30 : 10
       const newEx: BuilderExercise = {
         uid: `uid-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         exerciseId: ex.id,
@@ -1119,7 +1119,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         setsMax: pe.setsMax ?? null,
         reps: pe.reps,
         repsMax: pe.repsMax ?? null,
-        repUnit: (pe.repUnit as 'reps' | 'sec' | 'min') ?? 'reps',
+        repUnit: (pe.repUnit as BuilderExercise['repUnit']) ?? 'reps',
         rest: pe.restTime,
         extraParams: pe.extraParams ?? [],
         notes: pe.notes ?? null,

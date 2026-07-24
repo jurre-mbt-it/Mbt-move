@@ -143,7 +143,7 @@ function intensityFromRpe(rpe: number): number {
 type TrainingZone = 'strength' | 'hypertrophy' | 'strength_endurance' | 'endurance'
 
 function classifyTrainingZone(reps: number, repUnit: string): TrainingZone {
-  if (repUnit === 'sec') {
+  if (repUnit === 'sec' || repUnit === 'sec/zijde') {
     return reps <= 20 ? 'strength' : reps <= 45 ? 'hypertrophy' : 'endurance'
   }
   if (repUnit === 'min') return 'endurance'
@@ -187,7 +187,7 @@ export function damageFactor(input: {
     ? MOVEMENT_DAMAGE[input.movementPattern] ?? 1.0
     : 1.0
 
-  if (input.repUnit === 'sec') d *= 0.55 // isometric hold — minimal damage
+  if (input.repUnit === 'sec' || input.repUnit === 'sec/zijde') d *= 0.55 // isometric hold — minimal damage
   if (input.category === 'PLYOMETRICS') d *= 1.2 // high eccentric + impact
   if (input.loadType === 'BODYWEIGHT') d *= 0.9
   // category MOBILITY → dose already 0 upstream (muscleLoadsRecord returns {})

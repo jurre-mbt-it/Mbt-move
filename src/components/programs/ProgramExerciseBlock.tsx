@@ -578,7 +578,7 @@ export function ProgramExerciseBlock({
 
             {/* Reps + repUnit-selector inline */}
             <FixedChip
-              label={exercise.repUnit === 'sec' ? 'Houd vast' : exercise.repUnit === 'min' ? 'Duur' : exercise.repUnit === 'reps/zijde' ? 'Herhalingen (per zijde)' : 'Herhalingen'}
+              label={exercise.repUnit === 'sec' ? 'Houd vast' : exercise.repUnit === 'sec/zijde' ? 'Houd vast (per zijde)' : exercise.repUnit === 'min' ? 'Duur' : exercise.repUnit === 'reps/zijde' ? 'Herhalingen (per zijde)' : 'Herhalingen'}
               isRange={exercise.repsMax != null}
               onToggleRange={() => onUpdate(exercise.uid, {
                 repsMax: exercise.repsMax == null ? Math.max(exercise.reps * 2, exercise.reps + 1) : null,

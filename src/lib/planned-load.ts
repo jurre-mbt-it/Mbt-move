@@ -53,11 +53,11 @@ const DEFAULT_REST_SEC = 60
  */
 function werkSecondenPerSet(reps: number, repUnit?: string | null): number {
   const u = (repUnit ?? '').toLowerCase().trim()
-  if (u.startsWith('sec')) return reps
-  if (u.startsWith('min')) return reps * 60
-  if (u.includes('zijde') || u.includes('kant') || u.includes('been') || u.includes('arm')) {
-    return reps * SECONDS_PER_REP * 2
-  }
+  // "per zijde" verdubbelt óók bij tijd-eenheden: 30 sec/zijde = 60 sec werk.
+  const perZijde = u.includes('zijde') || u.includes('kant') || u.includes('been') || u.includes('arm')
+  if (u.startsWith('sec')) return reps * (perZijde ? 2 : 1)
+  if (u.startsWith('min')) return reps * 60 * (perZijde ? 2 : 1)
+  if (perZijde) return reps * SECONDS_PER_REP * 2
   return reps * SECONDS_PER_REP
 }
 

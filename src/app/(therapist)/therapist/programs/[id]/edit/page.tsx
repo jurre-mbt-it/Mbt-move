@@ -264,7 +264,7 @@ export default function EditProgramPage({ params }: Props) {
     reps: pe.reps,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     repsMax: (pe as any).repsMax ?? null,
-    repUnit: (pe.repUnit as 'reps' | 'sec' | 'min') ?? 'reps',
+    repUnit: (pe.repUnit as BuilderExercise['repUnit']) ?? 'reps',
     notes: pe.notes ?? null,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     intensityType: ((pe as any).intensityType as BuilderExercise['intensityType']) ?? 'NONE',
