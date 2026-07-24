@@ -54,7 +54,10 @@ export async function proxy(request: NextRequest) {
   requestHeaders.set('x-nonce', nonce)
   requestHeaders.set('content-security-policy', csp)
 
-  const response = await updateSession(request, requestHeaders)
+  // Eén auth-roundtrip: updateSession ververst de sessie én geeft de user terug.
+  // (Voorheen deed dit pad een tweede getUser() met een eigen client — dat was
+  // per navigatie een extra seriële call naar de Supabase-auth-server.)
+  const { response, user, authAvailable } = await updateSession(request, requestHeaders)
   response.headers.set('Content-Security-Policy', csp)
 
   const isProtected = protectedPrefixes.some((prefix) => pathname.startsWith(prefix))
@@ -62,28 +65,19 @@ export async function proxy(request: NextRequest) {
 
   if (!isProtected && !isAuthRoute) return response
 
-  try {
-    const { createServerClient } = await import('@supabase/auth-helpers-nextjs')
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name) { return request.cookies.get(name)?.value },
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          set(_n, _v, _o) {},
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          remove(_n, _o) {},
-        },
-      }
-    )
-
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (isProtected && !user) {
+  if (!authAvailable) {
+    // Supabase not reachable — allow access in development only
+    if (isProtected && process.env.NODE_ENV === 'production') {
       return NextResponse.redirect(new URL('/login', request.url))
     }
+    return response
+  }
 
+  if (isProtected && !user) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  try {
     if (isAuthRoute && user) {
       // BUGFIX 2026-05-24: we lazen `user.user_metadata?.role` als bron voor
       // de role-dashboard-redirect. Die is undefined voor users die hun
@@ -107,10 +101,8 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL(dest, request.url))
     }
   } catch {
-    // Supabase not reachable — allow access in development only
-    if (isProtected && process.env.NODE_ENV === 'production') {
-      return NextResponse.redirect(new URL('/login', request.url))
-    }
+    // DB niet bereikbaar tijdens de role-redirect op /login: val terug op de
+    // gewone login-pagina i.p.v. een middleware-error.
   }
 
   return response

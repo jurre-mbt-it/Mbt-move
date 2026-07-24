@@ -1,4 +1,5 @@
 import { createServerClient, type CookieOptions } from '@supabase/auth-helpers-nextjs'
+import type { User } from '@supabase/supabase-js'
 import { type NextRequest, NextResponse } from 'next/server'
 
 const isSupabaseConfigured =
@@ -6,7 +7,18 @@ const isSupabaseConfigured =
   !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
   !process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('your-supabase')
 
-export async function updateSession(request: NextRequest, requestHeaders?: Headers) {
+export interface SessionResult {
+  response: NextResponse
+  user: User | null
+  // false = Supabase niet geconfigureerd of onbereikbaar; `user: null` zegt dan
+  // niets over ingelogd-zijn. De proxy beslist daarop (prod: uitloggen, dev: door).
+  authAvailable: boolean
+}
+
+export async function updateSession(
+  request: NextRequest,
+  requestHeaders?: Headers
+): Promise<SessionResult> {
   // `requestHeaders` (met o.a. de CSP-nonce) wordt doorgegeven aan de SSR-render
   // zodat Next de nonce uit de `Content-Security-Policy`-request-header kan
   // extraheren en op zijn eigen scripts kan zetten.
@@ -16,7 +28,7 @@ export async function updateSession(request: NextRequest, requestHeaders?: Heade
 
   // Skip if Supabase isn't configured yet (local dev without credentials)
   if (!isSupabaseConfigured) {
-    return response
+    return { response, user: null, authAvailable: false }
   }
 
   const supabase = createServerClient(
@@ -39,8 +51,12 @@ export async function updateSession(request: NextRequest, requestHeaders?: Heade
     }
   )
 
-  // Refresh the session token
-  await supabase.auth.getUser()
-
-  return response
+  // Refresh the session token. Dit is de ENIGE auth-roundtrip in de proxy —
+  // de user gaat mee terug zodat de route-checks geen tweede getUser() doen.
+  try {
+    const { data } = await supabase.auth.getUser()
+    return { response, user: data.user ?? null, authAvailable: true }
+  } catch {
+    return { response, user: null, authAvailable: false }
+  }
 }
