@@ -2114,7 +2114,16 @@ export const patientRouter = createTRPCRouter({
           orderBy: { completedAt: 'asc' },
         }),
         ctx.prisma.weekSchedule.findMany({
-          where: { patientId: ctx.user.id, isTemplate: false },
+          // Alleen weken die de opgevraagde range raken. Een week beslaat
+          // startDate t/m startDate+6d, dus 7 dagen marge aan de voorkant dekt
+          // ook een week die vóór `from` begint maar erin doorloopt. Zonder dit
+          // filter groeide de payload lineair met de hele patiënt-historie,
+          // ongeacht welke maand de kalender toont.
+          where: {
+            patientId: ctx.user.id,
+            isTemplate: false,
+            startDate: { gte: new Date(fromDate.getTime() - 7 * 86_400_000), lt: toDate },
+          },
           select: {
             id: true,
             weekNumber: true,

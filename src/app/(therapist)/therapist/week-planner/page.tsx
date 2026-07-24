@@ -1487,14 +1487,30 @@ function WeekPlannerContent() {
   const { data: patientsRaw = [] } = trpc.patients.list.useQuery(undefined, { staleTime: 60_000 })
   const patients: Patient[] = patientsRaw.map(p => ({ id: p.id, name: p.name, email: p.email }))
 
+  // Datumvenster voor de planner-queries: de zichtbare maand + 2 weken marge
+  // aan beide kanten (het grid toont aanloop-/uitloopdagen van aangrenzende
+  // maanden). Zonder venster laadde de planner de volledige patiënt-historie,
+  // die elke behandelweek verder groeit. Weken zonder startDate (legacy)
+  // komen server-side altijd mee.
+  const plannerWindow = useMemo(() => ({
+    from: new Date(year, month0, 1 - 14).toISOString(),
+    to: new Date(year, month0 + 1, 15).toISOString(),
+  }), [year, month0])
+  // Eén gedeelde key: ook de optimistic updates (reorderItems) en de
+  // fetch-na-create moeten op exact deze cache-entry werken.
+  const schedulesKey = useMemo(
+    () => ({ patientId: selectedPatientId, isTemplate: false, ...plannerWindow }),
+    [selectedPatientId, plannerWindow],
+  )
+
   const { data: schedules = [] } = trpc.weekSchedules.listWithItems.useQuery(
-    selectedPatientId ? { patientId: selectedPatientId, isTemplate: false } : undefined,
+    selectedPatientId ? schedulesKey : undefined,
     { enabled: !!selectedPatientId, staleTime: 10_000 },
   )
   // Oefeningen + cardio-params per item (apart van listWithItems om TS2589 te
   // vermijden). Gegroepeerd op itemId voor merge in dateMap.
   const { data: itemContents = [], isFetched: contentsLoaded } = trpc.weekSchedules.listItemContents.useQuery(
-    selectedPatientId ? { patientId: selectedPatientId } : { patientId: '' },
+    selectedPatientId ? { patientId: selectedPatientId, ...plannerWindow } : { patientId: '' },
     { enabled: !!selectedPatientId, staleTime: 10_000 },
   )
   const contentsByItem = useMemo(() => {
@@ -1565,7 +1581,7 @@ function WeekPlannerContent() {
     // Optimistic: verplaats het item meteen in de cache zodat de tegel direct
     // mee-springt; server reconcilieert op de achtergrond.
     onMutate: async (vars) => {
-      const key = { patientId: selectedPatientId, isTemplate: false }
+      const key = schedulesKey
       await utils.weekSchedules.listWithItems.cancel(key)
       const prev = utils.weekSchedules.listWithItems.getData(key)
       /* eslint-disable @typescript-eslint/no-explicit-any -- cache-shape is diep-genest; lokaal any om TS2589 te vermijden */
@@ -2156,9 +2172,7 @@ function WeekPlannerContent() {
         days: Array.from({ length: 7 }, (_, i) => ({ dayOfWeek: i })),
       })
       await utils.weekSchedules.listWithItems.invalidate()
-      const refreshed = await utils.weekSchedules.listWithItems.fetch(
-        { patientId: selectedPatientId, isTemplate: false },
-      )
+      const refreshed = await utils.weekSchedules.listWithItems.fetch(schedulesKey)
       const newWs = refreshed.find(w => w.id === created.id)
       const newDay = newWs?.days.find(d => d.dayOfWeek === diffDays(date, monday))
       return newDay?.id ?? null

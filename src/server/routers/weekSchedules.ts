@@ -1043,6 +1043,14 @@ export const weekSchedulesRouter = createTRPCRouter({
       isTemplate: z.boolean().optional(),
       /** Sjabloon-weken van één trainingsplan (planTemplates.createEmpty). */
       planTemplateId: z.string().optional(),
+      /**
+       * Optioneel datumvenster (ISO) op startDate. Zonder venster komt de hele
+       * patiënt-historie mee — dat groeit elke behandelweek. Weken zónder
+       * startDate (legacy) blijven altijd meekomen: de planner plaatst die
+       * relatief aan een baseline en mag ze dus nooit kwijtraken.
+       */
+      from: z.string().optional(),
+      to: z.string().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
       const isAdmin = ctx.user.role === 'ADMIN'
@@ -1052,12 +1060,27 @@ export const weekSchedulesRouter = createTRPCRouter({
         : practiceId
           ? { OR: [{ creatorId: ctx.user.id }, { practiceId }] }
           : { creatorId: ctx.user.id }
+      // Als aparte AND-tak, want `ownership` claimt de top-level OR al.
+      const dateWindow = (input?.from || input?.to)
+        ? [{
+            OR: [
+              { startDate: null },
+              {
+                startDate: {
+                  ...(input.from ? { gte: new Date(input.from) } : {}),
+                  ...(input.to ? { lt: new Date(input.to) } : {}),
+                },
+              },
+            ],
+          }]
+        : []
       return ctx.prisma.weekSchedule.findMany({
         where: {
           ...ownership,
           ...(input?.patientId !== undefined ? { patientId: input.patientId } : {}),
           ...(input?.isTemplate !== undefined ? { isTemplate: input.isTemplate } : {}),
           ...(input?.planTemplateId !== undefined ? { planTemplateId: input.planTemplateId } : {}),
+          ...(dateWindow.length ? { AND: dateWindow } : {}),
         },
         include: {
           patient: { select: { id: true, name: true, email: true } },
@@ -1090,7 +1113,13 @@ export const weekSchedulesRouter = createTRPCRouter({
    * gecast naar een begrensd type (geen recursief Prisma JsonValue → geen TS2589).
    */
   listItemContents: coachStaffProcedure
-    .input(z.object({ patientId: z.string(), planTemplateId: z.string().optional() }))
+    .input(z.object({
+      patientId: z.string(),
+      planTemplateId: z.string().optional(),
+      /** Zelfde optionele datumvenster als listWithItems (alleen patiënt-tak). */
+      from: z.string().optional(),
+      to: z.string().optional(),
+    }))
     .query(async ({ ctx, input }) => {
       // Twee bronnen: de weken van een patiënt, of de sjabloon-weken van een
       // trainingsplan. Elk met zijn eigen toegangscheck.
@@ -1099,9 +1128,25 @@ export const weekSchedulesRouter = createTRPCRouter({
       } else {
         await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
       }
+      // NULL-startDate (legacy) blijft meekomen, zie listWithItems.
+      const scheduleWindow = (!input.planTemplateId && (input.from || input.to))
+        ? {
+            AND: [{
+              OR: [
+                { startDate: null },
+                {
+                  startDate: {
+                    ...(input.from ? { gte: new Date(input.from) } : {}),
+                    ...(input.to ? { lt: new Date(input.to) } : {}),
+                  },
+                },
+              ],
+            }],
+          }
+        : {}
       const where = input.planTemplateId
         ? { day: { weekSchedule: { planTemplateId: input.planTemplateId } } }
-        : { day: { weekSchedule: { patientId: input.patientId } } }
+        : { day: { weekSchedule: { patientId: input.patientId, ...scheduleWindow } } }
       const items = await ctx.prisma.weekScheduleDayItem.findMany({
         where,
         select: {

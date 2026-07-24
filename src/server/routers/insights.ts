@@ -70,29 +70,31 @@ export const insightsRouter = createTRPCRouter({
       return { insights: [], silentPatients: [] }
     }
 
-    const insights = await ctx.prisma.insight.findMany({
-      where: {
-        ...(patientIds ? { patientId: { in: patientIds } } : {}),
-        status: 'OPEN',
-        OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: new Date() } }],
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: [{ urgency: 'asc' }, { createdAt: 'desc' }],
-      include: {
-        patient: { select: { id: true, name: true, email: true } },
-        exercise: { select: { id: true, name: true } },
-      },
-    })
-
-    // "Geactiveerde patiënten zonder insights" — toon als kleine rustige lijst
-    const enabledStatuses = await ctx.prisma.patientInsightStatus.findMany({
-      where: {
-        enabled: true,
-        patientObjection: false,
-        ...(patientIds ? { patientId: { in: patientIds } } : {}),
-      },
-      include: { patient: { select: { id: true, name: true, email: true } } },
-    })
+    // Onafhankelijk van elkaar → parallel (dashboard-hot-path).
+    const [insights, enabledStatuses] = await Promise.all([
+      ctx.prisma.insight.findMany({
+        where: {
+          ...(patientIds ? { patientId: { in: patientIds } } : {}),
+          status: 'OPEN',
+          OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: new Date() } }],
+          expiresAt: { gt: new Date() },
+        },
+        orderBy: [{ urgency: 'asc' }, { createdAt: 'desc' }],
+        include: {
+          patient: { select: { id: true, name: true, email: true } },
+          exercise: { select: { id: true, name: true } },
+        },
+      }),
+      // "Geactiveerde patiënten zonder insights" — toon als kleine rustige lijst
+      ctx.prisma.patientInsightStatus.findMany({
+        where: {
+          enabled: true,
+          patientObjection: false,
+          ...(patientIds ? { patientId: { in: patientIds } } : {}),
+        },
+        include: { patient: { select: { id: true, name: true, email: true } } },
+      }),
+    ])
     const noisyPatientIds = new Set(insights.map((i) => i.patientId))
     const silentPatients = enabledStatuses
       .filter((s) => !noisyPatientIds.has(s.patientId))
