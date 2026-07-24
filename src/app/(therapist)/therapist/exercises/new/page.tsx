@@ -1,9 +1,12 @@
+'use client'
+
+// Geen metadata-export: usePortal() (coach/therapeut-gedeelde links) maakt dit
+// een client-pagina. Een server component die deze hook aanroept crasht met
+// een 500 op elke request — dat was precies de productie-bug op deze route.
 import Link from 'next/link'
 import { usePortal } from '@/lib/portal'
 import { ExerciseForm } from '@/components/exercises/ExerciseForm'
 import { Kicker, MetaLabel, P } from '@/components/dark-ui'
-
-export const metadata = { title: 'Nieuwe oefening – MBT Gym' }
 
 export default function NewExercisePage() {
   const portal = usePortal()
