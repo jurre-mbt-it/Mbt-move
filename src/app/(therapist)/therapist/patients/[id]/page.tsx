@@ -193,7 +193,8 @@ export default function PatientDetailPage({
   }, [patient, editing])
   const programs = programsRaw as Array<{
     id: string; name: string; status: string; weeks: number;
-    daysPerWeek: number; startDate: Date | null; endDate: Date | null; isTemplate: boolean;
+    daysPerWeek: number; flexibleSchedule: boolean; weeklyTarget: number | null;
+    startDate: Date | null; endDate: Date | null; isTemplate: boolean;
     updatedAt: Date | string; reviewAfterWeeks: number | null
   }>
 
@@ -1025,7 +1026,8 @@ function ProfileRow({ label, value }: { label: string; value: string }) {
 
 type ProgramTileData = {
   id: string; name: string; status: string; weeks: number;
-  daysPerWeek: number; startDate: Date | null; endDate: Date | null; isTemplate: boolean;
+  daysPerWeek: number; flexibleSchedule: boolean; weeklyTarget: number | null;
+  startDate: Date | null; endDate: Date | null; isTemplate: boolean;
   updatedAt: Date | string; reviewAfterWeeks: number | null
 }
 
@@ -1070,7 +1072,9 @@ function ProgramTile({
               className="athletic-mono"
               style={{ color: P.inkMuted, fontSize: 11, marginTop: 3, letterSpacing: '0.03em' }}
             >
-              {prog.weeks} weken · {prog.daysPerWeek}×/week
+              {/* Flexibele week: de frequentie staat in weeklyTarget, niet in daysPerWeek. */}
+              {prog.weeks} weken · {prog.flexibleSchedule ? (prog.weeklyTarget ?? prog.daysPerWeek) : prog.daysPerWeek}×/week
+              {prog.flexibleSchedule && ' (flexibel)'}
               {prog.startDate && ` · Start ${new Date(prog.startDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`}
               {dimmed && prog.endDate && ` · Afgesloten ${new Date(prog.endDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`}
             </p>

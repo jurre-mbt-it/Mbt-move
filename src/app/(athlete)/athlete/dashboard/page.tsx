@@ -98,7 +98,10 @@ export default function AthleteDashboard() {
   const weekCompleted =
     sessionHistory?.filter((s) => new Date(s.completedAt) >= weekStart).length ??
     0
-  const weekTotal = activeProgram?.daysPerWeek ?? 0
+  // Flexibele week: het weekdoel staat in weeklyTarget, niet in daysPerWeek.
+  const weekTotal = activeProgram?.flexibleSchedule
+    ? (activeProgram.weeklyTarget ?? activeProgram.daysPerWeek ?? 0)
+    : (activeProgram?.daysPerWeek ?? 0)
   const weekProgressPct =
     weekTotal > 0 ? Math.min((weekCompleted / weekTotal) * 100, 100) : 0
 

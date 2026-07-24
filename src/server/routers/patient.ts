@@ -292,6 +292,9 @@ export const patientRouter = createTRPCRouter({
       status: program.status,
       weeks: program.weeks,
       daysPerWeek: program.daysPerWeek,
+      // Flexibele week: clients moeten weeklyTarget tonen i.p.v. daysPerWeek.
+      flexibleSchedule: program.flexibleSchedule,
+      weeklyTarget: program.weeklyTarget ?? null,
       startDate: program.startDate?.toISOString() ?? null,
       currentWeek,
       currentDay,
