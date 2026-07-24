@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { MfaEnrollForm } from '@/components/auth/MfaEnrollForm'
 
 export const metadata = {
-  title: 'Enable 2FA – MBT Gym',
+  title: 'Enable 2FA – BASE',
 }
 
 export default function MfaEnrollPage() {

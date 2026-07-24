@@ -63,7 +63,7 @@ export default async function ShopLayout({
       <footer className="border-t mt-20" style={{ borderColor: P.line }}>
         <div className="mx-auto max-w-6xl px-5 py-10 text-xs leading-relaxed">
           <p className="mb-2 font-medium" style={{ color: P.inkMuted }}>
-            MBT Gym · Movement Based Therapy, Amsterdam
+            BASE · Movement Based Therapy, Amsterdam
           </p>
           <p style={{ color: P.inkDim }}>
             Onze programma&apos;s zijn educatieve trainings- en oefenprogramma&apos;s en vervangen

@@ -86,7 +86,7 @@ export default function OnboardingDpaPage() {
             OVEREENKOMST
           </Display>
           <MetaLabel style={{ marginTop: 8, textTransform: 'none', fontWeight: 500 }}>
-            Voor het gebruik van MBT Gym is een verwerkingsovereenkomst (AVG/GDPR) verplicht.
+            Voor het gebruik van BASE is een verwerkingsovereenkomst (AVG/GDPR) verplicht.
             Lees de samenvatting hieronder en accepteer om door te gaan.
           </MetaLabel>
         </div>

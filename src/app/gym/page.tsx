@@ -27,15 +27,15 @@ const P = {
 }
 
 // Merk-fonts, gematcht op de iOS-app: JetBrains Mono voor labels/meters,
-// Inter Tight voor body, Geometos voor display-koppen (zie @font-face + de
-// .mbt-gym-root regels in het <style>-blok hieronder).
+// Inter Tight voor body, Archivo voor display-koppen (vrije licentie; verving
+// Geometos bij de BASE-rebrand, DPIA actie 27).
 const mono =
   "'JetBrains Mono', ui-monospace, Menlo, 'SF Mono', monospace"
 
-const geo = "'Geometos', 'Satoshi', ui-sans-serif, system-ui, sans-serif"
+const geo = "'Archivo', ui-sans-serif, system-ui, sans-serif"
 
 const requestAccess =
-  'mailto:jurre@movementbasedtherapy.nl?subject=MBT-Gym%20TestFlight%20toegang&body=Hoi%20Jurre%2C%20ik%20zou%20graag%20toegang%20tot%20de%20MBT-Gym%20beta.'
+  'mailto:jurre@movementbasedtherapy.nl?subject=BASE%20TestFlight%20toegang&body=Hoi%20Jurre%2C%20ik%20zou%20graag%20toegang%20tot%20de%20BASE%20beta.'
 
 export default function GymLandingPage() {
   return (
@@ -49,12 +49,8 @@ export default function GymLandingPage() {
       }}
     >
       <style>{`
-        /* Merk-fonts uit de iOS-app, self-hosted (public/fonts) */
-        @font-face {
-          font-family: 'Geometos';
-          src: url('/fonts/Geometos.ttf') format('truetype');
-          font-weight: 100 900; font-style: normal; font-display: swap;
-        }
+        /* Merk-fonts uit de iOS-app, self-hosted (public/fonts).
+           Archivo (display) laadt app-breed via globals.css. */
         @font-face {
           font-family: 'InterTight';
           src: url('/fonts/InterTight-Regular.ttf') format('truetype');
@@ -80,7 +76,7 @@ export default function GymLandingPage() {
           src: url('/fonts/JetBrainsMono-Medium.ttf') format('truetype');
           font-weight: 600 900; font-style: normal; font-display: swap;
         }
-        /* Geometos = display-font voor de koppen (allemaal uppercase) */
+        /* Archivo = display-font voor de koppen (allemaal uppercase) */
         .mbt-gym-root h1, .mbt-gym-root h2, .mbt-gym-root h3 {
           font-family: ${geo};
         }

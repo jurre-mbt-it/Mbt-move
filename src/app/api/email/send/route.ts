@@ -235,7 +235,7 @@ export async function POST(req: NextRequest) {
         from:
           process.env.RESEND_FROM
           ?? process.env.RESEND_FROM_EMAIL
-          ?? 'MBT Gym <noreply@mbt-gym.nl>',
+          ?? 'BASE <noreply@mbt-gym.nl>',
         to,
         // Newlines eruit: een regelovergang in een subject-veld is een klassieke
         // header-injection-vector bij mail-API's.
