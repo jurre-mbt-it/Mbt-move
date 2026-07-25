@@ -24,6 +24,7 @@ import { prisma } from '@/lib/prisma'
 import { DPA_VERSION } from '@/lib/dpa-constants'
 import { GHV_VERSION } from '@/lib/ghv-constants'
 import { isPersonalModeEnabled } from './personal-mode'
+import { decodeAalClaim } from './aal'
 
 export type RequiredRole = 'THERAPIST' | 'ADMIN' | 'PATIENT' | 'ATHLETE' | 'COACH'
 
@@ -101,9 +102,17 @@ export const getServerUser = cache(async (): Promise<SessionUser | null> => {
 async function staffMfaChallengePending(): Promise<boolean> {
   try {
     const supabase = await createClient()
-    const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-    if (error || !data) return false
-    return data.nextLevel === 'aal2' && data.currentLevel !== 'aal2'
+    // Hier stond `mfa.getAuthenticatorAssuranceLevel()`, en die leidt het niveau
+    // af uit `session.user.factors` — rechtstreeks uit de cookie, ongeverifieerd.
+    // Wie zijn eigen cookie leegde, kreeg currentLevel === nextLevel === 'aal1'
+    // en dus géén challenge-redirect. Nu uit de `aal`-claim van het token.
+    //
+    // Geen extra getUser()-roundtrip: de aanroeper (requireRole) heeft
+    // getServerUser() al gedaan en die verifieert het token bij de Auth-server,
+    // dus dit is hetzelfde, al geverifieerde token.
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) return false
+    return decodeAalClaim(session.access_token) !== 'aal2'
   } catch {
     return false
   }

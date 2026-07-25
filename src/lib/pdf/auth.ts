@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/prisma'
+import { decodeAalClaim } from '@/lib/auth/aal'
 
 export type PrintActor = {
   id: string
@@ -11,20 +12,6 @@ export type PrintActor = {
   mfaEnabled: boolean
   /** `aal`-claim uit het geverifieerde access-token: 'aal2' = tweede factor gehaald. */
   aal: string | null
-}
-
-/** Twin van `decodeAalClaim` in src/server/trpc.ts. Geen signature-check nodig:
- *  het token is al door `getUser()` bij de Auth-server geverifieerd. */
-function decodeAalClaim(accessToken: string | null | undefined): string | null {
-  if (!accessToken) return null
-  try {
-    const payload = accessToken.split('.')[1]
-    if (!payload) return null
-    const json = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
-    return typeof json.aal === 'string' ? json.aal : null
-  } catch {
-    return null
-  }
 }
 
 /**

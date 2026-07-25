@@ -532,7 +532,12 @@ export const patientRouter = createTRPCRouter({
       where: {
         patientId: targetPatientId,
         status: 'ACTIVE',
-        ...(programIdOverride ? { id: programIdOverride } : {}),
+        // Zelfde filter als getActiveProgram: zonder specifiek verzoek alleen
+        // programma's die écht oefeningen hebben. Anders pakt dit een leeg
+        // ACTIVE-programma (bv. een rehab-placeholder) en filtert het dashboard
+        // alle sessies van het échte programma weg — de ring toonde dan 0/3
+        // terwijl de patiënt zijn trainingen wél had gedaan.
+        ...(programIdOverride ? { id: programIdOverride } : { exercises: { some: {} } }),
       },
       // Deterministische default bij meerdere actieve programma's: oudste eerst.
       orderBy: { createdAt: 'asc' },
@@ -2122,7 +2127,22 @@ export const patientRouter = createTRPCRouter({
           where: {
             patientId: ctx.user.id,
             isTemplate: false,
-            startDate: { gte: new Date(fromDate.getTime() - 7 * 86_400_000), lt: toDate },
+            // Een range-filter op een nullable kolom sluit NULL uit, en weken
+            // zónder startDate (legacy) moeten altijd meekomen — beide clients
+            // leiden de datum dan af uit createdAt + weekNumber. Zonder deze tak
+            // verdwijnt zo'n week stil uit de patiënt- en iOS-kalender. Dezelfde
+            // OR staat in weekSchedules.listWithItems en listItemContents.
+            // Bovengrens 7 dagen ruimer: een week met een niet-maandag startDate
+            // valt anders buiten het venster terwijl zijn dagen erin liggen.
+            OR: [
+              { startDate: null },
+              {
+                startDate: {
+                  gte: new Date(fromDate.getTime() - 7 * 86_400_000),
+                  lt: new Date(toDate.getTime() + 7 * 86_400_000),
+                },
+              },
+            ],
           },
           select: {
             id: true,

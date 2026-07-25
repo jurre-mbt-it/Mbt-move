@@ -5,6 +5,7 @@ import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
 import { DPA_VERSION } from '@/lib/dpa-constants'
+import { decodeAalClaim } from '@/lib/auth/aal'
 
 export interface Context {
   req?: NextRequest
@@ -23,20 +24,9 @@ export interface Context {
   aal: string | null
 }
 
-/** Lees de `aal`-claim uit een (reeds vertrouwde) Supabase access-token JWT.
- *  Geen signature-check nodig: de token is al geverifieerd door getUser/
- *  getSession voordat we hier komen. */
-function decodeAalClaim(accessToken: string | null | undefined): string | null {
-  if (!accessToken) return null
-  try {
-    const payload = accessToken.split('.')[1]
-    if (!payload) return null
-    const json = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
-    return typeof json.aal === 'string' ? json.aal : null
-  } catch {
-    return null
-  }
-}
+// `decodeAalClaim` staat in @/lib/auth/aal — één implementatie, ook gebruikt door
+// require-role.ts en de print-routes. De voorwaarde staat daar beschreven: het
+// token moet al door getUser() geverifieerd zijn voordat je de claim leest.
 
 // In-memory cache voor user lookups (leeft mee met de serverless instantie)
 const userCache = new Map<string, { user: Context['user']; expiresAt: number }>()
