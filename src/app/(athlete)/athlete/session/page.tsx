@@ -565,7 +565,12 @@ function AthleteSessionPageInner() {
     // minuten, met de live-getelde tijd als vangnet bij lege/onzinnige invoer.
     const inputMin = Math.round(Number(durationInput))
     const durationSeconds = inputMin >= 1 ? inputMin * 60 : Math.max(elapsed, 1)
-    const painLevel = painEnabled ? (sessionPain ?? 0) : 0
+    // Niet gevraagd of niet ingevuld = `null`, NOOIT 0. Klinisch is "geen pijn
+    // gemeld" iets anders dan "pijn 0", en de insights-laag leest `!= null` als
+    // "gerapporteerd": readyForProgression eist dat álle recente sessies een
+    // pijnscore onder de drempel hebben, dus verzonnen nullen laten dat advies
+    // slagen op sessies waar niemand iets invulde.
+    const painLevel = painEnabled ? sessionPain : null
     try {
       await logSession.mutateAsync({
         programId: isQuickMode ? undefined : sessionData?.program?.id,

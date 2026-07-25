@@ -46,7 +46,11 @@ export function SetRows({
           KG
         </span>
         <span className="flex-1 athletic-mono" style={{ color: P.inkDim, fontSize: 9, letterSpacing: '0.14em' }}>
-          {perSide ? 'REPS/ZIJDE' : repUnit === 'reps' ? 'REPS' : repUnit.toUpperCase()}
+          {/* Niet hardcoded 'REPS/ZIJDE' bij per-zijde: sinds `sec/zijde` bestaat
+              zou een side plank van 30 sec de kop REPS/ZIJDE krijgen en vulde de
+              patiënt seconden in onder een herhalingen-label. De eenheid zelf is
+              al 'reps/zijde' of 'sec/zijde', dus die is leidend. */}
+          {repUnit === 'reps' ? 'REPS' : repUnit.toUpperCase()}
         </span>
         <span style={{ width: 44 }} />
       </div>

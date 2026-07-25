@@ -32,8 +32,6 @@ export const HR_BIN_BPM = 5
  */
 export const LIGHT_HRR_FLOOR = 0.2
 export const LIGHT_WEIGHT = 0.3
-/** Fallback-ondergrens zonder bekende rust-HR: 40% HRmax. */
-export const LIGHT_PCTMAX_FLOOR = 0.4
 
 /** { ondergrens-van-de-bin (bpm) → seconden }, bv. { "120": 480 }. */
 export type BpmHistogram = Record<string, number>
@@ -69,15 +67,31 @@ export function computeExertionDay(
 
   const zones = computed.zones
   const zone1Floor = zones[0].minBpm
-  // Ondergrens van de lichte band: 20% HRR als de rust-HR bekend is, anders
-  // 40% HRmax. De HRR-variant personaliseert: bij iemand met een hoge rust-HR
-  // schuift de band mee omhoog zodat stilzitten nooit meetelt.
   const rest = profile.restingHeartRate ?? 0
   const maxHr = zones[zones.length - 1].maxBpm
+  /**
+   * Ondergrens van de lichte band: 20% HRR als de rust-HR bekend is. De
+   * HRR-variant personaliseert — bij een hoge rust-HR schuift de band mee
+   * omhoog zodat stilzitten niet meetelt.
+   *
+   * Twee vangnetten, want deze vloer bepaalt wat er wordt WEGGEGOOID:
+   *
+   * 1. Klemmen op `zone1Floor`. Zonder dat ligt de HRR-vloer bij een rust-HR
+   *    boven ~0,375 × HRmax BOVEN de Edwards-vloer, en dan sloeg de lus ook
+   *    echte zone-1-tijd over. Voorbeeld: max 175, rust 78 → zone1Floor 88,
+   *    HRR-vloer 97 — alles tussen 88 en 97 (traplopen, wandelen, boodschappen)
+   *    verdween. Dat raakt juist de gedeconditioneerde patiënt voor wie deze
+   *    readout bedoeld is. De lichte band mag krimpen, zone 1 nooit.
+   * 2. Zónder rust-HR geen lichte band. De oude 40%-HRmax-fallback lag bij een
+   *    60-jarige op 64 bpm, onder zijn slaap-HR, en het histogram is bewust het
+   *    hele etmaal (slaap inbegrepen) — dat leverde honderden AU verzonnen
+   *    belasting per dag op en drukte de p90-ijking van de 0-10-schaal plat.
+   *    Niets kunnen onderscheiden betekent hier: niets meetellen onder zone 1.
+   */
   const lightFloor =
     rest > 0 && rest < maxHr
-      ? rest + LIGHT_HRR_FLOOR * (maxHr - rest)
-      : LIGHT_PCTMAX_FLOOR * maxHr
+      ? Math.min(rest + LIGHT_HRR_FLOOR * (maxHr - rest), zone1Floor)
+      : zone1Floor
 
   const timeInZones: Record<string, number> = {}
   let activeSec = 0
