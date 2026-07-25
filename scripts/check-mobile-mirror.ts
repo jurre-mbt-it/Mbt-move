@@ -20,6 +20,7 @@ import * as web from '../src/lib/cardio-workout'
 import { HR_ZONES, type HRZone } from '../src/lib/cardio-constants'
 import { INTENSITY_TYPES, INTENSITY_TYPE_LABELS } from '../src/lib/prescription'
 import { STANDARD_PARAMS, REP_UNITS } from '../src/lib/program-constants'
+import { durationFromExercises } from '../src/lib/planned-load'
 
 const MOBILE = process.env.MOBILE_REPO
   ?? path.resolve(__dirname, '..', '..', 'mbt-gym-mobile')
@@ -105,6 +106,23 @@ async function main() {
   check('REP_UNITS (waarden)',
     REP_UNITS.map((u) => u.value),
     mirror.REP_UNITS)
+
+  // ── Duur per rep-eenheid: de rekenkunde, niet alleen de namen ─────────────
+  // Dit ontbrak, en daardoor kwam er drift ongezien door: de app kende
+  // `sec/zijde` niet en verdubbelde per-zijde helemaal niet, waardoor 3×30
+  // sec/zijde daar op 8 minuten uitkwam tegen 6 op het web. `check` op alleen
+  // REP_UNITS-waarden was groen. Web is canoniek (durationFromExercises met
+  // 1 set en 0 rust == werkSecondenPerSet).
+  console.log('\nDuur per rep-eenheid (planned-load ↔ prescription-mirror):')
+  for (const unit of REP_UNITS.map((u) => u.value)) {
+    check(`werk-seconden voor 30 × "${unit}"`,
+      durationFromExercises([{ sets: 1, reps: 30, repUnit: unit, restTime: 0 }]),
+      mirror.estimateSetActiveSec(30, unit))
+  }
+  // Onbekende eenheid moet aan beide kanten op de reps-schatting terugvallen.
+  check('werk-seconden voor een onbekende eenheid',
+    durationFromExercises([{ sets: 1, reps: 30, repUnit: 'onzin', restTime: 0 }]),
+    mirror.estimateSetActiveSec(30, 'onzin'))
 
   console.log(fouten === 0
     ? '\nGeen drift: web en app rekenen en benoemen gelijk.'

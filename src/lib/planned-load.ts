@@ -37,6 +37,15 @@ const FALLBACK_RPE = 5
 /** Ruwe schatting van de duur van een krachtset: reps × 3s + rust. */
 const SECONDS_PER_REP = 3
 const DEFAULT_REST_SEC = 60
+/**
+ * Seconden per meter voor afstand-oefeningen (farmer's carry, sledepush,
+ * lunges over een baan): 30 m = 60 sec. Bewust langzaam — het gaat om belaste
+ * verplaatsing, niet om hardlopen.
+ *
+ * MOET gelijk blijven aan `SECONDS_PER_METER` in de mobiele repo
+ * (lib/prescription-mirror.ts); `npm run check:mirror` vergelijkt de waarde.
+ */
+const SECONDS_PER_METER = 2
 
 /**
  * De eenheid van `reps` bepaalt wat het getal betékent, en dus hoe lang de set
@@ -48,17 +57,20 @@ const DEFAULT_REST_SEC = 60
  * tekst en oude rijen bevatten van alles. Onbekend → reps, zodat een eenheid
  * die we niet kennen nooit een wilde uitschieter oplevert.
  *
- * `m` (meters) kan niet: zonder tempo is afstand geen tijd. Valt bewust terug
- * op de reps-schatting in plaats van te doen alsof we het weten.
+ * `m` (meters) rekent op SECONDS_PER_METER. Afstand kent geen tempo-per-rep, dus
+ * dit is een vaste aanname; hij stond eerder op de reps-schatting (30 m = 90 sec)
+ * terwijl de app 45 sec gebruikte. Nu beide 2 sec/m.
  */
 function werkSecondenPerSet(reps: number, repUnit?: string | null): number {
   const u = (repUnit ?? '').toLowerCase().trim()
   // "per zijde" verdubbelt óók bij tijd-eenheden: 30 sec/zijde = 60 sec werk.
   const perZijde = u.includes('zijde') || u.includes('kant') || u.includes('been') || u.includes('arm')
-  if (u.startsWith('sec')) return reps * (perZijde ? 2 : 1)
-  if (u.startsWith('min')) return reps * 60 * (perZijde ? 2 : 1)
-  if (perZijde) return reps * SECONDS_PER_REP * 2
-  return reps * SECONDS_PER_REP
+  const zijde = perZijde ? 2 : 1
+  // Let op de volgorde: 'min' begint óók met 'm', dus die eerst.
+  if (u.startsWith('sec')) return reps * zijde
+  if (u.startsWith('min')) return reps * 60 * zijde
+  if (u.startsWith('m')) return reps * SECONDS_PER_METER * zijde
+  return reps * SECONDS_PER_REP * zijde
 }
 
 /**
