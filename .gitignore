@@ -71,3 +71,8 @@ tone-scan.json
 emdash-changes.json
 jargon-exercises.json
 jargon-final.json
+
+# Wegwerp-probes tegen de live database (lezen DIRECT_URL uit .env.local).
+# Nooit committen: het zijn ad-hoc debug-scripts, niet reviewbare code.
+.tmp-*
+.verify-*
