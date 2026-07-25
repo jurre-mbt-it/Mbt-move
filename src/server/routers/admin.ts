@@ -80,6 +80,10 @@ export const adminRouter = createTRPCRouter({
         select: { id: true, name: true, email: true, role: true, supabaseUserId: true },
       })
 
+      // Zonder dit houdt de gedegradeerde gebruiker tot 60s (USER_CACHE_TTL) zijn
+      // oude rechten op de tRPC-API, want de context-cache bewaart role/practiceId.
+      if (updated.supabaseUserId) invalidateUserCache(updated.supabaseUserId)
+
       // Sync ook Supabase user_metadata.role — proxy/middleware en LoginForm
       // lezen user_metadata, niet de DB. Zonder deze sync blijft de gebruiker
       // op de oude rol vastzitten bij login-redirect.

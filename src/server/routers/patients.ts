@@ -8,6 +8,7 @@ import {
   coachStaffProcedure,
   mfaCoachStaffProcedure,
   mfaTherapistProcedure,
+  invalidateUserCache,
 } from '@/server/trpc'
 import { hasPatientAccess } from '@/server/lib/patient-access'
 import { auditLog } from '@/server/audit'
@@ -1036,6 +1037,9 @@ export const patientsRouter = createTRPCRouter({
         data: { role: input.role },
         select: { id: true, role: true, supabaseUserId: true, email: true },
       })
+
+      // Anders blijft de oude rol tot 60s (USER_CACHE_TTL) in de context-cache staan.
+      if (updated.supabaseUserId) invalidateUserCache(updated.supabaseUserId)
 
       // Sync ook Supabase user_metadata.role — anders blijft de proxy/middleware
       // en LoginForm de oude rol gebruiken (die lezen user_metadata, niet de DB).

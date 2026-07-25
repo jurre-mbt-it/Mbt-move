@@ -8,11 +8,37 @@ export type PrintActor = {
   role: string
   practiceId: string | null
   canUseAssessment: boolean
+  mfaEnabled: boolean
+  /** `aal`-claim uit het geverifieerde access-token: 'aal2' = tweede factor gehaald. */
+  aal: string | null
+}
+
+/** Twin van `decodeAalClaim` in src/server/trpc.ts. Geen signature-check nodig:
+ *  het token is al door `getUser()` bij de Auth-server geverifieerd. */
+function decodeAalClaim(accessToken: string | null | undefined): string | null {
+  if (!accessToken) return null
+  try {
+    const payload = accessToken.split('.')[1]
+    if (!payload) return null
+    const json = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
+    return typeof json.aal === 'string' ? json.aal : null
+  } catch {
+    return null
+  }
 }
 
 /**
  * Ophalen van de huidige user voor een print-route. Resolved supabase
  * cookie → Prisma User. Geeft null als niet ingelogd of niet bekend.
+ *
+ * Bindt UITSLUITEND op `supabaseUserId`, net als `resolveUser` in
+ * src/server/trpc.ts. Hier stond een `OR` met een email-tak, en die accepteerde
+ * een User-row die aan een ánder Supabase-account hangt (of aan geen enkel) —
+ * precies het account-takeover-scenario dat de tRPC-kant bewust weigert, en bij
+ * twee matchende rows was de winnaar van `findFirst` willekeurig. Print-routes
+ * zijn per definitie staff, en voor THERAPIST/ADMIN weigert `resolveUser` de
+ * email-fallback óók, dus dit is geen functieverlies: wie hier niet doorkomt,
+ * komt vandaag al nergens in de app binnen.
  */
 export async function getPrintActor(): Promise<PrintActor | null> {
   const supabase = await createClient()
@@ -21,13 +47,8 @@ export async function getPrintActor(): Promise<PrintActor | null> {
   } = await supabase.auth.getUser()
   if (!user) return null
 
-  const dbUser = await prisma.user.findFirst({
-    where: {
-      OR: [
-        { supabaseUserId: user.id },
-        ...(user.email ? [{ email: user.email }] : []),
-      ],
-    },
+  const dbUser = await prisma.user.findUnique({
+    where: { supabaseUserId: user.id },
     select: {
       id: true,
       email: true,
@@ -35,10 +56,37 @@ export async function getPrintActor(): Promise<PrintActor | null> {
       role: true,
       practiceId: true,
       canUseAssessment: true,
+      mfaEnabled: true,
     },
   })
+  if (!dbUser) return null
 
-  return dbUser
+  // Token pas ná de geslaagde getUser() lezen, uitsluitend voor de aal-claim.
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  return { ...dbUser, aal: decodeAalClaim(session?.access_token) }
+}
+
+/**
+ * Reden waarom deze staff-actor géén dossier mag ophalen, of null als het mag.
+ *
+ * Print-routes vallen buiten `protectedPrefixes` in src/proxy.ts en buiten de
+ * tRPC-procedures, dus de MFA-plicht die daar wél geldt (`assertMfaSatisfied` +
+ * `assertStaffMfaEnrolled`, en de `/mfa/enroll`-redirect in require-role.ts)
+ * werd hier helemaal niet afgedwongen. Een therapeut die de tweede factor nog
+ * niet had ingesteld — of van wie alleen het wachtwoord gestolen was — kon zo
+ * volledige dossiers als HTML ophalen. Dit is de ontbrekende poort.
+ */
+export function staffMfaBlock(actor: PrintActor): string | null {
+  if (!actor.mfaEnabled) {
+    return 'Tweestapsverificatie is verplicht voor deze gegevens. Stel die eerst in via /mfa/enroll.'
+  }
+  if (actor.aal !== 'aal2') {
+    return 'Bevestig eerst de tweede stap van je login voordat je dossiers opvraagt.'
+  }
+  return null
 }
 
 /**
@@ -63,7 +111,12 @@ export async function actorCanSeePatient(
             },
           },
         },
-        ...(actor.practiceId ? [{ practiceId: actor.practiceId }] : []),
+        // Praktijk-tak expliciet aan THERAPIST gebonden, zoals AGENTS.md
+        // voorschrijft: nooit op de lege practiceId van een coach vertrouwen.
+        // De rol-gate in de routes dekt dit al, dit is defense-in-depth.
+        ...(actor.role === 'THERAPIST' && actor.practiceId
+          ? [{ practiceId: actor.practiceId }]
+          : []),
       ],
     },
     select: { id: true },

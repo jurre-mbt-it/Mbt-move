@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auditLog } from '@/server/audit'
 import { renderAssessmentPdfHtml } from '@/lib/pdf/assessment'
-import { actorIsTreating, getPrintActor } from '@/lib/pdf/auth'
+import { actorIsTreating, getPrintActor, staffMfaBlock } from '@/lib/pdf/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +16,8 @@ export async function GET(
   if (!actor) {
     return new NextResponse('Niet ingelogd', { status: 401 })
   }
+  const mfaBlock = staffMfaBlock(actor)
+  if (mfaBlock) return new NextResponse(mfaBlock, { status: 403 })
 
   // Spiegel van assessmentProcedure: alleen therapeut met canUseAssessment,
   // of admin. Anders 403 — wel met nette HTML zodat de tab niet leeg blijft.

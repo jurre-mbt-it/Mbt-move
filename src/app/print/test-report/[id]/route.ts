@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auditLog } from '@/server/audit'
 import { renderTestReportPdfHtml } from '@/lib/pdf/testReport'
-import { actorCanSeePatient, getPrintActor } from '@/lib/pdf/auth'
+import { actorCanSeePatient, getPrintActor, staffMfaBlock } from '@/lib/pdf/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +16,8 @@ export async function GET(
   if (!actor) {
     return new NextResponse('Niet ingelogd', { status: 401 })
   }
+  const mfaBlock = staffMfaBlock(actor)
+  if (mfaBlock) return new NextResponse(mfaBlock, { status: 403 })
   // Testrapport is een therapeut/admin-feature (niet patient-facing in v1).
   if (actor.role !== 'ADMIN' && actor.role !== 'THERAPIST') {
     return new NextResponse('Geen toegang tot testrapporten', { status: 403 })

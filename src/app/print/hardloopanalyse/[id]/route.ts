@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auditLog } from '@/server/audit'
 import { renderRunningAnalysisPdfHtml } from '@/lib/pdf/runningAnalysis'
-import { actorCanSeePatient, getPrintActor } from '@/lib/pdf/auth'
+import { actorCanSeePatient, getPrintActor, staffMfaBlock } from '@/lib/pdf/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +14,8 @@ export async function GET(
 
   const actor = await getPrintActor()
   if (!actor) return new NextResponse('Niet ingelogd', { status: 401 })
+  const mfaBlock = staffMfaBlock(actor)
+  if (mfaBlock) return new NextResponse(mfaBlock, { status: 403 })
 
   // Zelfde gate als de Mobility Assessment: therapeut met canUseAssessment of admin.
   if (actor.role !== 'ADMIN' && (actor.role !== 'THERAPIST' || !actor.canUseAssessment)) {

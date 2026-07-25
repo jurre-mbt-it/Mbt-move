@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auditLog } from '@/server/audit'
 import { renderProgressPdfHtml } from '@/lib/pdf/progress'
-import { actorCanSeePatient, getPrintActor } from '@/lib/pdf/auth'
+import { actorCanSeePatient, getPrintActor, staffMfaBlock } from '@/lib/pdf/auth'
 import { getPatientProgressData } from '@/lib/progress-data'
 import { getPatientRehabTrackerData } from '@/lib/rehab-data'
 
@@ -25,6 +25,8 @@ export async function GET(
   if (!actor) {
     return new NextResponse('Niet ingelogd', { status: 401 })
   }
+  const mfaBlock = staffMfaBlock(actor)
+  if (mfaBlock) return new NextResponse(mfaBlock, { status: 403 })
 
   if (actor.role !== 'ADMIN' && actor.role !== 'THERAPIST') {
     return new NextResponse('Geen toegang', { status: 403 })
