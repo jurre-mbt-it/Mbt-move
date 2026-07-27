@@ -10,7 +10,11 @@
  *      → `invite.request({ email, birthYear })`
  *      → server checkt dat er een geldige InviteCode bestaat met die
  *        email + birthYear (anders: generieke fout, geen user-enumeratie).
- *      → server triggert Supabase `signInWithOtp` met `shouldCreateUser: true`.
+ *      → server maakt de Supabase auth-user aan via de admin-API en vraagt
+ *        daarna de code aan met `signInWithOtp({ shouldCreateUser: false })`.
+ *        Sinds 2026-07-27 staat projectbrede signup uit, en `/auth/v1/otp`
+ *        respecteert dat ook met de service_role-key. Zie de toelichting bij
+ *        de aanroep zelf.
  *      → patient ontvangt mail met 6-digit code.
  *   3. Stap 2 (client-side):
  *      → `supabase.auth.verifyOtp({ email, token, type: 'email' })` — sessie komt in cookies.
