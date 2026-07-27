@@ -179,6 +179,10 @@ export const RATE_LIMITS = {
   shopAccessRequest:  { max: 5,  windowSec: 3600, message: 'Te veel aanvragen. Probeer het later opnieuw.', failClosedInProd: true },
   wearableSync:       { max: 60, windowSec: 3600, message: 'Te veel sync-verzoeken. Probeer het later opnieuw.' },
   loginLog:           { max: 12, windowSec: 600,  message: 'Te veel login-registraties.' },
+  // Publieke bedankt-pagina pollt elke 2s tot de betaling rond is (~30 calls),
+  // daarna stopt het. 90/5min laat legitiem pollen toe en remt enumeratie +
+  // ongeauthenticeerde Mollie-amplificatie van shop.orderStatus.
+  shopOrderStatus:    { max: 90, windowSec: 300,  message: 'Te veel statusverzoeken. Probeer het later opnieuw.' },
   cspReport:          { max: 60, windowSec: 600,  message: 'Te veel CSP-reports.' },
   messageSend:        { max: 120, windowSec: 3600, message: 'Te veel berichten. Probeer het later opnieuw.' },
   emailSend:          { max: 60, windowSec: 3600, message: 'Te veel e-mails verstuurd. Probeer het later opnieuw.' },

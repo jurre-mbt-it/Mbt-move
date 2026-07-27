@@ -1479,24 +1479,43 @@ export const weekSchedulesRouter = createTRPCRouter({
       })).min(1).max(200),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Authorisatie via één lookup van alle betrokken schedules.
+      const isAdmin = ctx.user.role === 'ADMIN'
+      // Praktijk-tak alleen voor THERAPIST: een coach heeft altijd
+      // practiceId=null, dus nooit op de lege practiceId vertrouwen (AGENTS.md).
+      const canAccessSchedule = (ws: { creatorId: string | null; practiceId: string | null }) => {
+        if (isAdmin) return true
+        if (ws.creatorId === ctx.user.id) return true
+        return (
+          ctx.user.role === 'THERAPIST' &&
+          !!ctx.user.practiceId &&
+          ws.practiceId === ctx.user.practiceId
+        )
+      }
+
+      // 1) Autoriseer alle bron-items via hun huidige schedule.
       const itemIds = input.moves.map(m => m.itemId)
       const items = await ctx.prisma.weekScheduleDayItem.findMany({
         where: { id: { in: itemIds } },
         include: { day: { include: { weekSchedule: { select: { id: true, creatorId: true, practiceId: true } } } } },
       })
       if (items.length !== itemIds.length) throw new TRPCError({ code: 'NOT_FOUND' })
-      const isAdmin = ctx.user.role === 'ADMIN'
       for (const it of items) {
-        const isOwner = it.day.weekSchedule.creatorId === ctx.user.id
-        const isSamePractice =
-          !!ctx.user.practiceId &&
-          !!it.day.weekSchedule.practiceId &&
-          it.day.weekSchedule.practiceId === ctx.user.practiceId
-        if (!isAdmin && !isOwner && !isSamePractice) {
-          throw new TRPCError({ code: 'FORBIDDEN' })
-        }
+        if (!canAccessSchedule(it.day.weekSchedule)) throw new TRPCError({ code: 'FORBIDDEN' })
       }
+
+      // 2) Autoriseer óók elke DOEL-dag. `dayId` komt van de client; zonder deze
+      //    check kon een item in de kalender van een andere praktijk/patiënt
+      //    worden gezet (IDOR). Siblings duplicateItem/copyDayItems doen dit al.
+      const destDayIds = [...new Set(input.moves.map(m => m.dayId))]
+      const destDays = await ctx.prisma.weekScheduleDay.findMany({
+        where: { id: { in: destDayIds } },
+        include: { weekSchedule: { select: { creatorId: true, practiceId: true } } },
+      })
+      if (destDays.length !== destDayIds.length) throw new TRPCError({ code: 'NOT_FOUND' })
+      for (const d of destDays) {
+        if (!canAccessSchedule(d.weekSchedule)) throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+
       // Transactie: alle moves atomisch toepassen.
       await ctx.prisma.$transaction(
         input.moves.map(m =>

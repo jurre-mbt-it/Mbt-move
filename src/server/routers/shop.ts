@@ -586,6 +586,16 @@ export const shopRouter = createTRPCRouter({
   orderStatus: publicProcedure
     .input(z.object({ orderId: z.string() }))
     .query(async ({ ctx, input }) => {
+      // Publiek (gast-checkout): de cuid orderId is de capability. Rate-limit
+      // per IP tegen enumeratie + ongeauthenticeerde Mollie-amplificatie.
+      const ip =
+        ctx.req?.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+        ctx.req?.headers.get('x-real-ip') ??
+        'unknown'
+      const rl = await rateLimit('shop.orderStatus', ip, RATE_LIMITS.shopOrderStatus)
+      if (!rl.ok) {
+        throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
+      }
       let status: string
       try {
         status = await syncOrderWithMollie(input.orderId)
