@@ -14,6 +14,7 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure, therapistProcedure } from '@/server/trpc'
+import { practiceScope } from '@/server/lib/patient-access'
 import { auditLog } from '@/server/audit'
 import { groupIntoEpisodes, normalizeTag } from '@/lib/tags'
 
@@ -34,7 +35,7 @@ async function assertTagAccess(
       id: patientId,
       OR: [
         { patientTherapists: { some: { therapistId: user.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } } } },
-        ...(user.practiceId ? [{ practiceId: user.practiceId }] : []),
+        ...practiceScope(user),
       ],
     },
     select: { id: true },

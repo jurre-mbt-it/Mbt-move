@@ -10,6 +10,7 @@ import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
+import { practiceScope } from '@/server/lib/patient-access'
 import { auditLog } from '@/server/audit'
 import { REAR_ITEMS, SIDE_ITEMS, METRICS, DEFAULT_SUBTITLE, DEFAULT_VIEW_LABEL } from '@/lib/running-analysis/catalog'
 import {
@@ -41,7 +42,7 @@ async function assertTreating(
       id: patientId,
       OR: [
         { patientTherapists: { some: { therapistId: user.id, ...ACTIVE_LINK } } },
-        ...(user.practiceId ? [{ practiceId: user.practiceId }] : []),
+        ...practiceScope(user),
       ],
     },
     select: { id: true },

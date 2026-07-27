@@ -41,7 +41,9 @@ async function assertTreating(
       id: patientId,
       OR: [
         { patientTherapists: { some: { therapistId: user.id, ...ACTIVE_LINK } } },
-        ...(user.practiceId ? [{ practiceId: user.practiceId }] : []),
+        // Praktijk-tak alleen voor THERAPIST (coach heeft practiceId=null).
+        // NB: lokale practiceScope() hieronder is library-seed-scoping, niet dit.
+        ...(user.role === 'THERAPIST' && user.practiceId ? [{ practiceId: user.practiceId }] : []),
       ],
     },
     select: { id: true },

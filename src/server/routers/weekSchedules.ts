@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { createTRPCRouter, coachStaffProcedure, protectedProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
 import { assertPlanAccess } from '@/server/lib/plan-access'
+import { practiceScope, inSamePractice } from '@/server/lib/patient-access'
 import { mondayKey, mondayKeyOf, addDaysKey, amsMidnight, weeksBetween, isDateKey } from '@/lib/week-dates'
 import { parseStructured, legacySummaryFields, structuredLoad } from '@/lib/cardio-workout'
 import { durationFromExercises } from '@/lib/planned-load'
@@ -238,10 +239,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       const isAdmin = ctx.user.role === 'ADMIN'
       const isOwner = ws.creatorId === ctx.user.id
       const isAssignedPatient = ws.patientId === ctx.user.id
-      const isSamePractice =
-        !!ctx.user.practiceId &&
-        !!ws.practiceId &&
-        ws.practiceId === ctx.user.practiceId
+      const isSamePractice = inSamePractice(ctx.user, ws.practiceId)
       if (!isAdmin && !isOwner && !isAssignedPatient && !isSamePractice) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
@@ -276,7 +274,7 @@ export const weekSchedulesRouter = createTRPCRouter({
           : {
               OR: [
                 { creatorId: ctx.user.id },
-                ...(ctx.user.practiceId ? [{ practiceId: ctx.user.practiceId }] : []),
+                ...practiceScope(ctx.user),
               ],
             }
         const bestaande = await ctx.prisma.weekSchedule.findMany({
@@ -465,8 +463,7 @@ export const weekSchedulesRouter = createTRPCRouter({
         if (!program) throw new TRPCError({ code: 'NOT_FOUND', message: 'Programma niet gevonden' })
         const isAdmin = ctx.user.role === 'ADMIN'
         const isOwner = program.creatorId === ctx.user.id
-        const samePractice =
-          !!ctx.user.practiceId && !!program.practiceId && program.practiceId === ctx.user.practiceId
+        const samePractice = inSamePractice(ctx.user, program.practiceId)
         if (!isAdmin && !isOwner && !samePractice) {
           throw new TRPCError({ code: 'FORBIDDEN' })
         }
@@ -1257,10 +1254,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       if (!day) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user.role === 'ADMIN'
       const isOwner = day.weekSchedule.creatorId === ctx.user.id
-      const isSamePractice =
-        !!ctx.user.practiceId &&
-        !!day.weekSchedule.practiceId &&
-        day.weekSchedule.practiceId === ctx.user.practiceId
+      const isSamePractice = inSamePractice(ctx.user, day.weekSchedule.practiceId)
       if (!isAdmin && !isOwner && !isSamePractice) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
@@ -1282,7 +1276,7 @@ export const weekSchedulesRouter = createTRPCRouter({
         const programInScope =
           isAdmin ||
           program.creatorId === ctx.user.id ||
-          (!!ctx.user.practiceId && !!program.practiceId && program.practiceId === ctx.user.practiceId)
+          inSamePractice(ctx.user, program.practiceId)
         if (!programInScope) throw new TRPCError({ code: 'FORBIDDEN' })
       }
       // Testbatterij moet in scope van de praktijk liggen (NULL = globale seed).
@@ -1354,10 +1348,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       if (!item) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user.role === 'ADMIN'
       const isOwner = item.day.weekSchedule.creatorId === ctx.user.id
-      const isSamePractice =
-        !!ctx.user.practiceId &&
-        !!item.day.weekSchedule.practiceId &&
-        item.day.weekSchedule.practiceId === ctx.user.practiceId
+      const isSamePractice = inSamePractice(ctx.user, item.day.weekSchedule.practiceId)
       if (!isAdmin && !isOwner && !isSamePractice) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
@@ -1389,7 +1380,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       const isAdmin = ctx.user.role === 'ADMIN'
       const canTouch = (ws: { creatorId: string; practiceId: string | null }) =>
         isAdmin || ws.creatorId === ctx.user.id ||
-        (!!ctx.user.practiceId && ws.practiceId === ctx.user.practiceId)
+        inSamePractice(ctx.user, ws.practiceId)
       if (!canTouch(item.day.weekSchedule)) throw new TRPCError({ code: 'FORBIDDEN' })
 
       const targetDayId = input.toDayId ?? item.dayId
@@ -1423,10 +1414,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       if (!item) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user.role === 'ADMIN'
       const isOwner = item.day.weekSchedule.creatorId === ctx.user.id
-      const isSamePractice =
-        !!ctx.user.practiceId &&
-        !!item.day.weekSchedule.practiceId &&
-        item.day.weekSchedule.practiceId === ctx.user.practiceId
+      const isSamePractice = inSamePractice(ctx.user, item.day.weekSchedule.practiceId)
       if (!isAdmin && !isOwner && !isSamePractice) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
@@ -1451,10 +1439,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       if (!day) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user.role === 'ADMIN'
       const isOwner = day.weekSchedule.creatorId === ctx.user.id
-      const isSamePractice =
-        !!ctx.user.practiceId &&
-        !!day.weekSchedule.practiceId &&
-        day.weekSchedule.practiceId === ctx.user.practiceId
+      const isSamePractice = inSamePractice(ctx.user, day.weekSchedule.practiceId)
       if (!isAdmin && !isOwner && !isSamePractice) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
@@ -1594,7 +1579,7 @@ export const weekSchedulesRouter = createTRPCRouter({
         : {
             OR: [
               { creatorId: ctx.user.id },
-              ...(practiceId ? [{ practiceId }] : []),
+              ...(ctx.user.role === 'THERAPIST' && practiceId ? [{ practiceId }] : []),
             ],
           }
 
@@ -1779,10 +1764,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       const isAdmin = ctx.user.role === 'ADMIN'
       for (const d of days) {
         const isOwner = d.weekSchedule.creatorId === ctx.user.id
-        const isSamePractice =
-          !!ctx.user.practiceId &&
-          !!d.weekSchedule.practiceId &&
-          d.weekSchedule.practiceId === ctx.user.practiceId
+        const isSamePractice = inSamePractice(ctx.user, d.weekSchedule.practiceId)
         if (!isAdmin && !isOwner && !isSamePractice) {
           throw new TRPCError({ code: 'FORBIDDEN' })
         }
@@ -1838,10 +1820,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       if (!item) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user.role === 'ADMIN'
       const isOwner = item.day.weekSchedule.creatorId === ctx.user.id
-      const isSamePractice =
-        !!ctx.user.practiceId &&
-        !!item.day.weekSchedule.practiceId &&
-        item.day.weekSchedule.practiceId === ctx.user.practiceId
+      const isSamePractice = inSamePractice(ctx.user, item.day.weekSchedule.practiceId)
       if (!isAdmin && !isOwner && !isSamePractice) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
@@ -1860,7 +1839,7 @@ export const weekSchedulesRouter = createTRPCRouter({
         const canRead =
           isAdmin ||
           source.creatorId === ctx.user.id ||
-          (!!ctx.user.practiceId && source.practiceId === ctx.user.practiceId)
+          inSamePractice(ctx.user, source.practiceId)
         if (!canRead) throw new TRPCError({ code: 'FORBIDDEN' })
 
         await ctx.prisma.program.create({
@@ -2020,10 +1999,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       if (!item) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user.role === 'ADMIN'
       const isOwner = item.day.weekSchedule.creatorId === ctx.user.id
-      const isSamePractice =
-        !!ctx.user.practiceId &&
-        !!item.day.weekSchedule.practiceId &&
-        item.day.weekSchedule.practiceId === ctx.user.practiceId
+      const isSamePractice = inSamePractice(ctx.user, item.day.weekSchedule.practiceId)
       if (!isAdmin && !isOwner && !isSamePractice) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
@@ -2111,10 +2087,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       if (!item) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user.role === 'ADMIN'
       const isOwner = item.day.weekSchedule.creatorId === ctx.user.id
-      const isSamePractice =
-        !!ctx.user.practiceId &&
-        !!item.day.weekSchedule.practiceId &&
-        item.day.weekSchedule.practiceId === ctx.user.practiceId
+      const isSamePractice = inSamePractice(ctx.user, item.day.weekSchedule.practiceId)
       if (!isAdmin && !isOwner && !isSamePractice) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }

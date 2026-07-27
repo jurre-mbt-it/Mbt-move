@@ -17,6 +17,7 @@ import {
   coachStaffProcedure,
   adminProcedure,
 } from '@/server/trpc'
+import { practiceScope } from '@/server/lib/patient-access'
 
 const ACTIVE_LINK = { isActive: true, status: 'APPROVED' as const }
 
@@ -37,7 +38,7 @@ async function assertTreating(
       id: patientId,
       OR: [
         { patientTherapists: { some: { therapistId: user.id, ...ACTIVE_LINK } } },
-        ...(user.practiceId ? [{ practiceId: user.practiceId }] : []),
+        ...practiceScope(user),
       ],
     },
     select: { id: true },

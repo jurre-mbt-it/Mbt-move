@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
+import { practiceScope } from '@/server/lib/patient-access'
 import { auditLog } from '@/server/audit'
 
 const createId = () => crypto.randomUUID()
@@ -84,7 +85,7 @@ export const wellnessRouter = createTRPCRouter({
                   },
                 },
               },
-              ...(me.practiceId ? [{ practiceId: me.practiceId }] : []),
+              ...practiceScope(me),
             ],
           },
           select: { id: true },

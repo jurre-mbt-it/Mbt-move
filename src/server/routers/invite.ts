@@ -38,6 +38,7 @@ import {
   publicProcedure,
   protectedProcedure,
 } from '@/server/trpc'
+import { practiceScope } from '@/server/lib/patient-access'
 import { auditLog } from '@/server/audit'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { inviteMail, sendMail } from '@/server/mail'
@@ -303,7 +304,7 @@ export const inviteRouter = createTRPCRouter({
                 },
               },
             },
-            ...(me.practiceId ? [{ practiceId: me.practiceId }] : []),
+            ...practiceScope(me),
           ],
         },
         select: {

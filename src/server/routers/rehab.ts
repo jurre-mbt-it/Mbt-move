@@ -8,6 +8,7 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure, therapistProcedure, adminProcedure, mfaAdminProcedure } from '@/server/trpc'
+import { practiceScope } from '@/server/lib/patient-access'
 import { getPatientRehabTrackerData } from '@/lib/rehab-data'
 import { notifyRehabCriterion, notifyRehabPhase } from '@/server/push/notify'
 
@@ -30,7 +31,7 @@ async function assertTreating(
       id: patientId,
       OR: [
         { patientTherapists: { some: { therapistId: user.id, ...ACTIVE_LINK } } },
-        ...(user.practiceId ? [{ practiceId: user.practiceId }] : []),
+        ...practiceScope(user),
       ],
     },
     select: { id: true },

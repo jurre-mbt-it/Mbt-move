@@ -51,6 +51,28 @@ export async function hasPatientAccess(
   return !!found
 }
 
+type ScopeUser = { role: string; practiceId: string | null }
+
+/**
+ * Praktijk-tak voor een Prisma `where`-OR-fragment. ALLEEN een THERAPIST met
+ * een practiceId krijgt de praktijk-brede tak. COACH (practiceId is altijd
+ * null) en PATIENT/ATHLETE (delen de practiceId van hun therapeut!) niet —
+ * zonder deze rol-check zou een patiënt via de praktijk-tak bij het dossier
+ * van elke mede-patiënt kunnen. Zie AGENTS.md. Gebruik als spread:
+ *   `OR: [ ...directe koppeling..., ...practiceScope(user) ]`.
+ */
+export function practiceScope(user: ScopeUser): { practiceId: string }[] {
+  return user.role === 'THERAPIST' && user.practiceId ? [{ practiceId: user.practiceId }] : []
+}
+
+/**
+ * Boolean-variant van {@link practiceScope}: hoort `resourcePracticeId` bij
+ * dezelfde praktijk als `user`? Zelfde rol-binding (alleen THERAPIST).
+ */
+export function inSamePractice(user: ScopeUser, resourcePracticeId: string | null): boolean {
+  return user.role === 'THERAPIST' && !!user.practiceId && resourcePracticeId === user.practiceId
+}
+
 /** Als {@link hasPatientAccess} false is: gooi FORBIDDEN i.p.v. stil falen. */
 export async function assertPatientAccess(
   prisma: PrismaClient,

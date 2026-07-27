@@ -10,7 +10,7 @@ import {
   mfaTherapistProcedure,
   invalidateUserCache,
 } from '@/server/trpc'
-import { hasPatientAccess } from '@/server/lib/patient-access'
+import { hasPatientAccess, practiceScope } from '@/server/lib/patient-access'
 import { auditLog } from '@/server/audit'
 import { amsMidnight, dateKey } from '@/lib/week-dates'
 import { deriveTopSet, estimateOneRepMax } from '@/lib/one-rep-max'
@@ -70,7 +70,7 @@ export const patientsRouter = createTRPCRouter({
               },
             },
           },
-          ...(me.practiceId ? [{ practiceId: me.practiceId }] : []),
+          ...practiceScope(me),
         ],
       },
       select: {
@@ -198,7 +198,7 @@ export const patientsRouter = createTRPCRouter({
                 },
               },
             },
-            ...(me.practiceId ? [{ practiceId: me.practiceId }] : []),
+            ...practiceScope(me),
           ],
         },
         select: { id: true },
@@ -328,7 +328,7 @@ export const patientsRouter = createTRPCRouter({
                 },
               },
             },
-            ...(me.practiceId ? [{ practiceId: me.practiceId }] : []),
+            ...practiceScope(me),
           ],
         },
         select: {
@@ -2115,7 +2115,7 @@ export const patientsRouter = createTRPCRouter({
                 },
               },
             },
-            ...(ctx.user.practiceId ? [{ practiceId: ctx.user.practiceId }] : []),
+            ...practiceScope(ctx.user),
           ],
           ...baseWhere,
         },

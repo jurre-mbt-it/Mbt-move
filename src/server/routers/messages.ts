@@ -16,6 +16,7 @@ import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
+import { practiceScope, inSamePractice } from '@/server/lib/patient-access'
 import { sendPush } from '@/server/push/send'
 import type { PrismaClient } from '@prisma/client'
 
@@ -96,7 +97,7 @@ async function resolveThreadPatient(
                   some: { therapistId: user.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } },
                 },
               },
-              ...(user.practiceId ? [{ practiceId: user.practiceId }] : []),
+              ...practiceScope(user),
             ],
           }),
     },
@@ -199,7 +200,7 @@ export const messagesRouter = createTRPCRouter({
           exercise &&
           (exercise.isPublic ||
             exercise.createdById === ctx.user.id ||
-            (exercise.practiceId != null && exercise.practiceId === ctx.user.practiceId))
+            inSamePractice(ctx.user, exercise.practiceId))
         if (!visible) throw new TRPCError({ code: 'NOT_FOUND', message: 'Oefening niet gevonden.' })
       }
 
@@ -264,7 +265,7 @@ export const messagesRouter = createTRPCRouter({
                     some: { therapistId: ctx.user.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] as never } },
                   },
                 },
-                ...(ctx.user.practiceId ? [{ practiceId: ctx.user.practiceId }] : []),
+                ...practiceScope(ctx.user),
               ],
             }),
       },
@@ -344,7 +345,7 @@ export const messagesRouter = createTRPCRouter({
                       some: { therapistId: ctx.user.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] as never } },
                     },
                   },
-                  ...(ctx.user.practiceId ? [{ practiceId: ctx.user.practiceId }] : []),
+                  ...practiceScope(ctx.user),
                 ],
               }),
         },

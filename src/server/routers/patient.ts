@@ -12,6 +12,7 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
+import { practiceScope } from '@/server/lib/patient-access'
 import { muscleLoadsRecord } from '@/server/lib/muscle-loads'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { auditLog } from '@/server/audit'
@@ -443,7 +444,7 @@ export const patientRouter = createTRPCRouter({
                 },
               },
             },
-            ...(me.practiceId ? [{ practiceId: me.practiceId }] : []),
+            ...practiceScope(me),
           ],
         },
         select: { id: true },
@@ -1482,7 +1483,7 @@ export const patientRouter = createTRPCRouter({
                   },
                 },
               },
-              ...(me.practiceId ? [{ practiceId: me.practiceId }] : []),
+              ...practiceScope(me),
             ],
           },
           select: { id: true },
