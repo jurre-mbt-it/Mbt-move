@@ -5,7 +5,7 @@ import { createTRPCRouter, publicProcedure, protectedProcedure, adminProcedure }
 import { TRPCError } from '@trpc/server'
 import { matchSlug, LABELS, type IntakeAnswers } from '@/lib/shop/intake/flow'
 import { sendOrderEmails as sendOrderEmailsLib } from '@/lib/shop/email/order-emails'
-import { sendMail } from '@/server/mail'
+import { sendMail, escapeHtml } from '@/server/mail'
 import { isShopPublic } from '@/lib/shop/access'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { createPayment, isMollieConfigured } from '@/lib/shop/mollie'
@@ -313,7 +313,8 @@ export const shopRouter = createTRPCRouter({
   previewProgram: publicProcedure
     .input(z.object({ slug: z.string() }))
     .query(async ({ ctx, input }) => {
-      const allowed = process.env.SHOP_PUBLIC === 'true' || ctx.user?.role === 'ADMIN'
+      const isAdminCaller = ctx.user?.role === 'ADMIN'
+      const allowed = process.env.SHOP_PUBLIC === 'true' || isAdminCaller
       if (!allowed) throw new TRPCError({ code: 'FORBIDDEN' })
 
       const product = await ctx.prisma.shopProduct.findUnique({
@@ -334,9 +335,19 @@ export const shopRouter = createTRPCRouter({
         },
       })
       if (!product) throw new TRPCError({ code: 'NOT_FOUND' })
+      // Concepten zijn niet publiek (audit 2026-07-27, M3).
+      if (product.status !== 'PUBLISHED' && !isAdminCaller) {
+        throw new TRPCError({ code: 'NOT_FOUND' })
+      }
 
       const program = product.program
-      const pes = program?.exercises ?? []
+      // Dit is een preview, geen levering: zonder begrenzing gaf deze publieke
+      // procedure het complete betaalde programma weg — alle weken, alle sets
+      // en reps, plus de video-URL's. Niet-admins krijgen week 1 en geen video.
+      const allExercises = program?.exercises ?? []
+      const pes = isAdminCaller
+        ? allExercises
+        : allExercises.filter((p) => p.week <= 1)
       const weekNums = [...new Set(pes.map((p) => p.week))].sort((a, b) => a - b)
       const weeks = weekNums.map((w) => {
         const dayNums = [...new Set(pes.filter((p) => p.week === w).map((p) => p.day))].sort((a, b) => a - b)
@@ -349,7 +360,9 @@ export const shopRouter = createTRPCRouter({
               .map((p) => ({
                 id: p.id,
                 name: p.exercise.name,
-                videoUrl: p.exercise.videoUrl,
+                // De video's zijn het product. In een publieke preview alleen
+                // de naam en het schema, geen speelbare media.
+                videoUrl: isAdminCaller ? p.exercise.videoUrl : null,
                 mediaType: p.exercise.mediaType,
                 sets: p.sets,
                 setsMax: p.setsMax,
@@ -395,6 +408,10 @@ export const shopRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const isAdmin = ctx.user.role === 'ADMIN'
       if (!isShopPublic() && !isAdmin) throw new TRPCError({ code: 'FORBIDDEN' })
+      // Elke aanroep maakt een ShopOrder-rij en een Mollie-betaling aan
+      // (audit 2026-07-27, L5).
+      const rl = await rateLimit('shop.checkout', ctx.user.id, RATE_LIMITS.shopCheckout)
+      if (!rl.ok) throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
       if (!isMollieConfigured()) {
         throw new TRPCError({
           code: 'PRECONDITION_FAILED',
@@ -564,11 +581,14 @@ export const shopRouter = createTRPCRouter({
           to,
           replyTo: email,
           subject: `Nieuwe toegangsaanvraag shop — ${name}`,
+          // Alle velden hier zijn door een ongeauthenticeerde aanvrager
+          // ingevuld. Consequent escapen, niet alleen `<` in `note`
+          // (audit 2026-07-27).
           html: [
-            `<p><strong>${name}</strong> vraagt toegang tot de MBT Gym shop.</p>`,
-            `<p>E-mail: <a href="mailto:${email}">${email}</a></p>`,
-            input.productSlug ? `<p>Interesse in: ${input.productSlug}</p>` : '',
-            note ? `<p>Bericht:<br>${note.replace(/</g, '&lt;')}</p>` : '',
+            `<p><strong>${escapeHtml(name)}</strong> vraagt toegang tot de MBT Gym shop.</p>`,
+            `<p>E-mail: <a href="mailto:${encodeURIComponent(email)}">${escapeHtml(email)}</a></p>`,
+            input.productSlug ? `<p>Interesse in: ${escapeHtml(input.productSlug)}</p>` : '',
+            note ? `<p>Bericht:<br>${escapeHtml(note)}</p>` : '',
             `<p>Nodig deze persoon uit via het uitnodigingsscherm om ze te laten kopen.</p>`,
           ].join('\n'),
           text: `${name} (${email}) vraagt toegang tot de shop.${note ? `\n\nBericht: ${note}` : ''}`,

@@ -4,6 +4,7 @@ import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js
 import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { DPA_VERSION } from '@/lib/dpa-constants'
+import { mayBindByEmail } from '@/server/lib/identity'
 
 export async function GET() {
   try {
@@ -47,7 +48,11 @@ export async function GET() {
     })
     if (!dbUser && user.email) {
       const byEmail = await prisma.user.findUnique({ where: { email: user.email }, select })
-      if (byEmail && (!byEmail.supabaseUserId || byEmail.supabaseUserId === user.id)) {
+      // `mayBindByEmail` weigert THERAPIST/ADMIN/COACH via de email-fallback.
+      // Zonder die guard gaf deze route de rol van een ongebonden ADMIN-rij aan
+      // iedereen die zich met dat adres registreerde — en schreef 'm hieronder
+      // ook nog met de service_role-key in hun user_metadata (audit H2).
+      if (mayBindByEmail(byEmail, user.id)) {
         dbUser = byEmail
       }
     }

@@ -43,8 +43,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
   }
 
+  // Identiteit op supabaseUserId, niet op e-mailadres — anders kan iemand die
+  // zich met een therapeut-adres registreert deze mail-relay gebruiken
+  // (audit 2026-07-27, H2).
   const caller = await prisma.user.findUnique({
-    where: { email: authUser.email },
+    where: { supabaseUserId: authUser.id },
     include: { practice: true },
   })
   if (!caller || (caller.role !== 'THERAPIST' && caller.role !== 'ADMIN')) {

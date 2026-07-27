@@ -449,6 +449,17 @@ export const inviteRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const email = input.email.toLowerCase().trim()
 
+      // Twee buckets. De e-mail-bucket remt geboortejaar-raden op één adres;
+      // die alleen is niet genoeg, want de aanvaller kiest het adres zelf en
+      // kan door te varieren ongelimiteerd audit_logs-rijen laten schrijven
+      // vanaf een onauthenticated endpoint (audit 2026-07-27, L4).
+      const ip =
+        ctx.req?.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+      const ipLimit = await rateLimit('invite.requestIp', ip, RATE_LIMITS.inviteRequestIp)
+      if (!ipLimit.ok) {
+        throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: ipLimit.message })
+      }
+
       const rl = await rateLimit('invite.request', email, RATE_LIMITS.inviteRedeem)
       if (!rl.ok) {
         await auditLog({
@@ -544,17 +555,57 @@ export const inviteRouter = createTRPCRouter({
         return { ok: true, delivered: false, devNote: 'Supabase niet geconfigureerd' }
       }
 
+      // Signup staat projectbreed uit sinds 2026-07-27 (audit C1: anders kan
+      // iedereen zich met een zelfgekozen rol registreren). `/auth/v1/otp` is
+      // geen admin-endpoint en respecteert `disable_signup` ook met de
+      // service_role-key, dus `shouldCreateUser: true` loopt daar nu op stuk.
+      //
+      // Daarom in twee stappen: de auth-user expliciet aanmaken via de
+      // admin-API (die negeert disable_signup wel), en daarna alleen nog de
+      // code versturen. De uitnodiging is op dit punt al gevalideerd op e-mail
+      // + geboortejaar, dus dit maakt geen account aan voor wie dat niet al
+      // mocht.
+      //
+      // `email_confirm: true` is nodig, niet cosmetisch: GoTrue routeert een
+      // OTP naar een ONbevestigde user alsnog door de signup-tak en geeft dan
+      // "Signups not allowed for this instance" (422), ook met
+      // shouldCreateUser: false. Empirisch vastgesteld op 2026-07-27.
+      // Veiligheidsafweging: het adres is hier al gekoppeld aan een door een
+      // therapeut aangemaakte InviteCode én aan het juiste geboortejaar, en de
+      // code moet uit die mailbox worden overgetypt. Dat is het bewijs van
+      // adresbezit; GoTrue's eigen confirm-mail voegt daar niets aan toe.
+      //
+      // De rol staat bewust NIET in de metadata. `handle_new_user()` leest hem
+      // sinds dezelfde audit uit `invite_codes`, en meesturen zou de indruk
+      // wekken dat de client hem nog bepaalt.
+      const createRes = await admin.auth.admin.createUser({
+        email,
+        email_confirm: true,
+        user_metadata: {
+          name: invite.name,
+          practiceId: invite.practiceId,
+          inviteId: invite.id,
+        },
+      })
+      if (createRes.error) {
+        const msg = createRes.error.message ?? ''
+        const alreadyExists = /already|exists|registered|duplicate/i.test(msg)
+        if (!alreadyExists) {
+          // Geen error.message loggen — die bevat vaak het patient-emailadres.
+          console.warn('[invite.request] supabase createUser error', {
+            status: (createRes.error as { status?: number }).status ?? null,
+          })
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Kon op dit moment geen code versturen. Probeer het straks opnieuw.',
+          })
+        }
+        // Bestaat al (her-verzending, of de patiënt had al een account) — door.
+      }
+
       const { error } = await admin.auth.signInWithOtp({
         email,
-        options: {
-          shouldCreateUser: true,
-          data: {
-            name: invite.name,
-            role: invite.role,
-            practiceId: invite.practiceId,
-            inviteId: invite.id,
-          },
-        },
+        options: { shouldCreateUser: false },
       })
       if (error) {
         // Geen error.message loggen — Supabase OTP-fouten bevatten vaak het

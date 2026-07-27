@@ -9,7 +9,12 @@
 import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 import { TRPCError } from '@trpc/server'
-import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  assertMfaSatisfied,
+  assertStaffMfaEnrolled,
+} from '@/server/trpc'
 import { practiceScope } from '@/server/lib/patient-access'
 import { auditLog } from '@/server/audit'
 import { REAR_ITEMS, SIDE_ITEMS, METRICS, DEFAULT_SUBTITLE, DEFAULT_VIEW_LABEL } from '@/lib/running-analysis/catalog'
@@ -52,6 +57,10 @@ async function assertTreating(
 
 /** Gate op canUseAssessment (admin altijd door) — spiegelt de Mobility Assessment. */
 const runningProcedure = protectedProcedure.use(async ({ ctx, next }) => {
+  // Zie assessments.ts: op protectedProcedure gebouwd, dus de MFA-poorten van
+  // therapistProcedure ontbraken (audit 2026-07-27, M1).
+  assertStaffMfaEnrolled(ctx)
+  assertMfaSatisfied(ctx)
   if (ctx.user!.role === 'ADMIN') return next({ ctx })
   if (ctx.user!.role !== 'THERAPIST') throw new TRPCError({ code: 'FORBIDDEN' })
   const u = await ctx.prisma.user.findUnique({

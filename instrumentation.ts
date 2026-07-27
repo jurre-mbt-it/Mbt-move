@@ -50,5 +50,16 @@ export async function onRequestError(
   const dsn = process.env.SENTRY_DSN
   if (!dsn) return
   const Sentry = await import('@sentry/nextjs')
-  Sentry.captureRequestError(err, request, context)
+  // `request.headers` gaat ongefilterd mee naar Sentry. Daar zitten de
+  // Supabase-sessiecookie en het Bearer-token van de mobiele app in: levende
+  // credentials in een externe error-tracker (audit 2026-07-27). Strip ze hier,
+  // vóór captureRequestError, in plaats van erop te vertrouwen dat Sentry's
+  // eigen scrubbing precies deze namen kent.
+  const SENSITIVE = new Set(['cookie', 'authorization', 'x-supabase-auth', 'apikey', 'set-cookie'])
+  const safeHeaders = Object.fromEntries(
+    Object.entries(request.headers ?? {}).map(([k, v]) =>
+      SENSITIVE.has(k.toLowerCase()) ? [k, '[redacted]'] : [k, v],
+    ),
+  )
+  Sentry.captureRequestError(err, { ...request, headers: safeHeaders }, context)
 }

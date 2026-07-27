@@ -435,8 +435,21 @@ export const adminRouter = createTRPCRouter({
       // trpc.ts) THERAPIST/ADMIN-rows via email-fallback te koppelen — dat is
       // een security-defense, maar betekent dat je hem hier MOET vullen anders
       // krijgt de nieuwe collega UNAUTHORIZED op elke tRPC-call.
-      const user = await ctx.prisma.user.create({
-        data: {
+      //
+      // Upsert, geen create: `inviteUserByEmail` hierboven schrijft een rij in
+      // auth.users, en de `on_auth_user_created`-trigger maakt daar direct een
+      // stub-rij bij met dezelfde id (rol PATIENT, want de trigger leest sinds
+      // 2026-07-27 geen rol meer uit client-metadata). Een `create` botst dan
+      // op de primary key. De rol wordt hier server-side gezet.
+      const user = await ctx.prisma.user.upsert({
+        where: { id: inviteData.user.id },
+        update: {
+          supabaseUserId: inviteData.user.id,
+          name: input.name ?? email.split('@')[0],
+          role: 'THERAPIST',
+          practiceId: ctx.user.practiceId ?? null,
+        },
+        create: {
           id: inviteData.user.id,
           supabaseUserId: inviteData.user.id,
           email,

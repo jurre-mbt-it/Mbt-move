@@ -36,6 +36,8 @@ export const pushRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const rl = await rateLimit('push.register', ctx.user.id, RATE_LIMITS.pushRegister)
+      if (!rl.ok) throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
       // Upsert op token: registreert hetzelfde device opnieuw (of wisselt van
       // gebruiker op een gedeeld toestel), dan herbinden aan de huidige user en
       // lastSeen verversen. Zo hoort een token altijd bij precies één account.

@@ -9,7 +9,14 @@
  */
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
-import { createTRPCRouter, protectedProcedure, adminProcedure, mfaAdminProcedure } from '@/server/trpc'
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  adminProcedure,
+  mfaAdminProcedure,
+  assertMfaSatisfied,
+  assertStaffMfaEnrolled,
+} from '@/server/trpc'
 import { practiceScope } from '@/server/lib/patient-access'
 
 const ACTIVE_LINK = { isActive: true, status: 'APPROVED' as const }
@@ -48,6 +55,12 @@ async function assertTreating(
  * Gate alle therapeut-procedures op User.canUseAssessment. ADMIN altijd door.
  */
 const assessmentProcedure = protectedProcedure.use(async ({ ctx, next }) => {
+  // Deze procedure is op `protectedProcedure` gebouwd en kreeg daardoor de
+  // server-side MFA-poorten niet mee die `therapistProcedure` wél afdwingt
+  // (audit 2026-07-27, M1). Zonder deze twee regels kon een therapeut met MFA
+  // aan maar een aal1-sessie hier klinische data schrijven.
+  assertStaffMfaEnrolled(ctx)
+  assertMfaSatisfied(ctx)
   if (ctx.user!.role === 'ADMIN') return next({ ctx })
   if (ctx.user!.role !== 'THERAPIST') {
     throw new TRPCError({ code: 'FORBIDDEN' })

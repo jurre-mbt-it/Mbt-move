@@ -19,7 +19,14 @@ export async function GET(
     data: { user },
   } = await supabase.auth.getUser()
   if (!user?.email) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
-  const caller = await prisma.user.findUnique({ where: { email: user.email }, select: { role: true } })
+
+  // Identiteit op supabaseUserId, niet op e-mailadres. Een e-mail-lookup zou
+  // een ongebonden ADMIN-rij aan iedereen geven die zich met dat adres
+  // registreert (audit 2026-07-27, H2).
+  const caller = await prisma.user.findUnique({
+    where: { supabaseUserId: user.id },
+    select: { role: true },
+  })
   if (caller?.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const order = await prisma.shopOrder.findUnique({

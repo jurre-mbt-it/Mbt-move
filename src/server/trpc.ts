@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
 import { DPA_VERSION } from '@/lib/dpa-constants'
 import { decodeAalClaim } from '@/lib/auth/aal'
+import { HIGH_VALUE_ROLES } from '@/server/lib/identity'
 
 export interface Context {
   req?: NextRequest
@@ -75,10 +76,33 @@ async function resolveUser(supabaseUserId: string, email: string) {
     // Defense-in-depth: voor high-value rollen weigeren we email-fallback
     // backfill. Anders zou een attacker die hun Supabase-email naar een
     // therapist/admin email weet te wisselen vóór de deploy-SQL gerund is,
-    // die identiteit kunnen claimen. Voor THERAPIST/ADMIN moet supabaseUserId
-    // al via de bulk-backfill (zie supabase-schema.sql) gevuld zijn.
-    if (byEmail.role === 'THERAPIST' || byEmail.role === 'ADMIN') {
-      return null
+    // die identiteit kunnen claimen. Voor THERAPIST/ADMIN/COACH moet
+    // supabaseUserId al via de bulk-backfill (zie supabase-schema.sql) of via
+    // `admin.inviteTherapist` gevuld zijn.
+    //
+    // COACH hoorde hier vanaf het begin bij en ontbrak (audit 2026-07-27, M2):
+    // `invite.create` maakt coach-rijen vooruit aan zónder binding, dus wie het
+    // adres van een genodigde coach kende kon dat account claimen.
+    //
+    // Een coach kan zich echter nooit anders binden: `invite.finalize` draait
+    // op `protectedProcedure` en heeft dus al een `ctx.user` nodig. Botweg
+    // weigeren zou coach-onboarding onmogelijk maken. Daarom dezelfde regel
+    // als de `handle_new_user`-trigger nu hanteert: binden mag alleen op gezag
+    // van een openstaande, server-gemaakte uitnodiging voor dít adres, niet op
+    // het e-mailadres alleen. THERAPIST/ADMIN krijgen hun binding al bij
+    // `admin.inviteTherapist` en hebben normaal geen openstaande InviteCode,
+    // dus voor die twee verandert er feitelijk niets.
+    if (HIGH_VALUE_ROLES.has(byEmail.role)) {
+      const invite = await prisma.inviteCode.findFirst({
+        where: {
+          email,
+          role: byEmail.role as 'THERAPIST' | 'ADMIN' | 'COACH',
+          usedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        select: { id: true },
+      })
+      if (!invite) return null
     }
     try {
       const updated = await prisma.user.update({
@@ -262,7 +286,7 @@ const MFA_CHALLENGE_MESSAGE =
  */
 const STAFF_ROLES: ReadonlySet<string> = new Set(['THERAPIST', 'ADMIN', 'COACH'])
 
-function assertMfaSatisfied(ctx: Context) {
+export function assertMfaSatisfied(ctx: Context) {
   const u = ctx.user
   if (!u) return
   const isStaff = STAFF_ROLES.has(u.role)
@@ -282,7 +306,7 @@ const MFA_ENROLL_REQUIRED_MESSAGE =
  * die deze gate niet heeft, dus dit veroorzaakt geen lockout. `mfaEnabled` komt
  * uit de context-cache; `auth.setMfaStatus` invalideert die na enrollment.
  */
-function assertStaffMfaEnrolled(ctx: Context) {
+export function assertStaffMfaEnrolled(ctx: Context) {
   const u = ctx.user
   if (!u) return
   if (STAFF_ROLES.has(u.role) && !u.mfaEnabled) {

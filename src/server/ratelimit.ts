@@ -187,4 +187,16 @@ export const RATE_LIMITS = {
   messageSend:        { max: 120, windowSec: 3600, message: 'Te veel berichten. Probeer het later opnieuw.' },
   emailSend:          { max: 60, windowSec: 3600, message: 'Te veel e-mails verstuurd. Probeer het later opnieuw.' },
   pushTest:           { max: 10, windowSec: 600,  message: 'Te veel testmeldingen. Wacht een paar minuten.' },
+  // Toegevoegd na audit 2026-07-27 (L4/L5).
+  // inviteRequestIp: `invite.request` limiteerde alleen op het door de
+  // aanvaller opgegeven e-mailadres, dus varieren van het adres gaf een
+  // ongelimiteerde, ongeauthenticeerde schrijfstroom naar audit_logs.
+  inviteRequestIp:    { max: 30, windowSec: 900,  message: 'Te veel aanvragen. Wacht 15 minuten.', failClosedInProd: true },
+  // Strava heeft een applicatie-brede quota: zonder limiet kan een enkele
+  // gebruiker de sync voor iedereen breken.
+  stravaSync:         { max: 12, windowSec: 3600, message: 'Te veel Strava-syncs. Probeer het later opnieuw.' },
+  // Elke checkout maakt een ShopOrder-rij en een Mollie-betaling aan.
+  shopCheckout:       { max: 10, windowSec: 3600, message: 'Te veel bestellingen. Probeer het later opnieuw.' },
+  // Push-tokens registreren is goedkoop, maar niet gratis en niet ongelimiteerd.
+  pushRegister:       { max: 20, windowSec: 3600, message: 'Te veel registraties. Probeer het later opnieuw.' },
 } as const

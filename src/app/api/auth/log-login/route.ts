@@ -5,6 +5,7 @@ import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { auditLog } from '@/server/audit'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
+import { mayBindByEmail } from '@/server/lib/identity'
 
 /**
  * Legt een geslaagde login vast in de audit-log (`LOGIN_SUCCESS`, met IP +
@@ -59,11 +60,13 @@ export async function POST(req: NextRequest) {
     // Prisma-gebruiker = actor van de audit-rij. Zelfde precedentie als
     // /api/auth/me: eerst supabaseUserId, daarna email-fallback voor legacy
     // rijen die nog niet aan een (andere) Supabase-account gebonden zijn.
-    const select = { id: true, email: true, supabaseUserId: true } as const
+    // `role` hoort erbij: `mayBindByEmail` weigert high-value rollen via de
+    // email-fallback en heeft de rol dus nodig.
+    const select = { id: true, email: true, role: true, supabaseUserId: true } as const
     let dbUser = await prisma.user.findUnique({ where: { supabaseUserId: user.id }, select })
     if (!dbUser && user.email) {
       const byEmail = await prisma.user.findUnique({ where: { email: user.email }, select })
-      if (byEmail && (!byEmail.supabaseUserId || byEmail.supabaseUserId === user.id)) {
+      if (mayBindByEmail(byEmail, user.id)) {
         dbUser = byEmail
       }
     }

@@ -1,7 +1,13 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
+import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import type { PrismaClient } from '@prisma/client'
-import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  assertMfaSatisfied,
+  assertStaffMfaEnrolled,
+} from '@/server/trpc'
 import { computeReadinessFor, READINESS_HISTORY_DAYS } from '@/server/readiness'
 import { exertionScore } from '@/lib/exertion'
 import { wearablesEnabledForRole } from '@/lib/wearables-access'
@@ -18,6 +24,11 @@ const wearablesProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (!wearablesEnabledForRole(ctx.user!.role)) {
     throw new TRPCError({ code: 'FORBIDDEN' })
   }
+  // Beide helpers zijn no-ops voor PATIENT/ATHLETE (ze kijken alleen naar
+  // STAFF_ROLES), dus een atleet die zijn eigen watch-data leest merkt hier
+  // niets van. Voor staff sluit dit het MFA-gat uit audit 2026-07-27, M1.
+  assertStaffMfaEnrolled(ctx)
+  assertMfaSatisfied(ctx)
   return next({ ctx })
 })
 
@@ -334,6 +345,10 @@ export const wearablesRouter = createTRPCRouter({
 
   /** Strava: handmatig (her)synchroniseren van de laatste 30 dagen. */
   stravaSync: wearablesProcedure.mutation(async ({ ctx }) => {
+    // Strava's quota is applicatie-breed, niet per gebruiker: zonder limiet kan
+    // één account de sync voor alle anderen opbranden (audit 2026-07-27, L5).
+    const rl = await rateLimit('wearables.stravaSync', ctx.user!.id, RATE_LIMITS.stravaSync)
+    if (!rl.ok) throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
     const synced = await syncStravaActivities(ctx.prisma, ctx.user!.id, { days: 30 })
     return { synced }
   }),

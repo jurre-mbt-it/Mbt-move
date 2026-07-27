@@ -20,12 +20,22 @@ export default function AdminDpaPage() {
   const acceptedCount = patients.filter(p => p.accepted).length
   const pendingCount = patients.length - acceptedCount
 
+  // CSV-injectie: Excel en Sheets voeren een cel uit die met =, +, - of @
+  // begint. Naam en e-mail zijn door de gebruiker zelf ingevuld, dus een
+  // patiënt kan daarmee een formule in de admin-export planten. Prefix met een
+  // apostrof en escape aanhalingstekens (audit 2026-07-27, L2).
+  function csvCell(value: string | null | undefined): string {
+    const s = String(value ?? '')
+    const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s
+    return `"${safe.replace(/"/g, '""')}"`
+  }
+
   function downloadCsv() {
     const header = 'Naam,E-mail,Rol,DPA versie,Geaccepteerd op,Account aangemaakt\n'
     const rows = patients.map(p =>
       [
-        `"${p.name}"`,
-        `"${p.email}"`,
+        csvCell(p.name),
+        csvCell(p.email),
         p.role,
         p.dpaAcceptedVersion ?? 'Niet geaccepteerd',
         p.dpaAcceptedAt

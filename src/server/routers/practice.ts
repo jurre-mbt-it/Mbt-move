@@ -120,14 +120,23 @@ export const practiceRouter = createTRPCRouter({
     })
     if (current?.logoUrl) {
       // Pad uit URL halen: ".../object/public/practice-logos/{practiceId}/logo.ext"
+      //
+      // `logoUrl` is via `practice.update` door de client te zetten, en de
+      // delete hieronder draait met de service_role-key en omzeilt dus de
+      // storage-policy die je normaal tot je eigen prefix beperkt. Zonder de
+      // prefix-check kon een praktijk-eigenaar het logo van een andere praktijk
+      // laten verwijderen (audit 2026-07-27, L1). Alleen objecten onder de
+      // eigen `{practiceId}/` mogen weg.
       const match = current.logoUrl.match(/\/practice-logos\/(.+?)(?:\?|$)/)
-      if (match) {
+      const objectPath = match?.[1]
+      const ownPrefix = `${ctx.user!.practiceId}/`
+      if (objectPath && objectPath.startsWith(ownPrefix) && !objectPath.includes('..')) {
         const { createClient } = await import('@supabase/supabase-js')
         const admin = createClient(
           process.env.NEXT_PUBLIC_SUPABASE_URL!,
           process.env.SUPABASE_SERVICE_ROLE_KEY!,
         )
-        await admin.storage.from('practice-logos').remove([match[1]]).catch(() => {
+        await admin.storage.from('practice-logos').remove([objectPath]).catch(() => {
           // Best-effort — als verwijderen faalt blijft het object weeshangen,
           // maar de DB-link is wel weg. Daar is een storage-cleanup-cron voor.
         })

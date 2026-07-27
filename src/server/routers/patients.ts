@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
-import type { PrismaClient } from '@prisma/client'
+import type { PrismaClient, Prisma } from '@prisma/client'
 import {
   createTRPCRouter,
   therapistProcedure,
@@ -1168,6 +1168,20 @@ export const patientsRouter = createTRPCRouter({
         },
       })
 
+      // De `on_auth_user_created`-trigger kan hierboven al een stub-rij hebben
+      // gemaakt. Die kent de bedoelde rol niet meer (sinds de fix van
+      // 2026-07-27 leest hij de rol niet meer uit client-metadata) en valt
+      // terug op PATIENT. De server is autoritatief: corrigeer de rol zolang
+      // de rij nog niet aan een Supabase-account gebonden is. Een bestaande,
+      // gebonden gebruiker raken we bewust niet aan — dat was en blijft de
+      // bescherming tegen rol-overschrijving via een openstaande invite.
+      if (!patient.supabaseUserId && (patient.role !== role || !patient.practiceId)) {
+        await ctx.prisma.user.update({
+          where: { id: patient.id },
+          data: { role, practiceId: ctx.user.practiceId ?? null },
+        })
+      }
+
       // Link therapist ↔ patient (only for PATIENT/ATHLETE). Status = PENDING
       // zodat de patiënt zelf moet bevestigen voordat de therapeut data inziet.
       if (role === 'PATIENT' || role === 'ATHLETE') {
@@ -2082,42 +2096,43 @@ export const patientsRouter = createTRPCRouter({
   search: coachStaffProcedure
     .input(z.object({ query: z.string().optional() }))
     .query(async ({ ctx, input }) => {
-      const baseWhere = {
-        ...(input.query ? {
-          OR: [
-            { name: { contains: input.query, mode: 'insensitive' as const } },
-            { email: { contains: input.query, mode: 'insensitive' as const } },
-          ],
-        } : {}),
-      }
+      // KRITIEK — zoekfilter en toegangscontrole moeten onder AND, niet als
+      // twee `OR`-sleutels in hetzelfde object. Een object-spread overschrijft
+      // een gelijknamige sleutel, dus `{ OR: [toegang], ...{ OR: [zoek] } }`
+      // levert alléén het zoekfilter op en laat de scoping volledig vallen.
+      // Dat lekte naam + e-mail van patiënten uit elke praktijk aan elke
+      // therapeut of coach (audit 2026-07-27, H1).
+      const queryFilter: Prisma.UserWhereInput = input.query
+        ? {
+            OR: [
+              { name: { contains: input.query, mode: 'insensitive' as const } },
+              { email: { contains: input.query, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}
 
-      if (ctx.user.role === 'ADMIN') {
-        return ctx.prisma.user.findMany({
-          where: {
-            role: { in: ['PATIENT', 'ATHLETE'] },
-            ...baseWhere,
-          },
-          select: { id: true, name: true, email: true },
-          take: 20,
-        })
-      }
+      const scopeFilter: Prisma.UserWhereInput =
+        ctx.user.role === 'ADMIN'
+          ? {}
+          : {
+              OR: [
+                {
+                  patientTherapists: {
+                    some: {
+                      therapistId: ctx.user.id,
+                      isActive: true,
+                      status: { in: ['APPROVED', 'PENDING'] },
+                    },
+                  },
+                },
+                ...practiceScope(ctx.user),
+              ],
+            }
 
       return ctx.prisma.user.findMany({
         where: {
           role: { in: ['PATIENT', 'ATHLETE'] },
-          OR: [
-            {
-              patientTherapists: {
-                some: {
-                  therapistId: ctx.user.id,
-                  isActive: true,
-                  status: { in: ['APPROVED', 'PENDING'] },
-                },
-              },
-            },
-            ...practiceScope(ctx.user),
-          ],
-          ...baseWhere,
+          AND: [scopeFilter, queryFilter],
         },
         select: { id: true, name: true, email: true },
         take: 20,
