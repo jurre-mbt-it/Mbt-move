@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { FileText, CheckCircle2, LogOut } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
@@ -59,13 +59,16 @@ export function DpaPopup() {
           >
             <FileText className="w-5 h-5" style={{ color: '#E87A55' }} />
           </div>
-          <h2 className="text-lg font-bold leading-tight" style={{ color: '#F5F2ED' }}>
+          <DialogTitle
+            className="text-lg font-bold leading-tight tracking-normal"
+            style={{ color: '#F5F2ED' }}
+          >
             Verwerkingsovereenkomst
-          </h2>
-          <p className="text-sm mt-1" style={{ color: '#9EB5B3' }}>
+          </DialogTitle>
+          <DialogDescription className="text-sm mt-1" style={{ color: '#9EB5B3' }}>
             Movement Based Therapy verwerkt uw persoonsgegevens als verwerkingsverantwoordelijke.
             Lees de overeenkomst en geef akkoord om door te gaan.
-          </p>
+          </DialogDescription>
         </div>
 
         {/* Body */}

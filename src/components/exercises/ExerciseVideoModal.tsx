@@ -1,7 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { X, VideoOff, TrendingDown, TrendingUp, Lightbulb, Edit } from 'lucide-react'
@@ -51,10 +51,17 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
         .slice(0, 4)
     : []
 
+  // Radix zet altijd een aria-describedby op DialogContent, ook als er geen
+  // DialogDescription bestaat. Bij een oefening zonder omschrijving wijst dat
+  // naar een id die nergens staat, en dat logt een console-warning. Alleen dan
+  // halen we het attribuut weg; mét omschrijving blijft de koppeling intact.
+  const describedBy = exercise.description ? {} : { 'aria-describedby': undefined }
+
   return (
     <Dialog open={open} onOpenChange={open => { if (!open) onClose() }}>
       <DialogContent
         hideCloseButton
+        {...describedBy}
         className="max-w-md mx-auto p-0 overflow-hidden gap-0"
         style={{ borderRadius: '20px', maxHeight: '90vh', overflowY: 'auto' }}
       >
@@ -102,7 +109,7 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
           {/* Name + badges */}
           <div>
             <div className="flex items-start justify-between gap-3">
-              <h2 className="font-bold text-lg leading-tight flex-1">{exercise.name}</h2>
+              <DialogTitle className="font-bold text-lg leading-tight tracking-normal flex-1">{exercise.name}</DialogTitle>
               {exercise.editHref && (
                 <Link href={exercise.editHref}>
                   <Button variant="outline" size="sm" className="gap-1.5 shrink-0 h-8 text-xs">
@@ -134,7 +141,7 @@ export function ExerciseVideoModal({ open, onClose, exercise }: Props) {
 
           {/* Description */}
           {exercise.description && (
-            <p className="text-sm text-[#9EB5B3] leading-relaxed">{exercise.description}</p>
+            <DialogDescription className="text-sm text-[#9EB5B3] leading-relaxed">{exercise.description}</DialogDescription>
           )}
 
           {/* Muscle groups */}

@@ -1313,7 +1313,7 @@ function WeekMetaDialog({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-md">
+      <DialogContent aria-describedby={undefined} className="max-w-md">
         <DialogHeader>
           <DialogTitle>Week {weekNumber} — fase &amp; belasting</DialogTitle>
         </DialogHeader>
@@ -2911,7 +2911,7 @@ function WeekPlannerContent() {
       {/* Mobiel: item-detail als centrale modal */}
       {!isDesktop && (
         <Dialog open={!!detailItem} onOpenChange={(o) => !o && setDetailItem(null)}>
-          <DialogContent className="max-w-xl p-0 overflow-hidden">
+          <DialogContent aria-describedby={undefined} className="max-w-xl p-0 overflow-hidden">
             <DialogHeader className="sr-only">
               <DialogTitle>Workout-details</DialogTitle>
             </DialogHeader>

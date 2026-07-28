@@ -347,7 +347,7 @@ function ActiveProgramsPanel() {
       )}
 
       <Dialog open={!!duplicateTarget} onOpenChange={open => { if (!open) setDuplicateTarget(null) }}>
-        <DialogContent
+        <DialogContent aria-describedby={undefined}
           className="max-w-sm"
           style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
         >
@@ -629,7 +629,7 @@ function ProgramExercisePreview({ programId }: { programId: string }) {
       </div>
 
       <Dialog open={!!moveDialog} onOpenChange={open => { if (!open) setMoveDialog(null) }}>
-        <DialogContent
+        <DialogContent aria-describedby={undefined}
           className="max-w-sm"
           style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
         >
@@ -824,7 +824,7 @@ function TemplateLibraryPanel() {
       )}
 
       <Dialog open={!!copyTarget} onOpenChange={open => { if (!open) setCopyTarget(null) }}>
-        <DialogContent
+        <DialogContent aria-describedby={undefined}
           className="max-w-sm"
           style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
         >

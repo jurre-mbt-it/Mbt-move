@@ -815,7 +815,7 @@ export function ProgramExerciseBlock({
 
       {/* Video dialog */}
       <Dialog open={videoOpen} onOpenChange={setVideoOpen}>
-        <DialogContent className="max-w-lg" style={{ borderRadius: '16px' }}>
+        <DialogContent aria-describedby={undefined} className="max-w-lg" style={{ borderRadius: '16px' }}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />

@@ -271,7 +271,7 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
         </div>
 
         <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
-          <DialogContent
+          <DialogContent aria-describedby={undefined}
             style={{
               borderRadius: '16px',
               background: P.surface,

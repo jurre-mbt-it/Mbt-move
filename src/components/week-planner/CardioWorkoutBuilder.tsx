@@ -177,7 +177,7 @@ export function CardioWorkoutBuilder({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-5xl">
+      <DialogContent aria-describedby={undefined} className="max-w-5xl">
         <DialogHeader>
           <DialogTitle>{itemName || 'Cardio-workout'}</DialogTitle>
         </DialogHeader>

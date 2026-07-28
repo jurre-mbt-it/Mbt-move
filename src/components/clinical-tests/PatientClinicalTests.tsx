@@ -307,7 +307,7 @@ function AddTestDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
+      <DialogContent aria-describedby={undefined}
         className="max-w-lg"
         style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
       >
@@ -503,7 +503,7 @@ function LogResultDialog({
 
   return (
     <Dialog open={!!assignment} onOpenChange={v => !v && onClose()}>
-      <DialogContent
+      <DialogContent aria-describedby={undefined}
         className="max-w-md"
         style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
       >

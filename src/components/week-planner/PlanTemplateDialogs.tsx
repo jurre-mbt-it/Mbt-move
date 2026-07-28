@@ -117,7 +117,7 @@ export function ApplyPlanDialog({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent aria-describedby={undefined} className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Plan toepassen</DialogTitle>
         </DialogHeader>
@@ -372,7 +372,7 @@ export function SavePlanDialog({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-md">
+      <DialogContent aria-describedby={undefined} className="max-w-md">
         <DialogHeader>
           <DialogTitle>Opslaan als plan</DialogTitle>
         </DialogHeader>

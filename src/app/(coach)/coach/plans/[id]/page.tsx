@@ -280,7 +280,7 @@ function AddItemDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
+      <DialogContent aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>
             Week {target.weekNumber}, {DAY_NAMES[target.dayOfWeek].toLowerCase()}
@@ -518,7 +518,7 @@ function PlanItemDialog({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-h-[88vh] overflow-y-auto">
+      <DialogContent aria-describedby={undefined} className="max-h-[88vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{item.program?.name ?? (naam || 'Workout')}</DialogTitle>
         </DialogHeader>

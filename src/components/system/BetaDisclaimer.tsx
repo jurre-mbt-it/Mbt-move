@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle, LogOut } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -60,13 +60,16 @@ export function BetaDisclaimer() {
           >
             <AlertTriangle className="w-5 h-5" style={{ color: '#F5B942' }} />
           </div>
-          <h2 className="text-lg font-bold leading-tight" style={{ color: '#F5F2ED' }}>
+          <DialogTitle
+            className="text-lg font-bold leading-tight tracking-normal"
+            style={{ color: '#F5F2ED' }}
+          >
             Beta-versie
-          </h2>
-          <p className="text-sm mt-1" style={{ color: '#9EB5B3' }}>
+          </DialogTitle>
+          <DialogDescription className="text-sm mt-1" style={{ color: '#9EB5B3' }}>
             MBT Gym is op dit moment in beta. Lees de voorwaarden hieronder
             en geef akkoord om door te gaan.
-          </p>
+          </DialogDescription>
         </div>
 
         <div className="px-5 py-4 space-y-3 text-sm" style={{ background: '#081A1C', color: '#F5F2ED' }}>

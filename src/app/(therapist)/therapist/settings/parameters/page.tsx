@@ -271,7 +271,7 @@ export default function ParametersPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent
+        <DialogContent aria-describedby={undefined}
           className="max-w-sm"
           style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
         >

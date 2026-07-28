@@ -1933,7 +1933,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         setMobileLibraryOpen(open)
         if (!open) { setMobileSelected(new Set()); setMobileQuery(''); setMobileCategory(null) }
       }}>
-        <DialogContent className="p-0 flex flex-col gap-0" style={{ borderRadius: '16px', maxHeight: '85vh' }}>
+        <DialogContent aria-describedby={undefined} className="p-0 flex flex-col gap-0" style={{ borderRadius: '16px', maxHeight: '85vh' }}>
           {/* Header */}
           <DialogHeader className="px-4 pt-4 pb-3 border-b shrink-0">
             <DialogTitle>Oefening toevoegen</DialogTitle>
@@ -2040,7 +2040,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
 
       {/* Vanaf-template import dialog */}
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent aria-describedby={undefined} className="max-w-md">
           <DialogHeader>
             <DialogTitle>Programma vanaf template</DialogTitle>
           </DialogHeader>
@@ -2088,7 +2088,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
 
       {/* Opslaan-als-template dialog */}
       <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent aria-describedby={undefined} className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Opslaan als template</DialogTitle>
           </DialogHeader>
@@ -2143,7 +2143,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
 
       {/* Preview dialog */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0" style={{ borderRadius: '16px' }}>
+        <DialogContent aria-describedby={undefined} className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0" style={{ borderRadius: '16px' }}>
           <DialogHeader className="px-5 pt-5 pb-3 border-b shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Eye className="w-4 h-4" />
@@ -2202,7 +2202,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
 
       {/* Mobile muscle balance dialog */}
       <Dialog open={mobileBalanceOpen} onOpenChange={setMobileBalanceOpen}>
-        <DialogContent className="max-w-sm max-h-[80vh] overflow-hidden flex flex-col p-0" style={{ borderRadius: '16px' }}>
+        <DialogContent aria-describedby={undefined} className="max-w-sm max-h-[80vh] overflow-hidden flex flex-col p-0" style={{ borderRadius: '16px' }}>
           <DialogHeader className="px-4 pt-4 pb-2 border-b shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <BarChart2 className="w-4 h-4" />
