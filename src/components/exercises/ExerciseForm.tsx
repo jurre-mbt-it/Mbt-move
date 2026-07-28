@@ -222,6 +222,14 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
     } else {
       const created = await createMutation.mutateAsync(payload)
       setCurrentExerciseId(created.id)
+      // De server bepaalt de zichtbaarheid bij create (ADMIN → globaal). Neem
+      // die waarde over in de form-state, anders stuurt de volgende autosave
+      // (die loopt via `update`, waar ADMIN isPublic wél mag zetten) de lokale
+      // default `false` mee en zet hij de net aangemaakte oefening stil terug
+      // op persoonlijk.
+      if (created.isPublic !== val.isPublic) {
+        setForm(prev => ({ ...prev, isPublic: created.isPublic }))
+      }
       // URL stil naar de edit-pagina zetten (geen route-navigatie → geen
       // AppLoader-flash). PageTransition mapt new + {id}/edit op één stabiele
       // key, dus de form-state blijft staan; een refresh laadt daarna correct.

@@ -58,6 +58,21 @@ IJkpunt: *"Patiënt is 8 weken post-OK. Kracht quadriceps rechts 78% t.o.v. link
 - Afkortingen die de ontvanger kent (HHD, LSI, post-OK) zijn prima.
 - Afsluiting: "Met vriendelijke groet, Jurre". In formelere externe stukken: "Met vriendelijke groet, Jurre" gevolgd door "Movement Based Therapy" op een eigen regel.
 
+#### Kritische collegiale afstemming
+
+Bij verschil van inzicht of twijfel over beleid schrijft Jurre uitgebreider dan in een gewone overdracht. De toon blijft collegiaal, maar de inhoud wordt niet afgezwakt.
+
+- Begin met de gedeelde patiëntcontext en benoem direct waarover je wilt sparren, bijvoorbeeld het vervolgbeleid.
+- Geef het standpunt van de ander niet als vaststaand feit weer als het via de patiënt is overgebracht. Formuleer als: "Zij gaf aan dat het advies luidde..." en laat expliciet ruimte voor een verschil in overdracht.
+- Zet daarna rustig de eigen klinische afweging uiteen. Gebruik de eerste persoon ("mijn eerste keuze zou liggen bij") en onderbouw die met mechanisme, risicoprofiel en praktische consequenties.
+- Benoem diagnostische onzekerheid concreet. Onzekerheid is een reden om zorgvuldig af te stemmen, niet om vaag te schrijven.
+- Stel een echte inhoudelijke vraag: "Ik ben benieuwd hoe jij daarnaar kijkt en hoe je tot dit advies bent gekomen." Nodig uit tot onderbouwing in plaats van het oordeel al vast te zetten.
+- Meld welk vervolgbeleid al is ingezet, zodat voor de ontvanger duidelijk is wat er ondertussen gebeurt.
+- Maak bij gevoelige feedback de intentie één keer expliciet: samen scherp blijven op beleid en kwaliteit, niet de ander de les lezen. Niet herhaaldelijk verontschuldigen.
+- Bied bellen aan als het onderwerp zich daar beter voor leent.
+- Zinsbouw mag langer en genuanceerder zijn dan in een overdracht. Gebruik logische verbindingen als "vandaar", "daarbij komt" en "zeker gezien", maar vermijd formeel of defensief taalgebruik.
+- Kernindruk: inhoudelijk stevig, respectvol, open voor correctie en gericht op gezamenlijk klinisch redeneren.
+
 ### 5. Slecht nieuws of een tegenvaller
 
 IJkpunt: *"De meting zegt: nog niet. Maar hij zegt ook: je bent goed op weg. Van 55% naar 70% in zes weken is een prima tempo. Houden we dit vol, dan zit je over een week of vijf op het niveau waarop voetballen weer veilig is. Twee weken was te krap, vijf weken is haalbaar."*

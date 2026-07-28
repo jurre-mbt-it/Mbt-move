@@ -22,6 +22,7 @@ import {
   DarkDialogHeader as DialogHeader,
   DarkDialogTitle as DialogTitle,
   DarkInput,
+  InfoTip,
   Kicker,
   MetaLabel,
   P,
@@ -403,6 +404,12 @@ export default function ParametersPage() {
               <span style={{ color: P.ink, fontSize: 13 }}>
                 Globaal (zichtbaar in alle programma&apos;s)
               </span>
+              <InfoTip label="Uitleg globale parameter" side="left">
+                Globaal betekent dat deze parameter in elk programma meteen klaarstaat bij je
+                oefeningen. Handig voor iets wat je overal invult, zoals kabelgewicht of
+                bandkleur. Laat je hem uit, dan blijft hij bestaan maar kies je per programma
+                zelf of je hem gebruikt.
+              </InfoTip>
             </div>
 
             <div className="flex gap-2 pt-1">

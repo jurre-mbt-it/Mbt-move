@@ -448,6 +448,63 @@ body {
   animation: mbt-fade-in 220ms ease-out both;
 }
 
+/* "Hier moet je zijn" — een ring die drie keer opgloeit en dan stopt. Voor het
+   moment dat een link je naar een specifieke knop stuurt (quick start → start
+   behandeling) en die knop tussen de rest van de pagina staat. Bewust eindig:
+   een oneindige puls wordt na tien seconden geklaag. Toegevoegd 2026-07-28. */
+@keyframes mbt-attention {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(95, 208, 138, 0); }
+  50%      { box-shadow: 0 0 28px 6px rgba(95, 208, 138, 0.45); }
+}
+.mbt-attention {
+  animation: mbt-attention 900ms ease-in-out 3;
+}
+
+/* ── Demo-lus in de lege program-builder ──────────────────────────────────────
+   Een nagespeelde mini-builder: oefening sleept naar de dag, naam vult zich,
+   deploy-knop springt aan. Alle vijf de sporen delen dezelfde 6s-cyclus zodat
+   ze synchroon lopen.
+
+   BELANGRIJK: 100% is bewust de EINDstand (oefening geplaatst, naam ingevuld,
+   knop koraal) en niet de lege beginstand. Het reduced-motion-blok onderaan zet
+   iteration-count op 1 en de duur op vrijwel nul, dus zonder animatie blijft
+   precies dat laatste frame staan. Zou 100% leeg zijn, dan zag iemand met
+   reduced motion een lege tekening zonder betekenis. Toegevoegd 2026-07-28. */
+@keyframes mbt-demo-ghost {
+  0%, 6%    { opacity: 0; transform: translate(0, 0) scale(0.96); }
+  10%       { opacity: 1; transform: translate(0, 0) scale(1); }
+  30%       { opacity: 1; transform: translate(var(--demo-dx), var(--demo-dy)) scale(1); }
+  34%, 100% { opacity: 0; transform: translate(var(--demo-dx), var(--demo-dy)) scale(0.98); }
+}
+@keyframes mbt-demo-placed {
+  0%, 32%   { opacity: 0; transform: scale(0.94); }
+  38%, 100% { opacity: 1; transform: scale(1); }
+}
+@keyframes mbt-demo-dropzone {
+  0%, 14%   { border-color: rgba(212, 232, 230, 0.16); background-color: transparent; }
+  20%, 32%  { border-color: #E87A55; background-color: rgba(232, 122, 85, 0.10); }
+  40%, 100% { border-color: rgba(212, 232, 230, 0.16); background-color: transparent; }
+}
+@keyframes mbt-demo-type {
+  0%, 42%   { width: 0; }
+  62%, 100% { width: 100%; }
+}
+@keyframes mbt-demo-caret {
+  0%, 40%   { opacity: 0; }
+  42%, 62%  { opacity: 1; }
+  64%, 100% { opacity: 0; }
+}
+@keyframes mbt-demo-deploy {
+  0%, 66%   { background-color: #1C4448; color: #86A3A1; }
+  72%, 100% { background-color: #E87A55; color: #0E2729; }
+}
+.mbt-demo-ghost    { animation: mbt-demo-ghost 6s ease-in-out infinite both; }
+.mbt-demo-placed   { animation: mbt-demo-placed 6s ease-out infinite both; }
+.mbt-demo-dropzone { animation: mbt-demo-dropzone 6s ease-in-out infinite both; }
+.mbt-demo-type     { animation: mbt-demo-type 6s steps(24, end) infinite both; }
+.mbt-demo-caret    { animation: mbt-demo-caret 6s steps(1, end) infinite both; }
+.mbt-demo-deploy   { animation: mbt-demo-deploy 6s ease-out infinite both; }
+
 /* Skeleton-shimmer — toont de VORM van de inhoud tijdens het laden i.p.v. een
    kale "LADEN…". Subtiele veeg in huisstijl (surfaceHi-basis + lichte highlight),
    bewust rustig. Killt netjes onder prefers-reduced-motion (blok hieronder).

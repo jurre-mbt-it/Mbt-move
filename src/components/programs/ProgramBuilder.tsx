@@ -39,9 +39,11 @@ import { cn } from '@/lib/utils'
 
 import {
   Eye, Copy, Plus, Trash2, Rocket, Check, AlertCircle, Loader2,
-  ChevronLeft, Layers, Search, CheckCircle2, X, BarChart2, Info,
+  ChevronLeft, Layers, Search, CheckCircle2, X, BarChart2,
   User, ChevronDown, ChevronsUpDown, ChevronsDownUp,
 } from 'lucide-react'
+import { InfoTip } from '@/components/dark-ui/InfoTip'
+import { BuilderDemo } from './BuilderDemo'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -1366,6 +1368,15 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                 : 'Archief'}
             </span>
           )}
+          {/* De `title` op de status-pill hierboven werkt alleen met een muis.
+              Deze tip legt hetzelfde uit en is ook op de iPad te openen. */}
+          {(currentStatus === 'DRAFT' || currentStatus === 'ACTIVE') && (
+            <InfoTip label="Uitleg concept en live">
+              {currentStatus === 'DRAFT'
+                ? 'Een concept staat alleen bij jou. De patiënt ziet er niets van, ook niet in de app. Klik op Deployen om het programma aan een patiënt te koppelen en actief te maken. Deployen kan pas als het programma een naam heeft.'
+                : 'Dit programma is live. Alles wat je hier wijzigt wordt direct opgeslagen en is meteen zichtbaar bij de patiënt. Met Update kies je of je daar ook een mail over stuurt.'}
+            </InfoTip>
+          )}
           <div className="flex-1" />
 
           <div className="hidden md:flex items-center gap-1">
@@ -1461,12 +1472,9 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               Tendinopathie pijn tracking
             </span>
           </button>
-          <div className="relative group">
-            <Info className="w-3.5 h-3.5 text-[#9EB5B3] cursor-help" />
-            <div className="absolute left-5 top-0 z-50 w-64 hidden group-hover:block bg-[#E87A55] text-[#0E2729] text-xs rounded-lg px-3 py-2 shadow-xl">
-              Voor peesproblematiek (achilles, patella, RC): splitst pijn in tijdens vs 24u erna + ochtend stijfheid. Gebruikt Silbernagel-protocol grenzen.
-            </div>
-          </div>
+          <InfoTip label="Uitleg tendinopathie pijn tracking">
+            Voor peesproblematiek (achilles, patella, RC): splitst pijn in tijdens vs 24u erna + ochtend stijfheid. Gebruikt Silbernagel-protocol grenzen.
+          </InfoTip>
           {program.tendinopathyMode && (
             <span
               className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
@@ -1519,6 +1527,12 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               1RM tracking
             </span>
           </button>
+          <InfoTip label="Uitleg 1RM tracking">
+            Met dit aan schat BASE na elke sessie het 1RM per oefening, via de formule van
+            Epley op het gewicht en het aantal herhalingen. Die schatting komt terug op de
+            voortgang van de patiënt, zodat je krachttoename ziet zonder een echte 1RM-test
+            af te nemen.
+          </InfoTip>
           {program.trackOneRepMax && (
             <span
               className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
@@ -1557,6 +1571,12 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               Flexibele week
             </span>
           </button>
+          <InfoTip label="Uitleg flexibele week">
+            Zet dit aan als iemand de oefeningen een aantal keer per week moet doen, maar
+            het niet uitmaakt op welke dag. Je vult dan alleen het aantal keer per week in,
+            en de patiënt kan elke dag starten. De week is klaar zodra dat aantal gehaald
+            is. Laat je dit uit, dan hang je de oefeningen aan vaste dagen.
+          </InfoTip>
           {program.flexibleSchedule && (
             <div className="flex items-center gap-1">
               <span className="text-[10px] text-muted-foreground">×</span>
@@ -1594,12 +1614,9 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               className="w-12 h-6 text-center text-xs font-bold bg-[#1C4448] rounded border border-[rgba(212,232,230,0.10)] focus:outline-none focus:ring-1 focus:ring-[#E87A55]"
             />
             <span className="text-[10px] text-muted-foreground">weken</span>
-            <div className="relative group">
-              <Info className="w-3.5 h-3.5 text-[#9EB5B3] cursor-help" />
-              <div className="absolute left-5 top-0 z-50 w-64 hidden group-hover:block bg-[#E87A55] text-[#0E2729] text-xs rounded-lg px-3 py-2 shadow-xl">
-                Na zoveel weken zonder wijziging krijg je een signaal om het schema te controleren. Leeg = standaard 8 weken. Elke aanpassing reset de teller.
-              </div>
-            </div>
+            <InfoTip label="Uitleg controle-interval">
+              Na zoveel weken zonder wijziging krijg je een signaal om het schema te controleren. Leeg = standaard 8 weken. Elke aanpassing reset de teller.
+            </InfoTip>
           </div>
 
           {/* Destination toggle — bepaalt of Opslaan naar deze patiënt of de
@@ -1804,6 +1821,10 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
 
             {/* Exercises */}
             <div className="flex-1 overflow-y-auto px-3 md:px-4 py-3 pb-32 md:pb-4">
+              {/* Demo-lus zolang het hele programma nog leeg is, niet alleen de
+                  huidige dag: wie op dag 3 begint heeft de uitleg net zo hard
+                  nodig. BuilderDemo beslist zelf of hij mag verschijnen. */}
+              {exercises.length === 0 && <BuilderDemo />}
               <DayDropZone day={program.currentDay} week={program.currentWeek} isEmpty={dayExercises.length === 0}>
                 <SortableContext
                   items={orderedItems.flatMap(i => i.type === 'free' ? [i.ex.uid] : [])}

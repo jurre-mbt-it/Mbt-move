@@ -22,6 +22,11 @@ import { P, DARK_CHART_COLORS } from '@/lib/palette'
 // werken. Servercomponenten importeren rechtstreeks uit `@/lib/palette`.
 export { P, DATA_COLORS, CATEGORY_COLORS, ZONE_COLORS, DARK_CHART_COLORS } from '@/lib/palette'
 
+// Uitleg-tooltip bij een instelling. Eigen bestand omdat dit ding zijn eigen
+// listeners en state heeft; hier alleen doorgegeven zodat imports uit
+// `@/components/dark-ui` blijven werken.
+export { InfoTip } from './InfoTip'
+
 // ─── Screen wrapper ──────────────────────────────────────────────────────────
 
 export function DarkScreen({
