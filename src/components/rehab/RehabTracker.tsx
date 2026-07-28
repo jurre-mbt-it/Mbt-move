@@ -126,7 +126,7 @@ function phaseTypicalRange(start: number | null, end: number | null): string {
   if (start != null && end == null) return `vanaf week ${start}`
   if (start == null) return `tot week ${end}`
   if (start < 0) return `pre-op (${Math.abs(start)} weken voor operatie)`
-  return `week ${start} – ${end}`
+  return `week ${start}-${end}`
 }
 
 export function RehabTracker({ patientId }: { patientId: string }) {
@@ -177,7 +177,7 @@ export function RehabTracker({ patientId }: { patientId: string }) {
                 className="athletic-mono"
                 style={{ color: P.gold, fontSize: 11, letterSpacing: '0.08em', marginTop: 4 }}
               >
-                {tr.progress.inProgress} bijna — {tr.progress.total - tr.progress.met - tr.progress.inProgress} open
+                {tr.progress.inProgress} bijna, {tr.progress.total - tr.progress.met - tr.progress.inProgress} open
               </p>
             )}
             {tr.expectedPhaseOrder != null && (
@@ -318,7 +318,7 @@ function PhaseCard({
                 }}
                 title={
                   weeksSinceSurgery != null
-                    ? `${weeksSinceSurgery} weken post-op — typische periode voor deze fase`
+                    ? `${weeksSinceSurgery} weken post-op, typische periode voor deze fase`
                     : undefined
                 }
               >
@@ -503,7 +503,7 @@ function CriterionRow({
         },
         {
           onSuccess: () => {
-            toast.success('Opgeslagen — status auto-berekend')
+            toast.success('Opgeslagen, status auto-berekend')
             setOpen(false)
           },
         },

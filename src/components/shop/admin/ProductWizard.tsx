@@ -571,7 +571,7 @@ export function ProductWizard({
                         }))
                       }}
                     >
-                      <option value="">— Geen schema gekoppeld —</option>
+                      <option value="">Geen schema gekoppeld</option>
                       {programs.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.name} ({p.weeks} wk · {p.daysPerWeek}×/wk)
@@ -586,7 +586,7 @@ export function ProductWizard({
                         value={editor.level}
                         onChange={(e) => set('level', e.target.value as Level)}
                       >
-                        <option value="">— Geen —</option>
+                        <option value="">Geen</option>
                         {Object.entries(LEVEL_LABELS).map(([k, v]) => (
                           <option key={k} value={k}>
                             {v}
@@ -778,7 +778,7 @@ export function ProductWizard({
                   value={editor.therapistId}
                   onChange={(e) => set('therapistId', e.target.value)}
                 >
-                  <option value="">— Geen therapeut —</option>
+                  <option value="">Geen therapeut</option>
                   {therapists.map((t) => {
                     const label =
                       t.name || [t.firstName, t.lastName].filter(Boolean).join(' ') || t.id

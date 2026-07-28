@@ -127,7 +127,7 @@ function Simulator() {
   return (
     <div style={{ minHeight: '100vh', background: IOS.bg, color: IOS.ink, padding: '28px 20px 60px', fontFamily: '-apple-system, "Segoe UI", sans-serif' }}>
       <div style={{ maxWidth: 1040, margin: '0 auto' }}>
-        <h1 style={{ fontSize: 20, fontWeight: 800, letterSpacing: 0.3 }}>Spiervermoeidheid — simulator</h1>
+        <h1 style={{ fontSize: 20, fontWeight: 800, letterSpacing: 0.3 }}>Spiervermoeidheid-simulator</h1>
         <p style={{ color: IOS.inkMuted, fontSize: 13, marginTop: 6, marginBottom: 24 }}>
           Voegt sessies toe en voert ze door de <b>echte</b> engine + lijst. Stel per sessie in hoeveel uur geleden hij was; de lijst rechts werkt real-time bij.
         </p>

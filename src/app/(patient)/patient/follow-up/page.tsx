@@ -196,7 +196,7 @@ function FollowUpCard({
                 className="athletic-mono"
                 style={{ color: silbernagelColor(pain24h), fontSize: 11, fontWeight: 900 }}
               >
-                {pain24h}/10 — {silbernagelLabel(pain24h)}
+                {pain24h}/10, {silbernagelLabel(pain24h)}
               </span>
             )}
           </div>
@@ -219,7 +219,7 @@ function FollowUpCard({
                 }}
               >
                 {pain24h > 7
-                  ? 'STOP · Pijn te hoog — bespreek met je therapeut voor de volgende sessie.'
+                  ? 'STOP · Pijn te hoog, bespreek met je therapeut voor de volgende sessie.'
                   : 'LET OP · Verhoogde pijn na sessie. Monitor het verloop.'}
               </p>
             </div>
@@ -387,8 +387,8 @@ export default function FollowUpPage() {
             <MetaLabel>Silbernagel grenzen</MetaLabel>
             <div className="flex flex-col gap-1.5">
               {[
-                { label: '0–5', desc: 'Belasting OK', color: P.lime },
-                { label: '5–7', desc: 'Let op, monitor', color: P.gold },
+                { label: '0-5', desc: 'Belasting OK', color: P.lime },
+                { label: '5-7', desc: 'Let op, monitor', color: P.gold },
                 { label: '> 7', desc: 'Stop, bespreek met therapeut', color: P.danger },
               ].map((r) => (
                 <div key={r.label} className="flex items-center gap-2">

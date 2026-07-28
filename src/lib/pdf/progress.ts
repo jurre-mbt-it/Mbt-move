@@ -224,7 +224,7 @@ function renderRehabPhase(phase: RehabPhaseForPdf, isExpected: boolean): string 
     phase.typicalStartWeek != null
       ? `WEEK ${phase.typicalStartWeek}${
           phase.typicalEndWeek != null && phase.typicalEndWeek !== phase.typicalStartWeek
-            ? `–${phase.typicalEndWeek}`
+            ? `${phase.typicalEndWeek}`
             : '+'
         }`
       : null
@@ -373,7 +373,7 @@ export function renderProgressPdfHtml(opts: {
   `
 
   return renderPdfDocument({
-    documentTitle: `Voortgangsrapport — ${patientName}`,
+    documentTitle: `Voortgangsrapport, ${patientName}`,
     headerTag: 'Voortgangsrapport',
     headerDate: p.generatedAt ?? new Date(),
     contentHtml: content,

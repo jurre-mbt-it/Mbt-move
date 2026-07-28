@@ -395,7 +395,7 @@ function bandMeta(band: ReadinessBandKey, illness: boolean): { label: string; de
       }
     case 'RED':
       return {
-        label: illness ? 'Mogelijk ziek — rust' : 'Herstel aanbevolen',
+        label: illness ? 'Mogelijk ziek, rust' : 'Herstel aanbevolen',
         description: illness
           ? 'Verhoogde ademhaling én temperatuur-afwijking wijzen op een mogelijke infectie. Kies voor rust of licht actief herstel en overleg met je therapeut.'
           : 'Meerdere signalen zitten duidelijk onder je normaal. Plan actief herstel of een deload en bouw belasting pas weer op als je readiness herstelt.',

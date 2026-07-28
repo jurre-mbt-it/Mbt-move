@@ -121,9 +121,9 @@ export function PatientLoadStrip({ patientId }: { patientId: string }) {
         <p style={{ color: P.inkMuted, fontSize: 12, lineHeight: 1.45, marginTop: 8 }}>
           {data.status.description}
           {wk !== null && wk > SPIKE
-            ? ' De belasting sprong deze week fors omhoog — bouw de komende dagen rustiger op.'
+            ? ' De belasting sprong deze week fors omhoog, bouw de komende dagen rustiger op.'
             : streak >= 3
-              ? ` ${streak} weken op rij consistent getraind — mooie basis.`
+              ? ` ${streak} weken op rij consistent getraind, mooie basis.`
               : ''}
         </p>
 

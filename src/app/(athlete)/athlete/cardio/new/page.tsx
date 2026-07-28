@@ -412,7 +412,7 @@ function AthleteCardioLogPageInner() {
                   </span>
                   <span style={{ flex: 1, fontSize: 12, color: P.inkMuted }}>{z.label}</span>
                   <span className="athletic-mono" style={{ fontSize: 12, fontWeight: 800, color: z.color }}>
-                    {z.minBpm}–{z.maxBpm}
+                    {z.minBpm}-{z.maxBpm}
                   </span>
                 </div>
               ))}
@@ -427,7 +427,7 @@ function AthleteCardioLogPageInner() {
 
         {/* RPE + pijn */}
         <Tile>
-          <MetaLabel style={{ marginBottom: 8 }}>RPE — HOE ZWAAR? ({rpe}/10)</MetaLabel>
+          <MetaLabel style={{ marginBottom: 8 }}>RPE · HOE ZWAAR? ({rpe}/10)</MetaLabel>
           <input type="range" min={1} max={10} step={1} value={rpe} onChange={(e) => setRpe(+e.target.value)} className="w-full" style={{ accentColor: P.brand }} />
 
           <MetaLabel style={{ marginTop: 14, marginBottom: 8 }}>PIJN (0-10) ({pain})</MetaLabel>

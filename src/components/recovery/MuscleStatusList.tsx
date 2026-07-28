@@ -126,7 +126,7 @@ export function MuscleStatusListView({
         </div>
       ) : rows.length === 0 ? (
         <div style={{ color: IOS.inkMuted, fontSize: 13, padding: '6px 0 2px' }}>
-          Alles hersteld — klaar om te trainen.
+          Alles hersteld, klaar om te trainen.
         </div>
       ) : (
         rows.map((s, i) => {

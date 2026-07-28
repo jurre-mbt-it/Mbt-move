@@ -336,7 +336,7 @@ export function renderAssessmentPdfHtml(opts: {
   `
 
   return renderPdfDocument({
-    documentTitle: `Mobility Assessment — ${patientName}`,
+    documentTitle: `Mobility Assessment, ${patientName}`,
     headerTag: 'Mobility Assessment',
     headerDate: a.performedAt,
     contentHtml: content,

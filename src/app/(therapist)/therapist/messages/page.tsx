@@ -41,8 +41,8 @@ export default function TherapistMessagesPage() {
             <MessageSquare className="w-8 h-8" style={{ color: P.inkDim }} />
             <p style={{ color: P.ink, fontSize: 15, fontWeight: 700 }}>Nog geen gesprekken</p>
             <p style={{ color: P.inkMuted, fontSize: 13, maxWidth: 360, lineHeight: 1.5 }}>
-              Zodra een atleet een bericht stuurt — of jij er een start vanaf een
-              atletenpagina — verschijnt het gesprek hier.
+              Zodra een atleet een bericht stuurt, of jij er een start vanaf een
+              atletenpagina, verschijnt het gesprek hier.
             </p>
           </div>
         </Tile>

@@ -50,7 +50,7 @@ import { getAppUrl } from '@/lib/app-url'
 
 const CODE_TTL_HOURS = 24
 const MAX_REDEEM_ATTEMPTS = 5
-const PENDING_INVITE_NOTE = 'Aangemaakt via invite — wacht op acceptatie'
+const PENDING_INVITE_NOTE = 'Aangemaakt via invite, wacht op acceptatie'
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -329,7 +329,7 @@ export const inviteRouter = createTRPCRouter({
       if (!patient.dateOfBirth) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'Patiënt heeft geen geboortedatum — vul die eerst in voordat je opnieuw uitnodigt.',
+          message: 'Patiënt heeft geen geboortedatum, vul die eerst in voordat je opnieuw uitnodigt.',
         })
       }
 

@@ -84,7 +84,7 @@ export function MuscleBalancePanel({ exercises, currentDay, currentWeek }: Props
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Spiergroep balans</p>
         <p
           className="text-xs text-muted-foreground mt-0.5"
-          title="Belastingspunten = spierbelasting van de oefening × sets, gewogen naar reps (laag = zwaarder) en extra gewicht. Relatief binnen deze dag — bedoeld om verhoudingen te zien, geen absolute maat."
+          title="Belastingspunten = spierbelasting van de oefening × sets, gewogen naar reps (laag = zwaarder) en extra gewicht. Relatief binnen deze dag, bedoeld om verhoudingen te zien, geen absolute maat."
         >
           Dag {currentDay} · Week {currentWeek} · belastingspunten
         </p>

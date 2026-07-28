@@ -23,7 +23,7 @@ const createId = () => crypto.randomUUID()
 // gewist hoort te worden. Self-heal in patients.list pikt rijen op die door een
 // eerdere bug nog steeds met deze tekst rondlopen terwijl de patient al
 // geaccepteerd heeft.
-const PENDING_INVITE_NOTE = 'Aangemaakt via invite — wacht op acceptatie'
+const PENDING_INVITE_NOTE = 'Aangemaakt via invite, wacht op acceptatie'
 
 /**
  * Toegang tot een patient = directe PatientTherapist-koppeling, OF dezelfde

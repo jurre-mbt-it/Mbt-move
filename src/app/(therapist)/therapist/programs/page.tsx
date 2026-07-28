@@ -312,7 +312,7 @@ function ActiveProgramsPanel() {
               {emptyDrafts.length} LEGE CONCEPTEN
             </span>
             <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 2 }}>
-              Achtergebleven zonder inhoud — klik om op te ruimen
+              Achtergebleven zonder inhoud, klik om op te ruimen
             </p>
           </div>
           <span className="athletic-mono shrink-0" style={{ color: P.gold, fontSize: 11, fontWeight: 900, letterSpacing: '0.1em' }}>
@@ -849,7 +849,7 @@ function TemplateLibraryPanel() {
                 value={copyPatientId}
                 onChange={e => setCopyPatientId(e.target.value)}
               >
-                <option value="">— Geen patiënt —</option>
+                <option value="">Geen patiënt</option>
                 {patients.map(p => (
                   <option key={p.id} value={p.id}>{p.name ?? p.email}</option>
                 ))}

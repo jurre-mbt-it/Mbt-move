@@ -447,7 +447,7 @@ function AddTestDialog({
                 className="athletic-mono pt-2 text-center"
                 style={{ color: P.inkDim, fontSize: 10, letterSpacing: '0.08em' }}
               >
-                {tests.length - filtered.length} extra — verfijn filters om te zien
+                {tests.length - filtered.length} extra, verfijn filters om te zien
               </p>
             )}
           </div>
@@ -562,7 +562,7 @@ function LogResultDialog({
           </div>
 
           <div className="space-y-1.5">
-            <MetaLabel>Pijnscore (NRS 0–10)</MetaLabel>
+            <MetaLabel>Pijnscore (NRS 0-10)</MetaLabel>
             <DarkInput
               inputMode="numeric"
               value={painScore}

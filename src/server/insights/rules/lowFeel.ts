@@ -30,7 +30,7 @@ export const lowFeel: Evaluator = (agg, rule) => {
 
   return {
     title: `${agg.patientName} voelt zich aanhoudend slecht na de sessies`,
-    suggestion: `Laatste ${cfg.recentSessions} sessies hadden een gevoelsscore ≤ ${cfg.feelBelow}/5 (gem. ${avg.toFixed(1)}). Bekijk samen of de belasting, uitvoering of het herstel aanpassing nodig heeft — ook als pijn en load binnen de grenzen blijven.`,
+    suggestion: `Laatste ${cfg.recentSessions} sessies hadden een gevoelsscore ≤ ${cfg.feelBelow}/5 (gem. ${avg.toFixed(1)}). Bekijk samen of de belasting, uitvoering of het herstel aanpassing nodig heeft, ook als pijn en load binnen de grenzen blijven.`,
     triggerData: {
       recentSessionIds: recent.map((s) => s.id),
       feelValues,

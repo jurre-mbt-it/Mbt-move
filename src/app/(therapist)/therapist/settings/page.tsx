@@ -23,9 +23,9 @@ export default function SettingsPage() {
   }
 
   const mfaSub = mfa?.enabled
-    ? `MFA aan · ${mfa.backupCodesRemaining} backup-codes resterend${mfa.backupCodesRemaining < 3 ? ' — regenereer' : ''}`
+    ? `MFA aan · ${mfa.backupCodesRemaining} backup-codes resterend${mfa.backupCodesRemaining < 3 ? ', regenereer' : ''}`
     : mfa?.required
-      ? 'MFA verplicht voor therapeuten — nu inschakelen'
+      ? 'MFA verplicht voor therapeuten, nu inschakelen'
       : 'Beveilig je account met Authenticator-app'
   const mfaBar =
     mfa?.enabled && mfa.backupCodesRemaining >= 3

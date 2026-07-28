@@ -86,9 +86,9 @@ export function BetaDisclaimer() {
             Door gebruik te maken van MBT Gym ga je ermee akkoord dat:
           </p>
           <ul className="list-disc pl-5 space-y-1.5" style={{ color: '#9EB5B3' }}>
-            <li>De software actief in ontwikkeling is — er kunnen bugs of fouten optreden.</li>
+            <li>De software actief in ontwikkeling is, er kunnen bugs of fouten optreden.</li>
             <li>Data verloren kan gaan tijdens deploys, migraties of incidenten.</li>
-            <li>De applicatie <strong style={{ color: '#F5F2ED' }}>niet de leidende bron</strong> is voor klinische beslissingen — verifieer kritieke informatie altijd in jouw eigen systeem.</li>
+            <li>De applicatie <strong style={{ color: '#F5F2ED' }}>niet de leidende bron</strong> is voor klinische beslissingen, verifieer kritieke informatie altijd in jouw eigen systeem.</li>
             <li>Je incidenten en bugs zo snel mogelijk meldt zodat we ze kunnen fixen.</li>
           </ul>
         </div>

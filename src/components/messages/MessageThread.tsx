@@ -112,7 +112,7 @@ export function MessageThread({
             <MetaLabel>NOG GEEN BERICHTEN</MetaLabel>
             <p style={{ color: P.inkMuted, fontSize: 13, lineHeight: 1.5 }}>
               {viewerSide === 'patient'
-                ? 'Stel een vraag over je programma of een oefening — koppel er met de +-knop een sessie aan.'
+                ? 'Stel een vraag over je programma of een oefening, koppel er met de +-knop een sessie aan.'
                 : 'Stuur een reactie op een sessie of beantwoord vragen van de patiënt.'}
             </p>
           </div>

@@ -147,7 +147,7 @@ export const gdprRouter = createTRPCRouter({
       favoriteExercises,
       auditLogs,
       anonymousResearchMapping: dpaRecords
-        ? { note: 'Er zijn geanonimiseerde onderzoeks-records onder een kettingloze ID — niet in deze export.' }
+        ? { note: 'Er zijn geanonimiseerde onderzoeks-records onder een kettingloze ID, niet in deze export.' }
         : null,
     }
 

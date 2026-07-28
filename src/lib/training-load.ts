@@ -402,7 +402,7 @@ export function loadStatus(form: number): LoadStatus {
     return {
       key: 'productief',
       label: 'Productief',
-      description: 'Effectieve trainingsprikkel — vermoeidheid is hoger dan fitheid, precies waar adaptatie ontstaat.',
+      description: 'Effectieve trainingsprikkel, vermoeidheid is hoger dan fitheid, precies waar adaptatie ontstaat.',
     }
   }
   if (form <= 5) {
@@ -416,13 +416,13 @@ export function loadStatus(form: number): LoadStatus {
     return {
       key: 'fris',
       label: 'Fris',
-      description: 'Goed hersteld — een uitstekend moment voor een zwaardere sessie of test.',
+      description: 'Goed hersteld, een uitstekend moment voor een zwaardere sessie of test.',
     }
   }
   return {
     key: 'ontraind',
     label: 'Fitheid zakt weg',
-    description: 'Langere tijd weinig belasting — de opgebouwde fitheid loopt langzaam terug.',
+    description: 'Langere tijd weinig belasting, de opgebouwde fitheid loopt langzaam terug.',
   }
 }
 

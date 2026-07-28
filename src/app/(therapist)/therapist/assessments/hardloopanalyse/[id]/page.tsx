@@ -86,7 +86,7 @@ export default function HardloopanalyseEditorPage({ params }: { params: Promise<
     onSuccess: (d) => {
       setMeta((m) => ({ ...m, therapistComments: d.comments, nextMoment: d.nextMoment }))
       setAdvice(d.advice)
-      toast.success('AI-concept ingevuld — controleer en sla op')
+      toast.success('AI-concept ingevuld, controleer en sla op')
     },
     onError: (e) => toast.error(e.message),
   })
@@ -164,7 +164,7 @@ export default function HardloopanalyseEditorPage({ params }: { params: Promise<
 
         {/* Achteraanzicht */}
         <Tile>
-          <MetaLabel>01 · Achteraanzicht — score 0–100</MetaLabel>
+          <MetaLabel>01 · Achteraanzicht, score 0-100</MetaLabel>
           <div className="space-y-2 mt-2">
             {rearItems.map((it) => <RearRow key={it.id} item={it} onChanged={refetch} />)}
           </div>
@@ -172,7 +172,7 @@ export default function HardloopanalyseEditorPage({ params }: { params: Promise<
 
         {/* Zijaanzicht */}
         <Tile>
-          <MetaLabel>02 · Zijaanzicht — hoek in °</MetaLabel>
+          <MetaLabel>02 · Zijaanzicht, hoek in °</MetaLabel>
           <div className="space-y-2 mt-2">
             {sideItems.map((it) => <SideRow key={it.id} item={it} onChanged={refetch} />)}
           </div>
@@ -281,7 +281,7 @@ function RearRow({ item, onChanged }: { item: RunningAnalysisItem; onChanged: ()
         {zone && <p className="athletic-mono" style={{ fontSize: 8, color: ZONE_COLOR[zone], letterSpacing: '0.1em' }}>{REAR_ZONE_LABEL[zone]}</p>}
       </div>
       <div style={{ width: 80 }}>
-        <DarkInput type="number" value={value} onChange={(e) => setValue(e.target.value)} onBlur={save} placeholder="0–100" />
+        <DarkInput type="number" value={value} onChange={(e) => setValue(e.target.value)} onBlur={save} placeholder="0-100" />
       </div>
       <div className="flex-1">
         <DarkInput value={comment} onChange={(e) => setComment(e.target.value)} onBlur={save} placeholder="omschrijving" />

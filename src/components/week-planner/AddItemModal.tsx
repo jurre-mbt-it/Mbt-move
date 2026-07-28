@@ -216,7 +216,7 @@ export function AddItemModal({
         {/* ── Aerobic: welke activiteit? ── */}
         {step === 'aerobic' && (
           <div className="mt-1">
-            <MetaLabel>Aerobic — kies activiteit</MetaLabel>
+            <MetaLabel>Aerobic, kies activiteit</MetaLabel>
             <div className="grid grid-cols-3 gap-2 mt-2">
               {AEROBIC_ACTIVITIES.map(a => {
                 const Icon = CARDIO_ICON_MAP[a] ?? IconCardio

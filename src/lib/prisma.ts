@@ -19,7 +19,7 @@ function createPrismaClient(): PrismaClient {
     return new Proxy({} as PrismaClient, {
       get(_target, prop) {
         throw new Error(
-          `[prisma] DATABASE_URL/DIRECT_URL ontbreekt — kan ${String(prop)} niet uitvoeren. ` +
+          `[prisma] DATABASE_URL/DIRECT_URL ontbreekt, kan ${String(prop)} niet uitvoeren. ` +
           `Stel de env var in via Vercel project settings of .env.local.`
         )
       },

@@ -210,7 +210,7 @@ function PhaseSection({
           )}
           {(phase.typicalStartWeek != null || phase.typicalEndWeek != null) && (
             <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, marginTop: 4, letterSpacing: '0.06em' }}>
-              TYPISCH: week {phase.typicalStartWeek ?? '?'} – {phase.typicalEndWeek ?? 'ongoing'}
+              TYPISCH: week {phase.typicalStartWeek ?? '?'}-{phase.typicalEndWeek ?? 'ongoing'}
             </p>
           )}
           {phase.keyGoals.length > 0 && (

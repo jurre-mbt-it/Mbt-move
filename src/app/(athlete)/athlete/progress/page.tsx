@@ -64,7 +64,7 @@ export default function AthleteProgressPage() {
             <MetaLabel>1RM PROGRESSIE</MetaLabel>
             {oneRm.length === 0 ? (
               <p style={{ color: P.inkMuted, fontSize: 13 }}>
-                Nog geen gewichtsdata — log je gewichten tijdens een sessie en je geschatte
+                Nog geen gewichtsdata, log je gewichten tijdens een sessie en je geschatte
                 1RM verschijnt hier.
               </p>
             ) : (

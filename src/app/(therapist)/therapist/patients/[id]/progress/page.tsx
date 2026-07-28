@@ -365,7 +365,7 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
             {/* ── Sessies tab ── */}
             <TabsContent value="sessies" className="space-y-4">
               {sessionChartData.some(s => s.Pijn !== null) && (
-                <ChartCard title="Pijn per sessie (NRS 0–10)">
+                <ChartCard title="Pijn per sessie (NRS 0-10)">
                   <ResponsiveContainer width="100%" height={180}>
                     <LineChart data={sessionChartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                       <CartesianGrid {...DARK_CHART_STYLES.grid} />
@@ -378,7 +378,7 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
                 </ChartCard>
               )}
               {sessionChartData.some(s => s.Inspanning !== null) && (
-                <ChartCard title="Inspanning per sessie (RPE 0–10)">
+                <ChartCard title="Inspanning per sessie (RPE 0-10)">
                   <ResponsiveContainer width="100%" height={160}>
                     <LineChart data={sessionChartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                       <CartesianGrid {...DARK_CHART_STYLES.grid} />
@@ -450,7 +450,7 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
 
                   {/* Tempo-trend */}
                   {cardioChartData.some(s => s.Tempo !== null) && (
-                    <ChartCard title="Tempo per sessie (min/km — lager = sneller)">
+                    <ChartCard title="Tempo per sessie (min/km, lager = sneller)">
                       <ResponsiveContainer width="100%" height={180}>
                         <LineChart data={cardioChartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                           <CartesianGrid {...DARK_CHART_STYLES.grid} />
@@ -480,7 +480,7 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
 
                   {/* RPE-trend */}
                   {cardioChartData.some(s => s.RPE != null) && (
-                    <ChartCard title="Inspanning per cardio-sessie (RPE 0–10)">
+                    <ChartCard title="Inspanning per cardio-sessie (RPE 0-10)">
                       <ResponsiveContainer width="100%" height={160}>
                         <LineChart data={cardioChartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                           <CartesianGrid {...DARK_CHART_STYLES.grid} />
@@ -600,7 +600,7 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
                     )}
                   </div>
                   {activeEx && oneRmData.length > 0 && (
-                    <ChartCard title={`${activeEx} — Geschat 1RM (kg)`}>
+                    <ChartCard title={`${activeEx}. Geschat 1RM (kg)`}>
                       <ResponsiveContainer width="100%" height={200}>
                         <LineChart data={oneRmData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                           <CartesianGrid {...DARK_CHART_STYLES.grid} />

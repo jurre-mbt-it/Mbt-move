@@ -39,8 +39,8 @@ export function PatientTagsPanel({ patientId }: { patientId: string }) {
         <div className="py-8 text-center space-y-2">
           <MetaLabel>NOG GEEN TAGS</MetaLabel>
           <p style={{ color: P.inkMuted, fontSize: 13, maxWidth: 360, margin: '0 auto', lineHeight: 1.5 }}>
-            Zodra de patiënt (of jij bij het afronden) een training met #klacht tagt — bijvoorbeeld
-            #achillespees — verschijnt hier vanaf wanneer en na welke sessies dat speelt.
+            Zodra de patiënt (of jij bij het afronden) een training met #klacht tagt, bijvoorbeeld
+            #achillespees, verschijnt hier vanaf wanneer en na welke sessies dat speelt.
           </p>
         </div>
       </Tile>
@@ -93,7 +93,7 @@ function TagTimeline({ tagId, display }: { tagId: string; display: string }) {
           <div className="flex items-center justify-between">
             <Kicker>{ep.current ? 'HUIDIGE PERIODE' : 'EERDERE PERIODE'}</Kicker>
             <MetaLabel style={{ color: ep.current ? P.lime : P.inkDim }}>
-              {fmtDate(ep.from)} – {fmtDate(ep.to)}
+              {fmtDate(ep.from)}-{fmtDate(ep.to)}
             </MetaLabel>
           </div>
           <div className="space-y-1.5">

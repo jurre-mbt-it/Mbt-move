@@ -15,10 +15,10 @@ import { P, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-ui'
 // Coaching cues by exerciseId (static — based on demo exercises)
 const COACHING_CUES: Record<string, string[]> = {
   '1': ['Houd de romp recht, borst omhoog', 'Knie over de tweede teen', 'Druk door de hiel van het voorste been'],
-  '2': ['Gecontroleerde val — niet laten crashen', 'Core strak tijdens de hele beweging', 'Krachtige push terug naar startpositie'],
+  '2': ['Gecontroleerde val, niet laten crashen', 'Core strak tijdens de hele beweging', 'Krachtige push terug naar startpositie'],
   '3': ['Beide zitknobbels in contact met de grond', 'Roteer vanuit de heup, niet de romp'],
-  '4': ['Staand been licht gebogen', 'Hinge vanuit de heup — niet buigen vanuit de rug', 'Houd het zwevende been in lijn met de romp'],
-  '5': ['Soft landing — knieën veren mee', 'Land op het midden van de voet', 'Spring omhoog en iets naar voren'],
+  '4': ['Staand been licht gebogen', 'Hinge vanuit de heup, niet buigen vanuit de rug', 'Houd het zwevende been in lijn met de romp'],
+  '5': ['Soft landing, knieën veren mee', 'Land op het midden van de voet', 'Spring omhoog en iets naar voren'],
   '6': ['Elleboog gefixeerd tegen het lichaam', 'Langzame gecontroleerde beweging'],
 }
 

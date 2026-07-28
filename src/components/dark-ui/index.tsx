@@ -1210,7 +1210,7 @@ export function DarkMenuSelect({
   value,
   onValueChange,
   options,
-  placeholder = '— kies —',
+  placeholder = 'kies',
   className,
   disabled,
   ariaLabel,

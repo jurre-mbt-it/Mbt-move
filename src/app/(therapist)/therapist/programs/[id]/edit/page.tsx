@@ -142,7 +142,7 @@ function CardioEditView({ id, program }: { id: string; program: EditProgram }) {
             {legacyBlob ? (
               <p className="text-[12px] leading-relaxed" style={{ color: P.inkDim }}>
                 Dit programma is in een ouder formaat opgeslagen. Bouw de workout
-                opnieuw op in blokken — opslaan vervangt dan de oude opbouw.
+                opnieuw op in blokken, opslaan vervangt dan de oude opbouw.
               </p>
             ) : !w ? (
               <p className="text-[12px] leading-relaxed" style={{ color: P.inkDim }}>
@@ -176,7 +176,7 @@ function CardioEditView({ id, program }: { id: string; program: EditProgram }) {
 
         <p className="text-[11px]" style={{ color: P.inkDim }}>
           {program.weeks} weken · {program.daysPerWeek} sessies per week
-          {program.description ? ` — ${program.description.split('\n')[0]}` : ''}
+          {program.description ? `${program.description.split('\n')[0]}` : ''}
         </p>
       </div>
 

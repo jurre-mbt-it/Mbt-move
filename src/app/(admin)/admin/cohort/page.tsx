@@ -38,7 +38,7 @@ export default function AdminCohortPage() {
           PLATFORM AGGREGATEN
         </h1>
         <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
-          Anonieme aggregaten. Alleen gebruikers die in hun privacy-instellingen expliciet hebben aangevinkt mee te doen, tellen mee (AVG art. 9 — opt-in vereist).
+          Anonieme aggregaten. Alleen gebruikers die in hun privacy-instellingen expliciet hebben aangevinkt mee te doen, tellen mee (AVG art. 9, opt-in vereist).
         </MetaLabel>
       </div>
 
@@ -264,9 +264,9 @@ export default function AdminCohortPage() {
       <Tile>
         <MetaLabel>Privacy</MetaLabel>
         <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>
-          Deze cijfers zijn aggregaten — geen individuele records. Alleen
+          Deze cijfers zijn aggregaten, geen individuele records. Alleen
           gebruikers die in hun privacy-instellingen expliciet hebben aangevinkt
-          mee te doen, tellen mee (AVG art. 9 — opt-in vereist voor bijzondere
+          mee te doen, tellen mee (AVG art. 9, opt-in vereist voor bijzondere
           persoonsgegevens). Voor onderzoeksdata-export naar derden zie de aparte
           research-pagina (vereist apart consent per gebruiker).
         </p>

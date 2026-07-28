@@ -28,7 +28,7 @@ const QUICK_ACTIONS = [
   {
     href: '/athlete/cardio/new',
     label: 'Cardio loggen',
-    description: 'Hardlopen, fietsen, roeien — tijd, tempo & zones',
+    description: 'Hardlopen, fietsen, roeien, tijd, tempo & zones',
     color: P.ice,
     icon: <IconCardio size={20} />,
   },

@@ -92,7 +92,7 @@ export function LoadCurveChart({ data, compact = false }: { data: LoadCurveData;
         <MetaLabel>BELASTING</MetaLabel>
         <div className="py-6 text-center">
           <p style={{ color: P.inkMuted, fontSize: 13 }}>
-            Nog geen gelogde trainingen — de belasting-curve verschijnt zodra er sessies of cardio gelogd zijn.
+            Nog geen gelogde trainingen, de belasting-curve verschijnt zodra er sessies of cardio gelogd zijn.
           </p>
         </div>
       </Tile>
@@ -235,7 +235,7 @@ export function LoadCurveChart({ data, compact = false }: { data: LoadCurveData;
               {acwr !== null && (
                 <span
                   className="athletic-mono"
-                  title="Acute:Chronic Workload Ratio (EWMA 7d/28d) — stil trend-cijfer, stuurt de status niet (ratio-maat methodologisch omstreden, Impellizzeri 2020)"
+                  title="Acute:Chronic Workload Ratio (EWMA 7d/28d), stil trend-cijfer, stuurt de status niet (ratio-maat methodologisch omstreden, Impellizzeri 2020)"
                   style={{
                     // Bewust neutraal: de ACWR is een indicatie, geen oordeel —
                     // kleuren zou 'm weer als verdict laten lezen.
@@ -270,7 +270,7 @@ export function LoadCurveChart({ data, compact = false }: { data: LoadCurveData;
         {cardioTrimp !== null && (
           <p
             className="athletic-mono"
-            title="Edwards' TRIMP — HR-zone-gewogen cardio-belasting; alleen uit sessies met gemeten hartslag"
+            title="Edwards' TRIMP · HR-zone-gewogen cardio-belasting; alleen uit sessies met gemeten hartslag"
             style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.04em' }}
           >
             HR-BELASTING (TRIMP) <span style={{ color: P.ink, fontWeight: 800 }}>{cardioTrimp}</span>
@@ -321,7 +321,7 @@ export function LoadCurveChart({ data, compact = false }: { data: LoadCurveData;
         {!compact && (
           <p style={{ color: P.inkDim, fontSize: 11, lineHeight: 1.5 }}>
             De lijn is je vorm. Zakt &apos;ie de groene zone in, dan is de prikkel optimaal voor
-            adaptatie — vermoeidheid is dan hoger dan fitheid. Onder de rode grens (−30) zit je in
+            adaptatie, vermoeidheid is dan hoger dan fitheid. Onder de rode grens (−30) zit je in
             overreaching; bovenin betekent fris of juist wegzakkende fitheid. ACWR is een indicatie,
             geen harde voorspeller.
           </p>

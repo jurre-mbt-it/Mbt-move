@@ -547,8 +547,8 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
                   }}
                 >
                   {practiceName
-                    ? <>Deze oefening komt in de bibliotheek van praktijk <strong style={{ color: P.ink }}>{practiceName}</strong> — zichtbaar voor alle therapeuten binnen deze praktijk. Globale (admin-)oefeningen blijven daarnaast voor iedereen zichtbaar.</>
-                    : 'Deze oefening is alleen voor jou zichtbaar — je bent niet aan een praktijk gekoppeld.'}
+                    ? <>Deze oefening komt in de bibliotheek van praktijk <strong style={{ color: P.ink }}>{practiceName}</strong>zichtbaar voor alle therapeuten binnen deze praktijk. Globale (admin-)oefeningen blijven daarnaast voor iedereen zichtbaar.</>
+                    : 'Deze oefening is alleen voor jou zichtbaar, je bent niet aan een praktijk gekoppeld.'}
                 </p>
               </div>
             </div>
@@ -791,7 +791,7 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
               className="flex items-center gap-1"
               style={{ color: P.danger }}
             >
-              <AlertCircle className="w-3 h-3" /> Opslaan mislukt — opnieuw
+              <AlertCircle className="w-3 h-3" /> Opslaan mislukt, opnieuw
             </button>
           )}
         </div>

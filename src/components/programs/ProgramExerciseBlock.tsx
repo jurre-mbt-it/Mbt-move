@@ -99,7 +99,7 @@ function FixedChip({
             <button
               type="button"
               onClick={onToggleRange}
-              title={isRange ? 'Verwijder range' : 'Maak range (min – max)'}
+              title={isRange ? 'Verwijder range' : 'Maak range (min, max)'}
               className={cn(
                 'w-5 h-5 rounded flex items-center justify-center transition-colors',
                 isRange
@@ -768,7 +768,7 @@ export function ProgramExerciseBlock({
               <textarea
                 value={exercise.notes}
                 onChange={e => onUpdate(exercise.uid, { notes: e.target.value })}
-                placeholder="Specifieke instructie alleen voor deze patiënt — wordt met dit programma meegestuurd."
+                placeholder="Specifieke instructie alleen voor deze patiënt, wordt met dit programma meegestuurd."
                 rows={2}
                 className="flex-1 text-xs bg-[#1C4448] border border-[rgba(159,206,201,0.20)] rounded-md px-2 py-1.5 resize-y min-h-[2.5rem] focus:outline-none focus:ring-1 focus:ring-[#9FCEC9] focus:border-[#9FCEC9] placeholder:text-[#86A3A1]"
               />
@@ -804,7 +804,7 @@ export function ProgramExerciseBlock({
                   onClick={() => { void defaultsAutosave.saveNow() }}
                   className="flex items-center gap-1 text-[#F0796C] hover:text-[#F59B92]"
                 >
-                  <AlertCircle className="w-2.5 h-2.5" /> Mislukt — opnieuw
+                  <AlertCircle className="w-2.5 h-2.5" /> Mislukt, opnieuw
                 </button>
               )}
             </div>
@@ -832,7 +832,7 @@ export function ProgramExerciseBlock({
               <div>
                 <p className="text-sm font-medium">Nog geen video gekoppeld</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Plak een YouTube of Vimeo link en sla &apos;m op — wordt direct
+                  Plak een YouTube of Vimeo link en sla &apos;m op, wordt direct
                   gekoppeld aan deze oefening voor alle programma&apos;s.
                 </p>
               </div>

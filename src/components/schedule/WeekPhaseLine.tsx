@@ -40,7 +40,7 @@ export function WeekPhaseLine({ variant = 'line' }: { variant?: 'line' | 'deload
           <span className="font-semibold" style={{ color: PHASE_META.DELOAD.color }}>
             Deload-week
           </span>
-          {' — '}bewust lichter, focus op herstel.
+          {', '}bewust lichter, focus op herstel.
           {data.weekNote ? ` ${data.weekNote}` : ''}
         </p>
       </div>

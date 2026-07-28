@@ -167,7 +167,7 @@ export const rehabRouter = createTRPCRouter({
         where: { patientId: input.patientId },
       })
       if (!existing) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Tracker niet gevonden — activeer eerst' })
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Tracker niet gevonden, activeer eerst' })
       }
       await ctx.prisma.patientRehabTracker.update({
         where: { patientId: input.patientId },

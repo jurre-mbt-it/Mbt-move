@@ -153,7 +153,7 @@ export default function AthleteProfilePage() {
               <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 4, lineHeight: '17px' }}>
                 Movement Based Therapy gebruikt geanonimiseerde gemiddelden
                 (pijn, sessies, oefeningen) om het platform te verbeteren.
-                Je kunt zelf kiezen om mee te doen — je individuele data
+                Je kunt zelf kiezen om mee te doen, je individuele data
                 blijft natuurlijk wel van jou. Standaard doe je niet mee.
               </p>
               <div className="mt-3">

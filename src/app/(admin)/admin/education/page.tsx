@@ -373,7 +373,7 @@ export default function AdminEducationPage() {
                 <option value="">Algemeen (alle patiënten)</option>
                 {(specialties ?? []).map((s) => (
                   <option key={s.specialty} value={s.specialty}>
-                    {s.specialty} — bv. {s.exampleName}
+                    {s.specialty}, bv. {s.exampleName}
                   </option>
                 ))}
               </DarkSelect>

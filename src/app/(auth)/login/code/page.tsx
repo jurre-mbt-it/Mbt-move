@@ -51,7 +51,7 @@ function AccessCodeInner() {
         birthYear: year,
       })
       setInfo(
-        'We hebben je een 6-cijfer code gemaild. Controleer je inbox — kan tot een minuut duren.',
+        'We hebben je een 6-cijfer code gemaild. Controleer je inbox, kan tot een minuut duren.',
       )
       setStep('verify')
       setTimeout(() => codeInputRef.current?.focus(), 100)
@@ -152,7 +152,7 @@ function AccessCodeInner() {
             </h1>
             <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 4, lineHeight: 1.5 }}>
               {step === 'request'
-                ? 'Jouw therapeut heeft je uitgenodigd. Vul je e-mail en geboortejaar in — we sturen je een 6-cijfer code.'
+                ? 'Jouw therapeut heeft je uitgenodigd. Vul je e-mail en geboortejaar in, we sturen je een 6-cijfer code.'
                 : `We hebben een code gestuurd naar ${email}. Vul 'm hieronder in.`}
             </p>
           </div>

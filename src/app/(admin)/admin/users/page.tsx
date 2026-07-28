@@ -185,7 +185,7 @@ export default function AdminUsersPage() {
                       disabled={setPractice.isPending}
                       style={{ padding: '6px 10px', fontSize: 13 }}
                     >
-                      <option value="">— geen —</option>
+                      <option value="">geen</option>
                       {practices.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </DarkSelect>
                   </div>

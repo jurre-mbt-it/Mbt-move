@@ -580,7 +580,7 @@ export const shopRouter = createTRPCRouter({
         await sendMail({
           to,
           replyTo: email,
-          subject: `Nieuwe toegangsaanvraag shop — ${name}`,
+          subject: `Nieuwe toegangsaanvraag shop, ${name}`,
           // Alle velden hier zijn door een ongeauthenticeerde aanvrager
           // ingevuld. Consequent escapen, niet alleen `<` in `note`
           // (audit 2026-07-27).

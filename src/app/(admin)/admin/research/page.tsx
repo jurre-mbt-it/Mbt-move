@@ -76,7 +76,7 @@ export default function AdminResearchPage() {
           <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 4 }}>
             Geanonimiseerde trainingsdata van patiënten met toestemming.{' '}
             <span style={{ color: P.ink, fontWeight: 600 }}>
-              Alleen aggregaties zichtbaar — geen individuele records.
+              Alleen aggregaties zichtbaar, geen individuele records.
             </span>
           </p>
         </div>

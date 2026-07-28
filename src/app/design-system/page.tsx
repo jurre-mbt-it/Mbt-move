@@ -91,8 +91,8 @@ export default function DesignSystemPage() {
           <Display size="xl">Display XL</Display>
           <Display size="lg">Display LG</Display>
           <Display size="md">Display MD</Display>
-          <MetaLabel>Meta label — uppercase mono metadata</MetaLabel>
-          <Kicker>Kicker — uppercase eyebrow</Kicker>
+          <MetaLabel>Meta label, uppercase mono metadata</MetaLabel>
+          <Kicker>Kicker, uppercase eyebrow</Kicker>
         </section>
 
         {/* Metrics */}
@@ -198,7 +198,7 @@ export default function DesignSystemPage() {
 
         {/* Weekly load chart — orange brand variant */}
         <section className="flex flex-col gap-3">
-          <Kicker>Wekelijkse belasting — voorstel</Kicker>
+          <Kicker>Wekelijkse belasting, voorstel</Kicker>
           <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.08em' }}>
             Glass-stijl bars in brand-oranje. Huidige week feller, oudere weken vervaagd.
           </p>

@@ -187,7 +187,7 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
                           onClick={() => setEditFor(item)}
                           className="athletic-tap min-w-0 flex-1 truncate text-left"
                           style={{ color: P.ink, fontSize: 11 }}
-                          title={`${item.program?.name ?? item.quickName ?? 'Workout'} — klik om te bewerken`}
+                          title={`${item.program?.name ?? item.quickName ?? 'Workout'}, klik om te bewerken`}
                         >
                           {item.program?.name ?? item.quickName ?? 'Workout'}
                         </button>

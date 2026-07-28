@@ -387,7 +387,7 @@ export function PatientPdfDocument({ patient, exercises, qrCodes }: Props) {
                     </View>
                     <Text style={styles.exName}>{ex.name}</Text>
                   </View>
-                  <Text style={{ fontSize: 8, color: '#94a3b8' }}>W8 — {last.gewicht} kg</Text>
+                  <Text style={{ fontSize: 8, color: '#94a3b8' }}>W8, {last.gewicht} kg</Text>
                 </View>
 
                 {/* Exercise body */}

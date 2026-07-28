@@ -549,7 +549,7 @@ function buildPreviewHtml(footer: string): string {
             <tr><td style="padding:16px 24px 0 24px;">
               <div style="background:#1C4448;border:1px solid rgba(212,232,230,0.12);border-radius:12px;padding:14px;">
                 <div style="font-family:ui-monospace,Menlo,monospace;font-size:10px;letter-spacing:0.14em;color:#9EB5B3;text-transform:uppercase;font-weight:700;">PROGRAMMA</div>
-                <div style="color:#F5F2ED;font-size:15px;font-weight:700;margin-top:4px;">Revalidatieprogramma — voorbeeld</div>
+                <div style="color:#F5F2ED;font-size:15px;font-weight:700;margin-top:4px;">Revalidatieprogramma, voorbeeld</div>
               </div>
             </td></tr>
             <tr><td style="padding:18px 24px 0 24px;">
@@ -559,7 +559,7 @@ function buildPreviewHtml(footer: string): string {
               ? `<tr><td style="padding:18px 24px 24px 24px;">${footer}</td></tr>`
               : `<tr><td style="padding:20px 24px 24px 24px;">
                   <div style="background:rgba(245,185,66,0.10);border:1px solid rgba(245,185,66,0.30);border-radius:8px;padding:12px;font-size:12px;color:#F5B942;line-height:1.5;">
-                    <IconWarning size={13} className="inline-block mr-1 align-[-2px]" /> Geen footer — vul minimaal praktijknaam, adres, plaats en telefoon óf email in.
+                    <IconWarning size={13} className="inline-block mr-1 align-[-2px]" /> Geen footer, vul minimaal praktijknaam, adres, plaats en telefoon óf email in.
                   </div>
                 </td></tr>`
             }

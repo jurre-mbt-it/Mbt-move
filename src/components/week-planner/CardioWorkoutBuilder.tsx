@@ -207,7 +207,7 @@ export function CardioWorkoutBuilder({
           <div className="grid lg:grid-cols-[1fr_300px] gap-4">
             <div className="min-w-0">
               {/* Palet */}
-              <MetaLabel>Blokken — klik of sleep</MetaLabel>
+              <MetaLabel>Blokken, klik of sleep</MetaLabel>
               <div className="grid grid-cols-4 gap-1.5 mt-1.5 mb-3">
                 {PALETTE.map(p => (
                   <PaletteButton key={p.kind} kind={p.kind} label={p.label} onAdd={add} />
@@ -409,7 +409,7 @@ function WorkoutChart({
               key={f.key}
               type="button"
               onClick={() => onSelect(f.stepId)}
-              title={`${STEP_META[f.kind]?.label ?? f.kind}${f.rounds ? ` — ronde ${f.round} van ${f.rounds}` : ''}`}
+              title={`${STEP_META[f.kind]?.label ?? f.kind}${f.rounds ? `, ronde ${f.round} van ${f.rounds}` : ''}`}
               className="relative transition-opacity hover:opacity-90"
               style={{
                 width: `${(f.sec / total) * 100}%`,

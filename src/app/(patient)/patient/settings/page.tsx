@@ -78,7 +78,7 @@ export default function PatientSettingsPage() {
         <ActionTile
           href="/patient/settings/data-rights"
           label="Mijn data downloaden of verwijderen"
-          sub="AVG art. 15, 17 en 20 — export of vergeetverzoek"
+          sub="AVG art. 15, 17 en 20: export of vergeetverzoek"
           bar={P.teal}
         />
       </div>

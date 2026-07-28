@@ -34,7 +34,7 @@ export default function SecuritySettingsPage() {
     if (!shownCodes) return
     const txt = shownCodes.join('\n')
     navigator.clipboard.writeText(txt)
-    toast.success('Codes gekopieerd — plak in je password-manager')
+    toast.success('Codes gekopieerd, plak in je password-manager')
   }
 
   function printCodes() {
@@ -57,7 +57,7 @@ export default function SecuritySettingsPage() {
       <p>${new Date().toLocaleDateString('nl-NL')}</p>
       ${shownCodes.map((c) => `<code>${c}</code>`).join('')}
       <div class="notice">
-        Elke code is één keer bruikbaar. Bewaar op een veilige plek — bijvoorbeeld in een brandkast
+        Elke code is één keer bruikbaar. Bewaar op een veilige plek, bijvoorbeeld in een brandkast
         of password-manager. Als je je authenticator-app kwijtraakt, kun je hiermee inloggen.
       </div>
       </body></html>

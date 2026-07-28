@@ -695,7 +695,7 @@ export default function TreatmentPage({
   function discardSession() {
     clearStoredDraft(draftKey)
     setDiscardOpen(false)
-    toast('Behandeling geannuleerd — niets opgeslagen', { duration: 2500 })
+    toast('Behandeling geannuleerd, niets opgeslagen', { duration: 2500 })
     router.push(`/therapist/patients/${patientId}`)
   }
 
@@ -764,7 +764,7 @@ export default function TreatmentPage({
           <Tile>
             <MetaLabel>Starttijd aanpassen</MetaLabel>
             <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, marginTop: 4 }}>
-              Sessie gestart om {timeInputValue(startedAt)} — pas aan als je later bent begonnen.
+              Sessie gestart om {timeInputValue(startedAt)}, pas aan als je later bent begonnen.
             </p>
             <div className="flex items-center gap-2 mt-2">
               <input
@@ -2465,7 +2465,7 @@ function FinishSessionModal({
           <section>
             <MetaLabel>Duur (minuten)</MetaLabel>
             <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, marginTop: 4, letterSpacing: '0.04em' }}>
-              Voorgesteld op basis van de live-tijd ({durationMin}m) — pas aan indien nodig
+              Voorgesteld op basis van de live-tijd ({durationMin}m), pas aan indien nodig
             </p>
             <DarkInput
               value={durationMinInput}

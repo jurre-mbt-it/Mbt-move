@@ -23,7 +23,7 @@ function getBackupSalt(): string {
   if (salt) return salt
   if (process.env.NODE_ENV === 'production') {
     throw new Error(
-      'MFA_BACKUP_SALT ontbreekt — vereist in productie voor MFA-backupcodes.',
+      'MFA_BACKUP_SALT ontbreekt, vereist in productie voor MFA-backupcodes.',
     )
   }
   return 'mbt-move-mfa-backup-dev'

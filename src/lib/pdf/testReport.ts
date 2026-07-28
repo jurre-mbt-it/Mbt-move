@@ -342,7 +342,7 @@ export function renderTestReportPdfHtml(opts: {
   `
 
   return renderPdfDocument({
-    documentTitle: `Testrapport — ${patientName}`,
+    documentTitle: `Testrapport, ${patientName}`,
     headerTag: 'Testdatum',
     headerDate: r.performedAt,
     brandTag: 'Sportfysiotherapie · Amsterdam',

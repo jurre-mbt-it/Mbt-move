@@ -67,7 +67,7 @@ export function WellnessCheckin({ homeHref }: { homeHref: string }) {
     onSuccess: () => {
       utils.wellness.today.invalidate()
       utils.wellness.history.invalidate()
-      toast.success(existing ? 'Wellness-check bijgewerkt' : 'Opgeslagen — tot morgen!')
+      toast.success(existing ? 'Wellness-check bijgewerkt' : 'Opgeslagen, tot morgen!')
       router.push(homeHref)
     },
     onError: (e) => toast.error(`Opslaan mislukt: ${e.message}`),
@@ -122,7 +122,7 @@ export function WellnessCheckin({ homeHref }: { homeHref: string }) {
             JE JE?
           </h1>
           <p style={{ color: P.inkMuted, fontSize: 13, lineHeight: '19px', marginTop: 4 }}>
-            5 vragen. Vul elke ochtend in — helpt je training-load afstemmen op je lichaam.
+            5 vragen. Vul elke ochtend in, helpt je training-load afstemmen op je lichaam.
           </p>
         </div>
 

@@ -376,7 +376,7 @@ function TestRow({
         }
       }}
       aria-expanded={expanded}
-      aria-label={`Test ${test.name} — klik om ${expanded ? 'in te klappen' : 'uit te klappen'}`}
+      aria-label={`Test ${test.name}, klik om ${expanded ? 'in te klappen' : 'uit te klappen'}`}
       className="athletic-tap rounded-lg cursor-pointer"
       style={{
         background: SCORE_BG[currentScore],
@@ -558,7 +558,7 @@ function ArchetypeSummaryEditor({
         className="athletic-mono cursor-pointer"
         style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.14em' }}
       >
-        SAMENVATTING + PROGRAMMING TEMPLATE — {ARCHETYPE_LABEL[archetype].toUpperCase()}
+        SAMENVATTING + PROGRAMMING TEMPLATE · {ARCHETYPE_LABEL[archetype].toUpperCase()}
       </summary>
       <div className="mt-3 flex flex-col gap-3">
         <div>
@@ -573,7 +573,7 @@ function ArchetypeSummaryEditor({
         <div>
           <MetaLabel>Primary Tissue Limitation</MetaLabel>
           <DarkSelect value={tissue} onChange={(e) => setTissue(e.target.value)}>
-            <option value="">— niet ingevuld —</option>
+            <option value="">niet ingevuld</option>
             {(['JOINT', 'SLIDING_SURFACE', 'MUSCLE_DYNAMICS', 'MOTOR_CONTROL'] as const).map((t) => (
               <option key={t} value={t}>
                 {TISSUE_LABEL[t]}

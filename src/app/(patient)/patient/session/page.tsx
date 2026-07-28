@@ -229,7 +229,7 @@ function FeedbackModal({
                   fontWeight: 900,
                 }}
               >
-                {feedback.painDuring !== null ? `${feedback.painDuring}/10 — ${painLabel(feedback.painDuring ?? 0, true)}` : 'Geen'}
+                {feedback.painDuring !== null ? `${feedback.painDuring}/10, ${painLabel(feedback.painDuring ?? 0, true)}` : 'Geen'}
               </span>
             </div>
             <div className="flex gap-1">
@@ -266,7 +266,7 @@ function FeedbackModal({
                 }}
               >
                 {(feedback.painDuring ?? 0) > 7
-                  ? <span className="inline-flex items-start gap-1.5"><IconStop size={14} className="mt-px shrink-0" /> Pijn te hoog — stop en consult de therapeut.</span>
+                  ? <span className="inline-flex items-start gap-1.5"><IconStop size={14} className="mt-px shrink-0" /> Pijn te hoog, stop en consult de therapeut.</span>
                   : <span className="inline-flex items-start gap-1.5"><IconWarning size={14} className="mt-px shrink-0" /> Verhoogde pijn. Noteer dit en monitor de volgende sessies.</span>}
               </div>
             )}
@@ -698,7 +698,7 @@ function SessionSummary({
         <Tile>
           <p style={{ color: P.ink, fontSize: 14, fontWeight: 800 }}>Hoe zwaar was de sessie?</p>
           <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
-            RPE 1 (heel licht) — 10 (maximaal). Gebruikt voor je workload.
+            RPE 1 (heel licht) tot 10 (maximaal). Gebruikt voor je workload.
           </MetaLabel>
           <div className="grid grid-cols-10 gap-1 mt-3">
             {Array.from({ length: 10 }, (_, i) => i + 1).map(val => {
@@ -1337,7 +1337,7 @@ function SessionPageInner() {
           Goed gedaan!
         </p>
         <p style={{ color: P.ink, fontSize: 15, maxWidth: 360, lineHeight: '22px' }}>
-          Je hebt alle programma&apos;s voor deze week voltooid — lekker bezig!
+          Je hebt alle programma&apos;s voor deze week voltooid, lekker bezig!
         </p>
         <div
           className="athletic-mono px-3 py-1 rounded-full mt-1"
@@ -1353,7 +1353,7 @@ function SessionPageInner() {
           {flexProg.completedThisWeek} / {flexProg.weeklyTarget} deze week
         </div>
         <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 4 }}>
-          De teller reset elke maandag — rust uit en kom terug.
+          De teller reset elke maandag, rust uit en kom terug.
         </p>
         <DarkButton variant="secondary" onClick={() => router.push('/patient/dashboard')}>
           Terug naar dashboard
@@ -2108,7 +2108,7 @@ function SessionPageInner() {
             if (!ex) return 'Adem rustig door je neus'
             const entries = setLog[ex.uid] ?? makeSetEntries(ex.sets, ex.reps)
             const nextIdx = entries.findIndex(s => !s.done)
-            if (nextIdx === -1) return 'Alle sets klaar — vink de oefening af'
+            if (nextIdx === -1) return 'Alle sets klaar, vink de oefening af'
             const pk = prevKgFor(lastLogs[ex.exerciseId], nextIdx)
             const pr = prevRepsFor(lastLogs[ex.exerciseId], nextIdx)
             const hint = pk != null && pk > 0 ? ` · vorige keer ${String(pk).replace('.', ',')} kg${pr ? ` × ${pr}` : ''}` : ''

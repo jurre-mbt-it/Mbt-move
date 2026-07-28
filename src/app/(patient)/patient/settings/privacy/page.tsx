@@ -172,7 +172,7 @@ export default function PrivacySettingsPage() {
               </p>
               <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 4, lineHeight: '17px' }}>
                 Je therapeut (en bij Movement Based Therapy de admin) ziet
-                gemiddelden en trends over alle patiënten — bijvoorbeeld
+                gemiddelden en trends over alle patiënten, bijvoorbeeld
                 gemiddelde pijn over 30 dagen. Jouw individuele data is altijd
                 herkenbaar voor jouw therapeut. Je kunt zelf kiezen om
                 jouw geanonimiseerde data toe te voegen aan deze aggregaten.

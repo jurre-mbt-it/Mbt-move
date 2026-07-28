@@ -178,7 +178,7 @@ function RecentOrders() {
   const { data: orders = [], isLoading } = trpc.shop.adminRecentOrders.useQuery({ limit: 15 })
   const send = trpc.shop.sendOrderEmails.useMutation({
     onSuccess: (r) => {
-      if (r.reason === 'no_api_key') toast.message('Geen RESEND_API_KEY ingesteld — e-mails niet verstuurd')
+      if (r.reason === 'no_api_key') toast.message('Geen RESEND_API_KEY ingesteld, e-mails niet verstuurd')
       else if (r.confirmation && r.invoice) toast.success('Bevestiging + factuur verstuurd')
       else toast.message(`Bevestiging: ${r.confirmation ? 'ok' : 'mislukt'} · factuur: ${r.invoice ? 'ok' : 'mislukt'}`)
     },

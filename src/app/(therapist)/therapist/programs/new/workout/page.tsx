@@ -217,7 +217,7 @@ function WorkoutBuilderContent() {
                     value={form.patientId}
                     onChange={e => set('patientId', e.target.value)}
                   >
-                    <option value="">— Selecteer patiënt (optioneel) —</option>
+                    <option value="">Selecteer patiënt (optioneel)</option>
                     {patientsData.map(p => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
@@ -227,7 +227,7 @@ function WorkoutBuilderContent() {
                 <div className="space-y-1.5">
                   <MetaLabel>Naam programma *</MetaLabel>
                   <DarkInput
-                    placeholder="Bijv. Zone 2 Cardio — Opbouw"
+                    placeholder="Bijv. Zone 2 Cardio, Opbouw"
                     value={form.name}
                     onChange={e => set('name', e.target.value)}
                   />
@@ -267,7 +267,7 @@ function WorkoutBuilderContent() {
             {/* Snelle templates */}
             <Tile>
               <div className="space-y-3">
-                <MetaLabel>Snelstart — kies een template</MetaLabel>
+                <MetaLabel>Snelstart, kies een template</MetaLabel>
                 <div className="space-y-2">
                   {CARDIO_TEMPLATES.slice(0, 5).map(tpl => (
                     <button
@@ -360,7 +360,7 @@ function WorkoutBuilderContent() {
                 {form.blocks.length === 0 ? (
                   <p className="text-[12px] leading-relaxed" style={{ color: P.inkDim }}>
                     Nog geen blokken. Bouw de workout op uit warming-up, intervallen
-                    en cooldown — dezelfde bouwer als in het weekschema.
+                    en cooldown, dezelfde bouwer als in het weekschema.
                   </p>
                 ) : (
                   <>
@@ -399,7 +399,7 @@ function WorkoutBuilderContent() {
                         <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: HR_ZONES[z.zone].color }} />
                         <span style={{ color: P.ink, fontWeight: 600 }}>{HR_ZONES[z.zone].label}</span>
                         <span className="athletic-mono ml-auto" style={{ color: P.inkMuted }}>
-                          {z.minBpm}–{z.maxBpm} bpm
+                          {z.minBpm}-{z.maxBpm} bpm
                         </span>
                       </div>
                     ))}

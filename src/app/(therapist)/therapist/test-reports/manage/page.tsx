@@ -164,7 +164,7 @@ function CatalogForm({
       </div>
 
       <div className="rounded-xl p-3" style={{ background: P.surfaceLow, border: `1px solid ${P.line}` }}>
-        <MetaLabel>Progressiebalk — as & zones ({d.plotUnit})</MetaLabel>
+        <MetaLabel>Progressiebalk, as & zones ({d.plotUnit})</MetaLabel>
         <div className="mt-2 flex gap-2">
           <div className="flex-1">
             <MetaLabel>As min</MetaLabel>
@@ -275,7 +275,7 @@ function BatteryForm({
     <div className="flex flex-col gap-3">
       <div>
         <MetaLabel>Naam</MetaLabel>
-        <DarkInput value={d.name} onChange={(e) => setD(p => ({ ...p, name: e.target.value }))} placeholder="Return to sport — VKB" />
+        <DarkInput value={d.name} onChange={(e) => setD(p => ({ ...p, name: e.target.value }))} placeholder="Return to sport, VKB" />
       </div>
       <div>
         <MetaLabel>Omschrijving</MetaLabel>
@@ -293,7 +293,7 @@ function BatteryForm({
             type="number"
             min={1}
             value={d.durationWeeks ?? ''}
-            placeholder="bv. 12 — leeg = losse batterij"
+            placeholder="bv. 12, leeg = losse batterij"
             onChange={(e) => setD(p => ({ ...p, durationWeeks: e.target.value === '' ? null : Number(e.target.value) }))}
           />
         </div>
@@ -432,7 +432,7 @@ export default function ManageTestsPage() {
           <Kicker>Return to sport · library</Kicker>
           <Display size="md">TESTS & BATTERIJEN</Display>
           <MetaLabel style={{ textTransform: 'none', fontWeight: 500, marginTop: 2 }}>
-            Stel eigen tests samen en bouw batterijen — desgewenst als revalidatie-protocol met weken.
+            Stel eigen tests samen en bouw batterijen, desgewenst als revalidatie-protocol met weken.
           </MetaLabel>
         </div>
 

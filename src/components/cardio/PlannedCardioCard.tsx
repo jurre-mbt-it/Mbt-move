@@ -27,7 +27,7 @@ const stepLen = (s: WorkoutStep) =>
 const stepTarget = (s: WorkoutStep) =>
   s.target.type === 'ZONE'
     ? (s.target.toZone != null
-        ? `${HR_ZONES[s.target.zone].label.split(' — ')[0]} → Z${s.target.toZone}`
+        ? `${HR_ZONES[s.target.zone].label.split(', ')[0]} → Z${s.target.toZone}`
         : HR_ZONES[s.target.zone].label)
     : s.target.type === 'RPE'
       ? `RPE ${s.target.min}${s.target.max != null ? `-${s.target.max}` : ''}`

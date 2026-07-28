@@ -83,10 +83,10 @@ export const PATIENTS: PatientProfile[] = [
       'Geen impact bij pijn > 4/10',
       'Trap lopen beperkt eerste 2 weken',
     ],
-    notes: 'Patiënt is gemotiveerd en trouw. Werkt als leraar — kan overdag niet trainen. Voorkeur voor sessies na 17:00.',
+    notes: 'Patiënt is gemotiveerd en trouw. Werkt als leraar, kan overdag niet trainen. Voorkeur voor sessies na 17:00.',
     tags: ['Knie', 'Post-op'],
     programId: 'p1',
-    programName: 'Knie Revalidatie — Fase 1',
+    programName: 'Knie Revalidatie, Fase 1',
     programStatus: 'ACTIVE',
     weeksCurrent: 3,
     weeksTotal: 6,
@@ -121,10 +121,10 @@ export const PATIENTS: PatientProfile[] = [
       'Geen overhead bewegingen eerste 3 weken',
       'Vermijd impingement provocatie',
     ],
-    notes: 'Werkt als verpleegkundige — wisselende diensten. Whatsapp liever dan bellen.',
+    notes: 'Werkt als verpleegkundige, wisselende diensten. Whatsapp liever dan bellen.',
     tags: ['Schouder', 'Tendinopathie'],
     programId: 'p2',
-    programName: 'Schouder Herstel — Fase 2',
+    programName: 'Schouder Herstel, Fase 2',
     programStatus: 'ACTIVE',
     weeksCurrent: 5,
     weeksTotal: 8,
@@ -158,7 +158,7 @@ export const PATIENTS: PatientProfile[] = [
       'Geen zware belasting zonder warming-up',
       'Zittend werk maximaal 45 min aaneengesloten',
     ],
-    notes: 'Geen programma toegewezen. Intake gepland. Patiënt is sceptisch t.o.v. oefentherapie — wil bewijs zien.',
+    notes: 'Geen programma toegewezen. Intake gepland. Patiënt is sceptisch t.o.v. oefentherapie, wil bewijs zien.',
     tags: ['Rug'],
     weeksCurrent: 0,
     weeksTotal: 0,
@@ -227,7 +227,7 @@ export const PATIENTS: PatientProfile[] = [
     notes: 'Nieuwe patiënt, programma concept klaar voor review.',
     tags: ['Knie', 'PFPS'],
     programId: 'p4',
-    programName: 'PFPS Protocol — Bilateral',
+    programName: 'PFPS Protocol, Bilateral',
     programStatus: 'DRAFT',
     weeksCurrent: 0,
     weeksTotal: 8,
@@ -335,7 +335,7 @@ export const CARDIO_LOGS: MockCardioLog[] = [
   { id: 'c1-4', patientId: 'pat1', date: '2026-03-27', activity: 'RUNNING', protocol: 'WALK_RUN', durationSec: 900, distanceM: 1800, avgHeartRate: 132, zone: 2, rpe: 4, painLevel: 3 },
   { id: 'c1-5', patientId: 'pat1', date: '2026-03-25', activity: 'RUNNING', protocol: 'WALK_RUN', durationSec: 900, distanceM: 1750, avgHeartRate: 136, zone: 2, rpe: 5, painLevel: 3 },
   { id: 'c1-6', patientId: 'pat1', date: '2026-03-23', activity: 'RUNNING', protocol: 'WALK_RUN', durationSec: 900, distanceM: 1700, avgHeartRate: 130, zone: 2, rpe: 4, painLevel: 4 },
-  { id: 'c1-7', patientId: 'pat1', date: '2026-03-18', activity: 'WALKING', protocol: 'ZONE_TRAINING', durationSec: 1800, distanceM: 2500, avgHeartRate: 110, zone: 1, rpe: 2, painLevel: 3, notes: 'Opstartweek — alleen wandelen' },
+  { id: 'c1-7', patientId: 'pat1', date: '2026-03-18', activity: 'WALKING', protocol: 'ZONE_TRAINING', durationSec: 1800, distanceM: 2500, avgHeartRate: 110, zone: 1, rpe: 2, painLevel: 3, notes: 'Opstartweek, alleen wandelen' },
 
   // Sophie Dekker (pat4) — achilles, zone 2 fiets
   { id: 'c4-1', patientId: 'pat4', date: '2026-03-14', activity: 'CYCLING', protocol: 'ZONE_TRAINING', durationSec: 2700, distanceM: 18000, avgHeartRate: 145, zone: 2, rpe: 4, painLevel: 1, notes: 'Crosstraining tijdens achillesrevalidatie' },
@@ -344,7 +344,7 @@ export const CARDIO_LOGS: MockCardioLog[] = [
   { id: 'c4-4', patientId: 'pat4', date: '2026-03-01', activity: 'CROSSTRAINER', protocol: 'STEADY_STATE', durationSec: 1800, avgHeartRate: 130, zone: 2, rpe: 3, painLevel: 2, notes: 'Geen impact op achilles' },
 
   // Lars Pietersen (pat6) — enkel, zwemmen als alternatief
-  { id: 'c6-1', patientId: 'pat6', date: '2026-04-06', activity: 'SWIMMING', protocol: 'STEADY_STATE', durationSec: 1800, distanceM: 1200, avgHeartRate: 135, zone: 2, rpe: 4, painLevel: 4, notes: 'Enkel rust — zwemmen als non-impact alternatief' },
+  { id: 'c6-1', patientId: 'pat6', date: '2026-04-06', activity: 'SWIMMING', protocol: 'STEADY_STATE', durationSec: 1800, distanceM: 1200, avgHeartRate: 135, zone: 2, rpe: 4, painLevel: 4, notes: 'Enkel rust, zwemmen als non-impact alternatief' },
   { id: 'c6-2', patientId: 'pat6', date: '2026-04-03', activity: 'SWIMMING', protocol: 'STEADY_STATE', durationSec: 1800, distanceM: 1100, avgHeartRate: 132, zone: 2, rpe: 3, painLevel: 5 },
 ]
 
@@ -378,7 +378,7 @@ export const CARDIO_PROGRAMS: MockCardioProgram[] = [
   {
     id: 'cp1',
     patientId: 'pat1',
-    name: 'Walk-Run Terugkeer Protocol — Knie',
+    name: 'Walk-Run Terugkeer Protocol, Knie',
     description: 'Geleidelijke terugkeer naar hardlopen na meniscusoperatie. 10 weken progressief walk-run schema.',
     type: 'CARDIO',
     activity: 'RUNNING',
@@ -395,7 +395,7 @@ export const CARDIO_PROGRAMS: MockCardioProgram[] = [
   {
     id: 'cp2',
     patientId: 'pat4',
-    name: 'Cardio Crosstraining — Achilles',
+    name: 'Cardio Crosstraining, Achilles',
     description: 'Non-impact cardio conditionering tijdens achillesrevalidatie. Fiets + crosstrainer.',
     type: 'CARDIO',
     activity: 'CYCLING',
@@ -410,7 +410,7 @@ export const CARDIO_PROGRAMS: MockCardioProgram[] = [
   {
     id: 'cp3',
     patientId: 'pat6',
-    name: 'Zwem Conditie — Enkel Herstel',
+    name: 'Zwem Conditie, Enkel Herstel',
     description: 'Cardiovasculaire basis behouden tijdens enkelherstel via zwemmen.',
     type: 'CARDIO',
     activity: 'SWIMMING',

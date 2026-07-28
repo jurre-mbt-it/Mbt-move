@@ -192,7 +192,7 @@ function FeedbackModal({
             style={{ background: 'rgba(240,121,108,0.10)', border: `1px solid color-mix(in srgb, ${P.danger} 20%, transparent)`, color: P.danger, fontSize: 11 }}
           >
             <IconWarning size={16} />
-            <span>Pijn &gt; 5/10 — Volgende sessie wordt herhaald. Therapeut wordt op de hoogte gesteld.</span>
+            <span>Pijn &gt; 5/10. Volgende sessie wordt herhaald. Therapeut wordt op de hoogte gesteld.</span>
           </div>
         )}
       </div>
@@ -488,7 +488,7 @@ export default function CardioSessionPage() {
             className="athletic-mono mt-1"
             style={{ color: P.ink, fontSize: 13, fontWeight: 800, letterSpacing: '0.04em' }}
           >
-            {protocolInfo.label} — Week {session.week}
+            {protocolInfo.label}, Week {session.week}
           </p>
         </div>
         <button
@@ -515,7 +515,7 @@ export default function CardioSessionPage() {
             letterSpacing: '0.08em',
           }}
         >
-          {zoneInfo.label} ({zoneInfo.minPct}–{zoneInfo.maxPct}% HRmax)
+          {zoneInfo.label} ({zoneInfo.minPct}-{zoneInfo.maxPct}% HRmax)
         </div>
 
         {/* Circulaire timer / interval timer */}
@@ -676,7 +676,7 @@ export default function CardioSessionPage() {
                   className="athletic-mono mt-1"
                   style={{ color: P.inkMuted, fontSize: 11 }}
                 >
-                  Doel: {HR_ZONES[session.targetZone].minPct}–{HR_ZONES[session.targetZone].maxPct}% HRmax
+                  Doel: {HR_ZONES[session.targetZone].minPct}-{HR_ZONES[session.targetZone].maxPct}% HRmax
                 </p>
               </div>
               <input

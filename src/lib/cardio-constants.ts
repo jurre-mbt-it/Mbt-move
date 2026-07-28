@@ -55,8 +55,8 @@ export const CARDIO_PROTOCOLS: Record<CardioProtocolKey, {
   FARTLEK:            { label: 'Fartlek',              description: 'Vrije intervallen op gevoel, wisselend tempo', hasIntervals: false, color: '#D9C08A' },
   ZONE_TRAINING:      { label: 'Zontraining',          description: 'Training in een specifieke hartslagzone', hasIntervals: false, color: '#45A8A2' },
   THRESHOLD:          { label: 'Drempeltraining',      description: 'Training op of net onder de anaerobe drempel', hasIntervals: false, color: '#F0796C' },
-  LONG_SLOW_DISTANCE: { label: 'Lange Duurloop (LSD)', description: 'Lage intensiteit, lange duur — opbouw aerobe basis', hasIntervals: false, color: '#9FCEC9' },
-  WALK_RUN:           { label: 'Walk-Run',             description: 'Afwisseling lopen en wandelen — return-to-running', hasIntervals: true,  color: '#E87A55' },
+  LONG_SLOW_DISTANCE: { label: 'Lange Duurloop (LSD)', description: 'Lage intensiteit, lange duur, opbouw aerobe basis', hasIntervals: false, color: '#9FCEC9' },
+  WALK_RUN:           { label: 'Walk-Run',             description: 'Afwisseling lopen en wandelen, return-to-running', hasIntervals: true,  color: '#E87A55' },
 }
 
 // ── Hartslagzones ─────────────────────────────────────────────────────────────
@@ -72,11 +72,11 @@ export const HR_ZONES: Record<HRZone, {
   bg: string
   rpeFeel: string
 }> = {
-  1: { label: 'Zone 1 — Herstel',         description: 'Actief herstel, zeer lage intensiteit',  minPct: 50, maxPct: 60, color: '#9FCEC9', bg: 'rgba(159,206,201,0.12)', rpeFeel: 'RPE 1-2 — Zeer licht' },
-  2: { label: 'Zone 2 — Aerobe basis',    description: 'Vetverbranding, aerobe opbouw',          minPct: 60, maxPct: 70, color: '#5FD08A', bg: 'rgba(95,208,138,0.12)',  rpeFeel: 'RPE 3-4 — Licht' },
-  3: { label: 'Zone 3 — Tempo',           description: 'Comfortabel intensief, aerobe drempel',  minPct: 70, maxPct: 80, color: '#F5B942', bg: 'rgba(245,185,66,0.12)',  rpeFeel: 'RPE 5-6 — Matig' },
-  4: { label: 'Zone 4 — Drempel',         description: 'Anaerobe drempel, hoog intensief',       minPct: 80, maxPct: 90, color: '#EE8447', bg: 'rgba(238,132,71,0.12)',  rpeFeel: 'RPE 7-8 — Hard' },
-  5: { label: 'Zone 5 — VO2max',          description: 'Maximale inspanning, korte duur',        minPct: 90, maxPct: 100, color: '#F0796C', bg: 'rgba(240,121,108,0.12)', rpeFeel: 'RPE 9-10 — Maximaal' },
+  1: { label: 'Zone 1, Herstel',         description: 'Actief herstel, zeer lage intensiteit',  minPct: 50, maxPct: 60, color: '#9FCEC9', bg: 'rgba(159,206,201,0.12)', rpeFeel: 'RPE 1-2 · Zeer licht' },
+  2: { label: 'Zone 2, Aerobe basis',    description: 'Vetverbranding, aerobe opbouw',          minPct: 60, maxPct: 70, color: '#5FD08A', bg: 'rgba(95,208,138,0.12)',  rpeFeel: 'RPE 3-4 · Licht' },
+  3: { label: 'Zone 3, Tempo',           description: 'Comfortabel intensief, aerobe drempel',  minPct: 70, maxPct: 80, color: '#F5B942', bg: 'rgba(245,185,66,0.12)',  rpeFeel: 'RPE 5-6 · Matig' },
+  4: { label: 'Zone 4, Drempel',         description: 'Anaerobe drempel, hoog intensief',       minPct: 80, maxPct: 90, color: '#EE8447', bg: 'rgba(238,132,71,0.12)',  rpeFeel: 'RPE 7-8 · Hard' },
+  5: { label: 'Zone 5, VO2max',          description: 'Maximale inspanning, korte duur',        minPct: 90, maxPct: 100, color: '#F0796C', bg: 'rgba(240,121,108,0.12)', rpeFeel: 'RPE 9-10 · Maximaal' },
 }
 
 /** Bereken maximale hartslag (220 - leeftijd) */
@@ -141,12 +141,12 @@ export const WALK_RUN_TEMPLATES: WalkRunTemplate[] = [
   {
     id: 'wr-generiek',
     name: 'Generiek Return-to-Running',
-    description: 'Stapsgewijs terugkeer naar hardlopen — geschikt voor de meeste blessures',
+    description: 'Stapsgewijs terugkeer naar hardlopen, geschikt voor de meeste blessures',
     injury: 'Generiek',
     targetDistance: '5 km',
     progressionRule: '10% toename per week maximaal. Bij pijn > 4/10 herhaal je de vorige week.',
     weeks: [
-      { week: 1, runMin: 1,  walkMin: 2, rounds: 6,  totalMin: 18, sessionsPerWeek: 3, notes: 'Voorzichtig beginnen — focus op looptechniek' },
+      { week: 1, runMin: 1,  walkMin: 2, rounds: 6,  totalMin: 18, sessionsPerWeek: 3, notes: 'Voorzichtig beginnen, focus op looptechniek' },
       { week: 2, runMin: 2,  walkMin: 2, rounds: 6,  totalMin: 24, sessionsPerWeek: 3 },
       { week: 3, runMin: 3,  walkMin: 2, rounds: 5,  totalMin: 25, sessionsPerWeek: 3 },
       { week: 4, runMin: 5,  walkMin: 2, rounds: 4,  totalMin: 28, sessionsPerWeek: 3, notes: 'Als pijn < 3/10 mag duur iets omhoog' },

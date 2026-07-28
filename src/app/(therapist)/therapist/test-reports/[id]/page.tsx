@@ -110,7 +110,7 @@ export default function TestReportEditorPage({
         nextTestGoal: d.nextTestGoal,
       }))
       setAdvice(d.advice)
-      toast.success('AI-concept ingevuld — controleer en sla op')
+      toast.success('AI-concept ingevuld, controleer en sla op')
     },
     onError: (e) => toast.error(e.message),
   })
@@ -212,7 +212,7 @@ export default function TestReportEditorPage({
             <div className="flex gap-2 items-end">
               <Labeled label="Uit catalogus" full>
                 <DarkSelect value={pickCatalog} onChange={(e) => setPickCatalog(e.target.value)}>
-                  <option value="">— kies test —</option>
+                  <option value="">kies test</option>
                   {catalog.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.category} · {c.name}{c.subtitle ? ` (${c.subtitle})` : ''}
@@ -231,7 +231,7 @@ export default function TestReportEditorPage({
             <div className="flex gap-2 items-end">
               <Labeled label="Test-batterij" full>
                 <DarkSelect value={pickBattery} onChange={(e) => setPickBattery(e.target.value)}>
-                  <option value="">— kies batterij —</option>
+                  <option value="">kies batterij</option>
                   {batteries.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.name} ({b.items.length})

@@ -113,7 +113,7 @@ export default function MobilityAssessmentPage() {
                   <DarkMenuSelect
                     value={newPatientId}
                     onValueChange={setNewPatientId}
-                    placeholder="— kies patiënt —"
+                    placeholder="kies patiënt"
                     options={patientOptions.map((p) => ({ value: p.id, label: p.label }))}
                   />
                 </div>
@@ -165,7 +165,7 @@ export default function MobilityAssessmentPage() {
             className="mt-2"
             value={selectedPatientId}
             onValueChange={setSelectedPatientId}
-            placeholder="— kies patiënt —"
+            placeholder="kies patiënt"
             options={patientOptions.map((p) => ({ value: p.id, label: p.label }))}
           />
         </Tile>
@@ -199,7 +199,7 @@ export default function MobilityAssessmentPage() {
                         }).toUpperCase()}
                       </p>
                       <p style={{ color: P.ink, fontSize: 14, fontWeight: 700, marginTop: 3 }}>
-                        {a.totalScored} tests gescoord — {a.pass} pass · {a.partial} partial · {a.fail} fail
+                        {a.totalScored} tests gescoord, {a.pass} pass · {a.partial} partial · {a.fail} fail
                       </p>
                       <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, marginTop: 2, letterSpacing: '0.06em' }}>
                         door {a.therapistName}

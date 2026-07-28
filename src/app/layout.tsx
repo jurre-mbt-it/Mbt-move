@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: {
-    template: '%s – BASE',
+    template: '%s · BASE',
     default: 'BASE',
   },
   description: 'Exercise prescription and rehabilitation platform for clinicians and patients.',

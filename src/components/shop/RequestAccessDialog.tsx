@@ -102,7 +102,7 @@ export function RequestAccessDialog({
               onChange={(e) => setEmail(e.target.value)}
             />
             <DarkTextarea
-              placeholder="Bericht (optioneel) — bijvoorbeeld welk programma je zoekt"
+              placeholder="Bericht (optioneel), bijvoorbeeld welk programma je zoekt"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               style={{ minHeight: 80 }}

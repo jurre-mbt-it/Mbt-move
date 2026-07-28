@@ -1,7 +1,7 @@
 import { MfaChallenge } from '@/components/auth/MfaChallenge'
 
 export const metadata = {
-  title: 'Two-Factor Auth – MBT Gym',
+  title: 'Two-Factor Auth · MBT Gym',
 }
 
 export default function MfaChallengePage() {

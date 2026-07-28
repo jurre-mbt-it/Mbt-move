@@ -52,7 +52,7 @@ export function InsightCard({ insight, onChange }: { insight: InsightCardData; o
     setBusy(true)
     try {
       await actMutation.mutateAsync({ insightId: insight.id, action, snoozeDays })
-      if (action === 'FOLLOWED_UP') toast.success('Opgevolgd — genoteerd.')
+      if (action === 'FOLLOWED_UP') toast.success('Opgevolgd, genoteerd.')
       if (action === 'DISMISSED') toast.success('Verborgen.')
       if (action === 'SNOOZED') toast.success('Verstopt voor 7 dagen.')
     } finally {

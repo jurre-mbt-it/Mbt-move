@@ -521,7 +521,7 @@ function Hero() {
           }}
         >
           MBT·Gym koppelt jouw programma, je Apple Watch en je herstel in één
-          athletic-first app. Gebouwd door een sportfysiotherapeut — voor sporters
+          athletic-first app. Gebouwd door een sportfysiotherapeut, voor sporters
           die onder begeleiding doorgaan waar de behandelkamer stopt.
         </p>
 
@@ -630,7 +630,7 @@ const FEATURES: Array<{
     kicker: '01 · PROGRAMMA',
     title: 'JOUW WEEK, VOLLEDIG GEPLAND',
     body:
-      'Je coach zet kracht, mobiliteit, plyometrie en cardio in een weekplanner. Jij ziet per dag precies wat je moet doen — en wat je gisteren deed.',
+      'Je coach zet kracht, mobiliteit, plyometrie en cardio in een weekplanner. Jij ziet per dag precies wat je moet doen, en wat je gisteren deed.',
     color: P.brand,
   },
   {
@@ -644,14 +644,14 @@ const FEATURES: Array<{
     kicker: '03 · CARDIO',
     title: 'ZONES, INTERVALLEN, TEMPO',
     body:
-      'Cardio wordt apart gelogd: HR-zones Z1–Z5, intervallen, tempo en steady-state. Inclusief een walk-run-opbouw terug naar hardlopen.',
+      'Cardio wordt apart gelogd: HR-zones Z1-Z5, intervallen, tempo en steady-state. Inclusief een walk-run-opbouw terug naar hardlopen.',
     color: P.danger,
   },
   {
     kicker: '04 · GEZONDHEID',
     title: 'JE APPLE WATCH, GESYNCED',
     body:
-      'Readiness, slaapkwaliteit, stappen en actieve verbranding. Plus HRV, rust-hartslag, ademhaling en polstemperatuur — direct van je pols.',
+      'Readiness, slaapkwaliteit, stappen en actieve verbranding. Plus HRV, rust-hartslag, ademhaling en polstemperatuur, direct van je pols.',
     color: P.ice,
   },
   {
@@ -665,7 +665,7 @@ const FEATURES: Array<{
     kicker: '06 · PIJN & CONTACT',
     title: 'WELLNESS EN EEN LIJN NAAR JE COACH',
     body:
-      'Dagelijkse wellness-checks, tendinopathie-follow-up na 24 uur, en een chat met je therapeut — gekoppeld aan de sessie of oefening waar het over gaat.',
+      'Dagelijkse wellness-checks, tendinopathie-follow-up na 24 uur, en een chat met je therapeut, gekoppeld aan de sessie of oefening waar het over gaat.',
     color: P.brand,
   },
 ]
@@ -1234,7 +1234,7 @@ function WorkloadSection() {
           >
             Elke set krijgt een sRPE-score (RPE × duur). De curve zet je opgebouwde
             fitheid af tegen je actuele vermoeidheid en leidt daaruit je{' '}
-            <strong style={{ color: P.ink }}>vorm</strong> af — het verschil dat
+            <strong style={{ color: P.ink }}>vorm</strong> af, het verschil dat
             laat zien of je fris bent of juist te veel hooi op je vork neemt.
           </p>
           <p
@@ -1399,7 +1399,7 @@ function ForWhoSection() {
       kicker: 'SPORTERS',
       title: 'IN HERSTEL',
       body:
-        'Na een blessure structureel terugbouwen met een therapeut die meekijkt — niet raden wat veilig is.',
+        'Na een blessure structureel terugbouwen met een therapeut die meekijkt, niet raden wat veilig is.',
       color: P.brand,
     },
     {
@@ -1557,7 +1557,7 @@ function CTASection() {
               marginRight: 'auto',
             }}
           >
-            Vraag toegang tot de iOS-beta. Eén mailtje — je krijgt de
+            Vraag toegang tot de iOS-beta. Eén mailtje, je krijgt de
             TestFlight-uitnodiging binnen een dag.
           </p>
           <div

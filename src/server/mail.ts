@@ -139,7 +139,7 @@ export function inviteMail({
     </td></tr>
     <tr><td style="padding:16px 28px 0 28px;">
       <p style="margin:0;color:${MBT_BRAND.inkMuted};font-size:15px;line-height:22px;">
-        ${therapistLine} voor BASE — onze begeleide trainings-app.
+        ${therapistLine} voor BASE, onze begeleide trainings-app.
       </p>
     </td></tr>
     <tr><td style="padding:24px 28px 0 28px;">
@@ -178,7 +178,7 @@ export function inviteMail({
       `Open deze link en vul je geboortejaar in:\n${codeUrl}\n\n` +
       `We sturen daarna een 6-cijfer code naar deze mail.\n\n` +
       `Verloopt: ${formatDate(expiresAt)}\n\n` +
-      `Movement Based Therapy — movementbasedtherapy.nl`,
+      `Movement Based Therapy, movementbasedtherapy.nl`,
   }
 }
 

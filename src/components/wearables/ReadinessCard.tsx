@@ -93,7 +93,7 @@ export function ReadinessCard({
           style={{ backgroundColor: P.surfaceLow, border: `1px solid ${P.line}`, padding: '10px 12px' }}
         >
           <MetaLabel style={{ color: P.ice }}>
-            {readiness.baselineNights}/7 NACHTEN — BASELINE OPBOUWEN
+            {readiness.baselineNights}/7 NACHTEN · BASELINE OPBOUWEN
           </MetaLabel>
         </div>
       )}

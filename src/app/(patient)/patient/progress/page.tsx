@@ -209,7 +209,7 @@ export default function ProgressPage() {
                   letterSpacing: '0.06em',
                 }}
               >
-                ↓ Je pijn verbetert de laatste 3 sessies — goed bezig!
+                ↓ Je pijn verbetert de laatste 3 sessies, goed bezig!
               </p>
             )}
           </Tile>
@@ -328,7 +328,7 @@ export default function ProgressPage() {
               const last3 = ex.data.slice(-3).map((d) => d.value)
               const isStagnant = last3.length === 3 && last3[2] <= last3[0]
               const suggestion = isStagnant
-                ? 'Deload aanbevolen — 3 sessies geen progressie'
+                ? 'Deload aanbevolen, 3 sessies geen progressie'
                 : `Volgende sessie: probeer ${last + 2.5} kg`
               return (
                 <div key={ex.exerciseId} className="flex flex-col gap-2">

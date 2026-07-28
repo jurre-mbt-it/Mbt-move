@@ -282,7 +282,7 @@ export function renderRunningAnalysisPdfHtml(opts: {
   `
 
   return renderPdfDocument({
-    documentTitle: `Hardloopanalyse — ${patientName}`,
+    documentTitle: `Hardloopanalyse, ${patientName}`,
     headerTag: 'Analysedatum',
     headerDate: a.performedAt,
     brandTag: 'Sportfysiotherapie · Amsterdam',

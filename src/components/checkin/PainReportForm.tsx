@@ -100,7 +100,7 @@ export function PainReportForm({ homeHref }: { homeHref: string }) {
         {nrs !== null && nrs >= 7 && (
           <Tile accentBar={P.danger} style={{ maxWidth: '20rem' }}>
             <p style={{ color: P.danger, fontSize: 13, textAlign: 'center' }}>
-              <strong>Hoge pijnscore</strong> — dit wordt duidelijk in je dossier gemarkeerd. Neem bij aanhoudende of toenemende pijn zelf direct contact op met je therapeut.
+              <strong>Hoge pijnscore</strong>, dit wordt duidelijk in je dossier gemarkeerd. Neem bij aanhoudende of toenemende pijn zelf direct contact op met je therapeut.
             </p>
           </Tile>
         )}
@@ -154,7 +154,7 @@ export function PainReportForm({ homeHref }: { homeHref: string }) {
         {/* NRS Scale */}
         <Tile>
           <div className="flex items-center justify-between mb-3">
-            <MetaLabel>PIJNNIVEAU (NRS 0–10)</MetaLabel>
+            <MetaLabel>PIJNNIVEAU (NRS 0-10)</MetaLabel>
             {nrs !== null && (
               <span
                 className="athletic-mono px-2 py-0.5 rounded-lg"

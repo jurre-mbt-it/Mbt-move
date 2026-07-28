@@ -457,7 +457,7 @@ function AthleteSessionPageInner() {
       utils.exercises.list.invalidate()
       toast.success(`"${trimmed}" aangemaakt en toegevoegd`)
     } catch {
-      toast.error('Aanmaken mislukt — probeer het opnieuw')
+      toast.error('Aanmaken mislukt, probeer het opnieuw')
     }
   }
 
@@ -798,7 +798,7 @@ function AthleteSessionPageInner() {
                   maxWidth: 240,
                 }}
               >
-                Kies uit favorieten, meest gebruikt of de hele bibliotheek — en start direct.
+                Kies uit favorieten, meest gebruikt of de hele bibliotheek, en start direct.
               </span>
             </button>
           ) : isQuickMode ? (
@@ -2278,7 +2278,7 @@ function QuickFinishModal({
           <section>
             <MetaLabel>Duur (minuten)</MetaLabel>
             <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, marginTop: 4, letterSpacing: '0.04em' }}>
-              Voorgesteld op basis van de tijd ({durationMin}m) — pas aan indien nodig
+              Voorgesteld op basis van de tijd ({durationMin}m), pas aan indien nodig
             </p>
             <DarkInput
               value={durationInput}

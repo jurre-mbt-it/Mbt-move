@@ -47,7 +47,7 @@ export function WearablePanel({
         </div>
         <p style={{ color: P.inkMuted, fontSize: 13, lineHeight: '19px', marginTop: 8 }}>
           Synchroniseer je trainingen, slaap en herstel automatisch. Je readiness,
-          slaapkwaliteit en belasting worden dan live bijgewerkt — zichtbaar voor
+          slaapkwaliteit en belasting worden dan live bijgewerkt, zichtbaar voor
           jou én je therapeut.
         </p>
         <div

@@ -44,7 +44,7 @@ export default function DataRightsPage() {
       a.click()
       a.remove()
       URL.revokeObjectURL(url)
-      toast.success('Download gestart — check je Downloads-map.')
+      toast.success('Download gestart, check je Downloads-map.')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Export mislukt.')
     } finally {
@@ -57,7 +57,7 @@ export default function DataRightsPage() {
     const payload = {
       exportedAt: new Date().toISOString(),
       format: 'mbt-move:access-log:v1',
-      law: 'Wabvpz art. 15j — inzage toegangslogboek',
+      law: 'Wabvpz art. 15j: inzage toegangslogboek',
       entries: accessLog,
     }
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
@@ -71,7 +71,7 @@ export default function DataRightsPage() {
     a.click()
     a.remove()
     URL.revokeObjectURL(url)
-    toast.success('Download gestart — check je Downloads-map.')
+    toast.success('Download gestart, check je Downloads-map.')
   }
 
   async function handleDeleteConfirm() {
@@ -212,7 +212,7 @@ export default function DataRightsPage() {
             </p>
           ) : accessLog.length === 0 ? (
             <p style={{ color: P.inkDim, fontSize: 12, marginTop: 12 }}>
-              Nog geen registraties — er heeft (nog) geen behandelaar je dossier
+              Nog geen registraties, er heeft (nog) geen behandelaar je dossier
               ingezien sinds het loggen actief is.
             </p>
           ) : (
@@ -250,7 +250,7 @@ export default function DataRightsPage() {
               {accessLog.length > 8 && (
                 <p style={{ color: P.inkDim, fontSize: 11, marginTop: 8 }}>
                   + {accessLog.length - 8} eerdere registratie
-                  {accessLog.length - 8 === 1 ? '' : 's'} — download voor het volledige logboek.
+                  {accessLog.length - 8 === 1 ? '' : 's'}, download voor het volledige logboek.
                 </p>
               )}
               <DarkButton
@@ -324,7 +324,7 @@ export default function DataRightsPage() {
                 }}
               >
                 Je kunt je account laten verwijderen. We starten een wachttijd van{' '}
-                {status?.gracePeriodDays ?? 30} dagen voordat alles definitief weg is — zodat je
+                {status?.gracePeriodDays ?? 30} dagen voordat alles definitief weg is, zodat je
                 tijd hebt om te heroverwegen. Daarna zijn je gegevens niet meer te herstellen.
               </p>
               <DarkButton

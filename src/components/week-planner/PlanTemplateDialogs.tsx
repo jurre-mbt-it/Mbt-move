@@ -233,7 +233,7 @@ export function ApplyPlanDialog({
                         </span>
                         {ws && (
                           <span className="font-mono text-[10px] whitespace-nowrap" style={{ color: P.inkDim }}>
-                            {fmtShort(ws)} – {fmtShort(addDays(ws, 6))}
+                            {fmtShort(ws)}-{fmtShort(addDays(ws, 6))}
                           </span>
                         )}
                       </div>

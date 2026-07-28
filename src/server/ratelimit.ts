@@ -106,7 +106,7 @@ export async function rateLimit(
     if (!warnedNoStore) {
       warnedNoStore = true
       console.error(
-        '[ratelimit] Geen gedeelde store (Upstash/KV) geconfigureerd in productie — ' +
+        '[ratelimit] Geen gedeelde store (Upstash/KV) geconfigureerd in productie' +
           'de in-memory fallback is per-instance en handhaaft NIET betrouwbaar. ' +
           'Zet UPSTASH_REDIS_REST_URL/TOKEN of KV_REST_API_URL/TOKEN op het Vercel-project.',
       )

@@ -502,7 +502,7 @@ export default function PatientSchedulePage() {
                   className="athletic-mono"
                   style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.1em' }}
                 >
-                  {isToday ? 'START SESSIE' : selectedDay < todayDayNum ? 'INHALEN' : 'EERDER DOEN'} — {exercisesForSelectedDay.length} OEFENINGEN
+                  {isToday ? 'START SESSIE' : selectedDay < todayDayNum ? 'INHALEN' : 'EERDER DOEN'} · {exercisesForSelectedDay.length} OEFENINGEN
                 </span>
               </Link>
             </div>
@@ -517,7 +517,7 @@ export default function PatientSchedulePage() {
                   </p>
                 </div>
                 <p style={{ color: P.inkMuted, fontSize: 12 }}>
-                  Lichaam en geest herstellen terwijl je rust — dat is training.
+                  Lichaam en geest herstellen terwijl je rust, dat is training.
                 </p>
               </div>
             </Tile>

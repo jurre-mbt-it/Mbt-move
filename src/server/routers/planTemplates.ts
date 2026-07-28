@@ -230,7 +230,7 @@ export const planTemplatesRouter = createTRPCRouter({
         await ctx.prisma.weekSchedule.create({
           data: {
             id: createId(),
-            name: input.weeks === 1 ? input.name.trim() : `${input.name.trim()} — week ${w}`,
+            name: input.weeks === 1 ? input.name.trim() : `${input.name.trim()}, week ${w}`,
             isTemplate: true,
             weekNumber: w,
             planTemplateId: tpl.id,

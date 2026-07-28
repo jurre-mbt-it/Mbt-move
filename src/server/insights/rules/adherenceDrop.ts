@@ -11,7 +11,7 @@ export const adherenceDrop: Evaluator = (agg, rule) => {
   if (agg.daysSinceLastSession != null && agg.daysSinceLastSession >= cfg.silentDays) {
     return {
       title: `Geen sessies van ${agg.patientName}`,
-      suggestion: `Laatste gelogde sessie was ${agg.daysSinceLastSession} dagen geleden. Check even of er iets speelt — bel of stuur een bericht.`,
+      suggestion: `Laatste gelogde sessie was ${agg.daysSinceLastSession} dagen geleden. Check even of er iets speelt, bel of stuur een bericht.`,
       triggerData: {
         trigger: 'silent_days',
         daysSinceLastSession: agg.daysSinceLastSession,

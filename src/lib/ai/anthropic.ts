@@ -15,7 +15,7 @@ let client: Anthropic | null = null
 
 function getClient(): Anthropic {
   if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error('ANTHROPIC_API_KEY ontbreekt — AI-concept is niet beschikbaar.')
+    throw new Error('ANTHROPIC_API_KEY ontbreekt. AI-concept is niet beschikbaar.')
   }
   client ??= new Anthropic()
   return client

@@ -115,7 +115,7 @@ export default function ScheduleDayPage({ params }: Props) {
                 RUSTDAG <IconSleep size={18} />
               </p>
               <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 8, maxWidth: '20rem', lineHeight: 1.5 }}>
-                Vandaag hoef je niet te trainen. Gun je lichaam de tijd om te herstellen — dat is net zo belangrijk als trainen!
+                Vandaag hoef je niet te trainen. Gun je lichaam de tijd om te herstellen, dat is net zo belangrijk als trainen!
               </p>
             </div>
           </Tile>

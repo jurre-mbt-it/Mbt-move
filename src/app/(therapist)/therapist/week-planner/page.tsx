@@ -354,9 +354,9 @@ function CalendarLegend() {
 
 const STATUS_TITLES: Record<ItemStatus, string | undefined> = {
   scheduled: undefined,
-  completed: 'Voltooid — klik voor details',
-  partial:   'Deels voltooid — eerder gestopt',
-  missed:    'Gemist — niet gedaan',
+  completed: 'Voltooid, klik voor details',
+  partial:   'Deels voltooid, eerder gestopt',
+  missed:    'Gemist, niet gedaan',
   in_progress: 'Bezig',
 }
 
@@ -1123,7 +1123,7 @@ function ItemDetailContent({
                       {Math.round((item.plannedDurationSec ?? 0) / 60)} min
                     </div>
                     <p className="text-[10px] mt-1" style={{ color: P.inkDim }}>
-                      Volgt uit {item.quickCategory === 'CARDIO' ? 'de blokken' : 'de oefeningen'} — pas die aan om de duur te wijzigen.
+                      Volgt uit {item.quickCategory === 'CARDIO' ? 'de blokken' : 'de oefeningen'}, pas die aan om de duur te wijzigen.
                     </p>
                   </>
                 ) : (
@@ -1320,7 +1320,7 @@ function WeekMetaDialog({
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent aria-describedby={undefined} className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Week {weekNumber} — fase &amp; belasting</DialogTitle>
+          <DialogTitle>Week {weekNumber}, fase &amp; belasting</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
@@ -1391,7 +1391,7 @@ function WeekMetaDialog({
               className="mt-1.5"
             />
             <p className="text-[11px] mt-1" style={{ color: P.inkDim }}>
-              sRPE-stijl richtpunt — verschijnt naast de gerealiseerde belasting.
+              sRPE-stijl richtpunt, verschijnt naast de gerealiseerde belasting.
             </p>
           </div>
 
@@ -1634,7 +1634,7 @@ function WeekPlannerContent() {
   const saveItemAsTemplate = trpc.weekSchedules.saveItemAsTemplate.useMutation({
     onSuccess: () => {
       utils.programs.list.invalidate()
-      toast.success('Opgeslagen als schema — staat nu in Programma’s')
+      toast.success('Opgeslagen als schema, staat nu in Programma’s')
     },
     onError: (err) => toast.error(err.message ?? 'Opslaan als schema mislukt'),
   })
@@ -2384,7 +2384,7 @@ function WeekPlannerContent() {
     if (!selectedPatientId) return
     setWeekClipboard({ mode, monday: isoDate(rowMonday), patientId: selectedPatientId, weekNum })
     toast.success(
-      `Week ${mode === 'copy' ? 'gekopieerd' : 'geknipt'} — kies "Plak week hier" in het menu van de doelweek`,
+      `Week ${mode === 'copy' ? 'gekopieerd' : 'geknipt'}, kies "Plak week hier" in het menu van de doelweek`,
     )
   }
 
@@ -2597,7 +2597,7 @@ function WeekPlannerContent() {
               {selectedIsos.size} dag{selectedIsos.size > 1 ? 'en' : ''} geselecteerd
             </span>
             <SelectionDragHandle isos={[...selectedIsos]} />
-            <span className="text-[11px]" style={{ color: P.inkMuted }}>— sleep naar een doeldag om te kopiëren</span>
+            <span className="text-[11px]" style={{ color: P.inkMuted }}>sleep naar een doeldag om te kopiëren</span>
             <button
               type="button"
               onClick={clearSelection}
@@ -2677,7 +2677,7 @@ function WeekPlannerContent() {
                         <span
                           className="athletic-mono text-[8px] leading-tight text-center"
                           style={{ color: P.inkMuted, letterSpacing: '0.04em' }}
-                          title={`${phase.label} — ${phase.description}`}
+                          title={`${phase.label}, ${phase.description}`}
                         >
                           {phase.short}
                         </span>

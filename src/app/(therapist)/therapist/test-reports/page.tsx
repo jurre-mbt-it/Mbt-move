@@ -84,7 +84,7 @@ export default function TestReportsPage() {
                   <DarkMenuSelect
                     value={newPatientId}
                     onValueChange={setNewPatientId}
-                    placeholder="— kies patiënt —"
+                    placeholder="kies patiënt"
                     options={patientOptions.map((p) => ({ value: p.id, label: p.label }))}
                   />
                 </div>
@@ -138,7 +138,7 @@ export default function TestReportsPage() {
             className="mt-2"
             value={selectedPatientId}
             onValueChange={setSelectedPatientId}
-            placeholder="— kies patiënt —"
+            placeholder="kies patiënt"
             options={patientOptions.map((p) => ({ value: p.id, label: p.label }))}
           />
         </Tile>

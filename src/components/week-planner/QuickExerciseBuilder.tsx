@@ -132,7 +132,7 @@ function MiniVeld({ label, suffix, isRange, onToggleRange, children }: {
       {suffix && <span className="text-[10px] shrink-0" style={{ color: P.inkDim }}>{suffix}</span>}
       {onToggleRange && (
         <button type="button" onClick={onToggleRange} aria-pressed={!!isRange}
-          title={isRange ? 'Terug naar één waarde' : 'Bereik instellen (min – max)'}
+          title={isRange ? 'Terug naar één waarde' : 'Bereik instellen (min, max)'}
           className="w-5 h-5 rounded flex items-center justify-center shrink-0"
           style={isRange
             ? { color: P.brand, background: 'rgba(232,122,85,0.12)' }
@@ -386,7 +386,7 @@ export function QuickExerciseBuilder({
         ) : (
           <button type="button" onClick={() => setCatFilter(defaultCategory)}
             className="px-2 py-0.5 rounded-full text-[11px]" style={{ color: P.inkMuted, border: `1px solid ${P.lineStrong}` }}>
-            Alle categorieën — klik voor {CATEGORY_LABELS[defaultCategory]}
+            Alle categorieën, klik voor {CATEGORY_LABELS[defaultCategory]}
           </button>
         )}
       </div>

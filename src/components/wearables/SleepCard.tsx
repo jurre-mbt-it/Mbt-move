@@ -249,5 +249,5 @@ function clockOf(iso: string): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 function bedtimeRange(n: SleepNightDto): string {
-  return `${clockOf(n.startAt)}–${clockOf(n.endAt)}`
+  return `${clockOf(n.startAt)}-${clockOf(n.endAt)}`
 }

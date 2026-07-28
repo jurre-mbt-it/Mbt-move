@@ -21,7 +21,7 @@ export function WearablesPreview() {
         </div>
         <div className="mx-auto w-full mt-6" style={{ maxWidth: 420 }}>
           <p style={{ color: P.inkDim, fontSize: 11, textAlign: 'center' }}>
-            Therapeut-view (read-only) — geen connect-CTA bij niet-gekoppeld
+            Therapeut-view (read-only), geen connect-CTA bij niet-gekoppeld
           </p>
         </div>
       </div>

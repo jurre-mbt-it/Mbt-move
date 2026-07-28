@@ -736,7 +736,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
     }
     if (dominantRegion && REGION_LABELS_NL[dominantRegion]) {
       const label = REGION_LABELS_NL[dominantRegion]
-      suggested = suggested ? `${suggested} – ${label}` : label
+      suggested = suggested ? `${suggested}-${label}` : label
     }
     if (suggested && suggested !== program.name) {
       setProgram(p => ({ ...p, name: suggested }))
@@ -866,7 +866,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
     try {
       await autosave.saveNow()
     } catch {
-      toast.error('Opslaan mislukt — kon niet deployen')
+      toast.error('Opslaan mislukt, kon niet deployen')
       return
     }
     if (!currentProgramId && !program.isTemplate) {
@@ -986,7 +986,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             patientId: null,
           })
         } catch {
-          toast.warning('Programma gedeployed — sjabloon-kopie mislukte, kun je later met "Opslaan als sjabloon" doen.', { duration: 6000 })
+          toast.warning('Programma gedeployed, sjabloon-kopie mislukte, kun je later met "Opslaan als sjabloon" doen.', { duration: 6000 })
         }
       }
       setDeployDialogOpen(false)
@@ -998,7 +998,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         toast.success(`Programma toegepast op ${target.name ?? 'patiënt'} en gedeployed.`, { duration: 4000 })
         router.push(`/therapist/programs/${targetProgramId}/edit`)
       } else if (mailSkipped) {
-        toast.success('Wijzigingen opgeslagen — geen mail verstuurd.', { duration: 4000 })
+        toast.success('Wijzigingen opgeslagen, geen mail verstuurd.', { duration: 4000 })
       } else if (mailSent) {
         toast.success(
           wasAlreadyActive ? 'Update-mail verstuurd aan patiënt.' : 'Programma gedeployed en mail verstuurd.',
@@ -1006,12 +1006,12 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         )
       } else if (target.email) {
         toast.warning(
-          wasAlreadyActive ? 'Update opgeslagen — mail kon niet worden verstuurd.' : 'Programma gedeployed — mail kon niet worden verstuurd.',
+          wasAlreadyActive ? 'Update opgeslagen, mail kon niet worden verstuurd.' : 'Programma gedeployed, mail kon niet worden verstuurd.',
           { duration: 5000 },
         )
       } else {
         toast.success(
-          wasAlreadyActive ? 'Update opgeslagen (geen mail — patiënt heeft geen e-mailadres).' : 'Programma gedeployed (geen mail — patiënt heeft geen e-mailadres).',
+          wasAlreadyActive ? 'Update opgeslagen (geen mail, patiënt heeft geen e-mailadres).' : 'Programma gedeployed (geen mail, patiënt heeft geen e-mailadres).',
           { duration: 4000 },
         )
       }
@@ -1159,7 +1159,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       setResources(mappedResources)
       setImportDialogOpen(false)
       setImportQuery('')
-      toast.success(`Template geladen — ${mapped.length} oefeningen overgenomen.`)
+      toast.success(`Template geladen, ${mapped.length} oefeningen overgenomen.`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Laden mislukt')
     }
@@ -1345,9 +1345,9 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               }
               title={
                 currentStatus === 'ACTIVE'
-                  ? 'Het programma is live — wijzigingen die je hier maakt worden direct opgeslagen en zijn meteen zichtbaar bij de patiënt.'
+                  ? 'Het programma is live, wijzigingen die je hier maakt worden direct opgeslagen en zijn meteen zichtbaar bij de patiënt.'
                   : currentStatus === 'DRAFT'
-                  ? 'Concept — patiënt ziet dit nog niet. Klik DEPLOYEN om actief te maken.'
+                  ? 'Concept, patiënt ziet dit nog niet. Klik DEPLOYEN om actief te maken.'
                   : currentStatus === 'COMPLETED'
                   ? 'Programma is afgerond.'
                   : 'Programma is gearchiveerd.'
@@ -1414,7 +1414,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                 onClick={() => { void autosave.saveNow() }}
                 className="flex items-center gap-1 text-[#F0796C] hover:text-[#F59B92]"
               >
-                <AlertCircle className="w-3 h-3" /> Opslaan mislukt — opnieuw
+                <AlertCircle className="w-3 h-3" /> Opslaan mislukt, opnieuw
               </button>
             )}
           </div>
@@ -2168,7 +2168,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           <DialogHeader className="px-5 pt-5 pb-3 border-b shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Eye className="w-4 h-4" />
-              Preview — {program.name}
+              Preview, {program.name}
             </DialogTitle>
             <p className="text-xs text-muted-foreground mt-0.5">
               Zo ziet de patiënt het programma · {program.weeks} weken · {program.daysPerWeek}×/week
@@ -2254,7 +2254,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             </DialogTitle>
             <DialogDescription>
               {program.isTemplate
-                ? 'Kies een patiënt — er wordt een kopie van dit sjabloon aangemaakt en direct live gezet.'
+                ? 'Kies een patiënt, er wordt een kopie van dit sjabloon aangemaakt en direct live gezet.'
                 : currentStatus === 'ACTIVE'
                   ? 'Wijzigingen zijn al opgeslagen en direct zichtbaar bij de patiënt. Kies hieronder of je de patiënt op de hoogte wil brengen via mail of dat je alleen opslaat.'
                   : 'Bevestig welke patiënt dit programma krijgt en stuur eventueel een bericht mee.'}
@@ -2371,7 +2371,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                     <div className="flex-1 text-xs">
                       <p className="font-semibold">Alleen opslaan, geen mail</p>
                       <p className="text-muted-foreground mt-0.5">
-                        Wijzigingen zijn al live — geen extra notificatie naar patiënt.
+                        Wijzigingen zijn al live, geen extra notificatie naar patiënt.
                       </p>
                     </div>
                   </label>

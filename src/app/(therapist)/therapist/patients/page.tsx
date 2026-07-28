@@ -130,7 +130,7 @@ function PatientsPageInner() {
         expiresAt: new Date(res.expiresAt),
         patientUserId: res.patientUserId,
       })
-      toast.success('Invite aangemaakt — deel de code-URL met je patiënt.')
+      toast.success('Invite aangemaakt, deel de code-URL met je patiënt.')
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Er ging iets mis')
     } finally {
@@ -453,7 +453,7 @@ function PatientsPageInner() {
                     required
                   />
                   <p style={{ color: P.inkMuted, fontSize: 11, marginTop: 2 }}>
-                    Bij inloggen controleren we het geboortejaar — alleen de echte patiënt weet dit.
+                    Bij inloggen controleren we het geboortejaar, alleen de echte patiënt weet dit.
                   </p>
                 </div>
                 <div className="space-y-1.5">

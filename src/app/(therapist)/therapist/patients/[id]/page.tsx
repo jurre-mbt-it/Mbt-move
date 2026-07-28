@@ -161,7 +161,7 @@ export default function PatientDetailPage({
           expiresAt: res.expiresAt,
           error: res.mailError,
         })
-        toast.error('Mail kon niet bezorgd worden — kopieer de link hieronder.')
+        toast.error('Mail kon niet bezorgd worden, kopieer de link hieronder.')
       }
     },
     onError: (e) => toast.error(e.message),
@@ -566,7 +566,7 @@ export default function PatientDetailPage({
                       fontStyle: patient.notes ? 'normal' : 'italic',
                     }}
                   >
-                    {patient.notes ?? 'Nog geen notities — klik Bewerken om toe te voegen.'}
+                    {patient.notes ?? 'Nog geen notities, klik Bewerken om toe te voegen.'}
                   </p>
                 ) : (
                   <textarea
@@ -624,7 +624,7 @@ export default function PatientDetailPage({
               <div className="pt-3 space-y-3">
                 <MetaLabel>Afgesloten · {closedPrograms.length}</MetaLabel>
                 <p style={{ color: P.inkDim, fontSize: 11, marginTop: -4 }}>
-                  Bewaard in het patiëntdossier — heropen om weer actief te maken.
+                  Bewaard in het patiëntdossier, heropen om weer actief te maken.
                 </p>
                 {closedPrograms.map(prog => (
                   <ProgramTile key={prog.id} prog={prog} patientId={patient.id} dimmed />

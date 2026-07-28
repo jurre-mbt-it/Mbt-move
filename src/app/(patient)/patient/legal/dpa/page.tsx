@@ -163,7 +163,7 @@ export default function DpaPage() {
               'Geboortedatum en leeftijd',
               'Diagnose en klachteninformatie',
               'Trainingsdata (oefeningen, sets, herhalingen, gewicht)',
-              'Pijnscores en RPE-scores (0–10)',
+              'Pijnscores en RPE-scores (0-10)',
               'PROMs (Patient-Reported Outcome Measures)',
               'Sessieduur en sessie-aantekeningen',
             ].map((item, i) => (
@@ -207,7 +207,7 @@ export default function DpaPage() {
                 style={{ backgroundColor: P.brand }}
               />
               <span>
-                <strong>Overeenkomst</strong> — uitvoering van de behandelovereenkomst (art. 6 lid 1
+                <strong>Overeenkomst</strong>, uitvoering van de behandelovereenkomst (art. 6 lid 1
                 sub b AVG)
               </span>
             </li>
@@ -217,7 +217,7 @@ export default function DpaPage() {
                 style={{ backgroundColor: P.brand }}
               />
               <span>
-                <strong>Wettelijke verplichting</strong> — bewaarplicht op grond van de WGBO (art. 6
+                <strong>Wettelijke verplichting</strong>, bewaarplicht op grond van de WGBO (art. 6
                 lid 1 sub c AVG)
               </span>
             </li>
@@ -227,7 +227,7 @@ export default function DpaPage() {
                 style={{ backgroundColor: P.brand }}
               />
               <span>
-                <strong>Gerechtvaardigde belangen</strong> — behandelkwaliteit en veiligheid (art. 6
+                <strong>Gerechtvaardigde belangen</strong>, behandelkwaliteit en veiligheid (art. 6
                 lid 1 sub f AVG)
               </span>
             </li>
@@ -316,13 +316,13 @@ export default function DpaPage() {
             <SubprocessorCard
               name="Supabase Inc."
               purpose="Hosting van database en authenticatie"
-              location="EU — Frankfurt (AWS eu-central-1)"
+              location="EU, Frankfurt (AWS eu-central-1)"
               safeguard="Standard Contractual Clauses (SCC)"
             />
             <SubprocessorCard
               name="Resend Inc."
               purpose="Transactionele e-mailverwerking"
-              location="VS — SCC van toepassing"
+              location="VS, SCC van toepassing"
               safeguard="Standard Contractual Clauses (SCC)"
             />
           </div>
