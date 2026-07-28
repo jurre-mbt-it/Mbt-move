@@ -14,8 +14,10 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { Trash2 } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
 import { usePortal } from '@/lib/portal'
+import { DeletePlanDialog } from '@/components/week-planner/PlanTemplateDialogs'
 import {
   DarkButton,
   DarkDialog as Dialog,
@@ -45,6 +47,7 @@ export default function CoachPlansPage() {
   const router = useRouter()
   const [q, setQ] = useState('')
   const [applyFor, setApplyFor] = useState<{ id: string; name: string; weeks: number } | null>(null)
+  const [deleteFor, setDeleteFor] = useState<{ id: string; name: string; weeks: number } | null>(null)
   const [newOpen, setNewOpen] = useState(false)
 
   const { data: plans, isLoading } = trpc.planTemplates.list.useQuery()
@@ -133,6 +136,20 @@ export default function CoachPlansPage() {
                 >
                   Bewerken
                 </DarkButton>
+                {/* Stil naast de twee gewone acties; de bevestiging is de luide
+                    stap. `canEdit` komt van de server, zodat er geen knop staat
+                    die daarna geweigerd wordt. */}
+                {t.canEdit && (
+                  <DarkButton
+                    variant="ghost"
+                    size="sm"
+                    className="ml-auto"
+                    style={{ color: P.inkMuted }}
+                    onClick={() => setDeleteFor({ id: t.id, name: t.name, weeks: t.weeks })}
+                  >
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Verwijderen
+                  </DarkButton>
+                )}
               </div>
             </Tile>
           ))}
@@ -141,6 +158,10 @@ export default function CoachPlansPage() {
 
       {applyFor && (
         <ApplyToAthletesDialog plan={applyFor} onClose={() => setApplyFor(null)} />
+      )}
+
+      {deleteFor && (
+        <DeletePlanDialog plan={deleteFor} onClose={() => setDeleteFor(null)} />
       )}
 
       {newOpen && <NewPlanDialog onClose={() => setNewOpen(false)} />}

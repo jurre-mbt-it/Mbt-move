@@ -35,21 +35,29 @@ const scopeFor = planScope
  * Writes: globale seeds zijn in de single-clinic realiteit ook bewerkbaar door
  * een therapeut. Een coach mag uitsluitend zijn eigen plannen bewerken; anders
  * zou hij via de seed-tak de sjablonen van de praktijk kunnen aanpassen.
+ *
+ * Als boolean beschikbaar omdat `list` het per plan meestuurt: de UI mag geen
+ * verwijderknop tonen die de server daarna weigert. Eén regel, twee plekken.
  */
+function canEdit(
+  user: { id: string; role: string; practiceId: string | null },
+  tpl: { practiceId: string | null; creatorId?: string; creator?: { role: string } | null },
+): boolean {
+  if (user.role === 'ADMIN') return true
+  if (user.role === 'COACH') return tpl.creatorId === user.id
+  // Seed-tak, maar niet voor plannen van een coach: die zijn privé, ook al
+  // hebben ze geen praktijk.
+  if (tpl.practiceId === null && tpl.creator?.role !== 'COACH') return true
+  return !!user.practiceId && tpl.practiceId === user.practiceId
+}
+
 function assertCanEdit(
   user: { id: string; role: string; practiceId: string | null },
   tpl: { practiceId: string | null; creatorId?: string; creator?: { role: string } | null },
 ) {
-  if (user.role === 'ADMIN') return
-  if (user.role === 'COACH') {
-    if (tpl.creatorId === user.id) return
+  if (!canEdit(user, tpl)) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Geen toegang tot dit plan' })
   }
-  // Seed-tak, maar niet voor plannen van een coach: die zijn privé, ook al
-  // hebben ze geen praktijk.
-  if (tpl.practiceId === null && tpl.creator?.role !== 'COACH') return
-  if (user.practiceId && tpl.practiceId === user.practiceId) return
-  throw new TRPCError({ code: 'FORBIDDEN', message: 'Geen toegang tot dit plan' })
 }
 
 async function assertPatientLink(
@@ -106,6 +114,7 @@ export const planTemplatesRouter = createTRPCRouter({
       where: { OR: scopeFor(ctx.user) },
       orderBy: [{ updatedAt: 'desc' }],
       include: {
+        creator: { select: { role: true } },
         schedules: {
           orderBy: { weekNumber: 'asc' },
           select: {
@@ -133,6 +142,8 @@ export const planTemplatesRouter = createTRPCRouter({
       practiceId: t.practiceId,
       /** Van mij? Bepaalt of je 'm mag hernoemen of verwijderen. */
       isOwn: t.creatorId === ctx.user.id,
+      /** Mag deze gebruiker het plan hernoemen of verwijderen? Zelfde regel als `update`/`delete`. */
+      canEdit: canEdit(ctx.user, t),
       // Een coach-plan heeft óók practiceId null. Zonder de creator-check zou
       // een coach zijn eigen plannen als "globale seed" gelabeld zien.
       isGlobalSeed: t.practiceId === null && t.creatorId !== ctx.user.id,

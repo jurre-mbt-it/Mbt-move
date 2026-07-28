@@ -26,6 +26,7 @@ import {
   type Category,
   type ItemExercise,
 } from '@/components/week-planner/QuickExerciseBuilder'
+import { DeletePlanDialog } from '@/components/week-planner/PlanTemplateDialogs'
 import {
   DarkButton,
   DarkDialog as Dialog,
@@ -86,6 +87,7 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
   const utils = trpc.useUtils()
   const [addFor, setAddFor] = useState<AddTarget | null>(null)
   const [editFor, setEditFor] = useState<PlanItem | null>(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   const { data: plans } = trpc.planTemplates.list.useQuery()
   const plan = useMemo(() => (plans ?? []).find((p) => p.id === planId) ?? null, [plans, planId])
@@ -127,9 +129,20 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
             gekoppeld
           </MetaLabel>
         </div>
-        <DarkButton variant="primary" onClick={() => router.push(`${portal.base}/plans`)}>
-          Naar atleet sturen
-        </DarkButton>
+        <div className="flex flex-wrap gap-2">
+          <DarkButton variant="primary" onClick={() => router.push(`${portal.base}/plans`)}>
+            Naar atleet sturen
+          </DarkButton>
+          {plan?.canEdit && (
+            <DarkButton
+              variant="ghost"
+              style={{ color: P.inkMuted }}
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash2 className="mr-1.5 h-4 w-4" /> Verwijderen
+            </DarkButton>
+          )}
+        </div>
       </div>
 
       {isLoading ? (
@@ -219,6 +232,16 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
           target={addFor}
           planId={planId}
           onClose={() => setAddFor(null)}
+        />
+      )}
+
+      {deleteOpen && plan && (
+        <DeletePlanDialog
+          plan={{ id: plan.id, name: plan.name, weeks: plan.weeks }}
+          onClose={() => setDeleteOpen(false)}
+          // Het plan bestaat niet meer; hier blijven staan levert een lege
+          // editor op.
+          onDeleted={() => router.push(`${portal.base}/plans`)}
         />
       )}
     </div>

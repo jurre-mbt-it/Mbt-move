@@ -3,9 +3,10 @@
 /**
  * Plan-sjablonen in de week-planner.
  *
- *   ApplyPlanDialog — kies een meerweeks plan uit de bibliotheek en zet het
- *                     vanaf een datum op de kalender van een patiënt.
- *   SavePlanDialog  — sla het geselecteerde weekbereik op als herbruikbaar plan.
+ *   ApplyPlanDialog  — kies een meerweeks plan uit de bibliotheek en zet het
+ *                      vanaf een datum op de kalender van een patiënt.
+ *   SavePlanDialog   — sla het geselecteerde weekbereik op als herbruikbaar plan.
+ *   DeletePlanDialog — gooi een plan uit de bibliotheek weg.
  *
  * Toepassen is een KOPIE (stempel): het plan later wijzigen raakt lopende
  * patiënten niet. Zie `planTemplates.applyToPatient`.
@@ -20,6 +21,7 @@ import {
   DarkButton,
   DarkDialog as Dialog,
   DarkDialogContent as DialogContent,
+  DarkDialogDescription as DialogDescription,
   DarkDialogHeader as DialogHeader,
   DarkDialogTitle as DialogTitle,
   DarkInput,
@@ -333,6 +335,65 @@ export function ApplyPlanDialog({
               : selected
                 ? `Plaats ${selected.weeks} ${selected.weeks === 1 ? 'week' : 'weken'}`
                 : 'Plaatsen'}
+          </DarkButton>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ══ Plan verwijderen ══════════════════════════════════════════════════════
+/**
+ * De sjabloon-weken gaan mee via cascade. Atleten die het plan al op de
+ * kalender hebben staan raken niets kwijt: `applyToPatient` kopieert en legt
+ * geen link, dus daar staat losse data.
+ *
+ * Toon deze knop alleen als `canEdit` van `planTemplates.list` true is — de
+ * server weigert de rest, en een knop die niets doet is erger dan geen knop.
+ */
+export function DeletePlanDialog({
+  plan, onClose, onDeleted,
+}: {
+  plan: { id: string; name: string; weeks: number }
+  onClose: () => void
+  /** Na een geslaagde verwijdering. De editor navigeert weg, het overzicht niet. */
+  onDeleted?: () => void
+}) {
+  const utils = trpc.useUtils()
+
+  const remove = trpc.planTemplates.delete.useMutation({
+    onSuccess: () => {
+      utils.planTemplates.list.invalidate()
+      toast.success(`${plan.name} verwijderd`)
+      onClose()
+      onDeleted?.()
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{plan.name} verwijderen</DialogTitle>
+          <DialogDescription>
+            Het plan en de {plan.weeks} {plan.weeks === 1 ? 'week' : 'weken'} die erin zitten
+            verdwijnen. Atleten die dit plan al op hun kalender hebben staan houden hun weken:
+            die zijn een kopie. Dit kun je niet terugdraaien.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex justify-end gap-2">
+          <DarkButton variant="secondary" onClick={onClose} disabled={remove.isPending}>
+            Annuleren
+          </DarkButton>
+          <DarkButton
+            variant="danger"
+            onClick={() => remove.mutate({ id: plan.id })}
+            disabled={remove.isPending}
+            loading={remove.isPending}
+          >
+            Verwijderen
           </DarkButton>
         </div>
       </DialogContent>
