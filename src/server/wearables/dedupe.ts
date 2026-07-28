@@ -85,6 +85,11 @@ export async function findCrossSourceDuplicate(
  * duplicaat-payload — bv. Strava heeft tempo/afstand, de watch heeft HR-zones.
  * Bestaande waarden en de bron/externalId blijven onaangetast; rpe alleen als
  * de rij niet handmatig beoordeeld is.
+ *
+ * Is de hartslag handmatig gecorrigeerd (`hrOverriddenAt`), dan blijven álle
+ * HR-velden leeg-of-niet met rust. Een leeggemaakte `series` is daar een
+ * bewuste keuze — zonder deze check zou de andere bron hem gewoon weer vullen
+ * met dezelfde onbruikbare meting.
  */
 export async function enrichExistingLog(
   prisma: Db,
@@ -104,19 +109,21 @@ export async function enrichExistingLog(
     where: { id: existing.id },
     select: {
       distanceM: true, avgHeartRate: true, maxHeartRate: true, calories: true,
-      rpe: true, timeInZones: true, series: true, avgPaceSecPerKm: true, ratedAt: true,
+      rpe: true, timeInZones: true, series: true, avgPaceSecPerKm: true,
+      ratedAt: true, hrOverriddenAt: true,
     },
   })
   if (!row) return
+  const hrLocked = row.hrOverriddenAt != null
   const patch: Record<string, unknown> = {}
   if (row.distanceM == null && incoming.distanceM != null) patch.distanceM = incoming.distanceM
-  if (row.avgHeartRate == null && incoming.avgHeartRate != null) patch.avgHeartRate = incoming.avgHeartRate
-  if (row.maxHeartRate == null && incoming.maxHeartRate != null) patch.maxHeartRate = incoming.maxHeartRate
+  if (!hrLocked && row.avgHeartRate == null && incoming.avgHeartRate != null) patch.avgHeartRate = incoming.avgHeartRate
+  if (!hrLocked && row.maxHeartRate == null && incoming.maxHeartRate != null) patch.maxHeartRate = incoming.maxHeartRate
   if (row.calories == null && incoming.calories != null) patch.calories = incoming.calories
   if (row.avgPaceSecPerKm == null && incoming.avgPaceSecPerKm != null) patch.avgPaceSecPerKm = incoming.avgPaceSecPerKm
-  if (row.timeInZones == null && incoming.timeInZones != null) patch.timeInZones = incoming.timeInZones
-  if (row.series == null && incoming.series != null) patch.series = incoming.series
-  if (row.rpe == null && row.ratedAt == null && incoming.rpe != null) patch.rpe = incoming.rpe
+  if (!hrLocked && row.timeInZones == null && incoming.timeInZones != null) patch.timeInZones = incoming.timeInZones
+  if (!hrLocked && row.series == null && incoming.series != null) patch.series = incoming.series
+  if (!hrLocked && row.rpe == null && row.ratedAt == null && incoming.rpe != null) patch.rpe = incoming.rpe
   if (Object.keys(patch).length > 0) {
     await prisma.cardioLog.update({ where: { id: existing.id }, data: patch })
   }

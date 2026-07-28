@@ -798,6 +798,13 @@ model CardioLog {
   // Gezet zodra de gebruiker de activiteit heeft beoordeeld (RPE/gevoel/notitie).
   // NULL = nog niet beoordeeld → gesyncte activiteiten met NULL triggeren de popup.
   ratedAt               DateTime?
+  // Handmatig gecorrigeerde hartslag. Een optische sensor kan vastlopen (hele
+  // rit exact dezelfde bpm, of cadans-lock) en dan is de gesyncte HR onbruikbaar.
+  // Staat dit gevuld, dan laat élke hersync de HR-velden met rust:
+  // avgHeartRate, maxHeartRate, series, timeInZones én de uit HR afgeleide rpe.
+  // Zonder deze vlag zet de eerstvolgende sync (anchor-reset, herinstallatie,
+  // Strava-hersync) de foute waarden gewoon terug.
+  hrOverriddenAt        DateTime?
   painLevel             Int? // 0-10
   notes                 String?
   intervals             Json? // werkelijk gelogde interval-breakdown [{ label, type, durationSec, distanceM?, avgHeartRate? }]

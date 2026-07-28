@@ -8,7 +8,7 @@
  */
 import type { CardioActivity, PrismaClient } from '@prisma/client'
 import { resolveMaxHr } from '@/lib/cardio-zones'
-import { rpeFromHeartRate } from '@/server/wearables/ingest'
+import { rpeFromHeartRate, updateExistingSyncedLog } from '@/server/wearables/ingest'
 import { findCrossSourceDuplicate, enrichExistingLog } from '@/server/wearables/dedupe'
 import { getValidAccessToken, stravaGet } from './oauth'
 
@@ -165,35 +165,26 @@ export async function syncStravaActivities(prisma: Db, userId: string, opts?: { 
       completedAt: a.start_date ? new Date(a.start_date) : new Date(),
     }
     const externalId = `strava:${a.id}`
-    // Atomisch t.o.v. gelijktijdig beoordelen: de ratedAt-conditie zit in de
-    // WHERE zelf, dus een parallelle sync kan een net-ingevulde RPE nooit
-    // overschrijven (de rated-tak raakt rpe niet aan).
-    const upd = await prisma.cardioLog.updateMany({
-      where: { patientId: userId, externalId, ratedAt: null },
-      data,
-    })
-    if (upd.count === 0) {
-      const updRated = await prisma.cardioLog.updateMany({
-        where: { patientId: userId, externalId },
-        data: { ...data, rpe: undefined },
-      })
-      if (updRated.count === 0) {
-        // Cross-source check: dezelfde workout kan al via de Apple Watch-sync
-        // binnen zijn. Tijd-overlap = zelfde training → niet dupliceren, alleen
-        // ontbrekende velden (bv. tempo/afstand) op de bestaande rij aanvullen.
-        const dup = await findCrossSourceDuplicate(prisma, userId, data.completedAt, durationSec, 'STRAVA')
-        if (dup) {
-          await enrichExistingLog(prisma, dup, data)
-        } else {
-          try {
-            await prisma.cardioLog.create({
-              data: { id: createId(), patientId: userId, externalId, ...data },
-            })
-          } catch (err) {
-            // P2002 = parallelle sync creëerde de rij zojuist; die is dan al bijgewerkt.
-            if (!(err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === 'P2002')) {
-              throw err
-            }
+    // Atomisch t.o.v. gelijktijdig beoordelen én t.o.v. een handmatig
+    // gecorrigeerde hartslag: beide sloten zitten in de WHERE zelf, dus een
+    // parallelle sync kan ze niet overrijden.
+    const existed = await updateExistingSyncedLog(prisma, userId, externalId, data)
+    if (!existed) {
+      // Cross-source check: dezelfde workout kan al via de Apple Watch-sync
+      // binnen zijn. Tijd-overlap = zelfde training → niet dupliceren, alleen
+      // ontbrekende velden (bv. tempo/afstand) op de bestaande rij aanvullen.
+      const dup = await findCrossSourceDuplicate(prisma, userId, data.completedAt, durationSec, 'STRAVA')
+      if (dup) {
+        await enrichExistingLog(prisma, dup, data)
+      } else {
+        try {
+          await prisma.cardioLog.create({
+            data: { id: createId(), patientId: userId, externalId, ...data },
+          })
+        } catch (err) {
+          // P2002 = parallelle sync creëerde de rij zojuist; die is dan al bijgewerkt.
+          if (!(err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === 'P2002')) {
+            throw err
           }
         }
       }

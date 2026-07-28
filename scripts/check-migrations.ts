@@ -87,6 +87,18 @@ const checks: Check[] = [
       }
     },
   },
+  {
+    name: 'cardio_logs.hrOverriddenAt kolom',
+    migration: '20260726_cardio_hr_override.sql',
+    run: async () => {
+      try {
+        await prisma.$queryRaw`SELECT "hrOverriddenAt" FROM cardio_logs LIMIT 1`
+        return true
+      } catch {
+        return false
+      }
+    },
+  },
 ]
 
 async function main() {

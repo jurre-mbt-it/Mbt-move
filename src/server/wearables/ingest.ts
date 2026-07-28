@@ -187,6 +187,50 @@ async function resolveMaxHrWithMeasured(
   return null
 }
 
+/**
+ * Bestaande gesyncte cardio-rij bijwerken, met respect voor de twee
+ * hand-gezette sloten op zo'n rij. Retourneert false als de rij niet bestaat
+ * (dan volgt de dedupe/create-tak bij de aanroeper).
+ *
+ * - `ratedAt` → de gebruiker heeft zelf een RPE ingevuld; die blijft staan.
+ * - `hrOverriddenAt` → de hartslag is handmatig gecorrigeerd omdat de sensor
+ *   onzin mat; alle HR-velden blijven staan, inclusief de daaruit afgeleide rpe.
+ *
+ * De sloten zitten in de WHERE, niet in een lees-dan-schrijf, zodat een
+ * gelijktijdige beoordeel-popup of parallelle sync ze niet kan overrijden. De
+ * vier varianten sluiten elkaar uit, dus precies één raakt de rij.
+ */
+export async function updateExistingSyncedLog(
+  prisma: Pick<PrismaClient, 'cardioLog'>,
+  userId: string,
+  externalId: string,
+  data: Record<string, unknown>,
+): Promise<boolean> {
+  // `undefined` = Prisma laat het veld ongemoeid.
+  const hrUntouched = {
+    avgHeartRate: undefined,
+    maxHeartRate: undefined,
+    series: undefined,
+    timeInZones: undefined,
+    rpe: undefined,
+  }
+  const variants = [
+    { lock: { ratedAt: null, hrOverriddenAt: null }, data },
+    { lock: { ratedAt: { not: null }, hrOverriddenAt: null }, data: { ...data, rpe: undefined } },
+    { lock: { ratedAt: null, hrOverriddenAt: { not: null } }, data: { ...data, ...hrUntouched } },
+    { lock: { ratedAt: { not: null }, hrOverriddenAt: { not: null } }, data: { ...data, ...hrUntouched } },
+  ] as const
+
+  for (const v of variants) {
+    const res = await prisma.cardioLog.updateMany({
+      where: { patientId: userId, externalId, ...v.lock },
+      data: v.data,
+    })
+    if (res.count > 0) return true
+  }
+  return false
+}
+
 export async function ingestWearableData(
   prisma: Db,
   userId: string,
@@ -244,35 +288,25 @@ export async function ingestWearableData(
 
     // Key op (patientId, externalId): een door de client aangeleverde
     // HealthKit-UUID kan zo nooit de cardio-rij van een ándere patiënt raken.
-    // Atomische rated-bescherming: de ratedAt-conditie zit in de WHERE, dus een
-    // door de gebruiker ingevulde RPE wordt nooit overschreven — ook niet bij
-    // een race met de beoordeel-popup (anchor-reset levert workouts opnieuw).
-    const upd = await prisma.cardioLog.updateMany({
-      where: { patientId: userId, externalId: w.externalId, ratedAt: null },
-      data,
-    })
-    if (upd.count === 0) {
-      const updRated = await prisma.cardioLog.updateMany({
-        where: { patientId: userId, externalId: w.externalId },
-        data: { ...data, rpe: undefined },
-      })
-      if (updRated.count === 0) {
-        // Cross-source check: dezelfde workout kan al via Strava binnen zijn
-        // (of andersom). Tijd-overlap = zelfde training → niet dupliceren,
-        // alleen ontbrekende velden op de bestaande rij aanvullen.
-        const dup = await findCrossSourceDuplicate(prisma, userId, completedAt, w.durationSec, 'APPLE_WATCH')
-        if (dup) {
-          await enrichExistingLog(prisma, dup, data)
-        } else {
-          try {
-            await prisma.cardioLog.create({
-              data: { id: createId(), patientId: userId, externalId: w.externalId, ...data },
-            })
-          } catch (err) {
-            // P2002 = parallelle sync creëerde de rij zojuist; die is dan al bijgewerkt.
-            if (!(err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === 'P2002')) {
-              throw err
-            }
+    // `updateExistingSyncedLog` bewaakt de hand-gezette RPE en een handmatig
+    // gecorrigeerde hartslag (anchor-reset levert workouts opnieuw aan).
+    const existed = await updateExistingSyncedLog(prisma, userId, w.externalId, data)
+    if (!existed) {
+      // Cross-source check: dezelfde workout kan al via Strava binnen zijn
+      // (of andersom). Tijd-overlap = zelfde training → niet dupliceren,
+      // alleen ontbrekende velden op de bestaande rij aanvullen.
+      const dup = await findCrossSourceDuplicate(prisma, userId, completedAt, w.durationSec, 'APPLE_WATCH')
+      if (dup) {
+        await enrichExistingLog(prisma, dup, data)
+      } else {
+        try {
+          await prisma.cardioLog.create({
+            data: { id: createId(), patientId: userId, externalId: w.externalId, ...data },
+          })
+        } catch (err) {
+          // P2002 = parallelle sync creëerde de rij zojuist; die is dan al bijgewerkt.
+          if (!(err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === 'P2002')) {
+            throw err
           }
         }
       }
