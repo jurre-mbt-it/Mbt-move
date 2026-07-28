@@ -44,7 +44,7 @@ import {
   type CardioActivityKey, type CardioProtocolKey, type HRZone, type CardioInterval,
 } from '@/lib/cardio-constants'
 import { ApplyPlanDialog, SavePlanDialog } from '@/components/week-planner/PlanTemplateDialogs'
-import { sumPlannedLoad, loadVerdict } from '@/lib/planned-load'
+import { sumPlannedLoad, loadVerdict, cardioEstimate } from '@/lib/planned-load'
 import { CardioWorkoutBuilder } from '@/components/week-planner/CardioWorkoutBuilder'
 import { readWorkout, summarize as summarizeWorkout, totalDurationSec as workoutDuration, structuredLoad, type StructuredCardio } from '@/lib/cardio-workout'
 import { AddItemModal, type AddItemPayload } from '@/components/week-planner/AddItemModal'
@@ -703,7 +703,12 @@ function WeekTotals({ dates, itemsFor, cardio, sessions }: {
       if (!isWorkoutKind(it.kind)) continue
       if (it.id.startsWith('sessionlog-') || it.id.startsWith('cardiolog-')) continue
       if (it.quickCategory === 'CARDIO') {
-        const sec = it.plannedDurationSec ?? it.cardioParams?.durationSec ?? it.quickDurationSec ?? 0
+        // Bewust `||` en niet `??`: bij cardio op afstand staat er wél een
+        // durationSec, maar die is 0 (legacySummaryFields telt alleen tijd-
+        // stappen). Met `??` won die nul en telde een duurloop van 29 km voor
+        // nul minuten in de hardloop-strook.
+        const sec = it.plannedDurationSec || it.cardioParams?.durationSec
+          || it.quickDurationSec || cardioEstimate(it.cardioParams)?.durationSec || 0
         plan[activityGroup(it.cardioParams?.activity ?? it.quickActivity ?? null)] += sec
       } else {
         plan.krachtN++
@@ -2102,6 +2107,9 @@ function WeekPlannerContent() {
         plannedRpe: i.plannedRpe ?? null,
         quickCategory: i.quickCategory,
         quickDurationSec: i.quickDurationSec,
+        // Zonder dit telt een duurloop die op afstand is voorgeschreven voor 0:
+        // de duur zit alleen in de blokken. Zie cardioEstimate.
+        cardioParams: i.cardioParams,
         exercises: i.exercises?.map(e => ({ sets: e.sets, reps: e.reps, repUnit: e.repUnit, restTime: e.restTime })),
       }))))
     }

@@ -20,6 +20,7 @@ import { trpc } from '@/lib/trpc/client'
 import { usePortal } from '@/lib/portal'
 import { CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
 import { readWorkout, type StructuredCardio } from '@/lib/cardio-workout'
+import { cardioEstimate } from '@/lib/planned-load'
 import { CardioWorkoutBuilder } from '@/components/week-planner/CardioWorkoutBuilder'
 import {
   QuickExerciseBuilder,
@@ -499,6 +500,17 @@ function PlanItemDialog({
    * misleidend, dus dan tonen we het afgeleide getal in plaats daarvan.
    */
   const heeftInhoud = (inhoud?.exercises?.length ?? 0) > 0 || !!workout
+  /**
+   * Cardio op afstand levert geen duur uit de blokken. Zonder dit stond hier
+   * een streepje terwijl de weekbalk wél een getal toonde — twee schermen die
+   * elkaar tegenspreken. Zie cardioEstimate in lib/planned-load.
+   */
+  const geschatteMinuten = minuten
+    ? ''
+    : (() => {
+        const est = cardioEstimate(inhoud?.cardioParams)
+        return est ? String(Math.round(est.durationSec / 60)) : ''
+      })()
 
   const ververs = () => {
     utils.weekSchedules.listWithItems.invalidate({ planTemplateId: planId })
@@ -564,8 +576,10 @@ function PlanItemDialog({
               <MetaLabel>Duur (min)</MetaLabel>
               {heeftInhoud ? (
                 <p style={{ color: P.ink, fontSize: 14, paddingTop: 8 }}>
-                  {minuten || '—'}{' '}
-                  <span style={{ color: P.inkDim, fontSize: 11 }}>uit de inhoud</span>
+                  {minuten || geschatteMinuten || '—'}{' '}
+                  <span style={{ color: P.inkDim, fontSize: 11 }}>
+                    {minuten ? 'uit de inhoud' : geschatteMinuten ? 'geschat uit de afstand' : 'uit de inhoud'}
+                  </span>
                 </p>
               ) : (
                 <DarkInput

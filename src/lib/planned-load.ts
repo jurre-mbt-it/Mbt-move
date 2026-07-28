@@ -10,6 +10,9 @@
  * getal mag niet doen alsof het een voorschrift is.
  */
 
+import { readWorkout, flattenSteps, targetRpe } from './cardio-workout'
+import type { CardioActivityKey } from './cardio-constants'
+
 export type PlannedLoadInput = {
   kind: string
   plannedDurationSec?: number | null
@@ -18,6 +21,12 @@ export type PlannedLoadInput = {
   quickDurationSec?: number | null
   /** Inline oefeningen — gebruikt om duur te schatten als die ontbreekt. */
   exercises?: { sets: number; reps: number; repUnit?: string | null; restTime?: number | null }[]
+  /**
+   * Ruwe `cardioParams` van het item. Nodig omdat een cardio-workout op
+   * AFSTAND geen duur oplevert: `totalDurationSec` telt alleen `durationSec`,
+   * dus een duurloop van 29 km kwam op 0 uit en telde niet mee in de weekbalk.
+   */
+  cardioParams?: unknown
 }
 
 /**
@@ -46,6 +55,67 @@ const DEFAULT_REST_SEC = 60
  * (lib/prescription-mirror.ts); `npm run check:mirror` vergelijkt de waarde.
  */
 const SECONDS_PER_METER = 2
+
+/**
+ * Seconden per kilometer per cardio-activiteit, als vangnet voor een workout
+ * die op AFSTAND is voorgeschreven ("lange duurloop 29 km") en dus geen duur
+ * heeft. Rustig-aeroob tempo van een recreatieve sporter.
+ *
+ * Nadrukkelijk een schatting, geen voorschrift: er is geen drempel of tempo per
+ * patiënt opgeslagen (zie de kop van lib/cardio-workout.ts), dus dit is de
+ * enige manier om zo'n sessie überhaupt mee te laten tellen. Alles wat hierop
+ * leunt komt terug als `estimated: true`, en de therapeut kan het overschrijven
+ * met `plannedDurationSec`.
+ *
+ * LET OP: dit is iets ánders dan SECONDS_PER_METER hierboven. Dat gaat over
+ * belaste verplaatsing in een krachtoefening (2 sec/m ≈ 33 min per km) en is
+ * gespiegeld met de mobiele repo; deze tabel is web-only.
+ */
+const SEC_PER_KM: Partial<Record<CardioActivityKey, number>> = {
+  RUNNING: 390,      // 6:30 min/km
+  WALKING: 750,      // 12:30 min/km
+  CYCLING: 150,      // 24 km/u
+  SWIMMING: 1500,    // 2:30 min/100 m
+  ROWING: 300,       // 2:30 min/500 m
+  SKIERG: 300,
+  CROSSTRAINER: 300,
+}
+/** Onbekende activiteit → hardlooptempo; dat is de veruit gebruikelijkste. */
+const SEC_PER_KM_FALLBACK = 390
+
+export type CardioEstimate = { durationSec: number; load: number; rpe: number }
+
+/**
+ * Duur, belasting en gemiddelde RPE van een gestructureerde cardio-workout,
+ * met afstand-stappen omgerekend naar tijd.
+ *
+ * Dit is `structuredLoad` + `totalDurationSec` in één pas, maar dan met de
+ * afstand-tak erbij: die twee doen `st.durationSec ?? 0` en laten een
+ * afstand-stap dus als nul meetellen. Retourneert null als er niets te rekenen
+ * valt, zodat de aanroeper zijn eigen vangnet houdt.
+ */
+export function cardioEstimate(raw: unknown): CardioEstimate | null {
+  const w = readWorkout(raw)
+  if (!w) return null
+  const secPerKm = SEC_PER_KM[w.activity] ?? SEC_PER_KM_FALLBACK
+
+  let sec = 0
+  let load = 0
+  for (const st of flattenSteps(w.blocks)) {
+    // Duur wint; een stap heeft er per contract precies één van beide.
+    const d = st.durationSec ?? (st.distanceM != null ? (st.distanceM / 1000) * secPerKm : 0)
+    if (d <= 0) continue
+    sec += d
+    load += (d / 60) * targetRpe(st.target)
+  }
+  if (sec <= 0) return null
+
+  return {
+    durationSec: Math.round(sec),
+    load: Math.round(load),
+    rpe: Math.round((load / (sec / 60)) * 10) / 10,
+  }
+}
 
 /**
  * De eenheid van `reps` bepaalt wat het getal betékent, en dus hoe lang de set
@@ -119,6 +189,16 @@ export function itemPlannedLoad(item: PlannedLoadInput): PlannedLoad {
 
   // ── Duur ──
   let durationSec = item.plannedDurationSec ?? item.quickDurationSec ?? null
+  // Cardio op afstand levert geen duur; reken 'm uit de blokken. Dit staat
+  // vóór de oefening-tak omdat een cardio-item geen inline oefeningen heeft.
+  let cardio: CardioEstimate | null = null
+  if (durationSec == null || durationSec <= 0) {
+    cardio = cardioEstimate(item.cardioParams)
+    if (cardio) {
+      durationSec = cardio.durationSec
+      estimated = true
+    }
+  }
   if (durationSec == null && item.exercises?.length) {
     durationSec = durationFromExercises(item.exercises)
     estimated = true
@@ -134,7 +214,14 @@ export function itemPlannedLoad(item: PlannedLoadInput): PlannedLoad {
   if (item.plannedDurationSec == null) estimated = true
 
   // ── RPE ──
+  // Voorschrift van de therapeut wint. Daarna het gewogen gemiddelde uit de
+  // cardio-blokken: die dragen hun eigen doelen, dus een intervalsessie hoeft
+  // niet terug te vallen op de categorie-gemiddelde 5.
   let rpe = item.plannedRpe ?? null
+  if (rpe == null && cardio) {
+    rpe = cardio.rpe
+    estimated = true
+  }
   if (rpe == null) {
     rpe = DEFAULT_RPE[item.quickCategory ?? ''] ?? FALLBACK_RPE
     estimated = true
