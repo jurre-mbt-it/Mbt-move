@@ -431,6 +431,56 @@ export const wearablesRouter = createTRPCRouter({
       return { ok: true }
     }),
 
+  /**
+   * Corrigeer de hartslag van een gesynchroniseerde activiteit handmatig.
+   *
+   * De sensor meet soms onzin (natte band, koud weer, cadans-koppeling), en dan
+   * vervuilt één sessie de zones en de belasting. Deze mutatie zet de
+   * gecorrigeerde waarden én stempelt `hrOverriddenAt`. Dat stempel is precies
+   * wat de sync-kant al respecteert: `updateExistingSyncedLog` en
+   * `enrichExistingLog` laten alle HR-velden staan zodra het gezet is, dus een
+   * volgende sync van de watch overschrijft de correctie niet meer.
+   *
+   * Alleen de eigenaar corrigeert: de WHERE bindt op `patientId`, dus een
+   * therapeut kan dit niet namens een patiënt doen (zelfde regel als
+   * `rateActivity`). `count === 0` betekent "bestaat niet of niet van jou" —
+   * bewust niet te onderscheiden.
+   *
+   * `timeInZones` blijft staan: dat komt uit het histogram van de sensor en is
+   * niet herleidbaar uit een gecorrigeerd gemiddelde. De zone-verdeling van zo'n
+   * sessie blijft dus zo onbetrouwbaar als de meting was.
+   */
+  correctHeartRate: wearablesProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        avgHeartRate: z.number().int().min(30).max(230).nullable(),
+        maxHeartRate: z.number().int().min(30).max(230).nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (
+        input.avgHeartRate != null &&
+        input.maxHeartRate != null &&
+        input.maxHeartRate < input.avgHeartRate
+      ) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'De maximale hartslag kan niet lager zijn dan de gemiddelde.',
+        })
+      }
+      const res = await ctx.prisma.cardioLog.updateMany({
+        where: { id: input.id, patientId: ctx.user!.id },
+        data: {
+          avgHeartRate: input.avgHeartRate,
+          maxHeartRate: input.maxHeartRate,
+          hrOverriddenAt: new Date(),
+        },
+      })
+      if (res.count === 0) throw new TRPCError({ code: 'NOT_FOUND' })
+      return { ok: true }
+    }),
+
   /** Therapeut/admin: wearable-overzicht van een patiënt (na toegangscheck). */
   forPatient: wearablesProcedure
     .input(z.object({ patientId: z.string() }))

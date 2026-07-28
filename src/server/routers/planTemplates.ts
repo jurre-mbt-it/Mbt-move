@@ -47,7 +47,16 @@ function canEdit(
   if (user.role === 'COACH') return tpl.creatorId === user.id
   // Seed-tak, maar niet voor plannen van een coach: die zijn privé, ook al
   // hebben ze geen praktijk.
-  if (tpl.practiceId === null && tpl.creator?.role !== 'COACH') return true
+  //
+  // Let op de eigenaarscheck: een therapeut ZONDER praktijk maakt zelf ook
+  // plannen met practiceId null (createEmpty/saveFromWeeks schrijven
+  // `practiceId: ctx.user.practiceId ?? null`). Zonder die check zijn die niet
+  // te onderscheiden van een globale seed en kan een therapeut uit een ándere
+  // praktijk ze bewerken of verwijderen — en `delete` cascadeert door naar de
+  // weekschema's van het plan.
+  if (tpl.practiceId === null && tpl.creator?.role !== 'COACH') {
+    return user.practiceId !== null || tpl.creatorId === user.id
+  }
   return !!user.practiceId && tpl.practiceId === user.practiceId
 }
 
@@ -57,6 +66,25 @@ function assertCanEdit(
 ) {
   if (!canEdit(user, tpl)) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Geen toegang tot dit plan' })
+  }
+}
+
+/**
+ * Maakt de aanname van de seed-tak wáár bij de bron.
+ *
+ * `practiceId null` betekent twee dingen tegelijk: "globale seed, door iedereen
+ * bewerkbaar" én "gemaakt door iemand zonder praktijk". Zolang beide kunnen
+ * bestaan, leest het plan van een praktijkloze therapeut als seed en kan een
+ * therapeut uit een ándere praktijk het bewerken of verwijderen (cascade over
+ * de weekschema's). Een ADMIN mag zulke seeds wél maken — dat is de bedoelde
+ * route — en een COACH is al afgeschermd via de creator-rolcheck in `canEdit`.
+ */
+function assertCanOwnPlan(user: { role: string; practiceId: string | null }) {
+  if (user.role === 'THERAPIST' && !user.practiceId) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Je account hangt nog niet aan een praktijk; vraag een beheerder je te koppelen.',
+    })
   }
 }
 
@@ -213,6 +241,7 @@ export const planTemplatesRouter = createTRPCRouter({
       description: z.string().max(2000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      assertCanOwnPlan(ctx.user)
       const tpl = await ctx.prisma.weekPlanTemplate.create({
         data: {
           name: input.name.trim(),
@@ -257,6 +286,7 @@ export const planTemplatesRouter = createTRPCRouter({
       goal: z.string().max(500).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      assertCanOwnPlan(ctx.user)
       await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
 
       if (!isDateKey(input.fromDate) || !isDateKey(input.toDate)) {
