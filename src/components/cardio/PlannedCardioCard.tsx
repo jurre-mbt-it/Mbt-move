@@ -11,9 +11,10 @@
 
 import { HR_ZONES } from '@/lib/cardio-constants'
 import {
-  STEP_META, isRepeat, targetColor, targetHeight, totalDurationSec,
+  STEP_META, isRepeat, targetColor, totalDurationSec,
   type StructuredCardio, type WorkoutStep,
 } from '@/lib/cardio-workout'
+import { cardioChartBars } from '@/lib/cardio-chart'
 import { P } from '@/components/dark-ui'
 
 const stepLen = (s: WorkoutStep) =>
@@ -35,23 +36,10 @@ const stepTarget = (s: WorkoutStep) =>
 export function PlannedCardioCard({ workout }: { workout: StructuredCardio }) {
   const dur = totalDurationSec(workout.blocks)
 
-  // Grafiek: breedte naar rato van de duur, hoogte = intensiteit.
-  const bars: { id: string; w: number; h: number; color: string }[] = []
-  for (const b of workout.blocks) {
-    if (isRepeat(b)) {
-      for (const s of b.steps) {
-        bars.push({
-          id: `${b.id}-${s.id}`,
-          w: (s.durationSec ?? 120) * b.times,
-          h: targetHeight(s.target),
-          color: targetColor(s.target),
-        })
-      }
-    } else {
-      bars.push({ id: b.id, w: b.durationSec ?? 120, h: targetHeight(b.target), color: targetColor(b.target) })
-    }
-  }
-  const total = bars.reduce((s, b) => s + b.w, 0) || 1
+  // Grafiek: breedte naar rato van de duur, hoogte = intensiteit. Herhalingen
+  // staan uitgevouwen (werk/rust/werk/rust), zie lib/cardio-chart.
+  const bars = cardioChartBars(workout.blocks)
+  const total = bars.reduce((s, b) => s + b.sec, 0) || 1
 
   return (
     <div className="rounded-xl p-3" style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}>
@@ -63,9 +51,9 @@ export function PlannedCardioCard({ workout }: { workout: StructuredCardio }) {
       <div className="flex items-end gap-px h-[52px] mb-2.5">
         {bars.map(b => (
           <span
-            key={b.id}
+            key={b.key}
             style={{
-              width: `${(b.w / total) * 100}%`,
+              width: `${(b.sec / total) * 100}%`,
               height: `${Math.max(10, b.h * 100)}%`,
               background: b.color,
               opacity: 0.85,

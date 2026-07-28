@@ -34,10 +34,11 @@ import {
   HR_ZONES, CARDIO_ACTIVITIES, type CardioActivityKey, type HRZone,
 } from '@/lib/cardio-constants'
 import {
-  STEP_META, IS_RAMP, isRepeat, targetColor, targetHeight, summarize,
+  STEP_META, IS_RAMP, isRepeat, targetColor, summarize,
   totalDurationSec, totalDistanceM, structuredLoad,
   type StepKind, type StructuredCardio, type WorkoutBlock, type WorkoutStep,
 } from '@/lib/cardio-workout'
+import { cardioChartBars } from '@/lib/cardio-chart'
 import {
   DarkButton, DarkDialog as Dialog, DarkDialogContent as DialogContent,
   DarkDialogHeader as DialogHeader, DarkDialogTitle as DialogTitle,
@@ -384,21 +385,9 @@ function WorkoutChart({
   blocks, selectedId, onSelect,
 }: { blocks: WorkoutBlock[]; selectedId: string | null; onSelect: (id: string) => void }) {
   // Breedte naar rato van de duur; blokken op afstand krijgen een vaste breedte
-  // want zonder tempo is hun duur niet bekend.
-  const FALLBACK = 120
-  const flat: { id: string; kind: string; sec: number; color: string; h: number; rep?: number }[] = []
-  for (const b of blocks) {
-    if (isRepeat(b)) {
-      for (const s of b.steps) {
-        flat.push({
-          id: s.id, kind: s.kind, sec: (s.durationSec ?? FALLBACK) * b.times,
-          color: targetColor(s.target), h: targetHeight(s.target), rep: b.times,
-        })
-      }
-    } else {
-      flat.push({ id: b.id, kind: b.kind, sec: b.durationSec ?? FALLBACK, color: targetColor(b.target), h: targetHeight(b.target) })
-    }
-  }
+  // want zonder tempo is hun duur niet bekend. Herhalingen staan uitgevouwen —
+  // werk/rust/werk/rust — zie lib/cardio-chart.
+  const flat = cardioChartBars(blocks)
   const total = flat.reduce((s, f) => s + f.sec, 0) || 1
 
   return (
@@ -411,24 +400,29 @@ function WorkoutChart({
           <div className="w-full h-full grid place-items-center text-[11px]" style={{ color: P.inkDim }}>
             De workout verschijnt hier
           </div>
-        ) : flat.map(f => (
-          <button
-            key={f.id}
-            type="button"
-            onClick={() => onSelect(f.id)}
-            title={`${STEP_META[f.kind as StepKind]?.label ?? f.kind}${f.rep ? ` (${f.rep}×)` : ''}`}
-            className="relative transition-opacity hover:opacity-90"
-            style={{
-              width: `${(f.sec / total) * 100}%`,
-              height: `${Math.max(8, f.h * 100)}%`,
-              background: f.color,
-              opacity: selectedId === f.id ? 1 : 0.72,
-              outline: selectedId === f.id ? `2px solid ${P.ink}` : 'none',
-              outlineOffset: -2,
-              minWidth: 2,
-            }}
-          />
-        ))}
+        ) : flat.map(f => {
+          // Rondes van dezelfde herhaalstap delen één stepId, dus lichten ze
+          // samen op. Dat klopt: het is één stap die je bewerkt.
+          const active = selectedId === f.stepId
+          return (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => onSelect(f.stepId)}
+              title={`${STEP_META[f.kind]?.label ?? f.kind}${f.rounds ? ` — ronde ${f.round} van ${f.rounds}` : ''}`}
+              className="relative transition-opacity hover:opacity-90"
+              style={{
+                width: `${(f.sec / total) * 100}%`,
+                height: `${Math.max(8, f.h * 100)}%`,
+                background: f.color,
+                opacity: active ? 1 : 0.72,
+                outline: active ? `2px solid ${P.ink}` : 'none',
+                outlineOffset: -2,
+                minWidth: 2,
+              }}
+            />
+          )
+        })}
       </div>
     </div>
   )
