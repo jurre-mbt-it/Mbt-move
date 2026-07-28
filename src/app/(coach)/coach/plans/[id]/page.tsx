@@ -28,6 +28,7 @@ import {
   type ItemExercise,
 } from '@/components/week-planner/QuickExerciseBuilder'
 import { DeletePlanDialog } from '@/components/week-planner/PlanTemplateDialogs'
+import { WorkoutProfileStrip } from '@/components/week-planner/WorkoutProfileStrip'
 import {
   DarkButton,
   DarkDialog as Dialog,
@@ -111,6 +112,23 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
     [weeks],
   )
 
+  /**
+   * De inhoud van álle items in één query, zodat de tegels hun profiel kunnen
+   * tekenen. `listWithItems` laat `cardioParams` bewust weg (te zwaar voor een
+   * lijst), en de item-dialoog haalde dit tot nu toe pas op bij openen.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: alleInhoud = [] } = (trpc.weekSchedules.listItemContents.useQuery as any)(
+    { patientId: '', planTemplateId: planId },
+    { staleTime: 10_000 },
+  ) as { data: Array<{ itemId: string; exercises: ItemExercise[]; cardioParams: unknown }> }
+
+  const inhoudPerItem = useMemo(() => {
+    const m = new Map<string, { exercises: ItemExercise[]; cardioParams: unknown }>()
+    for (const c of alleInhoud) m.set(c.itemId, { exercises: c.exercises, cardioParams: c.cardioParams })
+    return m
+  }, [alleInhoud])
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -174,34 +192,60 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
                       {DAY_SHORT[day.dayOfWeek]}
                     </p>
 
-                    {day.items.map((item) => (
-                      <div
-                        key={item.id}
-                        className="mb-1 flex items-start gap-1 rounded px-1.5 py-1"
-                        style={{ background: P.surfaceHi }}
-                      >
-                        {/* Klikken opent de inhoud. Zonder dit kon je in een plan
-                            wel een workout neerzetten, maar er verder niets mee. */}
-                        <button
-                          type="button"
-                          onClick={() => setEditFor(item)}
-                          className="athletic-tap min-w-0 flex-1 truncate text-left"
-                          style={{ color: P.ink, fontSize: 11 }}
-                          title={`${item.program?.name ?? item.quickName ?? 'Workout'}, klik om te bewerken`}
+                    {day.items.map((item) => {
+                      const inhoud = inhoudPerItem.get(item.id)
+                      return (
+                        <div
+                          key={item.id}
+                          className="mb-1 rounded"
+                          style={{ background: P.surfaceHi }}
                         >
-                          {item.program?.name ?? item.quickName ?? 'Workout'}
-                        </button>
-                        <button
-                          type="button"
-                          aria-label="Verwijderen"
-                          onClick={() => removeItem.mutate({ id: item.id })}
-                          className="athletic-tap shrink-0"
-                          style={{ color: P.inkDim }}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ))}
+                          <div className="flex items-start gap-1 px-1.5 py-1">
+                            {/* Klikken opent de inhoud. Zonder dit kon je in een plan
+                                wel een workout neerzetten, maar er verder niets mee. */}
+                            <button
+                              type="button"
+                              onClick={() => setEditFor(item)}
+                              className="athletic-tap min-w-0 flex-1 truncate text-left"
+                              style={{ color: P.ink, fontSize: 11 }}
+                              title={`${item.program?.name ?? item.quickName ?? 'Workout'}, klik om te bewerken`}
+                            >
+                              {item.program?.name ?? item.quickName ?? 'Workout'}
+                            </button>
+                            <button
+                              type="button"
+                              aria-label="Verwijderen"
+                              onClick={() => removeItem.mutate({ id: item.id })}
+                              className="athletic-tap shrink-0"
+                              style={{ color: P.inkDim }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                          {/* Vorm van de workout: cardio-blokken als zaagtand,
+                              kracht als balkje per oefening. */}
+                          <WorkoutProfileStrip
+                            cardioParams={inhoud?.cardioParams}
+                            exercises={inhoud?.exercises}
+                            category={item.quickCategory}
+                            height={14}
+                          />
+                          {item.plannedRpe != null && (
+                            <div className="px-1.5 pb-1 -mt-0.5">
+                              <span
+                                className="athletic-mono"
+                                style={{
+                                  color: P.inkMuted, fontSize: 9, fontWeight: 800,
+                                  letterSpacing: '0.06em',
+                                }}
+                              >
+                                RPE {item.plannedRpe}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
 
                     <button
                       type="button"

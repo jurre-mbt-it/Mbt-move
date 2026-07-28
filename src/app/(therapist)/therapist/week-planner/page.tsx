@@ -48,6 +48,7 @@ import { sumPlannedLoad, loadVerdict, cardioEstimate } from '@/lib/planned-load'
 import { CardioWorkoutBuilder } from '@/components/week-planner/CardioWorkoutBuilder'
 import { readWorkout, summarize as summarizeWorkout, totalDurationSec as workoutDuration, structuredLoad, type StructuredCardio } from '@/lib/cardio-workout'
 import { AddItemModal, type AddItemPayload } from '@/components/week-planner/AddItemModal'
+import { WorkoutProfileStrip } from '@/components/week-planner/WorkoutProfileStrip'
 import {
   DarkButton,
   DarkDialog as Dialog,
@@ -560,6 +561,37 @@ function ItemTile({
           </button>
         )}
       </div>
+      {/* Profiel van wat er GEPLAND staat: cardio-blokken als zaagtand,
+          kracht als balkje per oefening. Alleen zolang er nog niets gelogd is;
+          daarna wint de gerealiseerde data hieronder, anders staan er twee
+          verhalen op één tegel. */}
+      {!marker && status !== 'completed' && status !== 'partial' && (
+        <>
+          <WorkoutProfileStrip
+            cardioParams={item.cardioParams}
+            exercises={item.exercises}
+            category={item.quickCategory}
+          />
+          {item.plannedRpe != null && (() => {
+            const m = rpeMeta(item.plannedRpe)
+            return (
+              <div className="px-2 pb-1.5 -mt-0.5">
+                <span
+                  className="athletic-mono inline-flex items-center"
+                  style={{
+                    background: m.bg, color: m.color, fontSize: 9, fontWeight: 900,
+                    letterSpacing: '0.06em', padding: '1px 6px', borderRadius: 999,
+                  }}
+                  title={`Voorgeschreven RPE ${item.plannedRpe}`}
+                >
+                  RPE {item.plannedRpe}
+                </span>
+              </div>
+            )
+          })()}
+        </>
+      )}
+
       {/* Gelogde data — afstand · duur · tempo + RPE/gevoel-chips, zoals in
           trainingskalenders. Alleen bij een gedane (of deels gedane) workout. */}
       {logged && (status === 'completed' || status === 'partial') && (() => {
