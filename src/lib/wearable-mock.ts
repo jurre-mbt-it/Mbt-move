@@ -220,6 +220,8 @@ export function mockOverview(days = 30, end: Date = new Date()) {
       source: 'APPLE_WATCH' as const,
       feelScore: null as number | null,
       ratedAt: null as string | null,
+      hrDismissedAt: null as string | null,
+      hrSuspect: false,
       completedAt: d.toISOString(),
     }
   })

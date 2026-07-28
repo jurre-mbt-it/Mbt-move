@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
-import type { PrismaClient } from '@prisma/client'
+import { Prisma, type PrismaClient } from '@prisma/client'
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -15,6 +15,8 @@ import { auditLog } from '@/server/audit'
 import { buildAuthorizeUrl, encryptToken, isStravaConfigured, openTokens } from '@/server/wearables/strava/config'
 import { syncStravaActivities } from '@/server/wearables/strava/sync'
 import { syncHashtagsForLog } from '@/server/tags'
+import { heartRateLooksImplausible } from '@/lib/heart-rate-plausibility'
+import { resolveMaxHr } from '@/lib/cardio-zones'
 
 /**
  * Uitrol-gate: wearables is voorlopig alleen voor de admin (zie
@@ -129,7 +131,17 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
     },
   })
 
-  const [connection, readiness, sleepAll, vitalsAll, activities, trend, stress, exertion] = await Promise.all([
+  // Max-HR van deze persoon; nodig om een onmogelijk hoog sessie-gemiddelde te
+  // herkennen. Lift mee op de bestaande parallelle fetch, dus geen extra wachttijd.
+  const hrProfilePromise = prisma.user
+    .findUnique({
+      where: { id: userId },
+      select: { maxHeartRate: true, restingHeartRate: true, dateOfBirth: true },
+    })
+    .then(p => (p ? resolveMaxHr(p)?.maxHr ?? null : null))
+    .catch(() => null)
+
+  const [connection, readiness, sleepAll, vitalsAll, activities, trend, stress, exertion, profileMaxHr] = await Promise.all([
     prisma.wearableConnection.findUnique({
       where: { userId_provider: { userId, provider: 'APPLE_HEALTH' } },
       select: { provider: true, deviceModel: true, enabled: true, lastSyncAt: true, connectedAt: true },
@@ -159,6 +171,7 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
       orderBy: { date: 'asc' },
       select: { date: true, trimp: true, activeSec: true, timeInZones: true },
     }),
+    hrProfilePromise,
   ])
 
   // Het overzicht toont een korter venster dan de readiness-historie.
@@ -221,6 +234,19 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
       source: a.source,
       feelScore: a.feelScore,
       ratedAt: a.ratedAt ? a.ratedAt.toISOString() : null,
+      /** Gezet zodra de sporter deze meting zelf als onbetrouwbaar markeerde. */
+      hrDismissedAt: a.hrOverriddenAt ? a.hrOverriddenAt.toISOString() : null,
+      /**
+       * Ziet de hartslag er onmogelijk uit? Bewust server-side berekend en niet
+       * in de app herhaald: gespiegelde rekenregels lopen hier uit elkaar (zie
+       * `npm run check:mirror`). Al genegeerd → geen vlag meer.
+       */
+      hrSuspect:
+        a.hrOverriddenAt == null &&
+        heartRateLooksImplausible(
+          { avgHeartRate: a.avgHeartRate, maxHeartRate: a.maxHeartRate },
+          profileMaxHr,
+        ),
       completedAt: a.completedAt.toISOString(),
     })),
     stress: stress.map(s => ({
@@ -432,52 +458,52 @@ export const wearablesRouter = createTRPCRouter({
     }),
 
   /**
-   * Corrigeer de hartslag van een gesynchroniseerde activiteit handmatig.
+   * Markeer de hartslagmeting van een activiteit als onbetrouwbaar.
    *
-   * De sensor meet soms onzin (natte band, koud weer, cadans-koppeling), en dan
-   * vervuilt één sessie de zones en de belasting. Deze mutatie zet de
-   * gecorrigeerde waarden én stempelt `hrOverriddenAt`. Dat stempel is precies
-   * wat de sync-kant al respecteert: `updateExistingSyncedLog` en
-   * `enrichExistingLog` laten alle HR-velden staan zodra het gezet is, dus een
-   * volgende sync van de watch overschrijft de correctie niet meer.
+   * Bewust NIET "corrigeer naar X". Niemand weet zijn werkelijke gemiddelde
+   * hartslag, dus een invoerveld vraagt om een verzonnen getal — en dat belandt
+   * in een medisch dossier. Ontbrekende data is daar eerlijker dan verzonnen
+   * data. Dit is ook wat de rest van de markt doet: Apple Health laat je een
+   * meting verwijderen, Strava laat je de hartslag helemaal niet bewerken.
    *
-   * Alleen de eigenaar corrigeert: de WHERE bindt op `patientId`, dus een
-   * therapeut kan dit niet namens een patiënt doen (zelfde regel als
-   * `rateActivity`). `count === 0` betekent "bestaat niet of niet van jou" —
-   * bewust niet te onderscheiden.
+   * Het stempel `hrOverriddenAt` is precies wat de sync-kant al respecteert:
+   * `updateExistingSyncedLog` en `enrichExistingLog` laten de HR-velden met rust
+   * zodra het gezet is, dus de volgende sync van de watch zet de foute meting
+   * niet terug.
    *
-   * `timeInZones` blijft staan: dat komt uit het histogram van de sensor en is
-   * niet herleidbaar uit een gecorrigeerd gemiddelde. De zone-verdeling van zo'n
-   * sessie blijft dus zo onbetrouwbaar als de meting was.
+   * Alleen de eigenaar doet dit: de WHERE bindt op `patientId`, dus een
+   * therapeut kan het niet namens een patiënt (zelfde regel als `rateActivity`).
+   * "Bestaat niet" en "niet van jou" geven allebei NOT_FOUND.
+   *
+   * Voor de therapeut blijft het verschil zichtbaar tussen "geen hartslagdata"
+   * en "hartslagdata die de sporter zelf onbetrouwbaar noemde": dat laatste
+   * heeft een `hrOverriddenAt`, en dat is klinisch informatie op zich.
    */
-  correctHeartRate: wearablesProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        avgHeartRate: z.number().int().min(30).max(230).nullable(),
-        maxHeartRate: z.number().int().min(30).max(230).nullable(),
-      }),
-    )
+  dismissHeartRate: wearablesProcedure
+    .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      if (
-        input.avgHeartRate != null &&
-        input.maxHeartRate != null &&
-        input.maxHeartRate < input.avgHeartRate
-      ) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'De maximale hartslag kan niet lager zijn dan de gemiddelde.',
-        })
-      }
-      const res = await ctx.prisma.cardioLog.updateMany({
+      const log = await ctx.prisma.cardioLog.findFirst({
         where: { id: input.id, patientId: ctx.user!.id },
+        select: { id: true, ratedAt: true },
+      })
+      if (!log) throw new TRPCError({ code: 'NOT_FOUND' })
+
+      await ctx.prisma.cardioLog.update({
+        where: { id: log.id },
         data: {
-          avgHeartRate: input.avgHeartRate,
-          maxHeartRate: input.maxHeartRate,
+          avgHeartRate: null,
+          maxHeartRate: null,
+          // Zones en de curve komen uit dezelfde meting; laat je die staan, dan
+          // blijft de zoneverdeling een verhaal vertellen dat niet klopte.
+          timeInZones: Prisma.DbNull,
+          series: Prisma.DbNull,
+          // De RPE was uit de hartslag afgeleid (`rpeFromHeartRate`) en is dus
+          // net zo fout. Heeft de sporter de sessie zélf beoordeeld, dan is de
+          // RPE van hem en blijft hij staan.
+          ...(log.ratedAt == null ? { rpe: null } : {}),
           hrOverriddenAt: new Date(),
         },
       })
-      if (res.count === 0) throw new TRPCError({ code: 'NOT_FOUND' })
       return { ok: true }
     }),
 
