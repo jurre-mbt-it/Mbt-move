@@ -74,16 +74,16 @@ export function hasPrescription(p: Prescription): boolean {
   return p.intensityMin != null || p.intensityMax != null
 }
 
-/** "7" of "7–8" — een min..max range met en-dash, of één waarde. */
+/** "7" of "7-8" — een min..max range met koppelteken, of één waarde. */
 function rangeLabel(min: number | null, max: number | null, unit = ''): string {
   const fmt = (n: number) => `${Math.round(n * 10) / 10}`.replace('.', ',')
-  if (min != null && max != null && max !== min) return `${fmt(min)}–${fmt(max)}${unit}`
+  if (min != null && max != null && max !== min) return `${fmt(min)}-${fmt(max)}${unit}`
   const one = min ?? max
   return one != null ? `${fmt(one)}${unit}` : ''
 }
 
 /**
- * Leesbaar voorschrift-label, bv. "RPE 7–8", "70–75% 1RM",
+ * Leesbaar voorschrift-label, bv. "RPE 7-8", "70-75% 1RM",
  * "−10 kg onder daily max", "Techniek", of de vrije tekst. Leeg = niets.
  */
 export function formatPrescription(p: Prescription): string {
@@ -147,16 +147,16 @@ export function computeTargetKg(
   return { min: null, max: null }
 }
 
-/** "68 kg" of "70–75 kg" uit een TargetKg; leeg als er geen doel is. */
+/** "68 kg" of "70-75 kg" uit een TargetKg; leeg als er geen doel is. */
 export function formatTargetKg(t: TargetKg): string {
   const fmt = (n: number) => `${Math.round(n * 10) / 10}`.replace('.', ',')
-  if (t.min != null && t.max != null && t.max !== t.min) return `${fmt(t.min)}–${fmt(t.max)} kg`
+  if (t.min != null && t.max != null && t.max !== t.min) return `${fmt(t.min)}-${fmt(t.max)} kg`
   const one = t.min ?? t.max
   return one != null ? `${fmt(one)} kg` : ''
 }
 
 /**
- * "3 × 10 reps", "3–5 × 8–12 reps" — sets×reps inclusief bereik-voorschrift.
+ * "3 × 10 reps", "3-5 × 8-12 reps" — sets×reps inclusief bereik-voorschrift.
  * setsMax/repsMax null of gelijk aan de ondergrens = enkele waarde.
  */
 export function formatSetsReps(
@@ -166,8 +166,8 @@ export function formatSetsReps(
   repsMax: number | null | undefined,
   repUnit?: string,
 ): string {
-  const setsPart = setsMax != null && setsMax !== sets ? `${sets}–${setsMax}` : `${sets}`
-  const repsPart = repsMax != null && repsMax !== reps ? `${reps}–${repsMax}` : `${reps}`
+  const setsPart = setsMax != null && setsMax !== sets ? `${sets}-${setsMax}` : `${sets}`
+  const repsPart = repsMax != null && repsMax !== reps ? `${reps}-${repsMax}` : `${reps}`
   return `${setsPart} × ${repsPart}${repUnit ? ` ${repUnit}` : ''}`
 }
 
@@ -193,7 +193,7 @@ export function formatPrescribedParam(p: PrescribedParam): string | null {
     p.value === undefined ||
     (typeof p.value === 'number' && p.value === 0 && !hasMax)
   if (empty) return null
-  const val = hasMax ? `${p.value}–${p.valueMax}` : `${p.value}`
+  const val = hasMax ? `${p.value}-${p.valueMax}` : `${p.value}`
   const unit = p.unit ? ` ${p.unit}` : ''
   return `${p.label} ${val}${unit}`
 }
