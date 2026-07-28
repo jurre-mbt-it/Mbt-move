@@ -9,7 +9,7 @@
  * hun eigen tabellen.
  */
 import { z } from 'zod'
-import type { PrismaClient, CardioActivity } from '@prisma/client'
+import type { PrismaClient, CardioActivity, Prisma } from '@prisma/client'
 import { aggregateNight, sleepQualityScore, type SleepSegment } from '@/lib/sleep-metrics'
 import { resolveMaxHr } from '@/lib/cardio-zones'
 import { computeExertionDay } from '@/lib/exertion'
@@ -204,7 +204,12 @@ export async function updateExistingSyncedLog(
   prisma: Pick<PrismaClient, 'cardioLog'>,
   userId: string,
   externalId: string,
-  data: Record<string, unknown>,
+  // Bewust het GECONTROLEERDE Prisma-type en niet `Record<string, unknown>`:
+  // dat laatste laat ook `patientId` toe, en `data` bepaalt wat de rij WORDT
+  // (de WHERE bepaalt alleen wélke rij). Een toekomstige aanroeper die een
+  // gevalideerd-maar-doorgegeven object spreadt, zou een workout zo in het
+  // dossier van een andere patiënt kunnen schrijven — zonder type-fout.
+  data: Prisma.CardioLogUpdateManyMutationInput,
 ): Promise<boolean> {
   // `undefined` = Prisma laat het veld ongemoeid.
   const hrUntouched = {

@@ -79,11 +79,27 @@ const SEC_PER_KM: Partial<Record<CardioActivityKey, number>> = {
   ROWING: 300,       // 2:30 min/500 m
   SKIERG: 300,
   CROSSTRAINER: 300,
+  // Fiets-varianten horen bij fietstempo, niet bij het hardloop-vangnet: die
+  // vielen anders op 390 sec/km terug en telden ~2,6× te zwaar.
+  ASSAULT_BIKE: 150,
+  WATTBIKE: 150,
+  STAIRCLIMBER: 750, // trapklimmen ligt qua tempo bij wandelen
 }
 /** Onbekende activiteit → hardlooptempo; dat is de veruit gebruikelijkste. */
 const SEC_PER_KM_FALLBACK = 390
 
-export type CardioEstimate = { durationSec: number; load: number; rpe: number }
+export type CardioEstimate = {
+  durationSec: number
+  load: number
+  rpe: number
+  /**
+   * True zodra minstens één stap op AFSTAND is voorgeschreven. Dat maakt de
+   * opgeslagen `plannedDurationSec` onbetrouwbaar: die komt uit
+   * `legacySummaryFields` → `totalDurationSec`, en dat telt alleen tijd-stappen.
+   * Zie de aanroeper in `itemPlannedLoad`.
+   */
+  hasDistance: boolean
+}
 
 /**
  * Duur, belasting en gemiddelde RPE van een gestructureerde cardio-workout,
@@ -101,9 +117,11 @@ export function cardioEstimate(raw: unknown): CardioEstimate | null {
 
   let sec = 0
   let load = 0
+  let hasDistance = false
   for (const st of flattenSteps(w.blocks)) {
     // Duur wint; een stap heeft er per contract precies één van beide.
     const d = st.durationSec ?? (st.distanceM != null ? (st.distanceM / 1000) * secPerKm : 0)
+    if (st.durationSec == null && (st.distanceM ?? 0) > 0) hasDistance = true
     if (d <= 0) continue
     sec += d
     load += (d / 60) * targetRpe(st.target)
@@ -114,6 +132,7 @@ export function cardioEstimate(raw: unknown): CardioEstimate | null {
     durationSec: Math.round(sec),
     load: Math.round(load),
     rpe: Math.round((load / (sec / 60)) * 10) / 10,
+    hasDistance,
   }
 }
 
@@ -191,13 +210,18 @@ export function itemPlannedLoad(item: PlannedLoadInput): PlannedLoad {
   let durationSec = item.plannedDurationSec ?? item.quickDurationSec ?? null
   // Cardio op afstand levert geen duur; reken 'm uit de blokken. Dit staat
   // vóór de oefening-tak omdat een cardio-item geen inline oefeningen heeft.
+  //
+  // De schatting wint óók van een opgeslagen duur zodra er een afstand-stap in
+  // de blokken zit. `plannedDurationSec` wordt namelijk door `setItemCardio`
+  // weggeschreven als `legacySummaryFields().durationSec` = `totalDurationSec`,
+  // en dat telt ALLEEN tijd-stappen. Bij "10 min inloop + 29 km duurloop" staat
+  // er dus 600 sec op het item terwijl de sessie ~3,3 uur duurt: zonder deze
+  // tak telde die week ~40 AU in plaats van ~695 AU.
   let cardio: CardioEstimate | null = null
-  if (durationSec == null || durationSec <= 0) {
-    cardio = cardioEstimate(item.cardioParams)
-    if (cardio) {
-      durationSec = cardio.durationSec
-      estimated = true
-    }
+  if (item.cardioParams != null) cardio = cardioEstimate(item.cardioParams)
+  if (cardio && (durationSec == null || durationSec <= 0 || cardio.hasDistance)) {
+    durationSec = cardio.durationSec
+    estimated = true
   }
   if (durationSec == null && item.exercises?.length) {
     durationSec = durationFromExercises(item.exercises)

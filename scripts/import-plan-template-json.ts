@@ -25,6 +25,13 @@
 import { readFileSync } from 'node:fs'
 import { prisma } from '../src/lib/prisma'
 import { itemPlannedLoad } from '../src/lib/planned-load'
+import { parseStructured, legacySummaryFields } from '../src/lib/cardio-workout'
+
+/** Platte samenvattingsvelden bij een blokken-workout; {} als hij niet parst. */
+function cardioLegacyFields(raw: unknown): Record<string, unknown> {
+  const parsed = parseStructured(raw)
+  return parsed ? legacySummaryFields(parsed) : {}
+}
 
 const createId = () => crypto.randomUUID()
 
@@ -105,11 +112,29 @@ async function main() {
       if (it.quickActivity && !VALID_ACTIVITY.has(it.quickActivity)) {
         problems.push(`${where}: quickActivity "${it.quickActivity}" bestaat niet`)
       }
-      if (it.dayOfWeek < 1 || it.dayOfWeek > 7) {
-        problems.push(`${where}: dayOfWeek ${it.dayOfWeek} valt buiten 1..7`)
+      // Integer-check vóór de range-check: de schrijver matcht straks met
+      // `it.dayOfWeek - 1 === dow`, en NaN/undefined/"maandag"/3.5 matchen daar
+      // nooit. Een bare range-vergelijking laat die allemaal door (elke
+      // vergelijking met NaN is false), waarna het item stil nergens wordt
+      // aangemaakt terwijl de transactie gewoon slaagt.
+      if (!Number.isInteger(it.dayOfWeek) || it.dayOfWeek < 1 || it.dayOfWeek > 7) {
+        problems.push(`${where}: dayOfWeek ${JSON.stringify(it.dayOfWeek)} is geen geheel getal 1..7`)
       }
-      if (it.plannedRpe != null && (it.plannedRpe < 1 || it.plannedRpe > 10)) {
-        problems.push(`${where}: plannedRpe ${it.plannedRpe} valt buiten 1..10`)
+      if (it.plannedRpe != null && (!Number.isFinite(it.plannedRpe) || it.plannedRpe < 1 || it.plannedRpe > 10)) {
+        problems.push(`${where}: plannedRpe ${JSON.stringify(it.plannedRpe)} valt buiten 1..10`)
+      }
+      for (const [veld, waarde] of [
+        ['plannedDurationSec', it.plannedDurationSec],
+        ['quickDurationSec', it.quickDurationSec],
+      ] as const) {
+        if (waarde != null && (!Number.isInteger(waarde) || waarde < 0)) {
+          problems.push(`${where}: ${veld} ${JSON.stringify(waarde)} is geen geheel getal >= 0`)
+        }
+      }
+      // Cardio-blokken moeten parsen, anders landt er een cardio-item in de DB
+      // dat bij élke lezing als "geen workout" terugkomt.
+      if (it.cardioParams != null && !parseStructured(it.cardioParams)) {
+        problems.push(`${where}: cardioParams is geen geldige blokken-workout`)
       }
     }
   }
@@ -140,8 +165,11 @@ async function main() {
   const owner = candidates[0]
 
   // ── Al geïmporteerd? ────────────────────────────────────────────────────
+  // Scope op de eigen praktijk: Prisma draait als owner en bypasst RLS, dus
+  // zonder dit filter blokkeert (en toont) een gelijknamige import van een
+  // ándere praktijk deze import.
   const dup = await prisma.weekPlanTemplate.findFirst({
-    where: { description: { contains: src.importMarker } },
+    where: { description: { contains: src.importMarker }, practiceId: owner.practiceId },
     select: { id: true, name: true },
   })
 
@@ -156,6 +184,9 @@ async function main() {
     plannedRpe: i.plannedRpe,
     quickCategory: i.quickCategory,
     quickDurationSec: i.quickDurationSec,
+    // Zonder dit telt een op afstand voorgeschreven duurloop voor 0 en beweert
+    // de dry-run iets anders dan de app na de import laat zien.
+    cardioParams: i.cardioParams,
   }).load === 0)
 
   console.log(`\n${commit ? 'IMPORT' : 'DRY-RUN'} — ${src.program.name}`)
@@ -175,6 +206,7 @@ async function main() {
       plannedRpe: it.plannedRpe,
       quickCategory: it.quickCategory,
       quickDurationSec: it.quickDurationSec,
+      cardioParams: it.cardioParams,
     }).load, 0)
     console.log(
       `  week ${String(i + 1).padStart(2)} ${(w.phaseType ?? '—').padEnd(16)}` +
@@ -253,7 +285,13 @@ async function main() {
               plannedDurationSec: it.plannedDurationSec,
               plannedRpe: it.plannedRpe,
               notes: it.notes,
-              cardioParams: (it.cardioParams ?? undefined) as never,
+              // Zoals `setItemCardio`: de afgeleide platte velden meeschrijven
+              // (activity/durationSec/distanceM/zone). Lezers die het
+              // blokkenmodel nog niet kennen — WeekTotals en de iOS-app — zien
+              // een cardio-item zonder die velden namelijk als leeg.
+              cardioParams: (it.cardioParams
+                ? { ...(it.cardioParams as object), ...cardioLegacyFields(it.cardioParams) }
+                : undefined) as never,
             },
           })
         }
