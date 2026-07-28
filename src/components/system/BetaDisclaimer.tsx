@@ -9,7 +9,15 @@ import { createClient } from '@/lib/supabase/client'
 
 // Bump dit nummer om alle gebruikers opnieuw akkoord te laten geven
 // (bv. wanneer de tekst hieronder wijzigt of na een breaking change).
-const ACCEPTANCE_KEY = 'mbt-beta-accepted-v1'
+export const ACCEPTANCE_KEY = 'mbt-beta-accepted-v1'
+
+/**
+ * Andere popups moeten wachten tot deze weg is: dit is een blocking dialog die
+ * je niet kunt wegklikken. `QuickStartModal` leest de key bij mount en luistert
+ * daarna op dit event, want binnen dezelfde paginalading verandert localStorage
+ * zonder dat React dat merkt.
+ */
+export const BETA_ACCEPTED_EVENT = 'mbt:beta-accepted'
 
 export function BetaDisclaimer() {
   const [open, setOpen] = useState(false)
@@ -37,6 +45,7 @@ export function BetaDisclaimer() {
       localStorage.setItem(ACCEPTANCE_KEY, new Date().toISOString())
     } catch {}
     setOpen(false)
+    window.dispatchEvent(new Event(BETA_ACCEPTED_EVENT))
   }
 
   async function handleLogout() {

@@ -12,8 +12,11 @@ import { notifyNewSchedule } from '@/server/push/notify'
  * "Leeg concept" van één therapeut: DRAFT zonder inhoud en zonder verwijzingen.
  * Elke relatie die betekenis draagt telt als inhoud — een concept met sessies,
  * planner-items of shop-koppeling is niet leeg, wat de naam ook zegt.
+ *
+ * Geëxporteerd omdat `onboarding.progress` dezelfde definitie nodig heeft: een
+ * per ongeluk aangemaakte lege draft mag daar niet tellen als "programma gebouwd".
  */
-const EMPTY_DRAFT_WHERE = (creatorId: string): Prisma.ProgramWhereInput => ({
+export const EMPTY_DRAFT_WHERE = (creatorId: string): Prisma.ProgramWhereInput => ({
   creatorId,
   status: 'DRAFT',
   isTemplate: false,

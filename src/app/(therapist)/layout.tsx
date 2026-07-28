@@ -4,6 +4,7 @@ import { Header } from '@/components/layout/Header'
 import { PageTransition } from '@/components/layout/PageTransition'
 import { BetaDisclaimer } from '@/components/system/BetaDisclaimer'
 import { WhatsNewModal } from '@/components/system/WhatsNewModal'
+import { QuickStartModal } from '@/components/system/QuickStartModal'
 import { requireRole } from '@/lib/auth/require-role'
 
 export default async function TherapistLayout({
@@ -41,6 +42,7 @@ export default async function TherapistLayout({
       <TherapistBottomNav />
       <BetaDisclaimer />
       <WhatsNewModal />
+      <QuickStartModal />
     </div>
   )
 }

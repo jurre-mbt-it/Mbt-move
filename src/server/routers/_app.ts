@@ -32,6 +32,7 @@ import { messagesRouter } from './messages'
 import { tagsRouter } from './tags'
 import { pushRouter } from './push'
 import { dailyGoalsRouter } from './dailyGoals'
+import { onboardingRouter } from './onboarding'
 
 export const appRouter = createTRPCRouter({
   auth: authRouter,
@@ -65,6 +66,7 @@ export const appRouter = createTRPCRouter({
   tags: tagsRouter,
   push: pushRouter,
   dailyGoals: dailyGoalsRouter,
+  onboarding: onboardingRouter,
 })
 
 export type AppRouter = typeof appRouter

@@ -23,6 +23,7 @@ import {
   MessageSquare,
   PanelLeftClose,
   ArrowLeftRight,
+  Rocket,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -374,16 +375,28 @@ export function TherapistSidebar({ variant = 'therapist' }: { variant?: SidebarV
           </Link>
         )}
         {variant === 'therapist' && (
-          <Link
-            href="/therapist/release-notes"
-            onClick={expandGuard}
-            className={rowClass()}
-            title={collapsed ? 'Wat is nieuw' : undefined}
-            style={{ color: P.inkMuted }}
-          >
-            <Sparkles className="w-4.5 h-4.5 shrink-0" />
-            {!collapsed && 'Wat is nieuw'}
-          </Link>
+          <>
+            <Link
+              href="/therapist/quick-start"
+              onClick={expandGuard}
+              className={rowClass()}
+              title={collapsed ? 'Quick start' : undefined}
+              style={{ color: P.inkMuted }}
+            >
+              <Rocket className="w-4.5 h-4.5 shrink-0" />
+              {!collapsed && 'Quick start'}
+            </Link>
+            <Link
+              href="/therapist/release-notes"
+              onClick={expandGuard}
+              className={rowClass()}
+              title={collapsed ? 'Wat is nieuw' : undefined}
+              style={{ color: P.inkMuted }}
+            >
+              <Sparkles className="w-4.5 h-4.5 shrink-0" />
+              {!collapsed && 'Wat is nieuw'}
+            </Link>
+          </>
         )}
         <Link
           href={cfg.settingsHref}

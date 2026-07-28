@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
 import { usePortal, type Portal } from '@/lib/portal'
@@ -20,6 +20,8 @@ import {
   Tile,
 } from '@/components/dark-ui'
 import { IconCardio, IconSleep, IconStrength, IconWarning } from '@/components/icons'
+import { QuickStartCard } from '@/components/system/QuickStartCard'
+import { StartTreatmentCard } from '@/components/system/StartTreatmentCard'
 import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, type CardioActivityKey, type CardioProtocolKey } from '@/lib/cardio-constants'
 import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
 
@@ -348,6 +350,9 @@ export default function TherapistDashboard() {
         </Link>
       )}
 
+      {/* Quick start — verdwijnt vanzelf zodra de vijf stappen staan. */}
+      <QuickStartCard />
+
       {/* Stats — cijfers die per week bewegen i.p.v. statische totalen */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <MetricTile
@@ -385,6 +390,12 @@ export default function TherapistDashboard() {
           sub="> 7 dagen geen activiteit"
         />
       </div>
+
+      {/* Start behandeling — zelfde plek in de volgorde als op iOS: direct
+          onder de cijfers. Suspense omdat de kaart `useSearchParams` leest. */}
+      <Suspense fallback={null}>
+        <StartTreatmentCard />
+      </Suspense>
 
       {/* Vraagt aandacht — top-signalen uit de Clinical Insight Engine.
           Sectie verschijnt alleen als er echt iets speelt; bij rust volstaat

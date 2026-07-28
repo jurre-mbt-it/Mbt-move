@@ -58,6 +58,16 @@ export default function SettingsPage() {
       />
 
       <div className="flex flex-col gap-2">
+        {/* Quick start bestaat alleen onder het therapeut-segment, dus niet
+            tonen in de coach-shell (die deelt deze pagina). */}
+        {!portal.isCoach && (
+          <ActionTile
+            href="/therapist/quick-start"
+            label="Quick start"
+            sub="De eerste vijf stappen, met je voortgang"
+            bar={P.brand}
+          />
+        )}
         <ActionTile
           href={`${portal.base}/settings/profile`}
           label="Profiel"
