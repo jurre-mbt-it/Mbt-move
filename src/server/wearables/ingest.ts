@@ -254,6 +254,15 @@ export async function ingestWearableData(
     where: { userId_provider: { userId, provider: 'APPLE_HEALTH' } },
     update: {
       lastSyncAt: new Date(),
+      // Een aankomende sync ís een actieve koppeling: de app synct alleen als
+      // de gebruiker op het toestel gekoppeld heeft (loskoppelen wist die
+      // lokale vlag éérst, dus daarna komt hier niets meer binnen). Zonder dit
+      // bleef `enabled` na een oude ontkoppeling voorgoed false — builds ≤77
+      // zetten hem bij opnieuw koppelen nooit terug — terwijl de data gewoon
+      // doorstroomde: alle schermen zeiden "koppeling uit" en de
+      // readiness-cron sloeg de gebruiker over. Zelfde patroon als de
+      // Strava-claim (routers/wearables.ts).
+      enabled: true,
       ...(payload.device?.model ? { deviceModel: payload.device.model } : {}),
       ...(payload.anchors ? { anchors: payload.anchors } : {}),
     },
