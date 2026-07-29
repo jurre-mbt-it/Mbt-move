@@ -123,6 +123,33 @@ meerdere weken van dezelfde patiënt hetzelfde nummer (één patiënt heeft er 3
 waarvan 2 op dezelfde maandag). Alles wat een kalenderweek moet aanwijzen —
 `duplicateWeek`, `saveFromWeeks`, `applyToPatient` — ankert daarom op datum.
 
+# Invoervelden: corrigeer nooit tijdens het typen
+
+**Een veld dat de invoer bij elke toetsaanslag omrekent en terugschrijft is
+niet te bewerken.** Dit is twee keer gebeurd en allebei de keren gemeld als
+"de cijfers gaan niet helemaal weg":
+
+- Een `<input type="date">` die `mondayIso(new Date(e.target.value))` in zijn
+  onChange deed. Tijdens het typen is de waarde even leeg, en `new Date('')`
+  is een Invalid Date die verderop `"NaN-NaN-NaN"` oplevert; daarna is het veld
+  niet meer leeg te krijgen. Half getypte invoer sprong bovendien naar een
+  andere week (`2026-08` werd 27 juli), en kalenderklikken leek stuk omdat je
+  zaterdag koos en maandag zag verschijnen.
+- Getalvelden met `Math.max(1, Number(e.target.value) || 1)` in de onChange:
+  leeghalen springt terug naar de ondergrens, dus je kunt er geen ander getal
+  in tikken.
+
+De regel: **tijdens het typen is de tekst van de gebruiker de waarheid.**
+Omrekenen, klemmen en normaliseren gebeurt bij `blur` of Enter, of helemaal
+niet. Moet er iets afgeleid worden (de maandag van de gekozen week), zet dat
+zichtbaar náást of ónder het veld in plaats van de invoer te overschrijven.
+
+Gebruik `NumberField` uit [`src/components/dark-ui`](src/components/dark-ui/NumberField.tsx)
+voor getallen met grenzen; die doet dit al, inclusief terugvallen op de vorige
+waarde als je het veld leeg achterlaat. Voor datums: parse met `isDateKey` en
+reken met `mondayKey` uit [`src/lib/week-dates.ts`](src/lib/week-dates.ts), en
+schrijf geen eigen `new Date(...)`-logica in een pagina.
+
 # Wat mag een patiënt-client zien van de weekplanner?
 
 `WeekScheduleDayItem.kind` (`WeekItemKind`) bepaalt wat er op een dag staat.
