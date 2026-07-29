@@ -17,7 +17,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   Plus, Trash2, ChevronLeft, Copy, Scissors, ClipboardPaste, CopyPlus,
-  MoreHorizontal, Pencil, Eraser,
+  MoreHorizontal, Pencil, Eraser, ArrowUpToLine, ArrowDownToLine,
 } from 'lucide-react'
 import {
   DndContext, DragOverlay, type DragEndEvent, type DragStartEvent,
@@ -145,6 +145,15 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
    * refetch per workout op in plaats van één aan het eind.
    */
   const verwijderStil = trpc.weekSchedules.removeItem.useMutation()
+  /** Week ertussen of eruit; de server hernummert daarna 1..N. */
+  const weekErtussen = trpc.planTemplates.insertWeek.useMutation({
+    onSuccess: ververs,
+    onError: (e) => toast.error(e.message),
+  })
+  const weekEruit = trpc.planTemplates.removeWeek.useMutation({
+    onSuccess: ververs,
+    onError: (e) => toast.error(e.message),
+  })
 
   const sorted = useMemo(
     () => [...weeks].sort((a, b) => a.weekNumber - b.weekNumber),
@@ -254,6 +263,8 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
   >(null)
   /** Doelweek bevat al workouts: vervangen of eronder plakken? */
   const [weekPlakVraag, setWeekPlakVraag] = useState<string | null>(null)
+  /** Week met inhoud verwijderen: eerst bevestigen. */
+  const [weekWegVraag, setWeekWegVraag] = useState<{ weekId: string; weekNumber: number } | null>(null)
 
   const plakItem = async (naarDag: string) => {
     const klem = itemKlembord
@@ -381,8 +392,28 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
       onSelect: () => (heeftItems ? setWeekPlakVraag(weekId) : plakWeek(weekId, false)),
     },
     { type: 'separator' },
+    { label: 'Lege week ervoor', icon: <ArrowUpToLine className="h-3.5 w-3.5" />,
+      onSelect: () => weekErtussen.mutate({ planTemplateId: planId, atWeekNumber: weekNumber }) },
+    { label: 'Lege week erna', icon: <ArrowDownToLine className="h-3.5 w-3.5" />,
+      onSelect: () => weekErtussen.mutate({ planTemplateId: planId, atWeekNumber: weekNumber + 1 }) },
+    { type: 'separator' },
     { label: 'Week leegmaken', icon: <Eraser className="h-3.5 w-3.5" />, danger: true,
       disabled: !heeftItems, onSelect: () => wisWeek(weekId) },
+    {
+      label: 'Week verwijderen',
+      icon: <Trash2 className="h-3.5 w-3.5" />,
+      danger: true,
+      // Laatste week weghalen zou een plan zonder weken opleveren; de server
+      // weigert dat ook, maar een uitgegrijsde knop legt beter uit waarom.
+      disabled: sorted.length <= 1,
+      hint: heeftItems ? 'met inhoud' : undefined,
+      // Met inhoud eerst vragen: dit gooit workouts weg en de weken erna
+      // schuiven op, dus je kunt het niet even terugklikken.
+      onSelect: () =>
+        heeftItems
+          ? setWeekWegVraag({ weekId, weekNumber })
+          : weekEruit.mutate({ weekScheduleId: weekId }),
+    },
   ]
 
   /** Alleen activiteiten die écht in km gepland zijn; zie plannedVolume. */
@@ -628,6 +659,18 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
         />
       )}
 
+      {weekWegVraag && (
+        <WeekWegDialog
+          weekNumber={weekWegVraag.weekNumber}
+          aantalWeken={sorted.length}
+          onBevestig={() => {
+            weekEruit.mutate({ weekScheduleId: weekWegVraag.weekId })
+            setWeekWegVraag(null)
+          }}
+          onClose={() => setWeekWegVraag(null)}
+        />
+      )}
+
       {editFor && (
         <PlanItemDialog item={editFor} planId={planId} onClose={() => setEditFor(null)} />
       )}
@@ -685,6 +728,46 @@ function WeekPlakDialog({
             </DarkButton>
             <DarkButton variant="primary" onClick={() => onKies(true)}>
               Vervangen
+            </DarkButton>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/**
+ * Een week met workouts erin weghalen. Dat is twee dingen tegelijk: de inhoud
+ * is weg, én alles erna schuift een nummer op. Dat laatste zie je pas als het
+ * gebeurd is, dus het staat hier met zoveel woorden.
+ */
+function WeekWegDialog({
+  weekNumber, aantalWeken, onBevestig, onClose,
+}: {
+  weekNumber: number
+  aantalWeken: number
+  onBevestig: () => void
+  onClose: () => void
+}) {
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle>Week {weekNumber} verwijderen?</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <p style={{ color: P.inkMuted, fontSize: 13, lineHeight: 1.6 }}>
+            De workouts in deze week gaan weg.{' '}
+            {weekNumber < aantalWeken
+              ? `Week ${weekNumber + 1} wordt week ${weekNumber}, en de weken daarna schuiven mee op. Het plan houdt ${aantalWeken - 1} weken over.`
+              : `Het plan houdt ${aantalWeken - 1} weken over.`}
+          </p>
+          <div className="flex justify-end gap-2">
+            <DarkButton variant="secondary" onClick={onClose}>
+              Annuleren
+            </DarkButton>
+            <DarkButton variant="primary" onClick={onBevestig}>
+              Verwijderen
             </DarkButton>
           </div>
         </div>

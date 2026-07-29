@@ -9,6 +9,46 @@ import { notifyNewSchedule } from '@/server/push/notify'
 
 const createId = () => crypto.randomUUID()
 
+/** Zelfde bovengrens als `createEmpty`. */
+const MAX_PLAN_WEKEN = 24
+
+/**
+ * Weeknummers weer 1..N maken en de weeknamen erop laten aansluiten.
+ *
+ * Na invoegen of verwijderen zitten er gaten of dubbelingen in de nummering, en
+ * de namen (`"<plan>, week 3"`) wijzen dan naar de verkeerde plek. Dit trekt
+ * allebei recht op basis van de bestaande volgorde, en is idempotent: opnieuw
+ * draaien op een gezond plan verandert niets.
+ *
+ * `weekNumber` heeft geen unique-constraint (zie AGENTS.md), dus dit mag in één
+ * pass zonder tijdelijke nummers.
+ */
+async function hernummerPlanWeken(
+  prisma: PrismaClient,
+  planTemplateId: string,
+  planNaam: string,
+): Promise<number> {
+  const weken = await prisma.weekSchedule.findMany({
+    where: { planTemplateId },
+    orderBy: { weekNumber: 'asc' },
+    select: { id: true, weekNumber: true, name: true },
+  })
+  const enkel = weken.length === 1
+  const patches = weken.flatMap((w, i) => {
+    const nummer = i + 1
+    const naam = enkel ? planNaam : `${planNaam}, week ${nummer}`
+    if (w.weekNumber === nummer && w.name === naam) return []
+    return [prisma.weekSchedule.update({ where: { id: w.id }, data: { weekNumber: nummer, name: naam } })]
+  })
+  await prisma.$transaction([
+    ...patches,
+    // `weeks` op de header is een redundante teller; laat 'm nooit uit de pas
+    // lopen met het echte aantal weken.
+    prisma.weekPlanTemplate.update({ where: { id: planTemplateId }, data: { weeks: weken.length } }),
+  ])
+  return weken.length
+}
+
 /**
  * Plan-sjablonen: meerweekse behandelplannen die je vanaf een datum op de
  * kalender van een patiënt zet (TrainingPeaks-stijl "training plan").
@@ -631,5 +671,95 @@ export const planTemplatesRouter = createTRPCRouter({
       assertCanEdit(ctx.user, tpl)
       // Cascade ruimt de sjabloon-weken op.
       return ctx.prisma.weekPlanTemplate.delete({ where: { id: input.id } })
+    }),
+
+  /**
+   * Lege week ertussen zetten. `atWeekNumber` is de plek die de nieuwe week
+   * krijgt; alles vanaf daar schuift een plaats op.
+   */
+  insertWeek: coachStaffProcedure
+    .input(z.object({
+      planTemplateId: z.string(),
+      atWeekNumber: z.number().int().min(1).max(MAX_PLAN_WEKEN),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const tpl = await ctx.prisma.weekPlanTemplate.findUnique({
+        where: { id: input.planTemplateId },
+        select: {
+          id: true, name: true, practiceId: true, creatorId: true,
+          creator: { select: { role: true } },
+          _count: { select: { schedules: true } },
+        },
+      })
+      if (!tpl) throw new TRPCError({ code: 'NOT_FOUND' })
+      assertCanEdit(ctx.user, tpl)
+      if (tpl._count.schedules >= MAX_PLAN_WEKEN) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Een plan kan hoogstens ${MAX_PLAN_WEKEN} weken hebben.`,
+        })
+      }
+
+      await ctx.prisma.$transaction([
+        // Ruimte maken. Er is geen unique-constraint op (plan, weekNumber), dus
+        // dit hoeft niet in twee passes met tijdelijke nummers.
+        ctx.prisma.weekSchedule.updateMany({
+          where: { planTemplateId: tpl.id, weekNumber: { gte: input.atWeekNumber } },
+          data: { weekNumber: { increment: 1 } },
+        }),
+        ctx.prisma.weekSchedule.create({
+          data: {
+            id: createId(),
+            name: `${tpl.name}, week ${input.atWeekNumber}`,
+            isTemplate: true,
+            weekNumber: input.atWeekNumber,
+            planTemplateId: tpl.id,
+            creatorId: ctx.user.id,
+            practiceId: ctx.user.practiceId ?? null,
+            // Alle zeven dagen meteen aanmaken, net als createEmpty: de editor
+            // gaat ervan uit dat elke dag bestaat en heeft dus altijd een dayId
+            // om items op te zetten.
+            days: { create: Array.from({ length: 7 }, (_, i) => ({ id: createId(), dayOfWeek: i })) },
+          },
+        }),
+      ])
+      await hernummerPlanWeken(ctx.prisma, tpl.id, tpl.name)
+      return { ok: true }
+    }),
+
+  /**
+   * Week uit het plan halen; de weken erna schuiven op, zodat week 2 week 1
+   * wordt. Verwijdert ook de items van die week (cascade via de dagen).
+   */
+  removeWeek: coachStaffProcedure
+    .input(z.object({ weekScheduleId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const week = await ctx.prisma.weekSchedule.findUnique({
+        where: { id: input.weekScheduleId },
+        select: { id: true, planTemplateId: true },
+      })
+      if (!week?.planTemplateId) throw new TRPCError({ code: 'NOT_FOUND' })
+      const tpl = await ctx.prisma.weekPlanTemplate.findUnique({
+        where: { id: week.planTemplateId },
+        select: {
+          id: true, name: true, practiceId: true, creatorId: true,
+          creator: { select: { role: true } },
+          _count: { select: { schedules: true } },
+        },
+      })
+      if (!tpl) throw new TRPCError({ code: 'NOT_FOUND' })
+      assertCanEdit(ctx.user, tpl)
+      // Een plan zonder weken is geen plan; dan hoor je het plan zelf te
+      // verwijderen, en dat is een andere knop met een eigen bevestiging.
+      if (tpl._count.schedules <= 1) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Dit is de laatste week. Verwijder het hele plan als je het kwijt wilt.',
+        })
+      }
+
+      await ctx.prisma.weekSchedule.delete({ where: { id: week.id } })
+      await hernummerPlanWeken(ctx.prisma, tpl.id, tpl.name)
+      return { ok: true }
     }),
 })
