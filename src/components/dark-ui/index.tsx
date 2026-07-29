@@ -26,6 +26,7 @@ export { P, DATA_COLORS, CATEGORY_COLORS, ZONE_COLORS, DARK_CHART_COLORS } from 
 // listeners en state heeft; hier alleen doorgegeven zodat imports uit
 // `@/components/dark-ui` blijven werken.
 export { InfoTip } from './InfoTip'
+export { NumberField } from './NumberField'
 
 // ─── Screen wrapper ──────────────────────────────────────────────────────────
 

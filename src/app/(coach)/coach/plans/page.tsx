@@ -18,6 +18,10 @@ import { Trash2 } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
 import { usePortal } from '@/lib/portal'
 import { DeletePlanDialog } from '@/components/week-planner/PlanTemplateDialogs'
+// Datumrekenen via de gedeelde module, niet met eigen `new Date`-logica: deze
+// pagina had een eigen maandag-berekening en dat is precies waar het misging.
+// Zie de kop van week-dates.ts en de weekdatum-waarschuwing in AGENTS.md.
+import { isDateKey, mondayKey, mondayKeyOf } from '@/lib/week-dates'
 import {
   DarkButton,
   DarkDialog as Dialog,
@@ -34,12 +38,16 @@ import {
   Tile,
 } from '@/components/dark-ui'
 
-/** Maandag van de week waarin `d` valt, als YYYY-MM-DD. */
-function mondayIso(d = new Date()): string {
-  const x = new Date(d)
-  const shift = (x.getDay() + 6) % 7
-  x.setDate(x.getDate() - shift)
-  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+const NL_DAG = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag']
+const NL_MAAND = [
+  'januari', 'februari', 'maart', 'april', 'mei', 'juni',
+  'juli', 'augustus', 'september', 'oktober', 'november', 'december',
+]
+
+/** '2026-08-10' → 'maandag 10 augustus 2026'. Verwacht een geldige dagsleutel. */
+function langeDatum(key: string): string {
+  const [j, m, d] = key.split('-').map(Number)
+  return `${NL_DAG[new Date(j, m - 1, d).getDay()]} ${d} ${NL_MAAND[m - 1]} ${j}`
 }
 
 export default function CoachPlansPage() {
@@ -182,8 +190,21 @@ function ApplyToAthletesDialog({
   onClose: () => void
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [startDate, setStartDate] = useState(() => mondayIso())
+  /**
+   * Precies wat er in het veld staat, onbewerkt. Dit veld rekende vroeger bij
+   * elke toetsaanslag de maandag uit en schreef die terug: een half getypte
+   * datum sprong dan naar een heel andere week, en een even leeg veld werd
+   * "NaN-NaN-NaN" waarna je de cijfers niet meer weg kreeg. Klikken in de
+   * kalender leek ook stuk, want je koos zaterdag en zag maandag verschijnen.
+   */
+  const [startDate, setStartDate] = useState(() => mondayKeyOf(new Date()))
   const [busy, setBusy] = useState(false)
+
+  // De maandag waarop het plan werkelijk begint. Afgeleid en zichtbaar in
+  // beeld, in plaats van stilletjes de invoer overschrijven. `isDateKey`
+  // weigert onvolledige invoer, zodat het veld tijdens het typen met rust
+  // gelaten wordt.
+  const startMaandag = isDateKey(startDate) ? mondayKey(startDate) : null
 
   const { data: athletes, isLoading } = trpc.patients.list.useQuery()
   const utils = trpc.useUtils()
@@ -199,13 +220,13 @@ function ApplyToAthletesDialog({
   }
 
   async function send() {
-    if (selected.size === 0) return
+    if (selected.size === 0 || !startMaandag) return
     setBusy(true)
     const ids = [...selected]
     const failed: string[] = []
     for (const patientId of ids) {
       try {
-        await apply.mutateAsync({ templateId: plan.id, patientId, anchorDate: startDate, anchor: 'start', mode: 'merge' })
+        await apply.mutateAsync({ templateId: plan.id, patientId, anchorDate: startMaandag, anchor: 'start', mode: 'merge' })
       } catch {
         failed.push(patientId)
       }
@@ -214,7 +235,7 @@ function ApplyToAthletesDialog({
     const ok = ids.length - failed.length
     if (ok > 0) {
       toast.success(`${plan.name} geplaatst`, {
-        description: `${ok} ${ok === 1 ? 'atleet' : 'atleten'} vanaf ${startDate}`,
+        description: `${ok} ${ok === 1 ? 'atleet' : 'atleten'} vanaf ${langeDatum(startMaandag)}`,
       })
     }
     if (failed.length > 0) {
@@ -239,12 +260,20 @@ function ApplyToAthletesDialog({
 
         <div className="space-y-4">
           <div>
-            <MetaLabel>Startweek (maandag)</MetaLabel>
+            <MetaLabel>Startweek</MetaLabel>
             <DarkInput
               type="date"
               value={startDate}
-              onChange={(e) => setStartDate(mondayIso(new Date(e.target.value)))}
+              onChange={(e) => setStartDate(e.target.value)}
             />
+            {/* Welke maandag het wordt staat eronder in plaats van dat het veld
+                zichzelf overschrijft. Kies je woensdag, dan zie je meteen dat
+                het plan op de maandag ervoor begint. */}
+            <p className="mt-1.5 text-[11px]" style={{ color: P.inkDim }}>
+              {startMaandag
+                ? `Het plan begint op ${langeDatum(startMaandag)}.`
+                : 'Kies een datum; het plan begint op de maandag van die week.'}
+            </p>
           </div>
 
           <div>
@@ -285,7 +314,9 @@ function ApplyToAthletesDialog({
             <DarkButton
               variant="primary"
               onClick={send}
-              disabled={busy || selected.size === 0}
+              // Ook op een half getypte datum: zonder geldige maandag is er
+              // niets zinnigs om naartoe te sturen.
+              disabled={busy || selected.size === 0 || !startMaandag}
               loading={busy}
             >
               {selected.size > 1 ? `Naar ${selected.size} atleten` : 'Versturen'}

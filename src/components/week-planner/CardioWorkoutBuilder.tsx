@@ -42,7 +42,7 @@ import { cardioChartBars } from '@/lib/cardio-chart'
 import {
   DarkButton, DarkDialog as Dialog, DarkDialogContent as DialogContent,
   DarkDialogHeader as DialogHeader, DarkDialogTitle as DialogTitle,
-  DarkInput, MetaLabel, P,
+  DarkInput, MetaLabel, NumberField, P,
 } from '@/components/dark-ui'
 
 const uid = () => Math.random().toString(36).slice(2, 10)
@@ -454,12 +454,12 @@ function SortableBlock({
         {isRepeat(block) ? (
           <>
             <Repeat className="w-3.5 h-3.5 shrink-0" style={{ color: P.inkMuted }} />
-            <input
-              type="number"
+            <NumberField
               min={1}
               max={40}
               value={block.times}
-              onChange={e => onTimes(block.id, Math.max(1, Math.min(40, Number(e.target.value) || 1)))}
+              onCommit={(n) => onTimes(block.id, n)}
+              aria-label="Aantal herhalingen"
               className="w-11 px-1 py-0.5 rounded text-[11px] athletic-mono text-center"
               style={{ background: P.surfaceLow, border: `1px solid ${P.line}`, color: P.ink }}
             />
@@ -551,25 +551,29 @@ function StepEditor({
         </div>
         {byDistance ? (
           <div className="flex items-center gap-2 mt-2">
-            <DarkInput
-              type="number"
-              min={0.1}
+            {/* Klemmen op 0,05 km i.p.v. op meters: de gebruiker typt hier
+                kilometers, dus de ondergrens hoort in dezelfde eenheid. */}
+            <NumberField
+              min={0.05}
               step={0.1}
-              value={String((step.distanceM ?? 0) / 1000)}
-              onChange={e => onPatch(step.id, { distanceM: Math.max(50, (Number(e.target.value) || 0) * 1000) })}
-              className="text-xs"
+              value={(step.distanceM ?? 0) / 1000}
+              onCommit={(km) => onPatch(step.id, { distanceM: Math.round(km * 1000) })}
+              aria-label="Afstand in kilometer"
+              className="text-xs w-full px-2 py-1.5 rounded-lg"
+              style={{ background: P.surfaceLow, border: `1px solid ${P.line}`, color: P.ink }}
             />
             <span className="text-[11px] shrink-0" style={{ color: P.inkMuted }}>km</span>
           </div>
         ) : (
           <div className="flex items-center gap-2 mt-2">
-            <DarkInput
-              type="number"
+            <NumberField
               min={1}
               max={300}
-              value={String(Math.round((step.durationSec ?? 0) / 60))}
-              onChange={e => onPatch(step.id, { durationSec: Math.max(1, Math.min(300, Number(e.target.value) || 1)) * 60 })}
-              className="text-xs"
+              value={Math.round((step.durationSec ?? 0) / 60)}
+              onCommit={(min) => onPatch(step.id, { durationSec: Math.round(min * 60) })}
+              aria-label="Duur in minuten"
+              className="text-xs w-full px-2 py-1.5 rounded-lg"
+              style={{ background: P.surfaceLow, border: `1px solid ${P.line}`, color: P.ink }}
             />
             <span className="text-[11px] shrink-0" style={{ color: P.inkMuted }}>min</span>
           </div>
