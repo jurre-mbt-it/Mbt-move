@@ -168,8 +168,19 @@ async function main() {
   // Scope op de eigen praktijk: Prisma draait als owner en bypasst RLS, dus
   // zonder dit filter blokkeert (en toont) een gelijknamige import van een
   // ándere praktijk deze import.
+  // Op marker OF naam. De marker stond als `[import: ...]` in de description en
+  // is daarmee zichtbaar voor de therapeut; die tekst is uit bestaande plannen
+  // gehaald omdat het code-jargon is in een klinisch document. Zonder de
+  // naam-tak zou dit script zo'n opgeschoond plan niet meer herkennen en het
+  // stilletjes een tweede keer importeren.
   const dup = await prisma.weekPlanTemplate.findFirst({
-    where: { description: { contains: src.importMarker }, practiceId: owner.practiceId },
+    where: {
+      practiceId: owner.practiceId,
+      OR: [
+        { description: { contains: src.importMarker } },
+        { name: src.program.name },
+      ],
+    },
     select: { id: true, name: true },
   })
 

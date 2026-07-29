@@ -962,7 +962,12 @@ function PlanItemDialog({
   }
 
   const update = trpc.weekSchedules.updateItem.useMutation({
-    onSuccess: () => { ververs(); toast.success('Opgeslagen') },
+    // Sluiten hoort bij opslaan: dit is de knop onder naam, duur, RPE en
+    // notitie, en dat is het hele bovenblok. Bleef het venster staan, dan zag
+    // je alleen een toast en moest je zelf het kruisje zoeken om te zien of er
+    // iets veranderd was. De inhoud eronder (oefeningen, cardio-blokken) heeft
+    // zijn eigen opslaan-knop en laat het venster wél open.
+    onSuccess: () => { ververs(); toast.success('Opgeslagen'); onClose() },
     onError: (e) => toast.error(e.message),
   })
   const setExercises = trpc.weekSchedules.setItemExercises.useMutation({
