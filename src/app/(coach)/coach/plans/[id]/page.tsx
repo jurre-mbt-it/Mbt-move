@@ -12,10 +12,16 @@
  * Zie docs/plan-coach-role-20260721.md.
  */
 
-import { use, useMemo, useState } from 'react'
+import { use, useCallback, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Plus, Trash2, ChevronLeft } from 'lucide-react'
+import {
+  Plus, Trash2, ChevronLeft, Copy, Scissors, ClipboardPaste, CopyPlus,
+  MoreHorizontal, Pencil, Eraser,
+} from 'lucide-react'
+import {
+  DndContext, DragOverlay, type DragEndEvent, type DragStartEvent,
+} from '@dnd-kit/core'
 import { trpc } from '@/lib/trpc/client'
 import { usePortal } from '@/lib/portal'
 import { CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
@@ -30,6 +36,12 @@ import {
 import { DeletePlanDialog } from '@/components/week-planner/PlanTemplateDialogs'
 import { WorkoutProfileStrip } from '@/components/week-planner/WorkoutProfileStrip'
 import { WeekVolumePanel, formatAfstand, formatDuur } from '@/components/week-planner/WeekVolumePanel'
+import {
+  ContextMenu,
+  type ContextMenuItem,
+  type ContextMenuState,
+} from '@/components/week-planner/ContextMenu'
+import { DagCel, SleepbaarItem, usePlannerSensors } from '@/components/week-planner/PlanDragParts'
 import {
   DarkButton,
   DarkDialog as Dialog,
@@ -100,13 +112,39 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
     { staleTime: 10_000 },
   )
 
+  const ververs = useCallback(() => {
+    utils.weekSchedules.listWithItems.invalidate({ planTemplateId: planId })
+    utils.weekSchedules.listItemContents.invalidate()
+    utils.planTemplates.list.invalidate()
+  }, [utils, planId])
+
   const removeItem = trpc.weekSchedules.removeItem.useMutation({
-    onSuccess: () => {
-      utils.weekSchedules.listWithItems.invalidate({ planTemplateId: planId })
-      utils.planTemplates.list.invalidate()
-    },
+    onSuccess: ververs,
     onError: (e) => toast.error(e.message),
   })
+  /** Verplaatsen: één move is genoeg, de server autoriseert bron én doel. */
+  const verplaatsItem = trpc.weekSchedules.reorderItems.useMutation({
+    onSuccess: ververs,
+    onError: (e) => toast.error(e.message),
+  })
+  /**
+   * Kopiëren gaat server-side, want die neemt oefeningen, cardio-blokken,
+   * activiteit en geplande belasting mee. Zelf een nieuw item bouwen uit
+   * naam en duur laat precies die inhoud vallen.
+   */
+  const kopieerItem = trpc.weekSchedules.duplicateItem.useMutation({
+    onSuccess: ververs,
+    onError: (e) => toast.error(e.message),
+  })
+  const kopieerDagen = trpc.weekSchedules.copyDayItems.useMutation({
+    onError: (e) => toast.error(e.message),
+  })
+  /**
+   * Zelfde procedure, maar zonder ververs-na-elke-aanroep. Een week leegmaken
+   * verwijdert de items één voor één, en met de gewone mutatie levert dat een
+   * refetch per workout op in plaats van één aan het eind.
+   */
+  const verwijderStil = trpc.weekSchedules.removeItem.useMutation()
 
   const sorted = useMemo(
     () => [...weeks].sort((a, b) => a.weekNumber - b.weekNumber),
@@ -163,6 +201,189 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
       maxLoad: Math.max(0, ...[...perWeek.values()].map((v) => v.load)),
     }
   }, [sorted, inhoudPerItem])
+
+  /**
+   * Opzoektabellen voor slepen en plakken: waar staat een item nu, en wat is
+   * de volgende `order` op een dag. Sjabloon-weken hebben alle zeven dagen
+   * altijd al staan, dus een dayId is hier direct beschikbaar — anders dan in
+   * de patiënt-planner, die de dag soms nog moet aanmaken.
+   */
+  const { dagVanItem, dagInfo, itemNaam } = useMemo(() => {
+    const dagVanItem = new Map<string, string>()
+    const itemNaam = new Map<string, string>()
+    const dagInfo = new Map<string, { volgendeOrder: number; weekNumber: number; dayOfWeek: number }>()
+    for (const week of sorted) {
+      for (const day of week.days) {
+        dagInfo.set(day.id, {
+          volgendeOrder: day.items.reduce((m, i) => Math.max(m, i.order + 1), 0),
+          weekNumber: week.weekNumber,
+          dayOfWeek: day.dayOfWeek,
+        })
+        for (const it of day.items) {
+          dagVanItem.set(it.id, day.id)
+          itemNaam.set(it.id, it.program?.name ?? it.quickName ?? 'Workout')
+        }
+      }
+    }
+    return { dagVanItem, dagInfo, itemNaam }
+  }, [sorted])
+
+  // ── Slepen ────────────────────────────────────────────────────────────────
+  const sensors = usePlannerSensors()
+  const [sleeptItemId, setSleeptItemId] = useState<string | null>(null)
+
+  const onDragStart = (e: DragStartEvent) => setSleeptItemId(String(e.active.id))
+  const onDragEnd = (e: DragEndEvent) => {
+    setSleeptItemId(null)
+    const itemId = String(e.active.id)
+    const naarDag = e.over ? String(e.over.id) : null
+    // Buiten een dag losgelaten, of terug op de eigen dag: niets te doen.
+    if (!naarDag || dagVanItem.get(itemId) === naarDag) return
+    verplaatsItem.mutate({
+      moves: [{ itemId, dayId: naarDag, order: dagInfo.get(naarDag)?.volgendeOrder ?? 0 }],
+    })
+  }
+
+  // ── Klembord ──────────────────────────────────────────────────────────────
+  const [menu, setMenu] = useState<ContextMenuState>(null)
+  const [itemKlembord, setItemKlembord] = useState<
+    { itemId: string; naam: string; mode: 'copy' | 'cut' } | null
+  >(null)
+  const [weekKlembord, setWeekKlembord] = useState<
+    { weekId: string; weekNumber: number; mode: 'copy' | 'cut' } | null
+  >(null)
+  /** Doelweek bevat al workouts: vervangen of eronder plakken? */
+  const [weekPlakVraag, setWeekPlakVraag] = useState<string | null>(null)
+
+  const plakItem = async (naarDag: string) => {
+    const klem = itemKlembord
+    if (!klem) return
+    if (klem.mode === 'cut') {
+      if (dagVanItem.get(klem.itemId) === naarDag) return
+      verplaatsItem.mutate({
+        moves: [{ itemId: klem.itemId, dayId: naarDag, order: dagInfo.get(naarDag)?.volgendeOrder ?? 0 }],
+      })
+      // Knippen is eenmalig: het item staat nu ergens anders.
+      setItemKlembord(null)
+    } else {
+      kopieerItem.mutate({ itemId: klem.itemId, toDayId: naarDag })
+    }
+  }
+
+  /**
+   * Week plakken. Er is geen server-procedure voor: `duplicateWeek` eist een
+   * patiënt, een datum en `isTemplate: false`, en vindt op een sjabloon-week
+   * dus nooit iets. We koppelen daarom de zeven dagen op dayOfWeek en laten
+   * `copyDayItems` het werk doen — dat kopieert wél de oefeningen en de
+   * cardio-blokken mee.
+   */
+  const plakWeek = async (doelWeekId: string, vervang: boolean) => {
+    const klem = weekKlembord
+    const bron = sorted.find((w) => w.id === klem?.weekId)
+    const doel = sorted.find((w) => w.id === doelWeekId)
+    if (!klem || !bron || !doel || bron.id === doel.id) return
+
+    const doelDagOp = new Map(doel.days.map((d) => [d.dayOfWeek, d]))
+    try {
+      if (vervang) {
+        const teWissen = doel.days.flatMap((d) => d.items.map((i) => i.id))
+        // Serieel: de server synchroniseert per dag het legacy programId, en
+        // parallelle verwijderingen op dezelfde dag lopen elkaar dan in de weg.
+        for (const id of teWissen) await verwijderStil.mutateAsync({ id })
+      }
+      const pairs = bron.days
+        .filter((d) => d.items.length > 0 && doelDagOp.has(d.dayOfWeek))
+        .map((d) => ({ fromDayId: d.id, toDayId: doelDagOp.get(d.dayOfWeek)!.id }))
+      if (pairs.length > 0) await kopieerDagen.mutateAsync({ pairs })
+
+      if (klem.mode === 'cut') {
+        for (const id of bron.days.flatMap((d) => d.items.map((i) => i.id))) {
+          await verwijderStil.mutateAsync({ id })
+        }
+        setWeekKlembord(null)
+      }
+      ververs()
+      toast.success(`Week ${klem.weekNumber} geplakt in week ${doel.weekNumber}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Plakken mislukt')
+    }
+  }
+
+  const wisWeek = async (weekId: string) => {
+    const week = sorted.find((w) => w.id === weekId)
+    if (!week) return
+    try {
+      for (const id of week.days.flatMap((d) => d.items.map((i) => i.id))) {
+        await verwijderStil.mutateAsync({ id })
+      }
+      ververs()
+      toast.success(`Week ${week.weekNumber} leeggemaakt`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Leegmaken mislukt')
+    }
+  }
+
+  /** Menu-inhoud voor een workout. */
+  const itemMenu = (itemId: string, dayId: string): ContextMenuItem[] => [
+    { label: 'Bewerken', icon: <Pencil className="h-3.5 w-3.5" />, onSelect: () => {
+      const it = sorted.flatMap((w) => w.days).flatMap((d) => d.items).find((i) => i.id === itemId)
+      if (it) setEditFor(it)
+    } },
+    { label: 'Kopiëren', icon: <Copy className="h-3.5 w-3.5" />, onSelect: () =>
+      setItemKlembord({ itemId, naam: itemNaam.get(itemId) ?? 'Workout', mode: 'copy' }) },
+    { label: 'Knippen', icon: <Scissors className="h-3.5 w-3.5" />, onSelect: () =>
+      setItemKlembord({ itemId, naam: itemNaam.get(itemId) ?? 'Workout', mode: 'cut' }) },
+    { label: 'Dupliceren', icon: <CopyPlus className="h-3.5 w-3.5" />, onSelect: () =>
+      kopieerItem.mutate({ itemId, toDayId: dayId }) },
+    { type: 'separator' },
+    ...(itemKlembord
+      ? [{
+          label: 'Plakken', icon: <ClipboardPaste className="h-3.5 w-3.5" />,
+          hint: itemKlembord.naam, onSelect: () => plakItem(dayId),
+        } satisfies ContextMenuItem]
+      : []),
+    { label: 'Verwijderen', icon: <Trash2 className="h-3.5 w-3.5" />, danger: true,
+      onSelect: () => removeItem.mutate({ id: itemId }) },
+  ]
+
+  /** Menu-inhoud voor een lege plek op een dag. */
+  const dagMenu = (dayId: string, weekNumber: number, dayOfWeek: number): ContextMenuItem[] => [
+    { label: 'Workout toevoegen', icon: <Plus className="h-3.5 w-3.5" />,
+      onSelect: () => setAddFor({ dayId, weekNumber, dayOfWeek }) },
+    {
+      label: itemKlembord?.mode === 'cut' ? 'Hierheen verplaatsen' : 'Plakken',
+      icon: <ClipboardPaste className="h-3.5 w-3.5" />,
+      hint: itemKlembord?.naam,
+      disabled: !itemKlembord,
+      onSelect: () => plakItem(dayId),
+    },
+  ]
+
+  /** Menu-inhoud voor een hele week. */
+  const weekMenu = (weekId: string, weekNumber: number, heeftItems: boolean): ContextMenuItem[] => [
+    { label: 'Week kopiëren', icon: <Copy className="h-3.5 w-3.5" />, disabled: !heeftItems,
+      onSelect: () => {
+        setWeekKlembord({ weekId, weekNumber, mode: 'copy' })
+        toast.success(`Week ${weekNumber} gekopieerd, kies "Week plakken" op een andere week`)
+      } },
+    { label: 'Week knippen', icon: <Scissors className="h-3.5 w-3.5" />, disabled: !heeftItems,
+      onSelect: () => {
+        setWeekKlembord({ weekId, weekNumber, mode: 'cut' })
+        toast.success(`Week ${weekNumber} geknipt, kies "Week plakken" op een andere week`)
+      } },
+    {
+      label: 'Week plakken',
+      icon: <ClipboardPaste className="h-3.5 w-3.5" />,
+      hint: weekKlembord ? `week ${weekKlembord.weekNumber}` : undefined,
+      disabled: !weekKlembord || weekKlembord.weekId === weekId,
+      // Al inhoud? Dan eerst vragen; stil overschrijven of stil verdubbelen
+      // zijn allebei verrassingen die je niet terug kunt draaien.
+      onSelect: () => (heeftItems ? setWeekPlakVraag(weekId) : plakWeek(weekId, false)),
+    },
+    { type: 'separator' },
+    { label: 'Week leegmaken', icon: <Eraser className="h-3.5 w-3.5" />, danger: true,
+      disabled: !heeftItems, onSelect: () => wisWeek(weekId) },
+  ]
 
   /** Alleen activiteiten die écht in km gepland zijn; zie plannedVolume. */
   const planAfstanden = planTotaal.byActivity.filter((a) => a.distanceM != null)
@@ -230,9 +451,35 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
           </p>
         </Tile>
       ) : (
-        sorted.map((week) => (
+        <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        {sorted.map((week) => {
+          const weekHeeftItems = week.days.some((d) => d.items.length > 0)
+          return (
           <Tile key={week.id}>
-            <Kicker>Week {week.weekNumber}</Kicker>
+            <div
+              className="flex items-center justify-between gap-2"
+              onContextMenu={(e) => {
+                e.preventDefault()
+                setMenu({ x: e.clientX, y: e.clientY, items: weekMenu(week.id, week.weekNumber, weekHeeftItems) })
+              }}
+            >
+              <Kicker>Week {week.weekNumber}</Kicker>
+              {/* Rechtermuisknop is snel maar onzichtbaar; dit knopje maakt
+                  dezelfde acties vindbaar. */}
+              <button
+                type="button"
+                aria-label={`Acties voor week ${week.weekNumber}`}
+                title={`Acties voor week ${week.weekNumber}`}
+                onClick={(e) => {
+                  const r = e.currentTarget.getBoundingClientRect()
+                  setMenu({ x: r.left, y: r.bottom + 4, items: weekMenu(week.id, week.weekNumber, weekHeeftItems) })
+                }}
+                className="athletic-tap rounded p-1"
+                style={{ color: P.inkMuted }}
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+            </div>
             {/* Het weektotaal is de achtste kolom van dezelfde grid. Onder lg
                 zakt hij onder de dagen (col-span-7): naast zeven dagkolommen
                 past hij daar alleen door de dagen onleesbaar smal te maken. */}
@@ -240,10 +487,16 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
               {[...week.days]
                 .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
                 .map((day) => (
-                  <div
+                  <DagCel
                     key={day.id}
-                    className="rounded-lg p-2"
-                    style={{ background: P.surfaceLow, border: `1px solid ${P.line}`, minHeight: 96 }}
+                    dayId={day.id}
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      setMenu({
+                        x: e.clientX, y: e.clientY,
+                        items: dagMenu(day.id, week.weekNumber, day.dayOfWeek),
+                      })
+                    }}
                   >
                     <p
                       className="athletic-mono mb-1.5"
@@ -255,10 +508,15 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
                     {day.items.map((item) => {
                       const inhoud = inhoudPerItem.get(item.id)
                       return (
-                        <div
+                        <SleepbaarItem
                           key={item.id}
-                          className="mb-1 rounded"
-                          style={{ background: P.surfaceHi }}
+                          itemId={item.id}
+                          geknipt={itemKlembord?.mode === 'cut' && itemKlembord.itemId === item.id}
+                          onContextMenu={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setMenu({ x: e.clientX, y: e.clientY, items: itemMenu(item.id, day.id) })
+                          }}
                         >
                           <div className="flex items-start gap-1 px-1.5 py-1">
                             {/* Klikken opent de inhoud. Zonder dit kon je in een plan
@@ -303,7 +561,7 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
                               </span>
                             </div>
                           )}
-                        </div>
+                        </SleepbaarItem>
                       )
                     })}
 
@@ -321,7 +579,7 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
                     >
                       <Plus className="h-3 w-3" /> Toevoegen
                     </button>
-                  </div>
+                  </DagCel>
                 ))}
 
               <div className="md:col-span-7 lg:col-span-1">
@@ -335,7 +593,39 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
               </div>
             </div>
           </Tile>
-        ))
+          )
+        })}
+        {/* Wat je sleept, zichtbaar onder de cursor. Zonder dit sleep je een
+            onzichtbaar iets en zie je alleen de doeldag oplichten. */}
+        <DragOverlay dropAnimation={null}>
+          {sleeptItemId && (
+            <div
+              className="truncate rounded px-2 py-1 shadow-lg"
+              style={{
+                background: P.surfaceHi, color: P.ink, fontSize: 11,
+                border: `1px solid ${P.brand}`, maxWidth: 200,
+              }}
+            >
+              {itemNaam.get(sleeptItemId) ?? 'Workout'}
+            </div>
+          )}
+        </DragOverlay>
+        </DndContext>
+      )}
+
+      <ContextMenu state={menu} onClose={() => setMenu(null)} />
+
+      {weekPlakVraag && (
+        <WeekPlakDialog
+          bronWeek={weekKlembord?.weekNumber ?? 0}
+          doelWeek={sorted.find((w) => w.id === weekPlakVraag)?.weekNumber ?? 0}
+          onKies={(vervang) => {
+            const doel = weekPlakVraag
+            setWeekPlakVraag(null)
+            plakWeek(doel, vervang)
+          }}
+          onClose={() => setWeekPlakVraag(null)}
+        />
       )}
 
       {editFor && (
@@ -360,6 +650,46 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
         />
       )}
     </div>
+  )
+}
+
+/**
+ * De doelweek bevat al workouts. Stil overschrijven wist werk dat je niet
+ * terugkrijgt, stil toevoegen geeft een week met alles dubbel. Dus vragen.
+ */
+function WeekPlakDialog({
+  bronWeek, doelWeek, onKies, onClose,
+}: {
+  bronWeek: number
+  doelWeek: number
+  onKies: (vervang: boolean) => void
+  onClose: () => void
+}) {
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle>Week {doelWeek} bevat al workouts</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <p style={{ color: P.inkMuted, fontSize: 13, lineHeight: 1.6 }}>
+            Je plakt week {bronWeek} op week {doelWeek}. Wil je wat er staat vervangen,
+            of komt week {bronWeek} erbij?
+          </p>
+          <div className="flex flex-wrap justify-end gap-2">
+            <DarkButton variant="secondary" onClick={onClose}>
+              Annuleren
+            </DarkButton>
+            <DarkButton variant="secondary" onClick={() => onKies(false)}>
+              Toevoegen
+            </DarkButton>
+            <DarkButton variant="primary" onClick={() => onKies(true)}>
+              Vervangen
+            </DarkButton>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
