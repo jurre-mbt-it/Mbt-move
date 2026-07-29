@@ -20,7 +20,7 @@ import { trpc } from '@/lib/trpc/client'
 import { usePortal } from '@/lib/portal'
 import { CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
 import { readWorkout, type StructuredCardio } from '@/lib/cardio-workout'
-import { cardioEstimate } from '@/lib/planned-load'
+import { cardioEstimate, plannedVolume } from '@/lib/planned-load'
 import { CardioWorkoutBuilder } from '@/components/week-planner/CardioWorkoutBuilder'
 import {
   QuickExerciseBuilder,
@@ -29,6 +29,7 @@ import {
 } from '@/components/week-planner/QuickExerciseBuilder'
 import { DeletePlanDialog } from '@/components/week-planner/PlanTemplateDialogs'
 import { WorkoutProfileStrip } from '@/components/week-planner/WorkoutProfileStrip'
+import { WeekVolumePanel, formatAfstand, formatDuur } from '@/components/week-planner/WeekVolumePanel'
 import {
   DarkButton,
   DarkDialog as Dialog,
@@ -129,6 +130,43 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
     return m
   }, [alleInhoud])
 
+  /**
+   * Geplande omvang per week plus het totaal over het plan. De inhoud komt uit
+   * `listItemContents`: zonder de cardio-blokken telt een duurloop die op
+   * afstand is voorgeschreven voor nul, want de duur zit in die blokken.
+   */
+  const { volumePerWeek, planTotaal, maxLoad } = useMemo(() => {
+    const perWeek = new Map<string, ReturnType<typeof plannedVolume>>()
+    const itemsVan = (week: (typeof sorted)[number]) =>
+      week.days.flatMap((day) =>
+        day.items.map((it) => {
+          const inhoud = inhoudPerItem.get(it.id)
+          return {
+            kind: it.kind,
+            plannedDurationSec: it.plannedDurationSec,
+            plannedRpe: it.plannedRpe,
+            quickCategory: it.quickCategory,
+            quickActivity: it.quickActivity,
+            quickDurationSec: it.quickDurationSec,
+            cardioParams: inhoud?.cardioParams,
+            exercises: inhoud?.exercises?.map((e) => ({
+              sets: e.sets, reps: e.reps, repUnit: e.repUnit, restTime: e.restTime,
+            })),
+          }
+        }),
+      )
+    const alle = sorted.flatMap(itemsVan)
+    for (const week of sorted) perWeek.set(week.id, plannedVolume(itemsVan(week)))
+    return {
+      volumePerWeek: perWeek,
+      planTotaal: plannedVolume(alle),
+      maxLoad: Math.max(0, ...[...perWeek.values()].map((v) => v.load)),
+    }
+  }, [sorted, inhoudPerItem])
+
+  /** Alleen activiteiten die écht in km gepland zijn; zie plannedVolume. */
+  const planAfstanden = planTotaal.byActivity.filter((a) => a.distanceM != null)
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -147,6 +185,25 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
             {sorted.length} {sorted.length === 1 ? 'week' : 'weken'} · nog niet aan een atleet
             gekoppeld
           </MetaLabel>
+          {planTotaal.itemCount > 0 && (
+            <p
+              className="athletic-mono mt-1.5"
+              // Zie WeekVolumePanel: .athletic-mono kapitaliseert ongelaagd en
+              // wint van Tailwinds `normal-case`, dus hier inline uitzetten.
+              style={{ color: P.inkDim, fontSize: 11, textTransform: 'none' }}
+            >
+              {planTotaal.itemCount} sessies · {formatDuur(planTotaal.durationSec)} ·{' '}
+              {planTotaal.estimated ? '~' : ''}
+              {planTotaal.load} AU
+              {planAfstanden.map((a) => (
+                <span key={a.key}>
+                  {' · '}
+                  {a.label.toLowerCase()} {a.distanceEstimated ? '~' : ''}
+                  {formatAfstand(a.distanceM ?? 0)}
+                </span>
+              ))}
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <DarkButton variant="primary" onClick={() => router.push(`${portal.base}/plans`)}>
@@ -176,7 +233,10 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
         sorted.map((week) => (
           <Tile key={week.id}>
             <Kicker>Week {week.weekNumber}</Kicker>
-            <div className="mt-3 grid gap-2 md:grid-cols-7">
+            {/* Het weektotaal is de achtste kolom van dezelfde grid. Onder lg
+                zakt hij onder de dagen (col-span-7): naast zeven dagkolommen
+                past hij daar alleen door de dagen onleesbaar smal te maken. */}
+            <div className="mt-3 grid gap-2 md:grid-cols-7 lg:grid-cols-[repeat(7,minmax(0,1fr))_172px]">
               {[...week.days]
                 .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
                 .map((day) => (
@@ -263,6 +323,16 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
                     </button>
                   </div>
                 ))}
+
+              <div className="md:col-span-7 lg:col-span-1">
+                <WeekVolumePanel
+                  volume={volumePerWeek.get(week.id) ?? planTotaal}
+                  maxLoad={maxLoad}
+                  phaseType={week.phaseType}
+                  isDeload={week.isDeload}
+                  targetLoad={week.targetLoad}
+                />
+              </div>
             </div>
           </Tile>
         ))

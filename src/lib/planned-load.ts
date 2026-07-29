@@ -11,13 +11,16 @@
  */
 
 import { readWorkout, flattenSteps, targetRpe } from './cardio-workout'
-import type { CardioActivityKey } from './cardio-constants'
+import { CARDIO_ACTIVITIES, type CardioActivityKey } from './cardio-constants'
+import { EXERCISE_CATEGORIES } from './exercise-constants'
 
 export type PlannedLoadInput = {
   kind: string
   plannedDurationSec?: number | null
   plannedRpe?: number | null
   quickCategory?: string | null
+  /** Cardio-activiteit van het item; bepaalt onder welke kop het volume valt. */
+  quickActivity?: string | null
   quickDurationSec?: number | null
   /** Inline oefeningen — gebruikt om duur te schatten als die ontbreekt. */
   exercises?: { sets: number; reps: number; repUnit?: string | null; restTime?: number | null }[]
@@ -280,6 +283,115 @@ export function sumPlannedLoad(items: PlannedLoadInput[]): PlannedLoad & { itemC
     rpe: durationSec > 0 ? Math.round((load / (durationSec / 60)) * 10) / 10 : 0,
     itemCount: counted,
   }
+}
+
+/** Volume van één soort training binnen een week. */
+export type ActivityVolume = {
+  /** `CardioActivityKey` (RUNNING, CYCLING, …) of een categorie (STRENGTH, …). */
+  key: string
+  label: string
+  durationSec: number
+  /**
+   * Meters, of null als deze activiteit nergens in de week op AFSTAND is
+   * voorgeschreven. Die regel is bewust: een therapeut die fietsen in minuten
+   * plant heeft niets aan een omgerekende kilometerstand, en een getal dat
+   * niemand heeft voorgeschreven leest als een voorschrift.
+   */
+  distanceM: number | null
+  /** True als een deel van de afstand uit tijd is afgeleid (toon een ~). */
+  distanceEstimated: boolean
+  count: number
+}
+
+export type PlannedVolume = PlannedLoad & {
+  itemCount: number
+  /** Zwaarste eerst, gemeten in tijd. */
+  byActivity: ActivityVolume[]
+}
+
+/**
+ * Weekvolume uitgesplitst naar soort training, bovenop de belasting uit
+ * `sumPlannedLoad`.
+ *
+ * Waarom afstand en tijd door elkaar lopen: een stap draagt per contract
+ * ofwel een duur ofwel een afstand. In een marathonplan staat de lange duurloop
+ * in kilometers en de intervalsessie in minuten. Alleen de expliciete
+ * kilometers optellen geeft dus een weekstand die het halve hardloopwerk
+ * verzwijgt. We rekenen de tijd-stappen daarom om op hetzelfde aangenomen
+ * tempo dat `cardioEstimate` de andere kant op gebruikt (SEC_PER_KM), en
+ * markeren het resultaat als schatting.
+ *
+ * Dat tempo is een aanname, geen meting: er staat geen drempel of tempo per
+ * patiënt in de app. Een intervalsessie loopt harder dan het aangenomen
+ * duurtempo, dus de schatting valt daar aan de lage kant uit. Nog altijd
+ * dichter bij de waarheid dan nul.
+ */
+export function plannedVolume(items: PlannedLoadInput[]): PlannedVolume {
+  type Acc = {
+    durationSec: number
+    afstandM: number
+    /** Is er érgens in km voorgeschreven? Pas dan tonen we kilometers. */
+    heeftAfstand: boolean
+    afgeleid: boolean
+    count: number
+  }
+  const per = new Map<string, Acc>()
+
+  for (const it of items) {
+    if (!LOAD_BEARING_KINDS.includes(it.kind)) continue
+    const r = itemPlannedLoad(it)
+
+    // De blokken kennen hun eigen activiteit; die wint van het veld op het
+    // item, want de bouwer schrijft 'm daar weg.
+    const w = readWorkout(it.cardioParams)
+    const key = w?.activity ?? it.quickActivity ?? it.quickCategory ?? 'OTHER'
+
+    const acc = per.get(key) ?? {
+      durationSec: 0, afstandM: 0, heeftAfstand: false, afgeleid: false, count: 0,
+    }
+    acc.count++
+    acc.durationSec += r.durationSec
+
+    if (key in CARDIO_ACTIVITIES) {
+      const secPerKm = SEC_PER_KM[key as CardioActivityKey] ?? SEC_PER_KM_FALLBACK
+      if (w) {
+        for (const st of flattenSteps(w.blocks)) {
+          const m = st.distanceM ?? 0
+          if (m > 0) {
+            acc.afstandM += m
+            acc.heeftAfstand = true
+          } else if ((st.durationSec ?? 0) > 0) {
+            acc.afstandM += ((st.durationSec ?? 0) / secPerKm) * 1000
+            acc.afgeleid = true
+          }
+        }
+      } else if (r.durationSec > 0) {
+        // Cardio zonder blokken: alleen een duur, dus de hele afstand is afgeleid.
+        acc.afstandM += (r.durationSec / secPerKm) * 1000
+        acc.afgeleid = true
+      }
+    }
+    per.set(key, acc)
+  }
+
+  const byActivity: ActivityVolume[] = [...per.entries()]
+    .map(([key, a]) => ({
+      key,
+      label: activityLabel(key),
+      durationSec: a.durationSec,
+      distanceM: a.heeftAfstand ? Math.round(a.afstandM) : null,
+      distanceEstimated: a.heeftAfstand && a.afgeleid,
+      count: a.count,
+    }))
+    .sort((a, b) => b.durationSec - a.durationSec)
+
+  return { ...sumPlannedLoad(items), byActivity }
+}
+
+function activityLabel(key: string): string {
+  const cardio = CARDIO_ACTIVITIES[key as CardioActivityKey]
+  if (cardio) return cardio.label
+  return EXERCISE_CATEGORIES.find((c) => c.value === key)?.label ?? 'Overig'
 }
 
 /**
