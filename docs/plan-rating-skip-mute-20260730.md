@@ -46,11 +46,12 @@ Uitrol: `prisma db push` (alleen nieuwe kolommen op bestaande tabellen).
   alleen als de lijst niet leeg is).
 - Nieuw `skipRating({ id })` (`wearablesProcedure`, ownership via
   `patientId: ctx.user.id`, zelfde patroon als `rateActivity`): zet
-  `skippedAt = now()`. Retourneert `{ ok, activity, skippedOfType, muted }`
+  `skippedAt = now()`. Retourneert `{ ok, activity, skippedOfType, offerMute }`
   met `skippedOfType` = aantal overgeslagen ritten van dat type in de laatste
-  30 dagen en `muted` = staat het type al in de demp-lijst. De client beslist
-  daarmee of het demp-aanbod verschijnt; de server houdt geen
-  "al aangeboden"-boekhouding bij.
+  30 dagen. `offerMute` wordt server-side berekend (pure functie
+  `shouldOfferRatingMute`, met vitest-test): elke derde skip van een type,
+  zolang het niet gedempt is. De client toont het aanbod alleen bij
+  `offerMute: true`; niemand houdt "al aangeboden"-boekhouding bij.
 - Nieuw `setRatingMute({ activity, muted })`: voegt toe aan of verwijdert uit
   `ratingMutedActivities`. Idempotent; zelfde mutation dempt én herstelt.
 - Nieuw `ratingMutes` (query): de huidige demp-lijst, voor het

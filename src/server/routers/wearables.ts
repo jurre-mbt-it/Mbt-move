@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
-import { Prisma, type PrismaClient } from '@prisma/client'
+import { CardioActivity, Prisma, type PrismaClient } from '@prisma/client'
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -14,6 +14,7 @@ import { wearablesEnabledForRole } from '@/lib/wearables-access'
 import { auditLog } from '@/server/audit'
 import { buildAuthorizeUrl, encryptToken, isStravaConfigured, openTokens } from '@/server/wearables/strava/config'
 import { syncStravaActivities } from '@/server/wearables/strava/sync'
+import { shouldOfferRatingMute } from '@/server/wearables/rating'
 import { syncHashtagsForLog } from '@/server/tags'
 import { heartRateLooksImplausible } from '@/lib/heart-rate-plausibility'
 import { resolveMaxHr } from '@/lib/cardio-zones'
@@ -399,11 +400,20 @@ export const wearablesRouter = createTRPCRouter({
   unratedActivities: wearablesProcedure.query(async ({ ctx }) => {
     const since = startOfDay()
     since.setDate(since.getDate() - 7)
+    // Demp-lijst vers lezen, niet uit de (tot 60s) gecachete ctx.user: na
+    // "weer aanzetten" in instellingen moet de popup direct terug kunnen komen.
+    const me = await ctx.prisma.user.findUnique({
+      where: { id: ctx.user!.id },
+      select: { ratingMutedActivities: true },
+    })
+    const mutedTypes = me?.ratingMutedActivities ?? []
     const rows = await ctx.prisma.cardioLog.findMany({
       where: {
         patientId: ctx.user!.id,
         source: { in: ['APPLE_WATCH', 'STRAVA'] },
         ratedAt: null,
+        skippedAt: null,
+        ...(mutedTypes.length ? { activity: { notIn: mutedTypes } } : {}),
         completedAt: { gte: since },
       },
       orderBy: { completedAt: 'desc' },
@@ -456,6 +466,82 @@ export const wearablesRouter = createTRPCRouter({
       }
       return { ok: true }
     }),
+
+  /**
+   * "Overslaan" in de beoordeel-popup: onthoud de keuze zodat de rit niet bij
+   * elke app-start terugkomt. De rit mist niets — de HR-schatting blijft de
+   * RPE — en beoordelen via het detailscherm kan altijd nog. Geeft terug of
+   * de client het demp-aanbod voor dit type moet tonen (elke 3e skip).
+   */
+  skipRating: wearablesProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // ratedAt-guard: is de rit intussen op een ander apparaat beoordeeld,
+      // dan wint die beoordeling en slaan we niets over.
+      const res = await ctx.prisma.cardioLog.updateMany({
+        where: { id: input.id, patientId: ctx.user!.id, ratedAt: null },
+        data: { skippedAt: new Date() },
+      })
+      if (res.count === 0) throw new TRPCError({ code: 'NOT_FOUND' })
+      const log = await ctx.prisma.cardioLog.findUnique({
+        where: { id: input.id },
+        select: { activity: true },
+      })
+      if (!log) throw new TRPCError({ code: 'NOT_FOUND' })
+      const windowStart = startOfDay()
+      windowStart.setDate(windowStart.getDate() - 30)
+      const [skippedOfType, me] = await Promise.all([
+        ctx.prisma.cardioLog.count({
+          where: {
+            patientId: ctx.user!.id,
+            activity: log.activity,
+            skippedAt: { gte: windowStart },
+          },
+        }),
+        ctx.prisma.user.findUnique({
+          where: { id: ctx.user!.id },
+          select: { ratingMutedActivities: true },
+        }),
+      ])
+      const muted = (me?.ratingMutedActivities ?? []).includes(log.activity)
+      return {
+        ok: true,
+        activity: log.activity,
+        skippedOfType,
+        offerMute: shouldOfferRatingMute(skippedOfType, muted),
+      }
+    }),
+
+  /**
+   * Demp de beoordeel-popup voor een activiteitstype, of zet hem weer aan.
+   * Idempotent; dezelfde mutation doet beide richtingen (omkeerbaar via
+   * instellingen in de app).
+   */
+  setRatingMute: wearablesProcedure
+    .input(z.object({ activity: z.nativeEnum(CardioActivity), muted: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const me = await ctx.prisma.user.findUnique({
+        where: { id: ctx.user!.id },
+        select: { ratingMutedActivities: true },
+      })
+      const current = new Set(me?.ratingMutedActivities ?? [])
+      if (input.muted) current.add(input.activity)
+      else current.delete(input.activity)
+      await ctx.prisma.user.update({
+        where: { id: ctx.user!.id },
+        data: { ratingMutedActivities: { set: [...current] } },
+      })
+      return { ok: true, muted: [...current] }
+    }),
+
+  /** Gedempte activiteitstypes, voor het instellingen-scherm in de app. */
+  ratingMutes: wearablesProcedure.query(async ({ ctx }) => {
+    const me = await ctx.prisma.user.findUnique({
+      where: { id: ctx.user!.id },
+      select: { ratingMutedActivities: true },
+    })
+    return me?.ratingMutedActivities ?? []
+  }),
 
   /**
    * Markeer de hartslagmeting van een activiteit als onbetrouwbaar.
