@@ -24,6 +24,7 @@ import { QuickStartCard } from '@/components/system/QuickStartCard'
 import { StartTreatmentCard } from '@/components/system/StartTreatmentCard'
 import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, type CardioActivityKey, type CardioProtocolKey } from '@/lib/cardio-constants'
 import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
+import { formatWeightsPerSet } from '@/lib/session-sets'
 
 const URGENCY_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
   CRITICAL: { color: P.danger, bg: 'rgba(240,121,108,0.18)', label: 'Kritiek' },
@@ -157,12 +158,8 @@ function fmtDateTime(d: Date | string | null): string {
 
 function weightLabel(ex: { weight: number | null; weightsPerSet: unknown }): string | null {
   // Alleen tonen als er écht gewichten gelogd zijn — bodyweight-oefeningen
-  // hebben vaak een array vol nulls en dan is "— / — / — kg" alleen ruis.
-  if (Array.isArray(ex.weightsPerSet) && ex.weightsPerSet.some((w) => w != null)) {
-    return `${ex.weightsPerSet.map((w) => w ?? '—').join(' / ')} kg`
-  }
-  if (ex.weight != null) return `${ex.weight} kg`
-  return null
+  // hebben vaak een array vol nulls en dan is "—-—-— kg" alleen ruis.
+  return formatWeightsPerSet(ex.weightsPerSet, ex.weight)
 }
 
 function StatBlock({ label, value }: { label: string; value: React.ReactNode }) {

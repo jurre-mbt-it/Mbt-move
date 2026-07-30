@@ -544,6 +544,9 @@ export const weekSchedulesRouter = createTRPCRouter({
               repsCompleted: true,
               duration: true,
               weight: true,
+              // Per-set gewicht, zodat de week-planner "40-50-60-60 kg" kan
+              // tonen i.p.v. alleen de zwaarste set uit `weight`.
+              weightsPerSet: true,
               painLevel: true,
               painDuring: true,
               notes: true,

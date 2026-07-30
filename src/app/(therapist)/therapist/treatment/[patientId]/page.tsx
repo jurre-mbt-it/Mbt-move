@@ -49,6 +49,7 @@ import {
   SUPERSET_COLORS,
   SUPERSET_LETTERS,
 } from '@/lib/program-constants'
+import { formatWeightsPerSet } from '@/lib/session-sets'
 
 type ParamType = 'number' | 'text' | 'select' | 'slider'
 
@@ -1348,8 +1349,11 @@ function ExerciseTile({
         </div>
       )}
 
+      {/* items-end: de eenheid-knoppen boven het reps-veld wrappen over
+          meerdere regels, dus lijn de invoervelden onderaan uit i.p.v. de
+          labels bovenaan — anders staat het reps-veld lager dan de rest. */}
       <div
-        className="grid gap-2 mt-3"
+        className="grid gap-2 mt-3 items-end"
         style={{ gridTemplateColumns: `repeat(${2 + (r.visible.pain ? 1 : 0)}, minmax(0, 1fr))` }}
       >
         <LabeledInput label="Sets" value={r.setsCompleted} onChange={(v) => onUpdate(r.uid, { setsCompleted: v })} inputMode="numeric" />
@@ -1581,7 +1585,10 @@ function RepsInput({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-0.5">
+      {/* Zes eenheden in een grid-kolom van ~1/3 kaartbreedte: zonder wrap
+          steekt de rij ~175px buiten zijn kolom uit en renderen "SEC" en
+          "SEC/ZIJDE" bovenop het label van de PIJN-kolom ernaast. */}
+      <div className="flex flex-wrap items-center gap-1">
         {REP_UNITS.map((u) => {
           const active = unit === u.value
           return (
@@ -1599,6 +1606,8 @@ function RepsInput({
                 fontSize: 10,
                 letterSpacing: '0.12em',
                 fontWeight: 900,
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
               }}
             >
               {u.label.toUpperCase()}
@@ -2028,12 +2037,7 @@ function formatRelativeDate(input: Date | string | null): string {
 }
 
 function formatWeights(weightsPerSet: unknown, fallback: number | null): string | null {
-  if (Array.isArray(weightsPerSet) && weightsPerSet.length > 0) {
-    const cleaned = weightsPerSet.map((w) => (typeof w === 'number' && !Number.isNaN(w) ? `${w}` : '—'))
-    if (cleaned.some((c) => c !== '—')) return cleaned.join(' · ') + ' kg'
-  }
-  if (typeof fallback === 'number' && !Number.isNaN(fallback)) return `${fallback} kg`
-  return null
+  return formatWeightsPerSet(weightsPerSet, fallback)
 }
 
 function summarizeExtraParams(extraParams: unknown): string | null {

@@ -70,6 +70,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { CATEGORY_COLORS } from '@/lib/palette'
+import { formatWeightsPerSet } from '@/lib/session-sets'
 import { useCategoryColors } from '@/lib/useCategoryColors'
 import {
   CATEGORY_LABELS,
@@ -972,6 +973,7 @@ type SessionDetail = {
     repsCompleted: number | null
     duration: number | null
     weight: number | null
+    weightsPerSet: unknown
     painLevel: number | null
     painDuring: number | null
     notes: string | null
@@ -1292,6 +1294,7 @@ function ItemDetailContent({
                     ? `${log.setsCompleted} × ${log.repsCompleted}`
                     : log.setsCompleted ? `${log.setsCompleted} sets`
                     : log.duration ? fmtDuration(log.duration) : '—'
+                  const weightLine = formatWeightsPerSet(log.weightsPerSet, log.weight)
                   return (
                     <div
                       key={log.id}
@@ -1304,7 +1307,7 @@ function ItemDetailContent({
                         <span className="athletic-mono font-bold" style={{ color: P.ink, fontSize: 11 }}>{setLine}</span>
                       </div>
                       <div className="flex flex-wrap gap-3 mt-1.5" style={{ color: P.inkMuted, fontSize: 10 }}>
-                        {log.weight ? <span className="inline-flex items-center gap-1"><IconScale size={11} /> {log.weight}kg</span> : null}
+                        {weightLine ? <span className="inline-flex items-center gap-1"><IconScale size={11} /> {weightLine}</span> : null}
                         {log.painLevel != null ? <span>NRS pijn: {log.painLevel}/10</span> : null}
                       </div>
                     </div>

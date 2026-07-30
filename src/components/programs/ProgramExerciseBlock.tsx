@@ -90,8 +90,12 @@ function FixedChip({
   isRange?: boolean
 }) {
   return (
-    <div className="group/chip inline-flex items-center gap-1 bg-[#1C4448] border border-[rgba(212,232,230,0.06)] rounded-md pl-2 pr-1 py-0.5 text-xs h-7">
-      <span className="text-[#9EB5B3] font-medium">{label}</span>
+    // shrink-0 + min-h i.p.v. h-7: een lang label ("Herhalingen (per zijde)")
+    // maakt de chip breder dan een smalle kolom, en dan kneep de flex-rij 'm
+    // onder zijn tekstbreedte — waarna het label binnen de vaste hoogte brak
+    // en over de chips eronder heen viel. Liever een eigen regel.
+    <div className="group/chip inline-flex shrink-0 items-center gap-1 bg-[#1C4448] border border-[rgba(212,232,230,0.06)] rounded-md pl-2 pr-1 py-0.5 text-xs min-h-7">
+      <span className="text-[#9EB5B3] font-medium whitespace-nowrap">{label}</span>
       <span className="flex items-center gap-0.5 text-foreground">{children}</span>
       {(onToggleRange || onRemove) && (
         <span className="flex items-center gap-0.5 ml-0.5">
@@ -598,7 +602,7 @@ export function ProgramExerciseBlock({
               <select
                 value={exercise.repUnit}
                 onChange={e => onUpdate(exercise.uid, { repUnit: e.target.value as RepUnit })}
-                className="text-xs bg-transparent border-0 rounded px-0.5 h-5 focus:outline-none focus:ring-1 focus:ring-[#E87A55] text-[#9EB5B3]"
+                className="shrink-0 max-w-[7.5rem] text-xs bg-transparent border-0 rounded px-0.5 h-5 focus:outline-none focus:ring-1 focus:ring-[#E87A55] text-[#9EB5B3]"
               >
                 {REP_UNITS.map(u => <option key={u.value} value={u.value} className="bg-[#1C4448]">{u.label}</option>)}
               </select>

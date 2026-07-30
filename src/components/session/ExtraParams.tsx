@@ -20,7 +20,7 @@ let paramSeq = 0
 export function RepUnitPicker({ value, onChange }: { value: string; onChange: (unit: string) => void }) {
   return (
     <div
-      className="inline-flex items-center gap-0.5 rounded-full p-0.5"
+      className="inline-flex flex-wrap items-center gap-0.5 rounded-full p-0.5"
       style={{ background: P.surfaceLow, border: `1px solid ${P.line}` }}
       role="group"
       aria-label="Eenheid"
@@ -44,6 +44,10 @@ export function RepUnitPicker({ value, onChange }: { value: string; onChange: (u
               background: active ? P.surfaceHi : 'transparent',
               border: `1px solid ${active ? 'rgba(245,185,66,0.5)' : 'transparent'}`,
               color: active ? P.gold : P.inkMuted,
+              // Krimpen laat de tekst binnen de pil breken en over de buur
+              // heen lopen; liever een tweede regel dan overlap.
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
             }}
           >
             {u.label}

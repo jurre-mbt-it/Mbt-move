@@ -35,6 +35,7 @@ import { wearablesEnabledForRole } from '@/lib/wearables-access'
 import { isReviewDue, weeksSince } from '@/lib/program-review'
 import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, type CardioActivityKey, type CardioProtocolKey } from '@/lib/cardio-constants'
 import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
+import { formatWeightsPerSet } from '@/lib/session-sets'
 import { CARDIO_ICON_MAP, IconMail, IconCalendar, IconClipboard } from '@/components/icons'
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
@@ -126,6 +127,7 @@ export default function PatientDetailPage({
       reps: number | null
       painLevel: number | null
       weight: number | null
+      weightsPerSet: unknown
     }>
   }
   // therapistId-semantiek: null = legacy/onbekend, === patientId = patient
@@ -797,24 +799,29 @@ export default function PatientDetailPage({
                     </div>
                     {session.exercises.length > 0 && (
                       <div className="space-y-1 pt-1 border-t" style={{ borderColor: P.line }}>
-                        {session.exercises.map((ex) => (
+                        {session.exercises.map((ex) => {
+                          // Per set, want alleen `weight` toont de zwaarste set:
+                          // 40/50/60/60 kg kwam langs als kaal "60 kg".
+                          const weightLabel = formatWeightsPerSet(ex.weightsPerSet, ex.weight)
+                          return (
                           <div
                             key={ex.id}
-                            className="flex items-center justify-between gap-2 text-xs"
+                            className="flex items-start justify-between gap-2 text-xs"
                             style={{ color: P.inkMuted }}
                           >
                             <span style={{ color: P.ink }}>{ex.name}</span>
-                            <span className="athletic-mono" style={{ fontSize: 10, letterSpacing: '0.06em' }}>
+                            <span className="athletic-mono text-right" style={{ fontSize: 10, letterSpacing: '0.06em' }}>
                               {ex.sets != null && ex.reps != null
                                 ? `${ex.sets}×${ex.reps}`
                                 : ex.sets != null
                                   ? `${ex.sets} sets`
                                   : '—'}
-                              {ex.weight != null && ` · ${ex.weight}kg`}
+                              {weightLabel != null && ` · ${weightLabel}`}
                               {ex.painLevel != null && ` · NRS ${ex.painLevel}`}
                             </span>
                           </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     )}
                     {session.notes && (

@@ -132,6 +132,40 @@ export function prevRepsFor(last: LastLog | undefined, i: number): number | null
   return last.repsCompleted ?? null
 }
 
+/**
+ * Gelogde gewichten als één regel voor historie-overzichten:
+ * verschillende sets → "40-50-60-60 kg", allemaal gelijk → "60 kg".
+ *
+ * Zonder dit toonde de historie alleen `ExerciseLog.weight` — de zwaarste set —
+ * waardoor een opbouwende oefening (40 → 50 → 60) als "60 kg" langskwam.
+ *
+ * Niet-ingevulde sets middenin worden "—"; niet-ingevulde sets aan het eind
+ * vallen weg (4 rijen, 3 ingevuld → "40-50-60", niet "40-50-60-—"). Is er
+ * niets per set gelogd, dan valt 'ie terug op het losse `weight`-veld.
+ */
+export function formatWeightsPerSet(
+  weightsPerSet: unknown,
+  fallback: number | null | undefined,
+  unit = 'kg',
+): string | null {
+  if (Array.isArray(weightsPerSet)) {
+    const cells = weightsPerSet.map(w =>
+      typeof w === 'number' && Number.isFinite(w) ? fmtKg(w) : null,
+    )
+    while (cells.length > 0 && cells[cells.length - 1] === null) cells.pop()
+    const logged = cells.filter((c): c is string => c !== null)
+    if (logged.length > 0) {
+      // Alle sets hetzelfde gewicht (en geen gaten) → comprimeer tot één getal.
+      if (logged.length === cells.length && new Set(logged).size === 1) {
+        return `${logged[0]} ${unit}`
+      }
+      return `${cells.map(c => c ?? '—').join('-')} ${unit}`
+    }
+  }
+  if (typeof fallback === 'number' && Number.isFinite(fallback)) return `${fmtKg(fallback)} ${unit}`
+  return null
+}
+
 /** Korte samenvatting van de vorige sessie, bv. "22,5 kg × 10" of "20 / 22,5 / 25 kg". */
 export function prevSummaryFor(last: LastLog | undefined): string | null {
   if (!last) return null

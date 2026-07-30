@@ -30,6 +30,7 @@ import {
 import { CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
 import { WeekPhaseLine } from '@/components/schedule/WeekPhaseLine'
 import { CATEGORY_COLORS } from '@/lib/palette'
+import { formatWeightsPerSet } from '@/lib/session-sets'
 
 const mono =
   'var(--font-mono-athletic)'
@@ -900,7 +901,7 @@ function EventDetailSheet({
                       >
                         {[
                           l.setsCompleted != null && l.repsCompleted != null ? `${l.setsCompleted} × ${l.repsCompleted}` : null,
-                          l.weight != null ? `${l.weight} kg` : null,
+                          formatWeightsPerSet(l.weightsPerSet, l.weight),
                           (l.painDuring ?? l.painLevel) != null ? `pijn ${l.painDuring ?? l.painLevel}` : null,
                         ].filter(Boolean).join(' · ')}
                       </p>
@@ -944,6 +945,7 @@ type SessionDetailData = {
     setsCompleted: number | null
     repsCompleted: number | null
     weight: number | null
+    weightsPerSet: unknown
     painLevel: number | null
     painDuring: number | null
     supersetGroup: string | null
