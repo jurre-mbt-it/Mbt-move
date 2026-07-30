@@ -67,22 +67,24 @@ Uitrol: `prisma db push` (alleen nieuwe kolommen op bestaande tabellen).
 - Antwoordt de server met `skippedOfType >= 3`, `skippedOfType % 3 === 0` en
   `muted: false`, dan een `Alert`:
   - Titel: "Fietsritten stil houden?" (naam uit de bestaande `ACTIVITY_NL`-map)
-  - Tekst: "Je sloeg nu 3 fietsritten over. Wil je dat we hier niet meer om
-    vragen? De schatting uit je hartslag blijft meetellen. Terugzetten kan
-    bij Instellingen."
+  - Tekst: "Je sloeg nu [aantal] keer fietsen over. Wil je dat we hier niet
+    meer om vragen? De schatting uit je hartslag blijft meetellen. Terugzetten
+    kan bij Instellingen." Het aantal komt uit `skippedOfType` (3, 6, 9, …).
   - Knoppen: "Blijf vragen" (niets) / "Niet meer vragen" →
     `setRatingMute({ activity, muted: true })` en alle items van dat type
     lokaal uit de wachtrij.
-- Backdrop-tik en wegvegen worden het echte "later": de hele ronde sluit
-  lokaal (wachtrij leeg, géén server-call) en komt bij de volgende
-  foreground/refresh terug. Het huidige gedrag (backdrop skipt één item en de
-  volgende sheet verschijnt meteen) vervalt.
+- Backdrop-tik en de hardware-terugknop worden het echte "later": de hele
+  ronde parkeert lokaal (wachtrij leeg, géén server-call) en komt bij de
+  volgende terugkeer naar de voorgrond terug. Een geparkeerde ronde overleeft
+  ook de naijlende refresh na de HealthKit-sync. Het huidige gedrag (backdrop
+  skipt één item en de volgende sheet verschijnt meteen) vervalt. De sheet
+  heeft geen veeg-gesture; backdrop en terugknop dekken het sluiten.
 
 **`components/rating-sheet.tsx`**
 
 - Knop "Later" hernoemen naar "Overslaan" (die bewaart nu de skip).
-- `onSkip` (persistent, knop) en `onClose` (ronde pauzeren, backdrop/veeg)
-  worden aparte callbacks.
+- `onSkip` (persistent, knop) en `onClose` (ronde parkeren, backdrop en
+  hardware-terugknop) worden aparte callbacks.
 
 **`app/settings.tsx`**
 

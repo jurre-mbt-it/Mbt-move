@@ -29,7 +29,7 @@
 **Interfaces:**
 - Produces: `CardioLog.skippedAt: DateTime?`, `User.ratingMutedActivities: CardioActivity[]` (Prisma-client types voor Task 3)
 
-- [ ] **Step 1: CardioLog.skippedAt toevoegen**
+- [x] **Step 1: CardioLog.skippedAt toevoegen**
 
 In `prisma/schema.prisma`, direct onder het `ratedAt`-veld van `model CardioLog` (na de comment-regels die eindigen op "…triggeren de popup."):
 
@@ -40,7 +40,7 @@ In `prisma/schema.prisma`, direct onder het `ratedAt`-veld van `model CardioLog`
   skippedAt             DateTime?
 ```
 
-- [ ] **Step 2: User.ratingMutedActivities toevoegen**
+- [x] **Step 2: User.ratingMutedActivities toevoegen**
 
 In `model User`, in het blok `// Push-notificaties (mobiele app)` direct onder `dailyGoal              DailyGoal?`:
 
@@ -50,12 +50,12 @@ In `model User`, in het blok `// Push-notificaties (mobiele app)` direct onder `
   ratingMutedActivities CardioActivity[] @default([])
 ```
 
-- [ ] **Step 3: Valideren en pushen**
+- [x] **Step 3: Valideren en pushen**
 
 Run: `cd /Users/eva/mbt-gym && npx prisma validate && npm run db:push`
 Expected: "The database is now in sync with your Prisma schema" — additieve kolommen, geen data-loss-prompt. Krijg je WEL een data-loss-prompt: STOP, niet accepteren, terug naar de schema-edit.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add prisma/schema.prisma
@@ -75,7 +75,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces: `shouldOfferRatingMute(skippedOfType: number, muted: boolean): boolean` — gebruikt door Task 3.
 
-- [ ] **Step 1: Failing test schrijven**
+- [x] **Step 1: Failing test schrijven**
 
 `src/server/wearables/__tests__/rating.test.ts` (zelfde importstijl als `ingest.test.ts` — check die eerst; standaard expliciete vitest-imports):
 
@@ -106,12 +106,12 @@ describe('shouldOfferRatingMute', () => {
 })
 ```
 
-- [ ] **Step 2: Test draaien, moet falen**
+- [x] **Step 2: Test draaien, moet falen**
 
 Run: `npx vitest run src/server/wearables/__tests__/rating.test.ts`
 Expected: FAIL — module `../rating` bestaat niet.
 
-- [ ] **Step 3: Implementatie**
+- [x] **Step 3: Implementatie**
 
 `src/server/wearables/rating.ts`:
 
@@ -127,12 +127,12 @@ export function shouldOfferRatingMute(skippedOfType: number, muted: boolean): bo
 }
 ```
 
-- [ ] **Step 4: Test draaien, moet slagen**
+- [x] **Step 4: Test draaien, moet slagen**
 
 Run: `npx vitest run src/server/wearables/__tests__/rating.test.ts`
 Expected: PASS (3 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/server/wearables/rating.ts src/server/wearables/__tests__/rating.test.ts
@@ -156,7 +156,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
   - `wearables.setRatingMute({ activity: CardioActivity, muted: boolean })` → `{ ok: true, muted: CardioActivity[] }`
   - `wearables.ratingMutes` (query) → `CardioActivity[]`
 
-- [ ] **Step 1: Imports aanvullen**
+- [x] **Step 1: Imports aanvullen**
 
 Bovenaan `wearables.ts`: `CardioActivity` als value-import toevoegen aan de bestaande `@prisma/client`-import, en de nieuwe helper importeren:
 
@@ -165,7 +165,7 @@ import { CardioActivity, Prisma, type PrismaClient } from '@prisma/client'
 import { shouldOfferRatingMute } from '@/server/wearables/rating'
 ```
 
-- [ ] **Step 2: `unratedActivities` uitbreiden**
+- [x] **Step 2: `unratedActivities` uitbreiden**
 
 De bestaande query vervangen door (alleen de `where`-opbouw en de verse demp-lijst zijn nieuw):
 
@@ -200,7 +200,7 @@ De bestaande query vervangen door (alleen de `where`-opbouw en de verse demp-lij
   }),
 ```
 
-- [ ] **Step 3: Nieuwe endpoints, direct onder `rateActivity`**
+- [x] **Step 3: Nieuwe endpoints, direct onder `rateActivity`**
 
 ```ts
   /**
@@ -280,12 +280,12 @@ De bestaande query vervangen door (alleen de `where`-opbouw en de verse demp-lij
   }),
 ```
 
-- [ ] **Step 4: Checks**
+- [x] **Step 4: Checks**
 
 Run: `npx tsc --noEmit && npm run test`
 Expected: beide schoon/groen.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/server/routers/wearables.ts
@@ -307,7 +307,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Consumes: `wearables.skipRating` / `wearables.setRatingMute` uit Task 3.
 - Produces: `RatingSheet`-props `onSkip?: () => void` (persistent; toont knop "Overslaan") en `onClose: () => void` (backdrop/hardware-back; knop "Sluiten" als `onSkip` ontbreekt). `ACTIVITY_NL` geëxporteerd uit `rating-queue.tsx` (Task 5 gebruikt die).
 
-- [ ] **Step 1: `rating-sheet.tsx` — props splitsen**
+- [x] **Step 1: `rating-sheet.tsx` — props splitsen**
 
 In de props: `onSkip: () => void;` wordt:
 
@@ -326,7 +326,7 @@ In de props: `onSkip: () => void;` wordt:
                 </Pressable>
 ```
 
-- [ ] **Step 2: `rating-queue.tsx` — skip persistent + ronde parkeren + demp-aanbod**
+- [x] **Step 2: `rating-queue.tsx` — skip persistent + ronde parkeren + demp-aanbod**
 
 `export const ACTIVITY_NL` (was `const`). `HostValue` krijgt `close: () => void` naast `skip`. De `skip`-callback vervangen door:
 
@@ -372,16 +372,16 @@ In de props: `onSkip: () => void;` wordt:
 
 `hostValue` krijgt `close` in het object én in de dependency-array. `RatingSheetHost` geeft door: `onSkip={host.skip}` en `onClose={host.close}`.
 
-- [ ] **Step 3: `app/health/activity/[id].tsx`**
+- [x] **Step 3: `app/health/activity/[id].tsx`**
 
 `onSkip={() => setSheetOpen(false)}` → `onClose={() => setSheetOpen(false)}` (de knop heet daar dan "Sluiten"; er valt niets over te slaan, je opende de sheet zelf).
 
-- [ ] **Step 4: Typecheck**
+- [x] **Step 4: Typecheck**
 
 Run: `cd /Users/eva/mbt-gym-mobile && npx tsc --noEmit`
 Expected: schoon.
 
-- [ ] **Step 5: Commit (mobile repo)**
+- [x] **Step 5: Commit (mobile repo)**
 
 ```bash
 git add components/rating-sheet.tsx components/rating-queue.tsx "app/health/activity/[id].tsx"
@@ -400,7 +400,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 **Interfaces:**
 - Consumes: `wearables.ratingMutes` / `wearables.setRatingMute` (Task 3), `ACTIVITY_NL` uit `rating-queue.tsx` (Task 4).
 
-- [ ] **Step 1: Imports + state + handlers**
+- [x] **Step 1: Imports + state + handlers**
 
 Bovenaan: `Fragment` toevoegen aan de react-import, en `import { ACTIVITY_NL } from '@/components/rating-queue';`. In de component:
 
@@ -432,7 +432,7 @@ Bovenaan: `Fragment` toevoegen aan de react-import, en `import { ACTIVITY_NL } f
   };
 ```
 
-- [ ] **Step 2: Sectie in de JSX, direct na de MELDINGEN-`</View>` en vóór `<Kicker …>PRIVACY`**
+- [x] **Step 2: Sectie in de JSX, direct na de MELDINGEN-`</View>` en vóór `<Kicker …>PRIVACY`**
 
 ```tsx
           {ratingMutes.length > 0 && (
@@ -455,12 +455,12 @@ Bovenaan: `Fragment` toevoegen aan de react-import, en `import { ACTIVITY_NL } f
           )}
 ```
 
-- [ ] **Step 3: Typecheck**
+- [x] **Step 3: Typecheck**
 
 Run: `cd /Users/eva/mbt-gym-mobile && npx tsc --noEmit`
 Expected: schoon.
 
-- [ ] **Step 4: Commit (mobile repo)**
+- [x] **Step 4: Commit (mobile repo)**
 
 ```bash
 git add app/settings.tsx
@@ -473,12 +473,12 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 ### Task 6: Verificatie en zelf-review
 
-- [ ] **Step 1: Volle checks beide repo's**
+- [x] **Step 1: Volle checks beide repo's**
 
 Run (web): `cd /Users/eva/mbt-gym && npx tsc --noEmit && npm run test && npm run lint`
 Run (mobile): `cd /Users/eva/mbt-gym-mobile && npx tsc --noEmit`
 Expected: alles schoon. Lint-fouten in NIET-aangeraakte bestanden negeren.
 
-- [ ] **Step 2: Kritische zelf-review van de diff** — via superpowers:requesting-code-review; extra letten op: ownership-checks op de nieuwe mutations (alles keyt op `ctx.user.id`), de `ratedAt`-race, en of oude app-builds echt niets merken (alleen additieve API's).
+- [x] **Step 2: Kritische zelf-review van de diff** — via superpowers:requesting-code-review; extra letten op: ownership-checks op de nieuwe mutations (alles keyt op `ctx.user.id`), de `ratedAt`-race, en of oude app-builds echt niets merken (alleen additieve API's).
 
-- [ ] **Step 3: Best-effort simulator-QA** — alleen als er zonder veel omwegen een ingelogde sessie met onbeoordeelde ritten beschikbaar is (backend poort 3001, zie mobile-werkwijze). Anders expliciet rapporteren dat dit op device-QA wacht. GEEN EAS-build.
+- [x] **Step 3: Best-effort simulator-QA** — alleen als er zonder veel omwegen een ingelogde sessie met onbeoordeelde ritten beschikbaar is (backend poort 3001, zie mobile-werkwijze). Anders expliciet rapporteren dat dit op device-QA wacht. GEEN EAS-build.
