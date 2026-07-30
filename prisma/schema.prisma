@@ -391,6 +391,9 @@ model User {
   pushTokens             PushToken[]
   notificationPreference NotificationPreference?
   dailyGoal              DailyGoal?
+  /// Activiteitstypes waarvoor de beoordeel-popup stil is (omkeerbaar via
+  /// instellingen in de app). Leeg = overal vragen.
+  ratingMutedActivities  CardioActivity[] @default([])
 
   @@index([deletedAt])
   @@map("users")
@@ -798,6 +801,10 @@ model CardioLog {
   // Gezet zodra de gebruiker de activiteit heeft beoordeeld (RPE/gevoel/notitie).
   // NULL = nog niet beoordeeld → gesyncte activiteiten met NULL triggeren de popup.
   ratedAt               DateTime?
+  // Gezet als de gebruiker de beoordeel-popup voor deze rit bewust oversloeg
+  // ("Overslaan"). De rit komt dan niet meer in de popup-wachtrij; beoordelen
+  // via het detailscherm kan nog steeds en wint (ratedAt).
+  skippedAt             DateTime?
   // Handmatig gecorrigeerde hartslag. Een optische sensor kan vastlopen (hele
   // rit exact dezelfde bpm, of cadans-lock) en dan is de gesyncte HR onbruikbaar.
   // Staat dit gevuld, dan laat élke hersync de HR-velden met rust:
