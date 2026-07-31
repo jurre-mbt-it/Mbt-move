@@ -492,13 +492,21 @@ model PatientTherapist {
 }
 
 // ─── Uitbehandeld (inactieve patiënt) ────────────────────────────────────────
-// Het bestaan van de rij IS de status. Heractiveren verwijdert hem weer; de
-// geschiedenis van archiveren en terughalen zit in de audit-log. Bewust een
-// eigen tabel: niet op PatientTherapist (die status zit in het pad van
-// hasPatientAccess en leest voor de patiënt als een consent-intrekking) en
-// niet als kolom op User (dezelfde persoon kan tegelijk coach-atleet en
-// praktijk-patiënt zijn, en `users` is voor de gebruiker zelf leesbaar met de
-// anon-key).
+// LET OP bij het schrijven van een filter: het bestaan van de rij is NIET de
+// status. Rijen blijven staan als historie; alleen een rij met
+// `reactivatedAt = null` betekent "nu uitbehandeld". Een filter op
+// `careStatuses: { some: {} }` haalt dus elke ooit gearchiveerde patiënt
+// permanent uit de actieve lijst. Gebruik `careScopeWhere` of
+// `careScopeWhereForRead` uit src/server/lib/care-scope.ts; die bakken de
+// juiste voorwaarde in en zijn ook meteen scope-gebonden.
+//
+// De rij blijft bewaard omdat `note` een klinisch oordeel is dat vanwege de
+// PII-regel niet in de audit-log mag, en dus met een DELETE definitief weg zou
+// zijn. Bewust een eigen tabel: niet op PatientTherapist (die status zit in het
+// pad van hasPatientAccess en leest voor de patiënt als een
+// consent-intrekking) en niet als kolom op User (dezelfde persoon kan tegelijk
+// coach-atleet en praktijk-patiënt zijn, en `users` is voor de gebruiker zelf
+// leesbaar met de anon-key).
 
 model PatientCareStatus {
   id         String    @id @default(cuid())
