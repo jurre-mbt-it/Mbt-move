@@ -752,14 +752,15 @@ sed -n '/model RehabCriterionStatus/,/^}/p' prisma/schema.prisma | grep patientI
 grep -n "patientId: input.patientId" src/server/routers/rehab.ts
 ```
 
-- [ ] **Step 3: Genereer en controleer dat de diff leeg is**
+- [ ] **Step 3: Genereer de client**
 
 ```bash
 npx prisma generate
-npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script
 ```
 
-Expected: `-- This is an empty migration.` De baseline was vóór dit werk al leeg, dus elke afwijking is nieuw.
+De diff-controle staat bewust **niet** hier maar in stap 7, ná C2. Tussen deze deploy en C2 staat `patientId` nog in de database en niet meer in het schema, dus `migrate diff` geeft gegarandeerd `DROP COLUMN "patientId"` terug. Dat is de verwachte toestand van een contract-migratie, geen fout.
+
+**Draai in dat venster geen `npm run db:push` en voer de diff-output niet uit.** Die zou de eenrichtings-DROP uitvoeren buiten C2 om, dus zonder de precondities en de waarschuwingen die in dat bestand staan. C2 is de enige weg naar die kolom.
 
 - [ ] **Step 4: Voeg de drie checks toe aan `check-migrations.ts`**
 
@@ -806,7 +807,12 @@ Expected: exit-code 0.
 
 - [ ] **Step 6: Draai migratie C2, pas nadat deploy 2 live staat**
 
-Eén statement, en het is de eenrichtingsdeur. Controleer eerst in de Vercel-deploy-log dat de build van stap 2 live is.
+Eén statement, en het is de eenrichtingsdeur. Controleer eerst in de Vercel-deploy-log dat de build van stap 2 live is, en draai daarna de twee precondities uit de kop van het migratiebestand. Beide moeten nul regels geven:
+
+```bash
+sed -n '/model RehabCriterionStatus/,/^}/p' prisma/schema.prisma | grep patientId
+grep -n "patientId: input.patientId" src/server/routers/rehab.ts
+```
 
 ```bash
 set -a; . ./.env.local; set +a
@@ -816,7 +822,17 @@ npx tsx --env-file=.env.local scripts/check-migrations.ts
 
 Expected: `Script executed successfully.` en daarna alle checks groen, inclusief de derde.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Controleer dat de diff nu leeg is**
+
+Dit is de controle die eerder in stap 3 stond. Pas hier is de database gelijk aan het schema.
+
+```bash
+npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script
+```
+
+Expected: `-- This is an empty migration.` De baseline was vóór dit werk al leeg, dus elke afwijking is nieuw. Pas vanaf hier is `npm run db:push` weer een gegarandeerde no-op.
+
+- [ ] **Step 8: Commit**
 
 De commit van de code hoort bij stap 2, dus vóór de deploy. Deze commit sluit de reeks af.
 

@@ -378,9 +378,10 @@ export const rehabRouter = createTRPCRouter({
    * index laat maar één open traject toe.
    *
    * In principe alleen voor het laatste traject, met één uitzondering: een
-   * nieuwer traject waarop nog geen enkele criteriumstatus staat wordt
-   * opgeruimd. Dat is de misklik in de protocolkiezer, en zonder die
-   * uitzondering blijft die permanent in het dossier staan.
+   * nieuwer traject waarop niets is vastgelegd (geen criteriumstatus, geen
+   * notitie, geen uitkomst) wordt opgeruimd. Dat is de misklik in de
+   * protocolkiezer, en zonder die uitzondering blijft die permanent in het
+   * dossier staan.
    */
   reopenTraject: therapistProcedure
     .input(z.object({ trackerId: z.string() }))
@@ -409,7 +410,13 @@ export const rehabRouter = createTRPCRouter({
             { activatedAt: tracker.activatedAt, id: { gt: tracker.id } },
           ],
         },
-        select: { id: true, _count: { select: { statuses: true } } },
+        select: {
+          id: true,
+          outcome: true,
+          outcomeNote: true,
+          notes: true,
+          _count: { select: { statuses: true } },
+        },
       })
       // Een misklik in de protocolkiezer sluit het lopende traject af en opent
       // meteen een nieuw, leeg traject. Zonder uitzondering hieronder zou dat
@@ -417,13 +424,20 @@ export const rehabRouter = createTRPCRouter({
       // is geen procedure die een tracker verwijdert. In een medisch dossier
       // blijft dan een afgesloten echt traject plus een spookepisode staan.
       //
-      // De grens ligt bij nul criteriumstatussen. Een traject zonder statussen
-      // bevat geen enkele beoordeling of meetwaarde, dus er gaat met het
-      // verwijderen geen klinische vastlegging verloren. Zodra er één status op
-      // staat is het een echte episode en blijft de weigering: dan hoort de
-      // therapeut het traject af te sluiten, niet uit te wissen.
-      const metStatussen = nieuwere.filter((t) => t._count.statuses > 0)
-      if (metStatussen.length > 0) {
+      // "Leeg" is meer dan nul criteriumstatussen. `notes` is vrije tekst tot
+      // 2000 tekens die bij elke create meegegeven kan zijn en via
+      // updateTrackerDetails bewerkbaar is, en `outcome`/`outcomeNote` leggen
+      // vast hoe een episode eindigde. Een traject waar een therapeut een
+      // notitie in typte maar nog niets afvinkte is dus geen spookepisode.
+      // Alle vier moeten leeg zijn voordat er iets verdwijnt. Datums vallen er
+      // bewust buiten: die worden bij het aanmaken meegegeven en zeggen op
+      // zichzelf niets over ingevoerd werk.
+      const isLeeg = (t: (typeof nieuwere)[number]) =>
+        t._count.statuses === 0 &&
+        t.outcome === null &&
+        t.outcomeNote === null &&
+        t.notes === null
+      if (nieuwere.some((t) => !isLeeg(t))) {
         throw new TRPCError({
           code: 'CONFLICT',
           message: 'Er is al een nieuwer traject gestart. Dit traject kan niet meer heropend worden.',
@@ -438,18 +452,39 @@ export const rehabRouter = createTRPCRouter({
       // In één transactie: eerst de lege episodes weg, dan pas heropenen. Was
       // een van die lege episodes het open traject, dan geeft alleen deze
       // volgorde de partiële unique index op tijd vrij.
-      // De checks hierboven zijn read-then-write, dus de index blijft het
-      // laatste woord houden.
-      const [, reopened] = await ctx.prisma
-        .$transaction([
-          ctx.prisma.patientRehabTracker.deleteMany({
-            where: { id: { in: [...legeIds] } },
-          }),
-          ctx.prisma.patientRehabTracker.update({
+      //
+      // Interactieve transactie, geen array: bij een afwijkende telling moet
+      // ook het heropenen terugdraaien.
+      //
+      // De DELETE herhaalt de leeg-voorwaarden in zijn eigen where. De telling
+      // hierboven is read-then-write, en een collega met praktijk-brede toegang
+      // kan er tussendoor een criterium op aanvinken; RehabCriterionStatus
+      // hangt met onDelete: Cascade aan de tracker, dus die beoordeling zou
+      // stil meeverdwijnen. Nu slaat de DELETE zo'n rij over, wijkt `count` af
+      // van wat we wilden verwijderen, en rolt de hele transactie terug.
+      const reopened = await ctx.prisma
+        .$transaction(async (tx) => {
+          const verwijderd = await tx.patientRehabTracker.deleteMany({
+            where: {
+              id: { in: [...legeIds] },
+              statuses: { none: {} },
+              outcome: null,
+              outcomeNote: null,
+              notes: null,
+            },
+          })
+          if (verwijderd.count !== legeIds.size) {
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message:
+                'Er is inmiddels iets vastgelegd op het nieuwere traject van deze patiënt. Ververs het scherm en probeer het opnieuw.',
+            })
+          }
+          return tx.patientRehabTracker.update({
             where: { id: tracker.id },
             data: { deactivatedAt: null, closedById: null, outcome: null, outcomeNote: null },
-          }),
-        ])
+          })
+        })
         .catch(alsConflict(TRAJECT_AL_GESTART))
       await auditLog({
         event: 'REHAB_TRAJECT_REOPENED',
@@ -457,9 +492,15 @@ export const rehabRouter = createTRPCRouter({
         actorEmail: ctx.user.email,
         resource: 'PatientRehabTracker',
         resourceId: tracker.id,
-        // Alleen vaste waarden en IDs (audit.ts:7-8). Het aantal opgeruimde
-        // lege episodes hoort in het spoor: dat zijn verwijderde rijen.
-        metadata: { route: 'rehab.reopenTraject', removedEmptyTrackers: legeIds.size },
+        // Alleen vaste waarden en IDs (audit.ts:7-8). De ids van de verwijderde
+        // episodes horen erbij, niet alleen hun aantal: dit is de enige plek
+        // waar na een harde delete van dossierrijen nog staat wélke rijen dat
+        // waren.
+        metadata: {
+          route: 'rehab.reopenTraject',
+          removedEmptyTrackers: legeIds.size,
+          removedTrackerIds: [...legeIds],
+        },
         req: ctx.req,
       })
       return reopened

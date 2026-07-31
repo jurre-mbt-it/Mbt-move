@@ -273,9 +273,14 @@ export function RehabActivationToggle({
               </p>
               {/* Klopt sinds het episode-model: uitzetten sluit de episode af,
                   opnieuw aanzetten begint een nieuw en leeg traject. De oude
-                  copy beloofde dat de vinkjes terugkwamen. */}
+                  copy beloofde dat de vinkjes terugkwamen.
+                  Beloof hier geen historie-scherm: rehab.listTrajects en
+                  rehab.getTraject bestaan wel, maar hebben nog geen enkele
+                  aanroeper in web of app. De data blijft bewaard, alleen kan
+                  niemand er vandaag bij. Pas deze zin aan zodra dat scherm er
+                  is. */}
               <p style={{ color: P.inkMuted, fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
-                De ingevulde meetwaarden en statussen blijven in de historie terug te lezen. Zet je het protocol later opnieuw aan, dan start er een nieuw traject dat leeg begint.
+                De ingevulde meetwaarden en statussen blijven bewaard bij dit afgesloten traject. Zet je het protocol later opnieuw aan, dan start er een nieuw traject dat leeg begint.
               </p>
               <div className="flex justify-end gap-2 mt-5">
                 <DarkButton variant="ghost" size="sm" onClick={() => setDeactivateOpen(false)}>

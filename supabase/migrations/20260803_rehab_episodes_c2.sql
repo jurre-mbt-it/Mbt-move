@@ -12,9 +12,19 @@
 -- beide PDF-ingangen en iOS build 78. Schrijven valt ook om, want de create
 -- vult "patientId" tot die deploy expliciet.
 --
--- Controle vóór je dit draait, moet leeg zijn:
---   grep -rn "patientId" prisma/schema.prisma | sed -n '/RehabCriterionStatus/,$p'
+-- Controle vóór je dit draait. Beide commando's moeten NUL regels teruggeven;
+-- dat is groen licht. Geeft een van beide wél een regel, dan staat "patientId"
+-- nog in het schema of in de upsert, is deploy 2 dus niet gedaan, en mag dit
+-- bestand NIET draaien.
+--
+--   sed -n '/model RehabCriterionStatus/,/^}/p' prisma/schema.prisma | grep patientId
 --   grep -n "patientId: input.patientId" src/server/routers/rehab.ts
+--
+-- Let op de vorm van de eerste: het sed-bereik moet op de modelregel openen en
+-- op de sluitaccolade dichtgaan, en pas daarna filtert grep. Andersom
+-- (grep eerst, dan sed) opent het bereik nooit, want geen enkele regel met
+-- "patientId" bevat ook "RehabCriterionStatus". Die volgorde geeft dus altijd
+-- nul regels en daarmee altijd groen licht, ook als er niets is opgeschoond.
 --
 -- C1 heeft de vier policies en de twee indexes die van deze kolom afhingen al
 -- weggehaald, dus deze DROP heeft geen pg_depend-afhankelijkheden meer en

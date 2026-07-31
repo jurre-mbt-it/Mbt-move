@@ -225,12 +225,16 @@ C1 heeft de vier policies en de twee indexen die van deze kolom afhingen al wegg
 
 ## Na afloop
 
+Dit hoort **ná C2**, niet eerder.
+
 ```bash
 npx prisma generate
 npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script
 ```
 
 Moet `-- This is an empty migration.` teruggeven. De baseline is vandaag al leeg, dus elke afwijking is nieuw. Pas dan is `npm run db:push` gegarandeerd een no-op.
+
+Tussen deploy 2 en C2 geeft deze diff gegarandeerd `DROP COLUMN "patientId"`: de kolom staat dan nog in de database en niet meer in het schema. Dat is de verwachte toestand van een contract-migratie. **Draai daar geen `db:push` en voer de diff-output niet uit**; dan gaat de eenrichtings-DROP buiten C2 om, zonder de precondities uit dat bestand. C2 is de enige weg naar die kolom.
 
 Drie checks toevoegen aan `scripts/check-migrations.ts` (patroon staat op regel 17-40): kolom `id` op de trackers, kolom `trackerId` op de statussen, en de afwezigheid van `patientId` daar.
 
