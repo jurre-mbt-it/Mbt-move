@@ -16,9 +16,12 @@
 -- Volgorde: dit bestand moet vóór fase B draaien. Fase B backfilled
 -- rehab_criterion_status."trackerId" door te joinen op de huidige PK-waarde
 -- van de tracker (patientId). Zolang deze fase de PK nog niet heeft omgezet,
--- bestaat "id" niet en faalt fase B meteen. Fase C mag pas na de code-deploy
--- die beide kolommen op rehab_criterion_status kent (zie tussenfase in de
--- spec) — draai fase C nooit vóór die deploy.
+-- bestaat "id" niet en faalt fase B meteen.
+--
+-- Fase C is gesplitst. C1 mag pas na deploy 1, de code-deploy die beide
+-- kolommen op rehab_criterion_status kent (zie tussenfase in de spec). C2
+-- dropt "patientId" en mag pas na deploy 2, de deploy die die kolom uit het
+-- Prisma-model haalt. Volledige volgorde: A, B, deploy 1, C1, deploy 2, C2.
 --
 -- Geen eigen BEGIN/COMMIT: prisma db execute stuurt dit bestand al als één
 -- impliciete transactie. Geen CREATE INDEX CONCURRENTLY om dezelfde reden.
@@ -33,7 +36,7 @@ EXCEPTION WHEN duplicate_object THEN null; END $$;
 ALTER TABLE public.patient_rehab_trackers ADD COLUMN IF NOT EXISTS "id" text;
 UPDATE public.patient_rehab_trackers SET "id" = gen_random_uuid()::text WHERE "id" IS NULL;
 ALTER TABLE public.patient_rehab_trackers ALTER COLUMN "id" SET NOT NULL;
-ALTER TABLE public.patient_rehab_trackers DROP CONSTRAINT "patient_rehab_trackers_pkey";
+ALTER TABLE public.patient_rehab_trackers DROP CONSTRAINT IF EXISTS "patient_rehab_trackers_pkey";
 ALTER TABLE public.patient_rehab_trackers ADD CONSTRAINT "patient_rehab_trackers_pkey" PRIMARY KEY ("id");
 
 -- A7 afsluitvelden. deactivatedAt blijft de ENIGE sluitings-marker;
