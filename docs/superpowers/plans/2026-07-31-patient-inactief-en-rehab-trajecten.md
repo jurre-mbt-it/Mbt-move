@@ -45,6 +45,16 @@ van uren. `prisma generate` leest alleen `schema.prisma`, niet de database, dus
 de code kan tegen het nieuwe model gebouwd worden terwijl de oude kolommen nog
 in productie staan.
 
+Fase C is bovendien **gesplitst in C1 en C2**, met een tweede deploy ertussen.
+Reden: na een ongesplitste fase C draait er nog productiecode waarvan de
+Prisma-client `patientId` op `RehabCriterionStatus` kent. Prisma zet bij een
+`findMany` zonder `select` alle modelkolommen in de SELECT-lijst, dus
+`src/lib/rehab-data.ts` vraagt dan een kolom op die niet meer bestaat. Dat
+sloopt de complete gedeelde leeslaag: `rehab.getPatientTracker`,
+`rehab.getMyTracker`, `rehab.getTraject`, de patiënt- en atleet-dashboards, de
+rehab-pagina's, beide PDF-ingangen en iOS build 78. Schrijven valt ook om, want
+de upsert vult `patientId` tot die deploy expliciet.
+
 | Volgorde | Taak | Raakt productie |
 | --- | --- | --- |
 | 1 | Taak 1, backupscript | nee |
@@ -56,21 +66,26 @@ in productie staan.
 | 7 | Taak 1 stap 3, backup draaien | lezen |
 | 8 | Taak 2, migratie A | ja, additief |
 | 9 | Taak 3, migratie B | ja, additief |
-| 10 | Taak 8, deploy, direct na de migratie | ja |
-| 11 | Taak 9, migratie C | ja, eenrichtingsdeur |
+| 10 | Taak 8, deploy 1, tussenfase-code, direct na de migratie | ja |
+| 11 | Taak 9 deel 1, migratie C1 | ja, terug te draaien |
+| 12 | Taak 9 deel 2, deploy 2, `patientId` uit schema en upsert | ja |
+| 13 | Taak 9 deel 3, migratie C2 | ja, eenrichtingsdeur |
 
-Er zijn **twee** vensters waarin oud en nieuw schema naast elkaar staan. Allebei
-kort houden: plan stap 8 tot en met 11 achter elkaar in één sessie, niet
-verspreid over dagen.
+Kort samengevat is de volgorde dus: **migratie A, migratie B, deploy 1
+(tussenfase-code), migratie C1, deploy 2 (schema opgeschoond), migratie C2.**
 
-**Venster 1, tussen migratie A/B en de deploy.** De oude code draait op het
+Er zijn **drie** vensters waarin oud en nieuw naast elkaar staan. Allemaal kort
+houden: plan stap 8 tot en met 13 achter elkaar in één sessie, niet verspreid
+over dagen.
+
+**Venster 1, tussen migratie A/B en deploy 1.** De oude code draait op het
 nieuwe schema. Twee gevolgen: `activateForPatient` kan geen nieuw traject meer
 aanmaken (de oude client schrijft de `id`-kolom niet mee en de partiële index is
 geen geldig `ON CONFLICT`-doel), en migratie B zet `trackerId` op NOT NULL,
 waardoor de oude code ook geen nieuwe criteriumstatus meer kan wegschrijven.
 Bestaande statussen bijwerken blijft wel werken.
 
-**Venster 2, tussen de deploy en migratie C.** De nieuwe code schrijft
+**Venster 2, tussen deploy 1 en migratie C1.** De nieuwe code schrijft
 `patientId` nog mee (dat moet, de kolom is NOT NULL), terwijl de oude unieke
 index `rehab_criterion_status_patientId_criterionId_key` nog bestaat. Sluit een
 therapeut in dat venster een traject af en start hij **hetzelfde** protocol
@@ -78,77 +93,51 @@ opnieuw, dan krijgt het eerste criterium dat hij aanvinkt een `23505`: de upsert
 zoekt op `trackerId_criterionId`, vindt niets, doet een insert, en die botst op
 de oude index. Een protocolwissel is wel veilig, want dat zijn andere criteria.
 
-Migratie C dropt die index als vierde statement, dus dit venster sluit vanzelf
-zodra C draait. Moet C om wat voor reden ook wachten, drop dan direct na de
-deploy alleen deze regel:
+Migratie C1 dropt die index, dus dit venster sluit zodra C1 draait. Moet C1 om
+wat voor reden ook wachten, drop dan direct na deploy 1 alleen deze regel:
 
 ```sql
 DROP INDEX IF EXISTS public."rehab_criterion_status_patientId_criterionId_key";
 ```
 
-Dat mag niet eerder: tot aan de deploy leunt de oude code op precies die index
+Dat mag niet eerder: tot aan deploy 1 leunt de oude code op precies die index
 voor zijn upsert.
+
+**Venster 3, tussen migratie C1 en deploy 2.** Hier gebeurt niets spannends, en
+dat is precies het punt van de splitsing. C1 haalt alleen de NOT NULL van
+`patientId` af; de kolom staat er nog, dus de dan draaiende code kan gewoon
+blijven lezen en schrijven. Deploy 2 haalt `patientId` uit
+`prisma/schema.prisma` en uit de `create` in de upsert. Pas als die deploy live
+staat mag C2 de kolom droppen.
 
 ## Task 1: Backup van de rehab-tabellen
 
 **Files:**
 - Create: `scripts/backup-rehab-tables.ts`
 - Output: `scripts/backups/rehab-tables-<datum>.json`
+- Output: `scripts/backups/rehab-criterion-status-orphans-<datum>.json`
 
 **Interfaces:**
-- Produces: een JSON-bestand met alle rijen uit de vijf rehab-tabellen, waar taak 3 en 4 op terugvallen als de migratie misgaat.
+- Produces: een JSON-bestand met alle rijen uit de vijf rehab-tabellen, waar taak 3 en 4 op terugvallen als de migratie misgaat, plus een apart bestand met de wees-statusrijen die taak 3 verwijdert.
 
 - [ ] **Step 1: Schrijf het backupscript**
 
-Volg het huispatroon van `scripts/merge-duplicate-weeks.ts`: dry-run als default, `--apply` als vlag.
+Volg het huispatroon van `scripts/merge-duplicate-weeks.ts`: dry-run als default, `--apply` als vlag. Zie `scripts/backup-rehab-tables.ts` voor de uitgeschreven versie.
 
-```ts
-/**
- * Dumpt de vijf rehab-tabellen naar scripts/backups/ vóór de episode-migratie.
- * Draaien: npx tsx --env-file=.env.local scripts/backup-rehab-tables.ts --apply
- */
-import { writeFileSync } from 'fs'
-import { prisma } from '../src/lib/prisma'
+Twee dingen die niet vanzelf spreken, en die allebei in de kop van het script staan:
 
-const APPLY = process.argv.includes('--apply')
-
-async function main() {
-  const data = {
-    takenOp: new Date().toISOString(),
-    protocols: await prisma.rehabProtocol.findMany(),
-    phases: await prisma.rehabPhase.findMany(),
-    criteria: await prisma.rehabCriterion.findMany(),
-    trackers: await prisma.patientRehabTracker.findMany(),
-    statuses: await prisma.rehabCriterionStatus.findMany(),
-  }
-  const telling = Object.entries(data)
-    .filter(([, v]) => Array.isArray(v))
-    .map(([k, v]) => `${k}: ${(v as unknown[]).length}`)
-    .join(', ')
-
-  if (!APPLY) {
-    console.log(`Dry-run. Zou wegschrijven: ${telling}`)
-    console.log('Draai opnieuw met --apply om het bestand te maken.')
-    return
-  }
-  const dag = new Date().toISOString().slice(0, 10)
-  const pad = `scripts/backups/rehab-tables-${dag}.json`
-  writeFileSync(pad, JSON.stringify(data, null, 2))
-  console.log(`Geschreven naar ${pad}: ${telling}`)
-}
-
-main().finally(() => prisma.$disconnect())
-```
+1. **Geen `prisma.<model>.findMany()`, maar rauwe SQL.** Dit script draait vóór migratie A, dus tegen het OUDE schema, terwijl de Prisma-client al op het NIEUWE schema is gegenereerd. Die zet `id`, `closedById`, `outcomeNote` en `trackerId` in zijn SELECT-lijst; die kolommen bestaan dan nog niet, dus elke modelaanroep valt om met 42703 en er komt geen backup. Een backup hoort het schema van de bron te volgen. `to_jsonb(t.*)` laat Postgres serialiseren, wat meteen de deserialisatie van enum- en `char`-kolommen omzeilt waar een kale `SELECT *` op struikelt.
+2. **Het script schrijft ook het wees-bestand.** Migratie B eist een apart bestand met de statusrijen die geen tracker hebben, vóór de DELETE. Dat hoort niet in een los wegwerpscript dat iemand kan overslaan.
 
 - [ ] **Step 2: Draai de dry-run**
 
 Run: `npx tsx --env-file=.env.local scripts/backup-rehab-tables.ts`
-Expected: `Dry-run. Zou wegschrijven: protocols: N, phases: N, criteria: N, trackers: 2, statuses: 57`
+Expected: `Dry-run. Zou wegschrijven: protocols: N, phases: N, criteria: N, trackers: 2, statuses: 57, wees-statussen: 2`
 
 - [ ] **Step 3: Draai de echte backup**
 
 Run: `npx tsx --env-file=.env.local scripts/backup-rehab-tables.ts --apply`
-Expected: het bestand `scripts/backups/rehab-tables-2026-07-31.json` bestaat en `trackers` bevat 2 rijen.
+Expected: `scripts/backups/rehab-tables-2026-07-31.json` bestaat met 2 trackers, en `scripts/backups/rehab-criterion-status-orphans-2026-07-31.json` bestaat met 2 rijen.
 
 - [ ] **Step 4: Commit**
 
@@ -224,23 +213,10 @@ Draai dit **direct na taak 2**. De backfill werkt alleen zolang `rehab_criterion
 
 Er staan twee statusrijen van een hard verwijderde gebruiker (`c329f19b-…`), beide `NOT_MET` zonder meetwaarde. Ze worden in stap 3 verwijderd, dus eerst wegschrijven.
 
-```ts
-import { writeFileSync } from 'fs'
-import { prisma as p } from './src/lib/prisma'
-async function main() {
-  const rows: any = await p.$queryRawUnsafe(`
-    SELECT s.* FROM public.rehab_criterion_status s
-    LEFT JOIN public.patient_rehab_trackers t ON t."patientId" = s."patientId"
-    WHERE t."patientId" IS NULL`)
-  const pad = `scripts/backups/rehab-criterion-status-orphans-${new Date().toISOString().slice(0,10)}.json`
-  writeFileSync(pad, JSON.stringify(rows, null, 2))
-  console.log(`${rows.length} wees-rijen naar ${pad}`)
-}
-main().finally(() => p.$disconnect())
-```
+Dat doet het backupscript uit taak 1 al: het schrijft naast de volledige dump een apart bestand met precies deze rijen weg. Is taak 1 stap 3 al gedraaid, dan staat het bestand er en kun je door naar stap 2. Zo niet:
 
-Run: `npx tsx --env-file=.env.local ./.orphans-tmp.ts && rm ./.orphans-tmp.ts`
-Expected: `2 wees-rijen naar scripts/backups/rehab-criterion-status-orphans-2026-08-01.json`
+Run: `npx tsx --env-file=.env.local scripts/backup-rehab-tables.ts --apply`
+Expected: `Geschreven naar .../rehab-criterion-status-orphans-2026-08-01.json: 2 rijen`
 
 - [ ] **Step 2: Controleer dat het bestand er staat**
 
@@ -734,29 +710,47 @@ console.log(`rijen met een lege sleutel: ${r[0].n} (moet 0)`)
 
 Expected: 0.
 
-## Task 9: Migratie C en het schema opschonen
+## Task 9: Migratie C1, deploy 2, migratie C2
 
 **Files:**
-- Create: `supabase/migrations/20260802_rehab_episodes_c.sql`
+- Create: `supabase/migrations/20260802_rehab_episodes_c1.sql`
+- Create: `supabase/migrations/20260803_rehab_episodes_c2.sql`
 - Modify: `prisma/schema.prisma` (haal `patientId` uit `RehabCriterionStatus`)
 - Modify: `src/server/routers/rehab.ts` (haal het tijdelijke `patientId` uit de upsert-create)
 - Modify: `scripts/check-migrations.ts` (regel 17-40, `checks`-array)
 
 **Interfaces:**
-- Produces: het definitieve datamodel. Vanaf hier is terugdraaien lossy zodra er een tweede traject bestaat.
+- Produces: het definitieve datamodel. Vanaf C2 is terugdraaien lossy zodra er een tweede traject bestaat.
 
-- [ ] **Step 1: Schrijf en draai migratie C**
+Deze taak bevat **een deploy in het midden**. C1 en C2 zijn twee bestanden en
+mogen niet aan elkaar geplakt worden: tussen die twee moet de deploy staan die
+`patientId` uit het Prisma-model haalt. Draai je de DROP COLUMN daarvóór, dan
+vraagt de dan draaiende leeslaag een kolom op die niet meer bestaat en valt
+elke rehab-lees- en schrijfactie om, ook op iOS build 78.
 
-Neem de volledige SQL over uit de sectie "Fase C" van de migratiebijlage. De volgorde is dwingend: eerst de vier policies droppen (ze bevatten `is_therapist_of("patientId")` en zijn een pg_depend-afhankelijkheid, dus `DROP COLUMN` faalt zolang ze bestaan), dan de indexen, dan de kolom, dan RLS en grants terugzetten.
+- [ ] **Step 1: Schrijf en draai migratie C1**
+
+Neem de volledige SQL over uit de sectie "Fase C1" van de migratiebijlage. De volgorde is dwingend: eerst de vier policies droppen (ze bevatten `is_therapist_of("patientId")` en zijn een pg_depend-afhankelijkheid, dus de `DROP COLUMN` in C2 faalt zolang ze bestaan), dan de indexen, dan de NOT NULL van `patientId` af, dan RLS en grants.
 
 ```bash
 set -a; . ./.env.local; set +a
-npx prisma db execute --file supabase/migrations/20260802_rehab_episodes_c.sql
+npx prisma db execute --file supabase/migrations/20260802_rehab_episodes_c1.sql
 ```
 
-- [ ] **Step 2: Haal `patientId` uit het Prisma-model en uit de upsert**
+Na C1 blijft de op dat moment draaiende code gewoon werken: de kolom bestaat nog.
+
+- [ ] **Step 2: Haal `patientId` uit het Prisma-model en uit de upsert, en deploy**
 
 In `prisma/schema.prisma`: verwijder het tijdelijke `patientId String` uit `RehabCriterionStatus`. In `src/server/routers/rehab.ts`: verwijder de regel `patientId: input.patientId` uit de `create` van de upsert.
+
+Push naar `main` en wacht tot de Vercel-deploy groen is. **Dit is deploy 2.** Pas daarna mag stap 6 draaien.
+
+Controle dat er niets is blijven staan, beide moeten leeg zijn:
+
+```bash
+sed -n '/model RehabCriterionStatus/,/^}/p' prisma/schema.prisma | grep patientId
+grep -n "patientId: input.patientId" src/server/routers/rehab.ts
+```
 
 - [ ] **Step 3: Genereer en controleer dat de diff leeg is**
 
@@ -790,7 +784,7 @@ Volg het patroon op regel 17-40:
 },
 {
   name: 'rehab_criterion_status.patientId is weg',
-  migration: '20260802_rehab_episodes_c.sql',
+  migration: '20260803_rehab_episodes_c2.sql',
   run: async () => {
     const r: any = await prisma.$queryRawUnsafe(
       `SELECT count(*)::int AS n FROM information_schema.columns
@@ -800,19 +794,35 @@ Volg het patroon op regel 17-40:
 },
 ```
 
-- [ ] **Step 5: Draai de check en typecheck**
+Deze derde check gaat pas groen ná stap 6. Voeg hem nu al toe, dan is de rode check tot dat moment het bewijs dat C2 nog moet.
+
+- [ ] **Step 5: Draai de typecheck**
 
 ```bash
-npx tsx --env-file=.env.local scripts/check-migrations.ts && npx tsc --noEmit
+npx tsc --noEmit
 ```
 
-Expected: exit-code 0, alle checks groen.
+Expected: exit-code 0.
 
-- [ ] **Step 6: Commit en deploy**
+- [ ] **Step 6: Draai migratie C2, pas nadat deploy 2 live staat**
+
+Eén statement, en het is de eenrichtingsdeur. Controleer eerst in de Vercel-deploy-log dat de build van stap 2 live is.
 
 ```bash
-git add supabase/migrations/20260802_rehab_episodes_c.sql prisma/schema.prisma src/server/routers/rehab.ts scripts/check-migrations.ts
-git commit -m "feat(rehab): migratie C, patientId van de statustabel af"
+set -a; . ./.env.local; set +a
+npx prisma db execute --file supabase/migrations/20260803_rehab_episodes_c2.sql
+npx tsx --env-file=.env.local scripts/check-migrations.ts
+```
+
+Expected: `Script executed successfully.` en daarna alle checks groen, inclusief de derde.
+
+- [ ] **Step 7: Commit**
+
+De commit van de code hoort bij stap 2, dus vóór de deploy. Deze commit sluit de reeks af.
+
+```bash
+git add supabase/migrations/20260802_rehab_episodes_c1.sql supabase/migrations/20260803_rehab_episodes_c2.sql scripts/check-migrations.ts
+git commit -m "feat(rehab): migratie C1 en C2, patientId van de statustabel af"
 ```
 
 ## Task 10: Test dat trajecten elkaar niet vervuilen
@@ -823,8 +833,11 @@ git commit -m "feat(rehab): migratie C, patientId van de statustabel af"
 
 **Interfaces:**
 - Produces: `mergeCriterionStatuses(criteria, statuses)` → `{ ...criterion, status, measurementValue, measurementDate }[]`, gebruikt door `rehab-data.ts`.
+- Produces: `statussenVanTraject(statuses, trackerId, criterionIds)` → dezelfde rijen, gefilterd op traject én protocol. Ook gebruikt door `rehab-data.ts`.
 
-Er is geen testharnas voor Prisma, dus de regel wordt als pure functie getest: de samenvoeging van criteria met statussen mag alleen statussen accepteren die bij het traject horen.
+Er is geen testharnas voor Prisma, dus de regel wordt als pure functie getest.
+
+Let op waar de bescherming zit. `mergeCriterionStatuses` kent geen trajecten en kan de kernbug per definitie niet zien: twee trajecten op **hetzelfde** protocol delen dezelfde criterionIds, dus een test met een onbekend criterium slaagt ook als de datalaag weer op `where: { patientId }` staat. Daarom filtert `statussenVanTraject` op `trackerId` en draait `rehab-data.ts` die functie over het queryresultaat heen. Die functie is wél te testen met het echte scenario, en is tegelijk een tweede slot als de where-clausule ooit terugvalt.
 
 - [ ] **Step 1: Schrijf de falende test**
 
@@ -851,13 +864,28 @@ describe('mergeCriterionStatuses', () => {
     expect(uit.map((c) => c.status)).toEqual(['NOT_MET', 'NOT_MET'])
   })
 
-  it('negeert een status die niet bij deze criteria hoort', () => {
-    // Dit is de regressie: een status uit een ander traject mag nooit
-    // opduiken, ook niet als hij per ongeluk in de lijst belandt.
+  it('negeert een status van een criterium buiten dit protocol', () => {
     const uit = mergeCriterionStatuses(criteria, [
       { criterionId: 'onbekend', status: 'MET', measurementValue: '99', measurementDate: null },
     ])
     expect(uit.every((c) => c.status === 'NOT_MET')).toBe(true)
+  })
+})
+
+describe('statussenVanTraject', () => {
+  // Dit is de regressie waar het om gaat: twee trajecten op hetzelfde protocol,
+  // dus met exact dezelfde criterionIds. Alleen de trackerId onderscheidt ze.
+  const status = (trackerId: string, criterionId: string) => ({
+    trackerId,
+    criterionId,
+    status: 'MET',
+  })
+
+  it('laat de vinkjes van een afgesloten traject niet in het nieuwe traject vallen', () => {
+    const alles = [status('traject-oud', 'c1'), status('traject-nieuw', 'c1')]
+    expect(statussenVanTraject(alles, 'traject-nieuw', ['c1', 'c2'])).toEqual([
+      status('traject-nieuw', 'c1'),
+    ])
   })
 })
 ```
@@ -902,14 +930,16 @@ export function mergeCriterionStatuses<T extends CriterionLike>(
 }
 ```
 
+Plus `statussenVanTraject`, dat op `trackerId` én op de criteria van het protocol filtert. Zie `src/lib/rehab-traject.ts` voor de uitgeschreven versie.
+
 - [ ] **Step 4: Draai de test**
 
 Run: `npm test -- rehab-traject`
-Expected: PASS, 3 tests.
+Expected: PASS.
 
-- [ ] **Step 5: Gebruik de functie in `rehab-data.ts`**
+- [ ] **Step 5: Gebruik de functies in `rehab-data.ts`**
 
-Vervang de handmatige koppeling van statussen aan criteria door `mergeCriterionStatuses(criteria, statuses)`.
+Vervang de handmatige koppeling van statussen aan criteria door `mergeCriterionStatuses(criteria, statuses)`, en draai het queryresultaat eerst door `statussenVanTraject(ruweStatussen, tracker.id, criterionIds)`. De query zelf begrenst ook op `criterionId: { in: criterionIds }`: zonder die grens kunnen `met` en `inProgress` op topniveau hoger uitvallen dan `total`.
 
 - [ ] **Step 6: Typecheck en volledige testsuite**
 

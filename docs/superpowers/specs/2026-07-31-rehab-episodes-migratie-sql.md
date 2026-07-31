@@ -42,7 +42,7 @@ EXCEPTION WHEN duplicate_object THEN null; END $$;
 ALTER TABLE public.patient_rehab_trackers ADD COLUMN IF NOT EXISTS "id" text;
 UPDATE public.patient_rehab_trackers SET "id" = gen_random_uuid()::text WHERE "id" IS NULL;
 ALTER TABLE public.patient_rehab_trackers ALTER COLUMN "id" SET NOT NULL;
-ALTER TABLE public.patient_rehab_trackers DROP CONSTRAINT "patient_rehab_trackers_pkey";
+ALTER TABLE public.patient_rehab_trackers DROP CONSTRAINT IF EXISTS "patient_rehab_trackers_pkey";
 ALTER TABLE public.patient_rehab_trackers ADD CONSTRAINT "patient_rehab_trackers_pkey" PRIMARY KEY ("id");
 
 -- A7 afsluitvelden. deactivatedAt blijft de ENIGE sluitings-marker;
@@ -87,7 +87,7 @@ SELECT count(*) FROM (
 
 Draai dit **direct na fase A**. De backfill werkt alleen zolang `rehab_criterion_status."patientId"` nog gelijk is aan de oude PK-waarde van de tracker.
 
-Exporteer eerst de wees-rijen naar `scripts/backups/rehab-criterion-status-orphans-<datum>.json` en bevestig dat het bestand er staat:
+Exporteer eerst de wees-rijen naar `scripts/backups/rehab-criterion-status-orphans-<datum>.json` en bevestig dat het bestand er staat. `scripts/backup-rehab-tables.ts --apply` schrijft dat bestand naast de volledige dump weg, met precies deze query:
 
 ```sql
 SELECT s.* FROM public.rehab_criterion_status s
@@ -150,11 +150,21 @@ Let ook op `activateForPatient`: die doet nu een upsert die `deactivatedAt` op n
 
 En `adminDeleteProtocol` (`rehab.ts:371`) telt alle trackers inclusief gesloten. Met historie wordt een protocol daarmee de facto onverwijderbaar, en de foutmelding verwijst naar `deactivateForPatient`, wat dan iets anders betekent.
 
-## Fase C, na de code-deploy, eenrichtingsdeur
+## Fase C is gesplitst: C1 vóór de tweede deploy, C2 erna
 
-Bestand: `supabase/migrations/20260802_rehab_episodes_c.sql`
+Fase C was één bestand dat ook meteen `patientId` dropte. Dat kan niet in één stap.
 
-De volgorde is dwingend. De vier policies bevatten `is_therapist_of("patientId")` en zijn daarmee een pg_depend-afhankelijkheid op die kolom: `DROP COLUMN` faalt zolang ze bestaan, en `CASCADE` sloopt ze stil.
+Na die DROP draait er nog productiecode waarvan de Prisma-client `patientId` op `RehabCriterionStatus` kent. Prisma zet bij een `findMany` zonder `select` **alle** modelkolommen in de SELECT-lijst, dus `src/lib/rehab-data.ts` vraagt een kolom op die niet meer bestaat. Dat sloopt de complete gedeelde leeslaag: `rehab.getPatientTracker`, `rehab.getMyTracker`, `rehab.getTraject`, de patiënt- en atleet-dashboards, de rehab-pagina's, beide PDF-ingangen en iOS build 78. De upsert in `rehab.ts` schrijft `patientId` bovendien expliciet mee, dus schrijven valt ook om.
+
+De uitrolvolgorde is daarom: **migratie A, migratie B, deploy 1 (tussenfase-code), migratie C1, deploy 2 (schema opgeschoond), migratie C2.**
+
+### Fase C1, vóór de tweede deploy, terug te draaien
+
+Bestand: `supabase/migrations/20260802_rehab_episodes_c1.sql`
+
+Alles wat de oude code overleeft. De volgorde is dwingend. De vier policies bevatten `is_therapist_of("patientId")` en zijn daarmee een pg_depend-afhankelijkheid op die kolom: de `DROP COLUMN` in C2 faalt zolang ze bestaan, en `CASCADE` zou ze daar stil slopen.
+
+`patientId` wordt hier alleen nullable gemaakt, niet gedropt. Dat is precies wat deploy 2 nodig heeft: vanaf die deploy schrijft geen enkele insert de kolom nog mee, en zonder deze regel zou dat op NOT NULL falen. Na C1 kan de dan draaiende code nog steeds lezen én schrijven.
 
 ```sql
 DROP POLICY IF EXISTS "rehab_status_select_therapist" ON public.rehab_criterion_status;
@@ -166,7 +176,7 @@ DROP POLICY IF EXISTS "rehab_status_delete_therapist" ON public.rehab_criterion_
 DROP INDEX IF EXISTS public."rehab_criterion_status_patientId_criterionId_key";
 DROP INDEX IF EXISTS public."rehab_criterion_status_patientId_idx";
 
-ALTER TABLE public.rehab_criterion_status DROP COLUMN "patientId";
+ALTER TABLE public.rehab_criterion_status ALTER COLUMN "patientId" DROP NOT NULL;
 
 ALTER TABLE public.rehab_criterion_status ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "default_deny" ON public.rehab_criterion_status;
@@ -194,6 +204,25 @@ FOR SELECT USING (EXISTS (
 
 Dat heeft alleen zin als `is_therapist_of()` eerst wordt gerepareerd (sectie 4 van de spec). Zolang die functie alleen `isActive` checkt en `authenticated` INSERT-grants houdt op `patient_therapists`, is elke policy die erop leunt schijnzekerheid.
 
+### Fase C2, na de tweede deploy, eenrichtingsdeur
+
+Bestand: `supabase/migrations/20260803_rehab_episodes_c2.sql`
+
+Eén statement, en de enige echte contract-stap.
+
+```sql
+ALTER TABLE public.rehab_criterion_status DROP COLUMN "patientId";
+```
+
+**Draait pas nadat deploy 2 live staat**: de deploy waarin `patientId` uit het Prisma-model `RehabCriterionStatus` is gehaald én uit de `create` in de upsert van `src/server/routers/rehab.ts`. Controleer dat, beide moeten leeg zijn:
+
+```bash
+sed -n '/model RehabCriterionStatus/,/^}/p' prisma/schema.prisma | grep patientId
+grep -n "patientId: input.patientId" src/server/routers/rehab.ts
+```
+
+C1 heeft de vier policies en de twee indexen die van deze kolom afhingen al weggehaald, dus deze DROP heeft geen pg_depend-afhankelijkheden meer en hoeft geen `CASCADE`.
+
 ## Na afloop
 
 ```bash
@@ -207,20 +236,28 @@ Drie checks toevoegen aan `scripts/check-migrations.ts` (patroon staat op regel 
 
 ## Rollback
 
-Fase A en B zijn los van elkaar volledig terug te draaien. **Fase C plus het eerste nieuwe traject is een eenrichtingsdeur**: de oude unique index `(patientId, criterionId)` kan dan niet meer worden aangemaakt, en de PK op `patientId` kan niet terug.
+Fase A, B en **C1** zijn los van elkaar volledig terug te draaien: geen van drieën gooit data weg, op de DELETE in B na. **C2 plus het eerste nieuwe traject is een eenrichtingsdeur**: de oude unique index `(patientId, criterionId)` kan dan niet meer worden aangemaakt, en de PK op `patientId` kan niet terug.
+
+Let op de volgorde bij het terugdraaien van C2. De kolom terugzetten is niet genoeg: de code die er dan draait moet hem ook weer meeschrijven. Rol dus eerst de code terug naar de tussenfase-versie (`patientId` in het Prisma-model én in de `create` van de upsert), en draai daarna pas de SQL hieronder. Andersom faalt elke insert op NOT NULL.
 
 ```sql
--- Rollback C. Controleer eerst op duplicaten, anders faalt de unique index met 23505:
+-- Rollback C2. Controleer eerst op duplicaten, anders faalt de unique index met 23505:
 --   SELECT "patientId","criterionId", count(*) FROM public.rehab_criterion_status
 --   GROUP BY 1,2 HAVING count(*) > 1;
 ALTER TABLE public.rehab_criterion_status ADD COLUMN IF NOT EXISTS "patientId" text;
 UPDATE public.rehab_criterion_status s SET "patientId" = t."patientId"
   FROM public.patient_rehab_trackers t WHERE t."id" = s."trackerId" AND s."patientId" IS NULL;
+
+-- Rollback C1. De NOT NULL en de indexen horen bij C1, de kolom zelf bij C2.
 ALTER TABLE public.rehab_criterion_status ALTER COLUMN "patientId" SET NOT NULL;
 CREATE UNIQUE INDEX "rehab_criterion_status_patientId_criterionId_key"
   ON public.rehab_criterion_status ("patientId", "criterionId");
 CREATE INDEX "rehab_criterion_status_patientId_idx" ON public.rehab_criterion_status ("patientId");
 -- plus de vier originele policies letterlijk terug uit 20260424_rehab_protocols.sql
+
+-- Alleen C1 terugdraaien (C2 heeft nog niet gedraaid, de kolom staat er dus nog):
+-- laat de twee statements hierboven met "patientId" text en de UPDATE weg en begin
+-- bij SET NOT NULL. De rest is identiek.
 
 -- Rollback B
 DROP INDEX IF EXISTS public."rehab_criterion_status_trackerId_criterionId_key";
