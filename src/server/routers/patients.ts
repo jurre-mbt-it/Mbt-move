@@ -9,11 +9,10 @@ import {
   mfaCoachStaffProcedure,
   mfaTherapistProcedure,
   invalidateUserCache,
-  type Context,
 } from '@/server/trpc'
 import { hasPatientAccess, practiceScope } from '@/server/lib/patient-access'
-import { careScopeKey, careScopeWhere } from '@/server/lib/care-scope'
-import { findOpenTracker } from '@/lib/rehab-data'
+import { careScopeKey, careScopeWhere, type CareScopeKey } from '@/server/lib/care-scope'
+import { findOpenTracker, type TrackerClient } from '@/lib/rehab-data'
 import { auditLog } from '@/server/audit'
 import { amsMidnight, dateKey } from '@/lib/week-dates'
 import { deriveTopSet, estimateOneRepMax } from '@/lib/one-rep-max'
@@ -55,15 +54,12 @@ const alsConflict = (bericht: string) => (err: unknown): never => {
 const AL_INACTIEF =
   'Deze patiënt staat al op inactief. Ververs het scherm om de huidige status te zien.'
 
-/** Wat `closeOpenTrajectFor` van de tRPC-context nodig heeft. */
-type ArchiveerCtx = {
-  prisma: Context['prisma']
-  user: NonNullable<Context['user']>
-  req?: Context['req']
-}
+const TRAJECT_ALLEEN_THERAPEUT =
+  'Het afsluiten van een revalidatietraject is aan de behandelend therapeut. Zet de atleet op inactief zonder dat vinkje, of vraag de therapeut het traject af te ronden.'
 
 /**
  * Sluit het lopende rehab-traject van een patiënt mee af bij het archiveren.
+ * Geeft het id van het gesloten traject terug, of null als er niets liep.
  *
  * Zet dezelfde velden als `rehab.closeTraject`, maar met `outcome: 'UNKNOWN'`:
  * dat de behandeling stopt zegt niets over hoe de revalidatie afliep, en de
@@ -74,32 +70,53 @@ type ArchiveerCtx = {
  * Loopt er geen traject, dan gebeurt er niets. Dat is geen fout: het vinkje in
  * het archiveer-formulier is een wens, geen belofte dat er een traject is.
  *
- * De auditregel staat bewust náást PATIENT_DISCHARGED. Twee handelingen, twee
- * regels, anders is achteraf niet te zien of de therapeut dit traject zelf
- * sloot of dat het meeliep met het archiveren.
+ * Draait binnen de transactie van `setInactive`, vandaar `TrackerClient` in
+ * plaats van de hele client. Faalt deze update, dan rolt de uitbehandel-rij
+ * mee terug. Zonder dat zou de patiënt inactief staan met een fout in beeld,
+ * en was de enige weg terug: heractiveren en opnieuw archiveren.
+ *
+ * De auditregel hoort niet hier maar bij de caller, náást PATIENT_DISCHARGED.
+ * Twee handelingen, twee regels, anders is achteraf niet te zien of de
+ * therapeut dit traject zelf sloot of dat het meeliep met het archiveren.
  */
-async function closeOpenTrajectFor(ctx: ArchiveerCtx, patientId: string) {
-  const tracker = await findOpenTracker(ctx.prisma, patientId)
-  if (!tracker) return
-  await ctx.prisma.patientRehabTracker.update({
+async function closeOpenTrajectFor(
+  tx: TrackerClient,
+  patientId: string,
+  closedById: string,
+): Promise<string | null> {
+  const tracker = await findOpenTracker(tx, patientId)
+  if (!tracker) return null
+  await tx.patientRehabTracker.update({
     where: { id: tracker.id },
     data: {
       deactivatedAt: new Date(),
-      closedById: ctx.user.id,
+      closedById,
       outcome: 'UNKNOWN',
     },
   })
-  await auditLog({
-    event: 'REHAB_TRAJECT_CLOSED',
-    userId: ctx.user.id,
-    actorEmail: ctx.user.email,
-    resource: 'PatientRehabTracker',
-    resourceId: tracker.id,
-    // `route` wijst naar setInactive, niet naar rehab.closeTraject: zo is in
-    // het log te zien dat dit een neveneffect was.
-    metadata: { route: 'patients.setInactive', outcome: 'UNKNOWN' },
-    req: ctx.req,
-  })
+  return tracker.id
+}
+
+/**
+ * Welke programma's van deze patiënt horen bij de behandelaar die archiveert of
+ * heractiveert?
+ *
+ * De uitbehandel-markering is scope-gebonden, dus de bijwerkingen moeten dat
+ * ook zijn. Zonder dit predicaat zet een therapeut ook de programma's van een
+ * meekijkende coach dicht, en haalt een coach die van de praktijk terug.
+ *
+ * Zelfde vorm als `programs.list`: een coach ziet wat hij zelf maakte
+ * (coach-programma's hebben altijd `practiceId = null`), een therapeut of admin
+ * ziet daarnaast alles van zijn praktijk.
+ *
+ * Gebruik dit op BEIDE paden. Alleen bij het heropenen scopen is erger dan
+ * niets doen: dan kan een therapeut een coach-programma dichtzetten dat daarna
+ * door niemand meer automatisch terugkomt. `closedByDischarge` blijft dan true
+ * en het programma valt buiten ieders reopen-filter.
+ */
+function programmaScope(scope: CareScopeKey, userId: string): Prisma.ProgramWhereInput {
+  if (scope.coachId !== null) return { creatorId: scope.coachId }
+  return { OR: [{ practiceId: scope.practiceId }, { creatorId: userId }] }
 }
 
 /**
@@ -1393,10 +1410,21 @@ export const patientsRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Alleen patiënten en atleten' })
       }
 
+      // Een traject afsluiten is een klinisch besluit. Elke procedure in
+      // rehab.ts staat daarom op therapistProcedure, en AGENTS.md legt vast dat
+      // klinische schrijfacties daar horen. Een coach mag hier wel archiveren
+      // (dat is planning, geen behandeling), maar niet de episode van een
+      // meekijkende therapeut dichtzetten: die kan hij daarna zelf niet meer
+      // heropenen, want rehab.reopenTraject is ook therapistProcedure.
+      const magTrajectSluiten = ctx.user.role === 'THERAPIST' || ctx.user.role === 'ADMIN'
+      if (input.closeTraject && !magTrajectSluiten) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: TRAJECT_ALLEEN_THERAPEUT })
+      }
+
       const scope = careScopeKey(ctx.user)
       const nu = new Date()
 
-      await ctx.prisma.$transaction(async (tx) => {
+      const geslotenTrajectId = await ctx.prisma.$transaction(async (tx) => {
         await tx.patientCareStatus
           .create({
             data: {
@@ -1413,23 +1441,43 @@ export const patientsRouter = createTRPCRouter({
           })
           .catch(alsConflict(AL_INACTIEF))
         if (input.closeProgramIds.length > 0) {
-          // `patientId` in de where houdt de ids gebonden aan deze patiënt, en
-          // `closedByDischarge` markeert wat bij heractiveren terug mag.
+          // `patientId` houdt de ids gebonden aan deze patiënt, `programmaScope`
+          // aan de eigen praktijk of coach, en `closedByDischarge` markeert wat
+          // bij heractiveren terug mag.
           await tx.program.updateMany({
-            where: { id: { in: input.closeProgramIds }, patientId: input.id, status: 'ACTIVE' },
+            where: {
+              id: { in: input.closeProgramIds },
+              patientId: input.id,
+              status: 'ACTIVE',
+              ...programmaScope(scope, ctx.user.id),
+            },
             data: { status: 'COMPLETED', endDate: nu, closedByDischarge: true },
           })
         }
-        // Open insights sluiten, anders blijven ze tot hun expiresAt in het
-        // aandacht-overzicht staan.
-        await tx.insight.updateMany({
-          where: { patientId: input.id, status: 'OPEN' },
-          data: { status: 'DISMISSED', statusChangedById: ctx.user.id, statusChangedAt: nu },
-        })
+        // Open insights worden hier bewust NIET gedempt. Insight heeft geen
+        // praktijk- of coach-kolom, dus een updateMany raakt álle open signalen
+        // van deze patiënt, ook die van een andere behandelaar, en heractiveren
+        // zet ze niet terug. Delen een coach en een praktijk-therapeut een
+        // atleet, dan verdwijnt bij de een een kritieke pijnmelding omdat de
+        // ander archiveert. Het leesfilter in insights.getDashboard (taak 15)
+        // kijkt scope-bewust naar de care-status; daarmee is dempen voor de
+        // archiverende partij overbodig en voor de meekijker destructief.
+        return input.closeTraject ? closeOpenTrajectFor(tx, input.id, ctx.user.id) : null
       })
 
-      if (input.closeTraject) {
-        await closeOpenTrajectFor(ctx, input.id)
+      if (geslotenTrajectId) {
+        // Aparte regel naast PATIENT_DISCHARGED, met `route` op setInactive:
+        // zo is in het log te zien dat dit een neveneffect was en niet een
+        // therapeut die zelf een uitkomst koos.
+        await auditLog({
+          event: 'REHAB_TRAJECT_CLOSED',
+          userId: ctx.user.id,
+          actorEmail: ctx.user.email,
+          resource: 'PatientRehabTracker',
+          resourceId: geslotenTrajectId,
+          metadata: { route: 'patients.setInactive', outcome: 'UNKNOWN' },
+          req: ctx.req,
+        })
       }
 
       await auditLog({
@@ -1457,9 +1505,21 @@ export const patientsRouter = createTRPCRouter({
       if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.id))) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
-      const scope = careScopeWhere(ctx.user)
+      // Zelfde rolfilter als setInactive. Vandaag onbereikbaar (zonder
+      // markering is er niets te heractiveren, en markeren kan alleen op een
+      // patiënt of atleet), maar de verdediging hoort op allebei de paden te
+      // staan en niet op één.
+      const doel = await ctx.prisma.user.findFirst({
+        where: { id: input.id, role: { in: ['PATIENT', 'ATHLETE'] } },
+        select: { id: true },
+      })
+      if (!doel) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Alleen patiënten en atleten' })
+      }
+
+      const scope = careScopeKey(ctx.user)
       const rij = await ctx.prisma.patientCareStatus.findFirst({
-        where: { patientId: input.id, ...scope },
+        where: { patientId: input.id, ...careScopeWhere(ctx.user) },
       })
       if (!rij) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Deze patiënt is niet inactief' })
@@ -1469,10 +1529,15 @@ export const patientsRouter = createTRPCRouter({
 
       await ctx.prisma.$transaction(async (tx) => {
         await tx.patientCareStatus.delete({ where: { id: rij.id } })
-        // Alleen programma's die door het archiveren dichtgingen. Wat de
-        // therapeut zelf afrondde blijft COMPLETED.
+        // Alleen programma's die door het archiveren dichtgingen, en alleen
+        // binnen de eigen scope. Wat de therapeut zelf afrondde blijft
+        // COMPLETED, en wat een coach dichtzette blijft van de coach.
         const gesloten = await tx.program.findMany({
-          where: { patientId: input.id, closedByDischarge: true },
+          where: {
+            patientId: input.id,
+            closedByDischarge: true,
+            ...programmaScope(scope, ctx.user.id),
+          },
           select: { id: true, startDate: true },
         })
         for (const p of gesloten) {

@@ -19,6 +19,18 @@ export type PatientRehabTrackerData = NonNullable<
 >
 
 /**
+ * Genoeg client om trajecten te lezen en te schrijven: alleen de
+ * tracker-delegate, niet de hele `PrismaClient`.
+ *
+ * Zo kan een caller ook de transactie-client uit `$transaction(async (tx) =>
+ * ...)` doorgeven. Die mist `$transaction` en `$connect` en is dus geen
+ * `PrismaClient`, terwijl hij deze query prima kan uitvoeren.
+ * `patients.setInactive` heeft dat nodig om het lopende traject in dezelfde
+ * transactie te sluiten als de uitbehandel-markering.
+ */
+export type TrackerClient = Pick<PrismaClient, 'patientRehabTracker'>
+
+/**
  * Het lopende traject van een patiënt, of null als er geen loopt.
  *
  * DE enige plek waar "welk traject loopt er" wordt beslist. Er stonden vier
@@ -32,7 +44,7 @@ export type PatientRehabTrackerData = NonNullable<
  * een expliciete volgorde maakt dit deterministisch. `id` als tweede sleutel,
  * want bij een gelijke activatedAt is de keuze anders alsnog willekeurig.
  */
-export async function findOpenTracker(prisma: PrismaClient, patientId: string) {
+export async function findOpenTracker(prisma: TrackerClient, patientId: string) {
   return prisma.patientRehabTracker.findFirst({
     where: { patientId, deactivatedAt: null },
     orderBy: [{ activatedAt: 'desc' }, { id: 'desc' }],
