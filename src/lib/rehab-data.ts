@@ -1,5 +1,7 @@
 import type { PrismaClient } from '@prisma/client'
 
+import { mergeCriterionStatuses } from './rehab-traject'
+
 /**
  * Rehab-tracker data — geconsolideerd voor:
  *  - `rehab.getPatientTracker` / `rehab.getMyTracker` tRPC procedures
@@ -146,10 +148,32 @@ export async function getRehabTrackerDataById(
     expectedPhaseOrder,
     progress: { total, met, inProgress, pct: progressPct },
     phases: tracker.protocol.phases.map((phase) => {
-      const phaseStatuses = phase.criteria.map((c) => statusByCriterionId.get(c.id))
-      const phaseTotal = phase.criteria.length
-      const phaseMet = phaseStatuses.filter((s) => s?.status === 'MET').length
-      const phaseInProgress = phaseStatuses.filter((s) => s?.status === 'IN_PROGRESS').length
+      // Expliciete projectie i.p.v. de ruwe Prisma-rij spreaden: `criteria`
+      // hieronder mag alleen deze velden bevatten, niet elk kolomveld dat
+      // Prisma toevallig meegeeft.
+      const criteriaBase = phase.criteria.map((c) => ({
+        id: c.id,
+        order: c.order,
+        name: c.name,
+        testDescription: c.testDescription,
+        reference: c.reference,
+        targetValue: c.targetValue,
+        targetUnit: c.targetUnit,
+        inputType: c.inputType,
+        isBonus: c.isBonus,
+        isBilateral: c.isBilateral,
+        newtonMinGreen: c.newtonMinGreen,
+        newtonMinOrange: c.newtonMinOrange,
+        lsiMinGreen: c.lsiMinGreen,
+        lsiMinOrange: c.lsiMinOrange,
+      }))
+      // Koppelt status/measurementValue/measurementDate; negeert (in plaats
+      // van per ongeluk toont) een status die niet bij dit criterium hoort.
+      // Zie src/lib/rehab-traject.ts.
+      const mergedCriteria = mergeCriterionStatuses(criteriaBase, statuses)
+      const phaseTotal = mergedCriteria.length
+      const phaseMet = mergedCriteria.filter((c) => c.status === 'MET').length
+      const phaseInProgress = mergedCriteria.filter((c) => c.status === 'IN_PROGRESS').length
       return {
         id: phase.id,
         order: phase.order,
@@ -165,26 +189,11 @@ export async function getRehabTrackerDataById(
           inProgress: phaseInProgress,
           pct: phaseTotal > 0 ? Math.round((phaseMet / phaseTotal) * 100) : 0,
         },
-        criteria: phase.criteria.map((c) => {
+        criteria: mergedCriteria.map((c) => {
           const s = statusByCriterionId.get(c.id)
           return {
-            id: c.id,
-            order: c.order,
-            name: c.name,
-            testDescription: c.testDescription,
-            reference: c.reference,
-            targetValue: c.targetValue,
-            targetUnit: c.targetUnit,
-            inputType: c.inputType,
-            isBonus: c.isBonus,
-            isBilateral: c.isBilateral,
-            newtonMinGreen: c.newtonMinGreen,
-            newtonMinOrange: c.newtonMinOrange,
-            lsiMinGreen: c.lsiMinGreen,
-            lsiMinOrange: c.lsiMinOrange,
-            status: (s?.status ?? 'NOT_MET') as 'NOT_MET' | 'IN_PROGRESS' | 'MET',
-            measurementValue: s?.measurementValue ?? null,
-            measurementDate: s?.measurementDate ?? null,
+            ...c,
+            status: c.status as 'NOT_MET' | 'IN_PROGRESS' | 'MET',
             notes: s?.notes ?? null,
             updatedAt: s?.updatedAt ?? null,
           }
