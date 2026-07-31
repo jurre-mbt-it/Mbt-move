@@ -180,17 +180,28 @@ export type LopendeMarkering = { practiceId: string | null; coachId: string | nu
  * praktijk) telt als "behandelt door": zijn tak is per definitie niet
  * afgesloten, dus de patiënt blijft in beeld. Dat is de veilige kant.
  *
- * LET OP bij een lege `behandelaars`: `every` is dan waar, dus met een lopende
- * markering en nul actieve relaties komt hier `true` uit. Dat is bewust
- * (niemand behandelt nog door), maar het betekent dat de caller die situatie
- * zelf moet willen. `computeInsights` vangt nul relaties al eerder af met
- * `no_active_therapist`.
+ * NUL actieve behandelaars is expliciet NIET uitbehandeld, en die regel staat
+ * hier en niet bij de aanroepers. `every` op een lege verzameling is vacuously
+ * true, dus zonder de guard hieronder zou "niemand behandelt deze persoon"
+ * hetzelfde antwoord geven als "iedereen is met hem klaar". Dat is precies
+ * omgekeerd aan wat de vraag bedoelt.
+ *
+ * Het gaat om een bestaand pad, niet om een theoretisch geval:
+ * `shop.activateProgram` zet een actief programma klaar voor een koper zónder
+ * enige `PatientTherapist`-relatie. Die traint op een gekocht schema en hoort
+ * gewoon zijn dagelijkse herinnering te krijgen. Met de vacuous truth viel die
+ * stil zodra er ergens een markering op zijn naam stond, zonder melding en
+ * zonder dat het in enig scherm te zien was.
+ *
+ * VEREENVOUDIG DEZE GUARD NIET WEG. Hij ziet eruit als een randgeval dat `every`
+ * al afhandelt, en dat is nou juist het probleem.
  */
 export function uitbehandeldDoorIedereen(
   behandelaars: ScopeUser[],
   markeringen: LopendeMarkering[],
 ): boolean {
   if (markeringen.length === 0) return false
+  if (behandelaars.length === 0) return false
   return behandelaars.every((behandelaar) => {
     const key = careScopeKeyOrNull(behandelaar)
     if (!key) return false

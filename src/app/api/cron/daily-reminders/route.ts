@@ -116,10 +116,12 @@ export async function GET(req: NextRequest) {
     // die er gewoon staat. `reactivatedAt: null` hoort erbij omdat rijen als
     // historie blijven bestaan.
     //
-    // Heeft iemand een lopende markering en NUL actieve behandelrelaties, dan
-    // valt hij ook weg: er is dan niemand meer die doorbehandelt. Een gebruiker
-    // zonder markering raakt dit filter niet, dus een therapeut die zelf traint
-    // houdt gewoon zijn push.
+    // Heeft iemand een lopende markering maar NUL actieve behandelrelaties, dan
+    // blijft hij gewoon push krijgen: niemand heeft hem uitbehandeld, want er is
+    // niemand. Dat is het pad van `shop.activateProgram`, dat een actief
+    // programma klaarzet voor een koper zonder enige koppeling. Die regel zit in
+    // `uitbehandeldDoorIedereen` zelf. Een gebruiker zonder markering raakt dit
+    // filter sowieso niet, dus een therapeut die zelf traint houdt zijn push.
     //
     // Hier filteren en niet in de weekquery hieronder: de trainingsherinnering
     // droogt vanzelf op zodra er geen planning meer staat, maar de herstel- en

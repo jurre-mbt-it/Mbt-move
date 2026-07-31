@@ -216,11 +216,15 @@ describe('uitbehandeldDoorIedereen', () => {
     expect(uitbehandeldDoorIedereen([losseTherapeut], [praktijkMarkering])).toBe(false)
   })
 
-  it('is waar bij nul behandelaars mét een lopende markering', () => {
-    // Bewuste keuze: niemand behandelt nog door. Callers die dit niet willen,
-    // vangen de lege lijst zelf eerder af (computeInsights doet dat met
-    // no_active_therapist).
-    expect(uitbehandeldDoorIedereen([], [praktijkMarkering])).toBe(true)
+  it('is ONWAAR bij nul behandelaars, ook met een lopende markering', () => {
+    // De enige tak die je niet aan de code kunt aflezen: `every` op een lege
+    // verzameling is vacuously true, dus zonder expliciete guard zou "niemand
+    // behandelt deze persoon" hetzelfde antwoord geven als "iedereen is met hem
+    // klaar". Het pad bestaat echt: shop.activateProgram zet een actief
+    // programma klaar voor een koper zonder enige PatientTherapist-relatie, en
+    // die hoort zijn dagelijkse herinnering te houden.
+    expect(uitbehandeldDoorIedereen([], [praktijkMarkering])).toBe(false)
+    expect(uitbehandeldDoorIedereen([], [praktijkMarkering, coachMarkering])).toBe(false)
     expect(uitbehandeldDoorIedereen([], [])).toBe(false)
   })
 })

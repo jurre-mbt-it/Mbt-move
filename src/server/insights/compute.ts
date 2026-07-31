@@ -160,8 +160,8 @@ export async function computeInsights(
     // Alleen overslaan als ELKE actieve behandelaar deze patiënt heeft
     // afgesloten. Blijft er één over die niets archiveerde, dan blijven de
     // signalen lopen; die therapeut ziet ze immers ook nog in zijn dashboard.
-    // De lege-lijst-situatie is hierboven al afgevangen met
-    // `no_active_therapist`, dus die bereikt deze regel nooit.
+    // Nul behandelaars is hierboven al afgevangen met `no_active_therapist`, en
+    // `uitbehandeldDoorIedereen` geeft voor die lege verzameling sowieso false.
     if (
       uitbehandeldDoorIedereen(
         status.patient.patientTherapists.map((t) => t.therapist),
