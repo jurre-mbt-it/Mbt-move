@@ -71,13 +71,31 @@ export const adminRouter = createTRPCRouter({
           message: 'Je kunt je eigen admin-rol niet intrekken',
         })
       }
-      const updated = await ctx.prisma.user.update({
-        where: { id: input.userId },
-        // Een coach hoort nooit bij een praktijk: bij het omzetten naar COACH
-        // halen we de praktijk-koppeling weg, anders zou de praktijk-tak in
-        // de toegangschecks alsnog kunnen gaan gelden.
-        data: { role: input.role, ...(input.role === 'COACH' ? { practiceId: null } : {}) },
-        select: { id: true, name: true, email: true, role: true, supabaseUserId: true },
+      const updated = await ctx.prisma.$transaction(async (tx) => {
+        // Een uitbehandel-markering hoort bij een patiënt of atleet. Promoveert
+        // iemand naar THERAPIST, COACH of ADMIN, dan blijft die rij anders
+        // lopen terwijl niemand hem nog kan heractiveren: `patients.reactivate`
+        // zoekt in de patiëntenlijst en deze gebruiker staat daar niet meer in.
+        // Het pushfilter kijkt niet naar rol, dus de nieuwe therapeut krijgt
+        // vanaf dat moment stil geen ochtendpush meer over zijn eigen training.
+        //
+        // Afstempelen en niet verwijderen: de reden en de toelichting van de
+        // afgesloten periode zijn een klinisch oordeel dat nergens anders
+        // bewaard wordt (zie het commentaar bij model PatientCareStatus).
+        if (input.role !== 'PATIENT' && input.role !== 'ATHLETE') {
+          await tx.patientCareStatus.updateMany({
+            where: { patientId: input.userId, reactivatedAt: null },
+            data: { reactivatedAt: new Date(), reactivatedById: ctx.user.id },
+          })
+        }
+        return tx.user.update({
+          where: { id: input.userId },
+          // Een coach hoort nooit bij een praktijk: bij het omzetten naar COACH
+          // halen we de praktijk-koppeling weg, anders zou de praktijk-tak in
+          // de toegangschecks alsnog kunnen gaan gelden.
+          data: { role: input.role, ...(input.role === 'COACH' ? { practiceId: null } : {}) },
+          select: { id: true, name: true, email: true, role: true, supabaseUserId: true },
+        })
       })
 
       // Zonder dit houdt de gedegradeerde gebruiker tot 60s (USER_CACHE_TTL) zijn

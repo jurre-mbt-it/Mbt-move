@@ -54,6 +54,68 @@ const checks: Check[] = [
     },
   },
   {
+    // De tabel zelf en deze kolom komen van `prisma db push`, maar
+    // 20260805 leunt erop: dat bestand indexeert op "reactivatedAt".
+    // Ontbreekt de kolom, dan is de push nooit gedraaid en heeft de rest van
+    // de feature geen grond.
+    name: 'patient_care_status tabel met reactivatedAt kolom',
+    migration: '20260805_care_status_reactivated.sql',
+    run: async () => {
+      try {
+        await prisma.$queryRaw`SELECT "reactivatedAt" FROM patient_care_status LIMIT 1`
+        return true
+      } catch {
+        return false
+      }
+    },
+  },
+  {
+    // `prisma migrate diff` ziet partiële indexen niet, dus dit is de enige
+    // manier om te merken dat een omgeving achterloopt. Zonder 20260805 staan
+    // de indexen er nog in hun oude vorm (zonder de reactivatedAt-voorwaarde)
+    // en botst de tweede archiveer-cyclus op een rij uit de historie: de app
+    // meldt dan "Deze patiënt staat al op inactief" over een patiënt die juist
+    // actief is, en dat is vanuit de UI niet meer recht te zetten. De
+    // definitie moet dus mee gecontroleerd worden, niet alleen het bestaan.
+    name: 'patient_care_status indexen tellen alleen lopende markeringen',
+    migration: '20260805_care_status_reactivated.sql',
+    run: async () => {
+      const rows = await prisma.$queryRaw<{ indexname: string; indexdef: string }[]>`
+        SELECT indexname, indexdef FROM pg_indexes
+        WHERE schemaname = 'public'
+          AND tablename = 'patient_care_status'
+          AND indexname IN (
+            'patient_care_status_one_per_practice',
+            'patient_care_status_one_per_coach'
+          )`
+      if (rows.length !== 2) return false
+      return rows.every((r) => r.indexdef.includes('reactivatedAt'))
+    },
+  },
+  {
+    // Bewaakt dat precies één van practiceId/coachId gevuld is. Prisma kent
+    // geen CHECK-constraints, dus ook deze is onzichtbaar in elke diff. Valt
+    // hij weg, dan kan een markering in twee scopes tegelijk zichtbaar zijn
+    // (coach archiveert een praktijk-patiënt) of in geen enkele, en dan is
+    // heractiveren er niet meer bij.
+    name: 'patient_care_status_one_scope CHECK-constraint',
+    migration: '20260804_patient_care_status_one_scope.sql',
+    run: async () => {
+      // Via pg_class/pg_namespace in plaats van ::regclass, want die cast
+      // gooit als de tabel ontbreekt en zou de hele check-run afbreken.
+      const rows = await prisma.$queryRaw<{ n: bigint }[]>`
+        SELECT count(*) AS n
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace ns ON ns.oid = t.relnamespace
+        WHERE c.conname = 'patient_care_status_one_scope'
+          AND c.contype = 'c'
+          AND t.relname = 'patient_care_status'
+          AND ns.nspname = 'public'`
+      return Number(rows[0]?.n ?? 0) === 1
+    },
+  },
+  {
     name: 'invite_codes tabel',
     migration: '20260423_invite_codes_audit_gdpr.sql',
     run: async () => {

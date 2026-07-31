@@ -5,13 +5,15 @@
  *   1. Find opted-in patients in CIE-enabled practices (patient_insight_status.enabled=true
  *      AND no objection AND practice.cieEnabled=true).
  *   2. For each: find active treating therapists (isActive + APPROVED).
- *      Skip if 0.
+ *      Skip if 0, and skip if every one of them has discharged the patient
+ *      (see step 1b: one discharge in one scope is not enough).
  *   3. Build aggregates once.
  *   4. Run all 6 evaluators.
  *   5. Dedup: skip if open/recent insight of same signal_type exists within
  *      the per-signal dedup window (24h for CRITICAL, 7d for the rest).
  *   6. Insert new insights.
- *   7. Dispatch notifications (email for critical, in-app rows for all).
+ *   7. Dispatch notifications (email for critical, in-app rows for all), but
+ *      only to therapists who have not discharged this patient themselves.
  */
 import type { PrismaClient, InsightUrgency, InsightStatus } from '@prisma/client'
 import { buildPatientAggregates } from './aggregates'
@@ -26,6 +28,11 @@ import { deloadNeeded } from './rules/deloadNeeded'
 import { overloadRisk } from './rules/overloadRisk'
 import { lowFeel } from './rules/lowFeel'
 import { dispatchInsightNotifications } from './dispatcher'
+import {
+  uitbehandeldDoorIedereen,
+  behandelaarsDieDoorbehandelen,
+  type LopendeMarkering,
+} from '@/server/lib/care-scope'
 
 const EVALUATORS: Record<string, Evaluator> = {
   pain_flare: painFlare,
@@ -91,12 +98,46 @@ export async function computeInsights(
           email: true,
           patientTherapists: {
             where: { isActive: true, status: 'APPROVED' },
-            select: { therapistId: true },
+            // De rol en de praktijk van de behandelaar zijn nodig om te bepalen
+            // in welke scope zijn eventuele uitbehandel-markering valt; zie de
+            // filterstap hieronder.
+            select: {
+              therapistId: true,
+              therapist: { select: { id: true, role: true, practiceId: true } },
+            },
           },
         },
       },
     },
   })
+
+  // 1b. Wie is er uitbehandeld, en door wie?
+  //
+  // Deze motor draait als cron, zonder ingelogde lezer, dus er is geen scope om
+  // op te filteren. "Eén markering, waar dan ook" is hier het VERKEERDE
+  // antwoord: één persoon kan in twee scopes zitten (patients.inviteCoMonitor
+  // koppelt de atleet van een coach aan een praktijk-therapeut). Archiveert de
+  // coach terwijl de praktijk-therapeut doorbehandelt, dan zou die therapeut
+  // stil geen overbelastings- of pijnsignaal meer krijgen, zonder dat er ergens
+  // een melding komt. Daarom de vraag per behandelaar, in geheugen, met
+  // `uitbehandeldDoorIedereen`.
+  //
+  // `reactivatedAt: null` staat er expliciet bij: rijen blijven als historie
+  // bestaan, dus zonder die voorwaarde zou elke ooit gearchiveerde patiënt
+  // permanent uit de motor vallen.
+  const markeringen = await prisma.patientCareStatus.findMany({
+    where: {
+      patientId: { in: statuses.map((s) => s.patientId) },
+      reactivatedAt: null,
+    },
+    select: { patientId: true, practiceId: true, coachId: true },
+  })
+  const markeringenPerPatient = new Map<string, LopendeMarkering[]>()
+  for (const m of markeringen) {
+    const lijst = markeringenPerPatient.get(m.patientId) ?? []
+    lijst.push({ practiceId: m.practiceId, coachId: m.coachId })
+    markeringenPerPatient.set(m.patientId, lijst)
+  }
 
   // 2. Load rule catalog once (id → rule definition)
   const rules = await prisma.insightRule.findMany({ where: { enabledGlobally: true } })
@@ -120,6 +161,34 @@ export async function computeInsights(
       result.patientsSkipped.push({ patientId, reason: 'no_active_therapist' })
       continue
     }
+
+    const markeringenVanPatient = markeringenPerPatient.get(patientId) ?? []
+
+    // Alleen overslaan als ELKE actieve behandelaar deze patiënt heeft
+    // afgesloten. Blijft er één over die niets archiveerde, dan blijven de
+    // signalen lopen; die therapeut ziet ze immers ook nog in zijn dashboard.
+    // Nul behandelaars is hierboven al afgevangen met `no_active_therapist`, en
+    // `uitbehandeldDoorIedereen` geeft voor die lege verzameling sowieso false.
+    if (
+      uitbehandeldDoorIedereen(
+        status.patient.patientTherapists.map((t) => t.therapist),
+        markeringenVanPatient,
+      )
+    ) {
+      result.patientsSkipped.push({ patientId, reason: 'discharged_by_all_therapists' })
+      continue
+    }
+
+    // Wie krijgt straks bericht? Dat is een ANDERE vraag dan of de patiënt
+    // wordt overgeslagen. Hierboven staat alleen vast dat er nog iemand
+    // doorbehandelt; dat maakt de behandelaar die zélf afsloot nog geen
+    // ontvanger. Zonder dit filter krijgt hij bij een kritiek signaal een
+    // e-mail met de naam van zijn ex-patiënt en de signaaltitel erin, die
+    // linkt naar een overzicht waar dat item voor hem juist is weggefilterd.
+    const ontvangerIds = behandelaarsDieDoorbehandelen(
+      status.patient.patientTherapists.map((t) => t.therapist),
+      markeringenVanPatient,
+    ).map((t) => t.id)
 
     try {
       const aggregates = await buildPatientAggregates(prisma, patientId)
@@ -166,11 +235,12 @@ export async function computeInsights(
         })
         result.insightsCreated++
 
-        // 7. Notifications — dispatch to all active treating therapists
+        // 7. Notifications — dispatch to the active treating therapists who have
+        //    NOT discharged this patient (see `ontvangerIds` above).
         await dispatchInsightNotifications(prisma, {
           insight: inserted,
           patientName: aggregates.patientName,
-          therapistIds: status.patient.patientTherapists.map((t) => t.therapistId),
+          therapistIds: ontvangerIds,
         })
       }
     } catch (err) {

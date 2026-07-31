@@ -366,6 +366,13 @@ model User {
   rehabTrackersClosed    PatientRehabTracker[]  @relation("RehabTrackerCloser")
   rehabStatusUpdates     RehabCriterionStatus[] @relation("RehabStatusUpdater")
 
+  // Uitbehandeld-markering: als patiënt, als scope-houdende coach, als degene
+  // die de markering zette, en als degene die hem weer ophief.
+  careStatuses            PatientCareStatus[] @relation("CareStatusPatient")
+  careStatusesAsCoach     PatientCareStatus[] @relation("CareStatusCoach")
+  careStatusesDischarged  PatientCareStatus[] @relation("CareStatusDischarger")
+  careStatusesReactivated PatientCareStatus[] @relation("CareStatusReactivator")
+
   // Educatie-content (admin-beheerd)
   educationalResources EducationalResource[] @relation("EducationalResourceCreator")
 
@@ -403,7 +410,7 @@ model User {
   dailyGoal              DailyGoal?
   /// Activiteitstypes waarvoor de beoordeel-popup stil is (omkeerbaar via
   /// instellingen in de app). Leeg = overal vragen.
-  ratingMutedActivities  CardioActivity[] @default([])
+  ratingMutedActivities  CardioActivity[]        @default([])
 
   @@index([deletedAt])
   @@map("users")
@@ -484,6 +491,63 @@ model PatientTherapist {
   @@map("patient_therapists")
 }
 
+// ─── Uitbehandeld (inactieve patiënt) ────────────────────────────────────────
+// LET OP bij het schrijven van een filter: het bestaan van de rij is NIET de
+// status. Rijen blijven staan als historie; alleen een rij met
+// `reactivatedAt = null` betekent "nu uitbehandeld". Een filter op
+// `careStatuses: { some: {} }` haalt dus elke ooit gearchiveerde patiënt
+// permanent uit de actieve lijst. Gebruik `careScopeWhere` of
+// `careScopeWhereForRead` uit src/server/lib/care-scope.ts; die bakken de
+// juiste voorwaarde in en zijn ook meteen scope-gebonden.
+//
+// De rij blijft bewaard omdat `note` een klinisch oordeel is dat vanwege de
+// PII-regel niet in de audit-log mag, en dus met een DELETE definitief weg zou
+// zijn. Bewust een eigen tabel: niet op PatientTherapist (die status zit in het
+// pad van hasPatientAccess en leest voor de patiënt als een
+// consent-intrekking) en niet als kolom op User (dezelfde persoon kan tegelijk
+// coach-atleet en praktijk-patiënt zijn, en `users` is voor de gebruiker zelf
+// leesbaar met de anon-key).
+
+model PatientCareStatus {
+  id         String    @id @default(cuid())
+  patientId  String
+  patient    User      @relation("CareStatusPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  /// Scope-sleutel. THERAPIST -> practiceId van de therapeut. COACH -> eigen user-id.
+  /// Nooit allebei null: een therapeut zonder praktijk wordt geweigerd.
+  practiceId String?
+  practice   Practice? @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+  coachId    String?
+  coach      User?     @relation("CareStatusCoach", fields: [coachId], references: [id], onDelete: Cascade)
+
+  dischargedAt   DateTime
+  dischargedById String
+  dischargedBy   User                @relation("CareStatusDischarger", fields: [dischargedById], references: [id])
+  reason         CareDischargeReason
+  /// Vrije toelichting. Medische PII, staat daarom hier en niet in AuditLog.metadata.
+  note           String?
+
+  /// Gezet toen de patiënt weer in behandeling ging. Rij blijft bestaan zodat de
+  /// reden en de toelichting van de vorige afsluiting terug te lezen blijven;
+  /// alleen rijen met reactivatedAt = null tellen als "nu inactief".
+  reactivatedAt   DateTime?
+  reactivatedById String?
+  reactivatedBy   User?     @relation("CareStatusReactivator", fields: [reactivatedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@map("patient_care_status")
+}
+
+enum CareDischargeReason {
+  COMPLETED // behandeling afgerond
+  DISCONTINUED // voortijdig gestopt
+  TRANSFERRED // doorverwezen of overgedragen
+  NO_SHOW // niet meer verschenen
+  OTHER
+}
+
 model Exercise {
   id                 String           @id @default(cuid())
   name               String
@@ -545,7 +609,7 @@ model Exercise {
 }
 
 model Practice {
-  id                String       @id @default(cuid())
+  id                String              @id @default(cuid())
   name              String
   // Adres + contact — alle nullable zodat bestaande praktijken niet breken.
   // Worden meegerenderd in de email-footer als ze ingevuld zijn; lege velden
@@ -555,26 +619,27 @@ model Practice {
   addressLine2      String?
   postalCode        String?
   city              String?
-  country           String?      @default("Nederland")
+  country           String?             @default("Nederland")
   phone             String?
   email             String?
   website           String?
   logoUrl           String?
   /// Weergavevoorkeuren die voor iedereen in de praktijk gelden, zodat
   /// collega's dezelfde kalender zien. Nu: { categoryColors: { STRENGTH: "#..." } }.
-  uiPrefs           Json         @default("{}")
+  uiPrefs           Json                @default("{}")
   agbCodePractice   String?
   // Plain text, max 500 chars. Wordt onderaan de email-footer gerenderd in
   // kleinere grijze typografie. Geen HTML/markdown om XSS-risico in mail-
   // templates te vermijden.
   privacyDisclaimer String?
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
   // Clinical Insight Engine — gefaseerde rollout per praktijk.
-  cieEnabled        Boolean      @default(false)
+  cieEnabled        Boolean             @default(false)
   users             User[]
   exercises         Exercise[]
   inviteCodes       InviteCode[]
+  careStatuses      PatientCareStatus[]
 
   @@map("practices")
 }
@@ -711,6 +776,11 @@ model Program {
   // oefeningen voor de rest van die week.
   flexibleSchedule Boolean @default(false)
   weeklyTarget     Int?
+
+  /// Gezet toen dit programma automatisch werd afgesloten omdat de patiënt op
+  /// inactief ging. Alleen die programma's worden bij heractiveren teruggezet;
+  /// programma's die de therapeut zelf afrondde blijven COMPLETED.
+  closedByDischarge Boolean @default(false)
 
   creator   User    @relation("ProgramCreator", fields: [creatorId], references: [id])
   creatorId String
@@ -1493,7 +1563,7 @@ model PatientRehabTracker {
 
 /// Per traject \u00d7 criterium de R/O/G status + meetwaarde + datum.
 model RehabCriterionStatus {
-  id String @id @default(cuid())
+  id               String                    @id @default(cuid())
   trackerId        String
   tracker          PatientRehabTracker       @relation(fields: [trackerId], references: [id], onDelete: Cascade)
   criterionId      String

@@ -17,6 +17,7 @@ import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { practiceScope, inSamePractice } from '@/server/lib/patient-access'
+import { nietUitbehandeld } from '@/server/lib/care-scope'
 import { sendPush } from '@/server/push/send'
 import type { PrismaClient } from '@prisma/client'
 
@@ -268,6 +269,11 @@ export const messagesRouter = createTRPCRouter({
                 ...practiceScope(ctx.user),
               ],
             }),
+        // Uitbehandelde atleten vallen uit de inbox. Bewust NA de spread: bij
+        // een object-spread wint de laatste gelijknamige sleutel, dus zo kan
+        // een spread die ooit zelf `careStatuses` gaat bevatten dit filter niet
+        // wegschrijven. Eigen sleutel, nooit een tweede `OR`.
+        ...nietUitbehandeld(ctx.user),
       },
     }
 
@@ -348,6 +354,10 @@ export const messagesRouter = createTRPCRouter({
                   ...practiceScope(ctx.user),
                 ],
               }),
+          // Zelfde tak als in `inbox`, en om dezelfde reden ná de spread:
+          // zonder dit blijft de sidebar-badge oplichten voor iemand die uit
+          // elke lijst verdwenen is.
+          ...nietUitbehandeld(ctx.user),
         },
       },
     })

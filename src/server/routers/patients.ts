@@ -11,6 +11,17 @@ import {
   invalidateUserCache,
 } from '@/server/trpc'
 import { hasPatientAccess, practiceScope } from '@/server/lib/patient-access'
+import {
+  careScopeKey,
+  careScopeWhere,
+  careScopeWhereForRead,
+  nietUitbehandeld,
+  programmaScope,
+  welUitbehandeld,
+} from '@/server/lib/care-scope'
+import { hefUitbehandeldOp } from '@/server/lib/care-reactivate'
+import { werklijstAnd } from '@/server/lib/werklijst-where'
+import { findOpenTracker, type TrackerClient } from '@/lib/rehab-data'
 import { auditLog } from '@/server/audit'
 import { amsMidnight, dateKey } from '@/lib/week-dates'
 import { deriveTopSet, estimateOneRepMax } from '@/lib/one-rep-max'
@@ -26,134 +37,255 @@ const createId = () => crypto.randomUUID()
 const PENDING_INVITE_NOTE = 'Aangemaakt via invite, wacht op acceptatie'
 
 /**
+ * Vertaal een botsing op een unieke index (Prisma P2002) naar een CONFLICT met
+ * een melding waar de therapeut iets mee kan. Zonder deze vertaling komt de
+ * rauwe databasefout bij de client terecht en toont de app alleen een algemene
+ * "kon niet opslaan". Zelfde patroon als `alsConflict` in rehab.ts.
+ *
+ * Hier klappen de twee partiële indexen op patient_care_status
+ * (patient_care_status_one_per_practice en _one_per_coach). Prisma kent die
+ * niet, want `db push` negeert partiële indexen, dus een compound upsert kan
+ * niet en dit is read-then-write: twee therapeuten die tegelijk archiveren
+ * zien allebei "nog niet inactief" en de tweede insert botst.
+ *
+ * Sinds gereactiveerde rijen bewaard blijven staan die indexen op
+ * `AND "reactivatedAt" IS NULL` (20260805_care_status_reactivated.sql). Een
+ * botsing betekent daardoor nog steeds precies één ding: er staat al een
+ * LOPENDE markering. De melding hieronder klopt dus ook met historie erbij;
+ * een oude, afgesloten periode botst niet.
+ */
+const alsConflict = (bericht: string) => (err: unknown): never => {
+  if (
+    err &&
+    typeof err === 'object' &&
+    'code' in err &&
+    (err as { code?: string }).code === 'P2002'
+  ) {
+    throw new TRPCError({ code: 'CONFLICT', message: bericht })
+  }
+  throw err
+}
+
+const AL_INACTIEF =
+  'Deze patiënt staat al op inactief. Ververs het scherm om de huidige status te zien.'
+
+const TRAJECT_ALLEEN_THERAPEUT =
+  'Het afsluiten van een revalidatietraject is aan de behandelend therapeut. Zet de atleet op inactief zonder dat vinkje, of vraag de therapeut het traject af te ronden.'
+
+/**
+ * Sluit het lopende rehab-traject van een patiënt mee af bij het archiveren.
+ * Geeft het id van het gesloten traject terug, of null als er niets liep.
+ *
+ * Zet dezelfde velden als `rehab.closeTraject`, maar met `outcome: 'UNKNOWN'`:
+ * dat de behandeling stopt zegt niets over hoe de revalidatie afliep, en de
+ * therapeut kiest die uitkomst in dit formulier niet. `outcomeNote` blijft
+ * ongemoeid; er is hier geen toelichting om weg te schrijven en overschrijven
+ * zou alleen data kunnen wissen.
+ *
+ * Loopt er geen traject, dan gebeurt er niets. Dat is geen fout: het vinkje in
+ * het archiveer-formulier is een wens, geen belofte dat er een traject is.
+ *
+ * Draait binnen de transactie van `setInactive`, vandaar `TrackerClient` in
+ * plaats van de hele client. Faalt deze update, dan rolt de uitbehandel-rij
+ * mee terug. Zonder dat zou de patiënt inactief staan met een fout in beeld,
+ * en was de enige weg terug: heractiveren en opnieuw archiveren.
+ *
+ * De auditregel hoort niet hier maar bij de caller, náást PATIENT_DISCHARGED.
+ * Twee handelingen, twee regels, anders is achteraf niet te zien of de
+ * therapeut dit traject zelf sloot of dat het meeliep met het archiveren.
+ */
+async function closeOpenTrajectFor(
+  tx: TrackerClient,
+  patientId: string,
+  closedById: string,
+): Promise<string | null> {
+  const tracker = await findOpenTracker(tx, patientId)
+  if (!tracker) return null
+  await tx.patientRehabTracker.update({
+    where: { id: tracker.id },
+    data: {
+      deactivatedAt: new Date(),
+      closedById,
+      outcome: 'UNKNOWN',
+    },
+  })
+  return tracker.id
+}
+
+/**
  * Toegang tot een patient = directe PatientTherapist-koppeling, OF dezelfde
  * praktijk als de patient (therapeut). Coaches: alleen directe koppeling.
  * De regel zelf staat in src/server/lib/patient-access.ts — niet dupliceren.
  */
 export const patientsRouter = createTRPCRouter({
-  list: coachStaffProcedure.query(async ({ ctx }) => {
-    // Zichtbaar = directe koppeling (PatientTherapist) OF zelfde praktijk.
-    // Dat laatste laat collega-therapeuten binnen één praktijk elkaars
-    // patiënten zien zonder aparte invite.
-    const me = ctx.user
+  /**
+   * Werklijst met patiënten. `include` bepaalt welke kant van het archief je
+   * ziet: standaard alleen wie nog in behandeling is.
+   *
+   * De input is met opzet OPTIONEEL. Deze procedure had er tot nu toe geen, en
+   * de iOS-app (build 78, geen version-gate en geen OTA) roept 'm zonder
+   * parameters aan. Een verplichte input zou die app breken.
+   */
+  list: coachStaffProcedure
+    .input(
+      z
+        .object({
+          include: z.enum(['active', 'archived', 'all']).default('active'),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      // Zichtbaar = directe koppeling (PatientTherapist) OF zelfde praktijk.
+      // Dat laatste laat collega-therapeuten binnen één praktijk elkaars
+      // patiënten zien zonder aparte invite.
+      const me = ctx.user
+      const include = input?.include ?? 'active'
+      // Beide helpers gebruiken de leesvariant van de scope: een therapeut
+      // zonder praktijk krijgt een filter dat niets matcht in plaats van een
+      // foutmelding, en houdt dus gewoon zijn lijst.
+      const archiefFilter: Prisma.UserWhereInput =
+        include === 'all'
+          ? {}
+          : include === 'archived'
+            ? welUitbehandeld(me)
+            : nietUitbehandeld(me)
 
-    // Self-heal stale onboarding-notes voor reeds geaccepteerde patiënten
-    // van deze therapeut. Eén UPDATE per dashboard-load; raakt alleen rijen
-    // die nog letterlijk de placeholder bevatten.
-    await ctx.prisma.patientTherapist.updateMany({
-      where: {
-        therapistId: me.id,
-        status: 'APPROVED',
-        notes: PENDING_INVITE_NOTE,
-      },
-      data: { notes: null },
-    })
+      // Self-heal stale onboarding-notes voor reeds geaccepteerde patiënten
+      // van deze therapeut. Eén UPDATE per dashboard-load; raakt alleen rijen
+      // die nog letterlijk de placeholder bevatten.
+      await ctx.prisma.patientTherapist.updateMany({
+        where: {
+          therapistId: me.id,
+          status: 'APPROVED',
+          notes: PENDING_INVITE_NOTE,
+        },
+        data: { notes: null },
+      })
 
-    // Therapietrouw-window: laatste 14 dagen. Lage compliance = ≥ 3 geplande
-    // sessies en < 60% afgerond. Threshold is bewust conservatief zodat
-    // nieuwe patiënten met 1-2 sessies niet meteen 'low' zijn.
-    const COMPLIANCE_WINDOW_DAYS = 14
-    const COMPLIANCE_MIN_SCHEDULED = 3
-    const COMPLIANCE_THRESHOLD = 0.6
-    const since = new Date(Date.now() - COMPLIANCE_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+      // Therapietrouw-window: laatste 14 dagen. Lage compliance = ≥ 3 geplande
+      // sessies en < 60% afgerond. Threshold is bewust conservatief zodat
+      // nieuwe patiënten met 1-2 sessies niet meteen 'low' zijn.
+      const COMPLIANCE_WINDOW_DAYS = 14
+      const COMPLIANCE_MIN_SCHEDULED = 3
+      const COMPLIANCE_THRESHOLD = 0.6
+      const since = new Date(Date.now() - COMPLIANCE_WINDOW_DAYS * 24 * 60 * 60 * 1000)
 
-    const patients = await ctx.prisma.user.findMany({
-      where: {
-        role: { in: ['PATIENT', 'ATHLETE'] },
-        OR: [
-          {
-            patientTherapists: {
-              some: {
-                therapistId: me.id,
-                isActive: true,
-                status: { in: ['APPROVED', 'PENDING'] },
+      const patients = await ctx.prisma.user.findMany({
+        where: {
+          role: { in: ['PATIENT', 'ATHLETE'] },
+          // `werklijstAnd` zet de scope-OR en het archieffilter naast elkaar
+          // onder AND. Die vorm ligt vast in werklijst-where.test.ts.
+          AND: werklijstAnd(
+            [
+              {
+                patientTherapists: {
+                  some: {
+                    therapistId: me.id,
+                    isActive: true,
+                    status: { in: ['APPROVED', 'PENDING'] },
+                  },
+                },
               },
+              ...practiceScope(me),
+            ],
+            archiefFilter,
+          ),
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          avatarUrl: true,
+          phone: true,
+          dateOfBirth: true,
+          createdAt: true,
+          role: true,
+          // Alleen de LOPENDE markering van deze lezer. `careScopeWhereForRead`
+          // bakt `reactivatedAt: null` in, dus historie van eerdere
+          // afsluitingen blijft hier buiten. Maximaal één rij per scope
+          // (partiële unieke index), vandaar take: 1.
+          careStatuses: {
+            where: careScopeWhereForRead(me),
+            take: 1,
+            select: { dischargedAt: true, reason: true },
+          },
+          patientPrograms: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              weeks: true,
+              startDate: true,
+              endDate: true,
             },
           },
-          ...practiceScope(me),
-        ],
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        avatarUrl: true,
-        phone: true,
-        dateOfBirth: true,
-        createdAt: true,
-        role: true,
-        patientPrograms: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: {
-            id: true,
-            name: true,
-            status: true,
-            weeks: true,
-            startDate: true,
-            endDate: true,
+          patientTherapists: {
+            where: {
+              therapistId: me.id,
+              isActive: true,
+              status: { in: ['APPROVED', 'PENDING'] },
+            },
+            take: 1,
+            select: { status: true, notes: true },
+          },
+          sessionLogs: {
+            where: { scheduledAt: { gte: since } },
+            select: { completedAt: true },
           },
         },
-        patientTherapists: {
-          where: {
-            therapistId: me.id,
-            isActive: true,
-            status: { in: ['APPROVED', 'PENDING'] },
-          },
-          take: 1,
-          select: { status: true, notes: true },
-        },
-        sessionLogs: {
-          where: { scheduledAt: { gte: since } },
-          select: { completedAt: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+        orderBy: { createdAt: 'desc' },
+      })
 
-    return patients.map(p => {
-      const program = p.patientPrograms[0] ?? null
-      const myRel = p.patientTherapists[0] ?? null
-      const initials = (p.name ?? p.email)
-        .split(' ')
-        .map(w => w[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
+      return patients.map(p => {
+        const program = p.patientPrograms[0] ?? null
+        const myRel = p.patientTherapists[0] ?? null
+        const care = p.careStatuses[0] ?? null
+        const initials = (p.name ?? p.email)
+          .split(' ')
+          .map(w => w[0])
+          .join('')
+          .toUpperCase()
+          .slice(0, 2)
 
-      const scheduled = p.sessionLogs.length
-      const completed = p.sessionLogs.filter(s => s.completedAt !== null).length
-      const compliancePercent = scheduled > 0 ? completed / scheduled : null
-      const complianceLow =
-        scheduled >= COMPLIANCE_MIN_SCHEDULED &&
-        compliancePercent !== null &&
-        compliancePercent < COMPLIANCE_THRESHOLD
+        const scheduled = p.sessionLogs.length
+        const completed = p.sessionLogs.filter(s => s.completedAt !== null).length
+        const compliancePercent = scheduled > 0 ? completed / scheduled : null
+        const complianceLow =
+          scheduled >= COMPLIANCE_MIN_SCHEDULED &&
+          compliancePercent !== null &&
+          compliancePercent < COMPLIANCE_THRESHOLD
 
-      return {
-        accessStatus: myRel?.status ?? 'APPROVED',
-        id: p.id,
-        role: p.role,
-        name: p.name ?? p.email,
-        email: p.email,
-        phone: p.phone,
-        avatarInitials: initials,
-        dateOfBirth: p.dateOfBirth,
-        createdAt: p.createdAt,
-        notes: myRel?.notes ?? null,
-        programId: program?.id ?? null,
-        programName: program?.name ?? null,
-        programStatus: program?.status ?? null,
-        weeksTotal: program?.weeks ?? 0,
-        startDate: program?.startDate,
-        endDate: program?.endDate,
-        // Therapietrouw afgelopen 14 dagen
-        compliancePercent,
-        complianceLow,
-        complianceScheduled: scheduled,
-        complianceCompleted: completed,
-      }
-    })
-  }),
+        return {
+          accessStatus: myRel?.status ?? 'APPROVED',
+          id: p.id,
+          role: p.role,
+          name: p.name ?? p.email,
+          email: p.email,
+          phone: p.phone,
+          avatarInitials: initials,
+          dateOfBirth: p.dateOfBirth,
+          createdAt: p.createdAt,
+          // null = in behandeling. Gevuld = uitbehandeld door deze praktijk of
+          // deze coach; alleen zichtbaar bij include 'archived' of 'all'.
+          dischargedAt: care?.dischargedAt ?? null,
+          dischargeReason: care?.reason ?? null,
+          notes: myRel?.notes ?? null,
+          programId: program?.id ?? null,
+          programName: program?.name ?? null,
+          programStatus: program?.status ?? null,
+          weeksTotal: program?.weeks ?? 0,
+          startDate: program?.startDate,
+          endDate: program?.endDate,
+          // Therapietrouw afgelopen 14 dagen
+          compliancePercent,
+          complianceLow,
+          complianceScheduled: scheduled,
+          complianceCompleted: completed,
+        }
+      })
+    }),
 
   /**
    * Caseload voor de patiëntenlijst: dezelfde patiënten als `list`, plus per
@@ -184,22 +316,27 @@ export const patientsRouter = createTRPCRouter({
       const windowStart = new Date(weekStart.getTime() - (weeks - 1) * 7 * DAY)
       const windowEnd = new Date(weekStart.getTime() + 7 * DAY)
 
-      // Scope gelijk aan `list`: eigen koppeling óf dezelfde praktijk.
+      // Scope gelijk aan `list`: eigen koppeling óf dezelfde praktijk, en
+      // zonder lopende uitbehandel-markering. Dat archieffilter staat als
+      // aparte AND-tak naast de scope-OR en nooit als tweede `OR`-sleutel.
       const patients = await ctx.prisma.user.findMany({
         where: {
           role: { in: ['PATIENT', 'ATHLETE'] },
-          OR: [
-            {
-              patientTherapists: {
-                some: {
-                  therapistId: me.id,
-                  isActive: true,
-                  status: { in: ['APPROVED', 'PENDING'] },
+          AND: werklijstAnd(
+            [
+              {
+                patientTherapists: {
+                  some: {
+                    therapistId: me.id,
+                    isActive: true,
+                    status: { in: ['APPROVED', 'PENDING'] },
+                  },
                 },
               },
-            },
-            ...practiceScope(me),
-          ],
+              ...practiceScope(me),
+            ],
+            nietUitbehandeld(me),
+          ),
         },
         select: { id: true },
       })
@@ -467,23 +604,31 @@ export const patientsRouter = createTRPCRouter({
       //   2. zelf een sessie voor de patiënt gelogd (SessionLog.therapistId), OF
       //   3. zelf een programma voor de patiënt gemaakt (Program.creatorId), OF
       //   4. zelf een weekschema voor de patiënt gemaakt (WeekSchedule.creatorId).
+      //
+      // Uitbehandelde patiënten vallen af. Het archieffilter staat als aparte
+      // AND-tak naast de engagement-OR; een tweede `OR`-sleutel zou die hele
+      // lijst met engagements wissen. Dit dekt meteen `silentPatients`
+      // onderaan, dat uit dezelfde `patients` wordt afgeleid.
       const patients = await ctx.prisma.user.findMany({
         where: {
           role: { in: ['PATIENT', 'ATHLETE'] },
-          OR: [
-            {
-              patientTherapists: {
-                some: {
-                  therapistId: me.id,
-                  isActive: true,
-                  status: { in: ['APPROVED', 'PENDING'] },
+          AND: werklijstAnd(
+            [
+              {
+                patientTherapists: {
+                  some: {
+                    therapistId: me.id,
+                    isActive: true,
+                    status: { in: ['APPROVED', 'PENDING'] },
+                  },
                 },
               },
-            },
-            { sessionLogs: { some: { therapistId: me.id } } },
-            { patientPrograms: { some: { creatorId: me.id } } },
-            { patientWeekSchedules: { some: { creatorId: me.id } } },
-          ],
+              { sessionLogs: { some: { therapistId: me.id } } },
+              { patientPrograms: { some: { creatorId: me.id } } },
+              { patientWeekSchedules: { some: { creatorId: me.id } } },
+            ],
+            nietUitbehandeld(me),
+          ),
         },
         select: {
           id: true,
@@ -960,7 +1105,9 @@ export const patientsRouter = createTRPCRouter({
       const email = input.email.toLowerCase().trim()
       const therapist = await ctx.prisma.user.findUnique({
         where: { email },
-        select: { id: true, name: true, email: true, role: true },
+        // practiceId hoort erbij: de markering die hieronder opgeheven wordt is
+        // van de PRAKTIJK van de meekijker, niet van de uitnodigende coach.
+        select: { id: true, name: true, email: true, role: true, practiceId: true },
       })
       if (!therapist || therapist.role !== 'THERAPIST') {
         throw new TRPCError({
@@ -980,20 +1127,32 @@ export const patientsRouter = createTRPCRouter({
         return { ok: true, alreadyLinked: true, status: existing.status }
       }
 
-      const relation = existing
-        ? await ctx.prisma.patientTherapist.update({
-            where: { id: existing.id },
-            data: { status: 'PENDING', isActive: true, requestedAt: new Date(), respondedAt: null },
-          })
-        : await ctx.prisma.patientTherapist.create({
-            data: {
-              therapistId: therapist.id,
-              patientId: input.patientId,
-              status: 'PENDING',
-              isActive: true,
-              requestedAt: new Date(),
-            },
-          })
+      // Koppeling terug tot leven én de markering opheffen in één transactie.
+      // Los van elkaar levert een gefaalde tweede stap precies de onzichtbare
+      // toestand op die dit moet wegnemen.
+      //
+      // De scope is die van de UITGENODIGDE therapeut: heeft zijn praktijk deze
+      // atleet afgesloten en zet de coach hem daarna als meekijker terug, dan
+      // hoort die markering weg. `doorId` blijft de coach, want die drukt op de
+      // knop.
+      const relation = await ctx.prisma.$transaction(async (tx) => {
+        const rij = existing
+          ? await tx.patientTherapist.update({
+              where: { id: existing.id },
+              data: { status: 'PENDING', isActive: true, requestedAt: new Date(), respondedAt: null },
+            })
+          : await tx.patientTherapist.create({
+              data: {
+                therapistId: therapist.id,
+                patientId: input.patientId,
+                status: 'PENDING',
+                isActive: true,
+                requestedAt: new Date(),
+              },
+            })
+        await hefUitbehandeldOp(tx, therapist, input.patientId, ctx.user.id)
+        return rij
+      })
 
       await auditLog({
         event: 'CO_MONITOR_REQUESTED',
@@ -1185,20 +1344,27 @@ export const patientsRouter = createTRPCRouter({
       // Link therapist ↔ patient (only for PATIENT/ATHLETE). Status = PENDING
       // zodat de patiënt zelf moet bevestigen voordat de therapeut data inziet.
       if (role === 'PATIENT' || role === 'ATHLETE') {
-        await ctx.prisma.patientTherapist.upsert({
-          where: {
-            therapistId_patientId: {
+        // Koppeling activeren en de markering opheffen horen bij elkaar: samen
+        // in één transactie, anders zet een gefaalde tweede stap de koppeling
+        // terug op actief terwijl de patiënt in geen enkele lijst verschijnt,
+        // zonder foutmelding.
+        await ctx.prisma.$transaction(async (tx) => {
+          await tx.patientTherapist.upsert({
+            where: {
+              therapistId_patientId: {
+                therapistId: ctx.user.id,
+                patientId: patient.id,
+              },
+            },
+            update: { isActive: true },
+            create: {
               therapistId: ctx.user.id,
               patientId: patient.id,
+              status: 'PENDING',
+              requestedAt: new Date(),
             },
-          },
-          update: { isActive: true },
-          create: {
-            therapistId: ctx.user.id,
-            patientId: patient.id,
-            status: 'PENDING',
-            requestedAt: new Date(),
-          },
+          })
+          await hefUitbehandeldOp(tx, ctx.user, patient.id)
         })
       }
 
@@ -1243,6 +1409,12 @@ export const patientsRouter = createTRPCRouter({
       })
       if (error) throw new TRPCError({ code: 'BAD_REQUEST', message: error.message })
 
+      // Opnieuw uitnodigen betekent weer in behandeling. Pas ná de geslaagde
+      // uitnodiging: een mislukte mail hoort de markering niet op te heffen.
+      // Geen transactie nodig, dit pad raakt de koppeling niet aan en de helper
+      // is zelf al één atomaire eenheid.
+      await hefUitbehandeldOp(ctx.prisma, ctx.user, input.id)
+
       return { success: true }
     }),
 
@@ -1278,6 +1450,253 @@ export const patientsRouter = createTRPCRouter({
         where: { patientId: input.id, creatorId: ctx.user.id },
       })
 
+      return { success: true }
+    }),
+
+  /**
+   * Zet een patiënt op inactief (uitbehandeld).
+   *
+   * Dit is géén verwijdering en géén toegangsintrekking: de patiënt houdt zijn
+   * account, zijn app en zijn dossier. Hij verdwijnt alleen uit de werklijsten,
+   * de signalen en de herinneringen van deze praktijk of deze coach. De
+   * markering is daarom scope-gebonden (zie care-scope.ts): dezelfde persoon
+   * kan bij een coach uitbehandeld zijn en bij een praktijk nog lopen.
+   */
+  setInactive: coachStaffProcedure
+    .input(z.object({
+      id: z.string(),
+      reason: z.enum(['COMPLETED', 'DISCONTINUED', 'TRANSFERRED', 'NO_SHOW', 'OTHER']),
+      note: z.string().max(2000).optional(),
+      /** Programma's die mee afgesloten worden. Leeg = geen enkel programma. */
+      closeProgramIds: z.array(z.string()).default([]),
+      /** Sluit het lopende rehab-traject mee af, met uitkomst UNKNOWN. */
+      closeTraject: z.boolean().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.id))) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+      // hasPatientAccess filtert NIET op de rol van het doel en geeft true voor
+      // jezelf. Zonder deze check kan een therapeut een collega, een admin of
+      // zichzelf archiveren, en dat faalt stil omdat de lijsten op rol filteren.
+      // Zelfde vorm als patients.update hierboven.
+      const doel = await ctx.prisma.user.findFirst({
+        where: { id: input.id, role: { in: ['PATIENT', 'ATHLETE'] } },
+        select: { id: true },
+      })
+      if (!doel) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Alleen patiënten en atleten' })
+      }
+
+      // Een traject afsluiten is een klinisch besluit. Elke procedure in
+      // rehab.ts staat daarom op therapistProcedure, en AGENTS.md legt vast dat
+      // klinische schrijfacties daar horen. Een coach mag hier wel archiveren
+      // (dat is planning, geen behandeling), maar niet de episode van een
+      // meekijkende therapeut dichtzetten: die kan hij daarna zelf niet meer
+      // heropenen, want rehab.reopenTraject is ook therapistProcedure.
+      const magTrajectSluiten = ctx.user.role === 'THERAPIST' || ctx.user.role === 'ADMIN'
+      if (input.closeTraject && !magTrajectSluiten) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: TRAJECT_ALLEEN_THERAPEUT })
+      }
+
+      const scope = careScopeKey(ctx.user)
+      const nu = new Date()
+
+      const geslotenTrajectId = await ctx.prisma.$transaction(async (tx) => {
+        await tx.patientCareStatus
+          .create({
+            data: {
+              patientId: input.id,
+              practiceId: scope.practiceId,
+              coachId: scope.coachId,
+              dischargedAt: nu,
+              dischargedById: ctx.user.id,
+              reason: input.reason,
+              // Vrije toelichting hoort hier, op de rij achter RLS, en niet in
+              // de audit-metadata (audit.ts:7-8 verbiedt PII daar).
+              note: input.note ?? null,
+            },
+          })
+          .catch(alsConflict(AL_INACTIEF))
+        if (input.closeProgramIds.length > 0) {
+          // `patientId` houdt de ids gebonden aan deze patiënt, `programmaScope`
+          // aan de eigen praktijk of coach, en `closedByDischarge` markeert wat
+          // bij heractiveren terug mag.
+          await tx.program.updateMany({
+            where: {
+              id: { in: input.closeProgramIds },
+              patientId: input.id,
+              status: 'ACTIVE',
+              ...programmaScope(scope, ctx.user.id),
+            },
+            data: { status: 'COMPLETED', endDate: nu, closedByDischarge: true },
+          })
+        }
+        // Open insights worden hier bewust NIET gedempt. Insight heeft geen
+        // praktijk- of coach-kolom, dus een updateMany raakt álle open signalen
+        // van deze patiënt, ook die van een andere behandelaar, en heractiveren
+        // zet ze niet terug. Delen een coach en een praktijk-therapeut een
+        // atleet, dan verdwijnt bij de een een kritieke pijnmelding omdat de
+        // ander archiveert. Het leesfilter in insights.getDashboard (taak 15)
+        // kijkt scope-bewust naar de care-status; daarmee is dempen voor de
+        // archiverende partij overbodig en voor de meekijker destructief.
+        return input.closeTraject ? closeOpenTrajectFor(tx, input.id, ctx.user.id) : null
+      })
+
+      if (geslotenTrajectId) {
+        // Aparte regel naast PATIENT_DISCHARGED, met `route` op setInactive:
+        // zo is in het log te zien dat dit een neveneffect was en niet een
+        // therapeut die zelf een uitkomst koos.
+        await auditLog({
+          event: 'REHAB_TRAJECT_CLOSED',
+          userId: ctx.user.id,
+          actorEmail: ctx.user.email,
+          resource: 'PatientRehabTracker',
+          resourceId: geslotenTrajectId,
+          metadata: { route: 'patients.setInactive', outcome: 'UNKNOWN' },
+          req: ctx.req,
+        })
+      }
+
+      await auditLog({
+        event: 'PATIENT_DISCHARGED',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        resource: 'User',
+        resourceId: input.id,
+        metadata: { route: 'patients.setInactive', reason: input.reason },
+        req: ctx.req,
+      })
+      return { success: true }
+    }),
+
+  /**
+   * Haal een patiënt terug in de actieve lijst.
+   *
+   * Alleen binnen de eigen scope: een praktijk haalt geen coach-markering weg
+   * en andersom. Programma's die bij het archiveren zijn dichtgezet komen mee
+   * terug, met hun startdatum opgeschoven over de onderbreking heen.
+   *
+   * De uitbehandel-rij wordt afgestempeld en niet verwijderd, zodat de reden en
+   * de toelichting van die periode terug te lezen blijven. Een patiënt kan dus
+   * meerdere afgesloten periodes hebben; alleen de rij met `reactivatedAt` null
+   * telt als "nu inactief", en dat filter zit in careScopeWhere zelf.
+   */
+  reactivate: coachStaffProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.id))) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+      // Zelfde rolfilter als setInactive. Vandaag onbereikbaar (zonder
+      // markering is er niets te heractiveren, en markeren kan alleen op een
+      // patiënt of atleet), maar de verdediging hoort op allebei de paden te
+      // staan en niet op één.
+      const doel = await ctx.prisma.user.findFirst({
+        where: { id: input.id, role: { in: ['PATIENT', 'ATHLETE'] } },
+        select: { id: true },
+      })
+      if (!doel) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Alleen patiënten en atleten' })
+      }
+
+      const scope = careScopeKey(ctx.user)
+      // careScopeWhere filtert zelf op `reactivatedAt: null`, dus dit vindt
+      // alleen een lopende markering. Twee keer heractiveren geeft daardoor
+      // vanzelf NOT_FOUND in plaats van een tweede startdatum-schuif.
+      const rij = await ctx.prisma.patientCareStatus.findFirst({
+        where: { patientId: input.id, ...careScopeWhere(ctx.user) },
+      })
+      if (!rij) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Deze patiënt is niet inactief' })
+      }
+
+      const onderbreking = Date.now() - rij.dischargedAt.getTime()
+
+      await ctx.prisma.$transaction(async (tx) => {
+        // Afstempelen, niet verwijderen. De reden en de toelichting van deze
+        // afsluiting zijn een klinisch oordeel dat vanwege de PII-regel niet in
+        // de audit-log staat; met een DELETE was het na één misklik weg.
+        await tx.patientCareStatus.update({
+          where: { id: rij.id },
+          data: { reactivatedAt: new Date(), reactivatedById: ctx.user.id },
+        })
+        // Alleen programma's die door het archiveren dichtgingen, en alleen
+        // binnen de eigen scope. Wat de therapeut zelf afrondde blijft
+        // COMPLETED, en wat een coach dichtzette blijft van de coach.
+        //
+        // Geankerd op DEZE afgesloten periode, niet op de vlag alleen.
+        // `setInactive` schrijft `endDate` en `dischargedAt` met dezelfde
+        // instant, dus alles wat bij deze periode hoort heeft een endDate op of
+        // ná de ontslagdatum. Zonder dat anker herrijst een programma uit een
+        // vórige periode: die vlag blijft staan zodra een re-invite de markering
+        // opheft (dat pad zet geen enkel programma terug), en dan komt een
+        // programma van maanden geleden mee op ACTIVE met een startdatum die
+        // over de verkeerde onderbreking is opgeschoven. `status: 'COMPLETED'`
+        // hoort er om dezelfde reden bij: wie handmatig is heropend mag geen
+        // tweede schuif krijgen.
+        const gesloten = await tx.program.findMany({
+          where: {
+            patientId: input.id,
+            closedByDischarge: true,
+            status: 'COMPLETED',
+            endDate: { gte: rij.dischargedAt },
+            ...programmaScope(scope, ctx.user.id),
+          },
+          select: { id: true, startDate: true },
+        })
+        for (const p of gesloten) {
+          await tx.program.update({
+            where: { id: p.id },
+            data: {
+              status: 'ACTIVE',
+              endDate: null,
+              closedByDischarge: false,
+              // Schuif startDate op met de duur van de onderbreking. Zonder dat
+              // springt computeCurrentWeekDay (patient.ts) meteen naar de
+              // laatste week: die rekent kaal in dagen sinds startDate.
+              startDate: p.startDate ? new Date(p.startDate.getTime() + onderbreking) : null,
+            },
+          })
+        }
+        // Vlaggen uit een oudere periode opruimen. Binnen deze scope kan er maar
+        // één markering tegelijk openstaan, dus alles wat vóór deze afsluiting
+        // dichtging hoort bij een periode die allang voorbij is. Zulke rijen
+        // bestaan in productie doordat de invite-paden de markering opheffen
+        // zonder programma's terug te zetten; zonder deze opruiming blijven ze
+        // voor altijd op "wacht op heractivering" staan.
+        //
+        // `endDate: null` hoort er expliciet bij, want Prisma's `lt` matcht geen
+        // NULL en "Heropenen" zet endDate juist op null. Dat was het gat: een
+        // heropend programma ontsnapte hier én aan de findMany hierboven (die
+        // eist COMPLETED), hield zijn vlag voor altijd, en herrees twee cycli
+        // later als de therapeut het zelf had afgerond. `programs.save` zet de
+        // vlag inmiddels al bij het heropenen uit; dit is het vangnet voor de
+        // rijen die daar in productie al doorheen zijn.
+        //
+        // De voorwaarde staat in AND en niet los als `OR`, omdat programmaScope
+        // voor een therapeut zelf een `OR` teruggeeft. Twee OR-sleutels in
+        // hetzelfde object overschrijven elkaar stil.
+        await tx.program.updateMany({
+          where: {
+            patientId: input.id,
+            closedByDischarge: true,
+            ...programmaScope(scope, ctx.user.id),
+            AND: [{ OR: [{ endDate: { lt: rij.dischargedAt } }, { endDate: null }] }],
+          },
+          data: { closedByDischarge: false },
+        })
+      })
+
+      await auditLog({
+        event: 'PATIENT_REACTIVATED',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        resource: 'User',
+        resourceId: input.id,
+        metadata: { route: 'patients.reactivate' },
+        req: ctx.req,
+      })
       return { success: true }
     }),
 
@@ -2129,10 +2548,14 @@ export const patientsRouter = createTRPCRouter({
               ],
             }
 
+      // Derde AND-tak, zelfde reden: uitbehandelde patiënten horen niet in een
+      // kiezer waarmee je iets nieuws aan iemand hangt.
+      const archiefFilter: Prisma.UserWhereInput = nietUitbehandeld(ctx.user)
+
       return ctx.prisma.user.findMany({
         where: {
           role: { in: ['PATIENT', 'ATHLETE'] },
-          AND: [scopeFilter, queryFilter],
+          AND: [scopeFilter, queryFilter, archiefFilter],
         },
         select: { id: true, name: true, email: true },
         take: 20,

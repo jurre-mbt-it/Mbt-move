@@ -33,6 +33,7 @@ import {
   notifyLoadWarning,
 } from '@/server/push/notify'
 import { MORNING_PUSH_HOUR } from '@/server/push/send'
+import { uitbehandeldDoorIedereen } from '@/server/lib/care-scope'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -98,9 +99,58 @@ export async function GET(req: NextRequest) {
       where: { id: { in: tokenUserIds } },
       select: { id: true },
     })
-    const recipientIds = recipients.map((p) => p.id)
+    let recipientIds = recipients.map((p) => p.id)
     if (recipientIds.length === 0) {
       return NextResponse.json({ ok: true, candidates: 0, sent: 0 })
+    }
+
+    // Wie uitbehandeld is krijgt geen ochtendpush meer, maar alleen als ELKE
+    // actieve behandelaar hem heeft afgesloten.
+    //
+    // Deze route draait als cron, zonder ingelogde lezer, dus er is geen scope
+    // om op te filteren. "Eén markering, waar dan ook" is hier het VERKEERDE
+    // antwoord: één persoon kan in twee scopes zitten (patients.inviteCoMonitor
+    // koppelt de atleet van een coach aan een praktijk-therapeut). Archiveert
+    // de coach terwijl de praktijk-therapeut doorplant, dan zou de atleet stil
+    // zijn trainingsherinnering en zijn herstelpush verliezen voor een planning
+    // die er gewoon staat. `reactivatedAt: null` hoort erbij omdat rijen als
+    // historie blijven bestaan.
+    //
+    // Heeft iemand een lopende markering maar NUL actieve behandelrelaties, dan
+    // blijft hij gewoon push krijgen: niemand heeft hem uitbehandeld, want er is
+    // niemand. Dat is het pad van `shop.activateProgram`, dat een actief
+    // programma klaarzet voor een koper zonder enige koppeling. Die regel zit in
+    // `uitbehandeldDoorIedereen` zelf. Een gebruiker zonder markering raakt dit
+    // filter sowieso niet, dus een therapeut die zelf traint houdt zijn push.
+    //
+    // Hier filteren en niet in de weekquery hieronder: de trainingsherinnering
+    // droogt vanzelf op zodra er geen planning meer staat, maar de herstel- en
+    // belastingpush hangen aan wearable-data die gewoon door blijft komen.
+    const markeringen = await prisma.patientCareStatus.findMany({
+      where: { patientId: { in: recipientIds }, reactivatedAt: null },
+      select: { patientId: true, practiceId: true, coachId: true },
+    })
+    if (markeringen.length > 0) {
+      const gemarkeerdeIds = [...new Set(markeringen.map((m) => m.patientId))]
+      const relaties = await prisma.patientTherapist.findMany({
+        where: { patientId: { in: gemarkeerdeIds }, isActive: true, status: 'APPROVED' },
+        select: {
+          patientId: true,
+          therapist: { select: { id: true, role: true, practiceId: true } },
+        },
+      })
+      const uitbehandeld = new Set(
+        gemarkeerdeIds.filter((id) =>
+          uitbehandeldDoorIedereen(
+            relaties.filter((r) => r.patientId === id).map((r) => r.therapist),
+            markeringen.filter((m) => m.patientId === id),
+          ),
+        ),
+      )
+      recipientIds = recipientIds.filter((id) => !uitbehandeld.has(id))
+      if (recipientIds.length === 0) {
+        return NextResponse.json({ ok: true, candidates: 0, sent: 0 })
+      }
     }
 
     // Idempotentie: wat is er vandaag al ÉCHT gepusht (per categorie-type)?

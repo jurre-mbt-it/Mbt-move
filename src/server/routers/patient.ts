@@ -13,6 +13,7 @@ import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { practiceScope } from '@/server/lib/patient-access'
+import { planningCutoffVoorPatient } from '@/server/lib/planning-cutoff'
 import { muscleLoadsRecord } from '@/server/lib/muscle-loads'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { auditLog } from '@/server/audit'
@@ -2083,6 +2084,10 @@ export const patientRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const fromDate = new Date(input.from)
       const toDate = new Date(input.to)
+      // Is deze patiënt uitbehandeld? Dan stopt de planning bij de eerste
+      // maandag ná het ontslag. Vóór de weekquery, want het antwoord gaat als
+      // filter mee naar beneden.
+      const cutoff = await planningCutoffVoorPatient(ctx.prisma, ctx.user.id)
       const [sessions, cardio, schedules] = await Promise.all([
         ctx.prisma.sessionLog.findMany({
           where: { patientId: ctx.user.id, scheduledAt: { gte: fromDate, lt: toDate } },
@@ -2144,6 +2149,18 @@ export const patientRouter = createTRPCRouter({
                 },
               },
             ],
+            // Weken vanaf de eerste maandag ná het ontslag komen niet meer mee.
+            // Verbergen in plaats van verwijderen: dat is omkeerbaar en
+            // cascadeert niet via WeekScheduleDay naar items en oefeningen.
+            //
+            // Aparte sleutel naast de OR hierboven, dus ge-AND met het venster.
+            // Als tweede OR-tak zou de knip juist een lek zijn: dan komt elke
+            // week vóór de cutoff terug, ook buiten het gevraagde venster.
+            //
+            // Legacy-weken met startDate NULL vallen hier bewust af: `lt` matcht
+            // geen NULL, en een week zonder datum is niet te dateren, dus die
+            // zou anders eeuwig zichtbaar blijven na het ontslag.
+            ...(cutoff ? { startDate: { lt: cutoff } } : {}),
           },
           select: {
             id: true,
