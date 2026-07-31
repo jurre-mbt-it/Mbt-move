@@ -2458,6 +2458,10 @@ export const patientRouter = createTRPCRouter({
         where: { id: input.relationId },
         data: {
           status: input.accept ? 'APPROVED' : 'DECLINED',
+          // Houd `isActive` gelijk aan het antwoord, zodat status en isActive
+          // niet uiteenlopen; de RLS-helper `is_therapist_of()` leest beide.
+          // Opnieuw uitnodigen zet 'm via patients.invite weer op true.
+          isActive: input.accept,
           respondedAt: new Date(),
         },
       })
@@ -2477,6 +2481,12 @@ export const patientRouter = createTRPCRouter({
         where: { id: input.relationId },
         data: {
           status: 'REVOKED',
+          // `isActive` moet mee: de RLS-helper `is_therapist_of()` keek er
+          // lange tijd als enige naar, waardoor een ingetrokken therapeut op
+          // databaseniveau behandelaar bleef. De helper toetst sinds
+          // 20260731_is_therapist_of_respects_consent.sql ook `status`, maar
+          // laat de twee velden niet uiteenlopen.
+          isActive: false,
           respondedAt: new Date(),
         },
       })
