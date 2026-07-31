@@ -6,6 +6,7 @@ import type { PrismaClient } from '@prisma/client'
 import { maskMuscleLoadsArray } from '@/server/lib/muscle-loads'
 import { assertPatientAccess } from '@/server/lib/patient-access'
 import { nietUitbehandeld } from '@/server/lib/care-scope'
+import { assertNotDischarged } from '@/server/lib/care-guard'
 import { isReviewDue, weeksSince, reviewThresholdWeeks } from '@/lib/program-review'
 import { notifyNewSchedule } from '@/server/push/notify'
 
@@ -252,6 +253,10 @@ export const programsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { patientId, cardioParams, ...rest } = input
       await assertCanAssignPatient(ctx.prisma, ctx.user!, patientId)
+      // Een programma zonder patiënt is een sjabloon en raakt niemands
+      // behandeling; alleen directe toewijzing is nieuwe planning, en die
+      // stuurt hieronder ook nog een melding.
+      if (patientId) await assertNotDischarged(ctx.prisma, ctx.user!, patientId)
       const program = await ctx.prisma.program.create({
         data: {
           id: createId(),
@@ -305,9 +310,21 @@ export const programsRouter = createTRPCRouter({
 
       const existing = await ctx.prisma.program.findUnique({ where: { id } })
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
-      if (existing.creatorId !== ctx.user!.id && ctx.user!.role !== 'ADMIN') {
-        throw new TRPCError({ code: 'FORBIDDEN' })
-      }
+      // Zelfde praktijk-tak als changeDay en markReviewed hieronder. Zonder
+      // deze tak faalt "Afsluiten" al voor een collega uit dezelfde praktijk,
+      // en dus ook de bulk-afsluiting bij het inactief zetten.
+      //
+      // De praktijk-tak is expliciet aan de therapeut-rol gebonden: patiënten
+      // en atleten delen de practiceId van hun therapeut, dus een tak die
+      // alleen op practiceId kijkt geeft elke patiënt schrijfrechten op de
+      // programma's van de hele praktijk.
+      const magBewerken =
+        existing.creatorId === ctx.user!.id ||
+        ctx.user!.role === 'ADMIN' ||
+        (!!ctx.user!.practiceId &&
+          existing.practiceId === ctx.user!.practiceId &&
+          ctx.user!.role === 'THERAPIST')
+      if (!magBewerken) throw new TRPCError({ code: 'FORBIDDEN' })
 
       if (data.patientId !== undefined) {
         await assertCanAssignPatient(ctx.prisma, ctx.user!, data.patientId)
@@ -410,6 +427,9 @@ export const programsRouter = createTRPCRouter({
         ? (input.patientId != null ? input.patientId : undefined)
         : (source.patientId ?? undefined)
       await assertCanAssignPatient(ctx.prisma, ctx.user!, targetPatientId)
+      // Een kopie mét patiënt komt meteen ACTIVE binnen bij die patiënt; dat is
+      // nieuwe planning. Een kopie zonder patiënt is een sjabloon.
+      if (targetPatientId) await assertNotDischarged(ctx.prisma, ctx.user!, targetPatientId)
       return ctx.prisma.program.create({
         data: {
           id: newId,

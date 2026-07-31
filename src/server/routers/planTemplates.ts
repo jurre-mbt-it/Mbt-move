@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { createTRPCRouter, coachStaffProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
 import { planScope } from '@/server/lib/plan-access'
+import { assertNotDischarged } from '@/server/lib/care-guard'
 import type { PrismaClient } from '@prisma/client'
 import { copyItemToDay, COPY_ITEM_INCLUDE } from './weekSchedules'
 import { mondayKey, mondayKeyOf, addDaysKey, amsMidnight, isDateKey } from '@/lib/week-dates'
@@ -461,6 +462,9 @@ export const planTemplatesRouter = createTRPCRouter({
     }))
     .mutation(async ({ ctx, input }) => {
       await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
+      // Geen weken vol zetten voor wie je zelf hebt uitbehandeld. Vóór het
+      // sjabloon ophalen: hieronder volgt een transactie én een push-melding.
+      await assertNotDischarged(ctx.prisma, ctx.user, input.patientId)
 
       const tpl = await ctx.prisma.weekPlanTemplate.findFirst({
         where: { id: input.templateId, OR: scopeFor(ctx.user) },

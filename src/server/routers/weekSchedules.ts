@@ -4,6 +4,7 @@ import { TRPCError } from '@trpc/server'
 import { assertPlanAccess } from '@/server/lib/plan-access'
 import { practiceScope, inSamePractice } from '@/server/lib/patient-access'
 import { planningCutoffVoorPatient } from '@/server/lib/planning-cutoff'
+import { assertNotDischarged } from '@/server/lib/care-guard'
 import { mondayKey, mondayKeyOf, addDaysKey, amsMidnight, weeksBetween, isDateKey } from '@/lib/week-dates'
 import { parseStructured, legacySummaryFields, structuredLoad } from '@/lib/cardio-workout'
 import { durationFromExercises } from '@/lib/planned-load'
@@ -68,6 +69,29 @@ async function assertPatientLink(
       message: 'Geen actieve koppeling met deze patiënt',
     })
   }
+}
+
+/**
+ * Welke week-schema's mag deze gebruiker bewerken? Eigen schema's, plus die van
+ * praktijk-collega's; een admin mag alles.
+ *
+ * Week-schedules zijn praktijk-breed leesbaar (AGENTS.md), maar de mutaties
+ * hieronder zochten op `creatorId: ctx.user.id`. Daardoor kon een collega een
+ * week wel zien en niet aanpassen: `save`/`delete` gaven NOT_FOUND, en
+ * `setDayProgram`/`setWeekMeta` maakten stil een tweede week-rij op dezelfde
+ * maandag aan in plaats van de bestaande bij te werken.
+ *
+ * `practiceScope` bindt de praktijk-tak aan de therapeut-rol; patiënten en
+ * atleten delen de practiceId van hun therapeut. Geef het resultaat door als
+ * spread in een `where` ZONDER eigen OR-sleutel, anders wist de een de ander.
+ */
+function bewerkbareWeken(user: {
+  id: string
+  role: string
+  practiceId: string | null
+}): Prisma.WeekScheduleWhereInput {
+  if (user.role === 'ADMIN') return {}
+  return { OR: [{ creatorId: user.id }, ...practiceScope(user)] }
 }
 
 const DayInput = z.object({
@@ -329,7 +353,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       // de assertPatientLink call laat verdwijnen zonder dat de re-assignment
       // gevaarlijk wordt.
       const existing = await ctx.prisma.weekSchedule.findFirst({
-        where: { id, creatorId: ctx.user.id },
+        where: { id, ...bewerkbareWeken(ctx.user) },
         select: { id: true, patientId: true },
       })
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
@@ -439,7 +463,9 @@ export const weekSchedulesRouter = createTRPCRouter({
   delete: coachStaffProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const existing = await ctx.prisma.weekSchedule.findFirst({ where: { id: input.id, creatorId: ctx.user.id } })
+      const existing = await ctx.prisma.weekSchedule.findFirst({
+        where: { id: input.id, ...bewerkbareWeken(ctx.user) },
+      })
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
       return ctx.prisma.weekSchedule.delete({ where: { id: input.id } })
     }),
@@ -471,7 +497,11 @@ export const weekSchedulesRouter = createTRPCRouter({
       }
 
       const existing = await ctx.prisma.weekSchedule.findFirst({
-        where: { creatorId: ctx.user.id, patientId: input.patientId, weekNumber: input.weekNumber },
+        where: {
+          patientId: input.patientId,
+          weekNumber: input.weekNumber,
+          ...bewerkbareWeken(ctx.user),
+        },
         include: { days: true },
       })
 
@@ -779,7 +809,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       if (meta.weekNote !== undefined) data.weekNote = meta.weekNote
 
       const existing = await ctx.prisma.weekSchedule.findFirst({
-        where: { creatorId: ctx.user.id, patientId, weekNumber },
+        where: { patientId, weekNumber, ...bewerkbareWeken(ctx.user) },
       })
       if (existing) {
         return ctx.prisma.weekSchedule.update({ where: { id: existing.id }, data })
@@ -818,9 +848,9 @@ export const weekSchedulesRouter = createTRPCRouter({
       await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
       const existing = await ctx.prisma.weekSchedule.findFirst({
         where: {
-          creatorId: ctx.user.id,
           patientId: input.patientId,
           weekNumber: input.weekNumber,
+          ...bewerkbareWeken(ctx.user),
         },
       })
       if (!existing) return { deleted: false }
@@ -945,6 +975,9 @@ export const weekSchedulesRouter = createTRPCRouter({
 
       // Check dat patient gekoppeld is (eigen relatie OF zelfde praktijk).
       await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
+      // Uitbehandeld = geen nieuwe planning. Hieronder worden tot 52 weken
+      // gevuld en gaat er een melding naar de patiënt.
+      await assertNotDischarged(ctx.prisma, ctx.user, input.patientId)
 
       const patient = await ctx.prisma.user.findUnique({
         where: { id: input.patientId },
