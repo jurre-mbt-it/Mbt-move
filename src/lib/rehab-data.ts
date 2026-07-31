@@ -22,6 +22,10 @@ export async function getPatientRehabTrackerData(
 ) {
   const tracker = await prisma.patientRehabTracker.findFirst({
     where: { patientId, deactivatedAt: null },
+    // Met historie kan er meer dan één rij per patiënt zijn. De partial unique
+    // index houdt het aantal open trajecten op één, maar vertrouw daar niet op:
+    // een expliciete volgorde maakt dit deterministisch.
+    orderBy: { activatedAt: 'desc' },
     include: {
       protocol: {
         include: {
@@ -40,11 +44,13 @@ export async function getPatientRehabTrackerData(
   const criterionIds = tracker.protocol.phases.flatMap((p) =>
     p.criteria.map((c) => c.id),
   )
-  const statuses = criterionIds.length
-    ? await prisma.rehabCriterionStatus.findMany({
-        where: { patientId, criterionId: { in: criterionIds } },
-      })
-    : []
+  // Op trackerId, niet op patientId: anders lekken de vinkjes van een
+  // afgesloten traject door in het nieuwe protocol. De unique index op
+  // ("trackerId","criterionId") garandeert al hoogstens één rij per criterium,
+  // en de criteria van het traject zijn die van het protocol.
+  const statuses = await prisma.rehabCriterionStatus.findMany({
+    where: { trackerId: tracker.id },
+  })
   const statusByCriterionId = new Map(statuses.map((s) => [s.criterionId, s]))
 
   const now = new Date()
