@@ -1494,9 +1494,6 @@ model PatientRehabTracker {
 /// Per traject \u00d7 criterium de R/O/G status + meetwaarde + datum.
 model RehabCriterionStatus {
   id String @id @default(cuid())
-  /// TIJDELIJK. Blijft tot migratie C de kolom dropt (taak 9). De kolom is
-  /// NOT NULL zonder default, dus elke create moet 'm meeschrijven.
-  patientId        String
   trackerId        String
   tracker          PatientRehabTracker       @relation(fields: [trackerId], references: [id], onDelete: Cascade)
   criterionId      String

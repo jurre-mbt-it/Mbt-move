@@ -653,8 +653,6 @@ export const rehabRouter = createTRPCRouter({
           },
           create: {
             trackerId: tracker.id,
-            // TIJDELIJK meeschrijven tot migratie C de kolom dropt (taak 9).
-            patientId: input.patientId,
             criterionId: input.criterionId,
             status: input.status,
             measurementValue: input.measurementValue ?? null,
