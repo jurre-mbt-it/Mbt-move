@@ -59,8 +59,35 @@ in productie staan.
 | 10 | Taak 8, deploy, direct na de migratie | ja |
 | 11 | Taak 9, migratie C | ja, eenrichtingsdeur |
 
-Tussen stap 8 en 10 zit het korte venster waarin de oude code draait op het
-nieuwe schema. Plan die drie stappen achter elkaar, niet verspreid over dagen.
+Er zijn **twee** vensters waarin oud en nieuw schema naast elkaar staan. Allebei
+kort houden: plan stap 8 tot en met 11 achter elkaar in één sessie, niet
+verspreid over dagen.
+
+**Venster 1, tussen migratie A/B en de deploy.** De oude code draait op het
+nieuwe schema. Twee gevolgen: `activateForPatient` kan geen nieuw traject meer
+aanmaken (de oude client schrijft de `id`-kolom niet mee en de partiële index is
+geen geldig `ON CONFLICT`-doel), en migratie B zet `trackerId` op NOT NULL,
+waardoor de oude code ook geen nieuwe criteriumstatus meer kan wegschrijven.
+Bestaande statussen bijwerken blijft wel werken.
+
+**Venster 2, tussen de deploy en migratie C.** De nieuwe code schrijft
+`patientId` nog mee (dat moet, de kolom is NOT NULL), terwijl de oude unieke
+index `rehab_criterion_status_patientId_criterionId_key` nog bestaat. Sluit een
+therapeut in dat venster een traject af en start hij **hetzelfde** protocol
+opnieuw, dan krijgt het eerste criterium dat hij aanvinkt een `23505`: de upsert
+zoekt op `trackerId_criterionId`, vindt niets, doet een insert, en die botst op
+de oude index. Een protocolwissel is wel veilig, want dat zijn andere criteria.
+
+Migratie C dropt die index als vierde statement, dus dit venster sluit vanzelf
+zodra C draait. Moet C om wat voor reden ook wachten, drop dan direct na de
+deploy alleen deze regel:
+
+```sql
+DROP INDEX IF EXISTS public."rehab_criterion_status_patientId_criterionId_key";
+```
+
+Dat mag niet eerder: tot aan de deploy leunt de oude code op precies die index
+voor zijn upsert.
 
 ## Task 1: Backup van de rehab-tabellen
 
