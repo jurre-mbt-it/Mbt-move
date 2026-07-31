@@ -78,6 +78,10 @@ export async function getPatientRehabTrackerData(
   const progressPct = total > 0 ? Math.round((met / total) * 100) : 0
 
   return {
+    // Additief: `closeTraject`/`reopenTraject` en de web-UI moeten een traject
+    // kunnen aanwijzen. Bestaande clients negeren onbekende velden, dus build 78
+    // merkt hier niets van.
+    trackerId: tracker.id,
     patientId,
     protocolId: tracker.protocolId,
     protocol: {

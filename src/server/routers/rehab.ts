@@ -128,29 +128,63 @@ export const rehabRouter = createTRPCRouter({
       const surgeryDate = input.surgeryDate ? new Date(input.surgeryDate) : null
       const injuryDate = input.injuryDate ? new Date(input.injuryDate) : null
 
-      // Een nieuw traject starten mag alleen als er geen lopend traject is. Anders
-      // zou het oude stil worden overschreven; sluiten gaat via closeTraject.
       const bestaand = await ctx.prisma.patientRehabTracker.findFirst({
         where: { patientId: input.patientId, deactivatedAt: null },
       })
-      if (bestaand) {
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message: 'Er loopt al een traject. Sluit dat eerst af voordat je een nieuw traject start.',
-        })
+
+      // Drie takken, omdat de iOS-app dit ene endpoint voor twee dingen gebruikt.
+      // In mbt-gym-mobile/components/rehab-section.tsx opent de WIJZIG-link naast
+      // een lopend traject exact dezelfde sheet als "protocol aanzetten", en die
+      // sheet roept altijd activateForPatient aan. Build 78 heeft geen
+      // version-gate en geen OTA, dus een harde fout op een lopend traject zou
+      // zowel het bijwerken van datums/notitie als het overstappen slopen.
+      const nieuwTraject = {
+        patientId: input.patientId,
+        protocolId: input.protocolId,
+        activatedById: ctx.user.id,
+        surgeryDate,
+        injuryDate,
+        // `notes` is in zod .optional() en niet nullable. Bij een create is dat
+        // geen probleem meer: elk traject begint met zijn eigen notitie.
+        notes: input.notes ?? null,
       }
-      await ctx.prisma.patientRehabTracker.create({
-        data: {
-          patientId: input.patientId,
-          protocolId: input.protocolId,
-          activatedById: ctx.user.id,
-          surgeryDate,
-          injuryDate,
-          // `notes` is in zod .optional() en niet nullable. Bij een create is dat
-          // geen probleem meer: elk traject begint met zijn eigen notitie.
-          notes: input.notes ?? null,
-        },
-      })
+
+      // 1. Geen lopend traject: gewoon starten.
+      if (!bestaand) {
+        await ctx.prisma.patientRehabTracker.create({ data: nieuwTraject })
+        return { ok: true }
+      }
+
+      // 2. Zelfde protocol: dit is "wijzigen", geen nieuw traject. Alleen de
+      // meegestuurde velden bijwerken. `activatedAt` en `activatedById` blijven
+      // staan, anders zou een notitie-edit de startdatum en daarmee de
+      // weken-sinds-operatie verschuiven.
+      if (bestaand.protocolId === input.protocolId) {
+        await ctx.prisma.patientRehabTracker.update({
+          where: { id: bestaand.id },
+          data: { surgeryDate, injuryDate, notes: input.notes },
+        })
+        return { ok: true }
+      }
+
+      // 3. Ander protocol: dit is "overstappen". Vroeger overschreef de upsert
+      // het lopende traject stil; nu sluiten we het af en start er een nieuw
+      // traject naast, zodat de historie en de oude vinkjes bewaard blijven.
+      // In één transactie, want de partial unique index laat geen tweede open
+      // traject toe.
+      await ctx.prisma.$transaction([
+        ctx.prisma.patientRehabTracker.update({
+          where: { id: bestaand.id },
+          data: {
+            deactivatedAt: new Date(),
+            closedById: ctx.user.id,
+            // Afgesloten door een protocolwissel, niet door een therapeut die
+            // een uitkomst koos. UNKNOWN tot iemand dat alsnog invult.
+            outcome: 'UNKNOWN',
+          },
+        }),
+        ctx.prisma.patientRehabTracker.create({ data: nieuwTraject }),
+      ])
       return { ok: true }
     }),
 
@@ -385,16 +419,28 @@ export const rehabRouter = createTRPCRouter({
   adminDeleteProtocol: mfaAdminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // Alleen verwijderen als geen LOPEND traject dit protocol gebruikt.
-      // Afgesloten trajecten zijn historie; die mogen een protocol niet
-      // voorgoed onverwijderbaar maken.
-      const lopend = await ctx.prisma.patientRehabTracker.count({
-        where: { protocolId: input.id, deactivatedAt: null },
-      })
+      // De FK van tracker naar protocol staat op Prisma-default Restrict, dus
+      // ELK traject blokkeert de delete, ook een afgesloten. Alleen op lopende
+      // trajecten guarden zou de admin op een rauwe foreign-key-fout laten
+      // landen. Beide tellen, en de melding zegt welk geval het is.
+      const [lopend, totaal] = await Promise.all([
+        ctx.prisma.patientRehabTracker.count({
+          where: { protocolId: input.id, deactivatedAt: null },
+        }),
+        ctx.prisma.patientRehabTracker.count({
+          where: { protocolId: input.id },
+        }),
+      ])
       if (lopend > 0) {
         throw new TRPCError({
           code: 'CONFLICT',
           message: `Protocol wordt gebruikt door ${lopend} lopend(e) traject(en). Sluit die eerst af of zet isActive op false.`,
+        })
+      }
+      if (totaal > 0) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: `Dit protocol heeft historie (${totaal} afgesloten traject(en)) en kan niet verwijderd worden. Zet isActive op false.`,
         })
       }
       await ctx.prisma.rehabProtocol.delete({ where: { id: input.id } })
