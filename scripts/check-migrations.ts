@@ -16,6 +16,44 @@ type Check = {
 
 const checks: Check[] = [
   {
+    name: 'patient_rehab_trackers.id kolom',
+    migration: '20260801_rehab_episodes_a.sql',
+    run: async () => {
+      try {
+        await prisma.$queryRaw`SELECT "id" FROM patient_rehab_trackers LIMIT 1`
+        return true
+      } catch {
+        return false
+      }
+    },
+  },
+  {
+    name: 'rehab_criterion_status.trackerId kolom',
+    migration: '20260801_rehab_episodes_b.sql',
+    run: async () => {
+      try {
+        await prisma.$queryRaw`SELECT "trackerId" FROM rehab_criterion_status LIMIT 1`
+        return true
+      } catch {
+        return false
+      }
+    },
+  },
+  {
+    // Negatieve check: de kolom MOET weg zijn. Staat hij er nog, dan is C2 niet
+    // gedraaid en lopen schema en database uiteen zonder dat iets faalt.
+    name: 'rehab_criterion_status.patientId is weg',
+    migration: '20260803_rehab_episodes_c2.sql',
+    run: async () => {
+      const rows = await prisma.$queryRaw<{ n: bigint }[]>`
+        SELECT count(*) AS n FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'rehab_criterion_status'
+          AND column_name = 'patientId'`
+      return Number(rows[0]?.n ?? 0) === 0
+    },
+  },
+  {
     name: 'invite_codes tabel',
     migration: '20260423_invite_codes_audit_gdpr.sql',
     run: async () => {
