@@ -43,6 +43,7 @@ import {
   protectedProcedure,
 } from '@/server/trpc'
 import { practiceScope } from '@/server/lib/patient-access'
+import { hefUitbehandeldOp } from '@/server/lib/care-reactivate'
 import { auditLog } from '@/server/audit'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { inviteMail, sendMail } from '@/server/mail'
@@ -353,6 +354,11 @@ export const inviteRouter = createTRPCRouter({
           expiresAt,
         },
       })
+
+      // Opnieuw uitnodigen betekent weer in behandeling. Zonder dit krijg je
+      // een patiënt met een levende koppeling die in geen enkele lijst
+      // verschijnt, zonder foutmelding.
+      await hefUitbehandeldOp(ctx.prisma, ctx.user!, patient.id)
 
       const instructionUrl = `${getAppUrl()}/login/code?email=${encodeURIComponent(email)}`
 
@@ -725,6 +731,26 @@ export const inviteRouter = createTRPCRouter({
     })
 
     if (invite.role === 'PATIENT' || invite.role === 'ATHLETE') {
+      // Weer in behandeling bij de therapeut die uitnodigde. Hier is er geen
+      // ingelogde therapeut in de context. `ctx.user` is de patiënt zelf en die
+      // heeft geen scope, dus komt de scope uit de uitnodiger op de
+      // InviteCode-rij. Is die niet te bepalen, dan blijft de markering staan
+      // en loggen we dat: liever een patiënt die na een handmatige
+      // heractivering terugkomt dan blind elke markering opheffen.
+      const uitnodiger = await ctx.prisma.user.findUnique({
+        where: { id: invite.invitedById },
+        select: { id: true, role: true, practiceId: true },
+      })
+      const opheffen = uitnodiger
+        ? await hefUitbehandeldOp(ctx.prisma, uitnodiger, user.id)
+        : ({ status: 'geen-scope' } as const)
+      if (opheffen.status === 'geen-scope') {
+        console.warn(
+          'invite.finalize: uitbehandel-markering blijft staan, geen scope voor uitnodiger',
+          { inviteId: invite.id, invitedById: invite.invitedById },
+        )
+      }
+
       const existingLink = await ctx.prisma.patientTherapist.findUnique({
         where: {
           therapistId_patientId: {

@@ -19,6 +19,7 @@ import {
   welUitbehandeld,
   type CareScopeKey,
 } from '@/server/lib/care-scope'
+import { hefUitbehandeldOp } from '@/server/lib/care-reactivate'
 import { werklijstAnd } from '@/server/lib/werklijst-where'
 import { findOpenTracker, type TrackerClient } from '@/lib/rehab-data'
 import { auditLog } from '@/server/audit'
@@ -1366,6 +1367,10 @@ export const patientsRouter = createTRPCRouter({
             requestedAt: new Date(),
           },
         })
+        // Opnieuw uitnodigen betekent weer in behandeling. Zonder dit zet de
+        // regel hierboven de koppeling terug op actief terwijl de patiënt in
+        // geen enkele lijst verschijnt, zonder foutmelding.
+        await hefUitbehandeldOp(ctx.prisma, ctx.user, patient.id)
       }
 
       return { success: true, resent: !!resend, patientId: patient.id }
@@ -1408,6 +1413,10 @@ export const patientsRouter = createTRPCRouter({
         redirectTo: `${redirectBase}/auth/callback`,
       })
       if (error) throw new TRPCError({ code: 'BAD_REQUEST', message: error.message })
+
+      // Opnieuw uitnodigen betekent weer in behandeling. Pas ná de geslaagde
+      // uitnodiging: een mislukte mail hoort de markering niet op te heffen.
+      await hefUitbehandeldOp(ctx.prisma, ctx.user, input.id)
 
       return { success: true }
     }),
