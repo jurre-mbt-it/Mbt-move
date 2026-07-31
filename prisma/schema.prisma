@@ -174,6 +174,15 @@ enum RehabCriterionInputType {
   PASS_FAIL // slagen / niet slagen
 }
 
+/// Waarom een revalidatietraject is afgesloten.
+enum RehabTrajectOutcome {
+  COMPLETED
+  DISCONTINUED
+  TRANSFERRED
+  RELAPSE
+  UNKNOWN
+}
+
 // ─── Mobility Assessment (Ready State methodology) ───────────────────────────
 
 enum AssessmentArchetype {
@@ -352,8 +361,9 @@ model User {
   insightPrefs         TherapistInsightPref?
 
   // Rehab-tracker relations
-  rehabTracker           PatientRehabTracker?   @relation("RehabTrackerPatient")
+  rehabTrackers          PatientRehabTracker[]  @relation("RehabTrackerPatient")
   rehabTrackersActivated PatientRehabTracker[]  @relation("RehabTrackerActivator")
+  rehabTrackersClosed    PatientRehabTracker[]  @relation("RehabTrackerCloser")
   rehabStatusUpdates     RehabCriterionStatus[] @relation("RehabStatusUpdater")
 
   // Educatie-content (admin-beheerd)
@@ -1450,30 +1460,45 @@ model RehabCriterion {
   @@map("rehab_criteria")
 }
 
-/// Per-patient activation van \u00e9\u00e9n protocol tegelijk (toggle + dropdown).
+/// E\u00e9n revalidatietraject van een pati\u00ebnt op \u00e9\u00e9n protocol. Een pati\u00ebnt kan er
+/// meerdere hebben (historie), maar hoogstens \u00e9\u00e9n lopend traject tegelijk.
 model PatientRehabTracker {
-  patientId     String        @id
-  patient       User          @relation("RehabTrackerPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  id            String               @id @default(cuid())
+  patientId     String
+  patient       User                 @relation("RehabTrackerPatient", fields: [patientId], references: [id], onDelete: Cascade)
   protocolId    String
-  protocol      RehabProtocol @relation(fields: [protocolId], references: [id])
+  protocol      RehabProtocol        @relation(fields: [protocolId], references: [id])
   activatedById String
-  activatedBy   User          @relation("RehabTrackerActivator", fields: [activatedById], references: [id])
-  activatedAt   DateTime      @default(now())
+  activatedBy   User                 @relation("RehabTrackerActivator", fields: [activatedById], references: [id])
+  activatedAt   DateTime             @default(now())
+  /// Sluitings-marker. Dit is het ENIGE veld dat bepaalt of een traject loopt;
+  /// de partial unique index patient_rehab_trackers_one_open_per_patient hangt eraan.
   deactivatedAt DateTime?
+  closedById    String?
+  closedBy      User?                @relation("RehabTrackerCloser", fields: [closedById], references: [id], onDelete: SetNull)
+  outcome       RehabTrajectOutcome?
+  outcomeNote   String?
   // Operatiedatum: basis voor indicatieve fase-berekening (week-based).
   surgeryDate   DateTime?
   // Optioneel: datum van blessure (voor pre-op contextualisering).
   injuryDate    DateTime?
   notes         String?
-  updatedAt     DateTime      @updatedAt
+  updatedAt     DateTime             @updatedAt
 
+  statuses RehabCriterionStatus[]
+
+  @@index([patientId, activatedAt])
   @@map("patient_rehab_trackers")
 }
 
-/// Per patient \u00d7 criterium de R/O/G status + meetwaarde + datum.
+/// Per traject \u00d7 criterium de R/O/G status + meetwaarde + datum.
 model RehabCriterionStatus {
-  id               String                    @id @default(cuid())
+  id String @id @default(cuid())
+  /// TIJDELIJK. Blijft tot migratie C de kolom dropt (taak 9). De kolom is
+  /// NOT NULL zonder default, dus elke create moet 'm meeschrijven.
   patientId        String
+  trackerId        String
+  tracker          PatientRehabTracker       @relation(fields: [trackerId], references: [id], onDelete: Cascade)
   criterionId      String
   criterion        RehabCriterion            @relation(fields: [criterionId], references: [id], onDelete: Cascade)
   status           RehabCriterionStatusValue @default(NOT_MET)
@@ -1485,8 +1510,8 @@ model RehabCriterionStatus {
   createdAt        DateTime                  @default(now())
   updatedAt        DateTime                  @updatedAt
 
-  @@unique([patientId, criterionId])
-  @@index([patientId])
+  @@unique([trackerId, criterionId])
+  @@index([trackerId])
   @@map("rehab_criterion_status")
 }
 

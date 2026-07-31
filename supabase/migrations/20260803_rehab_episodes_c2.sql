@@ -1,0 +1,43 @@
+-- Rehab-trajecten, fase C2: rehab_criterion_status verliest "patientId".
+--
+-- Dit is de enige echte contract-stap. Eén statement, bewust apart van C1.
+--
+-- MAG UITSLUITEND NA DEPLOY 2 DRAAIEN: de deploy waarin "patientId" uit het
+-- Prisma-model RehabCriterionStatus is gehaald én uit de create in de upsert
+-- van src/server/routers/rehab.ts. Draai je dit eerder, dan valt de complete
+-- rehab-leeslaag om. Prisma zet bij een findMany zonder select alle
+-- modelkolommen in de SELECT-lijst, dus src/lib/rehab-data.ts vraagt dan een
+-- kolom op die niet meer bestaat. Dat raakt rehab.getPatientTracker,
+-- rehab.getMyTracker, rehab.getTraject, de patiënt- en atleet-dashboards,
+-- beide PDF-ingangen en iOS build 78. Schrijven valt ook om, want de create
+-- vult "patientId" tot die deploy expliciet.
+--
+-- Controle vóór je dit draait. Beide commando's moeten NUL regels teruggeven;
+-- dat is groen licht. Geeft een van beide wél een regel, dan staat "patientId"
+-- nog in het schema of in de upsert, is deploy 2 dus niet gedaan, en mag dit
+-- bestand NIET draaien.
+--
+--   sed -n '/model RehabCriterionStatus/,/^}/p' prisma/schema.prisma | grep patientId
+--   grep -n "patientId: input.patientId" src/server/routers/rehab.ts
+--
+-- Let op de vorm van de eerste: het sed-bereik moet op de modelregel openen en
+-- op de sluitaccolade dichtgaan, en pas daarna filtert grep. Andersom
+-- (grep eerst, dan sed) opent het bereik nooit, want geen enkele regel met
+-- "patientId" bevat ook "RehabCriterionStatus". Die volgorde geeft dus altijd
+-- nul regels en daarmee altijd groen licht, ook als er niets is opgeschoond.
+--
+-- C1 heeft de vier policies en de twee indexes die van deze kolom afhingen al
+-- weggehaald, dus deze DROP heeft geen pg_depend-afhankelijkheden meer en
+-- hoeft geen CASCADE.
+--
+-- Eenrichtingsdeur. Zodra dit bestand draait en er daarna ook maar één nieuw
+-- rehab-traject is aangemaakt, kan de oude unique index
+-- (patientId, criterionId) niet meer worden teruggezet zonder dataverlies
+-- (zie rollbacksectie in
+-- docs/superpowers/specs/2026-07-31-rehab-episodes-migratie-sql.md). Er is
+-- geen staging-database: dit bestand draait rechtstreeks tegen productie.
+--
+-- Geen eigen BEGIN/COMMIT: prisma db execute stuurt dit bestand al als één
+-- impliciete transactie.
+
+ALTER TABLE public.rehab_criterion_status DROP COLUMN "patientId";
