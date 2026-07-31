@@ -128,11 +128,18 @@ export async function getRehabTrackerDataById(
     activatedAt: tracker.activatedAt,
     // Additief, net als `trackerId`: `rehab.getTraject` leest ook AFGESLOTEN
     // trajecten en moet zelf kunnen zien dat het er een uit de historie is.
-    // Voor het lopende traject zijn deze drie altijd null, dus de bestaande
+    // Voor het lopende traject zijn deze twee altijd null, dus de bestaande
     // clients zien niets veranderen.
+    //
+    // `outcomeNote` staat hier BEWUST NIET bij. Deze vorm voedt ook
+    // `rehab.getMyTracker`, en dat is patiënt-facing: de toelichting bij een
+    // afsluiting is klinische vrije tekst van de therapeut en hoort niet op het
+    // toestel van de patiënt. Dat hij vandaag alleen samen met `deactivatedAt`
+    // gezet wordt is een code-invariant, geen afdwinging. Wie de toelichting
+    // nodig heeft, leest hem in `rehab.getTraject` of `rehab.listTrajects`;
+    // die draaien allebei op therapistProcedure. Niet terugzetten.
     deactivatedAt: tracker.deactivatedAt,
     outcome: tracker.outcome,
-    outcomeNote: tracker.outcomeNote,
     activatedByName: tracker.activatedBy.name ?? tracker.activatedBy.email,
     notes: tracker.notes,
     weeksSinceSurgery,

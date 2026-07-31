@@ -66,29 +66,32 @@ async function openTrackerFor(prisma: PrismaClient, patientId: string) {
 }
 
 /**
- * Vertaal een botsing op de partiële index
- * patient_rehab_trackers_one_open_per_patient naar een CONFLICT.
+ * Vertaal een unieke-index-botsing (Prisma P2002) naar een CONFLICT met een
+ * melding die de therapeut iets zegt. Zonder deze vertaling komt de rauwe
+ * databasefout bij de client terecht en toont de app alleen een algemene
+ * "kon niet opslaan".
  *
- * Elk pad dat een traject opent leest eerst of er al één loopt, en dat is een
- * read-then-write: twee gelijktijdige verzoeken kunnen allebei "geen lopend
- * traject" zien. De tweede botst op de index en krijgt een P2002. Zonder deze
- * vertaling komt die als rauwe databasefout bij de client terecht, en toont de
- * app alleen "Kon het protocol niet activeren".
+ * Twee indexen kunnen hier klappen:
+ *  - patient_rehab_trackers_one_open_per_patient, de partiële index die maar
+ *    één open traject per patiënt toelaat. Elk pad dat een traject opent leest
+ *    eerst of er al één loopt, en dat is read-then-write.
+ *  - rehab_criterion_status_patientId_criterionId_key, de OUDE index die tot
+ *    migratie C blijft staan. Zie de call-site in updateCriterionStatus.
  */
-const alsConflict = (err: unknown): never => {
+const alsConflict = (bericht: string) => (err: unknown): never => {
   if (
     err &&
     typeof err === 'object' &&
     'code' in err &&
     (err as { code?: string }).code === 'P2002'
   ) {
-    throw new TRPCError({
-      code: 'CONFLICT',
-      message: 'Er is zojuist al een traject gestart voor deze patiënt. Ververs het scherm en probeer het opnieuw.',
-    })
+    throw new TRPCError({ code: 'CONFLICT', message: bericht })
   }
   throw err
 }
+
+const TRAJECT_AL_GESTART =
+  'Er is zojuist al een traject gestart voor deze patiënt. Ververs het scherm en probeer het opnieuw.'
 
 /**
  * Tracker-state laden — pure logica zit in `@/lib/rehab-data` zodat
@@ -179,7 +182,7 @@ export const rehabRouter = createTRPCRouter({
 
       // 1. Geen lopend traject: gewoon starten.
       if (!bestaand) {
-        await ctx.prisma.patientRehabTracker.create({ data: nieuwTraject }).catch(alsConflict)
+        await ctx.prisma.patientRehabTracker.create({ data: nieuwTraject }).catch(alsConflict(TRAJECT_AL_GESTART))
         return { ok: true }
       }
 
@@ -214,7 +217,7 @@ export const rehabRouter = createTRPCRouter({
           }),
           ctx.prisma.patientRehabTracker.create({ data: nieuwTraject }),
         ])
-        .catch(alsConflict)
+        .catch(alsConflict(TRAJECT_AL_GESTART))
 
       // Dit sluit een klinische episode af, net als closeTraject, alleen zonder
       // dat iemand een uitkomst koos. Zelfde event, zodat het spoor compleet is.
@@ -273,11 +276,26 @@ export const rehabRouter = createTRPCRouter({
         patientId: z.string(),
         outcome: z.enum(['COMPLETED', 'DISCONTINUED', 'TRANSFERRED', 'RELAPSE', 'UNKNOWN']),
         outcomeNote: z.string().max(2000).optional(),
+        /**
+         * Het traject dat de therapeut op zijn scherm had (`trackerId` uit
+         * `getPatientTracker`). Optioneel, want de iOS-app kent het veld niet.
+         */
+        expectedTrackerId: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       await assertTreating(ctx.prisma, ctx.user, input.patientId)
       const tracker = await openTrackerFor(ctx.prisma, input.patientId)
+      // Zonder deze check sluit je "het open traject van deze patiënt" af, en
+      // dat hoeft niet het traject te zijn dat je voor je had: switcht een
+      // collega ondertussen van protocol, dan landt jouw uitkomst op de nieuwe
+      // episode terwijl de oude als UNKNOWN in de historie blijft staan.
+      if (input.expectedTrackerId && input.expectedTrackerId !== tracker.id) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Het traject van deze patiënt is inmiddels gewijzigd. Ververs het scherm en kies de uitkomst opnieuw.',
+        })
+      }
       const closed = await ctx.prisma.patientRehabTracker.update({
         where: { id: tracker.id },
         data: {
@@ -354,7 +372,7 @@ export const rehabRouter = createTRPCRouter({
           where: { id: tracker.id },
           data: { deactivatedAt: null, closedById: null, outcome: null, outcomeNote: null },
         })
-        .catch(alsConflict)
+        .catch(alsConflict(TRAJECT_AL_GESTART))
       await auditLog({
         event: 'REHAB_TRAJECT_REOPENED',
         userId: ctx.user.id,
@@ -393,21 +411,28 @@ export const rehabRouter = createTRPCRouter({
     }),
 
   /**
-   * Eén traject uit de historie, in dezelfde vorm als `getPatientTracker`.
-   * Aparte procedurenaam, want `getMyTracker`/`getPatientTracker` moeten één
-   * object of null blijven teruggeven voor de app.
+   * Eén traject uit de historie, in dezelfde vorm als `getPatientTracker`,
+   * plus de toelichting bij de afsluiting. Aparte procedurenaam, want
+   * `getMyTracker`/`getPatientTracker` moeten één object of null blijven
+   * teruggeven voor de app.
    */
   getTraject: therapistProcedure
     .input(z.object({ trackerId: z.string() }))
     .query(async ({ ctx, input }) => {
       const tracker = await ctx.prisma.patientRehabTracker.findUnique({
         where: { id: input.trackerId },
-        select: { id: true, patientId: true },
+        select: { id: true, patientId: true, outcomeNote: true },
       })
       if (!tracker) throw new TRPCError({ code: 'NOT_FOUND' })
       // Autoriseren op de patientId van de RIJ, niet op input.
       await assertTreating(ctx.prisma, ctx.user, tracker.patientId)
-      return getRehabTrackerDataById(ctx.prisma, tracker.id)
+      const data = await getRehabTrackerDataById(ctx.prisma, tracker.id)
+      if (!data) return null
+      // `outcomeNote` komt hier bovenop de gedeelde vorm en niet uit
+      // `@/lib/rehab-data`. Die vorm voedt ook het patiënt-facing
+      // `getMyTracker`, en klinische vrije tekst hoort daar niet in. Deze
+      // procedure draait op therapistProcedure, dus hier mag het wel.
+      return { ...data, outcomeNote: tracker.outcomeNote }
     }),
 
   /**
@@ -483,32 +508,45 @@ export const rehabRouter = createTRPCRouter({
         select: { status: true },
       })
 
-      await ctx.prisma.rehabCriterionStatus.upsert({
-        where: {
-          trackerId_criterionId: {
-            trackerId: tracker.id,
-            criterionId: input.criterionId,
+      // De upsert kijkt naar (trackerId, criterionId), maar tot migratie C staat
+      // de OUDE index rehab_criterion_status_patientId_criterionId_key er nog
+      // naast. Scenario in dat venster: traject afsluiten, hetzelfde protocol
+      // opnieuw starten, eerste criterium aanvinken. De upsert vindt geen rij op
+      // het nieuwe traject, doet dus een create, en botst op de oude rij van het
+      // vorige traject. Zonder deze vertaling is dat een rauwe 23505 op het
+      // scherm van de therapeut.
+      await ctx.prisma.rehabCriterionStatus
+        .upsert({
+          where: {
+            trackerId_criterionId: {
+              trackerId: tracker.id,
+              criterionId: input.criterionId,
+            },
           },
-        },
-        update: {
-          status: input.status,
-          measurementValue: input.measurementValue ?? null,
-          measurementDate,
-          notes: input.notes ?? null,
-          updatedById: ctx.user.id,
-        },
-        create: {
-          trackerId: tracker.id,
-          // TIJDELIJK meeschrijven tot migratie C de kolom dropt (taak 9).
-          patientId: input.patientId,
-          criterionId: input.criterionId,
-          status: input.status,
-          measurementValue: input.measurementValue ?? null,
-          measurementDate,
-          notes: input.notes ?? null,
-          updatedById: ctx.user.id,
-        },
-      })
+          update: {
+            status: input.status,
+            measurementValue: input.measurementValue ?? null,
+            measurementDate,
+            notes: input.notes ?? null,
+            updatedById: ctx.user.id,
+          },
+          create: {
+            trackerId: tracker.id,
+            // TIJDELIJK meeschrijven tot migratie C de kolom dropt (taak 9).
+            patientId: input.patientId,
+            criterionId: input.criterionId,
+            status: input.status,
+            measurementValue: input.measurementValue ?? null,
+            measurementDate,
+            notes: input.notes ?? null,
+            updatedById: ctx.user.id,
+          },
+        })
+        .catch(
+          alsConflict(
+            'Dit criterium staat nog geregistreerd op een eerder traject van deze patiënt, waardoor het nu niet opgeslagen kan worden. Meld het bij de beheerder als dit blijft terugkomen.',
+          ),
+        )
 
       // Melding aan de patiënt bij de overgang naar MET. Faalt nooit de mutatie.
       if (input.status === 'MET' && prevStatus?.status !== 'MET') {
