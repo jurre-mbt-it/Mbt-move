@@ -10,7 +10,7 @@ import type { PrismaClient } from '@prisma/client'
 import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure, therapistProcedure, adminProcedure, mfaAdminProcedure } from '@/server/trpc'
 import { practiceScope } from '@/server/lib/patient-access'
-import { getPatientRehabTrackerData, getRehabTrackerDataById } from '@/lib/rehab-data'
+import { findOpenTracker, getPatientRehabTrackerData, getRehabTrackerDataById } from '@/lib/rehab-data'
 import { notifyRehabCriterion, notifyRehabPhase } from '@/server/push/notify'
 import { auditLog } from '@/server/audit'
 
@@ -47,18 +47,19 @@ async function assertTreating(
 }
 
 /**
- * Het lopende traject van een patiënt. Sinds het episode-model kan een patiënt
- * meerdere trajecten hebben; `deactivatedAt IS NULL` wijst het lopende aan en
- * de partial unique index patient_rehab_trackers_one_open_per_patient houdt
- * dat er hoogstens één is.
+ * Het lopende traject van een patiënt, of een harde NOT_FOUND.
+ *
+ * De query zelf staat in `findOpenTracker` (@/lib/rehab-data), zodat er maar
+ * één definitie is van "welk traject loopt er", inclusief volgorde. Deze
+ * wrapper voegt alleen de fout toe. Wie null wil, roept `findOpenTracker`
+ * rechtstreeks aan.
+ *
+ * Sinds het episode-model kan een patiënt meerdere trajecten hebben;
+ * `deactivatedAt IS NULL` wijst het lopende aan en de partial unique index
+ * patient_rehab_trackers_one_open_per_patient houdt dat er hoogstens één is.
  */
 async function openTrackerFor(prisma: PrismaClient, patientId: string) {
-  const tracker = await prisma.patientRehabTracker.findFirst({
-    where: { patientId, deactivatedAt: null },
-    // `id` als tweede sleutel: bij twee rijen met dezelfde activatedAt zou de
-    // keuze anders alsnog willekeurig zijn.
-    orderBy: [{ activatedAt: 'desc' }, { id: 'desc' }],
-  })
+  const tracker = await findOpenTracker(prisma, patientId)
   if (!tracker) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Geen lopend traject voor deze patiënt' })
   }
@@ -159,9 +160,7 @@ export const rehabRouter = createTRPCRouter({
       const surgeryDate = input.surgeryDate ? new Date(input.surgeryDate) : null
       const injuryDate = input.injuryDate ? new Date(input.injuryDate) : null
 
-      const bestaand = await ctx.prisma.patientRehabTracker.findFirst({
-        where: { patientId: input.patientId, deactivatedAt: null },
-      })
+      const bestaand = await findOpenTracker(ctx.prisma, input.patientId)
 
       // Drie takken, omdat de iOS-app dit ene endpoint voor twee dingen gebruikt.
       // In mbt-gym-mobile/components/rehab-section.tsx opent de WIJZIG-link naast
@@ -182,7 +181,23 @@ export const rehabRouter = createTRPCRouter({
 
       // 1. Geen lopend traject: gewoon starten.
       if (!bestaand) {
-        await ctx.prisma.patientRehabTracker.create({ data: nieuwTraject }).catch(alsConflict(TRAJECT_AL_GESTART))
+        const gestart = await ctx.prisma.patientRehabTracker
+          .create({ data: nieuwTraject })
+          .catch(alsConflict(TRAJECT_AL_GESTART))
+        await auditLog({
+          event: 'REHAB_TRAJECT_STARTED',
+          userId: ctx.user.id,
+          actorEmail: ctx.user.email,
+          resource: 'PatientRehabTracker',
+          resourceId: gestart.id,
+          // Vaste waarden en IDs, geen vrije tekst (audit.ts:7-8).
+          metadata: {
+            route: 'rehab.activateForPatient',
+            reason: 'NEW',
+            protocolId: input.protocolId,
+          },
+          req: ctx.req,
+        })
         return { ok: true }
       }
 
@@ -190,10 +205,27 @@ export const rehabRouter = createTRPCRouter({
       // meegestuurde velden bijwerken. `activatedAt` en `activatedById` blijven
       // staan, anders zou een notitie-edit de startdatum en daarmee de
       // weken-sinds-operatie verschuiven.
+      //
+      // Een expliciete `null` betekent hier "niet wijzigen", niet "leegmaken".
+      // Reden: de iOS-app opent voor WIJZIG dezelfde sheet als voor aanzetten,
+      // die sheet vult zichzelf NIET voor met de bestaande tracker, en stuurt
+      // surgeryDate en injuryDate altijd mee, standaard op null. Zou null hier
+      // leegmaken, dan wist een therapeut die alleen een notitie toevoegt de
+      // operatiedatum, en daarmee `weeksSinceSurgery` en de fase-indicatie.
+      // Een check op `!== undefined` helpt niet: de app stuurt echt null.
+      //
+      // Verschil met `updateTrackerDetails` hieronder, waar null WEL leegmaakt:
+      // dat endpoint komt uit de web-UI, die het formulier vooraf invult met de
+      // huidige waarden. Een leeg veld daar is een bewuste keuze van de
+      // therapeut. Dat is ook de weg om een datum alsnog te wissen.
       if (bestaand.protocolId === input.protocolId) {
         await ctx.prisma.patientRehabTracker.update({
           where: { id: bestaand.id },
-          data: { surgeryDate, injuryDate, notes: input.notes },
+          data: {
+            ...(surgeryDate ? { surgeryDate } : {}),
+            ...(injuryDate ? { injuryDate } : {}),
+            notes: input.notes,
+          },
         })
         return { ok: true }
       }
@@ -236,6 +268,22 @@ export const rehabRouter = createTRPCRouter({
         },
         req: ctx.req,
       })
+      // En het starten van de vervangende episode, zodat elk traject in het
+      // spoor een begin én een eind heeft.
+      await auditLog({
+        event: 'REHAB_TRAJECT_STARTED',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        resource: 'PatientRehabTracker',
+        resourceId: nieuw.id,
+        metadata: {
+          route: 'rehab.activateForPatient',
+          reason: 'PROTOCOL_SWITCH',
+          protocolId: input.protocolId,
+          previousTrackerId: bestaand.id,
+        },
+        req: ctx.req,
+      })
       return { ok: true }
     }),
 
@@ -243,7 +291,13 @@ export const rehabRouter = createTRPCRouter({
     .input(z.object({ patientId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await assertTreating(ctx.prisma, ctx.user, input.patientId)
-      const tracker = await openTrackerFor(ctx.prisma, input.patientId)
+      // Stil slagen als er niets loopt, dus geen openTrackerFor. Dit is een
+      // "zet uit"-knop en die is idempotent: tikken twee therapeuten tegelijk
+      // op STOPPEN, dan krijgt de tweede anders "Mislukt, kon het protocol niet
+      // stoppen" terwijl het traject wel degelijk gesloten is. Dat was ook het
+      // gedrag vóór het episode-model.
+      const tracker = await findOpenTracker(ctx.prisma, input.patientId)
+      if (!tracker) return { ok: true }
       await ctx.prisma.patientRehabTracker.update({
         where: { id: tracker.id },
         data: { deactivatedAt: new Date(), closedById: ctx.user.id },
@@ -320,8 +374,13 @@ export const rehabRouter = createTRPCRouter({
     }),
 
   /**
-   * Draai een afsluiting terug. Alleen voor het laatste traject, en alleen als
-   * er niets anders loopt: de partiële index laat maar één open traject toe.
+   * Draai een afsluiting terug. Alleen als er niets anders loopt: de partiële
+   * index laat maar één open traject toe.
+   *
+   * In principe alleen voor het laatste traject, met één uitzondering: een
+   * nieuwer traject waarop nog geen enkele criteriumstatus staat wordt
+   * opgeruimd. Dat is de misklik in de protocolkiezer, en zonder die
+   * uitzondering blijft die permanent in het dossier staan.
    */
   reopenTraject: therapistProcedure
     .input(z.object({ trackerId: z.string() }))
@@ -339,10 +398,10 @@ export const rehabRouter = createTRPCRouter({
         throw new TRPCError({ code: 'CONFLICT', message: 'Dit traject loopt al.' })
       }
 
-      const nieuwer = await ctx.prisma.patientRehabTracker.findFirst({
+      const nieuwere = await ctx.prisma.patientRehabTracker.findMany({
         where: {
           patientId: tracker.patientId,
-          // Zelfde volgorde-sleutel als openTrackerFor: bij een gelijke
+          // Zelfde volgorde-sleutel als findOpenTracker: bij een gelijke
           // activatedAt beslist het id, anders zou "nieuwer" bij een gelijkspel
           // niets vinden en heropen je alsnog een oudere episode.
           OR: [
@@ -350,28 +409,47 @@ export const rehabRouter = createTRPCRouter({
             { activatedAt: tracker.activatedAt, id: { gt: tracker.id } },
           ],
         },
-        select: { id: true },
+        select: { id: true, _count: { select: { statuses: true } } },
       })
-      if (nieuwer) {
+      // Een misklik in de protocolkiezer sluit het lopende traject af en opent
+      // meteen een nieuw, leeg traject. Zonder uitzondering hieronder zou dat
+      // permanent zijn: heropenen weigert vanwege het nieuwere traject, en er
+      // is geen procedure die een tracker verwijdert. In een medisch dossier
+      // blijft dan een afgesloten echt traject plus een spookepisode staan.
+      //
+      // De grens ligt bij nul criteriumstatussen. Een traject zonder statussen
+      // bevat geen enkele beoordeling of meetwaarde, dus er gaat met het
+      // verwijderen geen klinische vastlegging verloren. Zodra er één status op
+      // staat is het een echte episode en blijft de weigering: dan hoort de
+      // therapeut het traject af te sluiten, niet uit te wissen.
+      const metStatussen = nieuwere.filter((t) => t._count.statuses > 0)
+      if (metStatussen.length > 0) {
         throw new TRPCError({
           code: 'CONFLICT',
           message: 'Er is al een nieuwer traject gestart. Dit traject kan niet meer heropend worden.',
         })
       }
-      const open = await ctx.prisma.patientRehabTracker.findFirst({
-        where: { patientId: tracker.patientId, deactivatedAt: null },
-        select: { id: true },
-      })
-      if (open) {
+      const legeIds = new Set(nieuwere.map((t) => t.id))
+      const open = await findOpenTracker(ctx.prisma, tracker.patientId)
+      // Een open traject dat we hieronder toch weggooien telt niet mee.
+      if (open && !legeIds.has(open.id)) {
         throw new TRPCError({ code: 'CONFLICT', message: 'Er loopt al een traject voor deze patiënt.' })
       }
-      // De twee checks hierboven zijn read-then-write, dus de index blijft het
+      // In één transactie: eerst de lege episodes weg, dan pas heropenen. Was
+      // een van die lege episodes het open traject, dan geeft alleen deze
+      // volgorde de partiële unique index op tijd vrij.
+      // De checks hierboven zijn read-then-write, dus de index blijft het
       // laatste woord houden.
-      const reopened = await ctx.prisma.patientRehabTracker
-        .update({
-          where: { id: tracker.id },
-          data: { deactivatedAt: null, closedById: null, outcome: null, outcomeNote: null },
-        })
+      const [, reopened] = await ctx.prisma
+        .$transaction([
+          ctx.prisma.patientRehabTracker.deleteMany({
+            where: { id: { in: [...legeIds] } },
+          }),
+          ctx.prisma.patientRehabTracker.update({
+            where: { id: tracker.id },
+            data: { deactivatedAt: null, closedById: null, outcome: null, outcomeNote: null },
+          }),
+        ])
         .catch(alsConflict(TRAJECT_AL_GESTART))
       await auditLog({
         event: 'REHAB_TRAJECT_REOPENED',
@@ -379,7 +457,9 @@ export const rehabRouter = createTRPCRouter({
         actorEmail: ctx.user.email,
         resource: 'PatientRehabTracker',
         resourceId: tracker.id,
-        metadata: { route: 'rehab.reopenTraject' },
+        // Alleen vaste waarden en IDs (audit.ts:7-8). Het aantal opgeruimde
+        // lege episodes hoort in het spoor: dat zijn verwijderde rijen.
+        metadata: { route: 'rehab.reopenTraject', removedEmptyTrackers: legeIds.size },
         req: ctx.req,
       })
       return reopened

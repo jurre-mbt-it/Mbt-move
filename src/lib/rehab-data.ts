@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client'
 
-import { mergeCriterionStatuses } from './rehab-traject'
+import { mergeCriterionStatuses, statussenVanTraject } from './rehab-traject'
 
 /**
  * Rehab-tracker data — geconsolideerd voor:
@@ -19,6 +19,27 @@ export type PatientRehabTrackerData = NonNullable<
 >
 
 /**
+ * Het lopende traject van een patiënt, of null als er geen loopt.
+ *
+ * DE enige plek waar "welk traject loopt er" wordt beslist. Er stonden vier
+ * kopieën van deze query verspreid over de router en deze module, waarvan er
+ * één geen `orderBy` had; die konden bij historie uit elkaar gaan lopen. Wie
+ * een harde fout wil in plaats van null, gebruikt `openTrackerFor` in
+ * `src/server/routers/rehab.ts`.
+ *
+ * Met historie kan er meer dan één rij per patiënt zijn. De partiële unique
+ * index houdt het aantal open trajecten op één, maar vertrouw daar niet op:
+ * een expliciete volgorde maakt dit deterministisch. `id` als tweede sleutel,
+ * want bij een gelijke activatedAt is de keuze anders alsnog willekeurig.
+ */
+export async function findOpenTracker(prisma: PrismaClient, patientId: string) {
+  return prisma.patientRehabTracker.findFirst({
+    where: { patientId, deactivatedAt: null },
+    orderBy: [{ activatedAt: 'desc' }, { id: 'desc' }],
+  })
+}
+
+/**
  * Het lopende traject van een patiënt.
  *
  * Dunne wrapper: zoekt het open traject op en laat `getRehabTrackerDataById`
@@ -30,16 +51,7 @@ export async function getPatientRehabTrackerData(
   prisma: PrismaClient,
   patientId: string,
 ) {
-  const open = await prisma.patientRehabTracker.findFirst({
-    where: { patientId, deactivatedAt: null },
-    // Met historie kan er meer dan één rij per patiënt zijn. De partial unique
-    // index houdt het aantal open trajecten op één, maar vertrouw daar niet op:
-    // een expliciete volgorde maakt dit deterministisch. `id` als tweede
-    // sleutel, want bij een gelijke activatedAt is de keuze anders alsnog
-    // willekeurig.
-    orderBy: [{ activatedAt: 'desc' }, { id: 'desc' }],
-    select: { id: true },
-  })
+  const open = await findOpenTracker(prisma, patientId)
   if (!open) return null
   return getRehabTrackerDataById(prisma, open.id)
 }
@@ -78,11 +90,16 @@ export async function getRehabTrackerDataById(
   )
   // Op trackerId, niet op patientId: anders lekken de vinkjes van een
   // afgesloten traject door in het nieuwe protocol. De unique index op
-  // ("trackerId","criterionId") garandeert al hoogstens één rij per criterium,
-  // en de criteria van het traject zijn die van het protocol.
-  const statuses = await prisma.rehabCriterionStatus.findMany({
-    where: { trackerId: tracker.id },
+  // ("trackerId","criterionId") garandeert al hoogstens één rij per criterium.
+  // De grens op criterionIds staat er weer bij omdat de tellingen hieronder
+  // erop leunen: zonder die grens kunnen `met` en `inProgress` op topniveau
+  // hoger uitvallen dan `total`.
+  const ruweStatussen = await prisma.rehabCriterionStatus.findMany({
+    where: { trackerId: tracker.id, criterionId: { in: criterionIds } },
   })
+  // Tweede slot op dezelfde deur, en het enige dat zonder database te testen
+  // is. Zie src/lib/rehab-traject.ts.
+  const statuses = statussenVanTraject(ruweStatussen, tracker.id, criterionIds)
   const statusByCriterionId = new Map(statuses.map((s) => [s.criterionId, s]))
 
   const now = new Date()

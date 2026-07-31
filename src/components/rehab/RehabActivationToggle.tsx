@@ -269,10 +269,13 @@ export function RehabActivationToggle({
                 <DarkDialogTitle>Revalidatie-tracker uitzetten?</DarkDialogTitle>
               </DarkDialogHeader>
               <p style={{ color: P.inkMuted, fontSize: 13, lineHeight: 1.55 }}>
-                Weet je het zeker? Het protocol en alle fases verdwijnen uit het dashboard van <strong style={{ color: P.ink }}>{patientName}</strong>.
+                Hiermee sluit je het lopende traject van <strong style={{ color: P.ink }}>{patientName}</strong> af. Het protocol en alle fases verdwijnen uit het dashboard van de patiënt.
               </p>
+              {/* Klopt sinds het episode-model: uitzetten sluit de episode af,
+                  opnieuw aanzetten begint een nieuw en leeg traject. De oude
+                  copy beloofde dat de vinkjes terugkwamen. */}
               <p style={{ color: P.inkMuted, fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
-                Ingevulde meetwaarden en statussen blijven bewaard en komen terug als je de tracker later opnieuw aanzet.
+                De ingevulde meetwaarden en statussen blijven in de historie terug te lezen. Zet je het protocol later opnieuw aan, dan start er een nieuw traject dat leeg begint.
               </p>
               <div className="flex justify-end gap-2 mt-5">
                 <DarkButton variant="ghost" size="sm" onClick={() => setDeactivateOpen(false)}>

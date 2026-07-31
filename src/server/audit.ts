@@ -42,10 +42,11 @@ export type AuditEvent =
   | 'CO_MONITOR_REQUESTED'
   | 'DPA_ACCEPTED'
   | 'GHV_ACCEPTED'
-  // Rehab-trajecten (episodes). Het afsluiten van een traject is een klinisch
-  // besluit met een uitkomst; heropenen draait dat besluit terug. Beide horen
-  // in het spoor. De toelichting (`outcomeNote`) blijft op de rij zelf staan,
-  // want die is vrije tekst en mag hier niet in.
+  // Rehab-trajecten (episodes). Starten, afsluiten en heropenen zijn alle drie
+  // klinische besluiten en horen in het spoor: zonder het startevent staat er
+  // een einde in het log zonder begin. De toelichting (`outcomeNote`) blijft op
+  // de rij zelf staan, want die is vrije tekst en mag hier niet in.
+  | 'REHAB_TRAJECT_STARTED'
   | 'REHAB_TRAJECT_CLOSED'
   | 'REHAB_TRAJECT_REOPENED'
   // GDPR
