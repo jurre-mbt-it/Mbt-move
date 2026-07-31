@@ -17,7 +17,7 @@ import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { practiceScope, inSamePractice } from '@/server/lib/patient-access'
-import { careScopeWhereForRead } from '@/server/lib/care-scope'
+import { nietUitbehandeld } from '@/server/lib/care-scope'
 import { sendPush } from '@/server/push/send'
 import type { PrismaClient } from '@prisma/client'
 
@@ -257,10 +257,6 @@ export const messagesRouter = createTRPCRouter({
     const accessiblePatient = {
       patient: {
         role: 'ATHLETE' as never,
-        // Uitbehandelde atleten vallen uit de inbox. Eigen sleutel naast de
-        // scope-OR en vóór de spread, zodat de conditionele spread hem niet
-        // kan overschrijven; een tweede `OR`-sleutel zou de scoping wissen.
-        careStatuses: { none: careScopeWhereForRead(ctx.user) },
         ...(ctx.user.role === 'ADMIN'
           ? {}
           : {
@@ -273,6 +269,11 @@ export const messagesRouter = createTRPCRouter({
                 ...practiceScope(ctx.user),
               ],
             }),
+        // Uitbehandelde atleten vallen uit de inbox. Bewust NA de spread: bij
+        // een object-spread wint de laatste gelijknamige sleutel, dus zo kan
+        // een spread die ooit zelf `careStatuses` gaat bevatten dit filter niet
+        // wegschrijven. Eigen sleutel, nooit een tweede `OR`.
+        ...nietUitbehandeld(ctx.user),
       },
     }
 
@@ -341,9 +342,6 @@ export const messagesRouter = createTRPCRouter({
         readAt: null,
         patient: {
           role: 'ATHLETE' as never,
-          // Zelfde tak als in `inbox`: zonder dit blijft de sidebar-badge
-          // oplichten voor iemand die uit elke lijst verdwenen is.
-          careStatuses: { none: careScopeWhereForRead(ctx.user) },
           ...(ctx.user.role === 'ADMIN'
             ? {}
             : {
@@ -356,6 +354,10 @@ export const messagesRouter = createTRPCRouter({
                   ...practiceScope(ctx.user),
                 ],
               }),
+          // Zelfde tak als in `inbox`, en om dezelfde reden ná de spread:
+          // zonder dit blijft de sidebar-badge oplichten voor iemand die uit
+          // elke lijst verdwenen is.
+          ...nietUitbehandeld(ctx.user),
         },
       },
     })

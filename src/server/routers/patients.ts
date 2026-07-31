@@ -15,8 +15,11 @@ import {
   careScopeKey,
   careScopeWhere,
   careScopeWhereForRead,
+  nietUitbehandeld,
+  welUitbehandeld,
   type CareScopeKey,
 } from '@/server/lib/care-scope'
+import { werklijstAnd } from '@/server/lib/werklijst-where'
 import { findOpenTracker, type TrackerClient } from '@/lib/rehab-data'
 import { auditLog } from '@/server/audit'
 import { amsMidnight, dateKey } from '@/lib/week-dates'
@@ -158,19 +161,15 @@ export const patientsRouter = createTRPCRouter({
       // patiënten zien zonder aparte invite.
       const me = ctx.user
       const include = input?.include ?? 'active'
-      // Leesvariant: een therapeut zonder praktijk krijgt hier een filter dat
-      // niets matcht in plaats van een foutmelding, en houdt dus zijn lijst.
-      const careScope = careScopeWhereForRead(me)
-      // KRITIEK: dit filter gaat onder AND naast de bestaande scope-OR. Als
-      // tweede `OR`-sleutel of via een object-spread zou het de scoping wissen;
-      // dat is de lek van 27 juli, uitgeschreven bij `search` onderaan dit
-      // bestand.
+      // Beide helpers gebruiken de leesvariant van de scope: een therapeut
+      // zonder praktijk krijgt een filter dat niets matcht in plaats van een
+      // foutmelding, en houdt dus gewoon zijn lijst.
       const archiefFilter: Prisma.UserWhereInput =
         include === 'all'
           ? {}
           : include === 'archived'
-            ? { careStatuses: { some: careScope } }
-            : { careStatuses: { none: careScope } }
+            ? welUitbehandeld(me)
+            : nietUitbehandeld(me)
 
       // Self-heal stale onboarding-notes voor reeds geaccepteerde patiënten
       // van deze therapeut. Eén UPDATE per dashboard-load; raakt alleen rijen
@@ -195,23 +194,23 @@ export const patientsRouter = createTRPCRouter({
       const patients = await ctx.prisma.user.findMany({
         where: {
           role: { in: ['PATIENT', 'ATHLETE'] },
-          AND: [
-            {
-              OR: [
-                {
-                  patientTherapists: {
-                    some: {
-                      therapistId: me.id,
-                      isActive: true,
-                      status: { in: ['APPROVED', 'PENDING'] },
-                    },
+          // `werklijstAnd` zet de scope-OR en het archieffilter naast elkaar
+          // onder AND. Die vorm ligt vast in werklijst-where.test.ts.
+          AND: werklijstAnd(
+            [
+              {
+                patientTherapists: {
+                  some: {
+                    therapistId: me.id,
+                    isActive: true,
+                    status: { in: ['APPROVED', 'PENDING'] },
                   },
                 },
-                ...practiceScope(me),
-              ],
-            },
+              },
+              ...practiceScope(me),
+            ],
             archiefFilter,
-          ],
+          ),
         },
         select: {
           id: true,
@@ -222,12 +221,12 @@ export const patientsRouter = createTRPCRouter({
           dateOfBirth: true,
           createdAt: true,
           role: true,
-          // Alleen de LOPENDE markering van deze lezer; `careScope` bakt
-          // `reactivatedAt: null` in, dus historie van eerdere afsluitingen
-          // blijft hier buiten. Maximaal één rij per scope (partiële unieke
-          // index), vandaar take: 1.
+          // Alleen de LOPENDE markering van deze lezer. `careScopeWhereForRead`
+          // bakt `reactivatedAt: null` in, dus historie van eerdere
+          // afsluitingen blijft hier buiten. Maximaal één rij per scope
+          // (partiële unieke index), vandaar take: 1.
           careStatuses: {
-            where: careScope,
+            where: careScopeWhereForRead(me),
             take: 1,
             select: { dischargedAt: true, reason: true },
           },
@@ -344,23 +343,21 @@ export const patientsRouter = createTRPCRouter({
       const patients = await ctx.prisma.user.findMany({
         where: {
           role: { in: ['PATIENT', 'ATHLETE'] },
-          AND: [
-            {
-              OR: [
-                {
-                  patientTherapists: {
-                    some: {
-                      therapistId: me.id,
-                      isActive: true,
-                      status: { in: ['APPROVED', 'PENDING'] },
-                    },
+          AND: werklijstAnd(
+            [
+              {
+                patientTherapists: {
+                  some: {
+                    therapistId: me.id,
+                    isActive: true,
+                    status: { in: ['APPROVED', 'PENDING'] },
                   },
                 },
-                ...practiceScope(me),
-              ],
-            },
-            { careStatuses: { none: careScopeWhereForRead(me) } },
-          ],
+              },
+              ...practiceScope(me),
+            ],
+            nietUitbehandeld(me),
+          ),
         },
         select: { id: true },
       })
@@ -636,25 +633,23 @@ export const patientsRouter = createTRPCRouter({
       const patients = await ctx.prisma.user.findMany({
         where: {
           role: { in: ['PATIENT', 'ATHLETE'] },
-          AND: [
-            {
-              OR: [
-                {
-                  patientTherapists: {
-                    some: {
-                      therapistId: me.id,
-                      isActive: true,
-                      status: { in: ['APPROVED', 'PENDING'] },
-                    },
+          AND: werklijstAnd(
+            [
+              {
+                patientTherapists: {
+                  some: {
+                    therapistId: me.id,
+                    isActive: true,
+                    status: { in: ['APPROVED', 'PENDING'] },
                   },
                 },
-                { sessionLogs: { some: { therapistId: me.id } } },
-                { patientPrograms: { some: { creatorId: me.id } } },
-                { patientWeekSchedules: { some: { creatorId: me.id } } },
-              ],
-            },
-            { careStatuses: { none: careScopeWhereForRead(me) } },
-          ],
+              },
+              { sessionLogs: { some: { therapistId: me.id } } },
+              { patientPrograms: { some: { creatorId: me.id } } },
+              { patientWeekSchedules: { some: { creatorId: me.id } } },
+            ],
+            nietUitbehandeld(me),
+          ),
         },
         select: {
           id: true,
@@ -2509,9 +2504,7 @@ export const patientsRouter = createTRPCRouter({
 
       // Derde AND-tak, zelfde reden: uitbehandelde patiënten horen niet in een
       // kiezer waarmee je iets nieuws aan iemand hangt.
-      const archiefFilter: Prisma.UserWhereInput = {
-        careStatuses: { none: careScopeWhereForRead(ctx.user) },
-      }
+      const archiefFilter: Prisma.UserWhereInput = nietUitbehandeld(ctx.user)
 
       return ctx.prisma.user.findMany({
         where: {

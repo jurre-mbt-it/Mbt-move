@@ -33,6 +33,7 @@ import {
   notifyLoadWarning,
 } from '@/server/push/notify'
 import { MORNING_PUSH_HOUR } from '@/server/push/send'
+import { uitbehandeldDoorIedereen } from '@/server/lib/care-scope'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -94,27 +95,60 @@ export async function GET(req: NextRequest) {
     }
     // Via `user` (niet rechtstreeks de token-ids) zodat de soft-delete-extension
     // verwijderde accounts eruit filtert.
+    const recipients = await prisma.user.findMany({
+      where: { id: { in: tokenUserIds } },
+      select: { id: true },
+    })
+    let recipientIds = recipients.map((p) => p.id)
+    if (recipientIds.length === 0) {
+      return NextResponse.json({ ok: true, candidates: 0, sent: 0 })
+    }
+
+    // Wie uitbehandeld is krijgt geen ochtendpush meer, maar alleen als ELKE
+    // actieve behandelaar hem heeft afgesloten.
     //
-    // Wie uitbehandeld is krijgt geen ochtendpush meer. Bewust ZONDER
-    // careScopeWhereForRead: deze route draait als cron, zonder ingelogde
-    // lezer, dus er is geen praktijk of coach om op te scopen en telt elke
-    // lopende markering. `reactivatedAt: null` hoort er wel bij, want de rij
-    // blijft als historie staan en `{ none: {} }` zou iedereen die ooit
-    // afgesloten is geweest permanent stilzetten.
+    // Deze route draait als cron, zonder ingelogde lezer, dus er is geen scope
+    // om op te filteren. "Eén markering, waar dan ook" is hier het VERKEERDE
+    // antwoord: één persoon kan in twee scopes zitten (patients.inviteCoMonitor
+    // koppelt de atleet van een coach aan een praktijk-therapeut). Archiveert
+    // de coach terwijl de praktijk-therapeut doorplant, dan zou de atleet stil
+    // zijn trainingsherinnering en zijn herstelpush verliezen voor een planning
+    // die er gewoon staat. `reactivatedAt: null` hoort erbij omdat rijen als
+    // historie blijven bestaan.
+    //
+    // Heeft iemand een lopende markering en NUL actieve behandelrelaties, dan
+    // valt hij ook weg: er is dan niemand meer die doorbehandelt. Een gebruiker
+    // zonder markering raakt dit filter niet, dus een therapeut die zelf traint
+    // houdt gewoon zijn push.
     //
     // Hier filteren en niet in de weekquery hieronder: de trainingsherinnering
     // droogt vanzelf op zodra er geen planning meer staat, maar de herstel- en
     // belastingpush hangen aan wearable-data die gewoon door blijft komen.
-    const recipients = await prisma.user.findMany({
-      where: {
-        id: { in: tokenUserIds },
-        careStatuses: { none: { reactivatedAt: null } },
-      },
-      select: { id: true },
+    const markeringen = await prisma.patientCareStatus.findMany({
+      where: { patientId: { in: recipientIds }, reactivatedAt: null },
+      select: { patientId: true, practiceId: true, coachId: true },
     })
-    const recipientIds = recipients.map((p) => p.id)
-    if (recipientIds.length === 0) {
-      return NextResponse.json({ ok: true, candidates: 0, sent: 0 })
+    if (markeringen.length > 0) {
+      const gemarkeerdeIds = [...new Set(markeringen.map((m) => m.patientId))]
+      const relaties = await prisma.patientTherapist.findMany({
+        where: { patientId: { in: gemarkeerdeIds }, isActive: true, status: 'APPROVED' },
+        select: {
+          patientId: true,
+          therapist: { select: { id: true, role: true, practiceId: true } },
+        },
+      })
+      const uitbehandeld = new Set(
+        gemarkeerdeIds.filter((id) =>
+          uitbehandeldDoorIedereen(
+            relaties.filter((r) => r.patientId === id).map((r) => r.therapist),
+            markeringen.filter((m) => m.patientId === id),
+          ),
+        ),
+      )
+      recipientIds = recipientIds.filter((id) => !uitbehandeld.has(id))
+      if (recipientIds.length === 0) {
+        return NextResponse.json({ ok: true, candidates: 0, sent: 0 })
+      }
     }
 
     // Idempotentie: wat is er vandaag al ÉCHT gepusht (per categorie-type)?

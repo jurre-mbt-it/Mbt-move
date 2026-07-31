@@ -5,7 +5,8 @@
  *   1. Find opted-in patients in CIE-enabled practices (patient_insight_status.enabled=true
  *      AND no objection AND practice.cieEnabled=true).
  *   2. For each: find active treating therapists (isActive + APPROVED).
- *      Skip if 0.
+ *      Skip if 0, and skip if every one of them has discharged the patient
+ *      (see step 1b: one discharge in one scope is not enough).
  *   3. Build aggregates once.
  *   4. Run all 6 evaluators.
  *   5. Dedup: skip if open/recent insight of same signal_type exists within
@@ -26,6 +27,7 @@ import { deloadNeeded } from './rules/deloadNeeded'
 import { overloadRisk } from './rules/overloadRisk'
 import { lowFeel } from './rules/lowFeel'
 import { dispatchInsightNotifications } from './dispatcher'
+import { uitbehandeldDoorIedereen, type LopendeMarkering } from '@/server/lib/care-scope'
 
 const EVALUATORS: Record<string, Evaluator> = {
   pain_flare: painFlare,
@@ -81,14 +83,6 @@ export async function computeInsights(
           { practiceId: null },
           { practice: { cieEnabled: true } },
         ],
-        // Uitbehandelde patiënten leveren geen insights meer op. Bewust ZONDER
-        // careScopeWhereForRead: deze motor draait als cron, zonder ingelogde
-        // lezer, dus er is geen praktijk of coach om op te scopen. Elke lopende
-        // markering telt hier, waar de rest van de app op de scope van de lezer
-        // filtert. `reactivatedAt: null` moet er wel bij staan: de rij blijft
-        // als historie bestaan, dus `{ none: {} }` zou elke ooit gearchiveerde
-        // patiënt permanent uit de motor houden.
-        careStatuses: { none: { reactivatedAt: null } },
       },
     },
     include: {
@@ -99,12 +93,46 @@ export async function computeInsights(
           email: true,
           patientTherapists: {
             where: { isActive: true, status: 'APPROVED' },
-            select: { therapistId: true },
+            // De rol en de praktijk van de behandelaar zijn nodig om te bepalen
+            // in welke scope zijn eventuele uitbehandel-markering valt; zie de
+            // filterstap hieronder.
+            select: {
+              therapistId: true,
+              therapist: { select: { id: true, role: true, practiceId: true } },
+            },
           },
         },
       },
     },
   })
+
+  // 1b. Wie is er uitbehandeld, en door wie?
+  //
+  // Deze motor draait als cron, zonder ingelogde lezer, dus er is geen scope om
+  // op te filteren. "Eén markering, waar dan ook" is hier het VERKEERDE
+  // antwoord: één persoon kan in twee scopes zitten (patients.inviteCoMonitor
+  // koppelt de atleet van een coach aan een praktijk-therapeut). Archiveert de
+  // coach terwijl de praktijk-therapeut doorbehandelt, dan zou die therapeut
+  // stil geen overbelastings- of pijnsignaal meer krijgen, zonder dat er ergens
+  // een melding komt. Daarom de vraag per behandelaar, in geheugen, met
+  // `uitbehandeldDoorIedereen`.
+  //
+  // `reactivatedAt: null` staat er expliciet bij: rijen blijven als historie
+  // bestaan, dus zonder die voorwaarde zou elke ooit gearchiveerde patiënt
+  // permanent uit de motor vallen.
+  const markeringen = await prisma.patientCareStatus.findMany({
+    where: {
+      patientId: { in: statuses.map((s) => s.patientId) },
+      reactivatedAt: null,
+    },
+    select: { patientId: true, practiceId: true, coachId: true },
+  })
+  const markeringenPerPatient = new Map<string, LopendeMarkering[]>()
+  for (const m of markeringen) {
+    const lijst = markeringenPerPatient.get(m.patientId) ?? []
+    lijst.push({ practiceId: m.practiceId, coachId: m.coachId })
+    markeringenPerPatient.set(m.patientId, lijst)
+  }
 
   // 2. Load rule catalog once (id → rule definition)
   const rules = await prisma.insightRule.findMany({ where: { enabledGlobally: true } })
@@ -126,6 +154,21 @@ export async function computeInsights(
     // Skip if no active treating therapists
     if (status.patient.patientTherapists.length === 0) {
       result.patientsSkipped.push({ patientId, reason: 'no_active_therapist' })
+      continue
+    }
+
+    // Alleen overslaan als ELKE actieve behandelaar deze patiënt heeft
+    // afgesloten. Blijft er één over die niets archiveerde, dan blijven de
+    // signalen lopen; die therapeut ziet ze immers ook nog in zijn dashboard.
+    // De lege-lijst-situatie is hierboven al afgevangen met
+    // `no_active_therapist`, dus die bereikt deze regel nooit.
+    if (
+      uitbehandeldDoorIedereen(
+        status.patient.patientTherapists.map((t) => t.therapist),
+        markeringenPerPatient.get(patientId) ?? [],
+      )
+    ) {
+      result.patientsSkipped.push({ patientId, reason: 'discharged_by_all_therapists' })
       continue
     }
 

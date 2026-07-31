@@ -5,7 +5,7 @@ import { Prisma } from '@prisma/client'
 import type { PrismaClient } from '@prisma/client'
 import { maskMuscleLoadsArray } from '@/server/lib/muscle-loads'
 import { assertPatientAccess } from '@/server/lib/patient-access'
-import { careScopeWhereForRead } from '@/server/lib/care-scope'
+import { nietUitbehandeld } from '@/server/lib/care-scope'
 import { isReviewDue, weeksSince, reviewThresholdWeeks } from '@/lib/program-review'
 import { notifyNewSchedule } from '@/server/push/notify'
 
@@ -591,10 +591,7 @@ export const programsRouter = createTRPCRouter({
         // creatorId en practiceId van het sjabloon, buiten de therapeut om, dus
         // een zelf geactiveerd shop-programma van een uitbehandelde koper zou
         // via de praktijk-tak alsnog als controle-signaal binnenkomen.
-        AND: [
-          ownership,
-          { patient: { careStatuses: { none: careScopeWhereForRead(ctx.user!) } } },
-        ],
+        AND: [ownership, { patient: nietUitbehandeld(ctx.user!) }],
       },
       select: {
         id: true,

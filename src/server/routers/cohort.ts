@@ -19,7 +19,7 @@ import {
   therapistProcedure,
   adminProcedure,
 } from '@/server/trpc'
-import { careScopeWhereForRead } from '@/server/lib/care-scope'
+import { nietUitbehandeld } from '@/server/lib/care-scope'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -56,7 +56,7 @@ export const cohortRouter = createTRPCRouter({
           role: 'PATIENT',
           cohortAnalyticsOptIn: true,
           deletedAt: null,
-          careStatuses: { none: careScopeWhereForRead(ctx.user) },
+          ...nietUitbehandeld(ctx.user),
           patientTherapists: {
             some: {
               therapistId: ctx.user.id,
@@ -215,15 +215,16 @@ export const cohortRouter = createTRPCRouter({
         role: { in: ['PATIENT', 'ATHLETE'] as ('PATIENT' | 'ATHLETE')[] },
         cohortAnalyticsOptIn: true,
         deletedAt: null,
-        // Eigen sleutel vóór de conditionele spread, zodat die hem niet kan
-        // overschrijven. Gescoped op de lezer: een admin filtert dus op de
-        // markeringen van zijn eigen praktijk. Let op: filtert de admin met
-        // `practiceId` op een ándere praktijk, dan blijven de uitbehandelde
-        // patiënten daarvan meetellen.
-        careStatuses: { none: careScopeWhereForRead(ctx.user) },
         ...(input?.practiceId !== undefined
           ? { practiceId: input.practiceId }
           : {}),
+        // Ná de conditionele spread, zodat die dit filter niet kan
+        // overschrijven: bij een object-spread wint de laatste gelijknamige
+        // sleutel. Gescoped op de lezer, dus een admin filtert op de
+        // markeringen van zijn eigen praktijk. Let op: filtert de admin met
+        // `practiceId` op een ándere praktijk, dan blijven de uitbehandelde
+        // patiënten daarvan meetellen.
+        ...nietUitbehandeld(ctx.user),
       }
 
       const users = await ctx.prisma.user.findMany({

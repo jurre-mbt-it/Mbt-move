@@ -13,7 +13,7 @@ import { TRPCError } from '@trpc/server'
  * patient-access.ts, met één bewust verschil: ADMIN valt hier wél in de
  * praktijk-tak, want een admin beheert vanuit zijn eigen praktijk.
  */
-type ScopeUser = { id: string; role: string; practiceId: string | null }
+export type ScopeUser = { id: string; role: string; practiceId: string | null }
 
 /**
  * Precies één van beide is gevuld. De CHECK-constraint
@@ -121,4 +121,81 @@ export function careScopeWhereForRead(
     return { practiceId: user.practiceId, reactivatedAt: null }
   }
   return matchtNiets()
+}
+
+/**
+ * Relatie-filter op User: deze lezer heeft de patiënt NIET uitbehandeld.
+ * Gebruik als tak in een where, bijvoorbeeld
+ * `AND: [scopeTak, nietUitbehandeld(ctx.user)]` of, op een relatie,
+ * `patient: nietUitbehandeld(ctx.user)`.
+ *
+ * Dit fragment stond eerst op tien plekken uitgeschreven. Achter een functie
+ * is er één plek waar `some` en `none` verwisseld kunnen worden, en één plek
+ * om de betekenis later te veranderen.
+ */
+export function nietUitbehandeld(user: ScopeUser) {
+  return { careStatuses: { none: careScopeWhereForRead(user) } }
+}
+
+/**
+ * Spiegelbeeld van {@link nietUitbehandeld}: alleen patiënten die deze lezer
+ * WEL heeft uitbehandeld. Dit is het archief.
+ *
+ * Zonder geldige scope komt hier een filter uit dat niets matcht, dus een leeg
+ * archief. Dat is de veilige kant: weglaten zou het archief van de hele
+ * praktijk, of dat van elke coach, in de lijst zetten.
+ */
+export function welUitbehandeld(user: ScopeUser) {
+  return { careStatuses: { some: careScopeWhereForRead(user) } }
+}
+
+/**
+ * Niet-gooiende variant van {@link careScopeKey}: `null` als deze gebruiker
+ * helemaal geen markering kán zetten (een therapeut zonder praktijk, of een
+ * rol die hier niets te zoeken heeft).
+ */
+export function careScopeKeyOrNull(user: ScopeUser): CareScopeKey | null {
+  if (user.role === 'COACH') return { practiceId: null, coachId: user.id }
+  if (user.role === 'THERAPIST' || user.role === 'ADMIN') {
+    return user.practiceId ? { practiceId: user.practiceId, coachId: null } : null
+  }
+  return null
+}
+
+/** Vorm van een lopende markering zoals de cron-jobs hem uitlezen. */
+export type LopendeMarkering = { practiceId: string | null; coachId: string | null }
+
+/**
+ * Is ELKE actieve behandelaar van deze patiënt klaar met hem?
+ *
+ * Dit is de vraag die de cron-jobs stellen. Zij draaien zonder ingelogde lezer
+ * en hebben dus geen scope om op te filteren, maar "één markering, waar dan
+ * ook" is het verkeerde antwoord: deze codebase ondersteunt bewust dat één
+ * persoon in twee scopes zit (`patients.inviteCoMonitor` koppelt de atleet van
+ * een coach aan een praktijk-therapeut). Archiveert de coach, dan behandelt de
+ * therapeut gewoon door, en dan horen de signalen en de push door te lopen.
+ * Anders valt dat stil zonder dat er ergens een melding komt.
+ *
+ * Een behandelaar die zelf geen markering kán zetten (therapeut zonder
+ * praktijk) telt als "behandelt door": zijn tak is per definitie niet
+ * afgesloten, dus de patiënt blijft in beeld. Dat is de veilige kant.
+ *
+ * LET OP bij een lege `behandelaars`: `every` is dan waar, dus met een lopende
+ * markering en nul actieve relaties komt hier `true` uit. Dat is bewust
+ * (niemand behandelt nog door), maar het betekent dat de caller die situatie
+ * zelf moet willen. `computeInsights` vangt nul relaties al eerder af met
+ * `no_active_therapist`.
+ */
+export function uitbehandeldDoorIedereen(
+  behandelaars: ScopeUser[],
+  markeringen: LopendeMarkering[],
+): boolean {
+  if (markeringen.length === 0) return false
+  return behandelaars.every((behandelaar) => {
+    const key = careScopeKeyOrNull(behandelaar)
+    if (!key) return false
+    return markeringen.some((m) =>
+      key.coachId !== null ? m.coachId === key.coachId : m.practiceId === key.practiceId,
+    )
+  })
 }

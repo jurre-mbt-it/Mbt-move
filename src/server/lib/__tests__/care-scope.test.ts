@@ -1,7 +1,14 @@
 import { TRPCError } from '@trpc/server'
 import { describe, expect, it } from 'vitest'
 
-import { careScopeKey, careScopeWhere, careScopeWhereForRead } from '../care-scope'
+import {
+  careScopeKey,
+  careScopeWhere,
+  careScopeWhereForRead,
+  nietUitbehandeld,
+  welUitbehandeld,
+  uitbehandeldDoorIedereen,
+} from '../care-scope'
 
 const therapeut = { id: 't1', role: 'THERAPIST' as const, practiceId: 'p1' }
 const coach = { id: 'c1', role: 'COACH' as const, practiceId: null }
@@ -141,5 +148,79 @@ describe('careScopeWhereForRead', () => {
     const a = careScopeWhereForRead(losseTherapeut)
     const b = careScopeWhereForRead(losseTherapeut)
     expect(a).not.toBe(b)
+  })
+})
+
+describe('nietUitbehandeld / welUitbehandeld', () => {
+  it('gebruiken none respectievelijk some, met dezelfde scope', () => {
+    // De twee staan hier naast elkaar omdat de verwisseling het gevaar is:
+    // `some` waar `none` hoort, levert precies de omgekeerde lijst op.
+    expect(nietUitbehandeld(therapeut)).toEqual({
+      careStatuses: { none: { practiceId: 'p1', reactivatedAt: null } },
+    })
+    expect(welUitbehandeld(therapeut)).toEqual({
+      careStatuses: { some: { practiceId: 'p1', reactivatedAt: null } },
+    })
+  })
+
+  it('scopen een coach op zichzelf', () => {
+    expect(nietUitbehandeld(coach)).toEqual({
+      careStatuses: { none: { coachId: 'c1', reactivatedAt: null } },
+    })
+  })
+
+  it('houden het archief leeg zonder geldige scope', () => {
+    // Niet weglaten maar niets matchen: anders zou het archief van elke
+    // praktijk in de lijst van deze gebruiker komen.
+    expect(welUitbehandeld(losseTherapeut)).toEqual({
+      careStatuses: { some: { practiceId: { in: [] } } },
+    })
+  })
+})
+
+describe('uitbehandeldDoorIedereen', () => {
+  const praktijkMarkering = { practiceId: 'p1', coachId: null }
+  const coachMarkering = { practiceId: null, coachId: 'c1' }
+
+  it('is onwaar zonder markeringen', () => {
+    expect(uitbehandeldDoorIedereen([therapeut], [])).toBe(false)
+  })
+
+  it('is waar als de enige behandelaar heeft afgesloten', () => {
+    expect(uitbehandeldDoorIedereen([therapeut], [praktijkMarkering])).toBe(true)
+  })
+
+  it('laat de patiënt lopen als één behandelaar niet heeft afgesloten', () => {
+    // Het scenario uit inviteCoMonitor: coach C archiveert de atleet, maar
+    // therapeut T uit praktijk P behandelt door. Zou dit true worden, dan
+    // vielen de signalen en de push van T stil zonder enige melding.
+    expect(uitbehandeldDoorIedereen([therapeut, coach], [coachMarkering])).toBe(false)
+    expect(uitbehandeldDoorIedereen([therapeut, coach], [praktijkMarkering])).toBe(false)
+  })
+
+  it('is waar als beide scopes hebben afgesloten', () => {
+    expect(
+      uitbehandeldDoorIedereen([therapeut, coach], [coachMarkering, praktijkMarkering]),
+    ).toBe(true)
+  })
+
+  it('houdt praktijken uit elkaar', () => {
+    const anderePraktijk = { id: 't9', role: 'THERAPIST' as const, practiceId: 'p2' }
+    expect(uitbehandeldDoorIedereen([anderePraktijk], [praktijkMarkering])).toBe(false)
+  })
+
+  it('telt een behandelaar zonder eigen scope als doorbehandelen', () => {
+    // Een therapeut zonder praktijk kan zelf geen markering zetten, dus zijn
+    // tak is per definitie niet afgesloten. Veilige kant: patiënt blijft in
+    // beeld in plaats van stil te vallen.
+    expect(uitbehandeldDoorIedereen([losseTherapeut], [praktijkMarkering])).toBe(false)
+  })
+
+  it('is waar bij nul behandelaars mét een lopende markering', () => {
+    // Bewuste keuze: niemand behandelt nog door. Callers die dit niet willen,
+    // vangen de lege lijst zelf eerder af (computeInsights doet dat met
+    // no_active_therapist).
+    expect(uitbehandeldDoorIedereen([], [praktijkMarkering])).toBe(true)
+    expect(uitbehandeldDoorIedereen([], [])).toBe(false)
   })
 })

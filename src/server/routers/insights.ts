@@ -18,7 +18,7 @@ import {
   adminProcedure,
 } from '@/server/trpc'
 import { practiceScope } from '@/server/lib/patient-access'
-import { careScopeWhereForRead } from '@/server/lib/care-scope'
+import { nietUitbehandeld } from '@/server/lib/care-scope'
 
 const ACTIVE_LINK = { isActive: true, status: 'APPROVED' as const }
 
@@ -61,14 +61,14 @@ export const insightsRouter = createTRPCRouter({
     // Uitbehandelde patiënten leveren geen signalen meer. Het fragment matcht
     // alleen LOPENDE markeringen binnen de scope van deze lezer; een
     // gereactiveerde patiënt komt dus vanzelf weer terug.
-    const nietUitbehandeld = { careStatuses: { none: careScopeWhereForRead(ctx.user) } }
+    const nogInBehandeling = nietUitbehandeld(ctx.user)
 
     const patientIds =
       ctx.user.role === 'ADMIN'
         ? undefined
         : (
             await ctx.prisma.patientTherapist.findMany({
-              where: { therapistId: ctx.user.id, ...ACTIVE_LINK, patient: nietUitbehandeld },
+              where: { therapistId: ctx.user.id, ...ACTIVE_LINK, patient: nogInBehandeling },
               select: { patientId: true },
             })
           ).map((r) => r.patientId)
@@ -88,7 +88,7 @@ export const insightsRouter = createTRPCRouter({
           // Ook nodig op de ADMIN-tak: daar blijft `patientIds` undefined, dus
           // zonder dit zag een admin de signalen van een patiënt die hij zelf
           // net had uitbehandeld. Eigen sleutel, geen tweede `OR`.
-          patient: nietUitbehandeld,
+          patient: nogInBehandeling,
         },
         orderBy: [{ urgency: 'asc' }, { createdAt: 'desc' }],
         include: {
@@ -102,7 +102,7 @@ export const insightsRouter = createTRPCRouter({
           enabled: true,
           patientObjection: false,
           ...(patientIds ? { patientId: { in: patientIds } } : {}),
-          patient: nietUitbehandeld,
+          patient: nogInBehandeling,
         },
         include: { patient: { select: { id: true, name: true, email: true } } },
       }),
