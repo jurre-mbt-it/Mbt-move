@@ -53,21 +53,35 @@ async function main() {
   console.log(`Te verwijderen: ${target.email} (${target.role}) "${target.name ?? ''}"`)
   console.log(`Eigenaarschap gaat naar: ${reassignTo.email}`)
 
-  const [ex, pr, ws, ec, ia, pa] = await Promise.all([
+  const [ex, pr, ws, ec, ia, pa, cs, rt, rc] = await Promise.all([
     prisma.exercise.count({ where: { createdById: target.id } }),
     prisma.program.count({ where: { creatorId: target.id } }),
     prisma.weekSchedule.count({ where: { creatorId: target.id } }),
     prisma.exerciseCollection.count({ where: { therapistId: target.id } }),
     prisma.insightAction.count({ where: { therapistId: target.id } }),
     prisma.patientAssessment.count({ where: { therapistId: target.id } }),
+    // Deze drie hangen aan verplichte relaties zonder onDelete, dus Postgres
+    // staat op RESTRICT en blokkeert de delete. Eén patiënt ooit gearchiveerd
+    // of één criterium ooit afgevinkt is genoeg. De gdpr-cleanup-cron doet een
+    // kale user.delete in een try/catch per gebruiker, dus die foutmelding
+    // verdwijnt stil in de logs en een AVG-verzoek blijft eeuwig hangen.
+    //
+    // reactivatedById (PatientCareStatus) en closedById (PatientRehabTracker)
+    // staan wel op SET NULL en hoeven hier dus niet.
+    prisma.patientCareStatus.count({ where: { dischargedById: target.id } }),
+    prisma.patientRehabTracker.count({ where: { activatedById: target.id } }),
+    prisma.rehabCriterionStatus.count({ where: { updatedById: target.id } }),
   ])
   console.log('\nOver te zetten:')
-  console.log(`  exercises:            ${ex}`)
-  console.log(`  programs:             ${pr}`)
-  console.log(`  week_schedules:       ${ws}`)
-  console.log(`  exercise_collections: ${ec}`)
-  console.log(`  insight_actions:      ${ia}`)
-  console.log(`  patient_assessments:  ${pa}`)
+  console.log(`  exercises:                ${ex}`)
+  console.log(`  programs:                 ${pr}`)
+  console.log(`  week_schedules:           ${ws}`)
+  console.log(`  exercise_collections:     ${ec}`)
+  console.log(`  insight_actions:          ${ia}`)
+  console.log(`  patient_assessments:      ${pa}`)
+  console.log(`  patient_care_status:      ${cs}`)
+  console.log(`  patient_rehab_trackers:   ${rt}`)
+  console.log(`  rehab_criterion_status:   ${rc}`)
 
   if (PREVIEW) {
     console.log('\n[PREVIEW] niets veranderd. Run zonder PREVIEW=1 om door te zetten.')
@@ -82,6 +96,11 @@ async function main() {
     prisma.exerciseCollection.updateMany({ where: { therapistId: target.id }, data: { therapistId: reassignTo.id } }),
     prisma.insightAction.updateMany({ where: { therapistId: target.id }, data: { therapistId: reassignTo.id } }),
     prisma.patientAssessment.updateMany({ where: { therapistId: target.id }, data: { therapistId: reassignTo.id } }),
+    // RESTRICT-relaties: zonder deze drie faalt de delete hieronder met een
+    // foreign-key-fout. Zie de toelichting bij de counts hierboven.
+    prisma.patientCareStatus.updateMany({ where: { dischargedById: target.id }, data: { dischargedById: reassignTo.id } }),
+    prisma.patientRehabTracker.updateMany({ where: { activatedById: target.id }, data: { activatedById: reassignTo.id } }),
+    prisma.rehabCriterionStatus.updateMany({ where: { updatedById: target.id }, data: { updatedById: reassignTo.id } }),
     prisma.user.delete({ where: { id: target.id } }),
   ])
   console.log('Klaar.')

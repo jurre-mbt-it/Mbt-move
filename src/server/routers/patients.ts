@@ -1665,12 +1665,24 @@ export const patientsRouter = createTRPCRouter({
         // bestaan in productie doordat de invite-paden de markering opheffen
         // zonder programma's terug te zetten; zonder deze opruiming blijven ze
         // voor altijd op "wacht op heractivering" staan.
+        //
+        // `endDate: null` hoort er expliciet bij, want Prisma's `lt` matcht geen
+        // NULL en "Heropenen" zet endDate juist op null. Dat was het gat: een
+        // heropend programma ontsnapte hier én aan de findMany hierboven (die
+        // eist COMPLETED), hield zijn vlag voor altijd, en herrees twee cycli
+        // later als de therapeut het zelf had afgerond. `programs.save` zet de
+        // vlag inmiddels al bij het heropenen uit; dit is het vangnet voor de
+        // rijen die daar in productie al doorheen zijn.
+        //
+        // De voorwaarde staat in AND en niet los als `OR`, omdat programmaScope
+        // voor een therapeut zelf een `OR` teruggeeft. Twee OR-sleutels in
+        // hetzelfde object overschrijven elkaar stil.
         await tx.program.updateMany({
           where: {
             patientId: input.id,
             closedByDischarge: true,
-            endDate: { lt: rij.dischargedAt },
             ...programmaScope(scope, ctx.user.id),
+            AND: [{ OR: [{ endDate: { lt: rij.dischargedAt } }, { endDate: null }] }],
           },
           data: { closedByDischarge: false },
         })

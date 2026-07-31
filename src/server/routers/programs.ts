@@ -331,6 +331,20 @@ export const programsRouter = createTRPCRouter({
       }
 
       const updateData: Record<string, unknown> = { ...data }
+      // `closedByDischarge` betekent "automatisch meegesloten toen de patiënt op
+      // inactief ging". Zodra iemand het programma handmatig uit COMPLETED haalt
+      // (de knop "Heropenen" op de patiëntpagina) is dat niet meer waar, dus gaat
+      // de vlag mee uit.
+      //
+      // Zonder deze reset blijft hij voor altijd staan op een ACTIEF programma:
+      // patients.reactivate is de enige plek die hem ooit op false zet, en die
+      // eist status COMPLETED. Bij een vólgende afsluitcyclus rondt de therapeut
+      // dat programma zelf af, en dan matcht het alsnog op vlag + COMPLETED +
+      // endDate. Het herrijst dan op ACTIVE met een opgeschoven startdatum en de
+      // patiënt ziet zijn schema opnieuw beginnen.
+      if (data.status !== undefined && data.status !== 'COMPLETED' && existing.closedByDischarge) {
+        updateData.closedByDischarge = false
+      }
       if (startDate !== undefined) updateData.startDate = startDate ? new Date(startDate) : null
       if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null
       if (cardioParams !== undefined) updateData.cardioParams = cardioParams

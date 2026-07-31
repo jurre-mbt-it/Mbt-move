@@ -97,7 +97,18 @@ export async function GET(req: NextRequest) {
       results.push({ email: u.email, ok: true })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      console.error('[cron/gdpr-cleanup] delete failed for', u.email, msg)
+      // De verwijdering is hier definitief mislukt en de gebruiker blijft dus
+      // staan met een lopend AVG-verzoek. Het antwoord van deze route ziet
+      // niemand (cron), dus dit logregel is het enige spoor: prefix + id +
+      // reden, zodat je er in Vercel op kunt zoeken.
+      //
+      // Meest voorkomende oorzaak is een RESTRICT-foreign-key op auteurschap
+      // (programma's, oefeningen, care-status, rehab). scripts/delete-user.ts
+      // zet die relaties eerst over naar de admin en ruimt zo'n blijver op.
+      console.error(
+        '[cron/gdpr-cleanup] delete failed',
+        JSON.stringify({ userId: u.id, email: u.email, reason: msg }),
+      )
       results.push({ email: u.email, ok: false, error: msg })
     }
   }
