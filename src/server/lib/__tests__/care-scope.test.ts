@@ -8,6 +8,7 @@ import {
   nietUitbehandeld,
   welUitbehandeld,
   uitbehandeldDoorIedereen,
+  behandelaarsDieDoorbehandelen,
 } from '../care-scope'
 
 const therapeut = { id: 't1', role: 'THERAPIST' as const, practiceId: 'p1' }
@@ -226,5 +227,57 @@ describe('uitbehandeldDoorIedereen', () => {
     expect(uitbehandeldDoorIedereen([], [praktijkMarkering])).toBe(false)
     expect(uitbehandeldDoorIedereen([], [praktijkMarkering, coachMarkering])).toBe(false)
     expect(uitbehandeldDoorIedereen([], [])).toBe(false)
+  })
+})
+
+describe('behandelaarsDieDoorbehandelen', () => {
+  const praktijkMarkering = { practiceId: 'p1', coachId: null }
+  const coachMarkering = { practiceId: null, coachId: 'c1' }
+
+  it('laat de behandelaar weg die zelf heeft afgesloten', () => {
+    // Het scenario dat dit filter bestaat: coach C sloot de atleet af,
+    // therapeut T behandelt door en pain_red_flag vuurt. T hoort bericht te
+    // krijgen, C niet. Zonder dit filter kreeg C een kritieke e-mail met de
+    // naam van zijn ex-patiënt erin, over een dossier dat hij dicht heeft gezet.
+    expect(behandelaarsDieDoorbehandelen([therapeut, coach], [coachMarkering])).toEqual([
+      therapeut,
+    ])
+    expect(behandelaarsDieDoorbehandelen([therapeut, coach], [praktijkMarkering])).toEqual([
+      coach,
+    ])
+  })
+
+  it('houdt iedereen als er geen markeringen zijn', () => {
+    expect(behandelaarsDieDoorbehandelen([therapeut, coach], [])).toEqual([therapeut, coach])
+  })
+
+  it('houdt niemand over als beide scopes hebben afgesloten', () => {
+    // Dan wordt de patiënt hierboven al overgeslagen, dus dit hoort nooit tot
+    // een lege dispatch te leiden. De twee functies moeten het wel eens zijn.
+    const markeringen = [coachMarkering, praktijkMarkering]
+    expect(behandelaarsDieDoorbehandelen([therapeut, coach], markeringen)).toEqual([])
+    expect(uitbehandeldDoorIedereen([therapeut, coach], markeringen)).toBe(true)
+  })
+
+  it('houdt een behandelaar zonder eigen scope erbij', () => {
+    // Wie zelf geen markering kán zetten, kan ook niets hebben afgesloten.
+    expect(behandelaarsDieDoorbehandelen([losseTherapeut], [praktijkMarkering])).toEqual([
+      losseTherapeut,
+    ])
+  })
+
+  it('houdt een therapeut uit een andere praktijk erbij', () => {
+    const anderePraktijk = { id: 't9', role: 'THERAPIST' as const, practiceId: 'p2' }
+    expect(behandelaarsDieDoorbehandelen([anderePraktijk], [praktijkMarkering])).toEqual([
+      anderePraktijk,
+    ])
+  })
+
+  it('bewaart de volgorde en muteert de invoer niet', () => {
+    // De caller mapt het resultaat direct naar ids voor de dispatch.
+    const invoer = [therapeut, coach, admin]
+    const uit = behandelaarsDieDoorbehandelen(invoer, [coachMarkering])
+    expect(uit).toEqual([therapeut, admin])
+    expect(invoer).toHaveLength(3)
   })
 })

@@ -202,11 +202,37 @@ export function uitbehandeldDoorIedereen(
 ): boolean {
   if (markeringen.length === 0) return false
   if (behandelaars.length === 0) return false
-  return behandelaars.every((behandelaar) => {
-    const key = careScopeKeyOrNull(behandelaar)
-    if (!key) return false
-    return markeringen.some((m) =>
-      key.coachId !== null ? m.coachId === key.coachId : m.practiceId === key.practiceId,
-    )
-  })
+  return behandelaarsDieDoorbehandelen(behandelaars, markeringen).length === 0
+}
+
+/**
+ * Welke van deze behandelaars zijn NIET klaar met de patiënt?
+ *
+ * Los van {@link uitbehandeldDoorIedereen} nodig, want die twee vragen zijn niet
+ * hetzelfde. Blijft er één behandelaar over, dan wordt de patiënt niet
+ * overgeslagen, maar dat betekent niet dat iedereen bericht hoort te krijgen:
+ * wie zelf heeft afgesloten, moet geen melding meer krijgen over een dossier dat
+ * hij dicht heeft gezet. Bij een kritiek signaal is dat een e-mail met de naam
+ * van de patiënt erin, die linkt naar een overzicht waar het item voor hem juist
+ * is weggefilterd.
+ *
+ * Behoudt de volgorde en het type van de invoer, zodat de caller er direct ids
+ * uit kan halen. Zelfde vergelijking als hierboven; een behandelaar zonder eigen
+ * scope kan niets hebben afgesloten en blijft dus in de lijst.
+ */
+export function behandelaarsDieDoorbehandelen<T extends ScopeUser>(
+  behandelaars: T[],
+  markeringen: LopendeMarkering[],
+): T[] {
+  if (markeringen.length === 0) return [...behandelaars]
+  return behandelaars.filter((behandelaar) => !heeftAfgesloten(behandelaar, markeringen))
+}
+
+/** Komt de scope van deze behandelaar voor in de lopende markeringen? */
+function heeftAfgesloten(behandelaar: ScopeUser, markeringen: LopendeMarkering[]): boolean {
+  const key = careScopeKeyOrNull(behandelaar)
+  if (!key) return false
+  return markeringen.some((m) =>
+    key.coachId !== null ? m.coachId === key.coachId : m.practiceId === key.practiceId,
+  )
 }
