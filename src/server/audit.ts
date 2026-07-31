@@ -49,6 +49,13 @@ export type AuditEvent =
   | 'REHAB_TRAJECT_STARTED'
   | 'REHAB_TRAJECT_CLOSED'
   | 'REHAB_TRAJECT_REOPENED'
+  // Uitbehandeld zetten en terughalen. Alleen de reden-enum gaat mee in de
+  // metadata; de vrije toelichting staat op PatientCareStatus.note, want dat is
+  // medische vrije tekst. Sluit het archiveren ook een rehab-traject af, dan
+  // komt er náást deze regel een eigen REHAB_TRAJECT_CLOSED bij: anders is
+  // achteraf niet te zien of de therapeut dat traject zelf sloot.
+  | 'PATIENT_DISCHARGED'
+  | 'PATIENT_REACTIVATED'
   // GDPR
   | 'DATA_EXPORTED'
   | 'ACCOUNT_DELETION_REQUESTED'

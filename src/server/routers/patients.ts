@@ -9,8 +9,11 @@ import {
   mfaCoachStaffProcedure,
   mfaTherapistProcedure,
   invalidateUserCache,
+  type Context,
 } from '@/server/trpc'
 import { hasPatientAccess, practiceScope } from '@/server/lib/patient-access'
+import { careScopeKey, careScopeWhere } from '@/server/lib/care-scope'
+import { findOpenTracker } from '@/lib/rehab-data'
 import { auditLog } from '@/server/audit'
 import { amsMidnight, dateKey } from '@/lib/week-dates'
 import { deriveTopSet, estimateOneRepMax } from '@/lib/one-rep-max'
@@ -24,6 +27,80 @@ const createId = () => crypto.randomUUID()
 // eerdere bug nog steeds met deze tekst rondlopen terwijl de patient al
 // geaccepteerd heeft.
 const PENDING_INVITE_NOTE = 'Aangemaakt via invite, wacht op acceptatie'
+
+/**
+ * Vertaal een botsing op een unieke index (Prisma P2002) naar een CONFLICT met
+ * een melding waar de therapeut iets mee kan. Zonder deze vertaling komt de
+ * rauwe databasefout bij de client terecht en toont de app alleen een algemene
+ * "kon niet opslaan". Zelfde patroon als `alsConflict` in rehab.ts.
+ *
+ * Hier klappen de twee partiële indexen op patient_care_status
+ * (patient_care_status_one_per_practice en _one_per_coach). Prisma kent die
+ * niet, want `db push` negeert partiële indexen, dus een compound upsert kan
+ * niet en dit is read-then-write: twee therapeuten die tegelijk archiveren
+ * zien allebei "nog niet inactief" en de tweede insert botst.
+ */
+const alsConflict = (bericht: string) => (err: unknown): never => {
+  if (
+    err &&
+    typeof err === 'object' &&
+    'code' in err &&
+    (err as { code?: string }).code === 'P2002'
+  ) {
+    throw new TRPCError({ code: 'CONFLICT', message: bericht })
+  }
+  throw err
+}
+
+const AL_INACTIEF =
+  'Deze patiënt staat al op inactief. Ververs het scherm om de huidige status te zien.'
+
+/** Wat `closeOpenTrajectFor` van de tRPC-context nodig heeft. */
+type ArchiveerCtx = {
+  prisma: Context['prisma']
+  user: NonNullable<Context['user']>
+  req?: Context['req']
+}
+
+/**
+ * Sluit het lopende rehab-traject van een patiënt mee af bij het archiveren.
+ *
+ * Zet dezelfde velden als `rehab.closeTraject`, maar met `outcome: 'UNKNOWN'`:
+ * dat de behandeling stopt zegt niets over hoe de revalidatie afliep, en de
+ * therapeut kiest die uitkomst in dit formulier niet. `outcomeNote` blijft
+ * ongemoeid; er is hier geen toelichting om weg te schrijven en overschrijven
+ * zou alleen data kunnen wissen.
+ *
+ * Loopt er geen traject, dan gebeurt er niets. Dat is geen fout: het vinkje in
+ * het archiveer-formulier is een wens, geen belofte dat er een traject is.
+ *
+ * De auditregel staat bewust náást PATIENT_DISCHARGED. Twee handelingen, twee
+ * regels, anders is achteraf niet te zien of de therapeut dit traject zelf
+ * sloot of dat het meeliep met het archiveren.
+ */
+async function closeOpenTrajectFor(ctx: ArchiveerCtx, patientId: string) {
+  const tracker = await findOpenTracker(ctx.prisma, patientId)
+  if (!tracker) return
+  await ctx.prisma.patientRehabTracker.update({
+    where: { id: tracker.id },
+    data: {
+      deactivatedAt: new Date(),
+      closedById: ctx.user.id,
+      outcome: 'UNKNOWN',
+    },
+  })
+  await auditLog({
+    event: 'REHAB_TRAJECT_CLOSED',
+    userId: ctx.user.id,
+    actorEmail: ctx.user.email,
+    resource: 'PatientRehabTracker',
+    resourceId: tracker.id,
+    // `route` wijst naar setInactive, niet naar rehab.closeTraject: zo is in
+    // het log te zien dat dit een neveneffect was.
+    metadata: { route: 'patients.setInactive', outcome: 'UNKNOWN' },
+    req: ctx.req,
+  })
+}
 
 /**
  * Toegang tot een patient = directe PatientTherapist-koppeling, OF dezelfde
@@ -1278,6 +1355,151 @@ export const patientsRouter = createTRPCRouter({
         where: { patientId: input.id, creatorId: ctx.user.id },
       })
 
+      return { success: true }
+    }),
+
+  /**
+   * Zet een patiënt op inactief (uitbehandeld).
+   *
+   * Dit is géén verwijdering en géén toegangsintrekking: de patiënt houdt zijn
+   * account, zijn app en zijn dossier. Hij verdwijnt alleen uit de werklijsten,
+   * de signalen en de herinneringen van deze praktijk of deze coach. De
+   * markering is daarom scope-gebonden (zie care-scope.ts): dezelfde persoon
+   * kan bij een coach uitbehandeld zijn en bij een praktijk nog lopen.
+   */
+  setInactive: coachStaffProcedure
+    .input(z.object({
+      id: z.string(),
+      reason: z.enum(['COMPLETED', 'DISCONTINUED', 'TRANSFERRED', 'NO_SHOW', 'OTHER']),
+      note: z.string().max(2000).optional(),
+      /** Programma's die mee afgesloten worden. Leeg = geen enkel programma. */
+      closeProgramIds: z.array(z.string()).default([]),
+      /** Sluit het lopende rehab-traject mee af, met uitkomst UNKNOWN. */
+      closeTraject: z.boolean().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.id))) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+      // hasPatientAccess filtert NIET op de rol van het doel en geeft true voor
+      // jezelf. Zonder deze check kan een therapeut een collega, een admin of
+      // zichzelf archiveren, en dat faalt stil omdat de lijsten op rol filteren.
+      // Zelfde vorm als patients.update hierboven.
+      const doel = await ctx.prisma.user.findFirst({
+        where: { id: input.id, role: { in: ['PATIENT', 'ATHLETE'] } },
+        select: { id: true },
+      })
+      if (!doel) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Alleen patiënten en atleten' })
+      }
+
+      const scope = careScopeKey(ctx.user)
+      const nu = new Date()
+
+      await ctx.prisma.$transaction(async (tx) => {
+        await tx.patientCareStatus
+          .create({
+            data: {
+              patientId: input.id,
+              practiceId: scope.practiceId,
+              coachId: scope.coachId,
+              dischargedAt: nu,
+              dischargedById: ctx.user.id,
+              reason: input.reason,
+              // Vrije toelichting hoort hier, op de rij achter RLS, en niet in
+              // de audit-metadata (audit.ts:7-8 verbiedt PII daar).
+              note: input.note ?? null,
+            },
+          })
+          .catch(alsConflict(AL_INACTIEF))
+        if (input.closeProgramIds.length > 0) {
+          // `patientId` in de where houdt de ids gebonden aan deze patiënt, en
+          // `closedByDischarge` markeert wat bij heractiveren terug mag.
+          await tx.program.updateMany({
+            where: { id: { in: input.closeProgramIds }, patientId: input.id, status: 'ACTIVE' },
+            data: { status: 'COMPLETED', endDate: nu, closedByDischarge: true },
+          })
+        }
+        // Open insights sluiten, anders blijven ze tot hun expiresAt in het
+        // aandacht-overzicht staan.
+        await tx.insight.updateMany({
+          where: { patientId: input.id, status: 'OPEN' },
+          data: { status: 'DISMISSED', statusChangedById: ctx.user.id, statusChangedAt: nu },
+        })
+      })
+
+      if (input.closeTraject) {
+        await closeOpenTrajectFor(ctx, input.id)
+      }
+
+      await auditLog({
+        event: 'PATIENT_DISCHARGED',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        resource: 'User',
+        resourceId: input.id,
+        metadata: { route: 'patients.setInactive', reason: input.reason },
+        req: ctx.req,
+      })
+      return { success: true }
+    }),
+
+  /**
+   * Haal een patiënt terug in de actieve lijst.
+   *
+   * Alleen binnen de eigen scope: een praktijk haalt geen coach-markering weg
+   * en andersom. Programma's die bij het archiveren zijn dichtgezet komen mee
+   * terug, met hun startdatum opgeschoven over de onderbreking heen.
+   */
+  reactivate: coachStaffProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!(await hasPatientAccess(ctx.prisma, ctx.user, input.id))) {
+        throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+      const scope = careScopeWhere(ctx.user)
+      const rij = await ctx.prisma.patientCareStatus.findFirst({
+        where: { patientId: input.id, ...scope },
+      })
+      if (!rij) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Deze patiënt is niet inactief' })
+      }
+
+      const onderbreking = Date.now() - rij.dischargedAt.getTime()
+
+      await ctx.prisma.$transaction(async (tx) => {
+        await tx.patientCareStatus.delete({ where: { id: rij.id } })
+        // Alleen programma's die door het archiveren dichtgingen. Wat de
+        // therapeut zelf afrondde blijft COMPLETED.
+        const gesloten = await tx.program.findMany({
+          where: { patientId: input.id, closedByDischarge: true },
+          select: { id: true, startDate: true },
+        })
+        for (const p of gesloten) {
+          await tx.program.update({
+            where: { id: p.id },
+            data: {
+              status: 'ACTIVE',
+              endDate: null,
+              closedByDischarge: false,
+              // Schuif startDate op met de duur van de onderbreking. Zonder dat
+              // springt computeCurrentWeekDay (patient.ts) meteen naar de
+              // laatste week: die rekent kaal in dagen sinds startDate.
+              startDate: p.startDate ? new Date(p.startDate.getTime() + onderbreking) : null,
+            },
+          })
+        }
+      })
+
+      await auditLog({
+        event: 'PATIENT_REACTIVATED',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        resource: 'User',
+        resourceId: input.id,
+        metadata: { route: 'patients.reactivate' },
+        req: ctx.req,
+      })
       return { success: true }
     }),
 
