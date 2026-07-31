@@ -1,4 +1,5 @@
 import { TRPCError } from '@trpc/server'
+import type { Prisma } from '@prisma/client'
 
 /**
  * Scope-sleutel voor PatientCareStatus. Een uitbehandel-markering geldt binnen
@@ -160,6 +161,31 @@ export function careScopeKeyOrNull(user: ScopeUser): CareScopeKey | null {
     return user.practiceId ? { practiceId: user.practiceId, coachId: null } : null
   }
   return null
+}
+
+/**
+ * Welke programma's van deze patiënt horen bij de behandelaar die archiveert,
+ * heractiveert of opnieuw uitnodigt?
+ *
+ * De uitbehandel-markering is scope-gebonden, dus de bijwerkingen moeten dat
+ * ook zijn. Zonder dit predicaat zet een therapeut ook de programma's van een
+ * meekijkende coach dicht, en haalt een coach die van de praktijk terug.
+ *
+ * Zelfde vorm als `programs.list`: een coach ziet wat hij zelf maakte
+ * (coach-programma's hebben altijd `practiceId = null`), een therapeut of admin
+ * ziet daarnaast alles van zijn praktijk.
+ *
+ * Gebruik dit op ALLE paden die `closedByDischarge` aanraken. Alleen bij het
+ * heropenen scopen is erger dan niets doen: dan kan een therapeut een
+ * coach-programma dichtzetten dat daarna door niemand meer automatisch
+ * terugkomt.
+ *
+ * Staat hier en niet in patients.ts omdat `care-reactivate.ts` hem ook nodig
+ * heeft; een import uit die router zou een cirkel opleveren.
+ */
+export function programmaScope(scope: CareScopeKey, userId: string): Prisma.ProgramWhereInput {
+  if (scope.coachId !== null) return { creatorId: scope.coachId }
+  return { OR: [{ practiceId: scope.practiceId }, { creatorId: userId }] }
 }
 
 /** Vorm van een lopende markering zoals de cron-jobs hem uitlezen. */

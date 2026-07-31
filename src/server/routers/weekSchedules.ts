@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { createTRPCRouter, coachStaffProcedure, protectedProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
 import { assertPlanAccess } from '@/server/lib/plan-access'
-import { practiceScope, inSamePractice } from '@/server/lib/patient-access'
+import { inSamePractice } from '@/server/lib/patient-access'
 import { planningCutoffVoorPatient } from '@/server/lib/planning-cutoff'
 import { assertNotDischarged } from '@/server/lib/care-guard'
 import { mondayKey, mondayKeyOf, addDaysKey, amsMidnight, weeksBetween, isDateKey } from '@/lib/week-dates'
@@ -71,9 +71,11 @@ async function assertPatientLink(
   }
 }
 
+type WeekUser = { id: string; role: string; practiceId: string | null }
+
 /**
  * Welke week-schema's mag deze gebruiker bewerken? Eigen schema's, plus die van
- * praktijk-collega's; een admin mag alles.
+ * praktijk-collega's.
  *
  * Week-schedules zijn praktijk-breed leesbaar (AGENTS.md), maar de mutaties
  * hieronder zochten op `creatorId: ctx.user.id`. Daardoor kon een collega een
@@ -81,17 +83,106 @@ async function assertPatientLink(
  * `setDayProgram`/`setWeekMeta` maakten stil een tweede week-rij op dezelfde
  * maandag aan in plaats van de bestaande bij te werken.
  *
- * `practiceScope` bindt de praktijk-tak aan de therapeut-rol; patiënten en
- * atleten delen de practiceId van hun therapeut. Geef het resultaat door als
- * spread in een `where` ZONDER eigen OR-sleutel, anders wist de een de ander.
+ * ADMIN krijgt hier bewust GEEN lege where. Dat zou cross-tenant schrijfrechten
+ * betekenen, en die had deze route nooit: vóór de verruiming zocht ook een
+ * admin op zijn eigen `creatorId`. Hij krijgt dezelfde praktijk-tak als een
+ * therapeut, net als in `careScopeKey`: een admin beheert vanuit zijn eigen
+ * praktijk. De rol-binding is expliciet, want patiënten en atleten delen de
+ * practiceId van hun therapeut.
+ *
+ * Geef het resultaat door als spread in een `where` ZONDER eigen OR-sleutel,
+ * anders wist de een de ander.
  */
-function bewerkbareWeken(user: {
-  id: string
-  role: string
-  practiceId: string | null
-}): Prisma.WeekScheduleWhereInput {
-  if (user.role === 'ADMIN') return {}
-  return { OR: [{ creatorId: user.id }, ...practiceScope(user)] }
+function bewerkbareWeken(user: WeekUser): Prisma.WeekScheduleWhereInput {
+  const praktijkTak =
+    (user.role === 'THERAPIST' || user.role === 'ADMIN') && user.practiceId
+      ? [{ practiceId: user.practiceId }]
+      : []
+  return { OR: [{ creatorId: user.id }, ...praktijkTak] }
+}
+
+/**
+ * Zoek de week-rij van een patiënt op de maandag van `startDate`, met een
+ * terugval op `weekNumber` voor clients die geen datum meesturen.
+ *
+ * `weekNumber` is GEEN sleutel: er is geen unique-constraint, de planner zet 'm
+ * niet op, en in productie is hij vrijwel altijd 1 (één patiënt heeft drie
+ * weken met nummer 1, waarvan twee op dezelfde maandag). `duplicateWeek` ankert
+ * daarom al op datum, en deze helper doet hetzelfde. Dat weegt zwaarder sinds
+ * de bewerk-scope praktijk-breed is: de kandidatenverzameling was eerst beperkt
+ * tot de eigen rijen, nu tot die van de hele praktijk.
+ *
+ * Zonder datum blijft het een gok. Dan minstens deterministisch (oudste
+ * startDate eerst, dan de oudste rij) en zonder sjablonen ertussen, zodat
+ * dezelfde aanroep niet vandaag de ene en morgen de andere rij pakt. Dat is een
+ * pleister, geen oplossing: de echte fix is de client een datum laten sturen.
+ */
+async function vindWeek(
+  prisma: Pick<PrismaClient, 'weekSchedule'>,
+  user: WeekUser,
+  args: { patientId: string; weekNumber: number; startDate?: string },
+): Promise<{ id: string } | null> {
+  const scope = bewerkbareWeken(user)
+  const maandag = args.startDate ? mondagVan(args.startDate) : null
+  if (maandag) {
+    const kandidaten = await prisma.weekSchedule.findMany({
+      where: {
+        patientId: args.patientId,
+        isTemplate: false,
+        startDate: { not: null },
+        ...scope,
+      },
+      select: { id: true, startDate: true },
+      orderBy: { createdAt: 'asc' },
+    })
+    return kandidaten.find((w) => mondayKeyOf(w.startDate!) === maandag) ?? null
+  }
+  return prisma.weekSchedule.findFirst({
+    where: {
+      patientId: args.patientId,
+      weekNumber: args.weekNumber,
+      isTemplate: false,
+      ...scope,
+    },
+    select: { id: true },
+    orderBy: [{ startDate: 'asc' }, { createdAt: 'asc' }],
+  })
+}
+
+/** Maandag-sleutel van een ISO-datum of -timestamp; null als hij onbruikbaar is. */
+function mondagVan(iso: string): string | null {
+  if (isDateKey(iso)) return mondayKey(iso)
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? null : mondayKeyOf(d)
+}
+
+/**
+ * Mag deze gebruiker deze bestaande week-rij aanraken?
+ *
+ * Sjabloon-rijen houden de oude, strengere regel: alleen de maker (of een
+ * admin). De weken achter een plan-sjabloon zijn gewone WeekSchedule-rijen met
+ * `isTemplate: true`, en de praktijk-verruiming zou daarmee
+ * `planTemplates.assertCanEdit` omzeilen. Verwijderen cascadeert bovendien via
+ * WeekScheduleDay naar items en oefeningen.
+ *
+ * Patiënt-weken lopen langs `assertPatientLink`, zodat de praktijk-tak niet
+ * verder reikt dan de patiënten waar deze behandelaar bij mag.
+ */
+async function assertMagWeekBewerken(
+  prisma: PrismaClient,
+  user: WeekUser,
+  week: { creatorId: string; isTemplate: boolean; patientId: string | null },
+) {
+  if (week.isTemplate) {
+    if (week.creatorId !== user.id && user.role !== 'ADMIN') {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Dit sjabloon is van een collega. Beheer het via het plan zelf.',
+      })
+    }
+    return
+  }
+  await assertPatientLink(prisma, user, week.patientId)
 }
 
 const DayInput = z.object({
@@ -293,17 +384,13 @@ export const weekSchedulesRouter = createTRPCRouter({
       // op deze maandag, geef die dan terug i.p.v. een duplicaat te maken.
       if (patientId && startDate && !input.isTemplate) {
         const monday = mondayKeyOf(new Date(startDate))
-        const isAdmin = ctx.user.role === 'ADMIN'
-        const scopeFilter = isAdmin
-          ? {}
-          : {
-              OR: [
-                { creatorId: ctx.user.id },
-                ...practiceScope(ctx.user),
-              ],
-            }
         const bestaande = await ctx.prisma.weekSchedule.findMany({
-          where: { patientId, isTemplate: false, startDate: { not: null }, ...scopeFilter },
+          where: {
+            patientId,
+            isTemplate: false,
+            startDate: { not: null },
+            ...bewerkbareWeken(ctx.user),
+          },
           include: {
             days: { include: { program: { select: { id: true, name: true } } }, orderBy: { dayOfWeek: 'asc' } },
           },
@@ -354,16 +441,15 @@ export const weekSchedulesRouter = createTRPCRouter({
       // gevaarlijk wordt.
       const existing = await ctx.prisma.weekSchedule.findFirst({
         where: { id, ...bewerkbareWeken(ctx.user) },
-        select: { id: true, patientId: true },
+        select: { id: true, patientId: true, isTemplate: true, creatorId: true },
       })
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
+      // De bestaande rij: sjabloon = alleen de maker, patiënt-week = link-check.
+      // De praktijk-tak hierboven mag niet verder reiken dan de patiënten waar
+      // deze behandelaar bij mag, en niet over sjablonen van collega's.
+      await assertMagWeekBewerken(ctx.prisma, ctx.user, existing)
+      // En de DOELpatiënt, die een andere kan zijn dan de huidige.
       await assertPatientLink(ctx.prisma, ctx.user, patientId)
-      // Als de patient verandert, dubbel-check ook de huidige link (zou
-      // theoretisch al gecovered moeten zijn door ownership, maar
-      // defense-in-depth).
-      if (existing.patientId && existing.patientId !== patientId) {
-        await assertPatientLink(ctx.prisma, ctx.user, existing.patientId)
-      }
 
       // Legacy-API: de client kent alleen "één programma per dag" en weet niets
       // van items. Twee valkuilen, allebei erger dan ze lijken:
@@ -465,8 +551,12 @@ export const weekSchedulesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const existing = await ctx.prisma.weekSchedule.findFirst({
         where: { id: input.id, ...bewerkbareWeken(ctx.user) },
+        select: { id: true, patientId: true, isTemplate: true, creatorId: true },
       })
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
+      // Verwijderen cascadeert via WeekScheduleDay naar items en oefeningen, dus
+      // hier hoort dezelfde check als op save en niet alleen de scope-filter.
+      await assertMagWeekBewerken(ctx.prisma, ctx.user, existing)
       return ctx.prisma.weekSchedule.delete({ where: { id: input.id } })
     }),
 
@@ -481,6 +571,13 @@ export const weekSchedulesRouter = createTRPCRouter({
       dayOfWeek: z.number().int().min(0).max(6),
       programId: z.string().nullable(),
       weekNumber: z.number().int().min(1).default(1),
+      /**
+       * Maandag van de bedoelde week (ISO-datum of -timestamp). Optioneel voor
+       * bestaande clients, maar wel de enige betrouwbare sleutel: `weekNumber`
+       * heeft geen unique-constraint en is in productie vrijwel altijd 1. Zie
+       * `vindWeek` en de input-doc van `duplicateWeek`.
+       */
+      startDate: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
@@ -496,14 +593,15 @@ export const weekSchedulesRouter = createTRPCRouter({
         }
       }
 
-      const existing = await ctx.prisma.weekSchedule.findFirst({
-        where: {
-          patientId: input.patientId,
-          weekNumber: input.weekNumber,
-          ...bewerkbareWeken(ctx.user),
-        },
-        include: { days: true },
-      })
+      const maandag = input.startDate ? mondagVan(input.startDate) : null
+      const nieuweWeekStart = maandag ? amsMidnight(maandag) : null
+      const gevonden = await vindWeek(ctx.prisma, ctx.user, input)
+      const existing = gevonden
+        ? await ctx.prisma.weekSchedule.findUnique({
+            where: { id: gevonden.id },
+            include: { days: true },
+          })
+        : null
 
       if (!existing) {
         const patient = await ctx.prisma.user.findUnique({
@@ -518,7 +616,10 @@ export const weekSchedulesRouter = createTRPCRouter({
             creatorId: ctx.user.id,
             practiceId: ctx.user.practiceId ?? null,
             patientId: input.patientId,
-            startDate: new Date(),
+            // Met een meegestuurd anker landt de nieuwe week op de juiste
+            // kalenderrij, in dezelfde NL-middernacht-vorm als de rest. Zonder
+            // anker blijft het "vandaag", zoals het altijd al was.
+            startDate: nieuweWeekStart ?? new Date(),
             isTemplate: false,
             weekNumber: input.weekNumber,
             days: {
@@ -792,15 +893,19 @@ export const weekSchedulesRouter = createTRPCRouter({
       isDeload: z.boolean().optional(),
       targetLoad: z.number().int().min(0).max(10000).nullable().optional(),
       weekNote: z.string().max(2000).nullable().optional(),
-      // Maandag van de week waarop dit slaat — alleen gebruikt wanneer de
-      // week-rij nog niet bestaat. Zonder dit anker zou een fase op een
-      // toekomstige week met startDate=vandaag worden aangemaakt en op de
-      // verkeerde kalenderrij renderen.
+      // Maandag van de week waarop dit slaat. Zowel de web-planner als de
+      // iOS-app sturen dit mee, en het is ook de LOOKUP-sleutel: `weekNumber`
+      // heeft geen unique-constraint en is in productie vrijwel altijd 1, dus
+      // zoeken op nummer pakt bij meerdere weken een willekeurige naamgenoot.
+      // Zonder dit anker wordt de rij bovendien met startDate=vandaag
+      // aangemaakt en rendert een toekomstige fase op de verkeerde kalenderrij.
       startDate: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
       const { patientId, weekNumber, startDate, ...meta } = input
+      const maandag = startDate ? mondagVan(startDate) : null
+      const nieuweWeekStart = maandag ? amsMidnight(maandag) : null
       // Alleen de meegegeven velden bijwerken (undefined = ongemoeid laten).
       const data: Record<string, unknown> = {}
       if (meta.phaseType !== undefined) data.phaseType = meta.phaseType
@@ -808,9 +913,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       if (meta.targetLoad !== undefined) data.targetLoad = meta.targetLoad
       if (meta.weekNote !== undefined) data.weekNote = meta.weekNote
 
-      const existing = await ctx.prisma.weekSchedule.findFirst({
-        where: { patientId, weekNumber, ...bewerkbareWeken(ctx.user) },
-      })
+      const existing = await vindWeek(ctx.prisma, ctx.user, input)
       if (existing) {
         return ctx.prisma.weekSchedule.update({ where: { id: existing.id }, data })
       }
@@ -825,7 +928,10 @@ export const weekSchedulesRouter = createTRPCRouter({
           creatorId: ctx.user.id,
           practiceId: ctx.user.practiceId ?? null,
           patientId,
-          startDate: startDate ? new Date(startDate) : new Date(),
+          // NL-middernacht op de maandag van het anker, dezelfde vorm als de
+          // bestaande startDate-waarden. Een kale `new Date(startDate)` zou de
+          // rij op een tijdstip midden in de dag zetten.
+          startDate: nieuweWeekStart ?? new Date(),
           isTemplate: false,
           weekNumber,
           ...data,
@@ -843,16 +949,12 @@ export const weekSchedulesRouter = createTRPCRouter({
     .input(z.object({
       patientId: z.string(),
       weekNumber: z.number().int().min(1),
+      /** Maandag van de bedoelde week; zie `setDayProgram`. */
+      startDate: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
-      const existing = await ctx.prisma.weekSchedule.findFirst({
-        where: {
-          patientId: input.patientId,
-          weekNumber: input.weekNumber,
-          ...bewerkbareWeken(ctx.user),
-        },
-      })
+      const existing = await vindWeek(ctx.prisma, ctx.user, input)
       if (!existing) return { deleted: false }
       await ctx.prisma.weekSchedule.delete({ where: { id: existing.id } })
       return { deleted: true }

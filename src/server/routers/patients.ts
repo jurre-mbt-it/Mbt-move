@@ -16,8 +16,8 @@ import {
   careScopeWhere,
   careScopeWhereForRead,
   nietUitbehandeld,
+  programmaScope,
   welUitbehandeld,
-  type CareScopeKey,
 } from '@/server/lib/care-scope'
 import { hefUitbehandeldOp } from '@/server/lib/care-reactivate'
 import { werklijstAnd } from '@/server/lib/werklijst-where'
@@ -110,28 +110,6 @@ async function closeOpenTrajectFor(
     },
   })
   return tracker.id
-}
-
-/**
- * Welke programma's van deze patiënt horen bij de behandelaar die archiveert of
- * heractiveert?
- *
- * De uitbehandel-markering is scope-gebonden, dus de bijwerkingen moeten dat
- * ook zijn. Zonder dit predicaat zet een therapeut ook de programma's van een
- * meekijkende coach dicht, en haalt een coach die van de praktijk terug.
- *
- * Zelfde vorm als `programs.list`: een coach ziet wat hij zelf maakte
- * (coach-programma's hebben altijd `practiceId = null`), een therapeut of admin
- * ziet daarnaast alles van zijn praktijk.
- *
- * Gebruik dit op BEIDE paden. Alleen bij het heropenen scopen is erger dan
- * niets doen: dan kan een therapeut een coach-programma dichtzetten dat daarna
- * door niemand meer automatisch terugkomt. `closedByDischarge` blijft dan true
- * en het programma valt buiten ieders reopen-filter.
- */
-function programmaScope(scope: CareScopeKey, userId: string): Prisma.ProgramWhereInput {
-  if (scope.coachId !== null) return { creatorId: scope.coachId }
-  return { OR: [{ practiceId: scope.practiceId }, { creatorId: userId }] }
 }
 
 /**
@@ -1127,7 +1105,9 @@ export const patientsRouter = createTRPCRouter({
       const email = input.email.toLowerCase().trim()
       const therapist = await ctx.prisma.user.findUnique({
         where: { email },
-        select: { id: true, name: true, email: true, role: true },
+        // practiceId hoort erbij: de markering die hieronder opgeheven wordt is
+        // van de PRAKTIJK van de meekijker, niet van de uitnodigende coach.
+        select: { id: true, name: true, email: true, role: true, practiceId: true },
       })
       if (!therapist || therapist.role !== 'THERAPIST') {
         throw new TRPCError({
@@ -1147,20 +1127,32 @@ export const patientsRouter = createTRPCRouter({
         return { ok: true, alreadyLinked: true, status: existing.status }
       }
 
-      const relation = existing
-        ? await ctx.prisma.patientTherapist.update({
-            where: { id: existing.id },
-            data: { status: 'PENDING', isActive: true, requestedAt: new Date(), respondedAt: null },
-          })
-        : await ctx.prisma.patientTherapist.create({
-            data: {
-              therapistId: therapist.id,
-              patientId: input.patientId,
-              status: 'PENDING',
-              isActive: true,
-              requestedAt: new Date(),
-            },
-          })
+      // Koppeling terug tot leven én de markering opheffen in één transactie.
+      // Los van elkaar levert een gefaalde tweede stap precies de onzichtbare
+      // toestand op die dit moet wegnemen.
+      //
+      // De scope is die van de UITGENODIGDE therapeut: heeft zijn praktijk deze
+      // atleet afgesloten en zet de coach hem daarna als meekijker terug, dan
+      // hoort die markering weg. `doorId` blijft de coach, want die drukt op de
+      // knop.
+      const relation = await ctx.prisma.$transaction(async (tx) => {
+        const rij = existing
+          ? await tx.patientTherapist.update({
+              where: { id: existing.id },
+              data: { status: 'PENDING', isActive: true, requestedAt: new Date(), respondedAt: null },
+            })
+          : await tx.patientTherapist.create({
+              data: {
+                therapistId: therapist.id,
+                patientId: input.patientId,
+                status: 'PENDING',
+                isActive: true,
+                requestedAt: new Date(),
+              },
+            })
+        await hefUitbehandeldOp(tx, therapist, input.patientId, ctx.user.id)
+        return rij
+      })
 
       await auditLog({
         event: 'CO_MONITOR_REQUESTED',
@@ -1352,25 +1344,28 @@ export const patientsRouter = createTRPCRouter({
       // Link therapist ↔ patient (only for PATIENT/ATHLETE). Status = PENDING
       // zodat de patiënt zelf moet bevestigen voordat de therapeut data inziet.
       if (role === 'PATIENT' || role === 'ATHLETE') {
-        await ctx.prisma.patientTherapist.upsert({
-          where: {
-            therapistId_patientId: {
+        // Koppeling activeren en de markering opheffen horen bij elkaar: samen
+        // in één transactie, anders zet een gefaalde tweede stap de koppeling
+        // terug op actief terwijl de patiënt in geen enkele lijst verschijnt,
+        // zonder foutmelding.
+        await ctx.prisma.$transaction(async (tx) => {
+          await tx.patientTherapist.upsert({
+            where: {
+              therapistId_patientId: {
+                therapistId: ctx.user.id,
+                patientId: patient.id,
+              },
+            },
+            update: { isActive: true },
+            create: {
               therapistId: ctx.user.id,
               patientId: patient.id,
+              status: 'PENDING',
+              requestedAt: new Date(),
             },
-          },
-          update: { isActive: true },
-          create: {
-            therapistId: ctx.user.id,
-            patientId: patient.id,
-            status: 'PENDING',
-            requestedAt: new Date(),
-          },
+          })
+          await hefUitbehandeldOp(tx, ctx.user, patient.id)
         })
-        // Opnieuw uitnodigen betekent weer in behandeling. Zonder dit zet de
-        // regel hierboven de koppeling terug op actief terwijl de patiënt in
-        // geen enkele lijst verschijnt, zonder foutmelding.
-        await hefUitbehandeldOp(ctx.prisma, ctx.user, patient.id)
       }
 
       return { success: true, resent: !!resend, patientId: patient.id }
@@ -1416,6 +1411,8 @@ export const patientsRouter = createTRPCRouter({
 
       // Opnieuw uitnodigen betekent weer in behandeling. Pas ná de geslaagde
       // uitnodiging: een mislukte mail hoort de markering niet op te heffen.
+      // Geen transactie nodig, dit pad raakt de koppeling niet aan en de helper
+      // is zelf al één atomaire eenheid.
       await hefUitbehandeldOp(ctx.prisma, ctx.user, input.id)
 
       return { success: true }
@@ -1627,10 +1624,23 @@ export const patientsRouter = createTRPCRouter({
         // Alleen programma's die door het archiveren dichtgingen, en alleen
         // binnen de eigen scope. Wat de therapeut zelf afrondde blijft
         // COMPLETED, en wat een coach dichtzette blijft van de coach.
+        //
+        // Geankerd op DEZE afgesloten periode, niet op de vlag alleen.
+        // `setInactive` schrijft `endDate` en `dischargedAt` met dezelfde
+        // instant, dus alles wat bij deze periode hoort heeft een endDate op of
+        // ná de ontslagdatum. Zonder dat anker herrijst een programma uit een
+        // vórige periode: die vlag blijft staan zodra een re-invite de markering
+        // opheft (dat pad zet geen enkel programma terug), en dan komt een
+        // programma van maanden geleden mee op ACTIVE met een startdatum die
+        // over de verkeerde onderbreking is opgeschoven. `status: 'COMPLETED'`
+        // hoort er om dezelfde reden bij: wie handmatig is heropend mag geen
+        // tweede schuif krijgen.
         const gesloten = await tx.program.findMany({
           where: {
             patientId: input.id,
             closedByDischarge: true,
+            status: 'COMPLETED',
+            endDate: { gte: rij.dischargedAt },
             ...programmaScope(scope, ctx.user.id),
           },
           select: { id: true, startDate: true },
@@ -1649,6 +1659,21 @@ export const patientsRouter = createTRPCRouter({
             },
           })
         }
+        // Vlaggen uit een oudere periode opruimen. Binnen deze scope kan er maar
+        // één markering tegelijk openstaan, dus alles wat vóór deze afsluiting
+        // dichtging hoort bij een periode die allang voorbij is. Zulke rijen
+        // bestaan in productie doordat de invite-paden de markering opheffen
+        // zonder programma's terug te zetten; zonder deze opruiming blijven ze
+        // voor altijd op "wacht op heractivering" staan.
+        await tx.program.updateMany({
+          where: {
+            patientId: input.id,
+            closedByDischarge: true,
+            endDate: { lt: rij.dischargedAt },
+            ...programmaScope(scope, ctx.user.id),
+          },
+          data: { closedByDischarge: false },
+        })
       })
 
       await auditLog({

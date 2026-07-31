@@ -336,29 +336,35 @@ export const inviteRouter = createTRPCRouter({
 
       const email = patient.email.toLowerCase().trim()
       const expiresAt = new Date(Date.now() + CODE_TTL_HOURS * 3600 * 1000)
+      // Vasthouden vóór de transactie: binnen een closure vervalt de
+      // narrowing van de guard hierboven.
+      const dateOfBirth = patient.dateOfBirth
 
-      await ctx.prisma.inviteCode.updateMany({
-        where: { email, usedAt: null, expiresAt: { gt: new Date() } },
-        data: { expiresAt: new Date(0) },
+      // Oude codes intrekken, de nieuwe uitnodiging klaarzetten en de
+      // uitbehandel-markering opheffen horen bij elkaar: opnieuw uitnodigen
+      // betekent weer in behandeling. Los van elkaar levert een gefaalde stap
+      // een patiënt op met een levende uitnodiging die in geen enkele lijst
+      // verschijnt, zonder foutmelding. De mail gaat bewust ná de transactie.
+      const invite = await ctx.prisma.$transaction(async (tx) => {
+        await tx.inviteCode.updateMany({
+          where: { email, usedAt: null, expiresAt: { gt: new Date() } },
+          data: { expiresAt: new Date(0) },
+        })
+        const rij = await tx.inviteCode.create({
+          data: {
+            codeHash: `supabase-otp:${crypto.randomBytes(16).toString('hex')}`,
+            email,
+            name: patient.name ?? email,
+            dateOfBirth,
+            role: patient.role === 'ATHLETE' ? 'ATHLETE' : 'PATIENT',
+            practiceId: patient.practiceId ?? ctx.user!.practiceId,
+            invitedById: ctx.user!.id,
+            expiresAt,
+          },
+        })
+        await hefUitbehandeldOp(tx, ctx.user!, patient.id)
+        return rij
       })
-
-      const invite = await ctx.prisma.inviteCode.create({
-        data: {
-          codeHash: `supabase-otp:${crypto.randomBytes(16).toString('hex')}`,
-          email,
-          name: patient.name ?? email,
-          dateOfBirth: patient.dateOfBirth,
-          role: patient.role === 'ATHLETE' ? 'ATHLETE' : 'PATIENT',
-          practiceId: patient.practiceId ?? ctx.user!.practiceId,
-          invitedById: ctx.user!.id,
-          expiresAt,
-        },
-      })
-
-      // Opnieuw uitnodigen betekent weer in behandeling. Zonder dit krijg je
-      // een patiënt met een levende koppeling die in geen enkele lijst
-      // verschijnt, zonder foutmelding.
-      await hefUitbehandeldOp(ctx.prisma, ctx.user!, patient.id)
 
       const instructionUrl = `${getAppUrl()}/login/code?email=${encodeURIComponent(email)}`
 
@@ -741,45 +747,49 @@ export const inviteRouter = createTRPCRouter({
         where: { id: invite.invitedById },
         select: { id: true, role: true, practiceId: true },
       })
-      const opheffen = uitnodiger
-        ? await hefUitbehandeldOp(ctx.prisma, uitnodiger, user.id)
-        : ({ status: 'geen-scope' } as const)
+      // Koppeling en markering in één transactie: los van elkaar levert een
+      // gefaalde tweede helft precies de onzichtbare toestand op die dit moet
+      // wegnemen.
+      const opheffen = await ctx.prisma.$transaction(async (tx) => {
+        const existingLink = await tx.patientTherapist.findUnique({
+          where: {
+            therapistId_patientId: {
+              therapistId: invite.invitedById,
+              patientId: user.id,
+            },
+          },
+          select: { id: true, notes: true },
+        })
+        if (existingLink) {
+          await tx.patientTherapist.update({
+            where: { id: existingLink.id },
+            data: {
+              isActive: true,
+              status: 'APPROVED',
+              // Wis de placeholder-note alleen als die nog ongewijzigd is —
+              // anders blijft een handmatig toegevoegde note van de therapeut
+              // staan.
+              ...(existingLink.notes === PENDING_INVITE_NOTE ? { notes: null } : {}),
+            },
+          })
+        } else {
+          await tx.patientTherapist.create({
+            data: {
+              therapistId: invite.invitedById,
+              patientId: user.id,
+              status: 'APPROVED',
+            },
+          })
+        }
+        return uitnodiger
+          ? await hefUitbehandeldOp(tx, uitnodiger, user.id)
+          : ({ status: 'geen-scope' } as const)
+      })
       if (opheffen.status === 'geen-scope') {
         console.warn(
-          'invite.finalize: uitbehandel-markering blijft staan, geen scope voor uitnodiger',
+          '[invite.finalize] uitbehandel-markering blijft staan, geen scope voor uitnodiger',
           { inviteId: invite.id, invitedById: invite.invitedById },
         )
-      }
-
-      const existingLink = await ctx.prisma.patientTherapist.findUnique({
-        where: {
-          therapistId_patientId: {
-            therapistId: invite.invitedById,
-            patientId: user.id,
-          },
-        },
-        select: { id: true, notes: true },
-      })
-      if (existingLink) {
-        await ctx.prisma.patientTherapist.update({
-          where: { id: existingLink.id },
-          data: {
-            isActive: true,
-            status: 'APPROVED',
-            // Wis de placeholder-note alleen als die nog ongewijzigd is —
-            // anders blijft een handmatig toegevoegde note van de therapeut
-            // staan.
-            ...(existingLink.notes === PENDING_INVITE_NOTE ? { notes: null } : {}),
-          },
-        })
-      } else {
-        await ctx.prisma.patientTherapist.create({
-          data: {
-            therapistId: invite.invitedById,
-            patientId: user.id,
-            status: 'APPROVED',
-          },
-        })
       }
     }
 
