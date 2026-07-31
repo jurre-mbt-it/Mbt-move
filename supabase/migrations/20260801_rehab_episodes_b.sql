@@ -9,9 +9,9 @@
 -- Moet DIRECT NA fase A draaien, en pas nadat de backfill hieronder is
 -- gecontroleerd. De backfill-UPDATE joint op
 -- "patient_rehab_trackers"."patientId" = "rehab_criterion_status"."patientId",
--- en werkt dus alleen zolang er per patiënt hooguit één tracker bestaat —
--- precies de aanname die na fase A nog geldt (er is nog geen tweede traject
--- aangemaakt, dat kan pas na de code-deploy in de tussenfase).
+-- en werkt dus alleen zolang er per patiënt hooguit één tracker bestaat, en
+-- dat is precies de aanname die na fase A nog geldt (er is nog geen tweede
+-- traject aangemaakt, dat kan pas na de code-deploy in de tussenfase).
 --
 -- Additief en terug te draaien (zie rollback-sectie in
 -- docs/superpowers/specs/2026-07-31-rehab-episodes-migratie-sql.md), BEHALVE
@@ -37,9 +37,11 @@ WHERE t."patientId" = s."patientId" AND s."trackerId" IS NULL;
 -- kunnen niet meekomen naar "trackerId" en worden hier definitief verwijderd.
 -- Dit is medische statusdata (RehabCriterionStatus: R/O/G-beoordeling +
 -- meetwaarde). Draai deze DELETE UITSLUITEND nadat de JSON-backup van de
--- wees-rijen bevestigd op schijf staat in scripts/backups/ (zie de
--- SELECT ... LEFT JOIN uit de spec, sectie "Fase B"). Zonder die backup zijn
--- deze twee rijen na dit statement nergens meer te herstellen.
+-- wees-rijen bevestigd op schijf staat als
+-- scripts/backups/rehab-criterion-status-orphans-<datum>.json. Dat bestand
+-- komt uit scripts/backup-rehab-tables.ts --apply, dat het naast de volledige
+-- dump wegschrijft. Zonder die backup zijn deze twee rijen na dit statement
+-- nergens meer te herstellen.
 DELETE FROM public.rehab_criterion_status WHERE "trackerId" IS NULL;
 
 ALTER TABLE public.rehab_criterion_status ALTER COLUMN "trackerId" SET NOT NULL;
