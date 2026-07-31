@@ -16,11 +16,19 @@ export type PatientRehabTrackerData = NonNullable<
   Awaited<ReturnType<typeof getPatientRehabTrackerData>>
 >
 
+/**
+ * Het lopende traject van een patiënt.
+ *
+ * Dunne wrapper: zoekt het open traject op en laat `getRehabTrackerDataById`
+ * de rest doen. Naam, argumenten en returnvorm zijn ONGEWIJZIGD, want de
+ * PDF-routes (`/print/progress/[patientId]`, `patients.getProgressPdfHtml`)
+ * en de iOS-app leunen erop.
+ */
 export async function getPatientRehabTrackerData(
   prisma: PrismaClient,
   patientId: string,
 ) {
-  const tracker = await prisma.patientRehabTracker.findFirst({
+  const open = await prisma.patientRehabTracker.findFirst({
     where: { patientId, deactivatedAt: null },
     // Met historie kan er meer dan één rij per patiënt zijn. De partial unique
     // index houdt het aantal open trajecten op één, maar vertrouw daar niet op:
@@ -28,6 +36,26 @@ export async function getPatientRehabTrackerData(
     // sleutel, want bij een gelijke activatedAt is de keuze anders alsnog
     // willekeurig.
     orderBy: [{ activatedAt: 'desc' }, { id: 'desc' }],
+    select: { id: true },
+  })
+  if (!open) return null
+  return getRehabTrackerDataById(prisma, open.id)
+}
+
+/**
+ * Eén traject op zijn eigen id, open of afgesloten. Hiermee kan een
+ * historie-scherm (`rehab.getTraject`) een afgesloten episode teruglezen in
+ * exact dezelfde vorm als het lopende traject.
+ *
+ * Geen access-check: de caller autoriseert op de `patientId` van de gevonden
+ * rij, nooit op een meegestuurde patientId.
+ */
+export async function getRehabTrackerDataById(
+  prisma: PrismaClient,
+  trackerId: string,
+) {
+  const tracker = await prisma.patientRehabTracker.findUnique({
+    where: { id: trackerId },
     include: {
       protocol: {
         include: {
@@ -84,7 +112,9 @@ export async function getPatientRehabTrackerData(
     // kunnen aanwijzen. Bestaande clients negeren onbekende velden, dus build 78
     // merkt hier niets van.
     trackerId: tracker.id,
-    patientId,
+    // Van de rij zelf, niet uit een argument: deze functie kent alleen een
+    // trackerId.
+    patientId: tracker.patientId,
     protocolId: tracker.protocolId,
     protocol: {
       id: tracker.protocol.id,
@@ -96,6 +126,13 @@ export async function getPatientRehabTrackerData(
     surgeryDate: tracker.surgeryDate,
     injuryDate: tracker.injuryDate,
     activatedAt: tracker.activatedAt,
+    // Additief, net als `trackerId`: `rehab.getTraject` leest ook AFGESLOTEN
+    // trajecten en moet zelf kunnen zien dat het er een uit de historie is.
+    // Voor het lopende traject zijn deze drie altijd null, dus de bestaande
+    // clients zien niets veranderen.
+    deactivatedAt: tracker.deactivatedAt,
+    outcome: tracker.outcome,
+    outcomeNote: tracker.outcomeNote,
     activatedByName: tracker.activatedBy.name ?? tracker.activatedBy.email,
     notes: tracker.notes,
     weeksSinceSurgery,

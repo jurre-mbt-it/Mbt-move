@@ -10,8 +10,9 @@ import type { PrismaClient } from '@prisma/client'
 import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure, therapistProcedure, adminProcedure, mfaAdminProcedure } from '@/server/trpc'
 import { practiceScope } from '@/server/lib/patient-access'
-import { getPatientRehabTrackerData } from '@/lib/rehab-data'
+import { getPatientRehabTrackerData, getRehabTrackerDataById } from '@/lib/rehab-data'
 import { notifyRehabCriterion, notifyRehabPhase } from '@/server/push/notify'
+import { auditLog } from '@/server/audit'
 
 const ACTIVE_LINK = { isActive: true, status: 'APPROVED' as const }
 
@@ -62,6 +63,31 @@ async function openTrackerFor(prisma: PrismaClient, patientId: string) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Geen lopend traject voor deze patiënt' })
   }
   return tracker
+}
+
+/**
+ * Vertaal een botsing op de partiële index
+ * patient_rehab_trackers_one_open_per_patient naar een CONFLICT.
+ *
+ * Elk pad dat een traject opent leest eerst of er al één loopt, en dat is een
+ * read-then-write: twee gelijktijdige verzoeken kunnen allebei "geen lopend
+ * traject" zien. De tweede botst op de index en krijgt een P2002. Zonder deze
+ * vertaling komt die als rauwe databasefout bij de client terecht, en toont de
+ * app alleen "Kon het protocol niet activeren".
+ */
+const alsConflict = (err: unknown): never => {
+  if (
+    err &&
+    typeof err === 'object' &&
+    'code' in err &&
+    (err as { code?: string }).code === 'P2002'
+  ) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'Er is zojuist al een traject gestart voor deze patiënt. Ververs het scherm en probeer het opnieuw.',
+    })
+  }
+  throw err
 }
 
 /**
@@ -151,26 +177,6 @@ export const rehabRouter = createTRPCRouter({
         notes: input.notes ?? null,
       }
 
-      // `bestaand` is hierboven gelezen, dus twee gelijktijdige activaties kunnen
-      // allebei "geen lopend traject" zien. De tweede botst op de partiële index
-      // patient_rehab_trackers_one_open_per_patient en krijgt een P2002. Zonder
-      // deze vertaling komt die als rauwe databasefout bij de client terecht, en
-      // toont de app alleen "Kon het protocol niet activeren".
-      const alsConflict = (err: unknown): never => {
-        if (
-          err &&
-          typeof err === 'object' &&
-          'code' in err &&
-          (err as { code?: string }).code === 'P2002'
-        ) {
-          throw new TRPCError({
-            code: 'CONFLICT',
-            message: 'Er is zojuist al een traject gestart voor deze patiënt. Ververs het scherm en probeer het opnieuw.',
-          })
-        }
-        throw err
-      }
-
       // 1. Geen lopend traject: gewoon starten.
       if (!bestaand) {
         await ctx.prisma.patientRehabTracker.create({ data: nieuwTraject }).catch(alsConflict)
@@ -194,7 +200,7 @@ export const rehabRouter = createTRPCRouter({
       // traject naast, zodat de historie en de oude vinkjes bewaard blijven.
       // In één transactie, want de partial unique index laat geen tweede open
       // traject toe.
-      await ctx.prisma
+      const [, nieuw] = await ctx.prisma
         .$transaction([
           ctx.prisma.patientRehabTracker.update({
             where: { id: bestaand.id },
@@ -209,6 +215,24 @@ export const rehabRouter = createTRPCRouter({
           ctx.prisma.patientRehabTracker.create({ data: nieuwTraject }),
         ])
         .catch(alsConflict)
+
+      // Dit sluit een klinische episode af, net als closeTraject, alleen zonder
+      // dat iemand een uitkomst koos. Zelfde event, zodat het spoor compleet is.
+      await auditLog({
+        event: 'REHAB_TRAJECT_CLOSED',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        resource: 'PatientRehabTracker',
+        resourceId: bestaand.id,
+        // Vaste waarden en IDs, geen vrije tekst (audit.ts:7-8).
+        metadata: {
+          route: 'rehab.activateForPatient',
+          reason: 'PROTOCOL_SWITCH',
+          outcome: 'UNKNOWN',
+          newTrackerId: nieuw.id,
+        },
+        req: ctx.req,
+      })
       return { ok: true }
     }),
 
@@ -221,7 +245,169 @@ export const rehabRouter = createTRPCRouter({
         where: { id: tracker.id },
         data: { deactivatedAt: new Date(), closedById: ctx.user.id },
       })
+      // Ook dit sluit een episode af, alleen zonder uitkomst: build 78 kent
+      // closeTraject nog niet en zet het protocol hiermee uit.
+      await auditLog({
+        event: 'REHAB_TRAJECT_CLOSED',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        resource: 'PatientRehabTracker',
+        resourceId: tracker.id,
+        metadata: { route: 'rehab.deactivateForPatient', reason: 'DEACTIVATED' },
+        req: ctx.req,
+      })
       return { ok: true }
+    }),
+
+  // ── Trajecten: afsluiten, heropenen, teruglezen ──────────────────────────
+
+  /**
+   * Sluit het lopende traject af met een uitkomst. Anders dan
+   * `deactivateForPatient` legt dit vast HOE het traject eindigde; de
+   * toelichting is vrije tekst en blijft daarom op de rij staan, niet in de
+   * audit-metadata.
+   */
+  closeTraject: therapistProcedure
+    .input(
+      z.object({
+        patientId: z.string(),
+        outcome: z.enum(['COMPLETED', 'DISCONTINUED', 'TRANSFERRED', 'RELAPSE', 'UNKNOWN']),
+        outcomeNote: z.string().max(2000).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertTreating(ctx.prisma, ctx.user, input.patientId)
+      const tracker = await openTrackerFor(ctx.prisma, input.patientId)
+      const closed = await ctx.prisma.patientRehabTracker.update({
+        where: { id: tracker.id },
+        data: {
+          deactivatedAt: new Date(),
+          closedById: ctx.user.id,
+          outcome: input.outcome,
+          outcomeNote: input.outcomeNote ?? null,
+        },
+      })
+      await auditLog({
+        event: 'REHAB_TRAJECT_CLOSED',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        resource: 'PatientRehabTracker',
+        resourceId: tracker.id,
+        // Geen vrije tekst: audit.ts:7-8 verbiedt PII in metadata. De
+        // toelichting staat op de rij zelf, achter RLS.
+        metadata: { route: 'rehab.closeTraject', outcome: input.outcome },
+        req: ctx.req,
+      })
+      return closed
+    }),
+
+  /**
+   * Draai een afsluiting terug. Alleen voor het laatste traject, en alleen als
+   * er niets anders loopt: de partiële index laat maar één open traject toe.
+   */
+  reopenTraject: therapistProcedure
+    .input(z.object({ trackerId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const tracker = await ctx.prisma.patientRehabTracker.findUnique({
+        where: { id: input.trackerId },
+      })
+      if (!tracker) throw new TRPCError({ code: 'NOT_FOUND' })
+      // Autoriseer op tracker.patientId, nooit op een meegestuurde patientId:
+      // anders is een trackerId genoeg om een dossier uit een andere praktijk
+      // te openen.
+      await assertTreating(ctx.prisma, ctx.user, tracker.patientId)
+
+      if (!tracker.deactivatedAt) {
+        throw new TRPCError({ code: 'CONFLICT', message: 'Dit traject loopt al.' })
+      }
+
+      const nieuwer = await ctx.prisma.patientRehabTracker.findFirst({
+        where: {
+          patientId: tracker.patientId,
+          // Zelfde volgorde-sleutel als openTrackerFor: bij een gelijke
+          // activatedAt beslist het id, anders zou "nieuwer" bij een gelijkspel
+          // niets vinden en heropen je alsnog een oudere episode.
+          OR: [
+            { activatedAt: { gt: tracker.activatedAt } },
+            { activatedAt: tracker.activatedAt, id: { gt: tracker.id } },
+          ],
+        },
+        select: { id: true },
+      })
+      if (nieuwer) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Er is al een nieuwer traject gestart. Dit traject kan niet meer heropend worden.',
+        })
+      }
+      const open = await ctx.prisma.patientRehabTracker.findFirst({
+        where: { patientId: tracker.patientId, deactivatedAt: null },
+        select: { id: true },
+      })
+      if (open) {
+        throw new TRPCError({ code: 'CONFLICT', message: 'Er loopt al een traject voor deze patiënt.' })
+      }
+      // De twee checks hierboven zijn read-then-write, dus de index blijft het
+      // laatste woord houden.
+      const reopened = await ctx.prisma.patientRehabTracker
+        .update({
+          where: { id: tracker.id },
+          data: { deactivatedAt: null, closedById: null, outcome: null, outcomeNote: null },
+        })
+        .catch(alsConflict)
+      await auditLog({
+        event: 'REHAB_TRAJECT_REOPENED',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        resource: 'PatientRehabTracker',
+        resourceId: tracker.id,
+        metadata: { route: 'rehab.reopenTraject' },
+        req: ctx.req,
+      })
+      return reopened
+    }),
+
+  /** Historie: alle trajecten van een patiënt, nieuwste eerst. */
+  listTrajects: therapistProcedure
+    .input(z.object({ patientId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await assertTreating(ctx.prisma, ctx.user, input.patientId)
+      const trackers = await ctx.prisma.patientRehabTracker.findMany({
+        where: { patientId: input.patientId },
+        orderBy: [{ activatedAt: 'desc' }, { id: 'desc' }],
+        include: {
+          protocol: { select: { name: true, phases: { select: { criteria: { select: { id: true } } } } } },
+          statuses: { select: { status: true } },
+        },
+      })
+      return trackers.map((t) => ({
+        id: t.id,
+        protocolName: t.protocol.name,
+        activatedAt: t.activatedAt,
+        deactivatedAt: t.deactivatedAt,
+        outcome: t.outcome,
+        outcomeNote: t.outcomeNote,
+        behaaldeCriteria: t.statuses.filter((s) => s.status === 'MET').length,
+        totaalCriteria: t.protocol.phases.reduce((n, f) => n + f.criteria.length, 0),
+      }))
+    }),
+
+  /**
+   * Eén traject uit de historie, in dezelfde vorm als `getPatientTracker`.
+   * Aparte procedurenaam, want `getMyTracker`/`getPatientTracker` moeten één
+   * object of null blijven teruggeven voor de app.
+   */
+  getTraject: therapistProcedure
+    .input(z.object({ trackerId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const tracker = await ctx.prisma.patientRehabTracker.findUnique({
+        where: { id: input.trackerId },
+        select: { id: true, patientId: true },
+      })
+      if (!tracker) throw new TRPCError({ code: 'NOT_FOUND' })
+      // Autoriseren op de patientId van de RIJ, niet op input.
+      await assertTreating(ctx.prisma, ctx.user, tracker.patientId)
+      return getRehabTrackerDataById(ctx.prisma, tracker.id)
     }),
 
   /**
