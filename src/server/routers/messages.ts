@@ -17,6 +17,7 @@ import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { practiceScope, inSamePractice } from '@/server/lib/patient-access'
+import { careScopeWhereForRead } from '@/server/lib/care-scope'
 import { sendPush } from '@/server/push/send'
 import type { PrismaClient } from '@prisma/client'
 
@@ -256,6 +257,10 @@ export const messagesRouter = createTRPCRouter({
     const accessiblePatient = {
       patient: {
         role: 'ATHLETE' as never,
+        // Uitbehandelde atleten vallen uit de inbox. Eigen sleutel naast de
+        // scope-OR en vóór de spread, zodat de conditionele spread hem niet
+        // kan overschrijven; een tweede `OR`-sleutel zou de scoping wissen.
+        careStatuses: { none: careScopeWhereForRead(ctx.user) },
         ...(ctx.user.role === 'ADMIN'
           ? {}
           : {
@@ -336,6 +341,9 @@ export const messagesRouter = createTRPCRouter({
         readAt: null,
         patient: {
           role: 'ATHLETE' as never,
+          // Zelfde tak als in `inbox`: zonder dit blijft de sidebar-badge
+          // oplichten voor iemand die uit elke lijst verdwenen is.
+          careStatuses: { none: careScopeWhereForRead(ctx.user) },
           ...(ctx.user.role === 'ADMIN'
             ? {}
             : {

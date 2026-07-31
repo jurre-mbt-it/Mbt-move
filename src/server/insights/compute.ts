@@ -81,6 +81,14 @@ export async function computeInsights(
           { practiceId: null },
           { practice: { cieEnabled: true } },
         ],
+        // Uitbehandelde patiënten leveren geen insights meer op. Bewust ZONDER
+        // careScopeWhereForRead: deze motor draait als cron, zonder ingelogde
+        // lezer, dus er is geen praktijk of coach om op te scopen. Elke lopende
+        // markering telt hier, waar de rest van de app op de scope van de lezer
+        // filtert. `reactivatedAt: null` moet er wel bij staan: de rij blijft
+        // als historie bestaan, dus `{ none: {} }` zou elke ooit gearchiveerde
+        // patiënt permanent uit de motor houden.
+        careStatuses: { none: { reactivatedAt: null } },
       },
     },
     include: {

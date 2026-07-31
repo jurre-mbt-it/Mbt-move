@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client'
 import type { PrismaClient } from '@prisma/client'
 import { maskMuscleLoadsArray } from '@/server/lib/muscle-loads'
 import { assertPatientAccess } from '@/server/lib/patient-access'
+import { careScopeWhereForRead } from '@/server/lib/care-scope'
 import { isReviewDue, weeksSince, reviewThresholdWeeks } from '@/lib/program-review'
 import { notifyNewSchedule } from '@/server/push/notify'
 
@@ -579,10 +580,21 @@ export const programsRouter = createTRPCRouter({
 
     const programs = await ctx.prisma.program.findMany({
       where: {
-        ...ownership,
         status: 'ACTIVE',
         isTemplate: false,
         patientId: { not: null },
+        // Twee aparte AND-takken, want `ownership` bevat zelf een OR-sleutel:
+        // spreiden zou de ene sleutel over de andere heen schrijven.
+        //
+        // Het archieffilter hangt aan de PATIËNT en niet aan de eigenaar van
+        // het programma. shop.activateProgram maakt programma's met de
+        // creatorId en practiceId van het sjabloon, buiten de therapeut om, dus
+        // een zelf geactiveerd shop-programma van een uitbehandelde koper zou
+        // via de praktijk-tak alsnog als controle-signaal binnenkomen.
+        AND: [
+          ownership,
+          { patient: { careStatuses: { none: careScopeWhereForRead(ctx.user!) } } },
+        ],
       },
       select: {
         id: true,

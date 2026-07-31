@@ -19,6 +19,7 @@ import {
   therapistProcedure,
   adminProcedure,
 } from '@/server/trpc'
+import { careScopeWhereForRead } from '@/server/lib/care-scope'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -47,12 +48,15 @@ export const cohortRouter = createTRPCRouter({
       const days = input?.windowDays ?? 30
       const since = sinceWindow(days)
 
-      // Alle eigen patiënten met actieve relatie + niet opt-out.
+      // Alle eigen patiënten met actieve relatie + niet opt-out. Uitbehandelde
+      // patiënten tellen niet mee in het aggregaat; het filter staat als eigen
+      // sleutel (dus onder AND) en nooit als extra tak in een OR.
       const patients = await ctx.prisma.user.findMany({
         where: {
           role: 'PATIENT',
           cohortAnalyticsOptIn: true,
           deletedAt: null,
+          careStatuses: { none: careScopeWhereForRead(ctx.user) },
           patientTherapists: {
             some: {
               therapistId: ctx.user.id,
@@ -211,6 +215,12 @@ export const cohortRouter = createTRPCRouter({
         role: { in: ['PATIENT', 'ATHLETE'] as ('PATIENT' | 'ATHLETE')[] },
         cohortAnalyticsOptIn: true,
         deletedAt: null,
+        // Eigen sleutel vóór de conditionele spread, zodat die hem niet kan
+        // overschrijven. Gescoped op de lezer: een admin filtert dus op de
+        // markeringen van zijn eigen praktijk. Let op: filtert de admin met
+        // `practiceId` op een ándere praktijk, dan blijven de uitbehandelde
+        // patiënten daarvan meetellen.
+        careStatuses: { none: careScopeWhereForRead(ctx.user) },
         ...(input?.practiceId !== undefined
           ? { practiceId: input.practiceId }
           : {}),

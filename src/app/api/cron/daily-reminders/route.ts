@@ -94,8 +94,22 @@ export async function GET(req: NextRequest) {
     }
     // Via `user` (niet rechtstreeks de token-ids) zodat de soft-delete-extension
     // verwijderde accounts eruit filtert.
+    //
+    // Wie uitbehandeld is krijgt geen ochtendpush meer. Bewust ZONDER
+    // careScopeWhereForRead: deze route draait als cron, zonder ingelogde
+    // lezer, dus er is geen praktijk of coach om op te scopen en telt elke
+    // lopende markering. `reactivatedAt: null` hoort er wel bij, want de rij
+    // blijft als historie staan en `{ none: {} }` zou iedereen die ooit
+    // afgesloten is geweest permanent stilzetten.
+    //
+    // Hier filteren en niet in de weekquery hieronder: de trainingsherinnering
+    // droogt vanzelf op zodra er geen planning meer staat, maar de herstel- en
+    // belastingpush hangen aan wearable-data die gewoon door blijft komen.
     const recipients = await prisma.user.findMany({
-      where: { id: { in: tokenUserIds } },
+      where: {
+        id: { in: tokenUserIds },
+        careStatuses: { none: { reactivatedAt: null } },
+      },
       select: { id: true },
     })
     const recipientIds = recipients.map((p) => p.id)
