@@ -3,6 +3,7 @@ import { createTRPCRouter, coachStaffProcedure, protectedProcedure } from '@/ser
 import { TRPCError } from '@trpc/server'
 import { assertPlanAccess } from '@/server/lib/plan-access'
 import { practiceScope, inSamePractice } from '@/server/lib/patient-access'
+import { planningCutoffVoorPatient } from '@/server/lib/planning-cutoff'
 import { mondayKey, mondayKeyOf, addDaysKey, amsMidnight, weeksBetween, isDateKey } from '@/lib/week-dates'
 import { parseStructured, legacySummaryFields, structuredLoad } from '@/lib/cardio-workout'
 import { durationFromExercises } from '@/lib/planned-load'
@@ -830,8 +831,17 @@ export const weekSchedulesRouter = createTRPCRouter({
   // Patient: get their assigned week schedule
   mySchedule: protectedProcedure
     .query(async ({ ctx }) => {
+      // Uitbehandeld? Dan stopt de planning bij de eerste maandag ná het
+      // ontslag. Verbergen, niet verwijderen.
+      const cutoff = await planningCutoffVoorPatient(ctx.prisma, ctx.user!.id)
       return ctx.prisma.weekSchedule.findFirst({
-        where: { patientId: ctx.user!.id },
+        where: {
+          patientId: ctx.user!.id,
+          // Eigen sleutel, dus ge-AND. Legacy-weken zonder startDate vallen na
+          // een ontslag af omdat `lt` geen NULL matcht; een week zonder datum
+          // is niet te dateren en zou anders eeuwig blijven staan.
+          ...(cutoff ? { startDate: { lt: cutoff } } : {}),
+        },
         orderBy: { updatedAt: 'desc' },
         include: {
           days: {
@@ -863,8 +873,15 @@ export const weekSchedulesRouter = createTRPCRouter({
    * toont dan gewoon niets, dit is decoratieve context.
    */
   myWeekMeta: protectedProcedure.query(async ({ ctx }) => {
+    // Zelfde knip als mySchedule en patient.calendarRange: na het ontslag hoort
+    // de fase-regel van een toekomstige week er niet meer te staan.
+    const cutoff = await planningCutoffVoorPatient(ctx.prisma, ctx.user!.id)
     const schedules = await ctx.prisma.weekSchedule.findMany({
-      where: { patientId: ctx.user!.id, isTemplate: false },
+      where: {
+        patientId: ctx.user!.id,
+        isTemplate: false,
+        ...(cutoff ? { startDate: { lt: cutoff } } : {}),
+      },
       select: {
         weekNumber: true, startDate: true, createdAt: true,
         phaseType: true, isDeload: true, targetLoad: true, weekNote: true,
