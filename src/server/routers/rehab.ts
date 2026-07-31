@@ -6,6 +6,7 @@
  * Therapeut activeert per patient en vinkt criteria R/O/G af.
  */
 import { z } from 'zod'
+import type { PrismaClient } from '@prisma/client'
 import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure, therapistProcedure, adminProcedure, mfaAdminProcedure } from '@/server/trpc'
 import { practiceScope } from '@/server/lib/patient-access'
@@ -42,6 +43,23 @@ async function assertTreating(
       message: 'Geen actieve behandelrelatie met deze patiënt',
     })
   }
+}
+
+/**
+ * Het lopende traject van een patiënt. Sinds het episode-model kan een patiënt
+ * meerdere trajecten hebben; `deactivatedAt IS NULL` wijst het lopende aan en
+ * de partial unique index patient_rehab_trackers_one_open_per_patient houdt
+ * dat er hoogstens één is.
+ */
+async function openTrackerFor(prisma: PrismaClient, patientId: string) {
+  const tracker = await prisma.patientRehabTracker.findFirst({
+    where: { patientId, deactivatedAt: null },
+    orderBy: { activatedAt: 'desc' },
+  })
+  if (!tracker) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Geen lopend traject voor deze patiënt' })
+  }
+  return tracker
 }
 
 /**
@@ -110,24 +128,27 @@ export const rehabRouter = createTRPCRouter({
       const surgeryDate = input.surgeryDate ? new Date(input.surgeryDate) : null
       const injuryDate = input.injuryDate ? new Date(input.injuryDate) : null
 
-      await ctx.prisma.patientRehabTracker.upsert({
-        where: { patientId: input.patientId },
-        update: {
-          protocolId: input.protocolId,
-          activatedById: ctx.user.id,
-          activatedAt: new Date(),
-          deactivatedAt: null,
-          surgeryDate,
-          injuryDate,
-          notes: input.notes,
-        },
-        create: {
+      // Een nieuw traject starten mag alleen als er geen lopend traject is. Anders
+      // zou het oude stil worden overschreven; sluiten gaat via closeTraject.
+      const bestaand = await ctx.prisma.patientRehabTracker.findFirst({
+        where: { patientId: input.patientId, deactivatedAt: null },
+      })
+      if (bestaand) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Er loopt al een traject. Sluit dat eerst af voordat je een nieuw traject start.',
+        })
+      }
+      await ctx.prisma.patientRehabTracker.create({
+        data: {
           patientId: input.patientId,
           protocolId: input.protocolId,
           activatedById: ctx.user.id,
           surgeryDate,
           injuryDate,
-          notes: input.notes,
+          // `notes` is in zod .optional() en niet nullable. Bij een create is dat
+          // geen probleem meer: elk traject begint met zijn eigen notitie.
+          notes: input.notes ?? null,
         },
       })
       return { ok: true }
@@ -137,13 +158,10 @@ export const rehabRouter = createTRPCRouter({
     .input(z.object({ patientId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await assertTreating(ctx.prisma, ctx.user, input.patientId)
-      const existing = await ctx.prisma.patientRehabTracker.findUnique({
-        where: { patientId: input.patientId },
-      })
-      if (!existing) return { ok: true }
+      const tracker = await openTrackerFor(ctx.prisma, input.patientId)
       await ctx.prisma.patientRehabTracker.update({
-        where: { patientId: input.patientId },
-        data: { deactivatedAt: new Date() },
+        where: { id: tracker.id },
+        data: { deactivatedAt: new Date(), closedById: ctx.user.id },
       })
       return { ok: true }
     }),
@@ -163,14 +181,9 @@ export const rehabRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       await assertTreating(ctx.prisma, ctx.user, input.patientId)
-      const existing = await ctx.prisma.patientRehabTracker.findUnique({
-        where: { patientId: input.patientId },
-      })
-      if (!existing) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Tracker niet gevonden, activeer eerst' })
-      }
+      const tracker = await openTrackerFor(ctx.prisma, input.patientId)
       await ctx.prisma.patientRehabTracker.update({
-        where: { patientId: input.patientId },
+        where: { id: tracker.id },
         data: {
           ...(input.surgeryDate !== undefined
             ? { surgeryDate: input.surgeryDate ? new Date(input.surgeryDate) : null }
@@ -199,20 +212,16 @@ export const rehabRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await assertTreating(ctx.prisma, ctx.user, input.patientId)
 
-      // Defensief: zorg dat dit criterium hoort bij het protocol van de patient
-      const tracker = await ctx.prisma.patientRehabTracker.findUnique({
-        where: { patientId: input.patientId },
-        select: { protocolId: true },
-      })
-      if (!tracker) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Tracker niet actief voor deze patiënt' })
-      }
+      // Defensief: zorg dat dit criterium hoort bij het protocol van het lopende
+      // traject. Op het traject vergelijken, niet op de patiënt: anders schrijf
+      // je een criterium van traject A weg in traject B.
+      const tracker = await openTrackerFor(ctx.prisma, input.patientId)
       const criterion = await ctx.prisma.rehabCriterion.findUnique({
         where: { id: input.criterionId },
         include: { phase: true },
       })
       if (!criterion || criterion.phase.protocolId !== tracker.protocolId) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Criterium hoort niet bij actief protocol' })
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Criterium hoort niet bij dit traject' })
       }
 
       const measurementDate = input.measurementDate ? new Date(input.measurementDate) : null
@@ -222,8 +231,8 @@ export const rehabRouter = createTRPCRouter({
       // criterium of een meetwaarde-edit).
       const prevStatus = await ctx.prisma.rehabCriterionStatus.findUnique({
         where: {
-          patientId_criterionId: {
-            patientId: input.patientId,
+          trackerId_criterionId: {
+            trackerId: tracker.id,
             criterionId: input.criterionId,
           },
         },
@@ -232,8 +241,8 @@ export const rehabRouter = createTRPCRouter({
 
       await ctx.prisma.rehabCriterionStatus.upsert({
         where: {
-          patientId_criterionId: {
-            patientId: input.patientId,
+          trackerId_criterionId: {
+            trackerId: tracker.id,
             criterionId: input.criterionId,
           },
         },
@@ -245,6 +254,8 @@ export const rehabRouter = createTRPCRouter({
           updatedById: ctx.user.id,
         },
         create: {
+          trackerId: tracker.id,
+          // TIJDELIJK meeschrijven tot migratie C de kolom dropt (taak 9).
           patientId: input.patientId,
           criterionId: input.criterionId,
           status: input.status,
@@ -265,9 +276,12 @@ export const rehabRouter = createTRPCRouter({
           where: { phaseId: criterion.phaseId },
           select: { id: true },
         })
+        // Op trackerId tellen: anders tellen vinkjes uit een afgesloten traject
+        // mee en krijgt de patiënt bij een nieuw traject meteen een onterechte
+        // "fase behaald"-melding.
         const metCount = await ctx.prisma.rehabCriterionStatus.count({
           where: {
-            patientId: input.patientId,
+            trackerId: tracker.id,
             criterionId: { in: phaseCriteria.map((c) => c.id) },
             status: 'MET',
           },
@@ -371,14 +385,16 @@ export const rehabRouter = createTRPCRouter({
   adminDeleteProtocol: mfaAdminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // Alleen verwijderen als geen trackers dit protocol gebruiken
-      const trackers = await ctx.prisma.patientRehabTracker.count({
-        where: { protocolId: input.id },
+      // Alleen verwijderen als geen LOPEND traject dit protocol gebruikt.
+      // Afgesloten trajecten zijn historie; die mogen een protocol niet
+      // voorgoed onverwijderbaar maken.
+      const lopend = await ctx.prisma.patientRehabTracker.count({
+        where: { protocolId: input.id, deactivatedAt: null },
       })
-      if (trackers > 0) {
+      if (lopend > 0) {
         throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: `Protocol wordt gebruikt door ${trackers} patient-tracker(s). Zet eerst deactivateForPatient uit voor alle patients of zet isActive=false.`,
+          code: 'CONFLICT',
+          message: `Protocol wordt gebruikt door ${lopend} lopend(e) traject(en). Sluit die eerst af of zet isActive op false.`,
         })
       }
       await ctx.prisma.rehabProtocol.delete({ where: { id: input.id } })
