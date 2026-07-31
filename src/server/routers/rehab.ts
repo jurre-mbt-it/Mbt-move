@@ -54,7 +54,9 @@ async function assertTreating(
 async function openTrackerFor(prisma: PrismaClient, patientId: string) {
   const tracker = await prisma.patientRehabTracker.findFirst({
     where: { patientId, deactivatedAt: null },
-    orderBy: { activatedAt: 'desc' },
+    // `id` als tweede sleutel: bij twee rijen met dezelfde activatedAt zou de
+    // keuze anders alsnog willekeurig zijn.
+    orderBy: [{ activatedAt: 'desc' }, { id: 'desc' }],
   })
   if (!tracker) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Geen lopend traject voor deze patiënt' })
@@ -149,9 +151,29 @@ export const rehabRouter = createTRPCRouter({
         notes: input.notes ?? null,
       }
 
+      // `bestaand` is hierboven gelezen, dus twee gelijktijdige activaties kunnen
+      // allebei "geen lopend traject" zien. De tweede botst op de partiële index
+      // patient_rehab_trackers_one_open_per_patient en krijgt een P2002. Zonder
+      // deze vertaling komt die als rauwe databasefout bij de client terecht, en
+      // toont de app alleen "Kon het protocol niet activeren".
+      const alsConflict = (err: unknown): never => {
+        if (
+          err &&
+          typeof err === 'object' &&
+          'code' in err &&
+          (err as { code?: string }).code === 'P2002'
+        ) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Er is zojuist al een traject gestart voor deze patiënt. Ververs het scherm en probeer het opnieuw.',
+          })
+        }
+        throw err
+      }
+
       // 1. Geen lopend traject: gewoon starten.
       if (!bestaand) {
-        await ctx.prisma.patientRehabTracker.create({ data: nieuwTraject })
+        await ctx.prisma.patientRehabTracker.create({ data: nieuwTraject }).catch(alsConflict)
         return { ok: true }
       }
 
@@ -172,19 +194,21 @@ export const rehabRouter = createTRPCRouter({
       // traject naast, zodat de historie en de oude vinkjes bewaard blijven.
       // In één transactie, want de partial unique index laat geen tweede open
       // traject toe.
-      await ctx.prisma.$transaction([
-        ctx.prisma.patientRehabTracker.update({
-          where: { id: bestaand.id },
-          data: {
-            deactivatedAt: new Date(),
-            closedById: ctx.user.id,
-            // Afgesloten door een protocolwissel, niet door een therapeut die
-            // een uitkomst koos. UNKNOWN tot iemand dat alsnog invult.
-            outcome: 'UNKNOWN',
-          },
-        }),
-        ctx.prisma.patientRehabTracker.create({ data: nieuwTraject }),
-      ])
+      await ctx.prisma
+        .$transaction([
+          ctx.prisma.patientRehabTracker.update({
+            where: { id: bestaand.id },
+            data: {
+              deactivatedAt: new Date(),
+              closedById: ctx.user.id,
+              // Afgesloten door een protocolwissel, niet door een therapeut die
+              // een uitkomst koos. UNKNOWN tot iemand dat alsnog invult.
+              outcome: 'UNKNOWN',
+            },
+          }),
+          ctx.prisma.patientRehabTracker.create({ data: nieuwTraject }),
+        ])
+        .catch(alsConflict)
       return { ok: true }
     }),
 

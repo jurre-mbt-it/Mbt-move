@@ -24,8 +24,10 @@ export async function getPatientRehabTrackerData(
     where: { patientId, deactivatedAt: null },
     // Met historie kan er meer dan één rij per patiënt zijn. De partial unique
     // index houdt het aantal open trajecten op één, maar vertrouw daar niet op:
-    // een expliciete volgorde maakt dit deterministisch.
-    orderBy: { activatedAt: 'desc' },
+    // een expliciete volgorde maakt dit deterministisch. `id` als tweede
+    // sleutel, want bij een gelijke activatedAt is de keuze anders alsnog
+    // willekeurig.
+    orderBy: [{ activatedAt: 'desc' }, { id: 'desc' }],
     include: {
       protocol: {
         include: {
