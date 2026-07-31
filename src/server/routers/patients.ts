@@ -11,7 +11,12 @@ import {
   invalidateUserCache,
 } from '@/server/trpc'
 import { hasPatientAccess, practiceScope } from '@/server/lib/patient-access'
-import { careScopeKey, careScopeWhere, type CareScopeKey } from '@/server/lib/care-scope'
+import {
+  careScopeKey,
+  careScopeWhere,
+  careScopeWhereForRead,
+  type CareScopeKey,
+} from '@/server/lib/care-scope'
 import { findOpenTracker, type TrackerClient } from '@/lib/rehab-data'
 import { auditLog } from '@/server/audit'
 import { amsMidnight, dateKey } from '@/lib/week-dates'
@@ -131,129 +136,178 @@ function programmaScope(scope: CareScopeKey, userId: string): Prisma.ProgramWher
  * De regel zelf staat in src/server/lib/patient-access.ts — niet dupliceren.
  */
 export const patientsRouter = createTRPCRouter({
-  list: coachStaffProcedure.query(async ({ ctx }) => {
-    // Zichtbaar = directe koppeling (PatientTherapist) OF zelfde praktijk.
-    // Dat laatste laat collega-therapeuten binnen één praktijk elkaars
-    // patiënten zien zonder aparte invite.
-    const me = ctx.user
+  /**
+   * Werklijst met patiënten. `include` bepaalt welke kant van het archief je
+   * ziet: standaard alleen wie nog in behandeling is.
+   *
+   * De input is met opzet OPTIONEEL. Deze procedure had er tot nu toe geen, en
+   * de iOS-app (build 78, geen version-gate en geen OTA) roept 'm zonder
+   * parameters aan. Een verplichte input zou die app breken.
+   */
+  list: coachStaffProcedure
+    .input(
+      z
+        .object({
+          include: z.enum(['active', 'archived', 'all']).default('active'),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      // Zichtbaar = directe koppeling (PatientTherapist) OF zelfde praktijk.
+      // Dat laatste laat collega-therapeuten binnen één praktijk elkaars
+      // patiënten zien zonder aparte invite.
+      const me = ctx.user
+      const include = input?.include ?? 'active'
+      // Leesvariant: een therapeut zonder praktijk krijgt hier een filter dat
+      // niets matcht in plaats van een foutmelding, en houdt dus zijn lijst.
+      const careScope = careScopeWhereForRead(me)
+      // KRITIEK: dit filter gaat onder AND naast de bestaande scope-OR. Als
+      // tweede `OR`-sleutel of via een object-spread zou het de scoping wissen;
+      // dat is de lek van 27 juli, uitgeschreven bij `search` onderaan dit
+      // bestand.
+      const archiefFilter: Prisma.UserWhereInput =
+        include === 'all'
+          ? {}
+          : include === 'archived'
+            ? { careStatuses: { some: careScope } }
+            : { careStatuses: { none: careScope } }
 
-    // Self-heal stale onboarding-notes voor reeds geaccepteerde patiënten
-    // van deze therapeut. Eén UPDATE per dashboard-load; raakt alleen rijen
-    // die nog letterlijk de placeholder bevatten.
-    await ctx.prisma.patientTherapist.updateMany({
-      where: {
-        therapistId: me.id,
-        status: 'APPROVED',
-        notes: PENDING_INVITE_NOTE,
-      },
-      data: { notes: null },
-    })
+      // Self-heal stale onboarding-notes voor reeds geaccepteerde patiënten
+      // van deze therapeut. Eén UPDATE per dashboard-load; raakt alleen rijen
+      // die nog letterlijk de placeholder bevatten.
+      await ctx.prisma.patientTherapist.updateMany({
+        where: {
+          therapistId: me.id,
+          status: 'APPROVED',
+          notes: PENDING_INVITE_NOTE,
+        },
+        data: { notes: null },
+      })
 
-    // Therapietrouw-window: laatste 14 dagen. Lage compliance = ≥ 3 geplande
-    // sessies en < 60% afgerond. Threshold is bewust conservatief zodat
-    // nieuwe patiënten met 1-2 sessies niet meteen 'low' zijn.
-    const COMPLIANCE_WINDOW_DAYS = 14
-    const COMPLIANCE_MIN_SCHEDULED = 3
-    const COMPLIANCE_THRESHOLD = 0.6
-    const since = new Date(Date.now() - COMPLIANCE_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+      // Therapietrouw-window: laatste 14 dagen. Lage compliance = ≥ 3 geplande
+      // sessies en < 60% afgerond. Threshold is bewust conservatief zodat
+      // nieuwe patiënten met 1-2 sessies niet meteen 'low' zijn.
+      const COMPLIANCE_WINDOW_DAYS = 14
+      const COMPLIANCE_MIN_SCHEDULED = 3
+      const COMPLIANCE_THRESHOLD = 0.6
+      const since = new Date(Date.now() - COMPLIANCE_WINDOW_DAYS * 24 * 60 * 60 * 1000)
 
-    const patients = await ctx.prisma.user.findMany({
-      where: {
-        role: { in: ['PATIENT', 'ATHLETE'] },
-        OR: [
-          {
-            patientTherapists: {
-              some: {
-                therapistId: me.id,
-                isActive: true,
-                status: { in: ['APPROVED', 'PENDING'] },
-              },
+      const patients = await ctx.prisma.user.findMany({
+        where: {
+          role: { in: ['PATIENT', 'ATHLETE'] },
+          AND: [
+            {
+              OR: [
+                {
+                  patientTherapists: {
+                    some: {
+                      therapistId: me.id,
+                      isActive: true,
+                      status: { in: ['APPROVED', 'PENDING'] },
+                    },
+                  },
+                },
+                ...practiceScope(me),
+              ],
+            },
+            archiefFilter,
+          ],
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          avatarUrl: true,
+          phone: true,
+          dateOfBirth: true,
+          createdAt: true,
+          role: true,
+          // Alleen de LOPENDE markering van deze lezer; `careScope` bakt
+          // `reactivatedAt: null` in, dus historie van eerdere afsluitingen
+          // blijft hier buiten. Maximaal één rij per scope (partiële unieke
+          // index), vandaar take: 1.
+          careStatuses: {
+            where: careScope,
+            take: 1,
+            select: { dischargedAt: true, reason: true },
+          },
+          patientPrograms: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              weeks: true,
+              startDate: true,
+              endDate: true,
             },
           },
-          ...practiceScope(me),
-        ],
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        avatarUrl: true,
-        phone: true,
-        dateOfBirth: true,
-        createdAt: true,
-        role: true,
-        patientPrograms: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: {
-            id: true,
-            name: true,
-            status: true,
-            weeks: true,
-            startDate: true,
-            endDate: true,
+          patientTherapists: {
+            where: {
+              therapistId: me.id,
+              isActive: true,
+              status: { in: ['APPROVED', 'PENDING'] },
+            },
+            take: 1,
+            select: { status: true, notes: true },
+          },
+          sessionLogs: {
+            where: { scheduledAt: { gte: since } },
+            select: { completedAt: true },
           },
         },
-        patientTherapists: {
-          where: {
-            therapistId: me.id,
-            isActive: true,
-            status: { in: ['APPROVED', 'PENDING'] },
-          },
-          take: 1,
-          select: { status: true, notes: true },
-        },
-        sessionLogs: {
-          where: { scheduledAt: { gte: since } },
-          select: { completedAt: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+        orderBy: { createdAt: 'desc' },
+      })
 
-    return patients.map(p => {
-      const program = p.patientPrograms[0] ?? null
-      const myRel = p.patientTherapists[0] ?? null
-      const initials = (p.name ?? p.email)
-        .split(' ')
-        .map(w => w[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
+      return patients.map(p => {
+        const program = p.patientPrograms[0] ?? null
+        const myRel = p.patientTherapists[0] ?? null
+        const care = p.careStatuses[0] ?? null
+        const initials = (p.name ?? p.email)
+          .split(' ')
+          .map(w => w[0])
+          .join('')
+          .toUpperCase()
+          .slice(0, 2)
 
-      const scheduled = p.sessionLogs.length
-      const completed = p.sessionLogs.filter(s => s.completedAt !== null).length
-      const compliancePercent = scheduled > 0 ? completed / scheduled : null
-      const complianceLow =
-        scheduled >= COMPLIANCE_MIN_SCHEDULED &&
-        compliancePercent !== null &&
-        compliancePercent < COMPLIANCE_THRESHOLD
+        const scheduled = p.sessionLogs.length
+        const completed = p.sessionLogs.filter(s => s.completedAt !== null).length
+        const compliancePercent = scheduled > 0 ? completed / scheduled : null
+        const complianceLow =
+          scheduled >= COMPLIANCE_MIN_SCHEDULED &&
+          compliancePercent !== null &&
+          compliancePercent < COMPLIANCE_THRESHOLD
 
-      return {
-        accessStatus: myRel?.status ?? 'APPROVED',
-        id: p.id,
-        role: p.role,
-        name: p.name ?? p.email,
-        email: p.email,
-        phone: p.phone,
-        avatarInitials: initials,
-        dateOfBirth: p.dateOfBirth,
-        createdAt: p.createdAt,
-        notes: myRel?.notes ?? null,
-        programId: program?.id ?? null,
-        programName: program?.name ?? null,
-        programStatus: program?.status ?? null,
-        weeksTotal: program?.weeks ?? 0,
-        startDate: program?.startDate,
-        endDate: program?.endDate,
-        // Therapietrouw afgelopen 14 dagen
-        compliancePercent,
-        complianceLow,
-        complianceScheduled: scheduled,
-        complianceCompleted: completed,
-      }
-    })
-  }),
+        return {
+          accessStatus: myRel?.status ?? 'APPROVED',
+          id: p.id,
+          role: p.role,
+          name: p.name ?? p.email,
+          email: p.email,
+          phone: p.phone,
+          avatarInitials: initials,
+          dateOfBirth: p.dateOfBirth,
+          createdAt: p.createdAt,
+          // null = in behandeling. Gevuld = uitbehandeld door deze praktijk of
+          // deze coach; alleen zichtbaar bij include 'archived' of 'all'.
+          dischargedAt: care?.dischargedAt ?? null,
+          dischargeReason: care?.reason ?? null,
+          notes: myRel?.notes ?? null,
+          programId: program?.id ?? null,
+          programName: program?.name ?? null,
+          programStatus: program?.status ?? null,
+          weeksTotal: program?.weeks ?? 0,
+          startDate: program?.startDate,
+          endDate: program?.endDate,
+          // Therapietrouw afgelopen 14 dagen
+          compliancePercent,
+          complianceLow,
+          complianceScheduled: scheduled,
+          complianceCompleted: completed,
+        }
+      })
+    }),
 
   /**
    * Caseload voor de patiëntenlijst: dezelfde patiënten als `list`, plus per
@@ -284,21 +338,28 @@ export const patientsRouter = createTRPCRouter({
       const windowStart = new Date(weekStart.getTime() - (weeks - 1) * 7 * DAY)
       const windowEnd = new Date(weekStart.getTime() + 7 * DAY)
 
-      // Scope gelijk aan `list`: eigen koppeling óf dezelfde praktijk.
+      // Scope gelijk aan `list`: eigen koppeling óf dezelfde praktijk, en
+      // zonder lopende uitbehandel-markering. Dat archieffilter staat als
+      // aparte AND-tak naast de scope-OR en nooit als tweede `OR`-sleutel.
       const patients = await ctx.prisma.user.findMany({
         where: {
           role: { in: ['PATIENT', 'ATHLETE'] },
-          OR: [
+          AND: [
             {
-              patientTherapists: {
-                some: {
-                  therapistId: me.id,
-                  isActive: true,
-                  status: { in: ['APPROVED', 'PENDING'] },
+              OR: [
+                {
+                  patientTherapists: {
+                    some: {
+                      therapistId: me.id,
+                      isActive: true,
+                      status: { in: ['APPROVED', 'PENDING'] },
+                    },
+                  },
                 },
-              },
+                ...practiceScope(me),
+              ],
             },
-            ...practiceScope(me),
+            { careStatuses: { none: careScopeWhereForRead(me) } },
           ],
         },
         select: { id: true },
@@ -567,22 +628,32 @@ export const patientsRouter = createTRPCRouter({
       //   2. zelf een sessie voor de patiënt gelogd (SessionLog.therapistId), OF
       //   3. zelf een programma voor de patiënt gemaakt (Program.creatorId), OF
       //   4. zelf een weekschema voor de patiënt gemaakt (WeekSchedule.creatorId).
+      //
+      // Uitbehandelde patiënten vallen af. Het archieffilter staat als aparte
+      // AND-tak naast de engagement-OR; een tweede `OR`-sleutel zou die hele
+      // lijst met engagements wissen. Dit dekt meteen `silentPatients`
+      // onderaan, dat uit dezelfde `patients` wordt afgeleid.
       const patients = await ctx.prisma.user.findMany({
         where: {
           role: { in: ['PATIENT', 'ATHLETE'] },
-          OR: [
+          AND: [
             {
-              patientTherapists: {
-                some: {
-                  therapistId: me.id,
-                  isActive: true,
-                  status: { in: ['APPROVED', 'PENDING'] },
+              OR: [
+                {
+                  patientTherapists: {
+                    some: {
+                      therapistId: me.id,
+                      isActive: true,
+                      status: { in: ['APPROVED', 'PENDING'] },
+                    },
+                  },
                 },
-              },
+                { sessionLogs: { some: { therapistId: me.id } } },
+                { patientPrograms: { some: { creatorId: me.id } } },
+                { patientWeekSchedules: { some: { creatorId: me.id } } },
+              ],
             },
-            { sessionLogs: { some: { therapistId: me.id } } },
-            { patientPrograms: { some: { creatorId: me.id } } },
-            { patientWeekSchedules: { some: { creatorId: me.id } } },
+            { careStatuses: { none: careScopeWhereForRead(me) } },
           ],
         },
         select: {
@@ -2436,10 +2507,16 @@ export const patientsRouter = createTRPCRouter({
               ],
             }
 
+      // Derde AND-tak, zelfde reden: uitbehandelde patiënten horen niet in een
+      // kiezer waarmee je iets nieuws aan iemand hangt.
+      const archiefFilter: Prisma.UserWhereInput = {
+        careStatuses: { none: careScopeWhereForRead(ctx.user) },
+      }
+
       return ctx.prisma.user.findMany({
         where: {
           role: { in: ['PATIENT', 'ATHLETE'] },
-          AND: [scopeFilter, queryFilter],
+          AND: [scopeFilter, queryFilter, archiefFilter],
         },
         select: { id: true, name: true, email: true },
         take: 20,
