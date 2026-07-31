@@ -45,22 +45,50 @@ export function careScopeKey(user: ScopeUser): CareScopeKey {
 }
 
 /**
- * Where-fragment om de rijen van deze gebruiker te vinden. Nooit leeg: een
- * lege where zou in een OR-tak de scoping volledig laten wegvallen.
+ * Where-fragment dat precies één lopende markering aanwijst.
+ *
+ * `reactivatedAt: null` hoort er ONLOSMAKELIJK bij. Een gereactiveerde rij
+ * blijft staan, want de reden en de toelichting van de vorige afsluiting zijn
+ * een klinisch oordeel dat niet in de audit-log mag (PII) en dus nergens
+ * anders bewaard wordt. Zonder deze voorwaarde zou zo'n rij uit de historie
+ * de patiënt voor altijd als inactief laten gelden.
+ */
+export type CareScopeWhere =
+  | { practiceId: string; reactivatedAt: null }
+  | { coachId: string; reactivatedAt: null }
+
+/**
+ * Where-fragment om de lopende markering van deze gebruiker te vinden. Nooit
+ * leeg: een lege where zou in een OR-tak de scoping volledig laten wegvallen.
+ *
+ * De voorwaarde `reactivatedAt: null` zit ingebakken en niet bij de caller.
+ * Dit fragment belandt in tientallen `careStatuses: { none: ... }` en
+ * `{ some: ... }`-filters; één plek waar hij vergeten wordt is één lijst waarin
+ * een allang teruggehaalde patiënt onzichtbaar blijft, en dat merk je niet aan
+ * een foutmelding.
  *
  * Gooit dezelfde fouten als {@link careScopeKey}. Gebruik deze variant op
  * schrijfpaden. Zit het fragment in een lijst- of telquery, gebruik dan
  * {@link careScopeWhereForRead}, anders krijgt een account zonder praktijk een
  * foutmelding in plaats van zijn lijst.
  */
-export function careScopeWhere(user: ScopeUser): { practiceId: string } | { coachId: string } {
+export function careScopeWhere(user: ScopeUser): CareScopeWhere {
   const key = careScopeKey(user)
-  return key.coachId !== null ? { coachId: key.coachId } : { practiceId: key.practiceId }
+  return key.coachId !== null
+    ? { coachId: key.coachId, reactivatedAt: null }
+    : { practiceId: key.practiceId, reactivatedAt: null }
 }
 
 /**
  * Matcht geen enkele rij. Vers object per aanroep, zodat een caller het mag
  * uitbreiden zonder de volgende aanroep te vervuilen.
+ *
+ * Hier staat bewust GEEN `reactivatedAt: null` bij. Gedrag verandert er niet
+ * van: een lege `in`-lijst is al onvervulbaar, en die AND-en met wat dan ook
+ * blijft onvervulbaar. Maar het fragment zou er daarmee uitzien als een gewone
+ * scope, en dan is `practiceId: { in: [] }` iets dat iemand later "repareert"
+ * terwijl de rest van de where blijft staan. Nu is de onvervulbaarheid het hele
+ * object en valt er niets aan te repareren zonder de functie te lezen.
  */
 function matchtNiets(): { practiceId: { in: string[] } } {
   return { practiceId: { in: [] } }
@@ -80,13 +108,17 @@ function matchtNiets(): { practiceId: { in: string[] } } {
  * `some` fataal: dan komt het archief van de hele praktijk, of dat van elke
  * coach, in de lijst terecht. Eén helper voor beide richtingen houdt die
  * vergissing buiten de deur.
+ *
+ * Net als de schrijfvariant matcht deze alleen LOPENDE markeringen: zie
+ * {@link CareScopeWhere}. Wil je juist de historie van eerdere afsluitingen
+ * lezen, bouw dan een eigen where en scope hem met {@link careScopeKey}.
  */
 export function careScopeWhereForRead(
   user: ScopeUser,
-): { practiceId: string } | { coachId: string } | { practiceId: { in: string[] } } {
-  if (user.role === 'COACH') return { coachId: user.id }
+): CareScopeWhere | { practiceId: { in: string[] } } {
+  if (user.role === 'COACH') return { coachId: user.id, reactivatedAt: null }
   if ((user.role === 'THERAPIST' || user.role === 'ADMIN') && user.practiceId) {
-    return { practiceId: user.practiceId }
+    return { practiceId: user.practiceId, reactivatedAt: null }
   }
   return matchtNiets()
 }

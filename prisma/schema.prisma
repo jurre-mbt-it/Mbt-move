@@ -366,11 +366,12 @@ model User {
   rehabTrackersClosed    PatientRehabTracker[]  @relation("RehabTrackerCloser")
   rehabStatusUpdates     RehabCriterionStatus[] @relation("RehabStatusUpdater")
 
-  // Uitbehandeld-markering: als patiënt, als scope-houdende coach, en als
-  // degene die de markering zette.
-  careStatuses           PatientCareStatus[] @relation("CareStatusPatient")
-  careStatusesAsCoach    PatientCareStatus[] @relation("CareStatusCoach")
-  careStatusesDischarged PatientCareStatus[] @relation("CareStatusDischarger")
+  // Uitbehandeld-markering: als patiënt, als scope-houdende coach, als degene
+  // die de markering zette, en als degene die hem weer ophief.
+  careStatuses            PatientCareStatus[] @relation("CareStatusPatient")
+  careStatusesAsCoach     PatientCareStatus[] @relation("CareStatusCoach")
+  careStatusesDischarged  PatientCareStatus[] @relation("CareStatusDischarger")
+  careStatusesReactivated PatientCareStatus[] @relation("CareStatusReactivator")
 
   // Educatie-content (admin-beheerd)
   educationalResources EducationalResource[] @relation("EducationalResourceCreator")
@@ -516,6 +517,13 @@ model PatientCareStatus {
   reason         CareDischargeReason
   /// Vrije toelichting. Medische PII, staat daarom hier en niet in AuditLog.metadata.
   note           String?
+
+  /// Gezet toen de patiënt weer in behandeling ging. Rij blijft bestaan zodat de
+  /// reden en de toelichting van de vorige afsluiting terug te lezen blijven;
+  /// alleen rijen met reactivatedAt = null tellen als "nu inactief".
+  reactivatedAt   DateTime?
+  reactivatedById String?
+  reactivatedBy   User?     @relation("CareStatusReactivator", fields: [reactivatedById], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

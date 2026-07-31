@@ -57,19 +57,64 @@ describe('careScopeKey', () => {
   })
 })
 
+/**
+ * Rijen zoals ze in patient_care_status staan, uitgekleed tot de velden waar de
+ * where-fragmenten op filteren. `matcht` speelt Prisma's AND-semantiek na, zodat
+ * een test kan aantonen wat een fragment wel en niet selecteert.
+ */
+const lopendPraktijk = { practiceId: 'p1', coachId: null, reactivatedAt: null }
+const afgeslotenPraktijk = { practiceId: 'p1', coachId: null, reactivatedAt: new Date() }
+const lopendCoach = { practiceId: null, coachId: 'c1', reactivatedAt: null }
+
+function matcht(fragment: Record<string, unknown>, rij: Record<string, unknown>): boolean {
+  return Object.entries(fragment).every(([veld, waarde]) => {
+    if (waarde && typeof waarde === 'object' && 'in' in waarde) {
+      return (waarde as { in: unknown[] }).in.includes(rij[veld])
+    }
+    return rij[veld] === waarde
+  })
+}
+
 describe('careScopeWhere', () => {
   it('geeft nooit een lege where terug', () => {
     // Een lege where zou in een OR-tak de scoping volledig laten wegvallen.
-    expect(careScopeWhere(coach)).toEqual({ coachId: 'c1' })
-    expect(careScopeWhere(therapeut)).toEqual({ practiceId: 'p1' })
+    expect(careScopeWhere(coach)).toEqual({ coachId: 'c1', reactivatedAt: null })
+    expect(careScopeWhere(therapeut)).toEqual({ practiceId: 'p1', reactivatedAt: null })
+  })
+
+  it('filtert zelf op lopende markeringen, zodat een caller dat niet kan vergeten', () => {
+    // Het fragment belandt in tientallen careStatuses: { none/some: ... }
+    // filters. Zit de voorwaarde bij de caller, dan is één vergeten filter één
+    // lijst waarin een teruggehaalde patiënt onzichtbaar blijft.
+    expect(careScopeWhere(therapeut)).toHaveProperty('reactivatedAt', null)
+  })
+
+  it('matcht een lopende markering en negeert een afgesloten periode', () => {
+    const fragment = careScopeWhere(therapeut)
+    expect(matcht(fragment, lopendPraktijk)).toBe(true)
+    // Dezelfde patiënt, dezelfde praktijk, maar al teruggehaald. Deze rij
+    // blijft bewaard voor de reden en de toelichting; hij mag de patiënt niet
+    // opnieuw als inactief laten gelden.
+    expect(matcht(fragment, afgeslotenPraktijk)).toBe(false)
+  })
+
+  it('houdt praktijk en coach uit elkaar', () => {
+    expect(matcht(careScopeWhere(therapeut), lopendCoach)).toBe(false)
+    expect(matcht(careScopeWhere(coach), lopendPraktijk)).toBe(false)
   })
 })
 
 describe('careScopeWhereForRead', () => {
   it('scopet net als de schrijfvariant zolang er een geldige scope is', () => {
-    expect(careScopeWhereForRead(therapeut)).toEqual({ practiceId: 'p1' })
-    expect(careScopeWhereForRead(coach)).toEqual({ coachId: 'c1' })
-    expect(careScopeWhereForRead(admin)).toEqual({ practiceId: 'p1' })
+    expect(careScopeWhereForRead(therapeut)).toEqual({ practiceId: 'p1', reactivatedAt: null })
+    expect(careScopeWhereForRead(coach)).toEqual({ coachId: 'c1', reactivatedAt: null })
+    expect(careScopeWhereForRead(admin)).toEqual({ practiceId: 'p1', reactivatedAt: null })
+  })
+
+  it('negeert een afgesloten periode net zo goed als de schrijfvariant', () => {
+    const fragment = careScopeWhereForRead(therapeut)
+    expect(matcht(fragment, lopendPraktijk)).toBe(true)
+    expect(matcht(fragment, afgeslotenPraktijk)).toBe(false)
   })
 
   it('gooit niet bij een therapeut zonder praktijk maar matcht niets', () => {
@@ -80,6 +125,16 @@ describe('careScopeWhereForRead', () => {
   it('matcht ook niets voor een rol die hier niets te zoeken heeft', () => {
     expect(careScopeWhereForRead(patient)).toEqual({ practiceId: { in: [] } })
     expect(careScopeWhereForRead(atleet)).toEqual({ practiceId: { in: [] } })
+  })
+
+  it('matcht geen enkele rij zonder geldige scope, lopend of afgesloten', () => {
+    // De lege in-lijst is op zichzelf al onvervulbaar, daarom staat er bewust
+    // geen reactivatedAt bij: er valt niets aan toe te voegen en een tweede
+    // voorwaarde zou de vorm laten lijken op een gewone scope.
+    const fragment = careScopeWhereForRead(losseTherapeut)
+    expect(matcht(fragment, lopendPraktijk)).toBe(false)
+    expect(matcht(fragment, afgeslotenPraktijk)).toBe(false)
+    expect(matcht(fragment, lopendCoach)).toBe(false)
   })
 
   it('geeft elke aanroep een vers object, zodat een caller het kan uitbreiden', () => {

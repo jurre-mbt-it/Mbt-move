@@ -38,6 +38,12 @@ const PENDING_INVITE_NOTE = 'Aangemaakt via invite, wacht op acceptatie'
  * niet, want `db push` negeert partiële indexen, dus een compound upsert kan
  * niet en dit is read-then-write: twee therapeuten die tegelijk archiveren
  * zien allebei "nog niet inactief" en de tweede insert botst.
+ *
+ * Sinds gereactiveerde rijen bewaard blijven staan die indexen op
+ * `AND "reactivatedAt" IS NULL` (20260805_care_status_reactivated.sql). Een
+ * botsing betekent daardoor nog steeds precies één ding: er staat al een
+ * LOPENDE markering. De melding hieronder klopt dus ook met historie erbij;
+ * een oude, afgesloten periode botst niet.
  */
 const alsConflict = (bericht: string) => (err: unknown): never => {
   if (
@@ -1498,6 +1504,11 @@ export const patientsRouter = createTRPCRouter({
    * Alleen binnen de eigen scope: een praktijk haalt geen coach-markering weg
    * en andersom. Programma's die bij het archiveren zijn dichtgezet komen mee
    * terug, met hun startdatum opgeschoven over de onderbreking heen.
+   *
+   * De uitbehandel-rij wordt afgestempeld en niet verwijderd, zodat de reden en
+   * de toelichting van die periode terug te lezen blijven. Een patiënt kan dus
+   * meerdere afgesloten periodes hebben; alleen de rij met `reactivatedAt` null
+   * telt als "nu inactief", en dat filter zit in careScopeWhere zelf.
    */
   reactivate: coachStaffProcedure
     .input(z.object({ id: z.string() }))
@@ -1518,6 +1529,9 @@ export const patientsRouter = createTRPCRouter({
       }
 
       const scope = careScopeKey(ctx.user)
+      // careScopeWhere filtert zelf op `reactivatedAt: null`, dus dit vindt
+      // alleen een lopende markering. Twee keer heractiveren geeft daardoor
+      // vanzelf NOT_FOUND in plaats van een tweede startdatum-schuif.
       const rij = await ctx.prisma.patientCareStatus.findFirst({
         where: { patientId: input.id, ...careScopeWhere(ctx.user) },
       })
@@ -1528,7 +1542,13 @@ export const patientsRouter = createTRPCRouter({
       const onderbreking = Date.now() - rij.dischargedAt.getTime()
 
       await ctx.prisma.$transaction(async (tx) => {
-        await tx.patientCareStatus.delete({ where: { id: rij.id } })
+        // Afstempelen, niet verwijderen. De reden en de toelichting van deze
+        // afsluiting zijn een klinisch oordeel dat vanwege de PII-regel niet in
+        // de audit-log staat; met een DELETE was het na één misklik weg.
+        await tx.patientCareStatus.update({
+          where: { id: rij.id },
+          data: { reactivatedAt: new Date(), reactivatedById: ctx.user.id },
+        })
         // Alleen programma's die door het archiveren dichtgingen, en alleen
         // binnen de eigen scope. Wat de therapeut zelf afrondde blijft
         // COMPLETED, en wat een coach dichtzette blijft van de coach.
