@@ -347,7 +347,9 @@ export function getMuscleFatigueColor(p: number): string {
   if (p >= 80) return '#5FD08A' // P.green — recovered
   if (p >= 55) return '#F5B942' // P.gold — recovering
   if (p >= 30) return '#E87A55' // accent orange (P.lime) — loaded
-  return '#F0796C' // P.danger — heavily loaded
+  // iOS P.danger. Deliberately NOT this repo's P.danger (#F0796C): docs §6 pins
+  // this ramp to the iOS tokens, and the two palettes disagree on danger.
+  return '#F87171' // iOS P.danger — heavily loaded
 }
 
 export function getMuscleFatigueLabel(p: number): string {
