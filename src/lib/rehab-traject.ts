@@ -135,3 +135,39 @@ export function mergeCriterionStatuses<T extends CriterionLike>(
     }
   })
 }
+
+/** Eén traject zoals `rehab.getMyLastClosedTraject` het nodig heeft om te kiezen. */
+export type TrajectKiesbaar = { id: string; activatedAt: Date; deactivatedAt: Date | null }
+
+/**
+ * Bepaalt wat `rehab.getMyLastClosedTraject` aan de patiënt teruggeeft,
+ * gegeven ALLE trajecten van die patiënt, in willekeurige volgorde.
+ *
+ * Een lopend traject (deactivatedAt null) wint altijd en levert null op: dan
+ * is "is mijn traject afgesloten" niet de vraag die voorligt, en hoort het
+ * gewone scherm te tonen, niet een afsluit-melding over een oud traject
+ * terwijl er alweer een nieuw loopt.
+ *
+ * Zonder lopend traject is het antwoord het meest recent afgesloten traject
+ * (op deactivatedAt, met id als tweede sleutel bij een gelijkspel, zelfde
+ * aanpak als findOpenTracker in rehab-data.ts), of null als de patiënt nooit
+ * een traject heeft gehad.
+ */
+export function laatsteAfgeslotenTraject<T extends TrajectKiesbaar>(trajecten: T[]): T | null {
+  if (trajecten.some((t) => t.deactivatedAt === null)) return null
+
+  let laatste: (T & { deactivatedAt: Date }) | null = null
+  for (const t of trajecten) {
+    if (t.deactivatedAt === null) continue
+    const kandidaat = t as T & { deactivatedAt: Date }
+    if (
+      !laatste ||
+      kandidaat.deactivatedAt > laatste.deactivatedAt ||
+      (kandidaat.deactivatedAt.getTime() === laatste.deactivatedAt.getTime() &&
+        kandidaat.id > laatste.id)
+    ) {
+      laatste = kandidaat
+    }
+  }
+  return laatste
+}
