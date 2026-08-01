@@ -2458,6 +2458,50 @@ function WeekPlannerContent() {
     return () => window.removeEventListener('pointerup', up)
   }, [])
 
+  /**
+   * Van patiënt wisselen wist alles wat aan de vórige hing.
+   *
+   * Dit is geen opruimwerk maar de enige bescherming die er is. De
+   * vergrendel-vlag rekent elke render opnieuw uit `selectedPatientId`, maar het
+   * detailpaneel, de dagselectie, de cardio-bouwer en het week-klembord zijn
+   * state die een wissel overleeft: `setUrl` verzet alleen de id, er is geen
+   * remount en `liveDetail` blijft het item van de vorige patiënt teruggeven.
+   *
+   * Wat er zonder deze reset gebeurt: je opent een workout van een
+   * gearchiveerde patiënt (het paneel opent vergrendeld, lezen mag) en kiest
+   * daarna een actieve patiënt. De vlag gaat uit, het paneel toont nog steeds
+   * het oude item, en "Snel bewerken", "Kopiëren" en de oefeningen-bouwer staan
+   * weer aan. `updateItem`, `duplicateItem` en `setItemExercises` hebben géén
+   * server-guard op de behandelstatus, dus die opslag slaagt gewoon: de kop
+   * zegt B, de schrijfactie landt op het itemId van A.
+   *
+   * Zelfde verhaal voor de dagselectie. `startSelection` weigert een nieuwe
+   * selectie bij een gearchiveerde patiënt, maar een selectie die je vóór de
+   * wissel maakte bleef staan, inclusief de toolbar en "Opslaan als plan".
+   *
+   * De open dialogen gaan om dezelfde reden mee. De toevoeg-modal houdt een
+   * `dayId` van de vorige patiënt vast (`addItem` schrijft dan in diens week),
+   * en week-instellingen en "Plan toepassen" schrijven juist naar de nieuw
+   * gekozen patiënt met waardes die je voor de vorige invulde. Wie van patiënt
+   * wisselt begint opnieuw; dat is het enige gedrag dat niet stiekem verkeerd
+   * kan aflopen.
+   */
+  useEffect(() => {
+    setDetailItem(null)
+    setPanelClosing(false)
+    setCardioBuilderItem(null)
+    setWeekClipboard(null)
+    setSelectedIsos(new Set())
+    selectAnchor.current = null
+    selecting.current = false
+    setAddOpen(false)
+    setAddDayId(null)
+    setAddDayDate(null)
+    setWeekMetaOpen(null)
+    setApplyPlanOpen(false)
+    setSavePlanRange(null)
+  }, [selectedPatientId])
+
   // Kalenderbereik van de huidige dag-selectie, als ISO-dagen. Bewust op datum
   // en niet op weekNumber: dat veld is in de praktijk vrijwel altijd 1 en
   // meerdere schedules delen het, dus het identificeert geen kalenderweek.
@@ -2647,7 +2691,10 @@ function WeekPlannerContent() {
           <Display size="md">{monthLabel.toUpperCase()}</Display>
         </div>
         <div className="flex items-center gap-2">
-          {selectedPatientId && selectedWeekRange && (
+          {/* Ook op de vergrendel-vlag: een selectie kan alleen ontstaan bij een
+              actieve patiënt, maar een knop die na een wissel blijft hangen is
+              precies waar het hierboven beschreven lek zat. */}
+          {selectedPatientId && selectedWeekRange && !planningVergrendeld && (
             <DarkButton
               variant="secondary"
               onClick={() => setSavePlanRange({ from: selectedWeekRange.from, to: selectedWeekRange.to })}
@@ -2807,8 +2854,10 @@ function WeekPlannerContent() {
         )}
 
 
-        {/* Selectie-toolbar: zichtbaar zodra er dagen geselecteerd zijn */}
-        {selectedIsos.size > 0 && (
+        {/* Selectie-toolbar: zichtbaar zodra er dagen geselecteerd zijn, en
+            nooit bij een gearchiveerde patiënt. Slepen doet daar niets, dus een
+            blok knoppen zonder effect is erger dan geen blok knoppen. */}
+        {selectedIsos.size > 0 && !planningVergrendeld && (
           <div
             className="flex items-center gap-3 flex-wrap rounded-xl px-3 py-2 animate-in fade-in-0 slide-in-from-top-1 duration-200"
             style={{ background: P.surface, border: `1px solid ${P.brand}` }}

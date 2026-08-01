@@ -8,6 +8,11 @@ import { trpc } from '@/lib/trpc/client'
 import { usePortal } from '@/lib/portal'
 import {
   DarkButton,
+  DarkDialog as Dialog,
+  DarkDialogContent as DialogContent,
+  DarkDialogDescription as DialogDescription,
+  DarkDialogHeader as DialogHeader,
+  DarkDialogTitle as DialogTitle,
   DarkInput,
   DarkTabs as Tabs,
   DarkTabsContent as TabsContent,
@@ -160,6 +165,12 @@ export default function PatientDetailPage({
   const [coMonitorOpen, setCoMonitorOpen] = useState(false)
   const [unlinkOpen, setUnlinkOpen] = useState(false)
   const [dischargeOpen, setDischargeOpen] = useState(false)
+  // Bevestiging vóór "Stuur invite-link", maar alleen bij een gearchiveerde
+  // patiënt. Bij iemand die in behandeling is doet de knop precies wat er staat
+  // en hoort er geen drempel; bij iemand uit het archief haalt dezelfde knop de
+  // markering weg, en dat staat nergens op de knop. Wie in een afgesloten
+  // dossier zit is daar meestal om te lezen.
+  const [resendConfirmOpen, setResendConfirmOpen] = useState(false)
   const reactivate = trpc.patients.reactivate.useMutation({
     onSuccess: () => {
       utils.patients.get.invalidate({ id })
@@ -177,11 +188,25 @@ export default function PatientDetailPage({
   })
   const resendInvite = trpc.invite.resend.useMutation({
     onSuccess: (res) => {
+      // Opnieuw uitnodigen doet meer dan mailen: `invite.resend` heft via
+      // `hefUitbehandeldOp` de uitbehandel-markering op. Zonder deze twee
+      // invalidaties blijft de archiefbanner hierboven staan en blijft de
+      // patiënt in het archief hangen terwijl hij al weer in behandeling is,
+      // tot iemand de pagina ververst. Onvoorwaardelijk, want de markering kan
+      // ook door een collega gezet zijn nadat deze pagina laadde.
+      utils.patients.get.invalidate({ id })
+      utils.patients.list.invalidate()
       if (res.mailDelivered) {
         const expires = new Date(res.expiresAt).toLocaleString('nl-NL', {
           day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
         })
-        toast.success(`Uitnodiging verstuurd naar ${res.email}. Verloopt ${expires}.`)
+        toast.success(`Uitnodiging verstuurd naar ${res.email}. Verloopt ${expires}.`, {
+          // Alleen als er ook echt iets op te heffen viel. De programma's
+          // blijven dicht: dat doet alleen "Weer in behandeling".
+          description: patient?.careStatus
+            ? `${patient.name} staat daarmee ook weer in behandeling. De programma's die bij het afsluiten dichtgingen blijven dicht.`
+            : undefined,
+        })
         setInviteFallback(null)
       } else {
         setInviteFallback({
@@ -360,7 +385,10 @@ export default function PatientDetailPage({
             variant="secondary"
             disabled={resendInvite.isPending}
             loading={resendInvite.isPending}
-            onClick={() => resendInvite.mutate({ patientId: patient.id })}
+            onClick={() => {
+              if (careStatus) setResendConfirmOpen(true)
+              else resendInvite.mutate({ patientId: patient.id })
+            }}
           >
             <span className="inline-flex items-center gap-1.5"><IconMail size={15} /> Stuur invite-link</span>
           </DarkButton>
@@ -1009,6 +1037,50 @@ export default function PatientDetailPage({
           onDone={() => router.push(portal.patients)}
         />
       )}
+
+      {/* Opnieuw uitnodigen vanuit het archief. De knop belooft een mail, de
+          server heft er ook de uitbehandel-markering mee op, en dat verschil
+          hoort de therapeut te zien vóórdat hij klikt en niet erna in een
+          toast. De tekst zegt er meteen bij wat er níet gebeurt, want dat is de
+          reden om in plaats hiervan "Weer in behandeling" te kiezen. */}
+      <Dialog open={resendConfirmOpen} onOpenChange={(o) => !o && setResendConfirmOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Opnieuw uitnodigen en weer in behandeling?</DialogTitle>
+            <DialogDescription>
+              {patient.name} staat nu op inactief. Een nieuwe uitnodiging haalt die markering weg,
+              dus {patient.name} komt terug in je werklijst, je signalen en de dagelijkse
+              herinneringen.
+            </DialogDescription>
+          </DialogHeader>
+
+          <p style={{ color: P.inkMuted, fontSize: 13, lineHeight: 1.6 }}>
+            De programma&rsquo;s die bij het afsluiten dichtgingen blijven dicht. Wil je die wél
+            terug, gebruik dan &ldquo;Weer in behandeling&rdquo; bovenaan het dossier.
+          </p>
+
+          <div className="mt-4 flex justify-end gap-2">
+            <DarkButton
+              variant="secondary"
+              onClick={() => setResendConfirmOpen(false)}
+              disabled={resendInvite.isPending}
+            >
+              Annuleren
+            </DarkButton>
+            <DarkButton
+              variant="primary"
+              disabled={resendInvite.isPending}
+              loading={resendInvite.isPending}
+              onClick={() => {
+                setResendConfirmOpen(false)
+                resendInvite.mutate({ patientId: patient.id })
+              }}
+            >
+              Uitnodiging sturen
+            </DarkButton>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {dischargeOpen && (
         <DischargeDialog

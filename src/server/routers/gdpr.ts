@@ -135,10 +135,12 @@ export const gdprRouter = createTRPCRouter({
       // net zo goed bij zijn gegevens. Geen careScopeWhereForRead hier: dat
       // filter scopet op de LEZER, en de lezer is hier de betrokkene zelf.
       //
-      // `dischargedBy`/`reactivatedBy` als naam en e-mail: wie dit besluit nam
-      // is onderdeel van de informatie waar art. 15 recht op geeft, en een
-      // kale user-id zegt de betrokkene niets. Verder geen velden van die
-      // behandelaar.
+      // `dischargedBy`/`reactivatedBy` gaan mee als NAAM: wie dit besluit nam
+      // is onderdeel van de informatie waar art. 15 recht op geeft, en een kale
+      // user-id zegt de betrokkene niets. Het e-mailadres wordt hier alleen
+      // opgehaald als terugval voor een behandelaar zonder naam, precies zoals
+      // `patients.get` het doet, en haalt de export verder niet (zie
+      // `careStatusExport` hieronder). Verder geen velden van die behandelaar.
       ctx.prisma.patientCareStatus.findMany({
         where: { patientId: userId },
         orderBy: { dischargedAt: 'desc' },
@@ -158,6 +160,26 @@ export const gdprRouter = createTRPCRouter({
 
     if (!user) throw new TRPCError({ code: 'NOT_FOUND' })
 
+    // De behandelaar gaat als naam mee, niet als naam plus werk-e-mailadres.
+    // Dat adres voegt voor de betrokkene niets toe aan "wie sloot mijn
+    // behandeling af", is een persoonsgegeven van een derde, en dit bestand is
+    // een download die overal terecht kan komen. Het adres blijft alleen als
+    // terugval staan voor een behandelaar zonder naam, want een leeg veld zegt
+    // helemaal niets.
+    const careStatusExport = careStatuses.map((c) => ({
+      id: c.id,
+      dischargedAt: c.dischargedAt,
+      reason: c.reason,
+      note: c.note,
+      reactivatedAt: c.reactivatedAt,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+      dischargedByName: c.dischargedBy.name ?? c.dischargedBy.email,
+      reactivatedByName: c.reactivatedBy
+        ? c.reactivatedBy.name ?? c.reactivatedBy.email
+        : null,
+    }))
+
     const payload = {
       exportedAt: new Date().toISOString(),
       format: 'mbt-move:export:v1',
@@ -174,7 +196,7 @@ export const gdprRouter = createTRPCRouter({
       messages,
       notifications,
       weekSchedules,
-      careStatuses,
+      careStatuses: careStatusExport,
       researchConsent,
       favoriteExercises,
       auditLogs,

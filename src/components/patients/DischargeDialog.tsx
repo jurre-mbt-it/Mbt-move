@@ -244,10 +244,17 @@ export function DischargeDialog({
                   />
                 ))}
               </div>
+              {/* Precies zeggen langs welke weg de programma's terugkomen. Ze
+                  komen alleen mee met de knop "Weer in behandeling" op het
+                  dossier; opnieuw uitnodigen maakt deze {personLabel} wel weer
+                  actief maar laat de programma's dicht. Zonder dat onderscheid
+                  leest deze regel als een belofte die het ene pad niet
+                  waarmaakt. */}
               <p style={{ color: P.inkDim, fontSize: 11.5, lineHeight: 1.5 }}>
-                Wat je hier afsluit komt vanzelf weer terug zodra je {personLabel} weer in
-                behandeling neemt. Laat je een programma aan staan, dan blijft het gewoon doorlopen
-                in de app.
+                Wat je hier afsluit komt terug zodra je deze {personLabel} met de knop &ldquo;Weer
+                in behandeling&rdquo; bovenaan het dossier terughaalt. Nodig je hem opnieuw uit,
+                dan is hij ook weer in behandeling, maar blijven deze programma&rsquo;s dicht. Laat
+                je een programma aan staan, dan blijft het gewoon doorlopen in de app.
               </p>
             </div>
           )}
