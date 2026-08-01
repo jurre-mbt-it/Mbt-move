@@ -71,6 +71,7 @@ export const gdprRouter = createTRPCRouter({
       favoriteExercises,
       auditLogs,
       dpaRecords,
+      careStatuses,
     ] = await Promise.all([
       ctx.prisma.user.findUnique({
         where: { id: userId },
@@ -123,6 +124,36 @@ export const gdprRouter = createTRPCRouter({
       // Research-consent anonymized-records: uit anonymousIdMapping ketenen niet
       // direct retoureerbaar (zijn gedepersonaliseerd per ontwerp). We melden het.
       ctx.prisma.anonymousIdMapping.findUnique({ where: { userId } }),
+      // Behandelstatus: wanneer een praktijk of coach de behandeling afsloot,
+      // waarom, en de vrije toelichting daarbij. Dat laatste is een klinisch
+      // oordeel over de betrokkene en valt daarmee onder art. 15; het staat
+      // bewust NIET in de audit-log (audit.ts:7-8 verbiedt PII in metadata),
+      // dus deze export is de enige plek waar de betrokkene er bij kan.
+      //
+      // Alle rijen, ook de gereactiveerde: `reactivatedAt` is gevuld zodra
+      // iemand weer in behandeling is genomen, en die eerdere periodes horen
+      // net zo goed bij zijn gegevens. Geen careScopeWhereForRead hier: dat
+      // filter scopet op de LEZER, en de lezer is hier de betrokkene zelf.
+      //
+      // `dischargedBy`/`reactivatedBy` als naam en e-mail: wie dit besluit nam
+      // is onderdeel van de informatie waar art. 15 recht op geeft, en een
+      // kale user-id zegt de betrokkene niets. Verder geen velden van die
+      // behandelaar.
+      ctx.prisma.patientCareStatus.findMany({
+        where: { patientId: userId },
+        orderBy: { dischargedAt: 'desc' },
+        select: {
+          id: true,
+          dischargedAt: true,
+          reason: true,
+          note: true,
+          reactivatedAt: true,
+          createdAt: true,
+          updatedAt: true,
+          dischargedBy: { select: { name: true, email: true } },
+          reactivatedBy: { select: { name: true, email: true } },
+        },
+      }),
     ])
 
     if (!user) throw new TRPCError({ code: 'NOT_FOUND' })
@@ -143,6 +174,7 @@ export const gdprRouter = createTRPCRouter({
       messages,
       notifications,
       weekSchedules,
+      careStatuses,
       researchConsent,
       favoriteExercises,
       auditLogs,
