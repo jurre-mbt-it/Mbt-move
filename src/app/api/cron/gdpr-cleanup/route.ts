@@ -109,6 +109,30 @@ export async function GET(req: NextRequest) {
         '[cron/gdpr-cleanup] delete failed',
         JSON.stringify({ userId: u.id, email: u.email, reason: msg }),
       )
+      // Naast de logregel ook in de audit-trail, want dáár kijkt een mens wel.
+      // Een mislukte verwijdering is geen technisch detail: er loopt een
+      // AVG-termijn door terwijl de gebruiker blijft staan. Zonder dit spoor
+      // moet iemand op goed geluk in de Vercel-logs zoeken naar een fout
+      // waarvan hij niet weet dat hij bestaat.
+      await auditLog({
+        event: 'ACCOUNT_DELETE_FAILED',
+        resource: 'User',
+        resourceId: u.id,
+        actorEmail: 'cron:gdpr-cleanup',
+        metadata: {
+          originalEmail: u.email,
+          requestedAt: u.deletionRequestedAt?.toISOString(),
+          reason: msg,
+          source: 'cron',
+          // Wat je moet doen. De meest voorkomende oorzaak is een
+          // RESTRICT-relatie op auteurschap; dat script zet die eerst over.
+          remedie: 'EMAIL=<adres> PREVIEW=1 npx tsx scripts/delete-user.ts',
+        },
+        req,
+      }).catch(() => {
+        // Faalt de audit-schrijf ook, dan blijft de console-regel hierboven
+        // over. Nooit de lus laten omvallen op het opschrijven van een fout.
+      })
       results.push({ email: u.email, ok: false, error: msg })
     }
   }

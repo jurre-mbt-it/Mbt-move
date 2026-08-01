@@ -60,6 +60,10 @@ export type AuditEvent =
   | 'DATA_EXPORTED'
   | 'ACCOUNT_DELETION_REQUESTED'
   | 'ACCOUNT_DELETED'
+  // De cron kon een aangevraagde verwijdering niet uitvoeren. Hoort in de
+  // trail en niet alleen in de serverlogs: er loopt een AVG-termijn door
+  // terwijl het account blijft staan, en niemand leest die logs uit zichzelf.
+  | 'ACCOUNT_DELETE_FAILED'
   | 'ACCOUNT_DELETION_CANCELLED'
   // Admin
   | 'ROLE_CHANGED'
