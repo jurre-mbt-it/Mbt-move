@@ -258,17 +258,24 @@ export const rehabRouter = createTRPCRouter({
       // weken-sinds-operatie verschuiven.
       //
       // Een expliciete `null` betekent hier "niet wijzigen", niet "leegmaken".
-      // Reden: de iOS-app opent voor WIJZIG dezelfde sheet als voor aanzetten,
-      // die sheet vult zichzelf NIET voor met de bestaande tracker, en stuurt
-      // surgeryDate en injuryDate altijd mee, standaard op null. Zou null hier
-      // leegmaken, dan wist een therapeut die alleen een notitie toevoegt de
-      // operatiedatum, en daarmee `weeksSinceSurgery` en de fase-indicatie.
-      // Een check op `!== undefined` helpt niet: de app stuurt echt null.
+      // Reden: iOS-builds tot en met 78 openen voor WIJZIG dezelfde sheet als
+      // voor aanzetten, die sheet vult zichzelf NIET voor met de bestaande
+      // tracker, en stuurt surgeryDate en injuryDate altijd mee, standaard op
+      // null. Zou null hier leegmaken, dan wist een therapeut die alleen een
+      // notitie toevoegt de operatiedatum, en daarmee `weeksSinceSurgery` en de
+      // fase-indicatie. Een check op `!== undefined` helpt niet: die builds
+      // sturen echt null.
       //
-      // Verschil met `updateTrackerDetails` hieronder, waar null WEL leegmaakt:
-      // dat endpoint komt uit de web-UI, die het formulier vooraf invult met de
-      // huidige waarden. Een leeg veld daar is een bewuste keuze van de
-      // therapeut. Dat is ook de weg om een datum alsnog te wissen.
+      // DIE BUILDS BLIJVEN IN OMLOOP; er is geen version-gate en geen OTA, dus
+      // deze coulance kan niet weg zolang 78 nog draait.
+      //
+      // Vanaf build 79 vult de app de sheet wél voor, en dan is deze coulance
+      // juist verkeerd: leegmaken en van OPERATIE naar BLESSURE wisselen zijn
+      // dan zichtbare handelingen die stil zouden verdampen. Die build stuurt
+      // een wijziging aan hetzelfde protocol daarom naar `updateTrackerDetails`
+      // hieronder, waar null WEL leegmaakt. Zelfde afspraak als de web-UI, die
+      // het formulier ook voorinvult. `activateForPatient` blijft daar voor
+      // aanzetten en voor het wisselen van protocol.
       if (bestaand.protocolId === input.protocolId) {
         await ctx.prisma.patientRehabTracker.update({
           where: { id: bestaand.id },
