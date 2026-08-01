@@ -76,3 +76,9 @@ jargon-final.json
 # Nooit committen: het zijn ad-hoc debug-scripts, niet reviewbare code.
 .tmp-*
 .verify-*
+
+# graphify: gegenereerde kennisgraaf (graph.json/html + cache), niet committen
+graphify-out/
+
+# Claude Code lokale settings (nooit committen, publieke repo)
+.claude/settings.local.json
