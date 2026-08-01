@@ -9,8 +9,11 @@ export const NIET_PLANNEN_VOOR_INACTIEVE =
  * Weigert nieuwe planning voor een uitbehandelde patiënt.
  *
  * Losse guard, geen aanpassing van hasPatientAccess: het dossier moet leesbaar
- * blijven en bestaande planning moet aan te passen zijn, alleen bíjplannen
- * stopt. Zet hem daarom op de bulk-planners en niet op elke schrijfactie.
+ * blijven en opruimen moet mogelijk blijven, alleen plannen stopt. Hij staat op
+ * de bulk-planners én op de losse planner-mutaties die planning toevoegen of
+ * wijzigen, en bewust NIET op verwijderen (`removeItem`, `deleteWeek`,
+ * `clearLegacyDay`, `delete`). Die afweging staat uitgeschreven bij
+ * `assertMagPlannen` in routers/weekSchedules.ts.
  *
  * Scope-gebonden: alleen wie zélf heeft afgesloten wordt tegengehouden. Een
  * praktijk-therapeut die doorbehandelt kan gewoon plannen nadat een coach zijn
