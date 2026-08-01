@@ -21,6 +21,22 @@ export const LAST_SEEN_RELEASE_KEY = 'mbt-last-seen-release'
 
 export const releaseNotes: ReleaseNote[] = [
   {
+    id: '2026-08-01-patient-op-inactief-en-revalidatietrajecten',
+    date: '2026-08-01',
+    title: 'Patiënten op inactief zetten, met een archief en trajecthistorie',
+    highlight: 'Een patiënt die je niet meer behandelt hoort niet meer in je werklijst, maar zijn dossier hoort wel te blijven staan. Dat kan nu: je zet iemand op inactief, hij verhuist naar het archief, en je haalt hem er met één knop weer bij.',
+    items: [
+      'Op inactief zetten: in het actiemenu op de patiëntpagina staat "Op inactief zetten". Je kiest een reden, kunt een toelichting kwijt, en de lopende programma\'s gaan standaard mee dicht. Dit is iets anders dan de koppeling verbreken: daar raak je je toegang kwijt, hier raakt niets kwijt.',
+      'Het archief: boven je patiëntenlijst staan twee standen, "In behandeling" en "Archief". Wie je op inactief zet verdwijnt uit de eerste en komt in de tweede te staan, met de datum en de reden erbij. Aandacht, belasting en therapietrouw zeggen daar niets meer, dus die kolommen zijn vervangen.',
+      'Het dossier blijft leesbaar. Sessies, metingen, testuitslagen, pijnregistraties, hardloopanalyses: alles staat er nog, precies zoals je het achterliet. Op inactief zetten haalt alleen de persoon uit je werklijst, je signalen en de dagelijkse herinneringen. Er wordt niets verwijderd.',
+      'Weer in behandeling nemen: bovenaan het dossier van een gearchiveerde patiënt staat een banner met wie de behandeling wanneer afsloot en waarom, plus de knop om hem terug te halen. De programma\'s die bij het afsluiten dichtgingen komen dan mee terug, met hun startdatum opgeschoven over de onderbreking heen.',
+      'Nodig je iemand opnieuw uit, dan wordt hij daarmee ook weer actief. Je hoeft dus niet eerst in het archief te zoeken.',
+      'Revalidatie werkt nu per traject. Sluit je een protocol af, dan sluit je dat traject af, met een uitkomst (criteria behaald, voortijdig gestopt, doorverwezen, terugval) en een optionele toelichting. Start je later een nieuw traject, dan begint dat met lege criteria. De vinkjes van het vorige traject komen dus niet terug, en dat is de bedoeling: een tweede knieblessure is geen voortzetting van de eerste.',
+      'Onder het lopende traject staat "Eerdere trajecten": per traject de periode, de uitkomst en hoeveel criteria er behaald zijn. Klikken opent het afgesloten traject met alle metingen erin, alleen om te lezen. Was afsluiten een misklik, dan haal je het meest recente traject met "Heropenen" weer terug.',
+      'De week-planner toont gearchiveerde patiënten onder een eigen kopje, zodat je hun weken kunt teruglezen. Plannen kan daar niet meer: een gearchiveerde patiënt krijgt geen nieuwe trainingen in de app te zien, en dan is inplannen wat je niet kunt versturen alleen maar verwarrend.',
+    ],
+  },
+  {
     id: '2026-06-24-meerdere-programmas-en-controle-signaal',
     date: '2026-06-24',
     title: "Meerdere programma's per patiënt + controle-signaal bij oude schema's",
