@@ -482,6 +482,20 @@ export const patientsRouter = createTRPCRouter({
           maxHeartRate: true,
           restingHeartRate: true,
           lthr: true,
+          // Lopende uitbehandel-markering van DEZE lezer, voor de archiefbanner
+          // op het detailscherm. Zelfde leesfilter als in `list`, dus historie
+          // van eerdere afsluitingen blijft erbuiten en een account zonder
+          // geldige scope krijgt gewoon niets in plaats van een foutmelding.
+          careStatuses: {
+            where: careScopeWhereForRead(me),
+            take: 1,
+            select: {
+              dischargedAt: true,
+              reason: true,
+              note: true,
+              dischargedBy: { select: { name: true, email: true } },
+            },
+          },
           patientPrograms: {
             orderBy: { createdAt: 'desc' },
             select: {
@@ -522,6 +536,7 @@ export const patientsRouter = createTRPCRouter({
 
       const myRel = p.patientTherapists[0] ?? null
       const program = p.patientPrograms[0] ?? null
+      const care = p.careStatuses[0] ?? null
       const initials = (p.name ?? p.email)
         .split(' ')
         .map(w => w[0])
@@ -544,6 +559,16 @@ export const patientsRouter = createTRPCRouter({
         lthr: p.lthr,
         // Alleen tonen als patient ermee instemt
         injuryInfo: p.injuryVisibleToTherapist ? p.injuryInfo : null,
+        // null = in behandeling. Gevuld = de lopende afsluiting van deze
+        // praktijk of deze coach, met wie hem zette en waarom.
+        careStatus: care
+          ? {
+              dischargedAt: care.dischargedAt,
+              reason: care.reason,
+              note: care.note,
+              dischargedByName: care.dischargedBy.name ?? care.dischargedBy.email,
+            }
+          : null,
         notes: myRel?.notes ?? null,
         programId: program?.id ?? null,
         programName: program?.name ?? null,

@@ -23,6 +23,8 @@ import {
 import { AssignFromTemplateDialog } from '@/components/patients/AssignFromTemplateDialog'
 import { CoMonitorDialog } from '@/components/patients/CoMonitorDialog'
 import { UnlinkDialog } from '@/components/patients/UnlinkDialog'
+import { DischargeDialog } from '@/components/patients/DischargeDialog'
+import { dischargeReasonTekst, formatDischargeDate } from '@/lib/care-status'
 import { MonthSummary } from '@/components/patients/MonthSummary'
 import { PerformerToggle, type PerformerFilter } from '@/components/patients/PerformerToggle'
 import { InsightActivationToggle } from '@/components/insights/InsightActivationToggle'
@@ -148,6 +150,22 @@ export default function PatientDetailPage({
   } | null>(null)
   const [coMonitorOpen, setCoMonitorOpen] = useState(false)
   const [unlinkOpen, setUnlinkOpen] = useState(false)
+  const [dischargeOpen, setDischargeOpen] = useState(false)
+  const reactivate = trpc.patients.reactivate.useMutation({
+    onSuccess: () => {
+      utils.patients.get.invalidate({ id })
+      utils.patients.list.invalidate()
+      utils.programs.list.invalidate()
+      toast.success('Weer in behandeling. Afgesloten programma’s lopen weer door.')
+    },
+    // De server schrijft hier zelf een bruikbare melding (NOT_FOUND als iemand
+    // anders net heractiveerde, PRECONDITION_FAILED zonder praktijk). Letterlijk
+    // tonen zegt meer dan een eigen tekst.
+    onError: (e) => {
+      toast.error(e.message)
+      utils.patients.get.invalidate({ id })
+    },
+  })
   const resendInvite = trpc.invite.resend.useMutation({
     onSuccess: (res) => {
       if (res.mailDelivered) {
@@ -226,6 +244,11 @@ export default function PatientDetailPage({
   }
 
   const status = patient.programStatus ? STATUS_CONFIG[patient.programStatus] : null
+  // Behandelstatus, niet programmastatus. Gevuld = deze praktijk of deze coach
+  // heeft de behandeling afgesloten; het dossier hieronder is gewoon compleet.
+  const careStatus = patient.careStatus ?? null
+  const careStatusDatum = formatDischargeDate(careStatus?.dischargedAt) ?? 'onbekende datum'
+  const careStatusReden = dischargeReasonTekst(careStatus?.reason)
   const activePrograms = programs.filter(p => p.status === 'ACTIVE' && !p.isTemplate)
   // Actief overzicht = alles behalve afgesloten; afgesloten schema's blijven
   // bewaard maar verhuizen naar een aparte, doorzichtige sectie.
@@ -243,6 +266,43 @@ export default function PatientDetailPage({
         >
           ← TERUG
         </Link>
+
+        {/* Archiefbanner. Staat bovenaan omdat de rest van de pagina er precies
+            hetzelfde uitziet als bij iemand die wel in behandeling is: het
+            dossier blijft compleet. Zonder deze regel zou je dat verschil
+            nergens zien. */}
+        {careStatus && (
+          <Tile accentBar={P.inkMuted}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-1.5">
+                <MetaLabel style={{ color: P.inkMuted }}>NIET MEER IN BEHANDELING</MetaLabel>
+                <p style={{ color: P.ink, fontSize: 13.5, lineHeight: 1.5 }}>
+                  {`Afgesloten op ${careStatusDatum} door ${careStatus.dischargedByName}`}
+                  {careStatusReden ? `, ${careStatusReden}` : ''}.
+                </p>
+                {careStatus.note && (
+                  <p style={{ color: P.inkMuted, fontSize: 12.5, lineHeight: 1.5 }}>
+                    {careStatus.note}
+                  </p>
+                )}
+                <p style={{ color: P.inkDim, fontSize: 12, lineHeight: 1.5 }}>
+                  Het dossier hieronder is compleet gebleven. {patient.name} staat alleen niet meer
+                  in je werklijst en krijgt geen herinneringen meer van jou.
+                </p>
+              </div>
+              <DarkButton
+                variant="secondary"
+                size="sm"
+                className="shrink-0"
+                disabled={reactivate.isPending}
+                loading={reactivate.isPending}
+                onClick={() => reactivate.mutate({ id: patient.id })}
+              >
+                Weer in behandeling
+              </DarkButton>
+            </div>
+          </Tile>
+        )}
 
         {/* Patient hero */}
         <div className="flex flex-col gap-2">
@@ -323,6 +383,15 @@ export default function PatientDetailPage({
           {portal.isCoach && (
             <DarkButton variant="secondary" onClick={() => setUnlinkOpen(true)}>
               Koppeling verbreken
+            </DarkButton>
+          )}
+          {/* Bewust NA "koppeling verbreken" en met een eigen woord: dit is de
+              zachte variant. Verbreken haalt toegang en programma's weg,
+              inactief zetten laat het dossier heel. Wie al inactief staat ziet
+              hier niets; die knop staat in de banner bovenaan. */}
+          {!careStatus && (
+            <DarkButton variant="secondary" onClick={() => setDischargeOpen(true)}>
+              Op inactief zetten
             </DarkButton>
           )}
           {/* Programma's. Een patient kan er meerdere naast elkaar hebben
@@ -922,6 +991,19 @@ export default function PatientDetailPage({
           patientName={patient.name ?? 'deze atleet'}
           onClose={() => setUnlinkOpen(false)}
           onDone={() => router.push(portal.patients)}
+        />
+      )}
+
+      {dischargeOpen && (
+        <DischargeDialog
+          patientId={patient.id}
+          patientName={patient.name ?? `deze ${portal.personLabel}`}
+          personLabel={portal.personLabel}
+          // Rol en niet het portaal: de server kijkt naar de rol, en het
+          // coach-segment is een re-export van deze pagina.
+          role={me?.role}
+          onClose={() => setDischargeOpen(false)}
+          onDone={() => setDischargeOpen(false)}
         />
       )}
     </div>
