@@ -1670,7 +1670,20 @@ function WeekPlannerContent() {
    * hangt aan de dagselectie en die dient verder alleen om te kopiëren en te
    * verslepen.
    */
-  const planningVergrendeld = !!selectedPatient?.dischargedAt
+  const patientGearchiveerd = !!selectedPatient?.dischargedAt
+  /**
+   * Op slot zolang we niet kunnen zien dát deze patiënt actief is.
+   *
+   * Dat dekt twee gevallen. Tijdens de eerste render is `patients` nog leeg en
+   * zou de planner een halve seconde volledig bewerkbaar zijn, ook voor iemand
+   * uit het archief. En een `?patientId=` in de URL kan wijzen naar iemand die
+   * niet in je lijst staat; daar slagen de mutaties toch niet, dus ontbrekende
+   * knoppen zijn een eerlijker antwoord dan een foutmelding achteraf.
+   *
+   * De uitleg-banner hangt bewust aan `patientGearchiveerd` en niet hieraan:
+   * zolang de lijst laadt weten we niet of "staat in je archief" waar is.
+   */
+  const planningVergrendeld = patientGearchiveerd || (!!selectedPatientId && !selectedPatient)
 
   // Datumvenster voor de planner-queries: de zichtbare maand + 2 weken marge
   // aan beide kanten (het grid toont aanloop-/uitloopdagen van aangrenzende
@@ -2736,7 +2749,7 @@ function WeekPlannerContent() {
         <>
         {/* Gearchiveerd: één regel die zegt waarom er niets meer te klikken is.
             Zonder die regel lijkt de planner stuk in plaats van dicht. */}
-        {planningVergrendeld && (
+        {patientGearchiveerd && (
           <Tile>
             <div className="flex items-start gap-3 py-1">
               <Archive className="w-4 h-4 mt-0.5 shrink-0" style={{ color: P.inkMuted }} />
