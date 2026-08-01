@@ -11,6 +11,7 @@ import { TRPCError } from '@trpc/server'
 import { createTRPCRouter, protectedProcedure, therapistProcedure, adminProcedure, mfaAdminProcedure } from '@/server/trpc'
 import { practiceScope } from '@/server/lib/patient-access'
 import { findOpenTracker, getPatientRehabTrackerData, getRehabTrackerDataById } from '@/lib/rehab-data'
+import { laatsteAfgeslotenTraject } from '@/lib/rehab-traject'
 import { notifyRehabCriterion, notifyRehabPhase } from '@/server/push/notify'
 import { auditLog } from '@/server/audit'
 
@@ -135,6 +136,56 @@ export const rehabRouter = createTRPCRouter({
    */
   getMyTracker: protectedProcedure.query(async ({ ctx }) => {
     return loadTrackerState(ctx.prisma, ctx.user.id)
+  }),
+
+  /**
+   * Voor de patiënt-client: heeft dit account een recent AFGESLOTEN traject,
+   * en zo ja, welk protocol was dat en wanneer liep het.
+   *
+   * Bestaat apart van `getMyTracker`, want die geeft `null` in twee
+   * volstrekt verschillende gevallen: nooit een protocol gehad, en er net
+   * één afgerond. `getMyTracker` blijft daarom exact zoals hij is, ook qua
+   * vorm van zijn `null`: build 78 (App Store, geen version-gate) rendert
+   * een niet-lege tracker als het LOPENDE protocol met alle fases, dus een
+   * afgesloten traject teruggeven op die plek zou de app een afgeronde
+   * revalidatie als actief protocol tonen. Zie ook de toelichting bij
+   * `deactivatedAt` in `getRehabTrackerDataById` (@/lib/rehab-data): dezelfde
+   * "wat mag een patiënt zien"-afweging, hier toegepast op een nieuwe query
+   * in plaats van op een bestaand veld.
+   *
+   * Geen `patientId` in de input: alleen het eigen account, nooit dat van
+   * iemand anders. Kiezen tussen "loopt er nog iets" en "wat was het laatst
+   * afgeslotene" staat in `laatsteAfgeslotenTraject` (@/lib/rehab-traject),
+   * zodat die beslissing zonder database te testen is.
+   *
+   * Bewust NIET in de returnvorm, en waarom:
+   *  - `outcomeNote`: klinische vrije tekst van de therapeut. Staat om
+   *    dezelfde reden al niet in de gedeelde vorm in @/lib/rehab-data.
+   *  - `outcome`: de uitkomst is een klinisch oordeel (COMPLETED t/m
+   *    RELAPSE). "Terugval" als conclusie van zijn eigen traject op het
+   *    toestel van de patiënt zetten is niet aan de app; dat hoort in een
+   *    gesprek, niet in een tegel.
+   *  - criteria en voortgang: die horen bij het lopende traject, niet bij
+   *    de mededeling dat er een is afgesloten.
+   *  - `closedById`: wie het dossier sloot is een interne handeling.
+   */
+  getMyLastClosedTraject: protectedProcedure.query(async ({ ctx }) => {
+    const trajecten = await ctx.prisma.patientRehabTracker.findMany({
+      where: { patientId: ctx.user.id },
+      select: {
+        id: true,
+        activatedAt: true,
+        deactivatedAt: true,
+        protocol: { select: { name: true } },
+      },
+    })
+    const laatste = laatsteAfgeslotenTraject(trajecten)
+    if (!laatste) return null
+    return {
+      protocolName: laatste.protocol.name,
+      activatedAt: laatste.activatedAt,
+      deactivatedAt: laatste.deactivatedAt,
+    }
   }),
 
   activateForPatient: therapistProcedure

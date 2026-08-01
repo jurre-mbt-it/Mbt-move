@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  laatsteAfgeslotenTraject,
   mergeCriterionStatuses,
   statussenVanTraject,
   trajectOutcomeTekst,
@@ -103,6 +104,50 @@ describe('trajectOutcomeTekst', () => {
 
   it('valt terug op de ruwe waarde bij een uitkomst die deze bundel niet kent', () => {
     expect(trajectOutcomeTekst('IETS_NIEUWS')).toBe('IETS_NIEUWS')
+  })
+})
+
+describe('laatsteAfgeslotenTraject', () => {
+  const traject = (id: string, activatedAt: string, deactivatedAt: string | null) => ({
+    id,
+    activatedAt: new Date(activatedAt),
+    deactivatedAt: deactivatedAt ? new Date(deactivatedAt) : null,
+  })
+
+  it('geeft null als de patiënt nooit een traject heeft gehad', () => {
+    expect(laatsteAfgeslotenTraject([])).toBeNull()
+  })
+
+  it('geeft null zodra er een lopend traject is, ook als er afgesloten trajecten liggen', () => {
+    const trajecten = [
+      traject('oud', '2026-01-01', '2026-02-01'),
+      traject('nieuw', '2026-03-01', null),
+    ]
+    expect(laatsteAfgeslotenTraject(trajecten)).toBeNull()
+  })
+
+  it('geeft het enige afgesloten traject als er maar één is', () => {
+    const trajecten = [traject('t1', '2026-01-01', '2026-02-01')]
+    expect(laatsteAfgeslotenTraject(trajecten)?.id).toBe('t1')
+  })
+
+  it('kiest van meerdere afgesloten trajecten het meest recent afgeslotene', () => {
+    // Expres niet op activatedAt-volgorde aangeleverd: de functie mag niet op
+    // invoervolgorde leunen.
+    const trajecten = [
+      traject('recent', '2026-05-01', '2026-06-01'),
+      traject('oud', '2026-01-01', '2026-02-01'),
+      traject('middelste', '2026-03-01', '2026-04-01'),
+    ]
+    expect(laatsteAfgeslotenTraject(trajecten)?.id).toBe('recent')
+  })
+
+  it('gebruikt het id als tweede sleutel bij een gelijke deactivatedAt', () => {
+    const trajecten = [
+      traject('a', '2026-01-01', '2026-02-01'),
+      traject('b', '2026-01-02', '2026-02-01'),
+    ]
+    expect(laatsteAfgeslotenTraject(trajecten)?.id).toBe('b')
   })
 })
 
