@@ -73,12 +73,21 @@ export default function PatientDetailPage({
   // Deep-link vanaf het dashboard: /patients/[id]?tab=signalen opent direct
   // de juiste tab. Ongeldige waardes vallen terug op 'profiel'.
   const { tab } = use(searchParams)
-  const initialTab = TAB_VALUES.includes(tab as (typeof TAB_VALUES)[number]) ? tab : 'profiel'
   const router = useRouter()
   const { data: patient, isLoading } = trpc.patients.get.useQuery({ id })
   // Wearable-tab voorlopig alleen voor de admin (zie wearables-access.ts).
   const { data: me } = trpc.auth.getMe.useQuery()
   const showWearables = wearablesEnabledForRole(me?.role)
+  // Het hele revalidatie-blok is therapeut-werk. Elke procedure in rehab.ts
+  // staat op therapistProcedure en weigert een coach met FORBIDDEN, dus de tab
+  // toonde voor een coach alleen een leeg blok plus een stille fout.
+  const showRehab = !portal.isCoach
+  const zichtbareTabs = TAB_VALUES.filter(
+    (t) => (t !== 'revalidatie' || showRehab) && (t !== 'wearables' || showWearables),
+  )
+  const initialTab = zichtbareTabs.includes(tab as (typeof TAB_VALUES)[number])
+    ? tab
+    : 'profiel'
   const { data: programsRaw = [] } = trpc.programs.list.useQuery({ patientId: id })
   const [historyLimit, setHistoryLimit] = useState(5)
   const [historyPerformer, setHistoryPerformer] = useState<PerformerFilter>('all')
@@ -518,13 +527,19 @@ export default function PatientDetailPage({
         {/* Tabs */}
         <Tabs defaultValue={initialTab} className="space-y-4">
           <TabsList
-            className={`w-full grid ${showWearables ? 'grid-cols-8' : 'grid-cols-7'} rounded-xl`}
-            style={{ background: P.surface, border: `1px solid ${P.line}` }}
+            className="w-full grid rounded-xl"
+            style={{
+              background: P.surface,
+              border: `1px solid ${P.line}`,
+              // Aantal kolommen volgt de zichtbare tabs; een vaste klasse liep
+              // scheef zodra er een tab wegviel.
+              gridTemplateColumns: `repeat(${zichtbareTabs.length}, minmax(0, 1fr))`,
+            }}
           >
             <TabsTrigger value="profiel" className="text-xs px-1">Profiel</TabsTrigger>
             <TabsTrigger value="programmas" className="text-xs px-1">Progr.</TabsTrigger>
             <TabsTrigger value="geschiedenis" className="text-xs px-1">Historie</TabsTrigger>
-            <TabsTrigger value="revalidatie" className="text-xs px-1">Revalidatie</TabsTrigger>
+            {showRehab && <TabsTrigger value="revalidatie" className="text-xs px-1">Revalidatie</TabsTrigger>}
             <TabsTrigger value="tests" className="text-xs px-1">Tests</TabsTrigger>
             <TabsTrigger value="signalen" className="text-xs px-1">Signalen</TabsTrigger>
             <TabsTrigger value="voortgang" className="text-xs px-1">Voortgang</TabsTrigger>
@@ -916,14 +931,15 @@ export default function PatientDetailPage({
           </TabsContent>
 
           {/* ── TAB: Revalidatie (stoplicht-tracker) ──────────────── */}
-          <TabsContent value="revalidatie" className="space-y-4">
-            {/* Een protocol activeren of wisselen is een klinisch besluit en
-                blijft bij de therapeut. De coach leest de tracker wel mee. */}
-            {!portal.isCoach && (
+          {/* Alles hieronder leest en schrijft via therapistProcedure. Voor een
+              coach bleef alleen een leeg blok over plus een FORBIDDEN die
+              nergens in beeld kwam, dus de tab is er voor hem niet. */}
+          {showRehab && (
+            <TabsContent value="revalidatie" className="space-y-4">
               <RehabActivationToggle patientId={patient.id} patientName={patient.name} />
-            )}
-            <RehabTracker patientId={patient.id} />
-          </TabsContent>
+              <RehabTracker patientId={patient.id} />
+            </TabsContent>
+          )}
 
           {/* ── TAB: Tests (losse klinische tests) ────────────────── */}
           <TabsContent value="tests" className="space-y-4">

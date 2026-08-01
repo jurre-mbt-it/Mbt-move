@@ -11,10 +11,16 @@ import {
   DarkDialogTrigger,
   DarkInput,
   DarkSelect,
+  DarkTextarea,
   MetaLabel,
   P,
   Tile,
 } from '@/components/dark-ui'
+import {
+  TRAJECT_OUTCOMES,
+  TRAJECT_OUTCOME_LABEL,
+  type TrajectOutcome,
+} from '@/lib/rehab-traject'
 import { toast } from 'sonner'
 
 function formatDate(d: Date | string | null | undefined): string {
@@ -38,19 +44,30 @@ export function RehabActivationToggle({
   const utils = trpc.useUtils()
   const { data: tracker, refetch } = trpc.rehab.getPatientTracker.useQuery({ patientId })
   const { data: protocols = [] } = trpc.rehab.listProtocols.useQuery()
+  // Alleen om te weten of er historie is. Zodra die er is, is "aanzetten" niet
+  // meer waar wat er gebeurt: je begint dan een volgend traject, met een eigen
+  // set lege vinkjes naast de trajecten die er al staan.
+  const { data: trajects = [] } = trpc.rehab.listTrajects.useQuery({ patientId })
+  const heeftHistorie = trajects.some((t) => t.deactivatedAt != null)
+
+  /** Alles wat na een traject-wissel opnieuw opgehaald moet worden. */
+  function ververs() {
+    refetch()
+    utils.rehab.getPatientTracker.invalidate({ patientId })
+    utils.rehab.listTrajects.invalidate({ patientId })
+  }
 
   const activate = trpc.rehab.activateForPatient.useMutation({
     onSuccess: () => {
-      toast.success('Revalidatie-tracker geactiveerd')
-      refetch()
-      utils.rehab.getPatientTracker.invalidate({ patientId })
+      toast.success(heeftHistorie ? 'Nieuw traject gestart' : 'Revalidatie-tracker geactiveerd')
+      ververs()
     },
     onError: (e) => toast.error(e.message),
   })
-  const deactivate = trpc.rehab.deactivateForPatient.useMutation({
+  const closeTraject = trpc.rehab.closeTraject.useMutation({
     onSuccess: () => {
-      toast.success('Uitgezet')
-      refetch()
+      toast.success('Traject afgesloten')
+      ververs()
     },
     onError: (e) => toast.error(e.message),
   })
@@ -65,10 +82,12 @@ export function RehabActivationToggle({
 
   const [setupOpen, setSetupOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
-  const [deactivateOpen, setDeactivateOpen] = useState(false)
+  const [closeOpen, setCloseOpen] = useState(false)
   const [selectedProtocolId, setSelectedProtocolId] = useState(protocols[0]?.id ?? '')
   const [surgeryDate, setSurgeryDate] = useState('')
   const [injuryDate, setInjuryDate] = useState('')
+  const [outcome, setOutcome] = useState<TrajectOutcome>('COMPLETED')
+  const [outcomeNote, setOutcomeNote] = useState('')
 
   const isActive = !!tracker
 
@@ -79,13 +98,15 @@ export function RehabActivationToggle({
           <div className="flex-1 min-w-[200px]">
             <MetaLabel>Revalidatie-tracker</MetaLabel>
             <p style={{ color: P.ink, fontSize: 13, fontWeight: 700, marginTop: 4 }}>
-              Niet geactiveerd
+              {heeftHistorie ? 'Geen lopend traject' : 'Niet geactiveerd'}
             </p>
             <p
               className="athletic-mono"
               style={{ color: P.inkMuted, fontSize: 11, marginTop: 2, letterSpacing: '0.04em' }}
             >
-              Kies een protocol (bv. Melbourne VKB) om de fase-criteria te volgen.
+              {heeftHistorie
+                ? 'De afgesloten trajecten staan hieronder en blijven leesbaar.'
+                : 'Kies een protocol (bv. Melbourne VKB) om de fase-criteria te volgen.'}
             </p>
           </div>
           <DarkDialog open={setupOpen} onOpenChange={setSetupOpen}>
@@ -101,16 +122,24 @@ export function RehabActivationToggle({
                 }}
                 disabled={protocols.length === 0}
               >
-                Aanzetten
+                {heeftHistorie ? 'Nieuw traject starten' : 'Aanzetten'}
               </DarkButton>
             </DarkDialogTrigger>
             <DarkDialogContent>
               <DarkDialogHeader>
-                <DarkDialogTitle>Revalidatie-tracker aanzetten</DarkDialogTitle>
+                <DarkDialogTitle>
+                  {heeftHistorie ? 'Nieuw revalidatietraject starten' : 'Revalidatie-tracker aanzetten'}
+                </DarkDialogTitle>
               </DarkDialogHeader>
               <p style={{ color: P.inkMuted, fontSize: 13, lineHeight: 1.5, marginBottom: 16 }}>
                 Kies een protocol voor <strong style={{ color: P.ink }}>{patientName}</strong>. Je kunt de operatiedatum invullen zodat het systeem kan indiceren in welke fase de patiënt zich ongeveer zou moeten bevinden (criteria blijven leidend).
               </p>
+              {heeftHistorie && (
+                <p style={{ color: P.inkMuted, fontSize: 12, lineHeight: 1.5, marginBottom: 16 }}>
+                  Dit wordt een nieuw traject en begint met lege criteria. De eerdere trajecten
+                  blijven met hun meetwaarden en uitkomst in het dossier staan.
+                </p>
+              )}
               <div className="flex flex-col gap-3">
                 <div>
                   <MetaLabel>Protocol</MetaLabel>
@@ -162,7 +191,7 @@ export function RehabActivationToggle({
                     )
                   }}
                 >
-                  Aanzetten
+                  {heeftHistorie ? 'Traject starten' : 'Aanzetten'}
                 </DarkButton>
               </div>
             </DarkDialogContent>
@@ -254,50 +283,86 @@ export function RehabActivationToggle({
               </div>
             </DarkDialogContent>
           </DarkDialog>
-          <DarkDialog open={deactivateOpen} onOpenChange={setDeactivateOpen}>
+          <DarkDialog open={closeOpen} onOpenChange={setCloseOpen}>
             <DarkDialogTrigger asChild>
               <DarkButton
                 variant="secondary"
                 size="sm"
-                onClick={() => setDeactivateOpen(true)}
+                onClick={() => {
+                  setOutcome('COMPLETED')
+                  setOutcomeNote('')
+                  setCloseOpen(true)
+                }}
               >
-                Uitzetten
+                Traject afsluiten
               </DarkButton>
             </DarkDialogTrigger>
             <DarkDialogContent>
               <DarkDialogHeader>
-                <DarkDialogTitle>Revalidatie-tracker uitzetten?</DarkDialogTitle>
+                <DarkDialogTitle>Revalidatietraject afsluiten</DarkDialogTitle>
               </DarkDialogHeader>
               <p style={{ color: P.inkMuted, fontSize: 13, lineHeight: 1.55 }}>
                 Hiermee sluit je het lopende traject van <strong style={{ color: P.ink }}>{patientName}</strong> af. Het protocol en alle fases verdwijnen uit het dashboard van de patiënt.
               </p>
-              {/* Klopt sinds het episode-model: uitzetten sluit de episode af,
-                  opnieuw aanzetten begint een nieuw en leeg traject. De oude
-                  copy beloofde dat de vinkjes terugkwamen.
-                  Beloof hier geen historie-scherm: rehab.listTrajects en
-                  rehab.getTraject bestaan wel, maar hebben nog geen enkele
-                  aanroeper in web of app. De data blijft bewaard, alleen kan
-                  niemand er vandaag bij. Pas deze zin aan zodra dat scherm er
-                  is. */}
+              {/* Klopt sinds het episode-model: afsluiten sluit de episode af,
+                  een nieuw protocol begint een nieuw en leeg traject. De oude
+                  copy beloofde dat de vinkjes terugkwamen. Het historie-scherm
+                  eronder bestaat nu wel, dus de belofte "blijft terug te lezen"
+                  is te controleren. */}
               <p style={{ color: P.inkMuted, fontSize: 12, lineHeight: 1.5, marginTop: 10 }}>
-                De ingevulde meetwaarden en statussen blijven bewaard bij dit afgesloten traject. Zet je het protocol later opnieuw aan, dan start er een nieuw traject dat leeg begint.
+                De ingevulde meetwaarden en statussen blijven aan dit traject hangen en zijn terug te
+                lezen onder Eerdere trajecten. Start je later een nieuw traject, dan begint dat leeg.
               </p>
+              <div className="flex flex-col gap-3 mt-4">
+                <div>
+                  <MetaLabel>Uitkomst</MetaLabel>
+                  <DarkSelect
+                    value={outcome}
+                    onChange={(e) => setOutcome(e.target.value as TrajectOutcome)}
+                  >
+                    {TRAJECT_OUTCOMES.map((o) => (
+                      <option key={o} value={o}>
+                        {TRAJECT_OUTCOME_LABEL[o]}
+                      </option>
+                    ))}
+                  </DarkSelect>
+                </div>
+                <div>
+                  <MetaLabel>Toelichting (optioneel)</MetaLabel>
+                  <DarkTextarea
+                    value={outcomeNote}
+                    maxLength={2000}
+                    onChange={(e) => setOutcomeNote(e.target.value)}
+                    rows={3}
+                    placeholder="Waar staat de knie nu, en wat is er afgesproken?"
+                  />
+                </div>
+              </div>
               <div className="flex justify-end gap-2 mt-5">
-                <DarkButton variant="ghost" size="sm" onClick={() => setDeactivateOpen(false)}>
+                <DarkButton variant="ghost" size="sm" onClick={() => setCloseOpen(false)}>
                   Annuleren
                 </DarkButton>
                 <DarkButton
                   variant="danger"
                   size="sm"
-                  disabled={deactivate.isPending}
+                  disabled={closeTraject.isPending}
                   onClick={() => {
-                    deactivate.mutate(
-                      { patientId },
-                      { onSuccess: () => setDeactivateOpen(false) },
+                    closeTraject.mutate(
+                      {
+                        patientId,
+                        outcome,
+                        outcomeNote: outcomeNote.trim() || undefined,
+                        // Het traject dat op dít scherm staat. Wisselt een
+                        // collega ondertussen van protocol, dan weigert de
+                        // server in plaats van de uitkomst op de nieuwe episode
+                        // te zetten.
+                        expectedTrackerId: tracker.trackerId,
+                      },
+                      { onSuccess: () => setCloseOpen(false) },
                     )
                   }}
                 >
-                  Ja, uitzetten
+                  Traject afsluiten
                 </DarkButton>
               </div>
             </DarkDialogContent>

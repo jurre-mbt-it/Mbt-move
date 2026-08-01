@@ -12,8 +12,10 @@ import {
   DarkTextarea,
   MetaLabel,
   P,
+  SkeletonText,
   Tile,
 } from '@/components/dark-ui'
+import { trajectOutcomeTekst, trajectPeriode } from '@/lib/rehab-traject'
 import { toast } from 'sonner'
 
 type StatusValue = 'NOT_MET' | 'IN_PROGRESS' | 'MET'
@@ -129,10 +131,36 @@ function phaseTypicalRange(start: number | null, end: number | null): string {
   return `week ${start}-${end}`
 }
 
+/** Vorm van één traject uit `rehab.listTrajects`. */
+type TrajectRow = {
+  id: string
+  protocolName: string
+  activatedAt: string | Date
+  deactivatedAt: string | Date | null
+  outcome: string | null
+  outcomeNote: string | null
+  behaaldeCriteria: number
+  totaalCriteria: number
+}
+
+/** De tracker-vorm die dit bestand rendert, zowel lopend als afgesloten. */
+type TrackerShape = {
+  progress: { total: number; met: number; inProgress: number; pct: number }
+  expectedPhaseOrder: number | null
+  weeksSinceSurgery: number | null
+  phases: PhaseData[]
+  protocol: { name: string; sourceReference: string | null }
+}
+
 export function RehabTracker({ patientId }: { patientId: string }) {
   const { data: tracker, isLoading } = trpc.rehab.getPatientTracker.useQuery({ patientId })
+  // Historie hoort ook op het scherm als er niets meer loopt: een afgesloten
+  // dossier is precies het geval waarin je terugleest wat er is gebeurd.
+  const { data: trajects = [], isLoading: trajectsLoading } =
+    trpc.rehab.listTrajects.useQuery({ patientId })
+  const [openTrajectId, setOpenTrajectId] = useState<string | null>(null)
 
-  if (isLoading) {
+  if (isLoading || trajectsLoading) {
     return (
       <div className="py-6 flex items-center justify-center">
         <span
@@ -145,74 +173,263 @@ export function RehabTracker({ patientId }: { patientId: string }) {
     )
   }
 
-  if (!tracker) return null
+  const historie = (trajects as TrajectRow[]).filter((t) => t.deactivatedAt != null)
+  if (!tracker && historie.length === 0) return null
 
-  const tr = tracker as unknown as {
-    progress: { total: number; met: number; inProgress: number; pct: number }
-    expectedPhaseOrder: number | null
-    weeksSinceSurgery: number | null
-    phases: PhaseData[]
-    protocol: { name: string; sourceReference: string | null }
-  }
+  const tr = tracker as unknown as TrackerShape | null
 
   return (
     <div className="space-y-4">
-      {/* Hero: overall progress + expected phase */}
-      <Tile>
-        <div className="flex items-center gap-4 flex-wrap">
-          <ProgressRing pct={tr.progress.pct} />
-          <div className="flex-1 min-w-[200px]">
-            <MetaLabel>Totale voortgang</MetaLabel>
-            <p
-              className="athletic-display"
-              style={{ color: P.ink, fontSize: 32, fontWeight: 900, letterSpacing: '-0.02em', marginTop: 4 }}
+      {tr && (
+        <>
+          {/* Hero: overall progress + expected phase */}
+          <Tile>
+            <div className="flex items-center gap-4 flex-wrap">
+              <ProgressRing pct={tr.progress.pct} />
+              <div className="flex-1 min-w-[200px]">
+                <MetaLabel>Totale voortgang</MetaLabel>
+                <p
+                  className="athletic-display"
+                  style={{ color: P.ink, fontSize: 32, fontWeight: 900, letterSpacing: '-0.02em', marginTop: 4 }}
+                >
+                  {tr.progress.met}{' '}
+                  <span style={{ color: P.inkMuted, fontSize: 18, fontWeight: 700 }}>
+                    van {tr.progress.total} behaald
+                  </span>
+                </p>
+                {tr.progress.inProgress > 0 && (
+                  <p
+                    className="athletic-mono"
+                    style={{ color: P.gold, fontSize: 11, letterSpacing: '0.08em', marginTop: 4 }}
+                  >
+                    {tr.progress.inProgress} bijna, {tr.progress.total - tr.progress.met - tr.progress.inProgress} open
+                  </p>
+                )}
+                {tr.expectedPhaseOrder != null && (
+                  <p
+                    className="athletic-mono"
+                    style={{ color: P.ice, fontSize: 11, letterSpacing: '0.08em', marginTop: 6 }}
+                  >
+                    Indicatie: patiënt zou ongeveer in{' '}
+                    <span style={{ color: P.ink, fontWeight: 900 }}>
+                      {tr.phases.find((p) => p.order === tr.expectedPhaseOrder)?.shortName ?? '—'}
+                    </span>{' '}
+                    moeten zitten ({tr.weeksSinceSurgery! >= 0 ? `${tr.weeksSinceSurgery} weken post-op` : 'pre-operatief'})
+                  </p>
+                )}
+                <p
+                  className="athletic-mono"
+                  style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.06em', marginTop: 4 }}
+                >
+                  {tr.protocol.name}
+                </p>
+              </div>
+            </div>
+          </Tile>
+
+          {/* Phases */}
+          {tr.phases.map((phase) => (
+            <PhaseCard
+              key={phase.id}
+              phase={phase}
+              patientId={patientId}
+              isExpected={phase.order === tr.expectedPhaseOrder}
+              weeksSinceSurgery={tr.weeksSinceSurgery}
+            />
+          ))}
+        </>
+      )}
+
+      {historie.length > 0 && (
+        <TrajectHistory
+          patientId={patientId}
+          historie={historie}
+          // Heropenen mag alleen op het meest recente afgesloten traject, en
+          // alleen als er niets loopt. De server weigert de rest ook, maar een
+          // knop die altijd op dezelfde melding uitkomt is geen knop.
+          heropenbaarId={!tracker ? (historie[0]?.id ?? null) : null}
+          // Loopt er niets, dan is de historie het enige op deze tab en hoort
+          // hij niet achter een dichtgeklapt kopje te zitten.
+          standaardOpen={!tracker}
+          onOpen={setOpenTrajectId}
+        />
+      )}
+
+      {openTrajectId && (
+        <TrajectDetailDialog
+          trackerId={openTrajectId}
+          meta={historie.find((t) => t.id === openTrajectId) ?? null}
+          onClose={() => setOpenTrajectId(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── Historie: afgesloten trajecten ──────────────────────────────────────────
+
+function TrajectHistory({
+  patientId,
+  historie,
+  heropenbaarId,
+  standaardOpen,
+  onOpen,
+}: {
+  patientId: string
+  historie: TrajectRow[]
+  heropenbaarId: string | null
+  standaardOpen: boolean
+  onOpen: (trackerId: string) => void
+}) {
+  // Zelf bijhouden in plaats van alleen een `open`-attribuut meegeven: dat
+  // laatste is een DOM-attribuut dat React bij elke render terugzet, en dan
+  // klapt het blok dicht zodra er iets anders op de pagina verandert.
+  const [uitgeklapt, setUitgeklapt] = useState(standaardOpen)
+  const utils = trpc.useUtils()
+  const reopen = trpc.rehab.reopenTraject.useMutation({
+    onSuccess: () => {
+      toast.success('Traject heropend')
+      utils.rehab.getPatientTracker.invalidate({ patientId })
+      utils.rehab.listTrajects.invalidate({ patientId })
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  return (
+    <Tile>
+      <details open={uitgeklapt} onToggle={(e) => setUitgeklapt(e.currentTarget.open)}>
+        <summary
+          className="athletic-mono cursor-pointer flex items-center justify-between gap-2"
+          style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.14em' }}
+        >
+          <span>EERDERE TRAJECTEN</span>
+          <span style={{ color: P.inkDim }}>{historie.length}</span>
+        </summary>
+        <div className="flex flex-col gap-2 mt-3">
+          {historie.map((t) => (
+            <div
+              key={t.id}
+              className="rounded-lg"
+              style={{ background: P.surfaceHi, border: `1px solid ${P.line}`, padding: '10px 12px' }}
             >
-              {tr.progress.met}{' '}
-              <span style={{ color: P.inkMuted, fontSize: 18, fontWeight: 700 }}>
-                van {tr.progress.total} behaald
-              </span>
-            </p>
-            {tr.progress.inProgress > 0 && (
-              <p
-                className="athletic-mono"
-                style={{ color: P.gold, fontSize: 11, letterSpacing: '0.08em', marginTop: 4 }}
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => onOpen(t.id)}
+                  className="athletic-tap text-left flex-1 min-w-[180px]"
+                >
+                  <p style={{ color: P.ink, fontSize: 13, fontWeight: 700 }}>{t.protocolName}</p>
+                  <p
+                    className="athletic-mono"
+                    style={{ color: P.inkMuted, fontSize: 11, marginTop: 2, letterSpacing: '0.04em' }}
+                  >
+                    {trajectPeriode(t.activatedAt, t.deactivatedAt)}
+                  </p>
+                  <p
+                    className="athletic-mono"
+                    style={{ color: P.inkMuted, fontSize: 11, marginTop: 2, letterSpacing: '0.04em' }}
+                  >
+                    {trajectOutcomeTekst(t.outcome)} · {t.behaaldeCriteria} van {t.totaalCriteria} criteria behaald
+                  </p>
+                  {t.outcomeNote && (
+                    <p style={{ color: P.inkDim, fontSize: 11.5, marginTop: 4, lineHeight: 1.5 }}>
+                      {t.outcomeNote}
+                    </p>
+                  )}
+                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  {heropenbaarId === t.id && (
+                    <DarkButton
+                      variant="ghost"
+                      size="sm"
+                      disabled={reopen.isPending}
+                      onClick={() => reopen.mutate({ trackerId: t.id })}
+                    >
+                      Heropenen
+                    </DarkButton>
+                  )}
+                  <DarkButton variant="secondary" size="sm" onClick={() => onOpen(t.id)}>
+                    Bekijken
+                  </DarkButton>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </details>
+    </Tile>
+  )
+}
+
+/** Eén afgesloten traject, read-only. Zelfde opbouw als het lopende traject. */
+function TrajectDetailDialog({
+  trackerId,
+  meta,
+  onClose,
+}: {
+  trackerId: string
+  meta: TrajectRow | null
+  onClose: () => void
+}) {
+  const { data, isLoading } = trpc.rehab.getTraject.useQuery({ trackerId })
+  const tr = data as unknown as (TrackerShape & { outcomeNote: string | null }) | null | undefined
+
+  return (
+    <DarkDialog open onOpenChange={(o) => !o && onClose()}>
+      <DarkDialogContent className="max-h-[85vh] overflow-y-auto">
+        <DarkDialogHeader>
+          <DarkDialogTitle>{meta?.protocolName ?? tr?.protocol.name ?? 'Afgesloten traject'}</DarkDialogTitle>
+        </DarkDialogHeader>
+        {meta && (
+          <p
+            className="athletic-mono"
+            style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.04em', marginBottom: 12 }}
+          >
+            {trajectPeriode(meta.activatedAt, meta.deactivatedAt)} · {trajectOutcomeTekst(meta.outcome)}
+          </p>
+        )}
+        {isLoading ? (
+          <SkeletonText lines={5} />
+        ) : !tr ? (
+          <p style={{ color: P.inkMuted, fontSize: 13 }}>Dit traject is niet meer op te halen.</p>
+        ) : (
+          <div className="space-y-3">
+            {tr.outcomeNote && (
+              <div
+                className="rounded-lg"
+                style={{ background: P.surfaceHi, border: `1px solid ${P.line}`, padding: '10px 12px' }}
               >
-                {tr.progress.inProgress} bijna, {tr.progress.total - tr.progress.met - tr.progress.inProgress} open
-              </p>
-            )}
-            {tr.expectedPhaseOrder != null && (
-              <p
-                className="athletic-mono"
-                style={{ color: P.ice, fontSize: 11, letterSpacing: '0.08em', marginTop: 6 }}
-              >
-                Indicatie: patiënt zou ongeveer in{' '}
-                <span style={{ color: P.ink, fontWeight: 900 }}>
-                  {tr.phases.find((p) => p.order === tr.expectedPhaseOrder)?.shortName ?? '—'}
-                </span>{' '}
-                moeten zitten ({tr.weeksSinceSurgery! >= 0 ? `${tr.weeksSinceSurgery} weken post-op` : 'pre-operatief'})
-              </p>
+                <MetaLabel>Toelichting bij de afsluiting</MetaLabel>
+                <p style={{ color: P.ink, fontSize: 12.5, marginTop: 4, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                  {tr.outcomeNote}
+                </p>
+              </div>
             )}
             <p
               className="athletic-mono"
-              style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.06em', marginTop: 4 }}
+              style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.06em' }}
             >
-              {tr.protocol.name}
+              {tr.progress.met} van {tr.progress.total} criteria behaald
             </p>
+            {tr.phases.map((phase) => (
+              <PhaseCard
+                key={phase.id}
+                phase={phase}
+                patientId=""
+                isExpected={false}
+                weeksSinceSurgery={null}
+                readOnly
+              />
+            ))}
           </div>
+        )}
+        <div className="flex justify-end mt-5">
+          <DarkButton variant="secondary" size="sm" onClick={onClose}>
+            Sluiten
+          </DarkButton>
         </div>
-      </Tile>
-
-      {/* Phases */}
-      {tr.phases.map((phase) => (
-        <PhaseCard
-          key={phase.id}
-          phase={phase}
-          patientId={patientId}
-          isExpected={phase.order === tr.expectedPhaseOrder}
-          weeksSinceSurgery={tr.weeksSinceSurgery}
-        />
-      ))}
-    </div>
+      </DarkDialogContent>
+    </DarkDialog>
   )
 }
 
@@ -266,11 +483,14 @@ function PhaseCard({
   patientId,
   isExpected,
   weeksSinceSurgery,
+  readOnly = false,
 }: {
   phase: PhaseData
   patientId: string
   isExpected: boolean
   weeksSinceSurgery: number | null
+  /** Traject uit de historie: statussen tonen, niets kunnen wijzigen. */
+  readOnly?: boolean
 }) {
   const accent =
     phase.progress.pct === 100
@@ -385,7 +605,7 @@ function PhaseCard({
       {/* Criteria list */}
       <div className="flex flex-col gap-2">
         {phase.criteria.map((c) => (
-          <CriterionRow key={c.id} criterion={c} patientId={patientId} />
+          <CriterionRow key={c.id} criterion={c} patientId={patientId} readOnly={readOnly} />
         ))}
       </div>
     </Tile>
@@ -420,9 +640,12 @@ function PhaseBadge({
 function CriterionRow({
   criterion,
   patientId,
+  readOnly = false,
 }: {
   criterion: CriterionData
   patientId: string
+  /** Traject uit de historie: geen R/O/G-knoppen en geen meet-dialoog. */
+  readOnly?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const utils = trpc.useUtils()
@@ -599,43 +822,69 @@ function CriterionRow({
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0 flex-wrap">
-          <StatusChip
-            active={criterion.status === 'NOT_MET'}
-            color={P.danger}
-            onClick={() => quickSetStatus('NOT_MET')}
-            label="R"
-            aria="Niet behaald"
-          />
-          <StatusChip
-            active={criterion.status === 'IN_PROGRESS'}
-            color={P.gold}
-            onClick={() => quickSetStatus('IN_PROGRESS')}
-            label="O"
-            aria="Bijna"
-          />
-          <StatusChip
-            active={criterion.status === 'MET'}
-            color={P.lime}
-            onClick={() => quickSetStatus('MET')}
-            label="G"
-            aria="Behaald"
-          />
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="athletic-mono athletic-tap"
-            style={{
-              padding: '4px 8px',
-              color: P.inkMuted,
-              fontSize: 10,
-              letterSpacing: '0.12em',
-              marginLeft: 4,
-            }}
-          >
-            Details
-          </button>
+          {readOnly ? (
+            // Historie: de eindstand als woord in plaats van drie knoppen die
+            // niets doen. De kleur zit al in de rand van de rij.
+            <span
+              className="athletic-mono"
+              style={{
+                color: STATUS_COLOR[criterion.status],
+                fontSize: 10,
+                letterSpacing: '0.12em',
+                fontWeight: 900,
+                textTransform: 'uppercase',
+              }}
+            >
+              {STATUS_LABEL[criterion.status]}
+            </span>
+          ) : (
+            <>
+              <StatusChip
+                active={criterion.status === 'NOT_MET'}
+                color={P.danger}
+                onClick={() => quickSetStatus('NOT_MET')}
+                label="R"
+                aria="Niet behaald"
+              />
+              <StatusChip
+                active={criterion.status === 'IN_PROGRESS'}
+                color={P.gold}
+                onClick={() => quickSetStatus('IN_PROGRESS')}
+                label="O"
+                aria="Bijna"
+              />
+              <StatusChip
+                active={criterion.status === 'MET'}
+                color={P.lime}
+                onClick={() => quickSetStatus('MET')}
+                label="G"
+                aria="Behaald"
+              />
+              <button
+                type="button"
+                onClick={() => setOpen(true)}
+                className="athletic-mono athletic-tap"
+                style={{
+                  padding: '4px 8px',
+                  color: P.inkMuted,
+                  fontSize: 10,
+                  letterSpacing: '0.12em',
+                  marginLeft: 4,
+                }}
+              >
+                Details
+              </button>
+            </>
+          )}
         </div>
       </div>
+      {/* Notitie bij de meting hoort in de historie zichtbaar te zijn: zonder de
+          detail-dialoog is er anders geen enkele plek waar hij nog staat. */}
+      {readOnly && criterion.notes && (
+        <p style={{ color: P.inkDim, fontSize: 11.5, marginTop: 6, lineHeight: 1.5 }}>
+          {criterion.notes}
+        </p>
+      )}
 
       <DarkDialog open={open} onOpenChange={setOpen}>
         <DarkDialogContent>
