@@ -23,7 +23,7 @@ import {
   ChevronLeft, ChevronRight, Plus, X, MoreHorizontal,
   Search, Building2, Copy, CopyPlus, Pencil, BookmarkPlus, GripVertical,
   CalendarRange, Layers, Moon, CalendarPlus, StickyNote, ClipboardCheck, Flag,
-  Scissors, ClipboardPaste,
+  Scissors, ClipboardPaste, Archive,
 } from 'lucide-react'
 import {
   PHASE_TYPES, PHASE_META, phaseMeta, DELOAD_LOAD_FRACTION,
@@ -160,12 +160,41 @@ function monthGrid(year: number, month0: number): Date[][] {
 
 // ─── Patient picker ────────────────────────────────────────────────────────────
 
-type Patient = { id: string; name: string | null; email: string | null }
+/**
+ * `dischargedAt` gevuld = deze persoon staat in het archief van de lezer. De
+ * planner haalt daarom `include: 'all'` op: zonder de gearchiveerden erbij
+ * verdwijnt een patiënt uit de kiezer op het moment dat je zijn week nog wilt
+ * teruglezen, en met alleen de actieven zou een bestaande deeplink of URL met
+ * `?patientId=` een lege kalender tonen zonder uitleg.
+ */
+type Patient = { id: string; name: string | null; email: string | null; dischargedAt: Date | string | null }
+
+/** Klein grijs label achter een gearchiveerde naam. */
+function ArchiefBadge() {
+  return (
+    <span
+      className="athletic-mono shrink-0"
+      style={{
+        background: P.surfaceHi,
+        color: P.inkMuted,
+        fontSize: 9,
+        letterSpacing: '0.12em',
+        padding: '1px 6px',
+        borderRadius: 999,
+        fontWeight: 900,
+      }}
+    >
+      ARCHIEF
+    </span>
+  )
+}
 
 function PatientPicker({
   patients, selectedId, onSelect,
 }: { patients: Patient[]; selectedId: string | null; onSelect: (id: string | null) => void }) {
   const current = patients.find(p => p.id === selectedId) ?? null
+  const actief = patients.filter(p => !p.dischargedAt)
+  const archief = patients.filter(p => p.dischargedAt)
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -175,6 +204,7 @@ function PatientPicker({
           style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
         >
           <span>{current ? (current.name ?? current.email ?? 'Patiënt') : 'Kies patiënt…'}</span>
+          {current?.dischargedAt ? <ArchiefBadge /> : null}
           <ChevronRight className="w-3.5 h-3.5 rotate-90 opacity-60" />
         </button>
       </DropdownMenuTrigger>
@@ -186,11 +216,31 @@ function PatientPicker({
         {patients.length === 0 ? (
           <div className="px-2 py-1.5 text-xs text-muted-foreground">Geen patiënten gekoppeld</div>
         ) : (
-          patients.map(p => (
-            <DropdownMenuItem key={p.id} onSelect={() => onSelect(p.id)} className="flex items-center gap-2 text-sm">
-              <span className="truncate">{p.name ?? p.email ?? 'Onbekend'}</span>
-            </DropdownMenuItem>
-          ))
+          <>
+            {actief.map(p => (
+              <DropdownMenuItem key={p.id} onSelect={() => onSelect(p.id)} className="flex items-center gap-2 text-sm">
+                <span className="truncate">{p.name ?? p.email ?? 'Onbekend'}</span>
+              </DropdownMenuItem>
+            ))}
+            {/* Gearchiveerden onderaan en met een eigen kopje: ze zijn hier om
+                terug te lezen, niet om als eerste te kiezen. */}
+            {archief.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Archief
+                </DropdownMenuLabel>
+                {archief.map(p => (
+                  <DropdownMenuItem key={p.id} onSelect={() => onSelect(p.id)} className="flex items-center gap-2 text-sm">
+                    <span className="truncate flex-1" style={{ color: P.inkMuted }}>
+                      {p.name ?? p.email ?? 'Onbekend'}
+                    </span>
+                    <ArchiefBadge />
+                  </DropdownMenuItem>
+                ))}
+              </>
+            )}
+          </>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
@@ -409,7 +459,7 @@ function WeekLoadBar({
  * blokken zelf bewerk je in een volledig scherm — 360px is te smal voor een
  * workout met herhalingen.
  */
-function CardioSummary({ item, onBuild }: { item: ScheduleItem; onBuild: () => void }) {
+function CardioSummary({ item, onBuild }: { item: ScheduleItem; onBuild: (() => void) | null }) {
   const w = readWorkout(item.cardioParams)
   const dur = w ? workoutDuration(w.blocks) : 0
   return (
@@ -437,10 +487,55 @@ function CardioSummary({ item, onBuild }: { item: ScheduleItem; onBuild: () => v
           Nog geen blokken. Bouw de workout op uit warming-up, intervallen en cooldown.
         </p>
       )}
-      <DarkButton variant="secondary" size="sm" onClick={onBuild} className="w-full text-xs">
-        <Layers className="w-3.5 h-3.5 mr-1.5" />
-        {w ? 'Workout bewerken' : 'Workout bouwen'}
-      </DarkButton>
+      {/* null = gearchiveerde patiënt: de bouwer slaat op, dus die knop hoort
+          er dan niet te staan. De samenvatting hierboven blijft leesbaar. */}
+      {onBuild && (
+        <DarkButton variant="secondary" size="sm" onClick={onBuild} className="w-full text-xs">
+          <Layers className="w-3.5 h-3.5 mr-1.5" />
+          {w ? 'Workout bewerken' : 'Workout bouwen'}
+        </DarkButton>
+      )}
+    </div>
+  )
+}
+
+/** De geplande oefeningen als leeslijst, voor wanneer de bouwer niet mag. */
+function PlannedExerciseList({ exercises }: { exercises: ItemExercise[] }) {
+  const catColors = useCategoryColors()
+  if (exercises.length === 0) {
+    return (
+      <div className="space-y-2">
+        <MetaLabel>Geplande oefeningen</MetaLabel>
+        <p className="text-xs py-2" style={{ color: P.inkMuted }}>
+          Er stonden geen oefeningen bij deze workout.
+        </p>
+      </div>
+    )
+  }
+  return (
+    <div className="space-y-2">
+      <MetaLabel>Geplande oefeningen</MetaLabel>
+      <div className="space-y-1.5">
+        {exercises.map(ex => {
+          const cat = (ex.exerciseCategory as Category) ?? 'STRENGTH'
+          const c = catColors[cat]
+          return (
+            <div
+              key={ex.id}
+              className="rounded-lg p-2.5 text-xs"
+              style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+            >
+              <div className="flex items-center gap-2">
+                <span style={{ color: c }} className="shrink-0"><CategoryIcon category={cat} size={12} /></span>
+                <span className="font-semibold flex-1 truncate" style={{ color: P.ink }}>{ex.exerciseName}</span>
+                <span className="athletic-mono font-bold" style={{ color: P.ink, fontSize: 11 }}>
+                  {ex.sets} × {ex.reps} {ex.repUnit}
+                </span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -821,6 +916,7 @@ function DayCell({
   selected, onSelectStart, onSelectEnter,
   onAddWorkout, onAddTemplate, onCopyDay,
   onItemClick, onRemoveItem, statusFor, sessionIdFor, loggedFor, openItemId,
+  readOnly = false,
 }: {
   date: Date
   inMonth: boolean
@@ -839,6 +935,8 @@ function DayCell({
   sessionIdFor: (date: Date, item: ScheduleItem) => string | null
   loggedFor: (date: Date, item: ScheduleItem) => LoggedInfo | null
   openItemId: string | null
+  /** Gearchiveerde patiënt: geen toevoeg-menu, geen verwijderkruis, niet slepen. */
+  readOnly?: boolean
 }) {
   const iso = isoDate(date)
   const { setNodeRef, isOver } = useDroppable({ id: `day:${iso}`, data: { iso } })
@@ -900,16 +998,16 @@ function DayCell({
               // Markeringen (rustdag/notitie/test/doel) hebben geen oefeningen
               // of cardio, dus het detail-paneel heeft ze niets te tonen.
               onClick={isCardioLog || !isWorkoutKind(item.kind) ? undefined : () => onItemClick(item, date, dayId, sId)}
-              readOnly={item.id.startsWith('sessionlog-') || isCardioLog}
+              readOnly={readOnly || item.id.startsWith('sessionlog-') || isCardioLog}
               isOpen={item.id === openItemId}
             />
           )
-          return realItem
+          return realItem && !readOnly
             ? <DraggableItem key={item.id} item={item} fromIso={iso}>{tile}</DraggableItem>
             : <div key={item.id} data-noselect className="w-full min-w-0">{tile}</div>
         })}
       </div>
-      {inMonth && (
+      {inMonth && !readOnly && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -1006,11 +1104,17 @@ type DetailItem = {
 function ItemDetailContent({
   detail, onClose, showClose = false,
   onSaveTemplate, onCopy, onSaveQuick, onSaveExercises, onBuildCardio,
-  savingTemplate, copying, savingExercises,
+  savingTemplate, copying, savingExercises, readOnly = false,
 }: {
   detail: DetailItem
   onClose: () => void
   showClose?: boolean
+  /**
+   * Gearchiveerde patiënt: alles wat de planning van deze patiënt verandert
+   * verdwijnt. "Opslaan als schema" blijft staan, want dat schrijft naar je
+   * eigen bibliotheek en niet naar dit dossier.
+   */
+  readOnly?: boolean
   onSaveTemplate: () => void
   onCopy: () => void
   onSaveQuick: (patch: { quickName?: string; quickDurationSec?: number; plannedRpe?: number | null }) => Promise<void>
@@ -1115,7 +1219,7 @@ function ItemDetailContent({
 
         {/* Acties */}
         <div className="flex flex-wrap gap-2">
-          {isProgram ? (
+          {!readOnly && (isProgram ? (
             <DarkButton
               variant="secondary"
               size="sm"
@@ -1127,17 +1231,25 @@ function ItemDetailContent({
             <DarkButton variant="secondary" size="sm" onClick={() => setEditing(v => !v)}>
               <Pencil className="w-3.5 h-3.5 mr-1.5" /> Snel bewerken
             </DarkButton>
-          )}
+          ))}
           <DarkButton variant="secondary" size="sm" onClick={onSaveTemplate} disabled={savingTemplate}>
             <BookmarkPlus className="w-3.5 h-3.5 mr-1.5" /> {savingTemplate ? 'Opslaan…' : 'Opslaan als schema'}
           </DarkButton>
-          <DarkButton variant="secondary" size="sm" onClick={onCopy} disabled={copying}>
-            <CopyPlus className="w-3.5 h-3.5 mr-1.5" /> {copying ? 'Kopiëren…' : 'Kopiëren'}
-          </DarkButton>
+          {!readOnly && (
+            <DarkButton variant="secondary" size="sm" onClick={onCopy} disabled={copying}>
+              <CopyPlus className="w-3.5 h-3.5 mr-1.5" /> {copying ? 'Kopiëren…' : 'Kopiëren'}
+            </DarkButton>
+          )}
         </div>
+        {readOnly && (
+          <p className="text-[11px] leading-relaxed" style={{ color: P.inkDim }}>
+            Deze patiënt staat in je archief, dus de planning is alleen om terug te lezen. Opslaan
+            als schema kan wel: dat zet de workout in je eigen bibliotheek.
+          </p>
+        )}
 
         {/* Quick inline-edit */}
-        {editing && !isProgram && (
+        {editing && !isProgram && !readOnly && (
           <Tile>
             <div className="space-y-2">
               <div>
@@ -1260,7 +1372,13 @@ function ItemDetailContent({
         ) : (
           <div className="space-y-4">
             {category === 'CARDIO' ? (
-              <CardioSummary item={item} onBuild={() => onBuildCardio(item)} />
+              <CardioSummary
+                item={item}
+                onBuild={readOnly ? null : () => onBuildCardio(item)}
+              />
+            ) : readOnly ? (
+              // De bouwer is één groot invoerscherm; read-only is dat een lijst.
+              <PlannedExerciseList exercises={item.exercises ?? []} />
             ) : (
               <QuickExerciseBuilder
                 key={item.id}
@@ -1524,8 +1642,48 @@ function WeekPlannerContent() {
   }
 
   // ─ Data ─
-  const { data: patientsRaw = [] } = trpc.patients.list.useQuery(undefined, { staleTime: 60_000 })
-  const patients: Patient[] = patientsRaw.map(p => ({ id: p.id, name: p.name, email: p.email }))
+  const { data: patientsRaw = [] } = trpc.patients.list.useQuery(
+    { include: 'all' },
+    { staleTime: 60_000 },
+  )
+  const patients: Patient[] = patientsRaw.map(p => ({
+    id: p.id, name: p.name, email: p.email, dischargedAt: p.dischargedAt,
+  }))
+  const selectedPatient = patients.find(p => p.id === selectedPatientId) ?? null
+
+  /**
+   * Planning aanpassen kan niet meer voor een gearchiveerde patiënt.
+   *
+   * Dit is geen cosmetische keuze. De leeskant knipt al: `patient.calendarRange`
+   * geeft vanaf de maandag ná het ontslag niets meer terug, dus wat je hier
+   * inplant komt nooit op het toestel van de patiënt. De schrijf-guards op de
+   * server zitten alleen op de bulkplanners (`planTemplates.applyToPatient`,
+   * `weekSchedules.scheduleProgram`, `programs.create`, `programs.duplicate`);
+   * losse item-mutaties als `addItem`, `setItemExercises`, `copyDayItems` en
+   * `reorderItems` slagen gewoon. Zonder deze vlag plant een therapeut dus een
+   * week in, ziet die in zijn eigen planner staan, krijgt geen enkele
+   * foutmelding, en gebeurt er bij de patiënt niets.
+   *
+   * Wat WEL blijft werken: "Opslaan als schema" in het item-paneel. Dat
+   * schrijft naar je eigen bibliotheek en niet naar dit dossier, en is juist bij
+   * een afgerond traject nuttig. "Opslaan als plan" valt er wel uit, want dat
+   * hangt aan de dagselectie en die dient verder alleen om te kopiëren en te
+   * verslepen.
+   */
+  const patientGearchiveerd = !!selectedPatient?.dischargedAt
+  /**
+   * Op slot zolang we niet kunnen zien dát deze patiënt actief is.
+   *
+   * Dat dekt twee gevallen. Tijdens de eerste render is `patients` nog leeg en
+   * zou de planner een halve seconde volledig bewerkbaar zijn, ook voor iemand
+   * uit het archief. En een `?patientId=` in de URL kan wijzen naar iemand die
+   * niet in je lijst staat; daar slagen de mutaties toch niet, dus ontbrekende
+   * knoppen zijn een eerlijker antwoord dan een foutmelding achteraf.
+   *
+   * De uitleg-banner hangt bewust aan `patientGearchiveerd` en niet hieraan:
+   * zolang de lijst laadt weten we niet of "staat in je archief" waar is.
+   */
+  const planningVergrendeld = patientGearchiveerd || (!!selectedPatientId && !selectedPatient)
 
   // Datumvenster voor de planner-queries: de zichtbare maand + 2 weken marge
   // aan beide kanten (het grid toont aanloop-/uitloopdagen van aangrenzende
@@ -2265,6 +2423,10 @@ function WeekPlannerContent() {
     return new Set(flatGridIsos.slice(lo, hi + 1))
   }
   function startSelection(iso: string, pointerType?: string) {
+    // Dagen selecteren dient alleen om ze te kopiëren of te verslepen. Bij een
+    // gearchiveerde patiënt kan dat niet, dus dan blijft de selectie-toolbar
+    // ook weg in plaats van een blok knoppen dat niets doet.
+    if (planningVergrendeld) return
     // Touch/pen (iPad): ingedrukt-slepen over cellen is daar scrollen, dus
     // selecteren gaat per tik — eerste tik ankert, een tik op een andere dag
     // breidt het bereik uit, een tik op het (enige) anker wist de selectie.
@@ -2295,6 +2457,50 @@ function WeekPlannerContent() {
     window.addEventListener('pointerup', up)
     return () => window.removeEventListener('pointerup', up)
   }, [])
+
+  /**
+   * Van patiënt wisselen wist alles wat aan de vórige hing.
+   *
+   * Dit is geen opruimwerk maar de enige bescherming die er is. De
+   * vergrendel-vlag rekent elke render opnieuw uit `selectedPatientId`, maar het
+   * detailpaneel, de dagselectie, de cardio-bouwer en het week-klembord zijn
+   * state die een wissel overleeft: `setUrl` verzet alleen de id, er is geen
+   * remount en `liveDetail` blijft het item van de vorige patiënt teruggeven.
+   *
+   * Wat er zonder deze reset gebeurt: je opent een workout van een
+   * gearchiveerde patiënt (het paneel opent vergrendeld, lezen mag) en kiest
+   * daarna een actieve patiënt. De vlag gaat uit, het paneel toont nog steeds
+   * het oude item, en "Snel bewerken", "Kopiëren" en de oefeningen-bouwer staan
+   * weer aan. `updateItem`, `duplicateItem` en `setItemExercises` hebben géén
+   * server-guard op de behandelstatus, dus die opslag slaagt gewoon: de kop
+   * zegt B, de schrijfactie landt op het itemId van A.
+   *
+   * Zelfde verhaal voor de dagselectie. `startSelection` weigert een nieuwe
+   * selectie bij een gearchiveerde patiënt, maar een selectie die je vóór de
+   * wissel maakte bleef staan, inclusief de toolbar en "Opslaan als plan".
+   *
+   * De open dialogen gaan om dezelfde reden mee. De toevoeg-modal houdt een
+   * `dayId` van de vorige patiënt vast (`addItem` schrijft dan in diens week),
+   * en week-instellingen en "Plan toepassen" schrijven juist naar de nieuw
+   * gekozen patiënt met waardes die je voor de vorige invulde. Wie van patiënt
+   * wisselt begint opnieuw; dat is het enige gedrag dat niet stiekem verkeerd
+   * kan aflopen.
+   */
+  useEffect(() => {
+    setDetailItem(null)
+    setPanelClosing(false)
+    setCardioBuilderItem(null)
+    setWeekClipboard(null)
+    setSelectedIsos(new Set())
+    selectAnchor.current = null
+    selecting.current = false
+    setAddOpen(false)
+    setAddDayId(null)
+    setAddDayDate(null)
+    setWeekMetaOpen(null)
+    setApplyPlanOpen(false)
+    setSavePlanRange(null)
+  }, [selectedPatientId])
 
   // Kalenderbereik van de huidige dag-selectie, als ISO-dagen. Bewust op datum
   // en niet op weekNumber: dat veld is in de praktijk vrijwel altijd 1 en
@@ -2332,6 +2538,9 @@ function WeekPlannerContent() {
 
   async function handleDragEnd(e: DragEndEvent) {
     setActiveDrag(null)
+    // Vangnet naast de uitgezette grepen: een drag die toch op gang komt mag
+    // geen reorderItems/copyDayItems afvuren op een gearchiveerd dossier.
+    if (planningVergrendeld) return
     const over = e.over
     if (!over) return
     const overData = over.data.current as { iso?: string } | undefined
@@ -2482,7 +2691,10 @@ function WeekPlannerContent() {
           <Display size="md">{monthLabel.toUpperCase()}</Display>
         </div>
         <div className="flex items-center gap-2">
-          {selectedPatientId && selectedWeekRange && (
+          {/* Ook op de vergrendel-vlag: een selectie kan alleen ontstaan bij een
+              actieve patiënt, maar een knop die na een wissel blijft hangen is
+              precies waar het hierboven beschreven lek zat. */}
+          {selectedPatientId && selectedWeekRange && !planningVergrendeld && (
             <DarkButton
               variant="secondary"
               onClick={() => setSavePlanRange({ from: selectedWeekRange.from, to: selectedWeekRange.to })}
@@ -2492,7 +2704,7 @@ function WeekPlannerContent() {
               Opslaan als plan ({selectedWeekRange.count} {selectedWeekRange.count === 1 ? 'week' : 'weken'})
             </DarkButton>
           )}
-          {selectedPatientId && (
+          {selectedPatientId && !planningVergrendeld && (
             <DarkButton onClick={() => setApplyPlanOpen(true)} className="text-xs">
               <CalendarRange className="w-3.5 h-3.5 mr-1.5" />
               Plan toepassen
@@ -2582,9 +2794,29 @@ function WeekPlannerContent() {
         </Tile>
       ) : (
         <>
+        {/* Gearchiveerd: één regel die zegt waarom er niets meer te klikken is.
+            Zonder die regel lijkt de planner stuk in plaats van dicht. */}
+        {patientGearchiveerd && (
+          <Tile>
+            <div className="flex items-start gap-3 py-1">
+              <Archive className="w-4 h-4 mt-0.5 shrink-0" style={{ color: P.inkMuted }} />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold" style={{ color: P.ink }}>
+                  {selectedPatient?.name ?? 'Deze patiënt'} staat in je archief
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: P.inkMuted }}>
+                  De planning is alleen om terug te lezen: een gearchiveerde patiënt krijgt geen
+                  nieuwe trainingen meer in de app te zien. Neem hem weer in behandeling om te
+                  kunnen plannen.
+                </p>
+              </div>
+            </div>
+          </Tile>
+        )}
+
         {/* Lege staat: patiënt gekozen maar nog geen enkel week-schema. Eén
             duidelijke CTA i.p.v. de gebruiker laten raden tussen de dagen. */}
-        {schedules.length === 0 && (
+        {schedules.length === 0 && !planningVergrendeld && (
           <Tile>
             <div className="flex flex-col sm:flex-row items-center gap-4 py-5 px-2">
               <div
@@ -2622,8 +2854,10 @@ function WeekPlannerContent() {
         )}
 
 
-        {/* Selectie-toolbar: zichtbaar zodra er dagen geselecteerd zijn */}
-        {selectedIsos.size > 0 && (
+        {/* Selectie-toolbar: zichtbaar zodra er dagen geselecteerd zijn, en
+            nooit bij een gearchiveerde patiënt. Slepen doet daar niets, dus een
+            blok knoppen zonder effect is erger dan geen blok knoppen. */}
+        {selectedIsos.size > 0 && !planningVergrendeld && (
           <div
             className="flex items-center gap-3 flex-wrap rounded-xl px-3 py-2 animate-in fade-in-0 slide-in-from-top-1 duration-200"
             style={{ background: P.surface, border: `1px solid ${P.brand}` }}
@@ -2737,6 +2971,10 @@ function WeekPlannerContent() {
                           />
                         )
                       })()}
+                      {/* Elk item in dit menu schrijft: fase/belasting, week
+                          kopiëren, knippen, plakken, dupliceren als deload.
+                          Bij een gearchiveerde patiënt blijft het dus weg. */}
+                      {!planningVergrendeld && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
@@ -2792,6 +3030,7 @@ function WeekPlannerContent() {
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
+                      )}
                     </>
                   ) : null}
                 </div>
@@ -2820,6 +3059,7 @@ function WeekPlannerContent() {
                       sessionIdFor={sessionIdFor}
                       loggedFor={loggedInfoFor}
                       openItemId={detailItem?.item.id ?? null}
+                      readOnly={planningVergrendeld}
                     />
                   )
                 })}
@@ -2947,6 +3187,7 @@ function WeekPlannerContent() {
             savingTemplate={saveItemAsTemplate.isPending}
             copying={duplicateItem.isPending}
             savingExercises={setItemExercises.isPending}
+            readOnly={planningVergrendeld}
           />
         </aside>
       )}
@@ -2972,6 +3213,7 @@ function WeekPlannerContent() {
                   savingTemplate={saveItemAsTemplate.isPending}
                   copying={duplicateItem.isPending}
                   savingExercises={setItemExercises.isPending}
+                  readOnly={planningVergrendeld}
                 />
               )}
             </div>

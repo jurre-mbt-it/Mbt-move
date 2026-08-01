@@ -51,6 +51,11 @@ function RowAction({ label, tint, onClick, onHover }: {
 
 type QuickFilter = 'all' | 'active' | 'low-compliance'
 type RoleFilter = 'all' | 'PATIENT' | 'ATHLETE'
+/**
+ * Welke kant van het archief je ziet. Dit is de BEHANDELstatus en staat los van
+ * de quickfilters hieronder, die over de programmastatus gaan.
+ */
+type ListView = 'behandeling' | 'archief'
 
 export default function PatientsPage() {
   return (
@@ -68,6 +73,7 @@ function PatientsPageInner() {
   const [search, setSearch] = useState('')
   const [quickFilter, setQuickFilter] = useState<QuickFilter>(initialFilter)
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('all')
+  const [view, setView] = useState<ListView>('behandeling')
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteName, setInviteName] = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
@@ -80,7 +86,13 @@ function PatientsPageInner() {
     patientUserId: string | null
   } | null>(null)
 
-  const { data: patients = [], isLoading } = trpc.patients.list.useQuery()
+  const archief = view === 'archief'
+  // Zonder input voor de werklijst, zodat deze query dezelfde cache-sleutel
+  // houdt als de andere schermen die `patients.list()` kaal aanroepen. De
+  // server defaultt zelf op 'active'.
+  const { data: patients = [], isLoading } = trpc.patients.list.useQuery(
+    archief ? { include: 'archived' } : undefined,
+  )
 
   // Belasting, pijn en laatste activiteit komen uit een aparte gebatchte query,
   // zodat de pickers en de weekplanner die `patients.list` ook gebruiken dat
@@ -92,9 +104,11 @@ function PatientsPageInner() {
     d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
     return d.toISOString()
   }, [])
+  // Alleen voor de werklijst. In het archief staan geen signaal-kolommen, dus
+  // dat rekenwerk hoeft daar niet te draaien.
   const { data: caseload = [] } = trpc.patients.caseload.useQuery(
     { weekStart, weeks: 6 },
-    { staleTime: 60_000 },
+    { staleTime: 60_000, enabled: !archief },
   )
 
   const utils = trpc.useUtils()
@@ -145,6 +159,10 @@ function PatientsPageInner() {
 
   const filtered = patients
     .filter(p => {
+      // De quickfilters gaan over het PROGRAMMA. In het archief zeggen ze niets
+      // meer, en ze staan daar ook niet in beeld, dus ze mogen daar niet stil
+      // meefilteren.
+      if (archief) return true
       if (quickFilter === 'active') return p.programStatus === 'ACTIVE'
       if (quickFilter === 'low-compliance') return p.complianceLow
       return true
@@ -159,7 +177,10 @@ function PatientsPageInner() {
    * De lijst samenstellen en op aandacht sorteren. Vier dingen vragen aandacht:
    * pijn die is opgelopen, een weeksprong boven de 30%, zeven dagen of langer
    * niets gelogd, en lage therapietrouw. Wie daaraan voldoet staat bovenaan,
-   * de rest op alfabet — zo is de bovenkant van het scherm je werklijst.
+   * de rest op alfabet, zo is de bovenkant van het scherm je werklijst.
+   *
+   * In het archief is er niets te triëren. Daar staat de laatst afgesloten
+   * behandeling bovenaan, want dat is degene die je waarschijnlijk zoekt.
    */
   const rows: CaseloadRow[] = useMemo(() => {
     const byId = new Map(caseload.map(c => [c.patientId, c]))
@@ -194,14 +215,21 @@ function PatientsPageInner() {
           lastActivityAt: c?.lastActivityAt ?? null,
           silentDays,
           attention,
+          dischargedAt: p.dischargedAt,
+          dischargeReason: p.dischargeReason,
         }
       })
-      .sort((a, b) =>
-        a.attention === b.attention
+      .sort((a, b) => {
+        if (archief) {
+          const ta = a.dischargedAt ? new Date(a.dischargedAt).getTime() : 0
+          const tb = b.dischargedAt ? new Date(b.dischargedAt).getTime() : 0
+          return tb - ta || a.name.localeCompare(b.name, 'nl')
+        }
+        return a.attention === b.attention
           ? a.name.localeCompare(b.name, 'nl')
-          : a.attention ? -1 : 1,
-      )
-  }, [filtered, caseload])
+          : a.attention ? -1 : 1
+      })
+  }, [filtered, caseload, archief])
 
   return (
     <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
@@ -219,30 +247,70 @@ function PatientsPageInner() {
           </DarkButton>
         </div>
 
-        {/* Quick stats */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          <QuickStat
-            value={patients.length}
-            label="Totaal"
-            tint={P.ice}
-            active={quickFilter === 'all'}
-            onClick={() => setQuickFilter('all')}
-          />
-          <QuickStat
-            value={activeCount}
-            label="Actief"
-            tint={P.lime}
-            active={quickFilter === 'active'}
-            onClick={() => setQuickFilter(quickFilter === 'active' ? 'all' : 'active')}
-          />
-          <QuickStat
-            value={lowComplianceCount}
-            label="Lage compliance"
-            tint={P.danger}
-            active={quickFilter === 'low-compliance'}
-            onClick={() => setQuickFilter(quickFilter === 'low-compliance' ? 'all' : 'low-compliance')}
-          />
+        {/* Behandelstatus: in behandeling of afgesloten. Staat bovenaan en apart
+            van de quickfilters eronder, want dit is een andere vraag: die
+            filters kijken naar het programma, deze schakelaar naar de
+            behandeling. */}
+        <div className="flex gap-2">
+          {([
+            { value: 'behandeling', label: 'In behandeling' },
+            { value: 'archief', label: 'Archief' },
+          ] as const).map(opt => {
+            const actief = view === opt.value
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setView(opt.value)}
+                className="athletic-tap athletic-mono px-3 py-1.5 rounded-lg text-xs transition-colors"
+                style={actief
+                  ? { border: `1.5px solid ${P.brand}`, background: P.brand + '1f', color: P.brand, fontWeight: 800, letterSpacing: '0.1em' }
+                  : { border: `1.5px solid ${P.lineStrong}`, color: P.inkMuted, background: 'transparent', fontWeight: 700, letterSpacing: '0.1em' }
+                }
+              >
+                {opt.label.toUpperCase()}
+              </button>
+            )
+          })}
         </div>
+
+        {archief && (
+          <p style={{ color: P.inkMuted, fontSize: 13, lineHeight: 1.6 }}>
+            Deze {portal.personLabelPlural} zijn niet meer in behandeling bij jou. Hun dossier is
+            bewaard gebleven. Open iemand en kies &ldquo;Weer in behandeling&rdquo; om verder te gaan.
+          </p>
+        )}
+
+        {/* Quick stats. Alleen in de werklijst: ze tellen programmastatus en
+            therapietrouw, en dat zegt niets over een afgesloten dossier. */}
+        {!archief && (
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <QuickStat
+              value={patients.length}
+              label="Totaal"
+              tint={P.ice}
+              active={quickFilter === 'all'}
+              onClick={() => setQuickFilter('all')}
+            />
+            {/* "Actief" ging over het programma, niet over de behandeling. Nu er
+                een archief naast staat, liepen die twee betekenissen door
+                elkaar. De waarde blijft 'active'; alleen het woord verandert. */}
+            <QuickStat
+              value={activeCount}
+              label="Met lopend schema"
+              tint={P.lime}
+              active={quickFilter === 'active'}
+              onClick={() => setQuickFilter(quickFilter === 'active' ? 'all' : 'active')}
+            />
+            <QuickStat
+              value={lowComplianceCount}
+              label="Lage compliance"
+              tint={P.danger}
+              active={quickFilter === 'low-compliance'}
+              onClick={() => setQuickFilter(quickFilter === 'low-compliance' ? 'all' : 'low-compliance')}
+            />
+          </div>
+        )}
 
         {/* Role filter pills */}
         <div className="flex gap-2">
@@ -287,12 +355,16 @@ function PatientsPageInner() {
         {!isLoading && rows.length > 0 && (
           <CaseloadTable
             rows={rows}
+            mode={archief ? 'archief' : 'werklijst'}
             onOpen={id => router.push(`${portal.patients}/${id}`)}
             onPrefetch={id => {
               router.prefetch(`${portal.patients}/${id}`)
               utils.patients.get.prefetch({ id })
             }}
-            renderAction={row => (
+            // Geen programma-knop in het archief: een nieuw schema beginnen bij
+            // iemand die je hebt afgesloten hoort via het dossier te lopen,
+            // waar de knop om hem terug te halen staat.
+            renderAction={archief ? undefined : row => (
               row.programId ? (
                 <RowAction
                   label="Programma"
@@ -317,10 +389,16 @@ function PatientsPageInner() {
         {!isLoading && rows.length === 0 && (
           <Tile>
             <div className="flex flex-col items-center justify-center py-8 text-center gap-3">
-              <p style={{ color: P.inkMuted, fontSize: 13 }}>Geen patiënten gevonden</p>
-              <DarkButton variant="secondary" size="sm" onClick={() => setInviteOpen(true)}>
-                + Patiënt uitnodigen
-              </DarkButton>
+              <p style={{ color: P.inkMuted, fontSize: 13 }}>
+                {archief
+                  ? `Je hebt nog geen ${portal.personLabelPlural} op inactief gezet.`
+                  : 'Geen patiënten gevonden'}
+              </p>
+              {!archief && (
+                <DarkButton variant="secondary" size="sm" onClick={() => setInviteOpen(true)}>
+                  + Patiënt uitnodigen
+                </DarkButton>
+              )}
             </div>
           </Tile>
         )}

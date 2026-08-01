@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { mergeCriterionStatuses, statussenVanTraject } from '../rehab-traject'
+import {
+  mergeCriterionStatuses,
+  statussenVanTraject,
+  trajectOutcomeTekst,
+  trajectPeriode,
+} from '../rehab-traject'
 
 const criteria = [
   { id: 'c1', name: 'Knieflexie' },
@@ -80,5 +85,40 @@ describe('statussenVanTraject', () => {
     )
     expect(uit.map((c) => c.status)).toEqual(['NOT_MET', 'NOT_MET'])
     expect(uit.map((c) => c.measurementValue)).toEqual([null, null])
+  })
+})
+
+describe('trajectOutcomeTekst', () => {
+  it('vertaalt een bekende uitkomst', () => {
+    expect(trajectOutcomeTekst('COMPLETED')).toBe('criteria behaald')
+  })
+
+  it('leest een leeg uitkomst-veld als onbekend en niet als een lege regel', () => {
+    // Trajecten die via deactivateForPatient zijn dichtgezet (de app doet dat
+    // nog) hebben outcome null. Dat is hetzelfde verhaal als UNKNOWN.
+    expect(trajectOutcomeTekst(null)).toBe('geen uitkomst vastgelegd')
+    expect(trajectOutcomeTekst(undefined)).toBe('geen uitkomst vastgelegd')
+    expect(trajectOutcomeTekst('UNKNOWN')).toBe('geen uitkomst vastgelegd')
+  })
+
+  it('valt terug op de ruwe waarde bij een uitkomst die deze bundel niet kent', () => {
+    expect(trajectOutcomeTekst('IETS_NIEUWS')).toBe('IETS_NIEUWS')
+  })
+})
+
+describe('trajectPeriode', () => {
+  it('zet begin en eind in één regel', () => {
+    expect(trajectPeriode('2026-05-04T00:00:00Z', '2026-07-20T00:00:00Z')).toBe(
+      '4 mei 2026 tot 20 juli 2026',
+    )
+  })
+
+  it('zegt van een lopend traject dat het nog loopt', () => {
+    expect(trajectPeriode('2026-05-04T00:00:00Z', null)).toBe('4 mei 2026, loopt nog')
+  })
+
+  it('slikt onbruikbare datums zonder NaN in beeld te zetten', () => {
+    expect(trajectPeriode(null, null)).toBe('periode onbekend')
+    expect(trajectPeriode('geen datum', null)).toBe('periode onbekend')
   })
 })

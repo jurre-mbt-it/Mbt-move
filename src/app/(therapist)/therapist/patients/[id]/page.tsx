@@ -8,6 +8,11 @@ import { trpc } from '@/lib/trpc/client'
 import { usePortal } from '@/lib/portal'
 import {
   DarkButton,
+  DarkDialog as Dialog,
+  DarkDialogContent as DialogContent,
+  DarkDialogDescription as DialogDescription,
+  DarkDialogHeader as DialogHeader,
+  DarkDialogTitle as DialogTitle,
   DarkInput,
   DarkTabs as Tabs,
   DarkTabsContent as TabsContent,
@@ -23,6 +28,8 @@ import {
 import { AssignFromTemplateDialog } from '@/components/patients/AssignFromTemplateDialog'
 import { CoMonitorDialog } from '@/components/patients/CoMonitorDialog'
 import { UnlinkDialog } from '@/components/patients/UnlinkDialog'
+import { DischargeDialog } from '@/components/patients/DischargeDialog'
+import { dischargeReasonTekst, formatDischargeDate } from '@/lib/care-status'
 import { MonthSummary } from '@/components/patients/MonthSummary'
 import { PerformerToggle, type PerformerFilter } from '@/components/patients/PerformerToggle'
 import { InsightActivationToggle } from '@/components/insights/InsightActivationToggle'
@@ -71,12 +78,21 @@ export default function PatientDetailPage({
   // Deep-link vanaf het dashboard: /patients/[id]?tab=signalen opent direct
   // de juiste tab. Ongeldige waardes vallen terug op 'profiel'.
   const { tab } = use(searchParams)
-  const initialTab = TAB_VALUES.includes(tab as (typeof TAB_VALUES)[number]) ? tab : 'profiel'
   const router = useRouter()
   const { data: patient, isLoading } = trpc.patients.get.useQuery({ id })
   // Wearable-tab voorlopig alleen voor de admin (zie wearables-access.ts).
   const { data: me } = trpc.auth.getMe.useQuery()
   const showWearables = wearablesEnabledForRole(me?.role)
+  // Het hele revalidatie-blok is therapeut-werk. Elke procedure in rehab.ts
+  // staat op therapistProcedure en weigert een coach met FORBIDDEN, dus de tab
+  // toonde voor een coach alleen een leeg blok plus een stille fout.
+  const showRehab = !portal.isCoach
+  const zichtbareTabs = TAB_VALUES.filter(
+    (t) => (t !== 'revalidatie' || showRehab) && (t !== 'wearables' || showWearables),
+  )
+  const initialTab = zichtbareTabs.includes(tab as (typeof TAB_VALUES)[number])
+    ? tab
+    : 'profiel'
   const { data: programsRaw = [] } = trpc.programs.list.useQuery({ patientId: id })
   const [historyLimit, setHistoryLimit] = useState(5)
   const [historyPerformer, setHistoryPerformer] = useState<PerformerFilter>('all')
@@ -148,13 +164,49 @@ export default function PatientDetailPage({
   } | null>(null)
   const [coMonitorOpen, setCoMonitorOpen] = useState(false)
   const [unlinkOpen, setUnlinkOpen] = useState(false)
+  const [dischargeOpen, setDischargeOpen] = useState(false)
+  // Bevestiging vóór "Stuur invite-link", maar alleen bij een gearchiveerde
+  // patiënt. Bij iemand die in behandeling is doet de knop precies wat er staat
+  // en hoort er geen drempel; bij iemand uit het archief haalt dezelfde knop de
+  // markering weg, en dat staat nergens op de knop. Wie in een afgesloten
+  // dossier zit is daar meestal om te lezen.
+  const [resendConfirmOpen, setResendConfirmOpen] = useState(false)
+  const reactivate = trpc.patients.reactivate.useMutation({
+    onSuccess: () => {
+      utils.patients.get.invalidate({ id })
+      utils.patients.list.invalidate()
+      utils.programs.list.invalidate()
+      toast.success('Weer in behandeling. Afgesloten programma’s lopen weer door.')
+    },
+    // De server schrijft hier zelf een bruikbare melding (NOT_FOUND als iemand
+    // anders net heractiveerde, PRECONDITION_FAILED zonder praktijk). Letterlijk
+    // tonen zegt meer dan een eigen tekst.
+    onError: (e) => {
+      toast.error(e.message)
+      utils.patients.get.invalidate({ id })
+    },
+  })
   const resendInvite = trpc.invite.resend.useMutation({
     onSuccess: (res) => {
+      // Opnieuw uitnodigen doet meer dan mailen: `invite.resend` heft via
+      // `hefUitbehandeldOp` de uitbehandel-markering op. Zonder deze twee
+      // invalidaties blijft de archiefbanner hierboven staan en blijft de
+      // patiënt in het archief hangen terwijl hij al weer in behandeling is,
+      // tot iemand de pagina ververst. Onvoorwaardelijk, want de markering kan
+      // ook door een collega gezet zijn nadat deze pagina laadde.
+      utils.patients.get.invalidate({ id })
+      utils.patients.list.invalidate()
       if (res.mailDelivered) {
         const expires = new Date(res.expiresAt).toLocaleString('nl-NL', {
           day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
         })
-        toast.success(`Uitnodiging verstuurd naar ${res.email}. Verloopt ${expires}.`)
+        toast.success(`Uitnodiging verstuurd naar ${res.email}. Verloopt ${expires}.`, {
+          // Alleen als er ook echt iets op te heffen viel. De programma's
+          // blijven dicht: dat doet alleen "Weer in behandeling".
+          description: patient?.careStatus
+            ? `${patient.name} staat daarmee ook weer in behandeling. De programma's die bij het afsluiten dichtgingen blijven dicht.`
+            : undefined,
+        })
         setInviteFallback(null)
       } else {
         setInviteFallback({
@@ -226,6 +278,11 @@ export default function PatientDetailPage({
   }
 
   const status = patient.programStatus ? STATUS_CONFIG[patient.programStatus] : null
+  // Behandelstatus, niet programmastatus. Gevuld = deze praktijk of deze coach
+  // heeft de behandeling afgesloten; het dossier hieronder is gewoon compleet.
+  const careStatus = patient.careStatus ?? null
+  const careStatusDatum = formatDischargeDate(careStatus?.dischargedAt) ?? 'onbekende datum'
+  const careStatusReden = dischargeReasonTekst(careStatus?.reason)
   const activePrograms = programs.filter(p => p.status === 'ACTIVE' && !p.isTemplate)
   // Actief overzicht = alles behalve afgesloten; afgesloten schema's blijven
   // bewaard maar verhuizen naar een aparte, doorzichtige sectie.
@@ -243,6 +300,43 @@ export default function PatientDetailPage({
         >
           ← TERUG
         </Link>
+
+        {/* Archiefbanner. Staat bovenaan omdat de rest van de pagina er precies
+            hetzelfde uitziet als bij iemand die wel in behandeling is: het
+            dossier blijft compleet. Zonder deze regel zou je dat verschil
+            nergens zien. */}
+        {careStatus && (
+          <Tile accentBar={P.inkMuted}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-1.5">
+                <MetaLabel style={{ color: P.inkMuted }}>NIET MEER IN BEHANDELING</MetaLabel>
+                <p style={{ color: P.ink, fontSize: 13.5, lineHeight: 1.5 }}>
+                  {`Afgesloten op ${careStatusDatum} door ${careStatus.dischargedByName}`}
+                  {careStatusReden ? `, ${careStatusReden}` : ''}.
+                </p>
+                {careStatus.note && (
+                  <p style={{ color: P.inkMuted, fontSize: 12.5, lineHeight: 1.5 }}>
+                    {careStatus.note}
+                  </p>
+                )}
+                <p style={{ color: P.inkDim, fontSize: 12, lineHeight: 1.5 }}>
+                  Het dossier hieronder is compleet gebleven. {patient.name} staat alleen niet meer
+                  in je werklijst en krijgt geen herinneringen meer van jou.
+                </p>
+              </div>
+              <DarkButton
+                variant="secondary"
+                size="sm"
+                className="shrink-0"
+                disabled={reactivate.isPending}
+                loading={reactivate.isPending}
+                onClick={() => reactivate.mutate({ id: patient.id })}
+              >
+                Weer in behandeling
+              </DarkButton>
+            </div>
+          </Tile>
+        )}
 
         {/* Patient hero */}
         <div className="flex flex-col gap-2">
@@ -291,7 +385,10 @@ export default function PatientDetailPage({
             variant="secondary"
             disabled={resendInvite.isPending}
             loading={resendInvite.isPending}
-            onClick={() => resendInvite.mutate({ patientId: patient.id })}
+            onClick={() => {
+              if (careStatus) setResendConfirmOpen(true)
+              else resendInvite.mutate({ patientId: patient.id })
+            }}
           >
             <span className="inline-flex items-center gap-1.5"><IconMail size={15} /> Stuur invite-link</span>
           </DarkButton>
@@ -323,6 +420,15 @@ export default function PatientDetailPage({
           {portal.isCoach && (
             <DarkButton variant="secondary" onClick={() => setUnlinkOpen(true)}>
               Koppeling verbreken
+            </DarkButton>
+          )}
+          {/* Bewust NA "koppeling verbreken" en met een eigen woord: dit is de
+              zachte variant. Verbreken haalt toegang en programma's weg,
+              inactief zetten laat het dossier heel. Wie al inactief staat ziet
+              hier niets; die knop staat in de banner bovenaan. */}
+          {!careStatus && (
+            <DarkButton variant="secondary" onClick={() => setDischargeOpen(true)}>
+              Op inactief zetten
             </DarkButton>
           )}
           {/* Programma's. Een patient kan er meerdere naast elkaar hebben
@@ -449,13 +555,19 @@ export default function PatientDetailPage({
         {/* Tabs */}
         <Tabs defaultValue={initialTab} className="space-y-4">
           <TabsList
-            className={`w-full grid ${showWearables ? 'grid-cols-8' : 'grid-cols-7'} rounded-xl`}
-            style={{ background: P.surface, border: `1px solid ${P.line}` }}
+            className="w-full grid rounded-xl"
+            style={{
+              background: P.surface,
+              border: `1px solid ${P.line}`,
+              // Aantal kolommen volgt de zichtbare tabs; een vaste klasse liep
+              // scheef zodra er een tab wegviel.
+              gridTemplateColumns: `repeat(${zichtbareTabs.length}, minmax(0, 1fr))`,
+            }}
           >
             <TabsTrigger value="profiel" className="text-xs px-1">Profiel</TabsTrigger>
             <TabsTrigger value="programmas" className="text-xs px-1">Progr.</TabsTrigger>
             <TabsTrigger value="geschiedenis" className="text-xs px-1">Historie</TabsTrigger>
-            <TabsTrigger value="revalidatie" className="text-xs px-1">Revalidatie</TabsTrigger>
+            {showRehab && <TabsTrigger value="revalidatie" className="text-xs px-1">Revalidatie</TabsTrigger>}
             <TabsTrigger value="tests" className="text-xs px-1">Tests</TabsTrigger>
             <TabsTrigger value="signalen" className="text-xs px-1">Signalen</TabsTrigger>
             <TabsTrigger value="voortgang" className="text-xs px-1">Voortgang</TabsTrigger>
@@ -847,14 +959,15 @@ export default function PatientDetailPage({
           </TabsContent>
 
           {/* ── TAB: Revalidatie (stoplicht-tracker) ──────────────── */}
-          <TabsContent value="revalidatie" className="space-y-4">
-            {/* Een protocol activeren of wisselen is een klinisch besluit en
-                blijft bij de therapeut. De coach leest de tracker wel mee. */}
-            {!portal.isCoach && (
+          {/* Alles hieronder leest en schrijft via therapistProcedure. Voor een
+              coach bleef alleen een leeg blok over plus een FORBIDDEN die
+              nergens in beeld kwam, dus de tab is er voor hem niet. */}
+          {showRehab && (
+            <TabsContent value="revalidatie" className="space-y-4">
               <RehabActivationToggle patientId={patient.id} patientName={patient.name} />
-            )}
-            <RehabTracker patientId={patient.id} />
-          </TabsContent>
+              <RehabTracker patientId={patient.id} />
+            </TabsContent>
+          )}
 
           {/* ── TAB: Tests (losse klinische tests) ────────────────── */}
           <TabsContent value="tests" className="space-y-4">
@@ -922,6 +1035,63 @@ export default function PatientDetailPage({
           patientName={patient.name ?? 'deze atleet'}
           onClose={() => setUnlinkOpen(false)}
           onDone={() => router.push(portal.patients)}
+        />
+      )}
+
+      {/* Opnieuw uitnodigen vanuit het archief. De knop belooft een mail, de
+          server heft er ook de uitbehandel-markering mee op, en dat verschil
+          hoort de therapeut te zien vóórdat hij klikt en niet erna in een
+          toast. De tekst zegt er meteen bij wat er níet gebeurt, want dat is de
+          reden om in plaats hiervan "Weer in behandeling" te kiezen. */}
+      <Dialog open={resendConfirmOpen} onOpenChange={(o) => !o && setResendConfirmOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Opnieuw uitnodigen en weer in behandeling?</DialogTitle>
+            <DialogDescription>
+              {patient.name} staat nu op inactief. Een nieuwe uitnodiging haalt die markering weg,
+              dus {patient.name} komt terug in je werklijst, je signalen en de dagelijkse
+              herinneringen.
+            </DialogDescription>
+          </DialogHeader>
+
+          <p style={{ color: P.inkMuted, fontSize: 13, lineHeight: 1.6 }}>
+            De programma&rsquo;s die bij het afsluiten dichtgingen blijven dicht. Wil je die wél
+            terug, gebruik dan &ldquo;Weer in behandeling&rdquo; bovenaan het dossier.
+          </p>
+
+          <div className="mt-4 flex justify-end gap-2">
+            <DarkButton
+              variant="secondary"
+              onClick={() => setResendConfirmOpen(false)}
+              disabled={resendInvite.isPending}
+            >
+              Annuleren
+            </DarkButton>
+            <DarkButton
+              variant="primary"
+              disabled={resendInvite.isPending}
+              loading={resendInvite.isPending}
+              onClick={() => {
+                setResendConfirmOpen(false)
+                resendInvite.mutate({ patientId: patient.id })
+              }}
+            >
+              Uitnodiging sturen
+            </DarkButton>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {dischargeOpen && (
+        <DischargeDialog
+          patientId={patient.id}
+          patientName={patient.name ?? `deze ${portal.personLabel}`}
+          personLabel={portal.personLabel}
+          // Rol en niet het portaal: de server kijkt naar de rol, en het
+          // coach-segment is een re-export van deze pagina.
+          role={me?.role}
+          onClose={() => setDischargeOpen(false)}
+          onDone={() => setDischargeOpen(false)}
         />
       )}
     </div>

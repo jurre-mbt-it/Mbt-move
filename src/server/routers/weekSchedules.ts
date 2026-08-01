@@ -185,6 +185,42 @@ async function assertMagWeekBewerken(
   await assertPatientLink(prisma, user, week.patientId)
 }
 
+/**
+ * Weiger nieuwe of gewijzigde planning bij een uitbehandelde patiënt.
+ *
+ * De vier bulk-planners hadden deze check al, de losse item-mutaties hieronder
+ * niet. Daarmee was de weekplanner-UI de enige bescherming, en dat is één
+ * bestand van drieduizend regels waarin elk stukje state dat een patiëntwissel
+ * overleeft opnieuw bij de verkeerde patiënt kan landen. Dat is geen theorie:
+ * het itempaneel bleef na een wissel op het oude item staan, waardoor een
+ * opslag bij de vórige patiënt terechtkwam terwijl de kop de nieuwe toonde. De
+ * server hoort het laatste woord te hebben, niet het scherm.
+ *
+ * VERWIJDEREN VALT ER BEWUST BUITEN. `removeItem`, `clearLegacyDay`,
+ * `deleteWeek` en `delete` krijgen deze guard NIET. Een therapeut die iets
+ * verkeerd heeft ingepland moet dat kunnen opruimen nadat hij het dossier heeft
+ * gesloten; blokkeren zou hem opzadelen met rommel die hij niet meer kwijt kan,
+ * en dat is geen bescherming maar een val. Zet de guard er dus niet alsnog op
+ * "voor de consistentie" zonder eerst een andere weg te bieden om te wissen.
+ *
+ * Sjabloon-weken vallen er ook buiten: die hangen aan geen enkele patiënt
+ * (`patientId` is dan null) en horen bij de bibliotheek van de therapeut. De
+ * plan-editor draait op exact dezelfde item-mutaties, dus zonder de vroege
+ * return zou een uitbehandeling het bouwen van een sjabloon raken.
+ *
+ * Gooit een CONFLICT met een leesbare melding; web toont die in een toast, iOS
+ * in een Alert. Zonder geldige scope (staf zonder praktijk) blokkeert
+ * `assertNotDischarged` niets, zie de doc daar.
+ */
+async function assertMagPlannen(
+  prisma: PrismaClient,
+  user: WeekUser,
+  patientId: string | null | undefined,
+) {
+  if (!patientId) return
+  await assertNotDischarged(prisma, user, patientId)
+}
+
 const DayInput = z.object({
   dayOfWeek: z.number().int().min(0).max(6),
   programId: z.string().nullable().optional(),
@@ -376,6 +412,9 @@ export const weekSchedulesRouter = createTRPCRouter({
       const id = createId()
       const { patientId, days, startDate, endDate, ...rest } = input
       await assertPatientLink(ctx.prisma, ctx.user, patientId)
+      // Zonder patiënt is dit een sjabloon of een losse week zonder dossier;
+      // dan is er niets uit te behandelen.
+      await assertMagPlannen(ctx.prisma, ctx.user, patientId)
 
       // Idempotent per (patiënt, maandag). De planners riepen create aan per
       // losse dag-actie; bij een verouderde client-state leverde dat meerdere
@@ -450,6 +489,11 @@ export const weekSchedulesRouter = createTRPCRouter({
       await assertMagWeekBewerken(ctx.prisma, ctx.user, existing)
       // En de DOELpatiënt, die een andere kan zijn dan de huidige.
       await assertPatientLink(ctx.prisma, ctx.user, patientId)
+      // Deze legacy-save vertaalt "programma per dag" naar echte item-operaties
+      // en plant dus. Guard op de DOELpatiënt, want dat is degene die de
+      // planning overhoudt. Een week weghalen bij een uitbehandelde patiënt
+      // (patientId null of een andere patiënt) blijft daardoor gewoon mogelijk.
+      await assertMagPlannen(ctx.prisma, ctx.user, patientId)
 
       // Legacy-API: de client kent alleen "één programma per dag" en weet niets
       // van items. Twee valkuilen, allebei erger dan ze lijken:
@@ -581,8 +625,11 @@ export const weekSchedulesRouter = createTRPCRouter({
     }))
     .mutation(async ({ ctx, input }) => {
       await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
-
       if (input.programId) {
+        // Alleen bij het ZETTEN van een programma. `programId: null` maakt de
+        // dag juist leeg, en dat is dezelfde opruim-actie als `clearLegacyDay`,
+        // die de guard bewust ook niet heeft.
+        await assertMagPlannen(ctx.prisma, ctx.user, input.patientId)
         const program = await ctx.prisma.program.findUnique({ where: { id: input.programId } })
         if (!program) throw new TRPCError({ code: 'NOT_FOUND', message: 'Programma niet gevonden' })
         const isAdmin = ctx.user.role === 'ADMIN'
@@ -903,6 +950,9 @@ export const weekSchedulesRouter = createTRPCRouter({
     }))
     .mutation(async ({ ctx, input }) => {
       await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
+      // Fase, deload en weeknotitie zijn planning: dit is de weekopzet van een
+      // dossier dat dicht staat, en de rij wordt hieronder desnoods aangemaakt.
+      await assertMagPlannen(ctx.prisma, ctx.user, input.patientId)
       const { patientId, weekNumber, startDate, ...meta } = input
       const maandag = startDate ? mondagVan(startDate) : null
       const nieuweWeekStart = maandag ? amsMidnight(maandag) : null
@@ -1404,7 +1454,9 @@ export const weekSchedulesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const day = await ctx.prisma.weekScheduleDay.findUnique({
         where: { id: input.dayId },
-        include: { weekSchedule: { select: { creatorId: true, practiceId: true } } },
+        // patientId komt mee op de rij die we toch al ophalen voor de
+        // toegangscheck; null bij een sjabloon-week.
+        include: { weekSchedule: { select: { creatorId: true, practiceId: true, patientId: true } } },
       })
       if (!day) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user.role === 'ADMIN'
@@ -1413,6 +1465,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       if (!isAdmin && !isOwner && !isSamePractice) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
+      await assertMagPlannen(ctx.prisma, ctx.user, day.weekSchedule.patientId)
       const last = await ctx.prisma.weekScheduleDayItem.findFirst({
         where: { dayId: input.dayId },
         orderBy: { order: 'desc' },
@@ -1498,7 +1551,8 @@ export const weekSchedulesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const item = await ctx.prisma.weekScheduleDayItem.findUnique({
         where: { id: input.id },
-        include: { day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true } } } } },
+        // patientId erbij op de rij die de toegangscheck toch al ophaalt.
+        include: { day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true, patientId: true } } } } },
       })
       if (!item) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user.role === 'ADMIN'
@@ -1507,6 +1561,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       if (!isAdmin && !isOwner && !isSamePractice) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
+      await assertMagPlannen(ctx.prisma, ctx.user, item.day.weekSchedule.patientId)
       const { id, ...patch } = input
       return ctx.prisma.weekScheduleDayItem.update({
         where: { id },
@@ -1528,7 +1583,7 @@ export const weekSchedulesRouter = createTRPCRouter({
         where: { id: input.itemId },
         include: {
           ...COPY_ITEM_INCLUDE,
-          day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true } } } },
+          day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true, patientId: true } } } },
         },
       })
       if (!item) throw new TRPCError({ code: 'NOT_FOUND' })
@@ -1539,14 +1594,19 @@ export const weekSchedulesRouter = createTRPCRouter({
       if (!canTouch(item.day.weekSchedule)) throw new TRPCError({ code: 'FORBIDDEN' })
 
       const targetDayId = input.toDayId ?? item.dayId
+      let doelWeek = item.day.weekSchedule
       if (targetDayId !== item.dayId) {
         const target = await ctx.prisma.weekScheduleDay.findUnique({
           where: { id: targetDayId },
-          include: { weekSchedule: { select: { creatorId: true, practiceId: true } } },
+          include: { weekSchedule: { select: { creatorId: true, practiceId: true, patientId: true } } },
         })
         if (!target) throw new TRPCError({ code: 'NOT_FOUND' })
         if (!canTouch(target.weekSchedule)) throw new TRPCError({ code: 'FORBIDDEN' })
+        doelWeek = target.weekSchedule
       }
+      // De kopie landt op de DOEL-dag, dus die patiënt telt. Zo blijft een
+      // kopie van een uitbehandelde naar een lopende patiënt mogelijk.
+      await assertMagPlannen(ctx.prisma, ctx.user, doelWeek.patientId)
 
       const last = await ctx.prisma.weekScheduleDayItem.findFirst({
         where: { dayId: targetDayId },
@@ -1649,11 +1709,23 @@ export const weekSchedulesRouter = createTRPCRouter({
       const destDayIds = [...new Set(input.moves.map(m => m.dayId))]
       const destDays = await ctx.prisma.weekScheduleDay.findMany({
         where: { id: { in: destDayIds } },
-        include: { weekSchedule: { select: { creatorId: true, practiceId: true } } },
+        include: { weekSchedule: { select: { creatorId: true, practiceId: true, patientId: true } } },
       })
       if (destDays.length !== destDayIds.length) throw new TRPCError({ code: 'NOT_FOUND' })
       for (const d of destDays) {
         if (!canAccessSchedule(d.weekSchedule)) throw new TRPCError({ code: 'FORBIDDEN' })
+      }
+
+      // 3) Uitbehandeld? Dan mag er niets NAARTOE. Alleen de doel-weken checken:
+      //    verslepen binnen dezelfde week valt daar vanzelf onder, en een item
+      //    wegslepen uit een gesloten dossier naar een lopende patiënt blijft
+      //    mogelijk. Ontdubbeld op patiëntniveau, want de moves van één
+      //    drag-actie zitten vrijwel altijd in dezelfde week.
+      const doelPatienten = [
+        ...new Set(destDays.map(d => d.weekSchedule.patientId).filter((p): p is string => !!p)),
+      ]
+      for (const pid of doelPatienten) {
+        await assertMagPlannen(ctx.prisma, ctx.user, pid)
       }
 
       // Transactie: alle moves atomisch toepassen.
@@ -1721,6 +1793,10 @@ export const weekSchedulesRouter = createTRPCRouter({
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Bron en doel zijn dezelfde week' })
       }
       await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
+      // Een hele week kopiëren of verplaatsen is bijplannen. Ook bij `move`:
+      // de bron wordt dan wel geleegd, maar er komt een gevulde week terug op
+      // een andere kalenderrij, en dat is nieuwe planning.
+      await assertMagPlannen(ctx.prisma, ctx.user, input.patientId)
 
       // Scope source + target lookup tot week-schema's die deze user mag
       // aanraken: eigen (creatorId=me), zelfde praktijk, of admin (overal).
@@ -1910,7 +1986,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       const days = await ctx.prisma.weekScheduleDay.findMany({
         where: { id: { in: dayIds } },
         include: {
-          weekSchedule: { select: { creatorId: true, practiceId: true } },
+          weekSchedule: { select: { creatorId: true, practiceId: true, patientId: true } },
           // exercises meeladen: copyItemToDay kopieert ze mee.
           items: { orderBy: { order: 'asc' }, include: COPY_ITEM_INCLUDE },
         },
@@ -1925,6 +2001,20 @@ export const weekSchedulesRouter = createTRPCRouter({
         }
       }
       const byId = new Map(days.map(d => [d.id, d]))
+      // Alleen de DOEL-dagen: daar komt de kopie te staan. Kopiëren uit een
+      // gesloten dossier naar een lopende patiënt blijft dus toegestaan.
+      // Ontdubbeld op patiënt, want de dagparen van één drag zitten in dezelfde
+      // kalender.
+      const doelPatienten = [
+        ...new Set(
+          input.pairs
+            .map(p => byId.get(p.toDayId)?.weekSchedule.patientId)
+            .filter((p): p is string => !!p),
+        ),
+      ]
+      for (const pid of doelPatienten) {
+        await assertMagPlannen(ctx.prisma, ctx.user, pid)
+      }
       // Volgende order per doel-dag bijhouden (max bestaand + 1), zodat
       // gekopieerde items netjes achteraan worden geplakt.
       const nextOrder = new Map<string, number>()
@@ -2149,7 +2239,7 @@ export const weekSchedulesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const item = await ctx.prisma.weekScheduleDayItem.findUnique({
         where: { id: input.itemId },
-        include: { day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true } } } } },
+        include: { day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true, patientId: true } } } } },
       })
       if (!item) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user.role === 'ADMIN'
@@ -2158,6 +2248,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       if (!isAdmin && !isOwner && !isSamePractice) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
+      await assertMagPlannen(ctx.prisma, ctx.user, item.day.weekSchedule.patientId)
       // De inhoud bepaalt de duur. Zonder dit bleef de tegel het getal tonen dat
       // de therapeut bij het toevoegen intikte ("30 min"), ook nadat hij de
       // training had uitgewerkt — dan spreken de tegel en de workout elkaar
@@ -2237,7 +2328,7 @@ export const weekSchedulesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const item = await ctx.prisma.weekScheduleDayItem.findUnique({
         where: { id: input.itemId },
-        include: { day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true } } } } },
+        include: { day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true, patientId: true } } } } },
       })
       if (!item) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user.role === 'ADMIN'
@@ -2246,6 +2337,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       if (!isAdmin && !isOwner && !isSamePractice) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
+      await assertMagPlannen(ctx.prisma, ctx.user, item.day.weekSchedule.patientId)
       // Gestructureerde workout? Dan valideren en de afgeleide velden
       // meeschrijven: de duur/zone voor lezers die de blokken niet kennen, en
       // plannedDurationSec/plannedRpe zodat de weekbalk een écht getal toont

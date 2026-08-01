@@ -64,6 +64,14 @@ export function UnlinkDialog({
           Wil je later weer samenwerken, dan nodig je de atleet opnieuw uit.
         </p>
 
+        {/* Deze knop staat naast "op inactief zetten" in het actiemenu en de
+            twee zijn makkelijk te verwisselen. Verbreken is de harde variant,
+            dus die zegt hier zelf wat de zachte is. */}
+        <p style={{ color: P.inkDim, fontSize: 12.5, lineHeight: 1.6, marginTop: 8 }}>
+          Wil je alleen de behandeling afronden en het dossier bewaren, kies dan &ldquo;Op inactief
+          zetten&rdquo;. Daarbij raakt niets kwijt.
+        </p>
+
         <div className="mt-4 flex justify-end gap-2">
           <DarkButton variant="secondary" onClick={onClose} disabled={busy}>
             Annuleren

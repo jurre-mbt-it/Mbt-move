@@ -18,6 +18,7 @@
 
 import { P, DATA_COLORS } from '@/lib/palette'
 import { LOAD_UITLEG } from '@/lib/training-load'
+import { dischargeReasonTekst, formatDischargeDate } from '@/lib/care-status'
 
 export type CaseloadRow = {
   id: string
@@ -38,6 +39,12 @@ export type CaseloadRow = {
   /** Dagen sinds de laatste activiteit; null als er nooit iets gelogd is. */
   silentDays: number | null
   attention: boolean
+  /**
+   * Behandelstatus, niet programmastatus: gevuld = deze praktijk of deze coach
+   * heeft de behandeling afgesloten. Zie src/lib/care-status.ts.
+   */
+  dischargedAt: Date | string | null
+  dischargeReason: string | null
 }
 
 const MONO = 'var(--font-mono-athletic)'
@@ -45,12 +52,37 @@ const MONO = 'var(--font-mono-athletic)'
 // de kop en de rijen verschillende breedtes — de kop rekent met een lege cel,
 // een rij met een knop — en dan staan de kolommen niet meer onder hun titel.
 const COLS = 'grid-cols-[8px_minmax(0,1fr)_136px_116px_56px_78px_104px]'
+// Archief: belasting, pijn, trouw en stille dagen zeggen niets meer over iemand
+// die niet meer in behandeling is. Wat er wél toe doet is wanneer het stopte.
+const COLS_ARCHIEF = 'grid-cols-[8px_minmax(0,1fr)_260px_104px]'
 const SILENT_DAYS = 7
 
 const STATUS_WOORD: Record<string, string> = {
   DRAFT: 'concept',
   COMPLETED: 'afgerond',
   ARCHIVED: 'gearchiveerd',
+}
+
+/**
+ * Wanneer de behandeling stopte, en waarom. Bewust géén hergebruik van
+ * STATUS_WOORD hierboven: dat zijn de woorden van het PROGRAMMA (concept,
+ * afgerond, gearchiveerd) en die betekenen iets anders. Een patiënt met een
+ * afgerond programma kan gewoon in behandeling zijn.
+ */
+function OntslagCel({ row }: { row: CaseloadRow }) {
+  const datum = formatDischargeDate(row.dischargedAt)
+  const reden = dischargeReasonTekst(row.dischargeReason)
+  if (!datum) return <span style={{ color: P.inkDim, fontFamily: MONO, fontSize: 11 }}>—</span>
+  return (
+    <span
+      className="truncate"
+      style={{ fontFamily: MONO, fontSize: 11.5, color: P.inkMuted }}
+      title={reden ? `Inactief sinds ${datum}, ${reden}` : `Inactief sinds ${datum}`}
+    >
+      inactief sinds {datum}
+      {reden && <span style={{ color: P.inkDim }}> · {reden}</span>}
+    </span>
+  )
 }
 
 function fmtLaatst(days: number | null): string {
@@ -163,13 +195,21 @@ function Getal({ waarde, tint, titel }: { waarde: string; tint: string; titel: s
 }
 
 export function CaseloadTable({
-  rows, onOpen, onPrefetch, renderAction,
+  rows, onOpen, onPrefetch, renderAction, mode = 'werklijst',
 }: {
   rows: CaseloadRow[]
   onOpen: (id: string) => void
   onPrefetch?: (id: string) => void
   renderAction?: (row: CaseloadRow) => React.ReactNode
+  /**
+   * 'werklijst' = wie in behandeling is, met de signalen erbij.
+   * 'archief' = wie afgesloten is; daar zeggen belasting, pijn, trouw en stille
+   * dagen niets meer, dus die kolommen maken plaats voor de ontslagdatum.
+   */
+  mode?: 'werklijst' | 'archief'
 }) {
+  const archief = mode === 'archief'
+  const kolommen = archief ? COLS_ARCHIEF : COLS
   return (
     <div
       className="rounded-2xl overflow-hidden"
@@ -177,15 +217,21 @@ export function CaseloadTable({
     >
       {/* Kop alleen waar de kolommen ook echt naast elkaar staan. */}
       <div
-        className={`hidden md:grid ${COLS} gap-3 items-center px-3 py-2`}
+        className={`hidden md:grid ${kolommen} gap-3 items-center px-3 py-2`}
         style={{ borderBottom: `1px solid ${P.line}`, color: P.inkDim }}
       >
         <span />
         <span className="athletic-mono text-[9px]">Sporter</span>
-        <span className="athletic-mono text-[9px]" title={LOAD_UITLEG}>Belasting, 6 wk</span>
-        <span className="athletic-mono text-[9px]">Pijn</span>
-        <span className="athletic-mono text-[9px]">Trouw</span>
-        <span className="athletic-mono text-[9px]">Laatst</span>
+        {archief ? (
+          <span className="athletic-mono text-[9px]">Afgesloten</span>
+        ) : (
+          <>
+            <span className="athletic-mono text-[9px]" title={LOAD_UITLEG}>Belasting, 6 wk</span>
+            <span className="athletic-mono text-[9px]">Pijn</span>
+            <span className="athletic-mono text-[9px]">Trouw</span>
+            <span className="athletic-mono text-[9px]">Laatst</span>
+          </>
+        )}
         <span />
       </div>
 
@@ -210,19 +256,44 @@ export function CaseloadTable({
 
         const naam = (
           <div className="min-w-0">
-            <div className="truncate" style={{ color: P.ink, fontSize: 13.5, fontWeight: 600 }}>
-              {row.name}
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="truncate" style={{ color: P.ink, fontSize: 13.5, fontWeight: 600 }}>
+                {row.name}
+              </span>
+              {/* Behandelstatus als eigen badge, los van de programmawoorden in
+                  de regel eronder. Die twee mogen niet op één hoop: een
+                  afgerond programma is geen afgesloten behandeling. */}
+              {row.dischargedAt && (
+                <span
+                  className="athletic-mono shrink-0"
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 800,
+                    letterSpacing: '0.1em',
+                    color: P.inkMuted,
+                    border: `1px solid ${P.lineStrong}`,
+                    borderRadius: 3,
+                    padding: '1px 5px',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title="Niet meer in behandeling bij jou. Het dossier is bewaard gebleven."
+                >
+                  INACTIEF
+                </span>
+              )}
             </div>
             <div className="truncate" style={{ color: P.inkDim, fontSize: 11.5 }}>{sub}</div>
           </div>
         )
-        /* De stip links: de scan van de rand ís de triage. */
+        /* De stip links: de scan van de rand ís de triage. In het archief valt
+           er niets te triëren, dus daar blijft de kolom leeg. */
+        const aandacht = row.attention && !archief
         const stip = (
           <span
             aria-hidden
             className="rounded-full self-center"
-            style={{ width: 6, height: 6, background: row.attention ? P.brand : 'transparent' }}
-            title={row.attention ? 'Vraagt aandacht' : undefined}
+            style={{ width: 6, height: 6, background: aandacht ? P.brand : 'transparent' }}
+            title={aandacht ? 'Vraagt aandacht' : undefined}
           />
         )
         const open = () => onOpen(row.id)
@@ -242,12 +313,14 @@ export function CaseloadTable({
             {/* Tafelbreedte: kolommen */}
             <div
               {...gedeeld}
-              className={`hidden md:grid ${COLS} gap-3 items-center px-3 py-2.5 cursor-pointer mbt-nav-hover`}
+              className={`hidden md:grid ${kolommen} gap-3 items-center px-3 py-2.5 cursor-pointer mbt-nav-hover`}
               style={{ borderTop: rand }}
             >
               {stip}
               {naam}
-              {leeg ? (
+              {archief ? (
+                <OntslagCel row={row} />
+              ) : leeg ? (
                 <span
                   className="col-span-4"
                   style={{ fontFamily: MONO, fontSize: 11, color: P.inkDim }}
@@ -285,7 +358,9 @@ export function CaseloadTable({
                     {renderAction?.(row)}
                   </span>
                 </div>
-                {leeg ? (
+                {archief ? (
+                  <OntslagCel row={row} />
+                ) : leeg ? (
                   <span style={{ fontFamily: MONO, fontSize: 11, color: P.inkDim }}>
                     nog niets gelogd
                   </span>

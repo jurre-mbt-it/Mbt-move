@@ -115,21 +115,36 @@ export const programsRouter = createTRPCRouter({
       includeAssigned: z.boolean().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
-      // Multi-tenant scope: admins zien alles. Therapeuten zien hun eigen
-      // programma's PLUS programma's van collega's binnen dezelfde praktijk
-      // (practiceId-match). Zonder practiceId: alleen eigen programma's.
-      const isAdmin = ctx.user!.role === 'ADMIN'
+      // Multi-tenant scope: therapeuten en admins zien hun eigen programma's
+      // PLUS die van collega's binnen dezelfde praktijk (practiceId-match).
+      // Zonder practiceId: alleen eigen programma's.
+      //
+      // Een ADMIN kreeg hier tot voor kort ALLE programma's, van elke praktijk.
+      // Dat liep uit de pas met `programmaScope()` in care-scope.ts, dat een
+      // admin wél op praktijk of eigen creatorId scopet. De afsluitdialoog
+      // (DischargeDialog) vinkt uit deze lijst de programma's aan die mee
+      // dichtgaan en stuurt de ids naar `patients.setInactive`, en die filtert
+      // ze door `programmaScope`. Een admin kon dus een programma van een
+      // andere praktijk aanvinken dat vervolgens stil open bleef staan: geen
+      // foutmelding, wel een patiënt die trainingen blijft krijgen.
+      //
+      // De lijst is gelijkgetrokken en niet de scope, want `programmaScope`
+      // zit op de schrijfpaden die `closedByDischarge` zetten (setInactive,
+      // heractiveren, opnieuw uitnodigen). Daar oprekken zou een admin
+      // programma's van andere praktijken laten dichtzetten en heropenen, en
+      // care-scope.ts legt uit waarom half scopen op die paden erger is dan
+      // niets doen. Verder heeft geen enkel admin-scherm deze procedure nodig;
+      // het admin-gedeelte kent geen programma-bibliotheek.
       const practiceId = ctx.user!.practiceId
       // Praktijk-brede zichtbaarheid is alleen voor therapeuten/admins. Een
       // atleet krijgt bij invite dezelfde practiceId; zonder deze rol-gate zou
       // de praktijk-tak programma's (incl. naam/e-mail) van mede-patiënten
       // lekken. Atleet ziet daarom enkel zijn eigen aangemaakte programma's.
-      const canSeePractice = !!practiceId && ctx.user!.role === 'THERAPIST'
-      const ownership = isAdmin
-        ? {}
-        : canSeePractice
-          ? { OR: [{ creatorId: ctx.user!.id }, { practiceId }] }
-          : { creatorId: ctx.user!.id }
+      const canSeePractice =
+        !!practiceId && (ctx.user!.role === 'THERAPIST' || ctx.user!.role === 'ADMIN')
+      const ownership = canSeePractice
+        ? { OR: [{ creatorId: ctx.user!.id }, { practiceId }] }
+        : { creatorId: ctx.user!.id }
       const includeAssigned = input?.includeAssigned ?? (input?.patientId !== undefined)
       // Sjablonen (isTemplate=true) zijn altijd patient-loos en blijven in
       // het bibliotheek-overzicht. Voor niet-sjablonen verbergen we patient-
