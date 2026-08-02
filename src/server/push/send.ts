@@ -28,19 +28,13 @@ export type PushCategory = 'message' | 'schedule' | 'reminder' | 'insight'
 const URGENT_CATEGORIES: readonly PushCategory[] = ['message']
 
 /**
- * Uur (lokale tijd) waarop de ochtend-cron zijn meldingen stuurt.
- *
- * Staat hier en niet in de cron, omdat de quiet-hours-default eronder er hard
- * aan vastzit: eindigt de stilte later dan dit uur, dan gooit `sendPush` de
- * hele ochtendbatch weg — reminder en insight zijn niet-urgent en vallen dus
- * onder quiet hours. Die twee getallen mogen nooit uit elkaar lopen.
+ * Het uur van de ochtend-push en de quiet-hours-defaults staan in `timing.ts`,
+ * los van dit bestand: die getallen zitten aan elkaar vast en worden gelezen
+ * door code die geen databaseverbinding nodig heeft. Hier alleen doorgegeven,
+ * zodat bestaande imports van `MORNING_PUSH_HOUR` uit `send` blijven werken.
  */
-export const MORNING_PUSH_HOUR = 7
-
-/** Default quiet-hours voor niet-urgente pushes als de gebruiker niets instelde:
- *  niets tussen 21:00 en de ochtend-push (minuten na middernacht, lokale tijd). */
-const DEFAULT_QUIET_START = 21 * 60
-const DEFAULT_QUIET_END = MORNING_PUSH_HOUR * 60
+export { MORNING_PUSH_HOUR } from './timing'
+import { DEFAULT_QUIET_START, DEFAULT_QUIET_END } from './timing'
 
 export type PushMessage = {
   title: string

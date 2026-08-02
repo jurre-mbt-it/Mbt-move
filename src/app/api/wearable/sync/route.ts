@@ -16,6 +16,7 @@ import { createTRPCContext } from '@/server/trpc'
 import { DPA_VERSION } from '@/lib/dpa-constants'
 import { ingestWearableData, syncPayloadSchema } from '@/server/wearables/ingest'
 import { computeAndStoreReadiness } from '@/server/readiness'
+import { maybeNotifyRecoveryOnSync } from '@/server/push/morning-insight'
 import { wearablesEnabledForRole } from '@/lib/wearables-access'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 
@@ -79,6 +80,12 @@ export async function POST(req: NextRequest) {
     for (const date of result.affectedDates) {
       await computeAndStoreReadiness(prisma, ctx.user.id, date)
     }
+
+    // Bracht deze sync de nacht van vandaag, dan hangt de herstelmelding hier
+    // en niet aan de ochtend-cron: die draait om 05:00 NL, en dan is de watch
+    // meestal nog niet gesynct. Zwijgt zelf bij een backfill, buiten het
+    // ochtendvenster, of als er vandaag al een insight uitging.
+    await maybeNotifyRecoveryOnSync(prisma, ctx.user.id, result.affectedDates)
 
     return NextResponse.json({
       ok: true,
