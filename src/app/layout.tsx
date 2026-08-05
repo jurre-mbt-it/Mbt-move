@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { TRPCProvider } from '@/lib/trpc/Provider'
 import { Toaster } from '@/components/ui/sonner'
+import { CookieBanner } from '@/components/CookieBanner'
 import './globals.css'
 
 // Nonce-based CSP (zie src/proxy.ts) vereist dat ELKE pagina dynamisch rendert:
@@ -35,6 +36,7 @@ export default function RootLayout({
         <TRPCProvider>
           {children}
         </TRPCProvider>
+        <CookieBanner />
         <Toaster
           theme="dark"
           toastOptions={{
