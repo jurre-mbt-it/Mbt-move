@@ -2099,6 +2099,9 @@ export const patientRouter = createTRPCRouter({
             completedAll: true,
             duration: true,
             programId: true,
+            // Hangt deze sessie al aan een gepland item? Zonder dit kan de
+            // client een log die bij dag A hoort ook dag B laten afvinken.
+            weekScheduleDayItemId: true,
             painLevel: true,
             exertionLevel: true,
             program: { select: { name: true } },
@@ -2113,6 +2116,9 @@ export const patientRouter = createTRPCRouter({
             completedAt: true,
             activity: true,
             protocol: true,
+            // Idem: identiteit boven dag-heuristiek. Een hardloop-log die aan
+            // gisteren hangt mag het geplande fietsen van vandaag niet opeten.
+            weekScheduleDayItemId: true,
             durationSec: true,
             distanceM: true,
             avgHeartRate: true,
@@ -2217,6 +2223,16 @@ export const patientRouter = createTRPCRouter({
                       orderBy: { completedAt: 'desc' },
                       take: 1,
                     },
+                    // Cardio vinkt af via een CardioLog, niet via een SessionLog.
+                    // Zonder dit had de client voor cardio helemaal geen
+                    // identiteits-signaal en viel hij terug op "is er die dag
+                    // iets van cardio gelogd?" — waardoor een hardloopje het
+                    // geplande fietsen van dezelfde dag liet verdwijnen.
+                    cardioLogs: {
+                      select: { id: true, completedAt: true },
+                      orderBy: { completedAt: 'desc' },
+                      take: 1,
+                    },
                   },
                 },
               },
@@ -2233,6 +2249,7 @@ export const patientRouter = createTRPCRouter({
           completedAll: s.completedAll,
           duration: s.duration,
           programId: s.programId,
+          weekScheduleDayItemId: s.weekScheduleDayItemId,
           programName: s.program?.name ?? null,
           painLevel: s.painLevel,
           exertionLevel: s.exertionLevel,

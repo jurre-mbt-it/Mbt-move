@@ -28,6 +28,7 @@ import {
   IconStrength, IconMobility, IconPlyometrics, IconCardio, IconCore, IconSleep,
 } from '@/components/icons'
 import { CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
+import { matchLoggedPlanned, type PlannedEntry } from '@/lib/planned-matching'
 import { WeekPhaseLine } from '@/components/schedule/WeekPhaseLine'
 import { CATEGORY_COLORS } from '@/lib/palette'
 import { formatWeightsPerSet } from '@/lib/session-sets'
@@ -238,25 +239,12 @@ export default function AthleteSchedulePage() {
         baselineWeekNumber = earliest.weekNumber
       }
 
-      // Tellers per dag: hoeveel logs kunnen nog een gepland item "afvinken".
-      const sessionProgramIdsByIso = new Map<string, Set<string>>()
-      const looseSessionsByIso = new Map<string, number>()
-      const cardioCountByIso = new Map<string, number>()
-      for (const s of data.sessions) {
-        if (!s.completedAt) continue
-        const iso = isoDate(new Date(s.scheduledAt))
-        if (s.programId) {
-          const set = sessionProgramIdsByIso.get(iso) ?? new Set<string>()
-          set.add(s.programId)
-          sessionProgramIdsByIso.set(iso, set)
-        } else {
-          looseSessionsByIso.set(iso, (looseSessionsByIso.get(iso) ?? 0) + 1)
-        }
-      }
-      for (const c of data.cardio) {
-        const iso = isoDate(new Date(c.completedAt))
-        cardioCountByIso.set(iso, (cardioCountByIso.get(iso) ?? 0) + 1)
-      }
+      // Eerst alle geplande items op een rij, dan in één keer bepalen welke al
+      // gelogd zijn — zie lib/planned-matching. Twee passes, want een gelogde
+      // duurloop hoort bij het geplande hardlopen en niet bij het generieke
+      // "Cardio" dat er toevallig eerder in de lijst staat.
+      const plannedEntries: PlannedEntry[] = []
+      const plannedByKey = new Map<string, { iso: string; date: Date; item: ScheduleItem }>()
 
       for (const ws of data.schedules) {
         const start = ws.startDate
@@ -272,48 +260,65 @@ export default function AthleteSchedulePage() {
             programId: day.programId,
             program: day.program,
             quickCategory: null,
+            quickActivity: null,
             quickName: null,
             quickDurationSec: null,
             plannedDurationSec: null,
             notes: null,
             _count: { exercises: 0 },
             hasContent: true,
-            sessionLogs: [] as { id: string }[],
+            sessionLogs: [],
+            cardioLogs: [],
           }] : []))
           for (const item of items) {
-            const category = (item.quickCategory ?? 'STRENGTH') as Category
-            const isRealItem = !item.id.startsWith('legacy-')
-            // Al gelogd? Eerst op identiteit (sessionLogs op het item zelf),
-            // want dat is exact. De datum+teller-heuristiek eronder is alleen
-            // nog nodig voor sessies van vóór deze koppeling en voor clients die
-            // het item niet meesturen (iOS).
-            let matched = (item.sessionLogs?.length ?? 0) > 0
-            if (!matched) {
-              if (item.programId) {
-                matched = sessionProgramIdsByIso.get(iso)?.has(item.programId) ?? false
-              } else if (category === 'CARDIO') {
-                const left = cardioCountByIso.get(iso) ?? 0
-                if (left > 0) { cardioCountByIso.set(iso, left - 1); matched = true }
-              } else {
-                const left = looseSessionsByIso.get(iso) ?? 0
-                if (left > 0) { looseSessionsByIso.set(iso, left - 1); matched = true }
-              }
-            }
-            if (matched) continue
-            push(iso, {
-              kind: 'planned',
-              id: item.id,
-              name: item.programId ? (item.program?.name ?? 'Programma') : (item.quickName ?? 'Workout'),
-              category,
-              status: date < today ? 'missed' : 'planned',
-              durationSec: item.plannedDurationSec ?? item.quickDurationSec,
+            const key = `${iso}:${item.id}`
+            plannedEntries.push({
+              key,
+              iso,
               programId: item.programId,
-              notes: item.notes,
-              itemId: isRealItem ? item.id : null,
-              hasExercises: item.hasContent ?? ((item._count?.exercises ?? 0) > 0),
+              category: item.quickCategory ?? 'STRENGTH',
+              activity: item.quickActivity ?? null,
+              // Identiteit: de patiënt startte dit item vanuit de kalender, dus
+              // de log wijst het item zelf aan. Geldt voor kracht én cardio.
+              hasOwnLog:
+                (item.sessionLogs?.length ?? 0) > 0 || (item.cardioLogs?.length ?? 0) > 0,
             })
+            plannedByKey.set(key, { iso, date, item })
           }
         }
+      }
+
+      const matchedKeys = matchLoggedPlanned(plannedEntries, {
+        sessions: data.sessions
+          .filter(s => s.completedAt)
+          .map(s => ({
+            iso: isoDate(new Date(s.scheduledAt)),
+            programId: s.programId,
+            itemId: s.weekScheduleDayItemId ?? null,
+          })),
+        cardio: data.cardio.map(c => ({
+          iso: isoDate(new Date(c.completedAt)),
+          activity: c.activity,
+          itemId: c.weekScheduleDayItemId ?? null,
+        })),
+      })
+
+      for (const [key, { iso, date, item }] of plannedByKey) {
+        if (matchedKeys.has(key)) continue
+        const category = (item.quickCategory ?? 'STRENGTH') as Category
+        const isRealItem = !item.id.startsWith('legacy-')
+        push(iso, {
+          kind: 'planned',
+          id: item.id,
+          name: item.programId ? (item.program?.name ?? 'Programma') : (item.quickName ?? 'Workout'),
+          category,
+          status: date < today ? 'missed' : 'planned',
+          durationSec: item.plannedDurationSec ?? item.quickDurationSec,
+          programId: item.programId,
+          notes: item.notes,
+          itemId: isRealItem ? item.id : null,
+          hasExercises: item.hasContent ?? ((item._count?.exercises ?? 0) > 0),
+        })
       }
     }
 
@@ -578,6 +583,8 @@ export default function AthleteSchedulePage() {
 // Shape van patient.calendarRange — handmatig getypeerd omdat de tRPC-
 // inference op deze nested select te diep is voor TS (zelfde patroon als de
 // week-planner).
+type ScheduleItem = CalendarData['schedules'][number]['days'][number]['items'][number]
+
 type CalendarData = {
   sessions: Array<{
     id: string
@@ -587,6 +594,8 @@ type CalendarData = {
     completedAll: boolean
     duration: number | null
     programId: string | null
+    /** Gevuld = deze sessie hoort bij een gepland item. */
+    weekScheduleDayItemId?: string | null
     programName: string | null
     painLevel: number | null
     exertionLevel: number | null
@@ -597,6 +606,8 @@ type CalendarData = {
     completedAt: string | Date
     activity: string
     protocol: string
+    /** Gevuld = deze cardio hoort bij een gepland item. */
+    weekScheduleDayItemId?: string | null
     durationSec: number
     distanceM: number | null
     avgHeartRate: number | null
@@ -622,6 +633,8 @@ type CalendarData = {
         programId: string | null
         program: { id: string; name: string } | null
         quickCategory: string | null
+        /** Bij cardio: hardlopen/fietsen/… Bepaalt of een gelogde cardio hier bij hoort. */
+        quickActivity?: string | null
         quickName: string | null
         quickDurationSec: number | null
         /** Volgt uit de oefeningen/blokken; wint van quickDurationSec. */
@@ -633,7 +646,9 @@ type CalendarData = {
          *  heeft géén oefeningen, dus op _count alleen gaan is fout. */
         hasContent?: boolean
         /** Gevuld = al afgevinkt tegen dit item (identiteit, geen heuristiek). */
-        sessionLogs?: Array<{ id: string; completedAt: string | null; completedAll: boolean }>
+        sessionLogs?: Array<{ id: string; completedAt: string | Date | null; completedAll: boolean }>
+        /** Idem voor cardio — dat logt een CardioLog, geen SessionLog. */
+        cardioLogs?: Array<{ id: string; completedAt: string | Date }>
       }>
     }>
   }>
