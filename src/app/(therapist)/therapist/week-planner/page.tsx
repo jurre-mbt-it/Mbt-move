@@ -358,7 +358,10 @@ const MARKER_META: Record<Exclude<ItemKind, 'PROGRAM' | 'WORKOUT'>, { color: str
   EVENT: { color: '#5FD08A', label: 'streefdatum' },
 }
 
-type ItemStatus = 'scheduled' | 'completed' | 'partial' | 'missed' | 'in_progress'
+// `moved` = wél gedaan, maar op een andere dag dan gepland. De workout zelf
+// staat als tegel op de uitvoerdag; hier blijft een spoor achter zodat de
+// therapeut ziet dát er iets stond en waar het heen ging.
+type ItemStatus = 'scheduled' | 'completed' | 'partial' | 'missed' | 'in_progress' | 'moved'
 
 // Status leidt de tile-kleur: gepland = neutraal/wit, voltooid = groen,
 // deels (eerder gestopt) = oranje, gemist (verleden + niet gedaan) = rood.
@@ -373,6 +376,7 @@ const STATUS_BORDER: Record<ItemStatus, string> = {
   partial:   P.orange,
   missed:    P.danger,
   in_progress: P.gold,
+  moved:     'rgba(212,232,230,0.25)',
 }
 /**
  * Uitleg onder de kalender. De rail links toont twee getallen die zonder
@@ -405,12 +409,19 @@ function CalendarLegend() {
   )
 }
 
+/** "wo 19 aug" — kort genoeg voor een tooltip op een tegel. */
+function dagLabelKort(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`)
+  return d.toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
 const STATUS_TITLES: Record<ItemStatus, string | undefined> = {
   scheduled: undefined,
   completed: 'Voltooid, klik voor details',
   partial:   'Deels voltooid, eerder gestopt',
   missed:    'Gemist, niet gedaan',
   in_progress: 'Bezig',
+  moved:     'Verplaatst — op een andere dag gedaan',
 }
 
 /**
@@ -552,10 +563,12 @@ function MarkerIcon({ kind, size = 11 }: { kind: ItemKind; size?: number }) {
 }
 
 function ItemTile({
-  item, status, logged, onRemove, onClick, readOnly, isOpen,
+  item, status, logged, movedTo, onRemove, onClick, readOnly, isOpen,
 }: {
   item: ScheduleItem
   status: ItemStatus
+  /** Bij status 'moved': de dag waarop deze workout wél is gedaan. */
+  movedTo?: string | null
   /** Gelogde data (afstand/duur/RPE/gevoel) — alleen getoond als gedaan/deels. */
   logged?: LoggedInfo | null
   onRemove: () => void
@@ -637,7 +650,11 @@ function ItemTile({
         borderLeftStyle: item.kind === 'REST' ? 'dotted' : 'solid',
         color: P.ink,
       }}
-      title={marker ? marker.label : STATUS_TITLES[status]}
+      title={
+        marker ? marker.label
+        : status === 'moved' && movedTo ? `Verplaatst — gedaan op ${dagLabelKort(movedTo)}`
+        : STATUS_TITLES[status]
+      }
     >
       <div className="flex items-center gap-1.5 px-2 py-1">
         <span style={{ color }} className="shrink-0">
@@ -658,11 +675,22 @@ function ItemTile({
           </button>
         )}
       </div>
+      {/* Verplaatst: de workout zelf staat als tegel op de dag dat hij gedaan
+          is. Hier blijft alleen zichtbaar dát er iets stond en waar het heen
+          ging — zonder dit leek de dag gewoon leeg. */}
+      {status === 'moved' && movedTo && (
+        <div
+          className="athletic-mono px-2 pb-1 -mt-0.5 truncate"
+          style={{ fontSize: 9, letterSpacing: '0.04em', color: P.inkDim }}
+        >
+          → gedaan op {dagLabelKort(movedTo)}
+        </div>
+      )}
       {/* Profiel van wat er GEPLAND staat: cardio-blokken als zaagtand,
           kracht als balkje per oefening. Alleen zolang er nog niets gelogd is;
           daarna wint de gerealiseerde data hieronder, anders staan er twee
           verhalen op één tegel. */}
-      {!marker && status !== 'completed' && status !== 'partial' && (
+      {!marker && status !== 'completed' && status !== 'partial' && status !== 'moved' && (
         <>
           <WorkoutProfileStrip
             cardioParams={item.cardioParams}
@@ -916,7 +944,7 @@ function DayCell({
   date, inMonth, isToday, info, weekLabel,
   selected, onSelectStart, onSelectEnter,
   onAddWorkout, onAddTemplate, onCopyDay,
-  onItemClick, onRemoveItem, statusFor, sessionIdFor, loggedFor, openItemId,
+  onItemClick, onRemoveItem, statusFor, sessionIdFor, loggedFor, movedToFor, openItemId,
   readOnly = false,
 }: {
   date: Date
@@ -935,6 +963,7 @@ function DayCell({
   statusFor: (date: Date, item: ScheduleItem) => ItemStatus
   sessionIdFor: (date: Date, item: ScheduleItem) => string | null
   loggedFor: (date: Date, item: ScheduleItem) => LoggedInfo | null
+  movedToFor: (date: Date, item: ScheduleItem) => string | null
   openItemId: string | null
   /** Gearchiveerde patiënt: geen toevoeg-menu, geen verwijderkruis, niet slepen. */
   readOnly?: boolean
@@ -995,6 +1024,7 @@ function DayCell({
               item={item}
               status={status}
               logged={logged}
+              movedTo={movedToFor(date, item)}
               onRemove={() => onRemoveItem(item, dayId)}
               // Markeringen (rustdag/notitie/test/doel) hebben geen oefeningen
               // of cardio, dus het detail-paneel heeft ze niets te tonen.
@@ -1895,7 +1925,9 @@ function WeekPlannerContent() {
 
   // Map (programId, dateISO) → { status, sessionId }. sessionId wordt
   // gebruikt voor de session-detail modal wanneer therapeut op een tile klikt.
-  type SessionMatch = { status: ItemStatus; sessionId: string | null; cardioId?: string | null }
+  /** `completedIso` = de dag waarop de log écht is afgerond. Wijkt die af van
+   *  de dag waarop het item gepland staat, dan is de workout verplaatst. */
+  type SessionMatch = { status: ItemStatus; sessionId: string | null; cardioId?: string | null; completedIso?: string | null }
   const sessionByKey = useMemo(() => {
     const todayStart = startOfDay(new Date())
     const map = new Map<string, SessionMatch>()
@@ -1916,9 +1948,9 @@ function WeekPlannerContent() {
       // Als er meerdere sessies op dezelfde sleutel zijn (re-schedule etc),
       // kies de "best status": completed > partial > in_progress > scheduled > missed.
       const prev = map.get(key)
-      const prio: Record<ItemStatus, number> = { completed: 5, partial: 4, in_progress: 3, scheduled: 2, missed: 1 }
+      const prio: Record<ItemStatus, number> = { completed: 5, partial: 4, in_progress: 3, scheduled: 2, moved: 2, missed: 1 }
       if (!prev || prio[status] > prio[prev.status]) {
-        map.set(key, { status, sessionId: s.id })
+        map.set(key, { status, sessionId: s.id, completedIso: s.completedAt ? isoDate(new Date(s.completedAt)) : null })
       }
     }
     return map
@@ -1942,18 +1974,40 @@ function WeekPlannerContent() {
       else if (s.status === 'SKIPPED' || new Date(s.scheduledAt) < todayStart) status = 'missed'
       else status = 'scheduled'
       const prev = map.get(itemId)
-      const prio: Record<ItemStatus, number> = { completed: 5, partial: 4, in_progress: 3, scheduled: 2, missed: 1 }
-      if (!prev || prio[status] > prio[prev.status]) map.set(itemId, { status, sessionId: s.id })
+      const prio: Record<ItemStatus, number> = { completed: 5, partial: 4, in_progress: 3, scheduled: 2, moved: 2, missed: 1 }
+      if (!prev || prio[status] > prio[prev.status]) {
+        map.set(itemId, { status, sessionId: s.id, completedIso: s.completedAt ? isoDate(new Date(s.completedAt)) : null })
+      }
     }
     return map
   }, [sessionsRaw])
+
+  /**
+   * Een afgeronde workout hoort op de dag waarop hij gedaan is. Staat het item
+   * op een andere dag, dan is die dag geen "voltooid" maar een spoor: de tegel
+   * met de echte data staat elders in de kalender.
+   */
+  function verplaatstOf(m: SessionMatch, iso: string): ItemStatus {
+    if (m.status !== 'completed' && m.status !== 'partial') return m.status
+    return m.completedIso && m.completedIso !== iso ? 'moved' : m.status
+  }
+
+  /** Naar welke dag is dit item verplaatst? Null = staat gewoon op zijn plek. */
+  function movedToFor(date: Date, item: ScheduleItem): string | null {
+    if (!isWorkoutKind(item.kind)) return null
+    const iso = isoDate(date)
+    const m = sessionByItemId.get(item.id)
+      ?? (item.programId ? sessionByKey.get(`${item.programId}|${iso}`) : adhocStatusById.get(item.id))
+    if (!m || verplaatstOf(m, iso) !== 'moved') return null
+    return m.completedIso ?? null
+  }
 
   function statusFor(date: Date, item: ScheduleItem): ItemStatus {
     // Markeringen zijn geen workout: een notitie kan niet "gemist" zijn.
     if (!isWorkoutKind(item.kind)) return 'scheduled'
     // Exacte koppeling wint van elke heuristiek.
     const byItem = sessionByItemId.get(item.id)
-    if (byItem) return byItem.status
+    if (byItem) return verplaatstOf(byItem, isoDate(date))
     // Synthetische tiles dragen hun eigen status: een cardiolog-tile ís een
     // gelogde workout, een sessionlog-tile leest zijn eigen SessionLog terug.
     if (item.id.startsWith('cardiolog-')) return 'completed'
@@ -1967,7 +2021,7 @@ function WeekPlannerContent() {
     const match = item.programId
       ? sessionByKey.get(`${item.programId}|${isoDate(date)}`)
       : adhocStatusById.get(item.id)
-    if (match) return match.status
+    if (match) return verplaatstOf(match, isoDate(date))
     // Geen log gevonden: in het verleden = gemist, anders gewoon gepland.
     return startOfDay(date) < startOfDay(new Date()) ? 'missed' : 'scheduled'
   }
@@ -2112,10 +2166,10 @@ function WeekPlannerContent() {
     // alleen nog logs die nergens aan hangen, en een item dat een activiteit
     // noemt gaat vóór generieke cardio. Zonder dat laatste markeerde een
     // gelogde duurloop het geplande fietsritje van dezelfde dag als voltooid.
-    const consumedSessionIds = new Set<string>()
-    // Per verbruikte cardio-log: op wélke dag stond het item dat hem afvinkt.
+    // Per verbruikte log: op wélke dag stond het item dat hem afvinkt.
     // Nodig omdat een log en zijn geplande item niet op dezelfde dag hoeven te
     // vallen (gisteren gepland, vandaag gedaan).
+    const consumedSessionIso = new Map<string, string>()
     const consumedCardioIso = new Map<string, string>()
 
     const plannedEntries: PlannedEntry[] = []
@@ -2176,12 +2230,14 @@ function WeekPlannerContent() {
           status: partial ? 'partial' : 'completed',
           sessionId: null,
           cardioId: hit.log.id,
+          completedIso: hit.log.iso,
         })
       } else if (hit.source === 'session') {
-        consumedSessionIds.add(hit.log.id)
+        consumedSessionIso.set(hit.log.id, itemIso)
         adhocStatusById.set(item.id, {
           status: hit.log.completedAll === false ? 'partial' : 'completed',
           sessionId: hit.log.id,
+          completedIso: hit.log.iso,
         })
       }
     }
@@ -2192,9 +2248,15 @@ function WeekPlannerContent() {
     // (voltooid + ingepland-maar-niet-gepland-via-WeekPlanner) als read-only
     // tile in de juiste dag-cel.
     for (const session of sessionsRaw) {
-      if (consumedSessionIds.has(session.id)) continue
-      const date = startOfDay(new Date(session.scheduledAt))
+      // Op de dag dat hij GEDAAN is. scheduledAt is bij een zelf-gelogde sessie
+      // het startmoment (zelfde dag), maar bij een door de therapeut ingeplande
+      // sessie de gepláánde dag — en daar hoort een afgeronde workout niet.
+      const date = startOfDay(new Date(session.completedAt ?? session.scheduledAt))
       const iso = isoDate(date)
+      // Afgevinkt tegen een gepland item op deze dag → dat item draagt de
+      // status al. Hangt het item aan een andere dag, dan is de sessie hier
+      // anders nergens te zien.
+      if (consumedSessionIso.get(session.id) === iso) continue
       const existing = map.get(iso)
 
       // Skip als deze sessie al door een gepland item wordt weergegeven — dan
@@ -2295,19 +2357,31 @@ function WeekPlannerContent() {
   // volledige sRPE-berekening client-side.
   const weekProgressByNumber = useMemo(() => {
     const m = new Map<number, { planned: number; done: number }>()
+    const bump = (week: number, veld: 'planned' | 'done') => {
+      const cur = m.get(week) ?? { planned: 0, done: 0 }
+      cur[veld]++
+      m.set(week, cur)
+    }
     for (const [iso, info] of dateMap) {
       if (info.weekNumber == null) continue
-      const cur = m.get(info.weekNumber) ?? { planned: 0, done: 0 }
       for (const item of info.items) {
         const real = !item.id.startsWith('legacy-')
           && !item.id.startsWith('sessionlog-')
           && !item.id.startsWith('cardiolog-')
         if (!real) continue
-        cur.planned++
+        bump(info.weekNumber, 'planned')
         const st = statusFor(new Date(iso), item)
-        if (st === 'completed' || st === 'partial') cur.done++
+        if (st === 'completed' || st === 'partial') {
+          bump(info.weekNumber, 'done')
+        } else if (st === 'moved') {
+          // Verplaatst: gepland blijft in deze week staan, gedaan telt in de
+          // week waarin hij écht is uitgevoerd. Valt die dag buiten elk
+          // schema-venster, dan telt hij nergens als gedaan.
+          const doelIso = movedToFor(new Date(iso), item)
+          const doelWeek = doelIso ? dateMap.get(doelIso)?.weekNumber : null
+          if (doelWeek != null) bump(doelWeek, 'done')
+        }
       }
-      m.set(info.weekNumber, cur)
     }
     return m
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2795,6 +2869,7 @@ function WeekPlannerContent() {
             ['completed', 'Voltooid'],
             ['partial', 'Deels'],
             ['missed', 'Gemist'],
+            ['moved', 'Verplaatst'],
           ] as const).map(([s, label]) => (
             <span key={s} className="flex items-center gap-1.5 text-[11px]" style={{ color: P.inkMuted }}>
               <span
@@ -3100,6 +3175,7 @@ function WeekPlannerContent() {
                       statusFor={statusFor}
                       sessionIdFor={sessionIdFor}
                       loggedFor={loggedInfoFor}
+                      movedToFor={movedToFor}
                       openItemId={detailItem?.item.id ?? null}
                       readOnly={planningVergrendeld}
                     />

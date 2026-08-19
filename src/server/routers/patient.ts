@@ -2090,7 +2090,18 @@ export const patientRouter = createTRPCRouter({
       const cutoff = await planningCutoffVoorPatient(ctx.prisma, ctx.user.id)
       const [sessions, cardio, schedules] = await Promise.all([
         ctx.prisma.sessionLog.findMany({
-          where: { patientId: ctx.user.id, scheduledAt: { gte: fromDate, lt: toDate } },
+          // Een sessie hoort in de kalender op de dag dat hij GEDAAN is. Voor
+          // zelf-gelogde sessies is scheduledAt het startmoment en dus dezelfde
+          // dag, maar een door de therapeut ingeplande sessie die later wordt
+          // afgerond heeft een scheduledAt in een andere week. Beide kanten
+          // ophalen, anders valt zo'n sessie uit het venster dat hem moet tonen.
+          where: {
+            patientId: ctx.user.id,
+            OR: [
+              { scheduledAt: { gte: fromDate, lt: toDate } },
+              { completedAt: { gte: fromDate, lt: toDate } },
+            ],
+          },
           select: {
             id: true,
             scheduledAt: true,

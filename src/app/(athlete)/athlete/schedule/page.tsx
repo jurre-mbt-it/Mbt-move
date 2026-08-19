@@ -96,6 +96,13 @@ function monthGrid(year: number, month0: number): Date[][] {
     Array.from({ length: 7 }, (_, d) => addDays(first, w * 7 + d)),
   )
 }
+/** "wo 19 aug" — voor de verplaatst-markering. */
+function dagLabel(iso: string | null | undefined): string {
+  if (!iso) return 'een andere dag'
+  const d = new Date(`${iso}T00:00:00`)
+  const dag = DAY_LABELS_SHORT[(d.getDay() + 6) % 7].toLowerCase()
+  return `${dag} ${d.getDate()} ${MONTH_LABELS_NL[d.getMonth()].slice(0, 3).toLowerCase()}`
+}
 function fmtDuration(sec: number): string {
   const m = Math.round(sec / 60)
   if (m < 60) return `${m} min`
@@ -141,7 +148,10 @@ type CalEvent =
       id: string
       name: string
       category: Category
-      status: 'planned' | 'missed'
+      /** `moved` = wél gedaan, maar op een andere dag; zie movedToIso. */
+      status: 'planned' | 'missed' | 'moved'
+      /** Alleen bij status 'moved': de dag waarop hij wél gedaan is. */
+      movedToIso?: string | null
       durationSec: number | null
       programId: string | null
       notes: string | null
@@ -191,7 +201,10 @@ export default function AthleteSchedulePage() {
     // planning hieronder zien).
     for (const s of data.sessions) {
       if (!s.completedAt) continue
-      push(isoDate(new Date(s.scheduledAt)), {
+      // Op de dag dat hij GEDAAN is. Voor zelf-gelogde sessies is scheduledAt
+      // het startmoment (zelfde dag); een door de therapeut ingeplande sessie
+      // die later wordt afgerond hoort op de afrondingsdag te staan.
+      push(isoDate(new Date(s.completedAt)), {
         kind: 'session',
         id: s.id,
         name: s.programName ?? 'Workout',
@@ -307,7 +320,12 @@ export default function AthleteSchedulePage() {
       })
 
       for (const [key, { iso, date, item }] of plannedByKey) {
-        if (matchedKeys.has(key)) continue
+        const hit = matchedKeys.get(key)
+        // Gedaan op de dag zelf → de log draagt het verhaal al, geen tegel.
+        // Gedaan op een andere dag → daar staat de log, maar hier moet zichtbaar
+        // blijven dát er iets gepland stond en waar het heen ging.
+        const movedToIso = hit?.log && hit.log.iso !== iso ? hit.log.iso : null
+        if (hit && !movedToIso) continue
         const category = (item.quickCategory ?? 'STRENGTH') as Category
         const isRealItem = !item.id.startsWith('legacy-')
         push(iso, {
@@ -315,7 +333,8 @@ export default function AthleteSchedulePage() {
           id: item.id,
           name: item.programId ? (item.program?.name ?? 'Programma') : (item.quickName ?? 'Workout'),
           category,
-          status: date < today ? 'missed' : 'planned',
+          status: movedToIso ? 'moved' : date < today ? 'missed' : 'planned',
+          movedToIso,
           durationSec: item.plannedDurationSec ?? item.quickDurationSec,
           programId: item.programId,
           notes: item.notes,
@@ -497,7 +516,7 @@ export default function AthleteSchedulePage() {
                           width: 5,
                           height: 5,
                           background: eventColor(e),
-                          opacity: e.kind === 'planned' ? (e.status === 'missed' ? 0.3 : 0.55) : 1,
+                          opacity: e.kind === 'planned' ? (e.status === 'planned' ? 0.55 : 0.3) : 1,
                         }}
                       />
                     ))}
@@ -668,9 +687,11 @@ function EventCard({ event, onClick }: { event: CalEvent; onClick: () => void })
           : { label: '✓ GEDAAN', color: P.lime })
       : event.kind === 'cardio'
         ? { label: '✓ GEDAAN', color: P.lime }
-        : event.status === 'missed'
-          ? { label: 'GEMIST', color: P.danger }
-          : { label: 'GEPLAND', color: P.inkMuted }
+        : event.status === 'moved'
+          ? { label: 'VERPLAATST', color: P.inkMuted }
+          : event.status === 'missed'
+            ? { label: 'GEMIST', color: P.danger }
+            : { label: 'GEPLAND', color: P.inkMuted }
 
   const meta: string[] = []
   if (event.kind === 'session') {
@@ -788,7 +809,10 @@ function EventDetailSheet({
     }
   }
   const canStartPlanned =
-    event.kind === 'planned' && !!event.itemId && (event.category === 'CARDIO' || event.hasExercises || !!event.programId)
+    event.kind === 'planned'
+    && event.status !== 'moved'   // al gedaan, alleen op een andere dag
+    && !!event.itemId
+    && (event.category === 'CARDIO' || event.hasExercises || !!event.programId)
 
   return (
     <div className="fixed inset-0 z-50 flex items-end" role="dialog" aria-label={event.name}>
@@ -851,7 +875,11 @@ function EventDetailSheet({
             {event.kind !== 'planned' && event.pain != null && <StatChip label={`Pijn ${event.pain}/10`} color={event.pain >= 5 ? P.danger : undefined} />}
             {event.kind === 'planned' && (
               <StatChip
-                label={event.status === 'missed' ? 'Gemist' : 'Gepland'}
+                label={
+                  event.status === 'moved'
+                    ? `Gedaan op ${dagLabel(event.movedToIso)}`
+                    : event.status === 'missed' ? 'Gemist' : 'Gepland'
+                }
                 color={event.status === 'missed' ? P.danger : undefined}
               />
             )}

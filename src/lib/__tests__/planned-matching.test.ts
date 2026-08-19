@@ -178,6 +178,10 @@ describe('matchLoggedPlanned', () => {
     )
     expect(m.get('run-gisteren')?.source).toBe('cardio')
     expect(m.has('fiets-vandaag')).toBe(false)
+    // De uitvoerdag komt mee terug: daarop bouwen beide kalenders de
+    // "verplaatst naar …"-markering en telt de week-voortgang.
+    expect(m.get('run-gisteren')?.log?.iso).toBe(ISO)
+    expect(m.get('run-gisteren')?.log?.iso).not.toBe(gisteren)
   })
 
   // Zelfde verhaal, maar ze logde de duurloop los (niet vanuit de kalender).
