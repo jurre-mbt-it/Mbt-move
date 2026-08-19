@@ -275,6 +275,7 @@ export default function AthleteSchedulePage() {
             plannedEntries.push({
               key,
               iso,
+              itemId: item.id.startsWith('legacy-') ? null : item.id,
               programId: item.programId,
               category: item.quickCategory ?? 'STRENGTH',
               activity: item.quickActivity ?? null,
@@ -292,11 +293,13 @@ export default function AthleteSchedulePage() {
         sessions: data.sessions
           .filter(s => s.completedAt)
           .map(s => ({
+            id: s.id,
             iso: isoDate(new Date(s.scheduledAt)),
             programId: s.programId,
             itemId: s.weekScheduleDayItemId ?? null,
           })),
         cardio: data.cardio.map(c => ({
+          id: c.id,
           iso: isoDate(new Date(c.completedAt)),
           activity: c.activity,
           itemId: c.weekScheduleDayItemId ?? null,

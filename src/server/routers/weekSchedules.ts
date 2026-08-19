@@ -870,6 +870,10 @@ export const weekSchedulesRouter = createTRPCRouter({
           zone: true,
           rpe: true,
           programId: true,
+          // Identiteit i.p.v. de dag-heuristiek: welk gepland item is hiermee
+          // afgevinkt? Zonder dit kon een gelogde duurloop het geplande
+          // fietsritje van dezelfde dag als "voltooid" markeren.
+          weekScheduleDayItemId: true,
         },
         orderBy: { completedAt: 'asc' },
       })

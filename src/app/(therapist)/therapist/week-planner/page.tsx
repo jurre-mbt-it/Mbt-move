@@ -17,6 +17,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { trpc } from '@/lib/trpc/client'
+import { matchLoggedPlanned, type PlannedEntry } from '@/lib/planned-matching'
 import { usePortal } from '@/lib/portal'
 import { toast } from 'sonner'
 import {
@@ -1864,6 +1865,8 @@ function WeekPlannerContent() {
     programName: string | null
     exertionLevel: number | null
     feelScore: number | null
+    /** Gevuld = deze sessie hoort bij een gepland item. */
+    weekScheduleDayItemId?: string | null
   }> }
   // CardioLogs in hetzelfde bereik — cardio wordt apart gelogd (CardioLog
   // i.p.v. SessionLog) en moet geplande cardio-items kunnen afvinken.
@@ -1881,6 +1884,8 @@ function WeekPlannerContent() {
     zone: number | null
     rpe: number | null
     programId: string | null
+    /** Gevuld = deze cardio hoort bij een gepland item. */
+    weekScheduleDayItemId?: string | null
   }> }
 
   /** Status van een afgeronde SessionLog: deels (eerder gestopt) of voltooid. */
@@ -2102,49 +2107,82 @@ function WeekPlannerContent() {
 
     // ── 2. Quick-items matchen aan logs ──
     // Quick workouts hebben geen programId, dus de programId|datum-sleutel
-    // werkt niet. Match per dag: CARDIO-items aan CardioLogs (zelfde activiteit
-    // eerst), overige quick-items greedy aan losse SessionLogs (programId null).
+    // werkt niet. Dezelfde regels als de atleet-kalender — zie
+    // lib/planned-matching, daar staan ook de tests: identiteit eerst, dan
+    // alleen nog logs die nergens aan hangen, en een item dat een activiteit
+    // noemt gaat vóór generieke cardio. Zonder dat laatste markeerde een
+    // gelogde duurloop het geplande fietsritje van dezelfde dag als voltooid.
     const consumedSessionIds = new Set<string>()
-    const consumedCardioIds = new Set<string>()
+    // Per verbruikte cardio-log: op wélke dag stond het item dat hem afvinkt.
+    // Nodig omdat een log en zijn geplande item niet op dezelfde dag hoeven te
+    // vallen (gisteren gepland, vandaag gedaan).
+    const consumedCardioIso = new Map<string, string>()
 
-    const looseSessionsByIso = new Map<string, typeof sessionsRaw>()
-    for (const s of sessionsRaw) {
-      if (s.programId || !s.completedAt) continue
-      const iso = isoDate(new Date(s.scheduledAt))
-      looseSessionsByIso.set(iso, [...(looseSessionsByIso.get(iso) ?? []), s])
-    }
-    const cardioByIso = new Map<string, typeof cardioRaw>()
-    for (const c of cardioRaw) {
-      const iso = isoDate(new Date(c.completedAt))
-      cardioByIso.set(iso, [...(cardioByIso.get(iso) ?? []), c])
-    }
-
+    const plannedEntries: PlannedEntry[] = []
+    const itemByKey = new Map<string, { iso: string; item: ScheduleItem }>()
     for (const [iso, info] of map) {
-      const cardioLogs = cardioByIso.get(iso) ?? []
-      const looseSessions = looseSessionsByIso.get(iso) ?? []
       for (const item of info.items) {
-        if (item.programId) continue
-        if (item.quickCategory === 'CARDIO') {
-          const plannedActivity = item.cardioParams?.activity
-          const log =
-            cardioLogs.find(c => !consumedCardioIds.has(c.id) && c.activity === plannedActivity)
-            ?? cardioLogs.find(c => !consumedCardioIds.has(c.id))
-          if (!log) continue
-          consumedCardioIds.add(log.id)
-          // "Eerder gestopt" bij cardio: werkelijke duur duidelijk korter dan
-          // gepland (de cardio-speler logt de echte verstreken tijd).
-          const plannedSec = item.cardioParams?.durationSec ?? item.quickDurationSec
-          const partial = !!plannedSec && log.durationSec < plannedSec * 0.8
-          adhocStatusById.set(item.id, { status: partial ? 'partial' : 'completed', sessionId: null, cardioId: log.id })
-        } else {
-          const log = looseSessions.find(s => !consumedSessionIds.has(s.id))
-          if (!log) continue
-          consumedSessionIds.add(log.id)
-          adhocStatusById.set(item.id, {
-            status: log.completedAll === false ? 'partial' : 'completed',
-            sessionId: log.id,
-          })
-        }
+        // Programma-items lopen via sessionByKey/sessionByItemId. Markeringen
+        // (notitie, rustdag, test, doel) zijn geen workout en mogen dus ook
+        // geen log opeten — die verdween dan uit de kalender, want stap 3/4
+        // slaan verbruikte logs over.
+        if (item.programId || !isWorkoutKind(item.kind)) continue
+        const key = `${iso}:${item.id}`
+        plannedEntries.push({
+          key,
+          iso,
+          itemId: item.id.startsWith('legacy-') ? null : item.id,
+          programId: null,
+          category: item.quickCategory ?? 'STRENGTH',
+          // De geplande activiteit staat in de opgebouwde cardio-blokken en
+          // anders op de planner-tegel zelf. Zelfde volgorde als de
+          // week-belastingberekening hierboven.
+          activity: item.cardioParams?.activity ?? item.quickActivity ?? null,
+        })
+        itemByKey.set(key, { iso, item })
+      }
+    }
+
+    const matches = matchLoggedPlanned(plannedEntries, {
+      sessions: sessionsRaw
+        .filter(s => s.completedAt)
+        .map(s => ({
+          id: s.id,
+          iso: isoDate(new Date(s.scheduledAt)),
+          programId: s.programId,
+          itemId: s.weekScheduleDayItemId ?? null,
+          completedAll: s.completedAll,
+        })),
+      cardio: cardioRaw.map(c => ({
+        id: c.id,
+        iso: isoDate(startOfDay(new Date(c.completedAt))),
+        activity: c.activity,
+        itemId: c.weekScheduleDayItemId ?? null,
+        durationSec: c.durationSec,
+      })),
+    })
+
+    for (const [key, hit] of matches) {
+      const entry = itemByKey.get(key)
+      if (!entry) continue
+      const { iso: itemIso, item } = entry
+      if (hit.source === 'cardio') {
+        consumedCardioIso.set(hit.log.id, itemIso)
+        // "Eerder gestopt" bij cardio: werkelijke duur duidelijk korter dan
+        // gepland (de cardio-speler logt de echte verstreken tijd).
+        const plannedSec = item.cardioParams?.durationSec ?? item.quickDurationSec
+        const partial = !!plannedSec && hit.log.durationSec < plannedSec * 0.8
+        adhocStatusById.set(item.id, {
+          status: partial ? 'partial' : 'completed',
+          sessionId: null,
+          cardioId: hit.log.id,
+        })
+      } else if (hit.source === 'session') {
+        consumedSessionIds.add(hit.log.id)
+        adhocStatusById.set(item.id, {
+          status: hit.log.completedAll === false ? 'partial' : 'completed',
+          sessionId: hit.log.id,
+        })
       }
     }
 
@@ -2203,8 +2241,12 @@ function WeekPlannerContent() {
     // Cardio die de patiënt zelf logde zonder gepland item, zodat de
     // therapeut ook ongeplande cardio-workouts in de kalender ziet.
     for (const c of cardioRaw) {
-      if (consumedCardioIds.has(c.id)) continue
       const iso = isoDate(startOfDay(new Date(c.completedAt)))
+      // Afgevinkt tegen een gepland item op dezelfde dag → dát item draagt de
+      // status al, een losse tegel zou hem verdubbelen. Hoort de log bij een
+      // item op een ándere dag (de duurloop van gisteren pas vandaag gedaan),
+      // dan is de training op de dag zelf anders nergens te zien.
+      if (consumedCardioIso.get(c.id) === iso) continue
       const synthetic: ScheduleItem = {
         id: `cardiolog-${c.id}`,
         order: 999,

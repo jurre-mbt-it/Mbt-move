@@ -9,8 +9,10 @@ import {
 
 const ISO = '2026-08-19'
 
+let n = 0
 const plan = (extra: Partial<PlannedEntry> & { key: string }): PlannedEntry => ({
   iso: ISO,
+  itemId: extra.key,
   programId: null,
   category: 'CARDIO',
   activity: null,
@@ -19,6 +21,7 @@ const plan = (extra: Partial<PlannedEntry> & { key: string }): PlannedEntry => (
 })
 
 const cardio = (extra: Partial<LoggedCardio> = {}): LoggedCardio => ({
+  id: `c${n++}`,
   iso: ISO,
   activity: 'RUNNING',
   itemId: null,
@@ -26,6 +29,7 @@ const cardio = (extra: Partial<LoggedCardio> = {}): LoggedCardio => ({
 })
 
 const sessie = (extra: Partial<LoggedSession> = {}): LoggedSession => ({
+  id: `s${n++}`,
   iso: ISO,
   programId: null,
   itemId: null,
@@ -35,35 +39,60 @@ const sessie = (extra: Partial<LoggedSession> = {}): LoggedSession => ({
 const geen = { sessions: [] as LoggedSession[], cardio: [] as LoggedCardio[] }
 
 describe('matchLoggedPlanned', () => {
-  it('vinkt een item af zodra er een log aan hangt (identiteit)', () => {
+  it('vinkt een item af zodra het zelf een log meldt (buiten het venster)', () => {
     const m = matchLoggedPlanned([plan({ key: 'a', hasOwnLog: true })], geen)
-    expect(m.has('a')).toBe(true)
+    expect(m.get('a')?.source).toBe('own')
+  })
+
+  it('vinkt een item af op de cardio-log die het item noemt', () => {
+    const log = cardio({ itemId: 'a', activity: 'CYCLING' })
+    const m = matchLoggedPlanned([plan({ key: 'a', activity: 'RUNNING' })], {
+      sessions: [],
+      cardio: [log],
+    })
+    // Identiteit wint van activiteit: de patiënt vinkte dit item zelf af.
+    expect(m.get('a')).toEqual({ source: 'cardio', log })
+  })
+
+  it('vinkt een item af op de sessie die het item noemt', () => {
+    const log = sessie({ itemId: 'a' })
+    const m = matchLoggedPlanned([plan({ key: 'a', category: 'STRENGTH' })], {
+      sessions: [log],
+      cardio: [],
+    })
+    expect(m.get('a')).toEqual({ source: 'session', log })
   })
 
   it('laat een gepland fietsritje staan als er die dag is hardgelopen', () => {
-    // De klacht: gisteren-run vandaag gedaan, vandaag stond fietsen gepland.
-    // De fietstraining moet zichtbaar blijven.
-    const m = matchLoggedPlanned(
-      [plan({ key: 'fiets', activity: 'CYCLING' })],
-      { sessions: [], cardio: [cardio({ activity: 'RUNNING' })] },
-    )
+    const m = matchLoggedPlanned([plan({ key: 'fiets', activity: 'CYCLING' })], {
+      sessions: [],
+      cardio: [cardio({ activity: 'RUNNING' })],
+    })
     expect(m.has('fiets')).toBe(false)
   })
 
   it('vinkt een gepland fietsritje wél af bij een gelogde fietsrit', () => {
-    const m = matchLoggedPlanned(
-      [plan({ key: 'fiets', activity: 'CYCLING' })],
-      { sessions: [], cardio: [cardio({ activity: 'CYCLING' })] },
-    )
-    expect(m.has('fiets')).toBe(true)
+    const m = matchLoggedPlanned([plan({ key: 'fiets', activity: 'CYCLING' })], {
+      sessions: [],
+      cardio: [cardio({ activity: 'CYCLING' })],
+    })
+    expect(m.get('fiets')?.source).toBe('cardio')
   })
 
   it('negeert een cardio-log die al aan een ánder item hangt', () => {
-    const m = matchLoggedPlanned(
-      [plan({ key: 'vandaag', activity: 'RUNNING' })],
-      { sessions: [], cardio: [cardio({ activity: 'RUNNING', itemId: 'gisteren' })] },
-    )
+    const m = matchLoggedPlanned([plan({ key: 'vandaag', activity: 'RUNNING' })], {
+      sessions: [],
+      cardio: [cardio({ activity: 'RUNNING', itemId: 'gisteren' })],
+    })
     expect(m.has('vandaag')).toBe(false)
+  })
+
+  it('negeert een sessie die al aan een ander gepland item hangt', () => {
+    const m = matchLoggedPlanned([plan({ key: 'los', category: 'STRENGTH' })], {
+      sessions: [sessie({ itemId: 'ander-item' })],
+      cardio: [],
+    })
+    expect(m.has('los')).toBe(false)
   })
 
   it('geeft de log aan het item dat de activiteit noemt, niet aan generieke cardio', () => {
@@ -76,10 +105,10 @@ describe('matchLoggedPlanned', () => {
   })
 
   it('laat generieke cardio wel matchen als er niets specifiekers is', () => {
-    const m = matchLoggedPlanned(
-      [plan({ key: 'algemeen' })],
-      { sessions: [], cardio: [cardio({ activity: 'RUNNING' })] },
-    )
+    const m = matchLoggedPlanned([plan({ key: 'algemeen' })], {
+      sessions: [],
+      cardio: [cardio({ activity: 'RUNNING' })],
+    })
     expect(m.has('algemeen')).toBe(true)
   })
 
@@ -92,35 +121,43 @@ describe('matchLoggedPlanned', () => {
   })
 
   it('houdt dagen uit elkaar', () => {
-    const m = matchLoggedPlanned(
-      [plan({ key: 'a', activity: 'RUNNING', iso: '2026-08-20' })],
-      { sessions: [], cardio: [cardio({ activity: 'RUNNING', iso: ISO })] },
-    )
+    const m = matchLoggedPlanned([plan({ key: 'a', activity: 'RUNNING', iso: '2026-08-20' })], {
+      sessions: [],
+      cardio: [cardio({ activity: 'RUNNING', iso: ISO })],
+    })
     expect(m.has('a')).toBe(false)
   })
 
   it('matcht een programma-item op een sessie met hetzelfde programma', () => {
-    const m = matchLoggedPlanned(
-      [plan({ key: 'p', category: 'STRENGTH', programId: 'prog1' })],
-      { sessions: [sessie({ programId: 'prog1' })], cardio: [] },
-    )
-    expect(m.has('p')).toBe(true)
+    const m = matchLoggedPlanned([plan({ key: 'p', category: 'STRENGTH', programId: 'prog1' })], {
+      sessions: [sessie({ programId: 'prog1' })],
+      cardio: [],
+    })
+    expect(m.get('p')?.source).toBe('session')
   })
 
   it('matcht een programma-item niet op een sessie van een ander programma', () => {
-    const m = matchLoggedPlanned(
-      [plan({ key: 'p', category: 'STRENGTH', programId: 'prog1' })],
-      { sessions: [sessie({ programId: 'prog2' })], cardio: [] },
-    )
+    const m = matchLoggedPlanned([plan({ key: 'p', category: 'STRENGTH', programId: 'prog1' })], {
+      sessions: [sessie({ programId: 'prog2' })],
+      cardio: [],
+    })
     expect(m.has('p')).toBe(false)
   })
 
-  it('negeert een sessie die al aan een ander gepland item hangt', () => {
+  it('vinkt een los krachtitem af met een losse sessie', () => {
+    const m = matchLoggedPlanned([plan({ key: 'los', category: 'STRENGTH' })], {
+      sessions: [sessie()],
+      cardio: [],
+    })
+    expect(m.get('los')?.source).toBe('session')
+  })
+
+  it('laat een tegel zonder itemId (legacy) gewoon de heuristiek volgen', () => {
     const m = matchLoggedPlanned(
-      [plan({ key: 'los', category: 'STRENGTH' })],
-      { sessions: [sessie({ itemId: 'ander-item' })], cardio: [] },
+      [plan({ key: 'legacy', itemId: null, activity: 'RUNNING' })],
+      { sessions: [], cardio: [cardio({ activity: 'RUNNING' })] },
     )
-    expect(m.has('los')).toBe(false)
+    expect(m.get('legacy')?.source).toBe('cardio')
   })
 
   // De melding die deze module opleverde: gisteren stond hardlopen gepland,
@@ -130,7 +167,7 @@ describe('matchLoggedPlanned', () => {
     const gisteren = '2026-08-18'
     const m = matchLoggedPlanned(
       [
-        plan({ key: 'run-gisteren', iso: gisteren, activity: 'RUNNING', hasOwnLog: true }),
+        plan({ key: 'run-gisteren', iso: gisteren, activity: 'RUNNING' }),
         plan({ key: 'fiets-vandaag', iso: ISO, activity: 'CYCLING' }),
       ],
       {
@@ -139,25 +176,28 @@ describe('matchLoggedPlanned', () => {
         cardio: [cardio({ iso: ISO, activity: 'RUNNING', itemId: 'run-gisteren' })],
       },
     )
-    expect(m.has('run-gisteren')).toBe(true)
+    expect(m.get('run-gisteren')?.source).toBe('cardio')
     expect(m.has('fiets-vandaag')).toBe(false)
   })
 
   // Zelfde verhaal, maar ze logde de duurloop los (niet vanuit de kalender).
   // Dan is er geen koppeling — de activiteit moet het verschil maken.
   it('houdt gepland fietsen staan bij een losgelogde duurloop op dezelfde dag', () => {
-    const m = matchLoggedPlanned(
-      [plan({ key: 'fiets-vandaag', activity: 'CYCLING' })],
-      { sessions: [], cardio: [cardio({ activity: 'RUNNING', itemId: null })] },
-    )
+    const m = matchLoggedPlanned([plan({ key: 'fiets-vandaag', activity: 'CYCLING' })], {
+      sessions: [],
+      cardio: [cardio({ activity: 'RUNNING', itemId: null })],
+    })
     expect(m.has('fiets-vandaag')).toBe(false)
   })
 
-  it('vinkt een los krachtitem af met een losse sessie', () => {
-    const m = matchLoggedPlanned(
-      [plan({ key: 'los', category: 'STRENGTH' })],
-      { sessions: [sessie()], cardio: [] },
-    )
-    expect(m.has('los')).toBe(true)
+  it('geeft de gematchte log terug zodat de therapeut-planner er status uit kan halen', () => {
+    const log = { ...cardio({ activity: 'CYCLING' }), durationSec: 900 }
+    const m = matchLoggedPlanned([plan({ key: 'fiets', activity: 'CYCLING' })], {
+      sessions: [],
+      cardio: [log],
+    })
+    const hit = m.get('fiets')
+    expect(hit?.source).toBe('cardio')
+    expect(hit?.log?.durationSec).toBe(900)
   })
 })
