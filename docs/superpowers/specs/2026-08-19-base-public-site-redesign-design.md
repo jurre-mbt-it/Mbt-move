@@ -26,6 +26,7 @@ De goedgekeurde richting is **Product Studio met crème basis**:
 - petrol voor tekst, navigatie, kaders en productinterface;
 - oranje uitsluitend voor primaire acties en belangrijke datapunten;
 - echte BASE-schermen als hoofdbeeld;
+- echte productschermen behouden hun donkere app-interface en worden niet opnieuw vormgegeven naar de lichte marketingsite;
 - fotografie alleen ondersteunend en niet nodig voor de eerste release;
 - stevige typografie in gewone kapitalisatie;
 - monospace alleen voor echte cijfers, grafiekassen en compacte datalabels;
@@ -182,7 +183,22 @@ Dit is de inhoudelijke ruggengraat van de pagina.
 
 ### 4.4 Programmeren
 
-Een echt weekplannerscherm laat meerdere programma's in één week zien. De tekst benoemt flexibel plannen, vaste dagen en meerweekse trainingsplannen.
+Een echt weekplannerscherm laat meerdere programma's over meerdere weken zien. Dit beeld volgt exact de bestaande BASE-planner en wordt niet vervangen door een generieke weekagenda.
+
+De zichtbare structuur bestaat uit:
+
+- een smalle weekrail links met labels als `W31`, `W32` en `W33`;
+- maandag tot en met zondag als zeven vaste kolommen;
+- kalenderweken als hoge horizontale rijen;
+- de datum linksboven in iedere dagcel;
+- een vaste achtste kolom `WEEKTOTAAL`;
+- subtiele petrol rasterlijnen en afgeronde buitenhoeken;
+- gedempte datums voor dagen buiten de actieve maand;
+- oranje datums voor dagen binnen de actieve maand;
+- programma's en workouts als echte planner-items binnen de dagcellen;
+- weekbelasting, sessieaantal en duur in de kolom `WEEKTOTAAL` wanneer die gegevens beschikbaar zijn.
+
+Voor de publieke site wordt het echte donkere scherm als breed productbeeld op het crème vlak geplaatst. De marketinglayout verandert de planner zelf niet. De tekst naast of boven het beeld benoemt flexibel plannen, vaste dagen, meerdere gelijktijdige programma's en meerweekse trainingsplannen.
 
 ### 4.5 Criteria en testen
 
@@ -227,7 +243,7 @@ Vereisten:
 Benodigde beelden:
 
 1. therapeutoverzicht met programma's, criteria en belastingcurve;
-2. weekplanner met meerdere gelijktijdige programma's;
+2. weekplanner als echte meerweekse matrix met weekrail, zeven dagkolommen en `WEEKTOTAAL`, gevuld met meerdere gelijktijdige programma's uit fictieve demo-data;
 3. revalidatietraject of testbatterij met criteria;
 4. patiënt- of atletenweek met toegewezen en eigen training;
 5. voortgangsrapport in PDF-vorm.
@@ -354,6 +370,7 @@ Alle copy volgt `docs/tone-of-voice.md`:
 - crème is de dominante achtergrond;
 - petrol en oranje volgen de afgesproken rollen;
 - productbeelden zijn echte, gesaniteerde BASE-schermen;
+- het weekplannerbeeld gebruikt de bestaande meerweekse matrix en geen nagebouwde dagkaarten;
 - Martian Mono komt alleen voor bij echte data;
 - geen horizontale overflow op 390 px breedte;
 - desktopweergave werkt op 1440 x 1000;
