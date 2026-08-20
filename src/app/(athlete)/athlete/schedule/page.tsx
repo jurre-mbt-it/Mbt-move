@@ -703,7 +703,11 @@ function EventCard({ event, onClick }: { event: CalEvent; onClick: () => void })
       type="button"
       onClick={onClick}
       className="athletic-tap mbt-card-hover w-full flex items-center gap-3 rounded-xl text-left"
-      style={{...CARD, borderLeft: `3px solid ${color}`,
+      // De balk links zegt hoe het ging, niet wat het was. Dat is dezelfde
+      // afspraak als op de weekplanner van de therapeut; daar stond hij al zo
+      // en hier op de categorie, waardoor hetzelfde streepje op twee schermen
+      // twee dingen betekende. De soort blijft zichtbaar in het icoonvlak.
+      style={{...CARD, borderLeft: `4px solid ${statusChip.color}`,
         padding: '12px 14px',
         opacity: event.kind === 'planned' && event.status === 'missed' ? 0.75 : 1,}}
     >

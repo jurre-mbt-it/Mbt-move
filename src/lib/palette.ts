@@ -98,6 +98,31 @@ export const DATA_COLORS = [
  * week vol gemiste trainingen als een week vol afgevinkte trainingen. Daarom
  * koele en gedempte tinten hier, en de warme signaalkleuren voor status.
  */
+/**
+ * Leesbare tekstkleur op een gekozen vlak.
+ *
+ * De categoriekleuren zijn instelbaar per therapeut (/therapist/settings/kleuren).
+ * Zolang een kleur alleen de letter kleurde maakte dat niet uit, maar zodra hij
+ * een vlak vult moet de tekst mee bewegen: op een lichte tint hoort donkere
+ * inkt, op een donkere tint lichte. Vaste donkere tekst werkt alleen bij de
+ * standaardtinten en valt weg zodra iemand iets donkers kiest.
+ *
+ * Relatieve helderheid volgens WCAG. Niet-hex waarden (rgba, gradient) leveren
+ * lichte inkt op; dat is de veilige kant op een donkere app.
+ */
+export function textOn(background: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(background.trim())
+  if (!m) return P.ink
+  const n = parseInt(m[1], 16)
+  const lin = (c: number) => {
+    const v = c / 255
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
+  }
+  const L =
+    0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255)
+  return L > 0.45 ? P.bg : P.ink
+}
+
 export const CATEGORY_COLORS: Record<string, string> = {
   STRENGTH:    '#9FCEC9', // mint
   MOBILITY:    '#7FB0D8', // staalblauw

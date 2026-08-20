@@ -56,7 +56,7 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { CATEGORY_COLORS } from '@/lib/palette'
+import { CATEGORY_COLORS, textOn } from '@/lib/palette'
 import { formatWeightsPerSet } from '@/lib/session-sets'
 import { useCategoryColors } from '@/lib/useCategoryColors'
 import {
@@ -589,7 +589,12 @@ function ItemTile({
   // Markeringen hebben geen status: een notitie of streefdatum in het verleden
   // is niet "gemist". Ze krijgen hun eigen rustige weergave i.p.v. de
   // status-kleuren van een workout.
-  const statusBg = marker ? 'transparent' : TILE_BG
+  // De soort vult het vlak, de status staat als balk links. Eerder deed de
+  // kleur alleen het icoontje; in een vol weekraster las je daardoor niet in
+  // een oogopslag wat voor training er stond. De statusbalk is meegegroeid van
+  // 3 naar 4 pixels, want tegen een gevuld vlak moet hij harder aankomen.
+  const statusBg = marker ? 'transparent' : color
+  const tileInk = marker ? P.ink : textOn(color)
   const statusBorder = marker ? marker.color : STATUS_BORDER[status]
   const isClickable = !!onClick
 
@@ -629,12 +634,12 @@ function ItemTile({
       )}
       style={{
         background: statusBg,
-        borderLeft: `3px solid ${statusBorder}`,
+        borderLeft: `4px solid ${statusBorder}`,
         border: marker ? `1px solid ${P.line}` : undefined,
-        borderLeftWidth: 3,
+        borderLeftWidth: 4,
         borderLeftColor: statusBorder,
         borderLeftStyle: item.kind === 'REST' ? 'dotted' : 'solid',
-        color: P.ink,
+        color: tileInk,
       }}
       title={
         marker ? marker.label
@@ -643,7 +648,7 @@ function ItemTile({
       }
     >
       <div className="flex items-center gap-1.5 px-2 py-1">
-        <span style={{ color }} className="shrink-0">
+        <span style={{ color: marker ? color : tileInk }} className="shrink-0">
           {marker
             ? <MarkerIcon kind={item.kind} size={11} />
             : <CategoryIcon category={category} size={11} />}
@@ -654,7 +659,8 @@ function ItemTile({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onRemove() }}
-            className="opacity-0 group-hover/tile:opacity-100 pointer-coarse:opacity-60 transition-opacity shrink-0 text-[#9EB5B3] hover:text-[#F0796C]"
+            className="opacity-0 group-hover/tile:opacity-100 pointer-coarse:opacity-60 transition-opacity shrink-0 hover:!text-[#F0796C]"
+            style={{ color: tileInk }}
             title="Verwijder"
           >
             <X className="w-3 h-3" />
