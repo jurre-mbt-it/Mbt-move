@@ -152,7 +152,13 @@ export const practiceRouter = createTRPCRouter({
   /** Alleen voor de live email-preview in settings: rendert de footer-HTML
    *  met de huidige (nog niet opgeslagen) praktijk-input + de eigen therapeut-
    *  identiteit. Niet voor mail-versturen — dat gebeurt server-side bij
-   *  `/api/email/send`. */
+   *  `/api/email/send`.
+   *
+   *  Gedragswijziging t.o.v. de oude footer-renderer: die gaf een lege
+   *  string terug zodra de praktijkgegevens onvolledig waren, dus bleef de
+   *  preview leeg. `resolveSender` valt in dat geval terug op BASE, en de
+   *  preview toont dan de BASE-footer — precies wat de patiënt ook te zien
+   *  zou krijgen, dus eerlijker dan een lege preview. */
   previewFooter: protectedProcedure
     .input(z.object({
       practice: PracticeUpdateInput.partial().nullable(),
@@ -162,13 +168,10 @@ export const practiceRouter = createTRPCRouter({
         where: { id: ctx.user!.id },
         select: { firstName: true, lastName: true, jobTitle: true, name: true },
       })
-      const { renderEmailFooter } = await import('@/server/email/footer')
-      return {
-        html: renderEmailFooter({
-          therapist: me ?? {},
-          practice: input.practice as Parameters<typeof renderEmailFooter>[0]['practice'],
-        }),
-      }
+      const { renderFooter } = await import('@/server/email/footer')
+      const { resolveSender } = await import('@/server/email/sender')
+      const sender = resolveSender({ therapist: me ?? {}, practice: input.practice ?? null })
+      return { html: renderFooter(sender) }
     }),
   /**
    * Kleur per trainingssoort. Hoort bij de praktijk zodat collega's dezelfde
