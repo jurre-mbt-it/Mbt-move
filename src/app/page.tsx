@@ -20,9 +20,9 @@ import { AuthHashCatcher } from '@/components/base-site/AuthHashCatcher'
  *    Haal je die weg, dan werkt inloggen via de mail niet meer.
  */
 export const metadata: Metadata = {
-  title: { absolute: 'BASE, de app van Movement Based Therapy' },
+  title: { absolute: 'BASE voor fysiotherapiepraktijken' },
   description:
-    'BASE is de app van Movement Based Therapy. Je fysiotherapeut stelt je programma samen, jij logt je training, en je metingen laten zien wanneer de volgende stap veilig is.',
+    'Programmeer, monitor en evalueer revalidatie en training in één platform. BASE brengt programma\u2019s, criteria, metingen en trainingsbelasting samen.',
 }
 
 export default async function RootPage() {

@@ -79,6 +79,17 @@ export function LoadCurve() {
       <div className={styles.curveAxis}>
         <span>Week 1</span><span>3</span><span>5</span><span>7</span><span>9</span><span>11</span><span>Nu</span>
       </div>
+      <div className={styles.legend}>
+        <span className={styles.legendItem}>
+          <i className={styles.legendKey} aria-hidden="true" />Gelogd programma
+        </span>
+        <span className={styles.legendItem}>
+          <i className={`${styles.legendKey} ${styles.legendKeyMid}`} aria-hidden="true" />Therapiesessie
+        </span>
+        <span className={styles.legendItem}>
+          <i className={`${styles.legendKey} ${styles.legendKeyLow}`} aria-hidden="true" />Eigen training en wearable
+        </span>
+      </div>
     </div>
   )
 }
