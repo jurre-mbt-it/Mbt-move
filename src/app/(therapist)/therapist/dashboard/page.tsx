@@ -403,8 +403,8 @@ export default function TherapistDashboard() {
           <Kicker>Vraagt aandacht</Kicker>
           <Link
             href={`${portal.base}/signals`}
-            className="athletic-mono"
-            style={{ color: P.brand, fontSize: 11, letterSpacing: '0.12em' }}
+            className="athletic-label"
+            style={{ color: P.brand, fontSize: 12.5 }}
           >
             Alles →
           </Link>
@@ -457,12 +457,12 @@ export default function TherapistDashboard() {
                 <Link
                   key={p.patientId}
                   href={`${portal.patients}/${p.patientId}`}
-                  className="athletic-mono athletic-tap inline-flex items-center gap-2 px-3 py-2 rounded-lg"
+                  className="athletic-tap inline-flex items-center gap-2 px-3 py-2 rounded-lg"
                   style={{
                     background: P.surfaceHi,
-                    color: P.inkMuted,
-                    fontSize: 11,
-                    letterSpacing: '0.05em',
+                    color: P.ink,
+                    fontSize: 13,
+                    fontWeight: 500,
                   }}
                 >
                   <span
@@ -476,7 +476,10 @@ export default function TherapistDashboard() {
                     }}
                   />
                   {p.name}
-                  <span style={{ color: P.inkDim }}>
+                  <span
+                    className="athletic-mono"
+                    style={{ color: P.inkDim, fontSize: 11 }}
+                  >
                     {p.lastActivityAt ? timeAgo(p.lastActivityAt, now) : 'nooit'}
                   </span>
                 </Link>
