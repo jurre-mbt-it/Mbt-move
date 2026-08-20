@@ -4,9 +4,12 @@ import { useEffect, useRef } from 'react'
 import styles from './base-site.module.css'
 
 /**
- * De belastingcurve uit ontwerprichting B: één lijn over twaalf weken die
- * zichzelf tekent zodra hij in beeld komt. De vorm is illustratief, niet de
- * data van een echte patiënt.
+ * De belastingcurve: één lijn over twaalf weken die zichzelf tekent zodra hij in
+ * beeld komt. De vorm is illustratief, niet de data van een echte patiënt.
+ *
+ * Kleur volgt de regel uit docs/design-systeem.md: mint is meting, dus de lijn
+ * en het vlak zijn mint. Oranje zegt waar je bent, dus alleen de punt "vandaag"
+ * is oranje.
  */
 const CURVE =
   'M0,252 C60,244 90,232 150,236 C210,240 240,268 300,262 C360,256 390,196 450,186 ' +
@@ -58,8 +61,8 @@ export function LoadCurve() {
         >
           <defs>
             <linearGradient id="base-curve-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#E87A55" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="#E87A55" stopOpacity="0" />
+              <stop offset="0%" stopColor="#9FCEC9" stopOpacity="0.26" />
+              <stop offset="100%" stopColor="#9FCEC9" stopOpacity="0" />
             </linearGradient>
           </defs>
           <g stroke="rgba(212,232,230,0.07)" strokeWidth="1">
@@ -69,8 +72,8 @@ export function LoadCurve() {
           </g>
           <path d={`${CURVE} L900,300 L0,300 Z`} fill="url(#base-curve-fill)" />
           <path ref={pathRef} className={styles.curvePath} d={CURVE} />
-          <circle cx="300" cy="262" r="5" fill="#0E2729" stroke="#E87A55" strokeWidth="2.5" />
-          <circle cx="880" cy="49" r="6" fill="#F5B942" />
+          <circle cx="300" cy="262" r="5" fill="var(--ground)" stroke="#9FCEC9" strokeWidth="2.5" />
+          <circle cx="880" cy="49" r="6" fill="#E87A55" />
         </svg>
       </div>
       <div className={styles.curveAxis}>
