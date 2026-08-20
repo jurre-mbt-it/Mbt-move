@@ -56,7 +56,7 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { CATEGORY_COLORS, textOn, fillFor } from '@/lib/palette'
+import { CATEGORY_COLORS, CARDIO_ACTIVITY_COLORS, textOn, fillFor } from '@/lib/palette'
 import { formatWeightsPerSet } from '@/lib/session-sets'
 import { useCategoryColors } from '@/lib/useCategoryColors'
 import {
@@ -593,7 +593,19 @@ function ItemTile({
   // de soortkleuren koel en gedempt zijn en de statuskleuren warm — vallen ze
   // samen, dan leest een week vol gemiste trainingen als een week vol
   // afgevinkte. Zie de opmerking bij CATEGORY_COLORS in lib/palette.
-  const color = marker ? marker.color : catColors[category] ?? P.inkMuted
+  // Cardio is één categorie, maar op een agenda staan hardlopen, fietsen en
+  // wandelen naast elkaar en dan zegt één gedeelde blauwe tint niets. Is de
+  // activiteit bekend, dan wint die; anders valt hij terug op de categorie.
+  // De activiteitstinten blijven in dezelfde koele familie, dus je ziet nog
+  // steeds dát het cardio is.
+  const cardioActivity = item.cardioParams?.activity ?? logged?.activity ?? null
+  const activityColor =
+    category === 'CARDIO' && cardioActivity
+      ? CARDIO_ACTIVITY_COLORS[cardioActivity] ?? null
+      : null
+  const color = marker
+    ? marker.color
+    : activityColor ?? catColors[category] ?? P.inkMuted
   const name = marker
     ? (item.kind === 'TEST' ? (item.testBattery?.name ?? 'Test') : (item.quickName ?? marker.label))
     : item.programId ? (item.program?.name ?? 'Programma') : (item.quickName ?? 'Workout')
@@ -1016,10 +1028,9 @@ function DayCell({
   return (
     <div
       ref={setNodeRef}
-      className="border-l p-1.5 flex flex-col gap-1 group/cell relative select-none min-w-0"
+      className="rounded-xl p-2 flex flex-col gap-1 group/cell relative select-none min-w-0"
       style={{
-        borderColor: P.line,
-        background: inMonth ? P.surfaceLow : 'transparent',
+        ...(inMonth ? CARD : { background: 'transparent' }),
         opacity: inMonth ? 1 : 0.4,
         minHeight: 130,
         outline: selected ? `2px solid ${P.brand}` : isOver ? `2px dashed ${P.brand}` : 'none',
@@ -3034,9 +3045,12 @@ function WeekPlannerContent() {
             </button>
           </div>
         )}
-        <div className="rounded-2xl overflow-hidden" style={{...CARD }}>
+        {/* Losse dagkaarten op de grond in plaats van één blok met scheidslijnen.
+            De ruimte ertussen doet wat de lijnen deden, en elke dag wordt een
+            eigen ding dat je kunt aanwijzen. */}
+        <div className="flex flex-col gap-2">
           {/* Day-of-week header row */}
-          <div className="grid grid-cols-[40px_repeat(7,1fr)_168px] border-b" style={{ borderColor: P.line }}>
+          <div className="grid grid-cols-[40px_repeat(7,1fr)_168px] gap-2 px-0.5">
             <div />
             {DAY_LABELS_SHORT.map(d => (
               <div
@@ -3078,7 +3092,7 @@ function WeekPlannerContent() {
             return (
               <div
                 key={wIdx}
-                className="grid grid-cols-[40px_repeat(7,1fr)_168px] border-b last:border-b-0"
+                className="grid grid-cols-[40px_repeat(7,1fr)_168px] gap-2"
                 style={{
                   borderColor: P.line,
                   minHeight: 176,

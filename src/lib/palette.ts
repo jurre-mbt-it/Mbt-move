@@ -164,6 +164,31 @@ export function fillFor(color: string, done: boolean): string {
   return `#${to(hue(h + 1 / 3))}${to(hue(h))}${to(hue(h - 1 / 3))}`
 }
 
+/**
+ * Kleur per cardio-activiteit.
+ *
+ * Cardio is één categorie, maar op een agenda staan hardlopen, fietsen en
+ * wandelen naast elkaar en dan zegt één gedeelde blauwe tint niets. Deze tinten
+ * blijven allemaal in de koele familie zodat je nog steeds ziet dát het cardio
+ * is; ze verschillen onderling genoeg om de activiteit te herkennen.
+ *
+ * Ze blijven weg bij amber (kracht), perzik (plyometrie) en lila (stabiliteit),
+ * en ze zijn alle elf licht genoeg voor donkere inkt. Zie textOn().
+ */
+export const CARDIO_ACTIVITY_COLORS: Record<string, string> = {
+  RUNNING:      '#7FB3DE', // blauw, het anker van de familie
+  CYCLING:      '#5FC2CF', // cyaan
+  WALKING:      '#8FC8A2', // groen
+  ROWING:       '#8E9FE0', // korenbloem
+  SWIMMING:     '#6FD3C6', // turquoise
+  CROSSTRAINER: '#A9B6DE', // lavendelblauw
+  SKIERG:       '#AFD6E8', // ijsblauw
+  ASSAULT_BIKE: '#7CBFA8', // zeegroen
+  WATTBIKE:     '#6E9FC4', // staalblauw
+  STAIRCLIMBER: '#9BC3D2', // leiblauw
+  OTHER:        '#A6B4BE', // neutraal
+}
+
 export function textOn(background: string): string {
   const m = /^#?([0-9a-f]{6})$/i.exec(background.trim())
   if (!m) return P.ink
@@ -174,7 +199,11 @@ export function textOn(background: string): string {
   }
   const L =
     0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255)
-  return L > 0.45 ? P.bg : P.ink
+  // Het omslagpunt ligt rond 0,20: daaronder wint lichte inkt, daarboven
+  // donkere. Een eerdere versie stond op 0,45 en gaf daardoor lichte tekst op
+  // middenlichte vlakken als #7FB3DE, en dat haalt maar 2,3 op 1. Donkere inkt
+  // op datzelfde vlak haalt 7,0 op 1.
+  return L > 0.22 ? P.bg : P.ink
 }
 
 export const CATEGORY_COLORS: Record<string, string> = {
