@@ -390,7 +390,11 @@ export function ActionTile({
         className,
       )}
       style={{
-        backgroundColor: P.surface,
+        // Instrument-kaart, gelijk aan `Tile` en `MetricTile`.
+        background: `linear-gradient(180deg, ${P.cardTop} 0%, ${P.cardBot} 100%)`,
+        border: `1px solid ${P.cardEdge}`,
+        borderTopColor: P.cardEdgeTop,
+        boxShadow: P.cardShadow,
         padding: '18px 18px',
         marginBottom: 6,
       }}
@@ -404,10 +408,9 @@ export function ActionTile({
           className="block truncate"
           style={{
             color: P.ink,
-            fontSize: 14,
-            fontWeight: 800,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
+            fontSize: 15,
+            fontWeight: 600,
+            letterSpacing: '-0.01em',
           }}
         >
           {label}
