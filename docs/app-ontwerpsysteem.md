@@ -12,10 +12,13 @@ Identieke kopie hoort in `mbt-gym-mobile/docs/app-ontwerpsysteem.md`. Wijzig je 
 
 ## 1. Waarom dit bestaat
 
-De app en de website deelden letterlijk dezelfde ondergrond `#0E2729` en dezelfde
-mono hoofdletter-labels. Daardoor leek de app een uitsnede van de site in plaats
-van een eigen product. Het palet mag hetzelfde blijven, dat is de familie. De
-ondergrond, het kader en de labeltaal niet.
+De app en de website deelden letterlijk dezelfde ondergrond `#0E2729`. Daardoor
+leek de app een uitsnede van de site in plaats van een eigen product. Het palet
+mag hetzelfde blijven, dat is de familie; de ondergrond en het kader niet.
+
+De labeltaal is bewust wél gedeeld. Zie sectie 4: mono in hoofdletters hoort bij
+dit product, en het onderscheid met de site komt uit de vlakken en het
+materiaal.
 
 Wat in beide werelden gelijk blijft en waar je dus vanaf blijft:
 
@@ -86,42 +89,31 @@ dus die ronding werkt in je voordeel. Zet hem niet op 0 "voor de consistentie".
 
 ## 4. Labels en cijfers
 
-**Labels in gewone schrijfwijze**, in Archivo. Geen mono hoofdletters meer: dat is
-het handelsmerk van de site, met dat omspringende scramble-effect erbij.
+**Labels staan in mono, in hoofdletters.** JetBrains Mono in de app, Martian op
+het web. Dat is de tekentaal van dit product en het past bij een app die meet.
 
-**Mono blijft voor wat het hoort te zijn**: getallen, eenheden en tijden. Martian
-op het web, JetBrains Mono in de mobiele app.
+Dit is in augustus 2026 heen en weer gegaan. Er is eerst geprobeerd de labels
+naar gewone schrijfwijze te brengen, omdat mono hoofdletters ook het handelsmerk
+van movementbasedtherapy.nl zijn. Dat is teruggedraaid: het maakte de app
+inderdaad anders dan de site, maar het haalde ook weg wat de app zíjn karakter
+gaf. **Het onderscheid met de site komt uit de vlakken en het materiaal, niet
+uit de typografie.**
 
-In Zonder kader worden de cijfers juist **Archivo 600** op groot formaat, niet
-mono. Ze zijn daar het beeld, niet de meting in een tabel.
+Wat wél proportioneel is: koppen en titels (Archivo op het web, Inter Tight in
+de app), en de subregel van een tegel als die een hele zin is.
 
-Omvang van deze wijziging: 228 plekken met `uppercase` in de web-app en 54
-mono-plekken in de mobiele app. Mechanisch werk dat geen logica raakt.
+De conventie binnen een tegel, zie `ActionTile`: **titel proportioneel in
+hoofdletters, subregel in mono.** Wijk daar niet van af; twee stijlen die geen
+`fontFamily` zetten vielen ooit terug op de tekstletter en weken daardoor
+zichtbaar af van de rest van hetzelfde scherm.
 
-**Wat er in code met hoofdletters gebeurde.** Los van de CSS stond er op 285
-plekken een `.toUpperCase()`. Die zijn in augustus 2026 als volgt afgehandeld:
+**Wat er in code met hoofdletters gebeurt.** Er staan zo'n 285 `.toUpperCase()`
+-aanroepen in de twee apps. Die horen daar: ze dwingen labels, namen en datums
+naar de vorm die hierboven staat. Haal ze niet weg.
 
-| groep | aantal | besluit |
-|---|---:|---|
-| labels van tegels en velden | 76 | weg |
-| namen van mensen, programma's, protocollen | 81 | weg |
-| datums uit `toLocaleDateString` | 7 | weg |
-| dagafkortingen (MA, DI, WO) | 8 | **blijven**, conventie boven een weekkolom |
-| initialen in een avatar | 5 | **blijven**, een initiaal ís een hoofdletter |
-| functioneel (bevestigingsveld, hexcode-vergelijking) | 8 | **blijven**, geen weergave |
-| hele zinnen in kapitalen | 100 | **blijven voorlopig**, bewuste keuze |
-
-Die laatste groep is bewust niet aangeraakt. Het gaat om zinnen als
-`{n} SETS · DOEL {reps}` en `GEACCEPTEERD OP {datum}`, waar de kapitalen in de
-brontekst staan. Dat vraagt herschrijven per geval en niet één aanroep weghalen:
-haal je alleen de aanroep weg, dan krijg je `Knie 3B · DOOR Jurre Kok`, en dat
-leest slechter dan het origineel. Pak je dit ooit op, doe het dan per scherm.
-
-**Let op de prijs.** Labels in gewone schrijfwijze zijn groter dan mono kapitalen
-van 8,5 pixel. Hetzelfde scherm wordt daardoor ongeveer elf procent hoger. Zet het
-label op 11,5 pixel en breng de kaartpadding een tandje terug als dat knelt.
-
----
+Uitzonderingen die géén hoofdletters zijn: initialen in een avatar (die zijn het
+al), en functionele aanroepen zoals het bevestigingsveld waar je VERWIJDER moet
+typen en hexcode-vergelijkingen.
 
 ## 5. Datakleuren
 
@@ -146,8 +138,9 @@ de lichte richting ("Dossier") niet gekozen is.
 hetzelfde zijn: beweging is geen merkkenmerk waar iemand twee producten aan
 herkent.
 
-Wat de app **niet** overneemt van de site: het scramble-effect op labels. Dat hoort
-bij de etalage, niet bij gereedschap dat je dertig keer per dag opent.
+Wat de app **niet** overneemt van de site: het scramble-effect op labels. De
+letters mogen hetzelfde zijn, maar dat effect hoort bij de etalage en niet bij
+gereedschap dat je dertig keer per dag opent.
 
 ---
 
