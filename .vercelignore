@@ -4,29 +4,33 @@
 # bestand gaat dus ook alles mee wat hier lokaal rondslingert. Deze lijst is
 # bewust een superset van .gitignore: hij herhaalt de gevoelige paden expliciet,
 # zodat het niet uitmaakt welke van de twee bestanden Vercel leest.
+#
+# Elk pad begint met een schuine streep. Zonder die streep matcht een patroon
+# op ELK niveau, en dan sluit `supabase/` ook `src/lib/supabase/` uit. Dat is
+# precies een keer gebeurd en de build viel om op module-not-found.
 
 # Praktijkgegevens en commerciele stukken. Deze horen de machine niet af.
-compliance/
-business/
+/compliance/
+/business/
 
 # Geheimen.
-.env
-.env.local
-.env.*.local
+/.env
+/.env.local
+/.env.*.local
 
 # Gereedschap van de assistent en van de kennisgraaf. Samen ruim anderhalve
 # gigabyte, waarvan .claude/worktrees volledige kopieen van de repo bevat.
-.claude/
-.hermes/
-.superpowers/
-graphify-out/
+/.claude/
+/.hermes/
+/.superpowers/
+/graphify-out/
 
-# Werkdocumenten. Draaien nergens, worden nergens geserveerd.
-docs/
-supabase/
+# Werkdocumenten en migraties. Draaien niet mee in de build.
+/docs/
+/supabase/
 
 # Bouwsel en afhankelijkheden. Vercel bouwt zelf.
-.git/
-.next/
-node_modules/
-coverage/
+/.git/
+/.next/
+/node_modules/
+/coverage/
