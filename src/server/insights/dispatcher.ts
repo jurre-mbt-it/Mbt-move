@@ -11,15 +11,8 @@
 import type { Insight, PrismaClient } from '@prisma/client'
 import { sendMail, escapeHtml } from '@/server/mail'
 import { getAppUrl } from '@/lib/app-url'
-
-const BRAND = {
-  bg: '#0E2729',
-  surface: '#15363A',
-  ink: '#F5F2ED',
-  inkMuted: '#9EB5B3',
-  lime: '#E87A55',
-  danger: '#F0796C',
-}
+import { emailShell, EMAIL_PALETTE as P } from '@/server/email/shell'
+import { BASE_SENDER } from '@/server/email/sender'
 
 function isWithinQuietHours(now: Date, start: number | null, end: number | null): boolean {
   if (start == null || end == null) return false
@@ -30,60 +23,45 @@ function isWithinQuietHours(now: Date, start: number | null, end: number | null)
   return hour >= start || hour < end
 }
 
-function renderCriticalEmail(insight: Insight, patientName: string): {
+export function renderCriticalEmail(insight: Insight, patientName: string): {
   subject: string
   html: string
   text: string
 } {
-  const subject = `[KRITIEK] ${insight.title}`
   const dashboardUrl = `${getAppUrl()}/therapist/signals`
-
   const safeTitle = escapeHtml(insight.title)
   const safeSuggestion = escapeHtml(insight.suggestion)
   const safePatientName = escapeHtml(patientName)
 
-  const html = `<!DOCTYPE html>
-<html lang="nl">
-  <body style="margin:0;padding:0;background:${BRAND.bg};color:${BRAND.ink};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-    <div style="max-width:560px;margin:0 auto;padding:32px 24px;">
-      <div style="color:${BRAND.danger};font-size:11px;letter-spacing:0.16em;font-weight:900;text-transform:uppercase;margin-bottom:8px;">
-        Kritiek klinisch signaal
-      </div>
-      <h1 style="margin:0 0 12px 0;font-size:22px;font-weight:900;letter-spacing:-0.01em;">
-        ${safeTitle}
-      </h1>
-      <p style="color:${BRAND.inkMuted};font-size:14px;line-height:1.55;margin:0 0 20px 0;">
-        ${safeSuggestion}
+  const body = `
+    <tr><td style="padding:0 28px 0 28px;">
+      <div style="color:${P.danger};font-size:11px;letter-spacing:0.16em;font-weight:900;text-transform:uppercase;margin-bottom:8px;">Kritiek klinisch signaal</div>
+      <p style="color:${P.ink};font-size:16px;font-weight:700;margin:0 0 12px 0;">${safeTitle}</p>
+      <p style="color:${P.inkMuted};font-size:14px;line-height:1.55;margin:0 0 16px 0;">${safeSuggestion}</p>
+      <p style="color:${P.inkMuted};font-size:12px;margin:0 0 16px 0;">Patiënt: <strong style="color:${P.ink};">${safePatientName}</strong></p>
+      <p style="color:${P.inkMuted};font-size:12px;line-height:1.55;margin:0;padding:10px 14px;border-left:3px solid ${P.inkMuted};background:${P.surfaceHi};border-radius:6px;">
+        Dit is een geautomatiseerd attentiesignaal op basis van vaste regels, geen diagnose en geen behandeladvies. Je eigen klinische oordeel prevaleert.
       </p>
-      <p style="color:${BRAND.inkMuted};font-size:12px;margin:0 0 20px 0;">
-        Patiënt: <strong style="color:${BRAND.ink};">${safePatientName}</strong>
+    </td></tr>
+    <tr><td style="padding:16px 28px 0 28px;">
+      <p style="color:${P.inkMuted};font-size:11px;line-height:1.55;margin:0;">
+        Je krijgt deze melding omdat je behandelend therapeut bent van deze patiënt. Voorkeuren pas je aan via Instellingen, Signalen.
       </p>
-      <p style="color:${BRAND.inkMuted};font-size:12px;line-height:1.55;margin:0 0 20px 0;padding:10px 14px;border-left:3px solid ${BRAND.inkMuted};background:${BRAND.surface};border-radius:6px;">
-        Dit is een geautomatiseerd attentiesignaal op basis van vaste regels, geen diagnose of behandeladvies. Je eigen klinische oordeel als behandelaar prevaleert altijd.
-      </p>
-      <a href="${dashboardUrl}" style="display:inline-block;background:${BRAND.lime};color:${BRAND.bg};padding:12px 20px;border-radius:8px;font-weight:900;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;text-decoration:none;">
-        Bekijk in dashboard →
-      </a>
-      <p style="color:${BRAND.inkMuted};font-size:11px;margin-top:32px;line-height:1.55;">
-        Je ontvangt deze melding omdat je een behandelend therapeut bent van deze patiënt en de Clinical Insight Engine is geactiveerd. Je kunt voorkeuren aanpassen via Instellingen → Signalen.
-      </p>
-    </div>
-  </body>
-</html>`
+    </td></tr>`
 
-  const text = `[KRITIEK] ${insight.title}
-
-${insight.suggestion}
-
-Patiënt: ${patientName}
-
-Let op: dit is een geautomatiseerd attentiesignaal op basis van vaste regels, geen diagnose of behandeladvies. Je eigen klinische oordeel als behandelaar prevaleert altijd.
-
-Bekijk in dashboard: ${dashboardUrl}
-
-Je ontvangt deze melding omdat je een behandelend therapeut bent van deze patient en de Clinical Insight Engine is geactiveerd.`
-
-  return { subject, html, text }
+  return {
+    subject: `[KRITIEK] ${insight.title}`,
+    html: emailShell({
+      sender: BASE_SENDER,
+      heading: 'Kritiek signaal',
+      bodyHtml: body,
+      cta: { url: dashboardUrl, label: 'Bekijk in dashboard' },
+    }),
+    text:
+      `[KRITIEK] ${insight.title}\n\n${insight.suggestion}\n\nPatiënt: ${patientName}\n\n` +
+      `Dit is een geautomatiseerd attentiesignaal op basis van vaste regels, geen diagnose en geen behandeladvies. Je eigen klinische oordeel prevaleert.\n\n` +
+      `Bekijk in dashboard: ${dashboardUrl}`,
+  }
 }
 
 export async function dispatchInsightNotifications(
@@ -153,6 +131,7 @@ export async function dispatchInsightNotifications(
         subject: rendered.subject,
         html: rendered.html,
         text: rendered.text,
+        sender: BASE_SENDER,
       }).catch((err) => {
         console.warn('[cie-dispatcher] email send failed', { therapistId: therapist.id, err: String(err) })
       })
