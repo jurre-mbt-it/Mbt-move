@@ -24,7 +24,8 @@ import {
 import { CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
 import { matchLoggedPlanned, type PlannedEntry } from '@/lib/planned-matching'
 import { WeekPhaseLine } from '@/components/schedule/WeekPhaseLine'
-import { CATEGORY_COLORS, fillFor, textOn } from '@/lib/palette'
+import { CATEGORY_COLORS, CARDIO_ACTIVITY_COLORS, fillFor, textOn } from '@/lib/palette'
+import { CARDIO_ICON_MAP } from '@/components/icons/icon-map'
 import { formatWeightsPerSet } from '@/lib/session-sets'
 
 const mono =
@@ -128,6 +129,8 @@ type CalEvent =
       id: string
       name: string
       category: 'CARDIO'
+      /** Hardlopen, fietsen, wandelen: bepaalt kleur en icoon. */
+      activity?: string | null
       durationSec: number
       distanceM: number | null
       avgHeartRate: number | null
@@ -142,6 +145,7 @@ type CalEvent =
       id: string
       name: string
       category: Category
+      activity?: string | null
       /** `moved` = wél gedaan, maar op een andere dag; zie movedToIso. */
       status: 'planned' | 'missed' | 'moved'
       /** Alleen bij status 'moved': de dag waarop hij wél gedaan is. */
@@ -155,8 +159,27 @@ type CalEvent =
       hasExercises: boolean
     }
 
+/**
+ * Cardio is één categorie, maar hardlopen en wandelen naast elkaar in dezelfde
+ * blauwe tint zeggen niets. Is de activiteit bekend, dan wint die kleur; de
+ * activiteitstinten blijven in dezelfde koele familie zodat je nog steeds ziet
+ * dát het cardio is. Gelijk aan de weekplanner van de therapeut.
+ */
 function eventColor(e: CalEvent): string {
+  const activity = 'activity' in e ? e.activity : null
+  if (e.category === 'CARDIO' && activity) {
+    return CARDIO_ACTIVITY_COLORS[activity] ?? CATEGORY_COLORS[e.category]
+  }
   return CATEGORY_COLORS[e.category]
+}
+
+/** Het icoon volgt dezelfde regel: activiteit als hij bekend is, anders soort. */
+function eventIcon(e: CalEvent) {
+  const activity = 'activity' in e ? e.activity : null
+  if (e.category === 'CARDIO' && activity && CARDIO_ICON_MAP[activity]) {
+    return CARDIO_ICON_MAP[activity]
+  }
+  return null
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -218,6 +241,7 @@ export default function AthleteSchedulePage() {
         id: c.id,
         name: CARDIO_ACTIVITIES[c.activity as CardioActivityKey]?.label ?? 'Cardio',
         category: 'CARDIO',
+        activity: c.activity ?? null,
         durationSec: c.durationSec,
         distanceM: c.distanceM,
         avgHeartRate: c.avgHeartRate,
@@ -327,6 +351,7 @@ export default function AthleteSchedulePage() {
           id: item.id,
           name: item.programId ? (item.program?.name ?? 'Programma') : (item.quickName ?? 'Workout'),
           category,
+          activity: item.quickActivity ?? null,
           status: movedToIso ? 'moved' : date < today ? 'missed' : 'planned',
           movedToIso,
           durationSec: item.plannedDurationSec ?? item.quickDurationSec,
@@ -726,7 +751,9 @@ function EventCard({ event, onClick }: { event: CalEvent; onClick: () => void })
           color: ink,
         }}
       >
-        <CategoryIcon category={event.category} size={18} />
+        {(() => { const A = eventIcon(event); return A
+          ? <A size={18} />
+          : <CategoryIcon category={event.category} size={18} /> })()}
       </div>
       <div className="flex-1 min-w-0">
         <p
@@ -833,7 +860,9 @@ function EventDetailSheet({
                 className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
                 style={{ background: `${color}1A`, border: `1px solid ${color}40`, color }}
               >
-                <CategoryIcon category={event.category} size={18} />
+                {(() => { const A = eventIcon(event); return A
+                  ? <A size={18} />
+                  : <CategoryIcon category={event.category} size={18} /> })()}
               </div>
               <div className="min-w-0">
                 <p className="truncate" style={{ color: P.ink, fontSize: 16, fontWeight: 900 }}>{event.name}</p>
