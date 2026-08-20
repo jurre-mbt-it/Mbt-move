@@ -31,28 +31,30 @@
      dus tussen de pagina en de kaart te liggen, niet eronder. Ligt het lager
      dan `bg`, dan slaan roosters en ingelegde panelen als zwarte gaten in de
      pagina — precies wat er in de weekplanner misging. */
-  /* Vlakken volgens docs/app-ontwerpsysteem.md. De grond is bewust dieper en
-     koeler dan de #0E2729 van movementbasedtherapy.nl: de app deelde die
-     letterlijk met de site en leek daardoor een uitsnede ervan.
+  /* Vlakken volgens docs/app-ontwerpsysteem.md. De grond is bewust dieper
+     dan de #0E2729 van movementbasedtherapy.nl: de app deelde die letterlijk
+     met de site en leek daardoor een uitsnede ervan. De tint volgt wél die van
+     het origineel; een eerdere poging maakte het vlak ook koeler en dat zag er
+     te blauw uit. Alleen de diepte doet het onderscheidende werk.
      De volgorde bg → surface-low → surface → surface-hi blijft intact. */
-  --p-bg: #071518;
-  --p-surface-low: #0E2226;
-  --p-surface: #16333A;
-  --p-surface-hi: #1D4149;
+  --p-bg: #0A1C1D;
+  --p-surface-low: #0F2628;
+  --p-surface: #163539;
+  --p-surface-hi: #1D4348;
   --p-line: rgba(212,232,230,0.09);
   --p-line-strong: rgba(212,232,230,0.20);
 
   /* Instrument: een kaart ligt op de grond door een verloop, een lichtere
      bovenrand en een schaduw. Niet door een lijn eromheen; lijnen zijn van de
      site. Gebruik hiervoor de utility `.base-card` verderop. */
-  --p-card-top: #16333A;
-  --p-card-bot: #0E2226;
+  --p-card-top: #163539;
+  --p-card-bot: #0F2628;
   --p-card-edge: rgba(255,255,255,0.05);
   --p-card-edge-top: rgba(255,255,255,0.07);
   --p-card-shadow: 0 8px 20px rgba(0,0,0,0.34);
 
   /* Zonder kader: leesschermen zonder kaarten. Hier draagt de haarlijn wel. */
-  --p-flat-bg: #0B1F21;
+  --p-flat-bg: #0C2224;
   --p-hairline: rgba(212,232,230,0.16);
   --p-ink: #F5F2ED;
   --p-ink-muted: #9EB5B3;
@@ -102,24 +104,24 @@
   /* shadcn/ui tokens — de app draait overal in de donkere context, dus deze
      staan meteen op petrol in plaats van op een licht thema dat toch nooit
      te zien is. */
-  --background: #071518;
+  --background: #0A1C1D;
   --foreground: #F5F2ED;
-  --card: #16333A;
+  --card: #163539;
   --card-foreground: #F5F2ED;
-  --popover: #16333A;
+  --popover: #163539;
   --popover-foreground: #F5F2ED;
   --primary: #E87A55;
-  --primary-foreground: #071518;
-  --secondary: #1D4149;
+  --primary-foreground: #0A1C1D;
+  --secondary: #1D4348;
   --secondary-foreground: #F5F2ED;
-  --muted: #1D4149;
+  --muted: #1D4348;
   --muted-foreground: #9EB5B3;
-  --accent: #1D4149;
+  --accent: #1D4348;
   --accent-foreground: #F5F2ED;
   --destructive: #F0796C;
-  --destructive-foreground: #071518;
+  --destructive-foreground: #0A1C1D;
   --border: rgba(212,232,230,0.09);
-  --input: #1D4149;
+  --input: #1D4348;
   --ring: #E87A55;
   --radius: 0.5rem;
 
@@ -131,11 +133,11 @@
   --chart-5: var(--p-data-5);
 
   /* Sidebar */
-  --sidebar: #071518;
+  --sidebar: #0A1C1D;
   --sidebar-foreground: #F5F2ED;
   --sidebar-primary: #E87A55;
-  --sidebar-primary-foreground: #071518;
-  --sidebar-accent: #1D4149;
+  --sidebar-primary-foreground: #0A1C1D;
+  --sidebar-accent: #1D4348;
   --sidebar-accent-foreground: #F5F2ED;
   --sidebar-border: rgba(212,232,230,0.20);
   --sidebar-ring: #E87A55;

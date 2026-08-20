@@ -63,16 +63,21 @@ Op een scherm dat je 's ochtends in tien seconden scant is dat een verslechterin
 
 | rol | waarde | opmerking |
 |---|---|---|
-| grond, Instrument | `#071518` | dieper en koeler dan de site |
-| kaart, verloop boven | `#16333A` | |
-| kaart, verloop onder | `#0E2226` | |
+| grond, Instrument | `#0A1C1D` | dieper dan de site, zelfde tint |
+| kaart, verloop boven | `#163539` | |
+| kaart, verloop onder | `#0F2628` | |
 | bovenrand kaart | wit 6% | hierdoor ligt de kaart er echt bovenop |
 | kaartschaduw | `0 8px 20px rgba(0,0,0,0.34)` | |
-| grond, Zonder kader | `#0B1F21` | |
+| grond, Zonder kader | `#0C2224` | |
 | haarlijn, Zonder kader | mint 16% | de lijn draagt hier het ontwerp |
 
 De site gebruikt haarlijnen om structuur te maken, de app gebruikt vlakken en
 schaduw. Dat is het verschil, en het is opzet.
+
+**Alleen dieper, niet koeler.** Een eerste poging zette de grond op `#071518`,
+dieper én blauwer dan het origineel. Dat zag er te koud uit. De tint volgt nu
+dezelfde groen-teal verhouding als `#0E2729`; het onderscheid komt puur uit de
+diepte.
 
 **Afronding blijft staan**, 10 tot 14 pixels. De site is overal hard afgesneden,
 dus die ronding werkt in je voordeel. Zet hem niet op 0 "voor de consistentie".
