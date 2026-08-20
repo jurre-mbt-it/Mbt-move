@@ -45,4 +45,26 @@ describe('renderCriticalEmail', () => {
     const mail = renderCriticalEmail(insight, 'Sam de Vries')
     expect(mail.text).toContain('Pijnscore drie sessies boven 5')
   })
+
+  it('strip regelovergangen uit het onderwerp', () => {
+    const insightWithNewlines = {
+      title: 'Pijnscore hoog\nBcc: attacker@example.com',
+      suggestion: 'Controleer de situatie.',
+      signalType: 'pain_trend',
+      urgency: 'CRITICAL',
+      id: 'test-id',
+    } as never
+
+    const mail = renderCriticalEmail(insightWithNewlines, 'Fictieve Patient')
+    expect(mail.subject).not.toContain('\n')
+    expect(mail.subject).not.toContain('\r')
+    expect(mail.subject).toContain('[KRITIEK]')
+    expect(mail.subject).toContain('Pijnscore hoog')
+  })
+
+  it('bevat de afsluitende zin in de tekstversie', () => {
+    const mail = renderCriticalEmail(insight, 'Fictieve Patient')
+    expect(mail.text).toContain('Je krijgt deze melding omdat je behandelend therapeut bent')
+    expect(mail.text).toContain('Voorkeuren pas je aan via Instellingen, Signalen')
+  })
 })

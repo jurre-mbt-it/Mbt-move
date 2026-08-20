@@ -50,7 +50,10 @@ export function renderCriticalEmail(insight: Insight, patientName: string): {
     </td></tr>`
 
   return {
-    subject: `[KRITIEK] ${insight.title}`,
+    // Strip regelovergangen uit titel: insight.title bevat patiëntnaam, die door de
+    // patiënt zelf wordt ingevuld. Regelovergangen in een headerveld kunnen
+    // header-injectie mogelijk maken.
+    subject: `[KRITIEK] ${insight.title.replace(/[\r\n]+/g, ' ').trim()}`,
     html: emailShell({
       sender: BASE_SENDER,
       heading: 'Kritiek signaal',
@@ -60,7 +63,8 @@ export function renderCriticalEmail(insight: Insight, patientName: string): {
     text:
       `[KRITIEK] ${insight.title}\n\n${insight.suggestion}\n\nPatiënt: ${patientName}\n\n` +
       `Dit is een geautomatiseerd attentiesignaal op basis van vaste regels, geen diagnose en geen behandeladvies. Je eigen klinische oordeel prevaleert.\n\n` +
-      `Bekijk in dashboard: ${dashboardUrl}`,
+      `Bekijk in dashboard: ${dashboardUrl}\n\n` +
+      `Je krijgt deze melding omdat je behandelend therapeut bent van deze patiënt. Voorkeuren pas je aan via Instellingen, Signalen.`,
   }
 }
 
