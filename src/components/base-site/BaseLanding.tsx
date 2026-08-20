@@ -4,6 +4,7 @@ import { Reveal } from './Reveal'
 import { LoadCurve } from './LoadCurve'
 import { ScrambleText } from './ScrambleText'
 import { Counter } from './Counter'
+import { MetricScene } from './MetricScene'
 
 /**
  * Publieke BASE-site.
@@ -135,6 +136,122 @@ export function BaseLanding() {
           </div>
         </div>
       </header>
+
+      {/* ── Therapeutendashboard ─────────────────────────────────────── */}
+      <section className={styles.sec}>
+        <div className={`${styles.shell} ${styles.block}`}>
+          <Reveal>
+            <p className={styles.eyebrow}><ScrambleText text="Therapeutendashboard" /></p>
+            <h2 className={styles.head}>
+              <span className={styles.ln}>Zie wie deze week</span>
+              <span className={styles.ln}>aandacht nodig heeft</span>
+            </h2>
+            <p className={styles.lede}>
+              Je opent BASE en ziet meteen waar het schuurt: wie is gestopt met loggen, wie zit
+              boven zijn belasting, bij wie staat een hertest open. <em>Geen lijst met alles, maar
+              een lijst met wat afwijkt.</em>
+            </p>
+
+            <div className={styles.board}>
+              <div className={styles.boardTop}>
+                <span className={styles.dataName}>Praktijk Houthavens &middot; week 31</span>
+                <span className={styles.dataName}>18 actieve trajecten</span>
+              </div>
+              <div className={styles.boardStats}>
+                <div className={styles.boardStat}>
+                  <span className={styles.boardVal}><Counter to={3} /></span>
+                  <span className={styles.figureLabel}>Signalen</span>
+                </div>
+                <div className={styles.boardStat}>
+                  <span className={styles.boardVal}><Counter to={86} /><small>%</small></span>
+                  <span className={styles.figureLabel}>Therapietrouw</span>
+                </div>
+                <div className={styles.boardStat}>
+                  <span className={styles.boardVal}><Counter to={2} /></span>
+                  <span className={styles.figureLabel}>Stilgevallen</span>
+                </div>
+                <div className={styles.boardStat}>
+                  <span className={styles.boardVal}><Counter to={4} /></span>
+                  <span className={styles.figureLabel}>Hertesten open</span>
+                </div>
+              </div>
+              <div className={styles.boardFeed}>
+                <div className={styles.feedRow}>
+                  <i className={styles.feedDot} aria-hidden="true" />
+                  <span>Belasting 52 procent boven de weekopbouw, drie dagen op rij</span>
+                  <span className={styles.feedWhen}>Vandaag</span>
+                </div>
+                <div className={styles.feedRow}>
+                  <i className={styles.feedDot} aria-hidden="true" />
+                  <span>Zeven dagen niets gelogd, laatste sessie was een afgebroken programma</span>
+                  <span className={styles.feedWhen}>2 dagen</span>
+                </div>
+                <div className={styles.feedRow}>
+                  <i className={`${styles.feedDot} ${styles.feedDotCalm}`} aria-hidden="true" />
+                  <span>Symmetrie quadriceps van 71 naar 78 procent, fase 6 komt in zicht</span>
+                  <span className={styles.feedWhen}>Gisteren</span>
+                </div>
+                <div className={styles.feedRow}>
+                  <i className={`${styles.feedDot} ${styles.feedDotCalm}`} aria-hidden="true" />
+                  <span>Hertest hop-batterij ingepland voor week 33</span>
+                  <span className={styles.feedWhen}>Deze week</span>
+                </div>
+              </div>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── Patiëntprofiel ───────────────────────────────────────────── */}
+      <section className={`${styles.sec} ${styles.secDark}`}>
+        <div className={`${styles.shell} ${styles.block}`}>
+          <Reveal>
+            <div className={styles.duo}>
+              <div className={styles.stage}>
+                <p className={styles.dataName}>Vandaag &middot; dinsdag 29 juli</p>
+                <div className={`${styles.dataCard} ${styles.dataCardRaised}`}>
+                  <div className={styles.dataTop}>
+                    <span className={styles.dataName}>Knie 3B</span>
+                    <span className={styles.pill}>3 oefeningen</span>
+                  </div>
+                  <p className={styles.dataNote}>
+                    Split squat 4 &times; 8, nordic curl 3 &times; 6, calf raise 3 &times; 12. Bij elke
+                    oefening staat een video.
+                  </p>
+                </div>
+                <div className={styles.dataCard}>
+                  <div className={styles.dataTop}>
+                    <span className={styles.dataName}>Na afloop</span>
+                    <span className={styles.pill}>Pijn 2 van 10</span>
+                  </div>
+                  <div className={styles.meter}><i style={{ width: '20%' }} /></div>
+                  <p className={styles.dataNote}>Pijn en gevoel per sessie, zodat het verloop zichtbaar blijft.</p>
+                </div>
+                <div className={styles.dataCard}>
+                  <div className={styles.dataTop}>
+                    <span className={styles.dataName}>Mijn voortgang</span>
+                    <span className={styles.pill}>5 van 8</span>
+                  </div>
+                  <p className={styles.dataNote}>Dezelfde criteria die jij ziet, in gewone taal.</p>
+                </div>
+              </div>
+              <div>
+                <p className={styles.eyebrow}><ScrambleText text="Patiëntprofiel" /></p>
+                <h2 className={styles.head}>
+                  <span className={styles.ln}>Je patiënt weet</span>
+                  <span className={styles.ln}>wat er vandaag</span>
+                  <span className={styles.ln}>moet gebeuren</span>
+                </h2>
+                <p className={styles.lede}>
+                  Geen papieren schema dat kwijtraakt. Het programma staat per dag klaar met video,
+                  en wat er gelogd wordt komt bij jou terug. <em>Doelen en criteria staan er in
+                  gewone taal bij</em>, zodat iemand snapt waar hij naartoe werkt.
+                </p>
+              </div>
+            </div>
+          </Reveal>
+        </div>
+      </section>
 
       {/* ── Werkwijze, de zes stappen ────────────────────────────────── */}
       <section id="werkwijze" className={`${styles.sec} ${styles.secDark}`}>
@@ -321,6 +438,24 @@ export function BaseLanding() {
           </Reveal>
         </div>
       </section>
+
+      {/* ── Atletenprofiel, uitbreiding ──────────────────────────────── */}
+      <section className={styles.sec}>
+        <div className={`${styles.shell} ${styles.block}`} style={{ paddingBottom: 0 }}>
+          <Reveal>
+            <p className={styles.eyebrow}><ScrambleText text="Atletenaccount, uitbreiding" /></p>
+            <h2 className={`${styles.head} ${styles.headSmall}`}>
+              Voor wie ook zelfstandig traint
+            </h2>
+            <p className={styles.lede}>
+              Traint iemand naast de revalidatie door, dan koppelt hij zijn wearable en komen slaap,
+              hartslag en herstel mee in hetzelfde beeld. Scroll door het scherm hieronder.
+            </p>
+          </Reveal>
+        </div>
+      </section>
+
+      <MetricScene />
 
       {/* ── Accounts ─────────────────────────────────────────────────── */}
       <section id="voor-praktijken" className={styles.sec}>

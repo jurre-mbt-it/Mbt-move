@@ -183,8 +183,10 @@
   .navCell { padding-inline: 14px; min-height: 54px; }
 }
 
-/* Losse letters van het scramble-effect. */
-.ltr { display: inline-block; }
+/* Losse letters van het scramble-effect. `white-space: pre` is geen detail: een
+   spatie in een inline-block valt anders weg, en dan leest de menubalk als
+   "PLANEENDEMO". */
+.ltr { display: inline-block; white-space: pre; }
 
 /* ── Typografie ───────────────────────────────────────────────────────── */
 .eyebrow {
@@ -574,6 +576,194 @@
   border-top: 1px solid var(--hair);
   padding-top: 10px;
   margin-top: 6px;
+}
+
+/* ── Dashboardpaneel ──────────────────────────────────────────────────
+   Breed, donker vlak op het crème: het therapeutenscherm krijgt de ruimte die
+   het in de praktijk ook heeft. */
+.board {
+  background: var(--petrol);
+  border: 1px solid var(--hair-strong);
+  margin-top: clamp(28px, 4vw, 48px);
+  --ground: var(--petrol);
+  --ink: var(--paper);
+  --ink-soft: rgba(251, 249, 243, 0.68);
+  --ink-dim: rgba(251, 249, 243, 0.46);
+  --hair: rgba(212, 232, 230, 0.20);
+  --hair-soft: rgba(212, 232, 230, 0.10);
+  --measure: var(--mint-bright);
+  color: var(--paper);
+}
+.boardTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: clamp(14px, 1.8vw, 20px) clamp(16px, 2vw, 24px);
+  border-bottom: 1px solid var(--hair);
+}
+.boardStats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--hair);
+  border-bottom: 1px solid var(--hair);
+}
+@media (max-width: 760px) { .boardStats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.boardStat {
+  background: var(--petrol);
+  padding: clamp(16px, 2vw, 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+.boardVal {
+  font-family: var(--mono);
+  font-size: clamp(24px, 3vw, 36px);
+  line-height: 1;
+  color: var(--measure);
+  font-variant-numeric: tabular-nums;
+}
+.boardVal small { font-size: 0.44em; color: var(--ink-dim); margin-left: 4px; letter-spacing: 0.06em; text-transform: uppercase; }
+.boardFeed { padding: clamp(6px, 1vw, 10px) clamp(16px, 2vw, 24px) clamp(14px, 1.8vw, 20px); }
+.feedRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding-block: clamp(10px, 1.3vw, 14px);
+  border-bottom: 1px solid var(--hair-soft);
+  font-size: clamp(13.5px, 1.1vw, 15.5px);
+  color: var(--ink-soft);
+}
+.feedRow:last-child { border-bottom: none; }
+.feedDot { width: 7px; height: 7px; flex: none; background: var(--orange); }
+.feedDotCalm { background: var(--measure); }
+.feedWhen {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+
+/* ── Vastgezette scene met de telefoon ────────────────────────────────
+   Naar het model van de ring-sectie op sensiq.co: het blok is drie
+   schermhoogtes lang, de binnenkant plakt aan de bovenkant, en de inhoud
+   wisselt terwijl je erdoorheen scrollt. */
+.scene { height: 340svh; position: relative; }
+.scenePin {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+.sceneProgress { display: flex; gap: 6px; margin-bottom: clamp(18px, 3vh, 34px); }
+.sceneBar { flex: 1; height: 2px; background: var(--hair); overflow: hidden; }
+.sceneBar i { display: block; height: 100%; background: var(--orange); transform-origin: left center; }
+.sceneBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: clamp(24px, 5vw, 76px);
+  align-items: center;
+}
+@media (max-width: 900px) {
+  .sceneBody { grid-template-columns: 1fr; gap: 18px; }
+  .sceneCopy { order: 2; }
+  .phoneWrap { order: 1; }
+}
+.sceneCopy .head { margin-top: 12px; }
+.sceneCopy .lede { margin-top: 14px; }
+.sceneFoot {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin: clamp(18px, 3vh, 30px) 0 0;
+}
+
+/* ── De telefoon ───────────────────────────────────────────────────── */
+.phoneWrap { display: flex; justify-content: center; }
+.phone {
+  position: relative;
+  width: 300px;
+  height: 620px;
+  max-height: 76svh;
+  padding: 10px;
+  border: 1px solid var(--hair-strong);
+  background: #060f10;
+  flex: none;
+}
+/* Op smalle schermen de telefoon écht kleiner maken in plaats van hem te
+   schalen: een transform met negatieve marge liet hem over de tekst heen
+   vallen. De inhoud is vloeiend, dus die past zich vanzelf aan. */
+@media (max-width: 900px) {
+  .phone { width: 236px; height: 480px; padding: 8px; }
+  .phoneNotch { width: 72px; top: 8px; }
+  .phoneScroll { padding: 14px 11px 30px; gap: 10px; }
+}
+.phoneNotch {
+  position: absolute;
+  top: 10px; left: 50%;
+  width: 92px; height: 5px;
+  transform: translateX(-50%);
+  background: var(--hair-strong);
+}
+.phoneScreen { position: relative; width: 100%; height: 100%; overflow: hidden; background: #0b1a19; }
+.phoneScroll { position: absolute; inset: 0 0 auto 0; padding: 18px 14px 40px; display: flex; flex-direction: column; gap: 12px; will-change: transform; }
+
+.appHead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+.appTitle { font-family: var(--body); font-weight: 600; font-size: 21px; letter-spacing: -0.02em; color: #e8f1ef; }
+.appMeta { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; color: #7f9c98; }
+.appLabel { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.12em; text-transform: uppercase; color: #a9c2be; }
+.appCard {
+  position: relative;
+  background: linear-gradient(180deg, #17312f 0%, #112423 100%);
+  border: 1px solid rgba(255,255,255,0.06);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.appCardTop { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.appBadge {
+  font-family: var(--mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #4ecb71; border: 1px solid rgba(78,203,113,0.45); padding: 3px 6px;
+}
+.arcs { width: 100%; height: auto; display: block; margin-top: 2px; }
+.appCentre { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-top: -46px; }
+.appBig { font-family: var(--mono); font-size: 30px; line-height: 1; color: #e8f1ef; font-variant-numeric: tabular-nums; }
+.appBig small { font-size: 0.45em; color: #7f9c98; margin-left: 1px; }
+.appLegend { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+.appLegendItem {
+  display: flex; align-items: center; gap: 7px;
+  font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; color: #a9c2be;
+}
+.appLegendItem i { width: 7px; height: 7px; flex: none; }
+.appLegendItem b { margin-left: auto; font-weight: 400; color: #e8f1ef; }
+.appRow { display: grid; grid-template-columns: 46px 1fr auto; gap: 8px; align-items: center; font-family: var(--mono); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: #a9c2be; }
+.appBarTrack { display: block; height: 5px; background: rgba(255,255,255,0.08); position: relative; }
+.appBarTrack b { position: absolute; inset: 0 auto 0 0; }
+.appNum { color: #e8f1ef; font-variant-numeric: tabular-nums; }
+.appGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.appTile {
+  background: linear-gradient(180deg, #17312f 0%, #112423 100%);
+  border: 1px solid rgba(255,255,255,0.06);
+  padding: 10px;
+  display: flex; flex-direction: column; gap: 6px; min-width: 0;
+}
+.appTileVal { font-family: var(--mono); font-size: 21px; line-height: 1; color: #e8f1ef; font-variant-numeric: tabular-nums; }
+.appTileVal small { font-size: 0.42em; color: #7f9c98; margin-left: 3px; letter-spacing: 0.06em; text-transform: uppercase; }
+
+@media (prefers-reduced-motion: reduce) {
+  .scene { height: auto; }
+  .scenePin { position: static; height: auto; padding-block: clamp(58px, 8vw, 120px); }
 }
 
 /* Legenda bij de curve: welke bronnen samen de belasting vormen. */
