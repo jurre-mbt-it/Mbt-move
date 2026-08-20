@@ -56,7 +56,7 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { CATEGORY_COLORS, textOn } from '@/lib/palette'
+import { CATEGORY_COLORS, textOn, fillFor } from '@/lib/palette'
 import { formatWeightsPerSet } from '@/lib/session-sets'
 import { useCategoryColors } from '@/lib/useCategoryColors'
 import {
@@ -593,8 +593,13 @@ function ItemTile({
   // kleur alleen het icoontje; in een vol weekraster las je daardoor niet in
   // een oogopslag wat voor training er stond. De statusbalk is meegegroeid van
   // 3 naar 4 pixels, want tegen een gevuld vlak moet hij harder aankomen.
-  const statusBg = marker ? 'transparent' : color
-  const tileInk = marker ? P.ink : textOn(color)
+  // Niet de rauwe categoriekleur als vulling: die is bij CARDIO middendonker
+  // en dan leest geen enkele tekstkleur goed. fillFor() trekt elke tint naar
+  // dezelfde lichtheid, zodat donkere inkt er altijd overheen kan. Zo werkten
+  // de gevulde blokjes in het ontwerpvoorbeeld ook.
+  const fill = fillFor(color)
+  const statusBg = marker ? 'transparent' : fill
+  const tileInk = marker ? P.ink : textOn(fill)
   const statusBorder = marker ? marker.color : STATUS_BORDER[status]
   const isClickable = !!onClick
 
