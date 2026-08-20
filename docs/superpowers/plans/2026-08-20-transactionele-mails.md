@@ -38,7 +38,7 @@
 
 ---
 
-## Taak 1: Afzender-resolutie
+## Task 1: Afzender-resolutie
 
 **Bestanden:**
 - Aanmaken: `src/server/email/sender.ts`
@@ -275,7 +275,7 @@ git commit -m "feat(mail): afzender-resolutie met terugval op BASE"
 
 ---
 
-## Taak 2: Voettekst per afzender
+## Task 2: Voettekst per afzender
 
 **Bestanden:**
 - Aanmaken: `src/server/email/palette.ts`
@@ -500,7 +500,7 @@ git commit -m "refactor(mail): gedeeld palet en footer op basis van een afzender
 
 ---
 
-## Taak 3: De gedeelde shell
+## Task 3: De gedeelde shell
 
 **Bestanden:**
 - Aanmaken: `src/server/email/shell.ts`
@@ -679,7 +679,7 @@ git commit -m "feat(mail): gedeelde shell voor alle app-mails"
 
 ---
 
-## Taak 4: Afzendernaam en reply-to in sendMail
+## Task 4: Afzendernaam en reply-to in sendMail
 
 **Bestanden:**
 - Wijzigen: `src/server/mail.ts:31-73` (de `sendMail`-functie)
@@ -837,7 +837,7 @@ git commit -m "feat(mail): afzendernaam per praktijk en reply-to"
 
 ---
 
-## Taak 5: Uitnodiging over de shell
+## Task 5: Uitnodiging over de shell
 
 **Bestanden:**
 - Wijzigen: `src/server/mail.ts` (`layout()` verwijderen, `inviteMail()` herschrijven)
@@ -1043,7 +1043,7 @@ git commit -m "feat(mail): uitnodiging over de gedeelde shell, met echte therape
 
 ---
 
-## Taak 6: Programma-mail over de shell
+## Task 6: Programma-mail over de shell
 
 **Bestanden:**
 - Wijzigen: `src/app/api/email/send/route.ts:120-280` (het hele HTML-blok en de `BRAND`-constante)
@@ -1253,7 +1253,7 @@ git commit -m "refactor(mail): programma-mail over de gedeelde shell"
 
 ---
 
-## Taak 7: Insight-alert over de shell
+## Task 7: Insight-alert over de shell
 
 **Bestanden:**
 - Wijzigen: `src/server/insights/dispatcher.ts:14-88` (de `BRAND`-constante en `renderCriticalEmail()`)
