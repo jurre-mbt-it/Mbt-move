@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { getServerUser } from '@/lib/auth/require-role'
+import { SHOP_BRAND } from '@/lib/shop/brand'
 import { P } from '@/lib/shop/palette'
 import { heroGradient } from '@/lib/shop/gradient'
 import { LEVEL_LABELS } from '@/lib/shop/labels'
@@ -87,7 +88,7 @@ export default async function MyProgramsPage() {
                   className="absolute bottom-3 left-4 text-[10px] font-bold uppercase tracking-[0.22em]"
                   style={{ color: 'rgba(212,232,230,0.42)' }}
                 >
-                  MBT·Gym
+                  {SHOP_BRAND.short}
                 </span>
               </div>
               <div className="p-5">

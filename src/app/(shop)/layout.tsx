@@ -1,7 +1,19 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { gateShopPreview } from '@/lib/shop/access'
 import { getServerUser } from '@/lib/auth/require-role'
+import { SHOP_BRAND } from '@/lib/shop/brand'
 import { P } from '@/lib/shop/palette'
+
+// De shop erft bewust niet het `%s · BASE`-sjabloon uit de root-layout. BASE is
+// het platform voor praktijken; wat hier verkocht wordt staat op naam van de
+// praktijk zelf. Zie src/lib/shop/brand.ts.
+export const metadata: Metadata = {
+  title: {
+    template: `%s · ${SHOP_BRAND.name}`,
+    default: SHOP_BRAND.name,
+  },
+}
 
 export default async function ShopLayout({
   children,
@@ -32,7 +44,10 @@ export default async function ShopLayout({
       >
         <div className="mx-auto max-w-6xl flex items-center justify-between px-5 h-16">
           <Link href="/shop" className="font-bold tracking-tight text-lg">
-            MBT<span style={{ color: P.brand }}>·</span>Gym
+            {/* Vol uitgeschreven, zoals op movementbasedtherapy.nl. Op smalle
+                schermen de korte vorm: de volledige naam duwt de navigatie weg. */}
+            <span className="hidden sm:inline">{SHOP_BRAND.name}</span>
+            <span className="sm:hidden">{SHOP_BRAND.short}</span>
           </Link>
           <nav className="flex items-center gap-6 text-sm" style={{ color: P.inkMuted }}>
             <Link href="/shop" className="hover:text-[#F5F2ED] transition-colors">
@@ -63,7 +78,7 @@ export default async function ShopLayout({
       <footer className="border-t mt-20" style={{ borderColor: P.line }}>
         <div className="mx-auto max-w-6xl px-5 py-10 text-xs leading-relaxed">
           <p className="mb-2 font-medium" style={{ color: P.inkMuted }}>
-            BASE · Movement Based Therapy, Amsterdam
+            {SHOP_BRAND.name}, Amsterdam
           </p>
           <p style={{ color: P.inkDim }}>
             Onze programma&apos;s zijn educatieve trainings- en oefenprogramma&apos;s en vervangen

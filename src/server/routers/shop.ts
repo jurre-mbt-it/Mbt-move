@@ -7,6 +7,7 @@ import { matchSlug, LABELS, type IntakeAnswers } from '@/lib/shop/intake/flow'
 import { sendOrderEmails as sendOrderEmailsLib } from '@/lib/shop/email/order-emails'
 import { sendMail, escapeHtml } from '@/server/mail'
 import { isShopPublic } from '@/lib/shop/access'
+import { SHOP_BRAND } from '@/lib/shop/brand'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { createPayment, isMollieConfigured } from '@/lib/shop/mollie'
 import { syncOrderWithMollie } from '@/lib/shop/fulfillment'
@@ -237,7 +238,7 @@ export const shopRouter = createTRPCRouter({
             rationale: z.string(),
           }),
           system: [
-            'Je bent de digitale intake van MBT Gym, een sportfysiotherapiepraktijk in Amsterdam.',
+            `Je bent de digitale intake van ${SHOP_BRAND.name}, een sportfysiotherapiepraktijk in Amsterdam.`,
             'Je adviseert precies één trainingsprogramma uit de onderstaande catalogus dat het best past bij de antwoorden. Kies uitsluitend uit de catalogus.',
             '',
             'Schrijfstijl voor de onderbouwing (streng volgen):',
@@ -503,7 +504,10 @@ export const shopRouter = createTRPCRouter({
       const isLocal = /localhost|127\.0\.0\.1/.test(appUrl)
       const payment = await createPayment({
         amountCents,
-        description: `MBT Gym · ${product.name}`.slice(0, 255),
+        // Dit is wat de koper op zijn bankafschrift ziet. De merknaam staat
+        // vooraan omdat afschriften afkappen: liever een herkenbare naam die
+        // halverwege stopt dan een afkorting die niets zegt.
+        description: `${SHOP_BRAND.name} · ${product.name}`.slice(0, 255),
         redirectUrl: `${appUrl}/shop/bedankt?order=${order.id}`,
         webhookUrl: isLocal ? undefined : `${appUrl}/api/shop/mollie/webhook`,
         metadata: { orderId: order.id },
@@ -585,7 +589,7 @@ export const shopRouter = createTRPCRouter({
           // ingevuld. Consequent escapen, niet alleen `<` in `note`
           // (audit 2026-07-27).
           html: [
-            `<p><strong>${escapeHtml(name)}</strong> vraagt toegang tot de MBT Gym shop.</p>`,
+            `<p><strong>${escapeHtml(name)}</strong> vraagt toegang tot de shop van ${SHOP_BRAND.name}.</p>`,
             `<p>E-mail: <a href="mailto:${encodeURIComponent(email)}">${escapeHtml(email)}</a></p>`,
             input.productSlug ? `<p>Interesse in: ${escapeHtml(input.productSlug)}</p>` : '',
             note ? `<p>Bericht:<br>${escapeHtml(note)}</p>` : '',

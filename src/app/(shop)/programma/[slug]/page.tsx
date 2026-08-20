@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { getServerUser } from '@/lib/auth/require-role'
+import { SHOP_BRAND } from '@/lib/shop/brand'
 import { P } from '@/lib/shop/palette'
 import { formatPriceCents } from '@/lib/shop/format'
 import { heroGradient } from '@/lib/shop/gradient'
@@ -80,7 +81,7 @@ export default async function ProductDetailPage({
                 className="absolute bottom-4 left-5 text-xs font-bold uppercase tracking-[0.22em]"
                 style={{ color: 'rgba(212,232,230,0.42)' }}
               >
-                MBT·Gym
+                {SHOP_BRAND.short}
               </span>
             )}
           </div>
