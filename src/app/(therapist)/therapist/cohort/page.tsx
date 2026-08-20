@@ -47,7 +47,7 @@ export default function TherapistCohortPage() {
                   : { background: P.surfaceHi, color: P.inkMuted, fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', border: `1px solid ${P.line}` }
               }
             >
-              {w.label.toUpperCase()}
+              {w.label}
             </button>
           ))}
         </div>

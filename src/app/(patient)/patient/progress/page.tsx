@@ -457,7 +457,7 @@ export default function ProgressPage() {
                     letterSpacing: '0.08em',
                   }}
                 >
-                  SILBERNAGEL: {statusConfig.label.toUpperCase()}
+                  SILBERNAGEL: {statusConfig.label}
                 </span>
               </div>
             )

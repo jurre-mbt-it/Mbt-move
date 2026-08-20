@@ -93,7 +93,7 @@ export function DarkHeader({
             className="athletic-mono text-[12px]"
             style={{ color: P.ink, letterSpacing: '0.15em', fontWeight: 800 }}
           >
-            {title.toUpperCase()}
+            {title}
           </span>
           {sub && (
             <span

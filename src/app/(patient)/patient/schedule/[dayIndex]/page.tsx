@@ -130,7 +130,7 @@ export default function ScheduleDayPage({ params }: Props) {
                   className="athletic-mono"
                   style={{ color: P.lime, fontSize: 13, fontWeight: 900, letterSpacing: '0.12em' }}
                 >
-                  {day.program.name.toUpperCase()}
+                  {day.program.name}
                 </h2>
               </div>
               <MetaLabel style={{ marginTop: 4 }}>

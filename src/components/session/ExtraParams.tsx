@@ -196,7 +196,7 @@ export function ExtraParamsEditor({
                     fontWeight: 800,
                   }}
                 >
-                  + {t.label.toUpperCase()}
+                  + {t.label}
                 </button>
               ))
             )}

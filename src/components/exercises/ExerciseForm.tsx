@@ -107,7 +107,7 @@ function Section({
           textAlign: 'left',
         }}
       >
-        <Kicker>{title.toUpperCase()}</Kicker>
+        <Kicker>{title}</Kicker>
         {collapsible &&
           (open ? (
             <ChevronUp className="w-4 h-4" style={{ color: P.inkMuted }} />

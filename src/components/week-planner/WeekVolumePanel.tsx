@@ -111,7 +111,7 @@ export function WeekVolumePanel({
           style={{ color: phase.color, fontSize: 9, letterSpacing: '0.08em' }}
           title={phase.description}
         >
-          {phase.label.toUpperCase()}
+          {phase.label}
         </p>
       )}
 

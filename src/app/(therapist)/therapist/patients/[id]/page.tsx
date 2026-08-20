@@ -341,7 +341,7 @@ export default function PatientDetailPage({
         {/* Patient hero */}
         <div className="flex flex-col gap-2">
           <Kicker>Patiënt</Kicker>
-          <Display size="md">{patient.name.toUpperCase()}</Display>
+          <Display size="md">{patient.name}</Display>
           <div className="flex items-center gap-2 flex-wrap">
             <span
               className="athletic-mono"

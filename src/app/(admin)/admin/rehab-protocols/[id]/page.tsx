@@ -88,7 +88,7 @@ export default function AdminRehabProtocolDetailPage({
                 className="athletic-display"
                 style={{ fontSize: 26, lineHeight: '30px', letterSpacing: '-0.02em', paddingTop: 4 }}
               >
-                {protocol.name.toUpperCase()}
+                {protocol.name}
               </h1>
               {protocol.description && (
                 <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 6 }}>{protocol.description}</p>

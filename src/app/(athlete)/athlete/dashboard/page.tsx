@@ -124,7 +124,7 @@ export default function AthleteDashboard() {
   })
 
   const displayName = userName ? userName.split(' ')[0] : 'ATHLETE'
-  const programName = activeProgram?.name?.toUpperCase() ?? null
+  const programName = activeProgram?.name ?? null
   const totalWeeks = activeProgram?.weeks ?? null
   const currentWeek = activeProgram?.currentWeek ?? null
 

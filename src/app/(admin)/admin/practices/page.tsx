@@ -200,7 +200,7 @@ function PracticeRow({
                   title={owner ? 'Wijzig eigenaar' : 'Wijs eigenaar toe'}
                 >
                   <Crown className="w-3 h-3" />
-                  {ownerLabel.toUpperCase()}
+                  {ownerLabel}
                 </button>
               </div>
             </div>
