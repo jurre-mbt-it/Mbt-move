@@ -157,7 +157,7 @@ export const practiceRouter = createTRPCRouter({
    *  Gedragswijziging t.o.v. de oude footer-renderer: die gaf een lege
    *  string terug zodra de praktijkgegevens onvolledig waren, dus bleef de
    *  preview leeg. `resolveSender` valt in dat geval terug op BASE, en de
-   *  preview toont dan de BASE-footer — precies wat de patiënt ook te zien
+   *  preview toont dan de BASE-footer, precies wat de patiënt ook te zien
    *  zou krijgen, dus eerlijker dan een lege preview. */
   previewFooter: protectedProcedure
     .input(z.object({

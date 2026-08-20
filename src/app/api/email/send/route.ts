@@ -89,6 +89,14 @@ export async function POST(req: NextRequest) {
     extraInstructions,
   })
   const result = await sendMail({ to, subject, html, sender })
+  // provider: 'console' betekent dat RESEND_API_KEY ontbreekt: sendMail() heeft
+  // toen alleen gelogd, niet verstuurd. Dat moet de caller expliciet terugkrijgen,
+  // want src/app/(admin)/admin/shop/verkopen/page.tsx toont deze reden aan de
+  // gebruiker. Zonder dit signaal leest de therapeut "mail verstuurd" terwijl de
+  // patiënt niets heeft gekregen.
+  if (result.provider === 'console') {
+    return NextResponse.json({ success: true, sent: false, reason: 'no_api_key' })
+  }
   if (!result.ok) {
     return NextResponse.json({ success: true, sent: false, reason: 'resend_error' })
   }
