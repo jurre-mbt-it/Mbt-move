@@ -24,7 +24,7 @@ import {
 import { CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
 import { matchLoggedPlanned, type PlannedEntry } from '@/lib/planned-matching'
 import { WeekPhaseLine } from '@/components/schedule/WeekPhaseLine'
-import { CATEGORY_COLORS } from '@/lib/palette'
+import { CATEGORY_COLORS, fillFor, textOn } from '@/lib/palette'
 import { formatWeightsPerSet } from '@/lib/session-sets'
 
 const mono =
@@ -670,6 +670,12 @@ type CalendarData = {
 
 function EventCard({ event, onClick }: { event: CalEvent; onClick: () => void }) {
   const color = eventColor(event)
+  // Zelfde taal als de weekplanner van de therapeut: de kleur zegt de soort,
+  // de diepte van de vulling zegt of het gebeurd is. Een gelogde sessie of
+  // cardio is per definitie gedaan; alleen planning kan nog openstaan.
+  const isDone = event.kind !== 'planned'
+  const fill = fillFor(color, isDone)
+  const ink = textOn(fill)
   const statusChip =
     event.kind === 'session'
       ? (event.status === 'partial'
@@ -703,24 +709,29 @@ function EventCard({ event, onClick }: { event: CalEvent; onClick: () => void })
       type="button"
       onClick={onClick}
       className="athletic-tap mbt-card-hover w-full flex items-center gap-3 rounded-xl text-left"
-      // De balk links zegt hoe het ging, niet wat het was. Dat is dezelfde
-      // afspraak als op de weekplanner van de therapeut; daar stond hij al zo
-      // en hier op de categorie, waardoor hetzelfde streepje op twee schermen
-      // twee dingen betekende. De soort blijft zichtbaar in het icoonvlak.
-      style={{...CARD, borderLeft: `4px solid ${statusChip.color}`,
+      style={{
+        background: fill,
+        color: ink,
+        borderRadius: 12,
+        boxShadow: P.cardShadow,
         padding: '12px 14px',
-        opacity: event.kind === 'planned' && event.status === 'missed' ? 0.75 : 1,}}
+        opacity: event.kind === 'planned' && event.status === 'missed' ? 0.75 : 1,
+      }}
     >
       <div
         className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-        style={{ background: `${color}1A`, border: `1px solid ${color}40`, color }}
+        style={{
+          background: isDone ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.10)',
+          border: `1px solid ${isDone ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.16)'}`,
+          color: ink,
+        }}
       >
         <CategoryIcon category={event.category} size={18} />
       </div>
       <div className="flex-1 min-w-0">
         <p
           className="truncate"
-          style={{ color: P.ink, fontSize: 14, fontWeight: 800, letterSpacing: '-0.01em' }}
+          style={{ color: ink, fontSize: 14, fontWeight: 800, letterSpacing: '-0.01em' }}
         >
           {event.name}
         </p>
@@ -730,7 +741,8 @@ function EventCard({ event, onClick }: { event: CalEvent; onClick: () => void })
             fontSize: 10,
             letterSpacing: '0.12em',
             fontWeight: 700,
-            color: P.inkMuted,
+            color: ink,
+            opacity: 0.72,
             marginTop: 3,
             textTransform: 'uppercase',
           }}
@@ -740,7 +752,7 @@ function EventCard({ event, onClick }: { event: CalEvent; onClick: () => void })
       </div>
       <span
         className="athletic-mono shrink-0"
-        style={{ color: statusChip.color, fontSize: 9, fontWeight: 900, letterSpacing: '0.12em' }}
+        style={{ color: ink, opacity: 0.85, fontSize: 9, fontWeight: 900, letterSpacing: '0.12em' }}
       >
         {statusChip.label}
       </span>
