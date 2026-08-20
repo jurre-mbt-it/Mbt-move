@@ -1,0 +1,32 @@
+# Wat er NIET mee de deploy in gaat.
+#
+# Een `vercel --prod` uploadt de hele map, niet wat er in git zit. Zonder dit
+# bestand gaat dus ook alles mee wat hier lokaal rondslingert. Deze lijst is
+# bewust een superset van .gitignore: hij herhaalt de gevoelige paden expliciet,
+# zodat het niet uitmaakt welke van de twee bestanden Vercel leest.
+
+# Praktijkgegevens en commerciele stukken. Deze horen de machine niet af.
+compliance/
+business/
+
+# Geheimen.
+.env
+.env.local
+.env.*.local
+
+# Gereedschap van de assistent en van de kennisgraaf. Samen ruim anderhalve
+# gigabyte, waarvan .claude/worktrees volledige kopieen van de repo bevat.
+.claude/
+.hermes/
+.superpowers/
+graphify-out/
+
+# Werkdocumenten. Draaien nergens, worden nergens geserveerd.
+docs/
+supabase/
+
+# Bouwsel en afhankelijkheden. Vercel bouwt zelf.
+.git/
+.next/
+node_modules/
+coverage/
