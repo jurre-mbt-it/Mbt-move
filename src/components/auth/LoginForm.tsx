@@ -100,20 +100,21 @@ export function LoginForm() {
     <div className="w-full max-w-sm">
       {/* Logo */}
       <div className="flex flex-col items-center mb-10 gap-3">
-        <div className="flex items-baseline gap-2">
-          <span
-            className="athletic-display"
-            style={{ color: P.ink, fontSize: 44, letterSpacing: '-0.04em', fontWeight: 900 }}
-          >
-            MBT
-          </span>
-          <span
-            className="athletic-mono"
-            style={{ color: P.brand, fontSize: 24, fontWeight: 900, letterSpacing: '0.16em' }}
-          >
-            GYM
-          </span>
-        </div>
+        <span
+          className="athletic-display"
+          // De negatieve marge rechts heft de spatiering achter de laatste
+          // letter op, anders staat het woordmerk optisch net links van het
+          // midden.
+          style={{
+            color: P.ink,
+            fontSize: 44,
+            letterSpacing: '0.18em',
+            marginRight: '-0.18em',
+            fontWeight: 900,
+          }}
+        >
+          BASE
+        </span>
         <Kicker>Movement Based Therapy</Kicker>
       </div>
 

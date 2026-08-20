@@ -215,27 +215,19 @@ export function TherapistSidebar({ variant = 'therapist' }: { variant?: SidebarV
           <div className="flex justify-center">
             <span
               className="athletic-display"
-              style={{ color: P.ink, fontSize: 15, letterSpacing: '-0.03em', fontWeight: 900 }}
+              style={{ color: P.ink, fontSize: 14, letterSpacing: '0.06em', fontWeight: 900 }}
             >
-              MBT
+              BASE
             </span>
           </div>
         ) : (
           <>
-            <div className="flex items-baseline gap-2">
-              <span
-                className="athletic-display"
-                style={{ color: P.ink, fontSize: 22, letterSpacing: '-0.04em', fontWeight: 900 }}
-              >
-                MBT
-              </span>
-              <span
-                className="athletic-mono"
-                style={{ color: P.brand, fontSize: 13, fontWeight: 900, letterSpacing: '0.2em' }}
-              >
-                GYM
-              </span>
-            </div>
+            <span
+              className="athletic-display"
+              style={{ color: P.ink, fontSize: 22, letterSpacing: '0.18em', fontWeight: 900 }}
+            >
+              BASE
+            </span>
             <p
               className="athletic-mono mt-2"
               style={{ color: P.inkDim, fontSize: 10, letterSpacing: '0.2em' }}

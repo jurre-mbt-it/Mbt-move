@@ -144,29 +144,17 @@ export function AppLoader() {
 
       {/* Wordmark */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-          <span
-            style={{
-              color: '#F5F2ED',
-              fontSize: 26,
-              fontWeight: 900,
-              letterSpacing: '-0.04em',
-            }}
-          >
-            MBT
-          </span>
-          <span
-            style={{
-              color: BRAND,
-              fontSize: 15,
-              fontWeight: 900,
-              letterSpacing: '0.18em',
-              fontFamily: "'Martian', ui-monospace, Menlo, monospace",
-            }}
-          >
-            GYM
-          </span>
-        </div>
+        <span
+          style={{
+            color: '#F5F2ED',
+            fontSize: 26,
+            fontWeight: 900,
+            letterSpacing: '0.18em',
+            marginRight: '-0.18em',
+          }}
+        >
+          BASE
+        </span>
         <span
           style={{
             color: INK_MUTED,
