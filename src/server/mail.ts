@@ -142,7 +142,7 @@ export function inviteMail({
     sender,
     html: emailShell({
       sender,
-      heading: `Hallo ${escapeHtml(firstName)}`,
+      heading: `Hallo ${firstName}`,
       bodyHtml: body,
       cta: { url: codeUrl, label: 'Start onboarding' },
     }),

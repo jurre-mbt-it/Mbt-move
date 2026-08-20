@@ -59,4 +59,12 @@ describe('inviteMail', () => {
     const mail = inviteMail({ ...basis, recipientName: '<script>x</script> Vries', sender })
     expect(mail.html).not.toContain('<script>x</script>')
   })
+
+  it('escapet de voornaam precies een keer', () => {
+    // emailShell escapet de heading zelf. Doet inviteMail dat ook, dan leest
+    // een naam als D'Hondt in de mailclient als "D&#39;Hondt".
+    const mail = inviteMail({ ...basis, recipientName: "D'Hondt", sender })
+    expect(mail.html).toContain('Hallo D&#39;Hondt')
+    expect(mail.html).not.toContain('&amp;#39;')
+  })
 })
