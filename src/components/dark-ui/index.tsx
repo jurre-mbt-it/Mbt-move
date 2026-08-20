@@ -472,9 +472,19 @@ export function MetricTile({
         interactive && 'athletic-tap mbt-card-hover cursor-pointer',
         className,
       )}
-      style={{ backgroundColor: P.surface, padding: 16, ...style }}
+      style={{
+        // Instrument-kaart, gelijk aan `Tile` (docs/app-ontwerpsysteem.md).
+        background: `linear-gradient(180deg, ${P.cardTop} 0%, ${P.cardBot} 100%)`,
+        border: `1px solid ${P.cardEdge}`,
+        borderTopColor: P.cardEdgeTop,
+        boxShadow: P.cardShadow,
+        padding: 16,
+        ...style,
+      }}
     >
-      <MetaLabel>{label.toUpperCase()}</MetaLabel>
+      {/* Bewust geen toUpperCase meer: labels staan in gewone schrijfwijze.
+          Die aanroep zat in JS en ontsnapte daardoor aan de CSS-wijziging. */}
+      <MetaLabel>{label}</MetaLabel>
       <div className="flex items-baseline gap-1">
         <span
           className="athletic-display"
