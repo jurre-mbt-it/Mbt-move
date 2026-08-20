@@ -310,7 +310,7 @@ function TrajectHistory({
             <div
               key={t.id}
               className="rounded-lg"
-              style={{ background: P.surfaceHi, border: `1px solid ${P.line}`, padding: '10px 12px' }}
+              style={{ background: P.control, border: `1px solid ${P.line}`, padding: '10px 12px' }}
             >
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <button
@@ -911,7 +911,7 @@ function CriterionRow({
                       onClick={() => setStatus(s)}
                       className="athletic-mono athletic-tap flex-1 rounded-lg"
                       style={{
-                        background: status === s ? STATUS_COLOR[s] : P.surfaceHi,
+                        background: status === s ? STATUS_COLOR[s] : P.control,
                         color: status === s ? P.bg : P.ink,
                         border: `1px solid ${status === s ? STATUS_COLOR[s] : P.lineStrong}`,
                         padding: '10px 8px',

@@ -154,7 +154,7 @@ function FeedbackModal({
               style={
                 rpe === i + 1
                   ? { borderColor: SMILEY_COLORS[i], background: SMILEY_COLORS[i] + '22', border: `2px solid ${SMILEY_COLORS[i]}` }
-                  : { border: `2px solid ${P.line}`, background: P.surfaceHi }
+                  : { border: `2px solid ${P.line}`, background: P.control }
               }
             >
               <SmileySVG expression={expr} color={SMILEY_COLORS[i]} />
@@ -582,7 +582,7 @@ export default function CardioSessionPage() {
             {/* Voortgangsbalk */}
             {phase !== 'IDLE' && (
               <div className="w-64 mx-auto mt-4">
-                <div className="h-2 rounded-full overflow-hidden" style={{ background: P.surfaceHi }}>
+                <div className="h-2 rounded-full overflow-hidden" style={{ background: P.track }}>
                   <div
                     className="h-full rounded-full transition-all duration-1000"
                     style={{ background: P.lime, width: `${Math.min((elapsedSec / (session.targetDurationMin * 60)) * 100, 100)}%` }}
@@ -683,7 +683,7 @@ export default function CardioSessionPage() {
                 type="number" min={40} max={220} placeholder="bpm"
                 className="w-20 h-8 rounded-lg text-center athletic-mono outline-none"
                 style={{
-                  background: P.surfaceHi,
+                  background: P.field,
                   border: `1px solid ${P.lineStrong}`,
                   color: P.ink,
                   fontSize: 12,

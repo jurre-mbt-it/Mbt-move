@@ -79,7 +79,7 @@ export default function AthleteProgressPage() {
                         onClick={() => setSelectedExercise(s.name)}
                         className="athletic-tap athletic-mono text-xs px-3 py-1.5 rounded-full font-bold transition-all"
                         style={{
-                          background: active ? P.ink : P.surfaceHi,
+                          background: active ? P.ink : P.control,
                           color: active ? P.bg : P.inkMuted,
                           border: `1px solid ${active ? P.ink : P.lineStrong}`,
                           letterSpacing: '0.08em',

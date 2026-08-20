@@ -280,7 +280,7 @@ export default function EditSessionPage({
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
                 style={{
-                  background: P.surfaceHi,
+                  background: P.field,
                   border: `1px solid ${P.lineStrong}`,
                   color: P.ink,
                   padding: '8px 10px',
@@ -297,7 +297,7 @@ export default function EditSessionPage({
                 value={scheduledTime}
                 onChange={(e) => setScheduledTime(e.target.value)}
                 style={{
-                  background: P.surfaceHi,
+                  background: P.field,
                   border: `1px solid ${P.lineStrong}`,
                   color: P.ink,
                   padding: '8px 10px',
@@ -447,7 +447,7 @@ function EditExerciseTile({
           {supersetMenuOpen && (
             <div
               className="absolute right-0 top-full mt-1 z-10 rounded-lg p-2 flex flex-col gap-1"
-              style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}`, minWidth: 140 }}
+              style={{ background: P.control, border: `1px solid ${P.lineStrong}`, minWidth: 140 }}
             >
               <button
                 type="button"
@@ -522,7 +522,7 @@ function EditExerciseTile({
             <div
               key={p.id}
               className="flex items-center gap-1 px-2 py-1 rounded-md"
-              style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}`, fontSize: 12 }}
+              style={{ background: P.field, border: `1px solid ${P.lineStrong}`, fontSize: 12 }}
             >
               <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.08em' }}>
                 {p.label.toUpperCase()}
@@ -604,7 +604,7 @@ function EditExerciseTile({
           {paramMenuOpen && (
             <div
               className="absolute left-0 top-full mt-1 z-10 rounded-lg p-1.5 flex flex-col gap-0.5"
-              style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}`, minWidth: 180 }}
+              style={{ background: P.control, border: `1px solid ${P.lineStrong}`, minWidth: 180 }}
             >
               {availableParams.map((p) => (
                 <button
@@ -668,7 +668,7 @@ function ScalePicker({
           <button key={n} type="button" onClick={() => onChange(active ? null : n)}
             className="athletic-tap athletic-mono aspect-square rounded flex items-center justify-center"
             style={{
-              background: active ? color : P.surfaceHi,
+              background: active ? color : P.control,
               color: active ? P.bg : P.inkMuted,
               border: active ? `1px solid ${color}` : `1px solid ${P.lineStrong}`,
               fontSize: 12, fontWeight: 900,

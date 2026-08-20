@@ -189,7 +189,7 @@ export default function ExercisesPage() {
           onClick={() => setActiveCollection(null)}
           className="w-full flex items-center gap-2 px-2 py-2 rounded-lg transition-colors athletic-tap"
           style={{
-            background: activeCollection === null ? P.surfaceHi : 'transparent',
+            background: activeCollection === null ? P.control : 'transparent',
             color: activeCollection === null ? P.ink : P.inkMuted,
             fontSize: 13,
             fontWeight: activeCollection === null ? 700 : 500,
@@ -210,7 +210,7 @@ export default function ExercisesPage() {
             onClick={() => setActiveCollection(activeCollection === col.id ? null : col.id)}
             className="w-full flex items-center gap-2 px-2 py-2 rounded-lg transition-colors athletic-tap"
             style={{
-              background: activeCollection === col.id ? P.surfaceHi : 'transparent',
+              background: activeCollection === col.id ? P.control : 'transparent',
               color: activeCollection === col.id ? P.ink : P.inkMuted,
               fontSize: 13,
               fontWeight: activeCollection === col.id ? 700 : 500,
@@ -338,7 +338,7 @@ export default function ExercisesPage() {
             {suggestOpen && suggesties.length > 0 && (
               <div
                 className="absolute left-0 right-0 top-full mt-1 z-30 rounded-xl overflow-hidden"
-                style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}` }}
+                style={{ background: P.control, border: `1px solid ${P.lineStrong}` }}
               >
                 <div className="athletic-mono text-[9px] px-3 pt-2 pb-1" style={{ color: P.inkDim }}>
                   Gerelateerde zoekopties
@@ -442,7 +442,7 @@ export default function ExercisesPage() {
                       onClick={() => setSelectedCategory(selectedCategory === c.value ? null : c.value)}
                       className="px-2.5 py-1 rounded-full athletic-mono transition-colors"
                       style={{
-                        background: selectedCategory === c.value ? P.ink : P.surfaceHi,
+                        background: selectedCategory === c.value ? P.ink : P.control,
                         color: selectedCategory === c.value ? P.bg : P.inkMuted,
                         border: `1px solid ${selectedCategory === c.value ? P.ink : P.lineStrong}`,
                         fontSize: 10,
@@ -466,7 +466,7 @@ export default function ExercisesPage() {
                       onClick={() => setSelectedRegion(selectedRegion === r.value ? null : r.value)}
                       className="px-2.5 py-1 rounded-full athletic-mono transition-colors"
                       style={{
-                        background: selectedRegion === r.value ? P.ink : P.surfaceHi,
+                        background: selectedRegion === r.value ? P.ink : P.control,
                         color: selectedRegion === r.value ? P.bg : P.inkMuted,
                         border: `1px solid ${selectedRegion === r.value ? P.ink : P.lineStrong}`,
                         fontSize: 10,
@@ -490,7 +490,7 @@ export default function ExercisesPage() {
                       onClick={() => setSelectedDifficulty(selectedDifficulty === d.value ? null : d.value)}
                       className="px-2.5 py-1 rounded-full athletic-mono transition-colors"
                       style={{
-                        background: selectedDifficulty === d.value ? P.ink : P.surfaceHi,
+                        background: selectedDifficulty === d.value ? P.ink : P.control,
                         color: selectedDifficulty === d.value ? P.bg : P.inkMuted,
                         border: `1px solid ${selectedDifficulty === d.value ? P.ink : P.lineStrong}`,
                         fontSize: 10,
@@ -602,7 +602,7 @@ export default function ExercisesPage() {
                       aria-label={ex.isFavorite ? 'Verwijder uit favorieten' : 'Voeg toe aan favorieten'}
                       className="athletic-tap w-7 h-7 rounded-full flex items-center justify-center"
                       style={{
-                        background: ex.isFavorite ? 'rgba(240,121,108,0.12)' : P.surfaceHi,
+                        background: ex.isFavorite ? 'rgba(240,121,108,0.12)' : P.control,
                       }}
                     >
                       <Heart

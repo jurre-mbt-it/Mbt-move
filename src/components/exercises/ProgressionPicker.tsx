@@ -86,7 +86,7 @@ function ExercisePicker({
             onClick={() => setOpen(o => !o)}
             className="athletic-tap w-full flex items-center gap-2 rounded-xl"
             style={{
-              background: P.surfaceHi,
+              background: P.control,
               border: `1px solid ${P.lineStrong}`,
               color: P.inkMuted,
               padding: '12px 14px',
@@ -144,7 +144,7 @@ function ExercisePicker({
                         fontSize: 13,
                         fontWeight: 700,
                       }}
-                      onMouseEnter={e => (e.currentTarget.style.background = P.surfaceHi)}
+                      onMouseEnter={e => (e.currentTarget.style.background = P.control)}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                       onClick={() => {
                         onSelect(ex.id)

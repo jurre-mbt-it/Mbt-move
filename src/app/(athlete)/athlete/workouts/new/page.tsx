@@ -272,7 +272,7 @@ function NewWorkoutPageInner() {
                     <div
                       className="w-14 h-14 rounded-2xl flex items-center justify-center"
                       style={{
-                        background: P.surfaceHi,
+                        background: P.control,
                         border: `1px solid ${P.line}`,
                       }}
                     >
@@ -386,7 +386,7 @@ function NewWorkoutPageInner() {
                     onChange={e => setManualDuration(Math.max(0, Number(e.target.value) || 0))}
                     className="text-center rounded-lg outline-none"
                     style={{
-                      background: P.surfaceHi,
+                      background: P.field,
                       border: `1px solid ${P.lineStrong}`,
                       color: P.ink,
                       width: 64,
@@ -684,7 +684,7 @@ function Stepper({ value, onChange, min = 0, step = 1, label, unit }: {
           onClick={() => onChange(Math.max(min, value - step))}
           className="w-8 h-8 rounded-l-lg flex items-center justify-center"
           style={{
-            background: P.surfaceHi,
+            background: P.control,
             border: `1px solid ${P.line}`,
             color: P.inkMuted,
           }}
@@ -718,7 +718,7 @@ function Stepper({ value, onChange, min = 0, step = 1, label, unit }: {
           onClick={() => onChange(value + step)}
           className="w-8 h-8 rounded-r-lg flex items-center justify-center"
           style={{
-            background: P.surfaceHi,
+            background: P.control,
             border: `1px solid ${P.line}`,
             color: P.inkMuted,
           }}
@@ -1117,7 +1117,7 @@ function FeedbackSlider({
         onChange={e => onChange(parseInt(e.target.value))}
         className="w-full h-2 rounded-full appearance-none cursor-pointer"
         style={{
-          background: `linear-gradient(to right, ${color} ${pct}%, ${P.surfaceHi} ${pct}%)`,
+          background: `linear-gradient(to right, ${color} ${pct}%, ${P.field} ${pct}%)`,
         }}
       />
       <div

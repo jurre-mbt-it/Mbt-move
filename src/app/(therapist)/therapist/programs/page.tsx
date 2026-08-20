@@ -456,7 +456,7 @@ function ProgramCard({
             onClick={onDuplicate}
             title="Dupliceren"
             className="athletic-tap w-8 h-8 rounded-lg flex items-center justify-center"
-            style={{ background: P.surfaceHi, color: P.inkMuted, fontSize: 14 }}
+            style={{ background: P.control, color: P.inkMuted, fontSize: 14 }}
           >
             ⧉
           </button>
@@ -573,7 +573,7 @@ function ProgramExercisePreview({ programId }: { programId: string }) {
                   onClick={() => setMoveDialog({ week, fromDay: day })}
                   className="athletic-tap athletic-mono px-2 py-0.5 rounded-md"
                   style={{
-                    background: P.surfaceHi,
+                    background: P.control,
                     color: P.inkMuted,
                     border: `1px solid ${P.lineStrong}`,
                     fontSize: 9,
@@ -644,7 +644,7 @@ function ProgramExercisePreview({ programId }: { programId: string }) {
                   }}
                   className="athletic-tap athletic-mono py-2 rounded-md"
                   style={{
-                    background: P.surfaceHi,
+                    background: P.control,
                     color: disabled ? P.inkDim : P.ink,
                     border: `1px solid ${P.lineStrong}`,
                     fontSize: 11,
@@ -931,7 +931,7 @@ function LibraryCard({ program, onCopy }: { program: Program; onCopy: () => void
             onClick={onCopy}
             title="Kopieer naar patiënt"
             className="athletic-tap w-8 h-8 rounded-lg flex items-center justify-center"
-            style={{ background: P.surfaceHi, color: P.inkMuted, fontSize: 14 }}
+            style={{ background: P.control, color: P.inkMuted, fontSize: 14 }}
           >
             ⧉
           </button>

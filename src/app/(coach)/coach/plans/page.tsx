@@ -289,7 +289,7 @@ function ApplyToAthletesDialog({
                     onClick={() => toggle(a.id)}
                     className="athletic-tap flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left"
                     style={{
-                      background: selected.has(a.id) ? P.surfaceHi : 'transparent',
+                      background: selected.has(a.id) ? P.control : 'transparent',
                       color: selected.has(a.id) ? P.ink : P.inkMuted,
                     }}
                   >

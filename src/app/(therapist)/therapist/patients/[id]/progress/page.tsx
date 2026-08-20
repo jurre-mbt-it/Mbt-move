@@ -401,7 +401,7 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
                   {zoneTotalMin > 0 && (
                     <ChartCard title="Tijd in hartslagzone (totaal)">
                       <div className="space-y-2">
-                        <div className="flex w-full h-3 rounded-full overflow-hidden" style={{ background: P.surfaceHi }}>
+                        <div className="flex w-full h-3 rounded-full overflow-hidden" style={{ background: P.track }}>
                           {zoneEntries.map(e => (
                             <div
                               key={e.zone}
@@ -517,7 +517,7 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
                         placeholder="Zoek oefening…"
                         className="athletic-mono w-full px-3 py-2 rounded-lg text-xs"
                         style={{
-                          background: P.surfaceHi,
+                          background: P.field,
                           color: P.ink,
                           border: `1px solid ${P.lineStrong}`,
                           letterSpacing: '0.04em',
@@ -531,7 +531,7 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
                           onClick={() => setSelectedExercise(name)}
                           className="athletic-tap athletic-mono text-xs px-3 py-1.5 rounded-full font-bold transition-all"
                           style={{
-                            background: activeEx === name ? P.ink : P.surfaceHi,
+                            background: activeEx === name ? P.ink : P.control,
                             color: activeEx === name ? P.bg : P.inkMuted,
                             border: `1px solid ${activeEx === name ? P.ink : P.lineStrong}`,
                             letterSpacing: '0.08em',

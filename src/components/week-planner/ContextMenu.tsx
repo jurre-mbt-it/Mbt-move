@@ -108,7 +108,7 @@ export function ContextMenu({ state, onClose }: { state: ContextMenuState; onClo
               className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors disabled:opacity-40"
               style={{ color: item.danger ? P.danger : P.ink, fontSize: 12 }}
               onMouseEnter={(e) => {
-                if (!item.disabled) e.currentTarget.style.background = P.surfaceHi
+                if (!item.disabled) e.currentTarget.style.background = P.control
               }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
             >

@@ -539,7 +539,7 @@ function StepEditor({
                 ? { durationSec: step.durationSec ?? 300, distanceM: undefined }
                 : { distanceM: step.distanceM ?? 1000, durationSec: undefined })}
               className="py-1.5 rounded-md text-[11px] font-semibold transition-colors"
-              style={{ background: on ? P.surfaceHi : 'transparent', color: on ? P.ink : P.inkMuted }}
+              style={{ background: on ? P.control : 'transparent', color: on ? P.ink : P.inkMuted }}
             >
               {label === 'tijd' ? 'Tijd' : 'Afstand'}
             </button>

@@ -137,7 +137,7 @@ export default function ProgressPage() {
             </div>
             <div
               className="w-full h-2 rounded-full overflow-hidden mb-2"
-              style={{ backgroundColor: P.surfaceHi }}
+              style={{ backgroundColor: P.track }}
             >
               <div
                 className="h-full rounded-full"

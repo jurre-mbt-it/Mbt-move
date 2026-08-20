@@ -332,7 +332,7 @@ export function AddItemModal({
                 >
                   <span className="flex-1 truncate text-sm">{p.name}</span>
                   {p.isTemplate && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded uppercase" style={{ background: P.surfaceHi, color: P.inkMuted }}>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded uppercase" style={{ background: P.control, color: P.inkMuted }}>
                       Sjabloon
                     </span>
                   )}

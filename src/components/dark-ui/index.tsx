@@ -777,7 +777,7 @@ export const DarkTextarea = React.forwardRef<
         className,
       )}
       style={{
-        backgroundColor: P.surfaceHi,
+        backgroundColor: P.field,
         border: `1px solid ${P.lineStrong}`,
         color: P.ink,
         minHeight: 100,
@@ -878,7 +878,7 @@ export const DarkDialogContent = React.forwardRef<
               width: 28,
               height: 28,
               color: P.inkMuted,
-              background: P.surfaceHi,
+              background: P.control,
               border: `1px solid ${P.line}`,
             }}
             aria-label="Sluiten"
@@ -933,7 +933,7 @@ export const DarkDrawerContent = React.forwardRef<
             width: 28,
             height: 28,
             color: P.inkMuted,
-            background: P.surfaceHi,
+            background: P.control,
             border: `1px solid ${P.line}`,
           }}
           aria-label="Sluiten"

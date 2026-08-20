@@ -199,7 +199,7 @@ function FeedbackModal({
                 onClick={() => onChange({ smiley: selected ? null : val })}
                 className="athletic-tap flex-1 flex flex-col items-center gap-1 py-3 rounded-2xl transition-all"
                 style={{
-                  background: selected ? SMILEY_COLORS[i] + '22' : P.surfaceHi,
+                  background: selected ? SMILEY_COLORS[i] + '22' : P.control,
                   border: selected ? `2px solid ${SMILEY_COLORS[i]}` : `2px solid ${P.line}`,
                   minHeight: 44,
                 }}
@@ -676,7 +676,7 @@ function SessionSummary({
                   className="athletic-tap flex-1 flex flex-col items-center gap-1 py-3 rounded-2xl transition-all"
                   style={{
                     minHeight: 44,
-                    background: selected ? SMILEY_COLORS[i] + '22' : P.surfaceHi,
+                    background: selected ? SMILEY_COLORS[i] + '22' : P.control,
                     border: selected ? `2px solid ${SMILEY_COLORS[i]}` : `2px solid ${P.line}`,
                   }}
                 >
@@ -711,7 +711,7 @@ function SessionSummary({
                   className="athletic-tap rounded-lg athletic-mono transition-all"
                   style={{
                     height: 40,
-                    background: selected ? color : P.surfaceHi,
+                    background: selected ? color : P.control,
                     color: selected ? P.bg : P.inkMuted,
                     border: selected ? `2px solid ${color}` : `1px solid ${P.line}`,
                     fontSize: 12,
@@ -1491,7 +1491,7 @@ function SessionPageInner() {
           <div
             className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 athletic-mono transition-all"
             style={{
-              background: isDone ? P.lime : allSetsDone && !isDone ? `color-mix(in srgb, ${P.lime} 20%, transparent)` : P.surfaceHi,
+              background: isDone ? P.lime : allSetsDone && !isDone ? `color-mix(in srgb, ${P.lime} 20%, transparent)` : P.control,
               color: isDone ? P.bg : P.inkMuted,
               fontSize: 12,
               fontWeight: 900,
@@ -1685,7 +1685,7 @@ function SessionPageInner() {
                   type="button"
                   onClick={() => takeOverPrevious(e, seed)}
                   className="athletic-tap w-full flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left"
-                  style={{ background: P.surfaceHi, border: `1px solid ${P.line}` }}
+                  style={{ background: P.track, border: `1px solid ${P.line}` }}
                 >
                   <span aria-hidden className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: P.ice }} />
                   <span className="flex-1 min-w-0 truncate" style={{ color: P.inkMuted, fontSize: 12 }}>
@@ -1971,7 +1971,7 @@ function SessionPageInner() {
           </div>
         </div>
         {/* Progress bar */}
-        <div className="h-2 rounded-full overflow-hidden" style={{ background: P.surfaceHi }}>
+        <div className="h-2 rounded-full overflow-hidden" style={{ background: P.track }}>
           <div
             className="h-full rounded-full transition-all duration-300"
             style={{ background: viewMode === 'focus' ? P.brand : P.lime, width: `${visibleProgress}%` }}
@@ -1981,7 +1981,7 @@ function SessionPageInner() {
         {/* View-mode toggle */}
         <div
           className="mt-3 grid grid-cols-2 gap-1 p-1 rounded-2xl"
-          style={{ background: P.surfaceHi, border: `1px solid ${P.line}` }}
+          style={{ background: P.control, border: `1px solid ${P.line}` }}
         >
           <button
             onClick={() => setViewMode('focus')}
@@ -2036,7 +2036,7 @@ function SessionPageInner() {
                 className="athletic-tap athletic-mono flex items-center justify-center gap-1.5 rounded-2xl transition-all"
                 style={{
                   height: 52,
-                  background: P.surfaceHi,
+                  background: P.control,
                   color: safeStepIndex === 0 ? P.inkDim : P.ink,
                   border: `1.5px solid ${P.line}`,
                   fontSize: 12,

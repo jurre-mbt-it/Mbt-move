@@ -275,7 +275,7 @@ export default function PatientSchedulePage() {
                 onClick={() => { setSelectedDay(dayNum); setMovePickerOpen(false) }}
                 className="athletic-tap flex flex-col items-center gap-1.5 min-w-[44px] rounded-2xl p-2.5 transition-all"
                 style={{
-                  background: isSelected ? P.surfaceHi : P.surface,
+                  background: isSelected ? P.control : P.surface,
                   border: isSelected
                     ? `2px solid ${P.brand}`
                     : isDone
@@ -423,7 +423,7 @@ export default function PatientSchedulePage() {
                         style={{
                           padding: '7px 14px',
                           border: `1px solid ${d === selectedDayInfo.movedFrom ? P.ice : P.lineStrong}`,
-                          background: P.surfaceHi,
+                          background: P.control,
                           color: d === selectedDayInfo.movedFrom ? P.ice : P.ink,
                           fontSize: 11,
                           fontWeight: 800,

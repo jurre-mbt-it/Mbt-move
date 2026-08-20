@@ -90,7 +90,7 @@ export function WeekVolumePanel({
 
       <div
         className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full"
-        style={{ background: P.surfaceHi }}
+        style={{ background: P.track }}
         title={`Deze week is ${Math.round(pct)}% van de zwaarste week in dit plan (${maxLoad} AU).`}
       >
         <div

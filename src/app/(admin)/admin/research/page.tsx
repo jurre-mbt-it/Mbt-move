@@ -152,7 +152,7 @@ export default function AdminResearchPage() {
                     </span>
                     <div
                       className="flex-1 h-2 rounded-full overflow-hidden"
-                      style={{ background: P.surfaceHi }}
+                      style={{ background: P.track }}
                     >
                       <div
                         className="h-full rounded-full transition-all"

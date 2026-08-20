@@ -89,7 +89,7 @@ export function PatientClinicalTests({ patientId }: { patientId: string }) {
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="h-20 rounded-xl animate-pulse" style={{ background: P.surfaceHi }} />
+            <div key={i} className="h-20 rounded-xl animate-pulse" style={{ background: P.control }} />
           ))}
         </div>
       ) : assignments.length === 0 ? (
@@ -366,7 +366,7 @@ function AddTestDialog({
                     }
                     className="athletic-tap w-full text-left rounded-lg flex items-start gap-3 px-3 py-2.5"
                     style={{
-                      background: P.surfaceHi,
+                      background: P.control,
                       border: `1px solid ${P.line}`,
                       opacity: already ? 0.45 : 1,
                       cursor: already ? 'not-allowed' : 'pointer',

@@ -105,7 +105,7 @@ export default function AthleteRehabPage() {
             </div>
             <div
               className="w-full rounded-full overflow-hidden"
-              style={{ background: P.surfaceHi, height: 6 }}
+              style={{ background: P.track, height: 6 }}
             >
               <div
                 style={{

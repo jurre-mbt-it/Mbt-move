@@ -114,7 +114,7 @@ export function WorkoutPlayer({ slug }: { slug: string }) {
             {doneCount}/{weekItems.length} afgevinkt
           </span>
         </div>
-        <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: P.surfaceHi }}>
+        <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: P.track }}>
           <div
             className="h-full rounded-full transition-all"
             style={{ width: `${pct}%`, background: P.brand }}
@@ -147,7 +147,7 @@ export function WorkoutPlayer({ slug }: { slug: string }) {
                         style={{
                           width: 96,
                           height: 64,
-                          background: yid ? `center / cover no-repeat url(${youtubeThumb(yid)})` : P.surfaceHi,
+                          background: yid ? `center / cover no-repeat url(${youtubeThumb(yid)})` : P.control,
                         }}
                         aria-label="Bekijk video"
                       >

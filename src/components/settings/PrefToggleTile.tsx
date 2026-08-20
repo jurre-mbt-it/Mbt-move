@@ -44,7 +44,7 @@ export function PrefToggleTile({ prefKey, defaultValue, label, sub, bar = P.bran
           style={{
             width: 44,
             height: 26,
-            background: enabled ? P.brand : P.surfaceHi,
+            background: enabled ? P.brand : P.control,
             border: `1px solid ${enabled ? P.brand : P.lineStrong}`,
           }}
         >

@@ -323,7 +323,7 @@ export function QuickExerciseBuilder({
                       })}
                       className="px-2 h-7 rounded text-[10px] font-semibold tracking-wide shrink-0"
                       style={perZijde
-                        ? { background: P.surfaceHi, color: P.ink, border: `1px solid ${P.lineStrong}` }
+                        ? { background: P.track, color: P.ink, border: `1px solid ${P.lineStrong}` }
                         : { background: P.surfaceLow, color: P.inkDim, border: `1px solid ${P.line}` }}
                       title={perZijde
                         ? 'Per zijde: het aantal geldt links én rechts'

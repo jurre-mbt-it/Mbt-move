@@ -22,6 +22,17 @@ export const P = {
   surfaceLow: '#0F2628',
   surface: '#163539',
   surfaceHi: '#1D4348',
+  /**
+   * Drie rollen die tot nu toe allemaal `surfaceHi` heetten: de rustende staat
+   * van een keuzeknop, de vulling van een invoerveld en de lege baan van een
+   * voortgangsbalk. Ze delen vandaag dezelfde tint, maar ze zijn het niet:
+   * wie de invoervelden wil aanpassen, wil niet dat de voortgangsbalken
+   * meeveranderen. Eigen namen maken dat mogelijk zonder alles om te bouwen.
+   * Spiegelt --p-control / --p-field / --p-track in globals.css.
+   */
+  control: '#1D4348',
+  field: '#1D4348',
+  track: '#1D4348',
   line: 'rgba(212,232,230,0.09)',
   lineStrong: 'rgba(212,232,230,0.20)',
   ink: '#F5F2ED',

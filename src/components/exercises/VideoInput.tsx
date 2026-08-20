@@ -152,7 +152,7 @@ export function VideoInput({ value, onChange }: VideoInputProps) {
               </div>
               <div
                 className="h-1.5 rounded-full overflow-hidden"
-                style={{ background: P.surfaceHi }}
+                style={{ background: P.track }}
               >
                 <div
                   className="h-full rounded-full transition-all duration-300"

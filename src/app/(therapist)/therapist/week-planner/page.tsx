@@ -875,7 +875,7 @@ function SelectionDragHandle({ isos }: { isos: string[] }) {
       {...attributes}
       {...listeners}
       className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-grab active:cursor-grabbing"
-      style={{ background: P.surfaceHi, border: `1px solid ${P.brand}`, color: P.ink, opacity: isDragging ? 0.5 : 1, touchAction: 'none', WebkitTouchCallout: 'none' }}
+      style={{ background: P.control, border: `1px solid ${P.brand}`, color: P.ink, opacity: isDragging ? 0.5 : 1, touchAction: 'none', WebkitTouchCallout: 'none' }}
     >
       <GripVertical className="w-3.5 h-3.5" /> Sleep naar doeldag
     </button>
@@ -1389,7 +1389,7 @@ function ItemDetailContent({
                     onClick={() => setERpe(null)}
                     className="px-2 py-1 rounded-md text-[11px] font-semibold transition-colors"
                     style={{
-                      background: eRpe === null ? P.surfaceHi : 'transparent',
+                      background: eRpe === null ? P.control : 'transparent',
                       color: eRpe === null ? P.ink : P.inkMuted,
                       border: `1px solid ${eRpe === null ? P.lineStrong : P.line}`,
                     }}
@@ -1573,7 +1573,7 @@ function WeekMetaDialog({
                 onClick={() => setPhaseType(null)}
                 className="px-2.5 py-1 rounded-md text-xs font-semibold transition-colors"
                 style={{
-                  background: phaseType === null ? P.surfaceHi : 'transparent',
+                  background: phaseType === null ? P.control : 'transparent',
                   color: phaseType === null ? P.ink : P.inkMuted,
                   border: `1px solid ${phaseType === null ? P.lineStrong : P.line}`,
                 }}

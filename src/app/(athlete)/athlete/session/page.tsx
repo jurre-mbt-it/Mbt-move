@@ -1196,7 +1196,7 @@ function AthleteSessionPageInner() {
         {/* Voortgangsbalk: afgeronde oefeningen */}
         <div
           className="h-1.5 rounded-full overflow-hidden"
-          style={{ background: P.surfaceHi }}
+          style={{ background: P.track }}
           role="progressbar"
           aria-valuemin={0}
           aria-valuemax={exercises.length}
@@ -1622,7 +1622,7 @@ function ExerciseRow({
         <div
           className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
           style={{
-            background: alreadyAdded ? P.lime : P.surfaceHi,
+            background: alreadyAdded ? P.lime : P.control,
             color: alreadyAdded ? P.bg : P.ink,
             fontWeight: 900,
             fontSize: 13,
@@ -1808,7 +1808,7 @@ function AddExerciseSheet({
               onChange={e => onQueryChange(e.target.value)}
               className="w-full rounded-xl outline-none"
               style={{
-                background: P.surfaceHi,
+                background: P.field,
                 border: `1px solid ${P.lineStrong}`,
                 color: P.ink,
                 padding: '10px 14px 10px 40px',
@@ -2005,7 +2005,7 @@ function QuickEditRow({
           type="button"
           onClick={onTakeOver}
           className="athletic-tap mt-3 w-full flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left"
-          style={{ background: P.surfaceHi, border: `1px solid ${P.line}` }}
+          style={{ background: P.track, border: `1px solid ${P.line}` }}
         >
           <span aria-hidden className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: P.ice }} />
           <span className="flex-1 min-w-0 truncate" style={{ color: P.inkMuted, fontSize: 12 }}>
@@ -2068,7 +2068,7 @@ function FeelPicker({ value, onChange }: { value: number | null; onChange: (v: n
             aria-pressed={active}
             className="athletic-tap flex flex-col items-center justify-center gap-1 rounded-lg py-2"
             style={{
-              background: active ? color : P.surfaceHi,
+              background: active ? color : P.control,
               color: active ? P.bg : P.inkMuted,
               border: `1px solid ${active ? color : P.lineStrong}`,
             }}
@@ -2109,7 +2109,7 @@ function ScalePicker({
             className="athletic-tap flex-1 rounded-lg athletic-mono transition-all"
             style={{
               height: 40,
-              background: active ? colorHigh : P.surfaceHi,
+              background: active ? colorHigh : P.control,
               color: active ? P.bg : P.inkMuted,
               fontSize: 12,
               fontWeight: 900,

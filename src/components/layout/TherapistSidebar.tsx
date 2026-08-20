@@ -262,7 +262,7 @@ export function TherapistSidebar({ variant = 'therapist' }: { variant?: SidebarV
               className={rowClass()}
               title={collapsed ? label : undefined}
               style={{
-                backgroundColor: active ? P.surfaceHi : undefined,
+                backgroundColor: active ? P.control : undefined,
                 color: active ? P.brand : P.inkMuted,
                 fontWeight: active ? 800 : 600,
                 letterSpacing: active && !collapsed ? '0.04em' : undefined,
@@ -299,7 +299,7 @@ export function TherapistSidebar({ variant = 'therapist' }: { variant?: SidebarV
             className={rowClass()}
             title={collapsed ? 'Assessment' : undefined}
             style={{
-              backgroundColor: pathname.startsWith('/therapist/assessments') ? P.surfaceHi : undefined,
+              backgroundColor: pathname.startsWith('/therapist/assessments') ? P.control : undefined,
               color: pathname.startsWith('/therapist/assessments') ? P.brand : P.inkMuted,
               fontWeight: pathname.startsWith('/therapist/assessments') ? 800 : 600,
               letterSpacing: pathname.startsWith('/therapist/assessments') && !collapsed ? '0.04em' : undefined,

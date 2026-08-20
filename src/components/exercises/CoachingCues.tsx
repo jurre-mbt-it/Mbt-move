@@ -135,7 +135,7 @@ export function CoachingCues({
             disabled={!draft.trim()}
             className="athletic-tap rounded-xl shrink-0 flex items-center justify-center"
             style={{
-              background: draft.trim() ? P.ink : P.surfaceHi,
+              background: draft.trim() ? P.ink : P.control,
               color: draft.trim() ? P.bg : P.inkDim,
               border: `1px solid ${draft.trim() ? P.ink : P.lineStrong}`,
               width: 48,

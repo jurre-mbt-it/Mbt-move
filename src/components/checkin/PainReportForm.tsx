@@ -171,7 +171,7 @@ export function PainReportForm({ homeHref }: { homeHref: string }) {
                 onClick={() => setNrs(nrs === i ? null : i)}
                 className="athletic-tap flex-1 h-11 rounded-xl athletic-mono transition-all"
                 style={{
-                  background: nrs === i ? NRS_COLORS[i] : P.surfaceHi,
+                  background: nrs === i ? NRS_COLORS[i] : P.control,
                   color: nrs === i ? P.bg : P.inkMuted,
                   border: nrs === i ? `1px solid ${NRS_COLORS[i]}` : `1px solid ${P.line}`,
                   transform: nrs === i ? 'scale(1.15)' : 'scale(1)',
@@ -208,7 +208,7 @@ export function PainReportForm({ homeHref }: { homeHref: string }) {
                   onClick={() => setLocation(selected ? null : loc)}
                   className="athletic-tap px-3 py-1.5 rounded-xl transition-all"
                   style={{
-                    background: selected ? P.surfaceHi : P.surfaceLow,
+                    background: selected ? P.control : P.surfaceLow,
                     color: selected ? P.brand : P.inkMuted,
                     border: selected ? `1.5px solid ${P.brand}` : `1.5px solid ${P.line}`,
                     fontSize: 12,

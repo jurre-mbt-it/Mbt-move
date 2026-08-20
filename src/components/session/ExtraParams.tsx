@@ -41,7 +41,7 @@ export function RepUnitPicker({ value, onChange }: { value: string; onChange: (u
               letterSpacing: '0.1em',
               fontWeight: 800,
               textTransform: 'uppercase',
-              background: active ? P.surfaceHi : 'transparent',
+              background: active ? P.control : 'transparent',
               border: `1px solid ${active ? 'rgba(245,185,66,0.5)' : 'transparent'}`,
               color: active ? P.gold : P.inkMuted,
               // Krimpen laat de tekst binnen de pil breken en over de buur
@@ -190,7 +190,7 @@ export function ExtraParamsEditor({
                     padding: '5px 11px',
                     border: `1px solid ${P.lineStrong}`,
                     color: P.ink,
-                    background: P.surfaceHi,
+                    background: P.control,
                     fontSize: 10,
                     letterSpacing: '0.08em',
                     fontWeight: 800,

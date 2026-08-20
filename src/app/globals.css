@@ -41,6 +41,12 @@
   --p-surface-low: #0F2628;
   --p-surface: #163539;
   --p-surface-hi: #1D4348;
+  /* Drie rollen die surfaceHi deelde: keuzeknop-rust, veldvulling, balkbaan.
+     Zelfde tint, eigen naam, zodat ze los kunnen bewegen. Spiegelt
+     control/field/track in lib/palette.ts. */
+  --p-control: #1D4348;
+  --p-field: #1D4348;
+  --p-track: #1D4348;
   --p-line: rgba(212,232,230,0.09);
   --p-line-strong: rgba(212,232,230,0.20);
 

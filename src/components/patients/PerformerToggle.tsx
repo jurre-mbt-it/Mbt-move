@@ -39,7 +39,7 @@ export function PerformerToggle({
             style={{
               padding: '8px 10px',
               borderRadius: 9,
-              background: active ? P.surfaceHi : 'transparent',
+              background: active ? P.control : 'transparent',
               color: active ? P.ink : P.inkMuted,
               fontSize: 11,
               fontWeight: 800,

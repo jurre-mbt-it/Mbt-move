@@ -130,14 +130,14 @@ export default function AdminShopPage() {
                     <span className="font-semibold truncate">{p.name}</span>
                     <span
                       className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-                      style={{ color: STATUS_COLOR[p.status as Status], background: P.surfaceHi }}
+                      style={{ color: STATUS_COLOR[p.status as Status], background: P.track }}
                     >
                       {STATUS_LABELS[p.status]}
                     </span>
                     {soldOut && (
                       <span
                         className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-                        style={{ color: 'var(--p-danger)', background: P.surfaceHi }}
+                        style={{ color: 'var(--p-danger)', background: P.track }}
                       >
                         Uitverkocht
                       </span>
@@ -145,7 +145,7 @@ export default function AdminShopPage() {
                     {lowStock && (
                       <span
                         className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-                        style={{ color: 'var(--p-gold)', background: P.surfaceHi }}
+                        style={{ color: 'var(--p-gold)', background: P.track }}
                       >
                         Nog {p.stockQty} op voorraad
                       </span>

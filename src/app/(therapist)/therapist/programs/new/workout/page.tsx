@@ -274,7 +274,7 @@ function WorkoutBuilderContent() {
                       key={tpl.id}
                       onClick={() => applyTemplate(tpl)}
                       className="athletic-tap w-full text-left p-3 rounded-lg flex items-center gap-3 transition-colors"
-                      style={{ background: P.surfaceHi, border: `1px solid ${P.line}` }}
+                      style={{ background: P.control, border: `1px solid ${P.line}` }}
                     >
                       <span style={{ fontSize: 20 }}>
                         {(() => { const Icon = CARDIO_ICON_MAP[tpl.activity]; return Icon ? <Icon size={22} /> : CARDIO_ACTIVITIES[tpl.activity].icon })()}
@@ -327,7 +327,7 @@ function WorkoutBuilderContent() {
                       className="athletic-tap flex flex-col items-center gap-1 p-3 rounded-xl text-center transition-all"
                       style={form.activity === key
                         ? { border: `1px solid ${P.lime}`, background: 'rgba(232,122,85,0.10)' }
-                        : { border: `1px solid ${P.line}`, background: P.surfaceHi }}
+                        : { border: `1px solid ${P.line}`, background: P.control }}
                     >
                       <span style={{ fontSize: 22 }}>
                         {(() => { const Icon = CARDIO_ICON_MAP[key]; return Icon ? <Icon size={28} /> : act.icon })()}

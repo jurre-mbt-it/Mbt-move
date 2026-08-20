@@ -290,7 +290,7 @@ export default function ParametersPage() {
                     onClick={() => setForm(f => ({ ...f, type: t }))}
                     className="py-1.5 rounded athletic-mono transition-colors"
                     style={{
-                      background: form.type === t ? P.ink : P.surfaceHi,
+                      background: form.type === t ? P.ink : P.control,
                       color: form.type === t ? P.bg : P.inkMuted,
                       border: `1px solid ${form.type === t ? P.ink : P.lineStrong}`,
                       fontSize: 10,
@@ -357,7 +357,7 @@ export default function ParametersPage() {
                       key={i}
                       className="athletic-mono flex items-center gap-1 rounded px-2 py-0.5"
                       style={{
-                        background: P.surfaceHi,
+                        background: P.control,
                         color: P.ink,
                         fontSize: 11,
                         letterSpacing: '0.04em',

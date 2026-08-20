@@ -99,7 +99,7 @@ export default function TagVocabularyPage() {
             <div
               key={it.id}
               className="rounded-full flex items-center gap-2 pl-3 pr-2 py-1.5"
-              style={{ background: P.surfaceHi, border: `1px solid ${P.line}` }}
+              style={{ background: P.control, border: `1px solid ${P.line}` }}
             >
               <span style={{ color: P.ink, fontSize: 13, fontWeight: 600 }}>
                 <span style={{ color: P.lime }}>#</span>{it.display}

@@ -164,7 +164,7 @@ export default function AthleteExercisesPage() {
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
                     style={{
-                      background: P.surfaceHi,
+                      background: P.control,
                       border: `1px solid ${P.line}`,
                       color,
                       fontFamily: mono,

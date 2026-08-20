@@ -212,7 +212,7 @@ export function MessageThread({
                       setPickerOpen(false)
                     }}
                     className="athletic-tap w-full flex items-center gap-2 rounded-xl px-3 py-2 text-left"
-                    style={{ background: P.surfaceHi, border: `1px solid ${P.line}` }}
+                    style={{ background: P.control, border: `1px solid ${P.line}` }}
                   >
                     <CalendarCheck className="w-3.5 h-3.5 shrink-0" style={{ color: P.lime }} />
                     <span className="truncate" style={{ color: P.ink, fontSize: 12.5, fontWeight: 700 }}>
@@ -255,7 +255,7 @@ export function MessageThread({
         {pendingLink && (
           <div
             className="flex items-center gap-2 rounded-xl px-3 py-2 mb-2"
-            style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}` }}
+            style={{ background: P.control, border: `1px solid ${P.lineStrong}` }}
           >
             {pendingLink.exerciseId
               ? <Dumbbell className="w-3.5 h-3.5 shrink-0" style={{ color: P.gold }} />
@@ -309,7 +309,7 @@ export function MessageThread({
             style={{
               width: 44,
               height: 44,
-              background: body.trim() && !send.isPending ? P.ink : P.surfaceHi,
+              background: body.trim() && !send.isPending ? P.ink : P.control,
               color: body.trim() && !send.isPending ? P.bg : P.inkDim,
               border: `1.5px solid ${body.trim() && !send.isPending ? P.ink : P.line}`,
               fontFamily: mono,

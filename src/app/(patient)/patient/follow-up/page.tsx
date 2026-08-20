@@ -66,7 +66,7 @@ function NrsPicker({
             className="athletic-tap athletic-mono flex-1 rounded-lg text-xs transition-all"
             style={{
               height: 40,
-              backgroundColor: selected ? color : P.surfaceHi,
+              backgroundColor: selected ? color : P.control,
               color: selected ? P.bg : P.inkMuted,
               fontWeight: 900,
               border: selected ? 'none' : `1px solid ${P.lineStrong}`,

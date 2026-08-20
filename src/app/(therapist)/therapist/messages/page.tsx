@@ -60,7 +60,7 @@ export default function TherapistMessagesPage() {
             >
               <div
                 className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: P.surfaceHi, border: `1px solid ${P.line}`, color: P.ink, fontWeight: 900, fontSize: 15 }}
+                style={{ background: P.control, border: `1px solid ${P.line}`, color: P.ink, fontWeight: 900, fontSize: 15 }}
               >
                 {(t.patientName[0] ?? '?').toUpperCase()}
               </div>

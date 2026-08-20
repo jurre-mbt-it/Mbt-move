@@ -499,7 +499,7 @@ export default function AthleteSchedulePage() {
                   className="athletic-tap flex flex-col items-center justify-start rounded-xl pt-1.5 pb-1"
                   style={{
                     minHeight: 46,
-                    background: isSelected ? P.surfaceHi : 'transparent',
+                    background: isSelected ? P.control : 'transparent',
                     border: isSelected
                       ? `1.5px solid ${P.brand}`
                       : isTd

@@ -253,7 +253,7 @@ export function ApplyPlanDialog({
                     onClick={() => setAnchor(v)}
                     className="py-1.5 rounded-md text-[11px] font-semibold transition-colors"
                     style={{
-                      background: anchor === v ? P.surfaceHi : 'transparent',
+                      background: anchor === v ? P.control : 'transparent',
                       color: anchor === v ? P.ink : P.inkMuted,
                     }}
                   >
@@ -285,7 +285,7 @@ export function ApplyPlanDialog({
                     onClick={() => setMode(v)}
                     className="py-1.5 rounded-md text-[11px] font-semibold transition-colors"
                     style={{
-                      background: mode === v ? P.surfaceHi : 'transparent',
+                      background: mode === v ? P.control : 'transparent',
                       color: mode === v ? P.ink : P.inkMuted,
                     }}
                   >

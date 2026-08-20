@@ -183,7 +183,7 @@ function ScoreDots({ value }: { value: number }) {
             width: 16,
             height: 6,
             borderRadius: 2,
-            background: i < value ? color : P.surfaceHi,
+            background: i < value ? color : P.track,
             display: 'inline-block',
           }}
         />
@@ -459,7 +459,7 @@ export default function TherapistDashboard() {
                   href={`${portal.patients}/${p.patientId}`}
                   className="athletic-mono athletic-tap inline-flex items-center gap-2 px-3 py-2 rounded-lg"
                   style={{
-                    background: P.surfaceHi,
+                    background: P.control,
                     color: P.inkMuted,
                     fontSize: 11,
                     letterSpacing: '0.05em',

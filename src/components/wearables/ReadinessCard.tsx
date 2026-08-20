@@ -142,7 +142,7 @@ function ContributorRow({ c }: { c: Contributor }) {
       <span className="shrink-0" style={{ width: 74, color: P.ink, fontSize: 12, fontWeight: 700 }}>
         {c.label}
       </span>
-      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: P.surfaceHi }}>
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: P.track }}>
         <div
           className="h-full rounded-full"
           style={{

@@ -129,7 +129,7 @@ function Toggle({
       style={{
         width: 44,
         height: 26,
-        background: checked ? P.brand : P.surfaceHi,
+        background: checked ? P.brand : P.control,
         border: `1px solid ${checked ? P.brand : P.lineStrong}`,
       }}
     >
@@ -418,7 +418,7 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
                 disabled={!tagDraft.trim()}
                 className="athletic-tap rounded-xl shrink-0 flex items-center justify-center"
                 style={{
-                  background: tagDraft.trim() ? P.ink : P.surfaceHi,
+                  background: tagDraft.trim() ? P.ink : P.control,
                   color: tagDraft.trim() ? P.bg : P.inkDim,
                   border: `1px solid ${tagDraft.trim() ? P.ink : P.lineStrong}`,
                   width: 48,
@@ -589,7 +589,7 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
               value={form.movementPattern ?? ''}
               onChange={e => set('movementPattern', e.target.value || null)}
               style={{
-                background: P.surfaceHi,
+                background: P.field,
                 border: `1px solid ${P.lineStrong}`,
                 color: P.ink,
                 padding: '12px 14px',
@@ -688,7 +688,7 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
             }}
             className="athletic-tap athletic-mono w-full flex items-center justify-center gap-2 rounded-xl"
             style={{
-              background: P.surfaceHi,
+              background: P.control,
               border: `1px solid ${P.lineStrong}`,
               color: P.ink,
               padding: '12px 16px',

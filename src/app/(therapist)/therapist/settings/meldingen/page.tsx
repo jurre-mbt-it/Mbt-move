@@ -49,7 +49,7 @@ function Switch({
         width: 44,
         height: 26,
         opacity: disabled ? 0.4 : 1,
-        background: checked ? P.brand : P.surfaceHi,
+        background: checked ? P.brand : P.control,
         border: `1px solid ${checked ? P.brand : P.lineStrong}`,
       }}
     >

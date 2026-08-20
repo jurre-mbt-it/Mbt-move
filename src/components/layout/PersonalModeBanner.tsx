@@ -43,7 +43,7 @@ export function PersonalModeBanner() {
         onClick={exit}
         disabled={leaving}
         className="athletic-tap flex items-center gap-1.5 px-3 py-1.5 rounded-lg shrink-0 transition-colors disabled:opacity-60"
-        style={{ background: P.surfaceHi, color: P.ink, fontSize: 12, fontWeight: 700 }}
+        style={{ background: P.control, color: P.ink, fontSize: 12, fontWeight: 700 }}
       >
         {leaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowLeft className="w-3.5 h-3.5" />}
         Therapeut

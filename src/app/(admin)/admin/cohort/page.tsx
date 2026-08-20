@@ -52,7 +52,7 @@ export default function AdminCohortPage() {
             style={
               windowDays === w.days
                 ? { background: P.brand, color: P.bg, fontSize: 11, fontWeight: 900, letterSpacing: '0.1em' }
-                : { background: P.surfaceHi, color: P.inkMuted, fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', border: `1px solid ${P.line}` }
+                : { background: P.field, color: P.inkMuted, fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', border: `1px solid ${P.line}` }
             }
           >
             {w.label.toUpperCase()}
@@ -64,7 +64,7 @@ export default function AdminCohortPage() {
             onChange={(e) => setPracticeId(e.target.value || null)}
             className="athletic-mono"
             style={{
-              background: P.surfaceHi,
+              background: P.field,
               color: P.ink,
               border: `1px solid ${P.line}`,
               borderRadius: 8,
@@ -176,7 +176,7 @@ export default function AdminCohortPage() {
           </div>
           <div
             className="w-full h-2 rounded-full overflow-hidden"
-            style={{ backgroundColor: P.surfaceHi }}
+            style={{ backgroundColor: P.track }}
           >
             <div
               className="h-full rounded-full"
@@ -224,7 +224,7 @@ export default function AdminCohortPage() {
                     </p>
                     <div
                       className="w-full h-1.5 rounded-full overflow-hidden mt-1"
-                      style={{ background: P.surfaceHi }}
+                      style={{ background: P.track }}
                     >
                       <div
                         className="h-full rounded-full"

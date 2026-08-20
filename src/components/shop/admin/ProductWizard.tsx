@@ -277,7 +277,7 @@ function TogglePill({
         size === 'sm' ? 'px-3 py-1.5 text-xs' : 'px-4 py-1.5 text-sm'
       }`}
       style={{
-        background: active ? P.ink : P.surfaceHi,
+        background: active ? P.ink : P.control,
         color: active ? P.bg : P.inkMuted,
         border: `1px solid ${active ? P.ink : P.line}`,
       }}
@@ -483,7 +483,7 @@ export function ProductWizard({
                 onClick={() => reachable && goTo(n)}
                 className="flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-colors shrink-0 disabled:opacity-40"
                 style={{
-                  background: active ? P.surfaceHi : 'transparent',
+                  background: active ? P.control : 'transparent',
                   color: active ? P.ink : P.inkMuted,
                 }}
               >
@@ -677,7 +677,7 @@ export function ProductWizard({
                     <span
                       className="flex h-5 w-5 items-center justify-center rounded-md text-[11px] font-bold transition-colors"
                       style={{
-                        background: editor.requiresShipping ? P.ink : P.surfaceHi,
+                        background: editor.requiresShipping ? P.ink : P.control,
                         color: editor.requiresShipping ? P.bg : 'transparent',
                         border: `1px solid ${editor.requiresShipping ? P.ink : P.line}`,
                       }}

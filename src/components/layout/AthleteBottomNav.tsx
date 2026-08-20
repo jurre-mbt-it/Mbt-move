@@ -122,7 +122,7 @@ export function AthleteBottomNav({ personalMode = false }: { personalMode?: bool
                 onClick={() => setDrawerOpen(false)}
                 className="athletic-tap mbt-nav-hover flex items-center gap-3 px-3 py-3 rounded-xl transition-colors"
                 style={{
-                  background: active ? P.surfaceHi : undefined,
+                  background: active ? P.control : undefined,
                   color: active ? P.brand : P.ink,
                 }}
               >

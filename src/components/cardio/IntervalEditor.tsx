@@ -126,7 +126,7 @@ export function IntervalEditor({
                       fontSize: 12,
                       fontWeight: 900,
                       color: active ? P.bg : HR_ZONES[z].color,
-                      background: active ? HR_ZONES[z].color : P.surfaceHi,
+                      background: active ? HR_ZONES[z].color : P.control,
                       border: `1px solid ${active ? HR_ZONES[z].color : P.line}`,
                     }}
                   >
@@ -144,7 +144,7 @@ export function IntervalEditor({
         className="athletic-tap w-full rounded-xl flex items-center justify-center gap-2"
         style={{
           height: 44,
-          background: P.surfaceHi,
+          background: P.control,
           border: `1px dashed ${P.lineStrong}`,
           color: P.ink,
           fontSize: 12,

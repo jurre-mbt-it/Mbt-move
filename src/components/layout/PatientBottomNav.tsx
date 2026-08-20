@@ -96,7 +96,7 @@ export function PatientBottomNav() {
                   onClick={() => setSheetOpen(false)}
                   className="athletic-tap mbt-nav-hover flex items-center gap-3 rounded-2xl px-4 py-3"
                   style={{
-                    background: P.surfaceHi,
+                    background: P.control,
                     borderLeft: `3px solid ${color}`,
                   }}
                 >

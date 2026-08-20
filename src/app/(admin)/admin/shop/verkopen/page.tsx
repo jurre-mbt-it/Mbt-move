@@ -97,7 +97,7 @@ export default function SalesPage() {
                   <span className="w-20 shrink-0 text-sm" style={{ color: P.inkMuted }}>
                     {formatPeriod(p.period, gran)}
                   </span>
-                  <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: P.surfaceHi }}>
+                  <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: P.track }}>
                     <div
                       className="h-full rounded-full"
                       style={{ width: `${(p.revenueCents / maxPeriod) * 100}%`, background: P.brand }}

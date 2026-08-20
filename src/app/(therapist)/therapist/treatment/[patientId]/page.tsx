@@ -763,7 +763,7 @@ export default function TreatmentPage({
                 onChange={(e) => applyStartTime(e.target.value)}
                 className="px-2 py-1.5 rounded"
                 style={{
-                  background: P.surfaceHi,
+                  background: P.field,
                   border: `1px solid ${P.lineStrong}`,
                   color: P.ink,
                   fontSize: 14,
@@ -1288,7 +1288,7 @@ function ExerciseTile({
           {supersetMenuOpen && (
             <div
               className="absolute right-0 top-full mt-1 z-10 rounded-lg p-2 flex flex-col gap-1"
-              style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}`, minWidth: 140 }}
+              style={{ background: P.control, border: `1px solid ${P.lineStrong}`, minWidth: 140 }}
             >
               <button
                 type="button"
@@ -1377,7 +1377,7 @@ function ExerciseTile({
               className="athletic-tap"
               style={{
                 width: 18, height: 18, borderRadius: 999,
-                background: P.surfaceHi, color: P.inkMuted,
+                background: P.control, color: P.inkMuted,
                 border: `1px solid ${P.lineStrong}`,
                 fontSize: 10, lineHeight: 1,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1420,7 +1420,7 @@ function ExerciseTile({
             <div
               key={p.id}
               className="flex items-center gap-1 px-2 py-1 rounded-md group/param"
-              style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}`, fontSize: 12 }}
+              style={{ background: P.field, border: `1px solid ${P.lineStrong}`, fontSize: 12 }}
             >
               <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.08em' }}>
                 {p.label.toUpperCase()}
@@ -1493,7 +1493,7 @@ function ExerciseTile({
             onClick={() => onToggleVisible(r.uid, 'weight')}
             className="athletic-mono athletic-tap px-2 py-1 rounded-full"
             style={{
-              background: P.surfaceHi, color: P.inkMuted,
+              background: P.control, color: P.inkMuted,
               border: `1px dashed ${P.lineStrong}`,
               fontSize: 10, letterSpacing: '0.08em', fontWeight: 800,
             }}
@@ -1507,7 +1507,7 @@ function ExerciseTile({
             onClick={() => onToggleVisible(r.uid, 'pain')}
             className="athletic-mono athletic-tap px-2 py-1 rounded-full"
             style={{
-              background: P.surfaceHi, color: P.inkMuted,
+              background: P.control, color: P.inkMuted,
               border: `1px dashed ${P.lineStrong}`,
               fontSize: 10, letterSpacing: '0.08em', fontWeight: 800,
             }}
@@ -1532,7 +1532,7 @@ function ExerciseTile({
         {paramMenuOpen && (
           <div
             className="absolute left-0 top-full mt-1 z-10 rounded-lg p-1.5 flex flex-col gap-0.5"
-            style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}`, minWidth: 180 }}
+            style={{ background: P.control, border: `1px solid ${P.lineStrong}`, minWidth: 180 }}
           >
             {availableParams.map((p) => (
               <button
@@ -1642,7 +1642,7 @@ function LabeledInput({
             width: 18,
             height: 18,
             borderRadius: 999,
-            background: P.surfaceHi,
+            background: P.control,
             color: P.inkMuted,
             border: `1px solid ${P.lineStrong}`,
             fontSize: 10,
@@ -1822,7 +1822,7 @@ function ExercisePicker({
               onClose()
             }}
             className="athletic-tap text-left rounded-lg px-3 py-2"
-            style={{ background: P.surfaceHi }}
+            style={{ background: P.control }}
           >
             <span style={{ color: P.ink, fontSize: 13, fontWeight: 600 }}>{ex.name}</span>
             <span
@@ -1883,7 +1883,7 @@ function ExercisePicker({
                     onClick={() => setQuickAddCategory(cat)}
                     className="athletic-mono athletic-tap px-2.5 py-1 rounded-full"
                     style={{
-                      background: quickAddCategory === cat ? P.ink : P.surfaceHi,
+                      background: quickAddCategory === cat ? P.ink : P.control,
                       color: quickAddCategory === cat ? P.bg : P.inkMuted,
                       border: `1px solid ${quickAddCategory === cat ? P.ink : P.lineStrong}`,
                       fontSize: 10,
@@ -1962,7 +1962,7 @@ function Chip({
       onClick={onClick}
       className="athletic-tap athletic-mono flex items-center gap-1 shrink-0 px-2.5 py-1 rounded-full text-[10px] font-black"
       style={{
-        background: active ? color : P.surfaceHi,
+        background: active ? color : P.control,
         color: active ? P.bg : P.inkMuted,
         border: `1px solid ${active ? color : P.lineStrong}`,
         letterSpacing: '0.1em',
@@ -2239,7 +2239,7 @@ function ScalePicker({
           <button key={n} type="button" onClick={() => onChange(n)}
             className="athletic-tap athletic-mono aspect-square rounded flex items-center justify-center"
             style={{
-              background: active ? color : P.surfaceHi,
+              background: active ? color : P.control,
               color: active ? P.bg : P.inkMuted,
               border: active ? `1px solid ${color}` : `1px solid ${P.lineStrong}`,
               fontSize: 12, fontWeight: 900,
@@ -2285,7 +2285,7 @@ function FeelPicker({
             aria-pressed={active}
             className="athletic-tap flex flex-col items-center justify-center gap-1 rounded-lg py-2"
             style={{
-              background: active ? color : P.surfaceHi,
+              background: active ? color : P.control,
               color: active ? P.bg : P.inkMuted,
               border: `1px solid ${active ? color : P.lineStrong}`,
             }}
