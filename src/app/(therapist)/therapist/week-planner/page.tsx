@@ -606,6 +606,11 @@ function ItemTile({
   const color = marker
     ? marker.color
     : activityColor ?? catColors[category] ?? P.inkMuted
+  // Kleur én vorm samen houden de activiteiten uit elkaar. CARDIO_ICON_MAP lag
+  // er al met een icoon per activiteit; de agenda pakte tot nu toe het
+  // generieke hartje voor alles wat cardio was.
+  const ActivityIcon =
+    category === 'CARDIO' && cardioActivity ? CARDIO_ICON_MAP[cardioActivity] ?? null : null
   const name = marker
     ? (item.kind === 'TEST' ? (item.testBattery?.name ?? 'Test') : (item.quickName ?? marker.label))
     : item.programId ? (item.program?.name ?? 'Programma') : (item.quickName ?? 'Workout')
@@ -697,7 +702,9 @@ function ItemTile({
         <span style={{ color: marker ? color : tileInk }} className="shrink-0">
           {marker
             ? <MarkerIcon kind={item.kind} size={11} />
-            : <CategoryIcon category={category} size={11} />}
+            : ActivityIcon
+              ? <ActivityIcon size={11} />
+              : <CategoryIcon category={category} size={11} />}
         </span>
         {!isOpen && <span className="min-w-0 flex-1 truncate font-semibold">{name}</span>}
         {!marker && Glyph && (
