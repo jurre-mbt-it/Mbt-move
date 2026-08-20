@@ -287,19 +287,6 @@ function paceLabelFor(distanceM: number | null | undefined, durationSec: number 
   return `${m}:${String(s2).padStart(2, '0')} /km`
 }
 
-/**
- * Een RPE-chip leesbaar houden op een gevulde tegel.
- *
- * De bandkleuren (goud, koraal) zijn gekozen voor een donkere ondergrond. Op
- * een lichte, gedane tegel vallen ze weg. fillFor(..., false) geeft precies de
- * donkere variant van diezelfde kleur, dus de band blijft herkenbaar en de
- * tekst leest weer.
- */
-function chipStyle(m: { color: string; bg: string }, lichteTegel: boolean) {
-  return lichteTegel
-    ? { background: 'rgba(0,0,0,0.09)', color: fillFor(m.color, false) }
-    : { background: m.bg, color: m.color }
-}
 
 /**
  * Het tekentje rechtsboven op een tegel. De vulling zegt al of er iets gebeurd
@@ -632,8 +619,11 @@ function ItemTile({
   // verschrompelde tot een lijntje. Nu draagt de kleur de soort en de vorm de
   // staat, en dat werkt ook voor wie kleuren slecht onderscheidt.
   const isDone = status === 'completed' || status === 'partial' || status === 'in_progress'
-  const fill = fillFor(color, isDone)
-  const statusBg = marker ? 'transparent' : fill
+  // De volle categoriekleur, precies zoals hij in het palet staat. Een eerdere
+  // versie rekende hem om naar een lichtere tint; dat maakte elke pil bleek en
+  // doorzichtig. De kleuren zijn al gekozen om als vlak te werken, dus laat ze
+  // met rust en bepaal alleen de inkt erbij.
+  const fill = color
   const tileInk = marker ? P.ink : textOn(fill)
   const statusBorder = marker ? marker.color : STATUS_BORDER[status]
   const Glyph = marker ? null : STATUS_GLYPH[status]
@@ -673,16 +663,14 @@ function ItemTile({
         'group/tile relative rounded-md text-[11px] overflow-hidden w-full min-w-0',
         isClickable ? 'cursor-pointer hover:brightness-110 transition-[filter]' : 'cursor-default',
       )}
+      // Alleen de kopregel is gekleurd. De cijfers eronder staan op de
+      // dagkaart zelf, want een pil met een naam leest sneller dan een blok
+      // met vier regels erin.
       style={{
-        background: statusBg,
-        // Markeringen houden hun gekleurde balk links: dat zijn geen
-        // trainingen, ze hebben geen status en geen vulling. Een workout
-        // heeft die balk niet meer nodig, want de vulling zegt al hoe het
-        // ervoor staat.
+        background: marker ? P.surfaceLow : 'transparent',
         border: marker ? `1px solid ${P.line}` : undefined,
         borderLeft: marker ? `4px solid ${statusBorder}` : undefined,
         borderLeftStyle: marker && item.kind === 'REST' ? 'dotted' : undefined,
-        color: tileInk,
       }}
       title={
         marker ? marker.label
@@ -690,14 +678,16 @@ function ItemTile({
         : STATUS_TITLES[status]
       }
     >
-      <div className="flex items-center gap-1.5 px-2 py-1">
+      <div
+        className="flex items-center gap-1.5 px-2 py-1.5 rounded-md"
+        style={marker ? undefined : { background: fill, color: tileInk }}
+      >
         <span style={{ color: marker ? color : tileInk }} className="shrink-0">
           {marker
             ? <MarkerIcon kind={item.kind} size={11} />
             : <CategoryIcon category={category} size={11} />}
         </span>
-        {!isOpen && <span className="min-w-0 flex-1 truncate">{name}</span>}
-        {duration && <span className="text-[10px] opacity-70 shrink-0">{duration}</span>}
+        {!isOpen && <span className="min-w-0 flex-1 truncate font-semibold">{name}</span>}
         {!marker && Glyph && (
           <span className="shrink-0 opacity-80" style={{ color: tileInk }} aria-hidden="true">
             <Glyph size={10} />
@@ -715,13 +705,23 @@ function ItemTile({
           </button>
         )}
       </div>
+      {/* De tijdsduur stond hiervoor op de pil zelf. Daar vrat hij de ruimte op
+          die de naam nodig heeft, en juist die naam is waar je op zoekt. */}
+      {duration && !marker && (
+        <div
+          className="athletic-mono px-2 pt-1 truncate"
+          style={{ fontSize: 9, letterSpacing: '0.06em', color: P.inkMuted }}
+        >
+          {duration}
+        </div>
+      )}
       {/* Verplaatst: de workout zelf staat als tegel op de dag dat hij gedaan
           is. Hier blijft alleen zichtbaar dát er iets stond en waar het heen
           ging — zonder dit leek de dag gewoon leeg. */}
       {status === 'moved' && movedTo && (
         <div
           className="athletic-mono px-2 pb-1 -mt-0.5 truncate"
-          style={{ fontSize: 9, letterSpacing: '0.04em', color: tileInk, opacity: 0.6 }}
+          style={{ fontSize: 9, letterSpacing: '0.04em', color: P.inkDim }}
         >
           → gedaan op {dagLabelKort(movedTo)}
         </div>
@@ -744,7 +744,7 @@ function ItemTile({
                 <span
                   className="athletic-mono inline-flex items-center"
                   style={{
-                    ...chipStyle(m, isDone), fontSize: 9, fontWeight: 900,
+                    background: m.bg, color: m.color, fontSize: 9, fontWeight: 900,
                     letterSpacing: '0.06em', padding: '1px 6px', borderRadius: 999,
                   }}
                   title={`Voorgeschreven RPE ${item.plannedRpe}`}
@@ -770,7 +770,7 @@ function ItemTile({
         return (
           <div className="px-2 pb-1.5 pt-0.5 min-w-0">
             {statLine && (
-              <div className="athletic-mono truncate" style={{ color: tileInk, fontSize: 10, fontWeight: 700 }}>
+              <div className="athletic-mono truncate" style={{ color: P.ink, fontSize: 10, fontWeight: 700 }}>
                 {statLine}
               </div>
             )}
@@ -782,7 +782,7 @@ function ItemTile({
                     <span
                       className="athletic-mono inline-flex items-center gap-1"
                       style={{
-                        ...chipStyle(m, isDone), fontSize: 9, fontWeight: 900,
+                        background: m.bg, color: m.color, fontSize: 9, fontWeight: 900,
                         letterSpacing: '0.06em', padding: '1px 6px', borderRadius: 999,
                       }}
                     >
@@ -791,7 +791,7 @@ function ItemTile({
                   )
                 })()}
                 {feel && (
-                  <span className="inline-flex items-center gap-1" style={{ fontSize: 9, color: tileInk, opacity: 0.7 }}>
+                  <span className="inline-flex items-center gap-1" style={{ fontSize: 9, color: P.inkMuted }}>
                     <feel.Icon size={11} /> {feel.label}
                   </span>
                 )}
