@@ -6,16 +6,21 @@ import { trpc } from '@/lib/trpc/client'
 import { Search } from 'lucide-react'
 import { EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
 import { IconStrength } from '@/components/icons'
-import { P, CARD, Kicker, MetaLabel, Tile, DarkButton, DarkInput, CATEGORY_COLORS } from '@/components/dark-ui'
+import { P, CARD, Kicker, MetaLabel, Tile, DarkButton, DarkInput } from '@/components/dark-ui'
+import { useCategoryColors } from '@/lib/useCategoryColors'
 
 const mono =
   'var(--font-mono-athletic)'
 
-function categoryColor(cat: string): string {
-  return (CATEGORY_COLORS as Record<string, string>)[cat] ?? P.lime
+// Krijgt de kleuren doorgegeven in plaats van ze uit het palet te trekken:
+// deze functie staat buiten de component en kan dus geen hook aanroepen, maar
+// hij moet wel de kleuren volgen die de praktijk heeft ingesteld.
+function categoryColor(cat: string, colors: Record<string, string>): string {
+  return colors[cat] ?? P.lime
 }
 
 export default function AthleteExercisesPage() {
+  const catColors = useCategoryColors()
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
   const utils = trpc.useUtils()
@@ -104,7 +109,7 @@ export default function AthleteExercisesPage() {
           </button>
           {EXERCISE_CATEGORIES.map((cat) => {
             const active = categoryFilter === cat.value
-            const color = categoryColor(cat.value)
+            const color = categoryColor(cat.value, catColors)
             return (
               <button
                 key={cat.value}
@@ -141,7 +146,7 @@ export default function AthleteExercisesPage() {
           <div className="space-y-2">
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             {exercises.map((ex: any) => {
-              const color = categoryColor(ex.category)
+              const color = categoryColor(ex.category, catColors)
               const catLabel =
                 EXERCISE_CATEGORIES.find((c) => c.value === ex.category)?.label ??
                 ex.category

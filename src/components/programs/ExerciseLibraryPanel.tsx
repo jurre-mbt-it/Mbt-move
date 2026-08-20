@@ -11,7 +11,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
-import { CATEGORY_COLORS } from '@/lib/palette'
+import { useCategoryColors } from '@/lib/useCategoryColors'
 
 
 interface LibraryExercise {
@@ -45,7 +45,8 @@ function DraggableLibraryItem({
   })
 
   const style = transform ? { transform: CSS.Translate.toString(transform) } : undefined
-  const color = CATEGORY_COLORS[exercise.category] ?? '#E87A55'
+  const catColors = useCategoryColors()
+  const color = catColors[exercise.category] ?? '#E87A55'
 
   return (
     <div
@@ -126,6 +127,7 @@ interface ExerciseLibraryPanelProps {
 }
 
 export function ExerciseLibraryPanel({ onAdd, exercises: propExercises, onAddResource }: ExerciseLibraryPanelProps) {
+  const catColorsPanel = useCategoryColors()
   const [tab, setTab] = useState<'move' | 'learn'>('move')
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<string | null>(null)
@@ -246,7 +248,7 @@ export function ExerciseLibraryPanel({ onAdd, exercises: propExercises, onAddRes
                   ? 'text-[#0E2729] border-transparent'
                   : 'border-[rgba(212,232,230,0.12)] text-muted-foreground hover:border-[rgba(212,232,230,0.2)] bg-[#15363A]'
               )}
-              style={category === c.value ? { background: CATEGORY_COLORS[c.value] } : {}}
+              style={category === c.value ? { background: catColorsPanel[c.value] } : {}}
             >
               {c.label}
             </button>
@@ -287,7 +289,7 @@ export function ExerciseLibraryPanel({ onAdd, exercises: propExercises, onAddRes
                         'px-1.5 py-0.5 rounded text-xs font-medium border',
                         quickAddCategory === c.value ? 'text-[#0E2729] border-transparent' : 'border-[rgba(212,232,230,0.12)] text-muted-foreground',
                       )}
-                      style={quickAddCategory === c.value ? { background: CATEGORY_COLORS[c.value] } : {}}
+                      style={quickAddCategory === c.value ? { background: catColorsPanel[c.value] } : {}}
                     >
                       {c.label}
                     </button>

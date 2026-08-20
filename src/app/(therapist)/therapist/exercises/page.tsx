@@ -18,7 +18,6 @@ import { usePortal } from '@/lib/portal'
 import { IconFolder } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import {
-  CATEGORY_COLORS,
   DarkButton,
   DarkInput,
   Kicker,
@@ -27,6 +26,7 @@ import {
   SkeletonTile,
   Tile,
 } from '@/components/dark-ui'
+import { useCategoryColors } from '@/lib/useCategoryColors'
 
 type ExerciseItem = {
   id: string
@@ -44,6 +44,7 @@ type ExerciseItem = {
 }
 
 export default function ExercisesPage() {
+  const catColors = useCategoryColors()
   const portal = usePortal()
   const router = useRouter()
   const [view, setView] = useState<'grid' | 'list'>('grid')
@@ -560,7 +561,7 @@ export default function ExercisesPage() {
           <div className="flex flex-col gap-2">
             {filtered.map((ex) => {
               const categoryColor =
-                (CATEGORY_COLORS as Record<string, string>)[ex.category] ?? P.inkDim
+                catColors[ex.category] ?? P.inkDim
               return (
                 <div
                   key={ex.id}

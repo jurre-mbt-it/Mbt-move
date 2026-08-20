@@ -30,7 +30,7 @@ import { NumericInput } from '@/components/ui/numeric-input'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { CustomParameter } from './types'
-import { CATEGORY_COLORS } from '@/lib/palette'
+import { useCategoryColors } from '@/lib/useCategoryColors'
 
 
 interface LibraryExerciseLike {
@@ -256,7 +256,11 @@ export function ProgramExerciseBlock({
   })
 
   const style = { transform: CSS.Transform.toString(transform), transition }
-  const color = CATEGORY_COLORS[exercise.category] ?? '#E87A55'
+  // Via de hook, niet rechtstreeks uit het palet: anders negeert dit scherm
+  // de kleuren die de praktijk zelf heeft ingesteld terwijl de agenda ze wel
+  // volgt, en dan lopen twee schermen uit elkaar zodra iemand iets aanpast.
+  const catColors = useCategoryColors()
+  const color = catColors[exercise.category] ?? '#E87A55'
 
   const addParam = (tpl: { label: string; type: 'number' | 'text' | 'select' | 'slider'; unit?: string; options?: string[]; min?: number; max?: number; defaultValue?: string | number }) => {
     if (exercise.extraParams.find(p => p.label === tpl.label)) return
