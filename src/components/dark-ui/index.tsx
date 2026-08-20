@@ -219,7 +219,13 @@ export function Tile({
         className,
       )}
       style={{
-        backgroundColor: P.surface,
+        // Instrument-kaart uit docs/app-ontwerpsysteem.md: een verloop, een
+        // lichtere bovenrand en een schaduw, zodat de kaart op de grond lígt.
+        // Geen lijn eromheen: lijnen zijn de taal van de praktijksite.
+        background: `linear-gradient(180deg, ${P.cardTop} 0%, ${P.cardBot} 100%)`,
+        border: `1px solid ${P.cardEdge}`,
+        borderTopColor: P.cardEdgeTop,
+        boxShadow: P.cardShadow,
         padding: 16,
         paddingLeft: accentBar ? 20 : 16,
         ...style,
