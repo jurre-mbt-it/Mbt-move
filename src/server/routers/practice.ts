@@ -76,6 +76,15 @@ const PRACTICE_FIELDS = {
   createdAt: true, updatedAt: true,
 } as const
 
+/** De standaardset tot 20 augustus 2026; zie de toelichting in de query. */
+const OUDE_STANDAARD_KLEUREN: Record<string, string> = {
+  STRENGTH:    '#9fcec9',
+  MOBILITY:    '#7fb0d8',
+  PLYOMETRICS: '#d9c08a',
+  CARDIO:      '#45a8a2',
+  STABILITY:   '#b9a6d4',
+}
+
 export const practiceRouter = createTRPCRouter({
   /** Eigen praktijk ophalen + de owner-naam (voor de waarschuwing-copy aan
    *  niet-owners: "Vraag {ownerName} om dit aan te passen"). */
@@ -185,9 +194,19 @@ export const practiceRouter = createTRPCRouter({
       ? await ctx.prisma.practice.findUnique({ where: { id: me.practiceId }, select: { uiPrefs: true } })
       : await ctx.prisma.user.findUnique({ where: { id: me.id }, select: { uiPrefs: true } })
     const opgeslagen = (bron?.uiPrefs as { categoryColors?: Record<string, string> } | null)?.categoryColors ?? {}
+    // Praktijken die nooit bewust kleuren kozen, kregen de oude standaardset
+    // toch opgeslagen. Zonder deze controle blijven zij eeuwig op die oude
+    // tinten hangen en wijkt de instellingenpagina af van wat de app toont
+    // (de client-hook filtert dit ook al; hier is de bron, dus hier hoort het).
+    const isOudeStandaard =
+      Object.keys(OUDE_STANDAARD_KLEUREN).every(
+        (k) => opgeslagen[k]?.trim().toLowerCase() === OUDE_STANDAARD_KLEUREN[k],
+      ) && Object.keys(opgeslagen).length > 0
+        && Object.keys(opgeslagen).length <= Object.keys(OUDE_STANDAARD_KLEUREN).length
+    const effectief = isOudeStandaard ? {} : schoon(opgeslagen)
     return {
       scope: me.practiceId ? ('practice' as const) : ('user' as const),
-      colors: { ...CATEGORY_COLORS, ...schoon(opgeslagen) },
+      colors: { ...CATEGORY_COLORS, ...effectief },
       defaults: CATEGORY_COLORS,
     }
   }),

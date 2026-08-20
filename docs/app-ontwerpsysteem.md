@@ -126,6 +126,45 @@ Twee correcties ten opzichte van nu:
 - **beweging naar het merkgoud `#F5B942`**, in plaats van het losse `#f2b33d` dat
   alleen in `charts-v2` bestond.
 
+### Soortkleuren en de agenda-taal (besluit 20/21 aug 2026)
+
+Kleur per trainingssoort, gelijk op web en iOS, uit één bron
+(`src/lib/palette.ts` ↔ `constants/theme.ts`):
+
+| soort | kleur | |
+|---|---|---|
+| Kracht | `#E9B45C` | amber |
+| Cardio | `#7FB3DE` | blauw |
+| Mobiliteit | `#8FCFC4` | mint |
+| Plyometrie | `#E39A78` | perzik |
+| Stabiliteit | `#B4A2DC` | lila |
+
+Cardio heeft daarnaast een **kleur én icoon per activiteit** (hardlopen,
+fietsen, wandelen…), allemaal in de koele familie: je ziet dát het cardio is en
+wélke het is. Web: `CARDIO_ACTIVITY_COLORS` + `CARDIO_ICON_MAP`; app:
+zelfde constanten + `cardioIcon()` in `components/icons.tsx`.
+
+**De agendataal:** de soort vult het blokje, vol en dicht, met inkt via
+`textOn()`. De status zit niet in de kleur maar in een tekentje (vinkje,
+kruisje, klokje, pijl) of chip; gepland krijgt níéts, want dat is de normale
+toestand. Markeringen (rustdag, notitie, test, doel) zijn geen trainingen: die
+houden hun balkje links en krijgen geen vulling.
+
+Waarom dit zo is: eerder droeg de rand de status in een signaalkleur en moest
+de soortkleur daar koel en gedempt naast blijven. Door status uit de kleur te
+halen kwam amber vrij voor kracht. Er zijn onderweg twee versies afgewezen —
+een uitgewassen lichte vulling en een tweediepte-variant (`fillFor()`, weer
+verwijderd). Niet opnieuw proberen zonder nieuw besluit.
+
+**Selectie is geen actie.** Oranje is van dingen die je kunt dóén. Een gekozen
+tab, dag, week of filter krijgt een lichte vulling (`P.ink` met donkere tekst),
+nooit oranje. Schakelaars (aan/uit) blijven wél oranje: dat is een instelling.
+
+**Eén bron, instelbaar.** De web-staf leest kleuren via `useCategoryColors()`
+(volgt wat de praktijk instelt; de opgeslagen oude standaardset wordt server-
+en clientzijdig als "niets gekozen" behandeld). Patiënt-schermen en de app
+lezen de vaste set: `practice.categoryColors` is staff-only.
+
 Gaat de app ooit naar een lichte ondergrond, dan heb je een **tweede set
 datakleuren** nodig: mint en goud zijn op licht niet leesbaar. Dat is de reden dat
 de lichte richting ("Dossier") niet gekozen is.
@@ -147,8 +186,18 @@ gereedschap dat je dertig keer per dag opent.
 ## 7. Waar het in de code zit
 
     src/app/globals.css                 tokens web (--p-bg en verder)
-    mbt-gym-mobile/constants/theme.ts   tokens mobiel (P, Radius, Font)
+    src/lib/palette.ts                  P, CARD, CATEGORY_COLORS,
+                                        CARDIO_ACTIVITY_COLORS, textOn
+    src/lib/useCategoryColors.ts        praktijk-instelbare soortkleuren
+    mbt-gym-mobile/constants/theme.ts   tokens mobiel (P, Radius, Font,
+                                        CATEGORY_COLORS, textOn)
+    mbt-gym-mobile/components/icons.tsx cardioIcon() per activiteit
     mbt-gym-mobile/components/charts-v2.tsx   CV-palet voor grafieken
+
+De Instrument-kaart is op het web een spread: `style={{ ...CARD }}` uit
+`palette.ts` (spiegel van `.base-card`). `surfaceHi` is opgesplitst in
+`control` (keuzeknop-rust), `field` (invoerveld) en `track` (balkbaan) —
+zelfde tint, eigen naam, zodat ze los kunnen bewegen.
 
 De shadcn-tokens in `globals.css` hangen aan `.athletic-dark` en volgen de
 vlakken hierboven. Verander je een vlak, loop dan die blok ook langs.
