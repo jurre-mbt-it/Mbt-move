@@ -1193,7 +1193,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             onClick={() => setProgram(p => ({ ...p, currentWeek: w }))}
             className={cn(
               'px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
-              program.currentWeek === w ? 'bg-[var(--p-brand)] text-[var(--p-bg)]' : 'text-muted-foreground hover:bg-[var(--p-surface-hi)]'
+              program.currentWeek === w ? 'bg-[var(--p-ink)] text-[var(--p-bg)]' : 'text-muted-foreground hover:bg-[var(--p-surface-hi)]'
             )}
           >
             W{w}
@@ -1634,7 +1634,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               disabled={!program.patientId}
               className="athletic-tap px-2.5 py-0.5 rounded text-[11px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
-                background: !program.isTemplate && program.patientId ? 'var(--p-brand)' : 'transparent',
+                background: !program.isTemplate && program.patientId ? 'var(--p-ink)' : 'transparent',
                 color: !program.isTemplate && program.patientId ? 'var(--p-bg)' : 'var(--p-ink-muted)',
                 border: '1px solid rgba(212,232,230,0.12)',
                 letterSpacing: '0.04em',
@@ -1648,7 +1648,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               onClick={() => setProgram(p => ({ ...p, isTemplate: true }))}
               className="athletic-tap px-2.5 py-0.5 rounded text-[11px] font-bold transition-colors"
               style={{
-                background: program.isTemplate ? 'var(--p-brand)' : 'transparent',
+                background: program.isTemplate ? 'var(--p-ink)' : 'transparent',
                 color: program.isTemplate ? 'var(--p-bg)' : 'var(--p-ink-muted)',
                 border: '1px solid rgba(212,232,230,0.12)',
                 letterSpacing: '0.04em',
@@ -1726,7 +1726,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                         'shrink-0 flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-colors',
                         program.currentDay === d ? 'text-[var(--p-bg)]' : 'text-muted-foreground hover:bg-[var(--p-surface-hi)]'
                       )}
-                      style={program.currentDay === d ? { background: 'var(--p-brand)' } : {}}
+                      style={program.currentDay === d ? { background: 'var(--p-ink)' } : {}}
                     >
                       {DAY_LABELS[d - 1]}
                       {count > 0 && (

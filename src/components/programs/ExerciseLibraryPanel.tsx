@@ -11,6 +11,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
+import { CARD } from '@/lib/palette'
 import { useCategoryColors } from '@/lib/useCategoryColors'
 
 
@@ -51,12 +52,15 @@ function DraggableLibraryItem({
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      // Dezelfde Instrument-kaart als de agenda: verloop, lichtere bovenrand,
+      // schaduw. Stond hiervoor op een vlak vulvlak met een gewone rand,
+      // waardoor twee soorten kaart naast elkaar in dezelfde app stonden.
+      style={{ ...CARD, ...style }}
       {...attributes}
       {...listeners}
       className={cn(
-        'group flex items-center gap-2 px-2 py-2 rounded-lg border bg-[var(--p-surface)] transition-all text-sm touch-none',
-        isDragging ? 'opacity-40 shadow-lg cursor-grabbing' : 'hover:border-[rgba(212,232,230,0.16)] hover:bg-[var(--p-surface-hi)] cursor-grab'
+        'group flex items-center gap-2 px-2 py-2 rounded-lg transition-all text-sm touch-none',
+        isDragging ? 'opacity-40 shadow-lg cursor-grabbing' : 'mbt-card-hover cursor-grab'
       )}
     >
       <GripVertical className="w-3.5 h-3.5 text-[var(--p-ink-muted)] shrink-0" />
@@ -174,7 +178,11 @@ export function ExerciseLibraryPanel({ onAdd, exercises: propExercises, onAddRes
                   ? 'text-[var(--p-bg)] border-transparent'
                   : 'border-[rgba(212,232,230,0.12)] text-muted-foreground hover:border-[rgba(212,232,230,0.2)] bg-[var(--p-surface)]',
               )}
-              style={tab === key ? { background: 'var(--p-brand)' } : {}}
+              // Selectie is geen actie. Oranje is in het ontwerpsysteem de kleur van iets
+              // dat je kunt dóen; als het ook de gekozen week, dag en tab markeert, dan
+              // staat het scherm vol oranje en springt de actie nergens meer uit. De
+              // gekozen staat krijgt daarom een lichte vulling, net als in de agenda.
+              style={tab === key ? { background: 'var(--p-ink)' } : {}}
             >
               {label}
             </button>
@@ -243,13 +251,27 @@ export function ExerciseLibraryPanel({ onAdd, exercises: propExercises, onAddRes
               key={c.value}
               onClick={() => setCategory(category === c.value ? null : c.value)}
               className={cn(
-                'px-1.5 py-0.5 rounded text-xs font-medium transition-colors border',
+                'inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium transition-colors border',
                 category === c.value
                   ? 'text-[var(--p-bg)] border-transparent'
                   : 'border-[rgba(212,232,230,0.12)] text-muted-foreground hover:border-[rgba(212,232,230,0.2)] bg-[var(--p-surface)]'
               )}
               style={category === c.value ? { background: catColorsPanel[c.value] } : {}}
             >
+              {/* Het stipje staat er altijd, ook als de chip niet gekozen is.
+                  Zonder dat is de filterbalk een rij grijze woorden, terwijl
+                  diezelfde categorie overal elders in de app wél een kleur
+                  heeft. Op een gekozen chip is de achtergrond al de kleur, dus
+                  dan zou het stipje erin verdwijnen: daar wordt hij donker. */}
+              <span
+                aria-hidden="true"
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{
+                  background: category === c.value
+                    ? 'rgba(10,28,29,0.55)'
+                    : catColorsPanel[c.value],
+                }}
+              />
               {c.label}
             </button>
           ))}
