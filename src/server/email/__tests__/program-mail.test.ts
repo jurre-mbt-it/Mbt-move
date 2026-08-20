@@ -61,4 +61,12 @@ describe('programMail', () => {
     expect(mail.subject).not.toContain('\n')
     expect(mail.subject).not.toContain('\r')
   })
+
+  it('zet de login-URL ook als terugvallink onder de knop', () => {
+    // Een mailclient die de gestileerde knop niet als link rendert, moet
+    // ergens anders de URL nog kunnen kopiëren. inviteMail had dit blok
+    // altijd al; het viel weg bij het overzetten naar de gedeelde shell.
+    const mail = programMail(basis)
+    expect(mail.html).toContain(basis.loginUrl)
+  })
 })

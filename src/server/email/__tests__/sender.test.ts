@@ -60,6 +60,20 @@ describe('resolveSender', () => {
     expect(sender.replyTo).toBeNull()
   })
 
+  it('levert een lege therapistName als alle drie de naamvelden leeg zijn', () => {
+    // Bereikbaar: admin.ts maakt een therapeut aan met `name: input.name ?? ''`
+    // zonder voor- of achternaam, en auth.updateProfile staat
+    // firstName: null, lastName: null toe. De praktijk zelf kan dan nog wel
+    // bruikbaar zijn.
+    const sender = resolveSender({
+      therapist: { firstName: null, lastName: null, jobTitle: null, name: null },
+      practice: complete,
+    })
+    expect(sender.kind).toBe('practice')
+    if (sender.kind !== 'practice') throw new Error('verwachtte praktijk')
+    expect(sender.therapistName).toBe('')
+  })
+
   it('valt terug op het losse naamveld als voor- en achternaam leeg zijn', () => {
     const sender = resolveSender({
       therapist: { firstName: null, lastName: null, jobTitle: null, name: 'A. Jansen' },

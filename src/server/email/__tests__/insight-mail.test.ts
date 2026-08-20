@@ -34,6 +34,11 @@ describe('renderCriticalEmail', () => {
   it('komt van BASE, zonder praktijkblok', () => {
     const mail = renderCriticalEmail(insight, 'Sam de Vries')
     expect(mail.html).toContain('BASE')
+    // De praktijk-footer is een tweekolomstabel (therapeut links, praktijk
+    // rechts); `valign="top"` komt alleen daaruit. Zonder deze tegencheck
+    // slaagt de test ook als renderCriticalEmail per ongeluk een
+    // praktijkblok zou gaan renderen.
+    expect(mail.html).not.toContain('valign="top"')
   })
 
   it('houdt de afbakening dat dit geen diagnose is', () => {

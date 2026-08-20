@@ -47,6 +47,7 @@ describe('inviteMail', () => {
   it('werkt zonder praktijk, zoals bij een coach', () => {
     const mail = inviteMail({ ...basis, sender: BASE_SENDER })
     expect(mail.html).toContain('BASE')
+    expect(mail.html).not.toContain('Praktijk Voorbeeld')
     expect(mail.subject).toBeTruthy()
   })
 
@@ -66,5 +67,41 @@ describe('inviteMail', () => {
     const mail = inviteMail({ ...basis, recipientName: "D'Hondt", sender })
     expect(mail.html).toContain('Hallo D&#39;Hondt')
     expect(mail.html).not.toContain('&amp;#39;')
+  })
+
+  it('houdt regelovergangen uit het onderwerp, ook als de therapeutnaam ze bevat', () => {
+    // firstName komt uit auth.updateProfile, waar het schema alleen
+    // voor- en naloopwitruimte trimt. Interne regelovergangen kunnen dus
+    // gewoon een profielveld in, en gingen tot deze fix rauw het
+    // onderwerp in (header-injectierisico).
+    const senderMetRegelovergang = resolveSender({
+      therapist: { firstName: 'Anna\nBcc: kwaadwillende@voorbeeld.nl', lastName: 'Jansen' },
+      practice: {
+        name: 'Praktijk Voorbeeld',
+        addressLine1: 'Teststraat 1',
+        city: 'Testdorp',
+        email: 'info@voorbeeld.nl',
+      },
+    })
+    const mail = inviteMail({ ...basis, sender: senderMetRegelovergang })
+    expect(mail.subject).not.toContain('\n')
+    expect(mail.subject).not.toContain('\r')
+  })
+
+  it('levert een kloppende zin als de therapeut geen naam heeft ingevuld', () => {
+    const senderZonderNaam = resolveSender({
+      therapist: { firstName: null, lastName: null, jobTitle: null, name: null },
+      practice: {
+        name: 'Praktijk Voorbeeld',
+        addressLine1: 'Teststraat 1',
+        city: 'Testdorp',
+        email: 'info@voorbeeld.nl',
+      },
+    })
+    const mail = inviteMail({ ...basis, sender: senderZonderNaam })
+    expect(mail.html).not.toContain('">, ')
+    expect(mail.html).toContain('Praktijk Voorbeeld heeft een account voor je klaargezet in BASE')
+    expect(mail.text).not.toContain('van Praktijk Voorbeeld heeft')
+    expect(mail.text).toContain('Praktijk Voorbeeld heeft een account voor je klaargezet in BASE')
   })
 })

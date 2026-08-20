@@ -49,6 +49,17 @@ export function programMail(opts: ProgramMailOptions): { subject: string; html: 
     </td></tr>`
     : ''
 
+  // De loginUrl gaat hier in de body (rauw HTML), dus zelf escapen. In de
+  // `cta` hieronder gaat dezelfde URL rauw mee, want emailShell escapet die
+  // zelf al; dubbel escapen zou de link breken.
+  const fallbackLinkBlock = `
+    <tr><td style="padding:16px 28px 0 28px;">
+      <p style="margin:0;color:${P.inkMuted};font-size:11px;line-height:17px;">
+        Werkt de knop niet? Kopieer deze link:<br/>
+        <span style="color:${P.ink};word-break:break-all;">${escapeHtml(loginUrl)}</span>
+      </p>
+    </td></tr>`
+
   const intro =
     sender.kind === 'practice' && sender.therapistName
       ? `${escapeHtml(sender.therapistName)} heeft een programma voor je klaargezet.`
@@ -67,7 +78,8 @@ export function programMail(opts: ProgramMailOptions): { subject: string; html: 
         <div style="color:${P.ink};font-size:14px;font-weight:700;margin-top:4px;">${escapeHtml(startFormatted)}</div>
       </div>
     </td></tr>
-    ${codeBlock}`
+    ${codeBlock}
+    ${fallbackLinkBlock}`
 
   return {
     subject: `Je programma staat klaar · ${programName.replace(/[\r\n]+/g, ' ').trim()}`,

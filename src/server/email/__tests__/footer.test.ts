@@ -47,6 +47,23 @@ describe('renderFooter', () => {
     expect(html).not.toContain('Praktijk Voorbeeld')
   })
 
+  it('rendert het logo als afbeelding en toont de privacy-disclaimer', () => {
+    const sender = resolveSender({
+      therapist: { firstName: 'Anna', lastName: 'Jansen', jobTitle: 'fysiotherapeut', name: null },
+      practice: {
+        name: 'Praktijk Met Logo',
+        addressLine1: 'Teststraat 1',
+        city: 'Testdorp',
+        email: 'info@voorbeeld.nl',
+        logoUrl: 'https://voorbeeld.nl/logo.png',
+        privacyDisclaimer: 'Wij delen je gegevens niet met derden.',
+      },
+    })
+    const html = renderFooter(sender)
+    expect(html).toContain('<img src="https://voorbeeld.nl/logo.png"')
+    expect(html).toContain('Wij delen je gegevens niet met derden.')
+  })
+
   it('escapet gebruikersinvoer in de praktijknaam', () => {
     const sender = resolveSender({
       therapist: { firstName: 'Anna', lastName: 'Jansen' },

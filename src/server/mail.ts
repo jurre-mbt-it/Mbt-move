@@ -45,7 +45,7 @@ export async function sendMail(msg: MailMessage): Promise<MailResult> {
     msg.replyTo ?? (msg.sender?.kind === 'practice' ? msg.sender.replyTo ?? undefined : undefined)
 
   if (!apiKey) {
-    // Dev / ontbrekende config — log voor traceability, faal niet
+    // Dev / ontbrekende config: log voor traceability, faal niet
     if (process.env.NODE_ENV !== 'production') {
       console.log('[mail] (dev) to:', msg.to, 'subject:', msg.subject)
     }
@@ -105,9 +105,11 @@ export function inviteMail({
   const firstName = recipientName.trim().split(' ')[0] || recipientName.trim()
 
   const intro =
-    sender.kind === 'practice'
+    sender.kind === 'practice' && sender.therapistName
       ? `${escapeHtml(sender.therapistName)}${sender.jobTitle ? `, ${escapeHtml(sender.jobTitle)}` : ''} bij ${escapeHtml(sender.displayName)}, heeft een account voor je klaargezet in BASE. Daar staat je trainingsschema en daar log je hoe het gaat.`
-      : 'Er is een account voor je klaargezet in BASE. Daar staat je trainingsschema en daar log je hoe het gaat.'
+      : sender.kind === 'practice'
+        ? `${escapeHtml(sender.displayName)} heeft een account voor je klaargezet in BASE. Daar staat je trainingsschema en daar log je hoe het gaat.`
+        : 'Er is een account voor je klaargezet in BASE. Daar staat je trainingsschema en daar log je hoe het gaat.'
 
   const body = `
     <tr><td style="padding:16px 28px 0 28px;">
@@ -131,9 +133,12 @@ export function inviteMail({
       </p>
     </td></tr>`
 
+  // Strip regelovergangen uit de therapeutnaam: die komt uit een vrij
+  // invulbaar profielveld en gaat rauw het onderwerp in. Regelovergangen in
+  // een headerveld kunnen header-injectie mogelijk maken.
   const subject =
     sender.kind === 'practice' && sender.therapistName
-      ? `${sender.therapistName} heeft je uitgenodigd voor BASE`
+      ? `${sender.therapistName.replace(/[\r\n]+/g, ' ').trim()} heeft je uitgenodigd voor BASE`
       : 'Je account voor BASE staat klaar'
 
   return {
@@ -148,7 +153,13 @@ export function inviteMail({
     }),
     text:
       `Hallo ${firstName},\n\n` +
-      `${sender.kind === 'practice' ? `${sender.therapistName} van ${sender.displayName} heeft` : 'Er is'} een account voor je klaargezet in BASE.\n\n` +
+      `${
+        sender.kind === 'practice' && sender.therapistName
+          ? `${sender.therapistName} van ${sender.displayName} heeft`
+          : sender.kind === 'practice'
+            ? `${sender.displayName} heeft`
+            : 'Er is'
+      } een account voor je klaargezet in BASE.\n\n` +
       `Open deze link en vul je geboortejaar in:\n${codeUrl}\n\n` +
       `Je krijgt daarna een code van zes cijfers in deze mailbox.\n\n` +
       `Verloopt: ${formatDate(expiresAt)}`,
