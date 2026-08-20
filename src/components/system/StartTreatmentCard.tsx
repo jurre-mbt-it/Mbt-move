@@ -73,10 +73,10 @@ export function StartTreatmentCard() {
       >
         <span className="min-w-0">
           <span
-            className="athletic-mono block"
-            style={{ color: P.bg, fontSize: 15, fontWeight: 900, letterSpacing: '0.06em' }}
+            className="block"
+            style={{ color: P.bg, fontSize: 16, fontWeight: 700, letterSpacing: '-0.01em' }}
           >
-            START BEHANDELING
+            Start behandeling
           </span>
           <span style={{ color: 'rgba(14,39,41,0.72)', fontSize: 12.5, marginTop: 2, display: 'block' }}>
             Kies een patiënt en log live mee

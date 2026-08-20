@@ -73,20 +73,12 @@ export function Header({ title, userName, userEmail, userAvatar, settingsBase = 
     >
       {/* Logo op mobiel (sidebar is verborgen) */}
       <div className="flex items-center md:hidden">
-        <div className="flex items-baseline gap-2">
-          <span
-            className="athletic-display"
-            style={{ color: P.ink, fontSize: 18, letterSpacing: '-0.04em', fontWeight: 900 }}
-          >
-            MBT
-          </span>
-          <span
-            className="athletic-mono"
-            style={{ color: P.brand, fontSize: 11, fontWeight: 900, letterSpacing: '0.2em' }}
-          >
-            GYM
-          </span>
-        </div>
+        <span
+          className="athletic-display"
+          style={{ color: P.ink, fontSize: 18, letterSpacing: '0.18em', fontWeight: 900 }}
+        >
+          BASE
+        </span>
       </div>
       {title && (
         <h1

@@ -406,7 +406,7 @@ export default function TherapistDashboard() {
             className="athletic-mono"
             style={{ color: P.brand, fontSize: 11, letterSpacing: '0.12em' }}
           >
-            ALLES →
+            Alles →
           </Link>
         </div>
         {topSignals.map((i) => {

@@ -69,7 +69,7 @@ export function PatientBottomNav() {
           >
             <div className="flex items-center justify-between mb-3">
               <span
-                className="athletic-mono"
+                className="athletic-label"
                 style={{
                   color: P.inkMuted,
                   fontSize: 11,
@@ -103,7 +103,7 @@ export function PatientBottomNav() {
                   <Icon className="w-5 h-5" style={{ color }} />
                   <div className="flex flex-col flex-1 min-w-0">
                     <span
-                      className="athletic-mono"
+                      className="athletic-label"
                       style={{
                         color: P.ink,
                         fontSize: 13,
@@ -139,7 +139,7 @@ export function PatientBottomNav() {
               >
                 <Icon className="w-5 h-5" />
                 <span
-                  className="athletic-mono"
+                  className="athletic-label"
                   style={{
                     fontSize: 10,
                     letterSpacing: '0.14em',
@@ -172,7 +172,7 @@ export function PatientBottomNav() {
               <Plus className="w-6 h-6" strokeWidth={3} />
             </span>
             <span
-              className="athletic-mono"
+              className="athletic-label"
               style={{
                 color: P.inkMuted,
                 fontSize: 9,
@@ -197,7 +197,7 @@ export function PatientBottomNav() {
               >
                 <Icon className="w-5 h-5" />
                 <span
-                  className="athletic-mono"
+                  className="athletic-label"
                   style={{
                     fontSize: 10,
                     letterSpacing: '0.14em',

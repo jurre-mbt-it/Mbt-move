@@ -306,7 +306,24 @@ body {
   font-size-adjust: 0.55;
   letter-spacing: 0.1em;
   font-weight: 700;
-  text-transform: uppercase;
+  /* Geen `text-transform: uppercase` meer. Deze klasse draagt zowel getallen
+     als woorden; op een getal doet hoofdletters niets, en bij een woord is het
+     precies de schreeuwtoon van de website die de app juist niet moet hebben.
+     De bronteksten staan al in de bedoelde schrijfwijze ('Home', 'Patiënt'),
+     dus dit legt de keuze terug bij de auteur. Zie docs/app-ontwerpsysteem.md.
+
+     Woorden horen op termijn helemaal niet in mono maar in `.athletic-label`;
+     mono blijft voor getallen, eenheden en tijden. */
+}
+
+/* Labels in gewone schrijfwijze en in Archivo: de eindvorm voor woorden die nu
+   nog `.athletic-mono` dragen. */
+.athletic-label {
+  font-family: var(--font-athletic);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 /* Displaykoppen staan breed en zwaar; de variabele as doet het werk, niet een
