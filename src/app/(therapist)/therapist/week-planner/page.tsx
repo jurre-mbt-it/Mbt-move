@@ -24,7 +24,7 @@ import {
   ChevronLeft, ChevronRight, Plus, X, MoreHorizontal,
   Search, Building2, Copy, CopyPlus, Pencil, BookmarkPlus, GripVertical,
   CalendarRange, Layers, Moon, CalendarPlus, StickyNote, ClipboardCheck, Flag,
-  Scissors, ClipboardPaste, Archive,
+  Scissors, ClipboardPaste, Archive, Check, Clock3, CornerUpRight,
 } from 'lucide-react'
 import {
   PHASE_TYPES, PHASE_META, phaseMeta, DELOAD_LOAD_FRACTION,
@@ -285,6 +285,38 @@ function paceLabelFor(distanceM: number | null | undefined, durationSec: number 
   const m = Math.floor(secPerKm / 60)
   const s2 = Math.round(secPerKm % 60)
   return `${m}:${String(s2).padStart(2, '0')} /km`
+}
+
+/**
+ * Een RPE-chip leesbaar houden op een gevulde tegel.
+ *
+ * De bandkleuren (goud, koraal) zijn gekozen voor een donkere ondergrond. Op
+ * een lichte, gedane tegel vallen ze weg. fillFor(..., false) geeft precies de
+ * donkere variant van diezelfde kleur, dus de band blijft herkenbaar en de
+ * tekst leest weer.
+ */
+function chipStyle(m: { color: string; bg: string }, lichteTegel: boolean) {
+  return lichteTegel
+    ? { background: 'rgba(0,0,0,0.09)', color: fillFor(m.color, false) }
+    : { background: m.bg, color: m.color }
+}
+
+/**
+ * Het tekentje rechtsboven op een tegel. De vulling zegt al of er iets gebeurd
+ * is (donker = nog te doen, licht = gedaan); dit maakt precies wát er gebeurd
+ * is eenduidig, zonder er een kleur voor nodig te hebben.
+ *
+ * `scheduled` krijgt niets: een blokje dat gewoon nog moet gebeuren is de
+ * normale toestand, en daar hoort geen markering bij. Alleen afwijkingen
+ * verdienen een tekentje.
+ */
+const STATUS_GLYPH: Record<ItemStatus, ((p: { size?: number }) => React.ReactNode) | null> = {
+  scheduled:   null,
+  completed:   ({ size = 10 }) => <Check size={size} strokeWidth={3.5} />,
+  partial:     ({ size = 10 }) => <Check size={size} strokeWidth={3.5} />,
+  in_progress: ({ size = 10 }) => <Clock3 size={size} strokeWidth={3} />,
+  missed:      ({ size = 10 }) => <X size={size} strokeWidth={3.5} />,
+  moved:       ({ size = 10 }) => <CornerUpRight size={size} strokeWidth={3} />,
 }
 
 /** RPE-band zoals in trainingskalenders: cijfer + woord + kleur. */
@@ -589,18 +621,22 @@ function ItemTile({
   // Markeringen hebben geen status: een notitie of streefdatum in het verleden
   // is niet "gemist". Ze krijgen hun eigen rustige weergave i.p.v. de
   // status-kleuren van een workout.
-  // De soort vult het vlak, de status staat als balk links. Eerder deed de
-  // kleur alleen het icoontje; in een vol weekraster las je daardoor niet in
-  // een oogopslag wat voor training er stond. De statusbalk is meegegroeid van
-  // 3 naar 4 pixels, want tegen een gevuld vlak moet hij harder aankomen.
-  // Niet de rauwe categoriekleur als vulling: die is bij CARDIO middendonker
-  // en dan leest geen enkele tekstkleur goed. fillFor() trekt elke tint naar
-  // dezelfde lichtheid, zodat donkere inkt er altijd overheen kan. Zo werkten
-  // de gevulde blokjes in het ontwerpvoorbeeld ook.
-  const fill = fillFor(color)
+  // De soort vult het vlak, de status zit in de diepte van diezelfde vulling.
+  // Een training die nog moet gebeuren is donker en dicht: er staat toch
+  // alleen een naam in. Een gedane training is licht, want daar staan de
+  // cijfers in en die lezen als donkere inkt op een licht vlak. Zo zie je aan
+  // de diepte al of er iets gebeurd is, nog voordat je het tekentje leest.
+  //
+  // Hiervoor droeg de rand de status in een signaalkleur. Dat kon niet samen
+  // met een gevuld blokje: de categoriekleur werd het beeld en de rand
+  // verschrompelde tot een lijntje. Nu draagt de kleur de soort en de vorm de
+  // staat, en dat werkt ook voor wie kleuren slecht onderscheidt.
+  const isDone = status === 'completed' || status === 'partial' || status === 'in_progress'
+  const fill = fillFor(color, isDone)
   const statusBg = marker ? 'transparent' : fill
   const tileInk = marker ? P.ink : textOn(fill)
   const statusBorder = marker ? marker.color : STATUS_BORDER[status]
+  const Glyph = marker ? null : STATUS_GLYPH[status]
   const isClickable = !!onClick
 
   // Compacte inhoud-preview onder de titel: oefeningen of cardio-samenvatting.
@@ -639,11 +675,13 @@ function ItemTile({
       )}
       style={{
         background: statusBg,
-        borderLeft: `4px solid ${statusBorder}`,
+        // Markeringen houden hun gekleurde balk links: dat zijn geen
+        // trainingen, ze hebben geen status en geen vulling. Een workout
+        // heeft die balk niet meer nodig, want de vulling zegt al hoe het
+        // ervoor staat.
         border: marker ? `1px solid ${P.line}` : undefined,
-        borderLeftWidth: 4,
-        borderLeftColor: statusBorder,
-        borderLeftStyle: item.kind === 'REST' ? 'dotted' : 'solid',
+        borderLeft: marker ? `4px solid ${statusBorder}` : undefined,
+        borderLeftStyle: marker && item.kind === 'REST' ? 'dotted' : undefined,
         color: tileInk,
       }}
       title={
@@ -660,6 +698,11 @@ function ItemTile({
         </span>
         {!isOpen && <span className="min-w-0 flex-1 truncate">{name}</span>}
         {duration && <span className="text-[10px] opacity-70 shrink-0">{duration}</span>}
+        {!marker && Glyph && (
+          <span className="shrink-0 opacity-80" style={{ color: tileInk }} aria-hidden="true">
+            <Glyph size={10} />
+          </span>
+        )}
         {!readOnly && (
           <button
             type="button"
@@ -678,7 +721,7 @@ function ItemTile({
       {status === 'moved' && movedTo && (
         <div
           className="athletic-mono px-2 pb-1 -mt-0.5 truncate"
-          style={{ fontSize: 9, letterSpacing: '0.04em', color: P.inkDim }}
+          style={{ fontSize: 9, letterSpacing: '0.04em', color: tileInk, opacity: 0.6 }}
         >
           → gedaan op {dagLabelKort(movedTo)}
         </div>
@@ -701,7 +744,7 @@ function ItemTile({
                 <span
                   className="athletic-mono inline-flex items-center"
                   style={{
-                    background: m.bg, color: m.color, fontSize: 9, fontWeight: 900,
+                    ...chipStyle(m, isDone), fontSize: 9, fontWeight: 900,
                     letterSpacing: '0.06em', padding: '1px 6px', borderRadius: 999,
                   }}
                   title={`Voorgeschreven RPE ${item.plannedRpe}`}
@@ -727,7 +770,7 @@ function ItemTile({
         return (
           <div className="px-2 pb-1.5 pt-0.5 min-w-0">
             {statLine && (
-              <div className="athletic-mono truncate" style={{ color: P.ink, fontSize: 10, fontWeight: 700 }}>
+              <div className="athletic-mono truncate" style={{ color: tileInk, fontSize: 10, fontWeight: 700 }}>
                 {statLine}
               </div>
             )}
@@ -739,7 +782,7 @@ function ItemTile({
                     <span
                       className="athletic-mono inline-flex items-center gap-1"
                       style={{
-                        background: m.bg, color: m.color, fontSize: 9, fontWeight: 900,
+                        ...chipStyle(m, isDone), fontSize: 9, fontWeight: 900,
                         letterSpacing: '0.06em', padding: '1px 6px', borderRadius: 999,
                       }}
                     >
@@ -748,7 +791,7 @@ function ItemTile({
                   )
                 })()}
                 {feel && (
-                  <span className="inline-flex items-center gap-1" style={{ fontSize: 9, color: P.inkMuted }}>
+                  <span className="inline-flex items-center gap-1" style={{ fontSize: 9, color: tileInk, opacity: 0.7 }}>
                     <feel.Icon size={11} /> {feel.label}
                   </span>
                 )}

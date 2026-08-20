@@ -91,12 +91,14 @@ export const DATA_COLORS = [
  * Kleur per trainingssoort. Eén bron voor de hele app; de kalender, de
  * oefeningkaarten en de kiezers lezen hier allemaal uit.
  *
- * Belangrijk: deze tinten mogen NIET samenvallen met de statuskleuren van de
- * weekplanner (groen = gedaan, goud = bezig, oranje = deels, koraal = gemist).
- * Op een kalendertegel dragen de twee namelijk allebei betekenis — de rand zegt
- * hoe het ging, het icoon zegt wat het was — en vallen ze samen, dan leest een
- * week vol gemiste trainingen als een week vol afgevinkte trainingen. Daarom
- * koele en gedempte tinten hier, en de warme signaalkleuren voor status.
+ * Deze tinten mochten hiervoor NIET samenvallen met de statuskleuren van de
+ * weekplanner, want rand en icoon droegen toen allebei betekenis op dezelfde
+ * tegel. Die beperking is vervallen: status zit nu in de diepte van de vulling
+ * en in een tekentje rechtsboven, niet meer in de kleur. Daarom kan kracht
+ * amber zijn zonder dat een geplande training als "bezig" leest.
+ *
+ * Wel blijft gelden dat ze onderling genoeg moeten verschillen, en dat ze in
+ * allebei hun dieptes leesbaar zijn. Zie fillFor().
  */
 /**
  * Leesbare tekstkleur op een gekozen vlak.
@@ -124,7 +126,7 @@ export const DATA_COLORS = [
  *
  * Werkt ook op een zelfgekozen kleur uit /therapist/settings/kleuren.
  */
-export function fillFor(color: string): string {
+export function fillFor(color: string, done: boolean): string {
   const m = /^#?([0-9a-f]{6})$/i.exec(color.trim())
   if (!m) return color
   const n = parseInt(m[1], 16)
@@ -142,7 +144,13 @@ export function fillFor(color: string): string {
   }
   // Vaste lichtheid, verzadiging geknepen: anders gaat een fel gekozen kleur
   // alsnog schreeuwen naast de oranje actiekleur.
-  const L = 0.74, S = Math.min(Math.max(sat, 0.28), 0.52)
+  // Nog te doen is donker en dicht: er staat toch alleen een naam in. Gedaan
+  // is licht, want daar staan de cijfers in en die lezen het best als donkere
+  // inkt op een licht vlak.
+  const L = done ? 0.78 : 0.29
+  const S = done
+    ? Math.min(Math.max(sat, 0.34), 0.62)
+    : Math.min(Math.max(sat, 0.30), 0.46)
   const hue = (t: number) => {
     t = (t + 1) % 1
     if (t < 1 / 6) return q0 + (q1 - q0) * 6 * t
@@ -170,11 +178,11 @@ export function textOn(background: string): string {
 }
 
 export const CATEGORY_COLORS: Record<string, string> = {
-  STRENGTH:    '#9FCEC9', // mint
-  MOBILITY:    '#7FB0D8', // staalblauw
-  PLYOMETRICS: '#D9C08A', // zand
-  CARDIO:      '#45A8A2', // diep turquoise
-  STABILITY:   '#B9A6D4', // lila
+  STRENGTH:    '#E9B45C', // amber
+  CARDIO:      '#7FB3DE', // blauw
+  MOBILITY:    '#8FCFC4', // mint
+  PLYOMETRICS: '#E39A78', // perzik
+  STABILITY:   '#B4A2DC', // lila
 }
 
 /** Hartslagzones houden hun eigen oplopende reeks: koel bij laag, warm bij hoog. */
