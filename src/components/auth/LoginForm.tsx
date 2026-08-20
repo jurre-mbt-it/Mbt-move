@@ -274,7 +274,7 @@ export function LoginForm() {
             className="athletic-mono text-center mt-10"
             style={{ color: P.inkDim, fontSize: 10, letterSpacing: '0.16em' }}
           >
-            MBT GYM v1.0
+            BASE by Movement Based Therapy
           </p>
         </>
       )}

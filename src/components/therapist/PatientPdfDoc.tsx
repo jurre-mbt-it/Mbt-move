@@ -349,7 +349,7 @@ export function PatientPdfDocument({ patient, exercises, qrCodes }: Props) {
   const lastWeek = (ex: ExerciseData) => ex.data[ex.data.length - 1]
 
   return (
-    <Document title={`Programma ${patient.name}`} author="MBT Gym">
+    <Document title={`Programma ${patient.name}`} author="BASE">
       <Page size="A4" style={styles.page}>
 
         {/* Header */}

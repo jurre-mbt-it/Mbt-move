@@ -208,7 +208,7 @@ export function TherapistSidebar({ variant = 'therapist' }: { variant?: SidebarV
         style={{ borderColor: P.lineStrong }}
         title={collapsed ? 'Menu uitklappen' : undefined}
         aria-expanded={!collapsed}
-        aria-label={collapsed ? 'Menu uitklappen' : 'MBT Gym'}
+        aria-label={collapsed ? 'Menu uitklappen' : 'BASE'}
         tabIndex={collapsed ? 0 : -1}
       >
         {collapsed ? (
