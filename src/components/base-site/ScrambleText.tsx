@@ -23,6 +23,7 @@ const DURATION = 520
 export function ScrambleText({ text, className }: { text: string; className?: string }) {
   const hostRef = useRef<HTMLSpanElement>(null)
   const rafRef = useRef<number | null>(null)
+  const settleRef = useRef<number | null>(null)
   const chars = text.split('')
 
   const run = useCallback(() => {
@@ -33,6 +34,11 @@ export function ScrambleText({ text, className }: { text: string; className?: st
     const spans = Array.from(host.querySelectorAll<HTMLSpanElement>(`.${styles.ltr}`))
     if (spans.length !== chars.length) return
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+    if (settleRef.current !== null) clearTimeout(settleRef.current)
+
+    const settle = () => {
+      chars.forEach((ch, i) => { spans[i].textContent = ch })
+    }
 
     const start = performance.now()
     const step = (now: number) => {
@@ -48,6 +54,15 @@ export function ScrambleText({ text, className }: { text: string; className?: st
       rafRef.current = p < 1 ? requestAnimationFrame(step) : null
     }
     rafRef.current = requestAnimationFrame(step)
+
+    // Vangnet: requestAnimationFrame staat stil in een achtergrondtab. Zonder
+    // dit blijft een half gescramblede label als onzin staan tot iemand er met
+    // de muis overheen gaat. Een timer loopt daar wel gewoon door.
+    settleRef.current = window.setTimeout(() => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+      settle()
+    }, DURATION + 400)
   }, [chars])
 
   useEffect(() => {
@@ -69,6 +84,7 @@ export function ScrambleText({ text, className }: { text: string; className?: st
     return () => {
       io.disconnect()
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+      if (settleRef.current !== null) clearTimeout(settleRef.current)
     }
   }, [run])
 
