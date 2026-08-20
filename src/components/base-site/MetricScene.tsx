@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import styles from './base-site.module.css'
+import { ScrambleText } from './ScrambleText'
 
 /**
  * Vastgezette scene met de telefoon, naar het model van de ring-sectie op
@@ -160,7 +161,9 @@ export function MetricScene() {
 
           <div className={styles.sceneBody}>
             <div className={styles.sceneCopy}>
-              <p className={styles.eyebrow}>{step.label}</p>
+              <p className={styles.eyebrow}>
+                <ScrambleText key={step.label} text={step.label} />
+              </p>
               <h2 className={`${styles.head} ${styles.headSmall}`}>{step.title}</h2>
               <p className={styles.lede}>{step.note}</p>
               <p className={styles.sceneFoot}>Gezondheid in de BASE-app</p>
