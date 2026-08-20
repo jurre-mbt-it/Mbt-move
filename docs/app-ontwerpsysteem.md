@@ -93,6 +93,25 @@ mono. Ze zijn daar het beeld, niet de meting in een tabel.
 Omvang van deze wijziging: 228 plekken met `uppercase` in de web-app en 54
 mono-plekken in de mobiele app. Mechanisch werk dat geen logica raakt.
 
+**Wat er in code met hoofdletters gebeurde.** Los van de CSS stond er op 285
+plekken een `.toUpperCase()`. Die zijn in augustus 2026 als volgt afgehandeld:
+
+| groep | aantal | besluit |
+|---|---:|---|
+| labels van tegels en velden | 76 | weg |
+| namen van mensen, programma's, protocollen | 81 | weg |
+| datums uit `toLocaleDateString` | 7 | weg |
+| dagafkortingen (MA, DI, WO) | 8 | **blijven**, conventie boven een weekkolom |
+| initialen in een avatar | 5 | **blijven**, een initiaal ís een hoofdletter |
+| functioneel (bevestigingsveld, hexcode-vergelijking) | 8 | **blijven**, geen weergave |
+| hele zinnen in kapitalen | 100 | **blijven voorlopig**, bewuste keuze |
+
+Die laatste groep is bewust niet aangeraakt. Het gaat om zinnen als
+`{n} SETS · DOEL {reps}` en `GEACCEPTEERD OP {datum}`, waar de kapitalen in de
+brontekst staan. Dat vraagt herschrijven per geval en niet één aanroep weghalen:
+haal je alleen de aanroep weg, dan krijg je `Knie 3B · DOOR Jurre Kok`, en dat
+leest slechter dan het origineel. Pak je dit ooit op, doe het dan per scherm.
+
 **Let op de prijs.** Labels in gewone schrijfwijze zijn groter dan mono kapitalen
 van 8,5 pixel. Hetzelfde scherm wordt daardoor ongeveer elf procent hoger. Zet het
 label op 11,5 pixel en breng de kaartpadding een tandje terug als dat knelt.
