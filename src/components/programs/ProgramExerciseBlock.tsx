@@ -72,7 +72,7 @@ function InlineNumber({
       min={min}
       allowEmpty={false}
       className={cn(
-        'w-10 h-5 text-center text-xs font-semibold bg-transparent rounded border-0 focus:outline-none focus:ring-1 focus:ring-[#E87A55]',
+        'w-10 h-5 text-center text-xs font-semibold bg-transparent rounded border-0 focus:outline-none focus:ring-1 focus:ring-[var(--p-brand)]',
         className,
       )}
     />
@@ -94,8 +94,8 @@ function FixedChip({
     // maakt de chip breder dan een smalle kolom, en dan kneep de flex-rij 'm
     // onder zijn tekstbreedte — waarna het label binnen de vaste hoogte brak
     // en over de chips eronder heen viel. Liever een eigen regel.
-    <div className="group/chip inline-flex shrink-0 items-center gap-1 bg-[#1C4448] border border-[rgba(212,232,230,0.06)] rounded-md pl-2 pr-1 py-0.5 text-xs min-h-7">
-      <span className="text-[#9EB5B3] font-medium whitespace-nowrap">{label}</span>
+    <div className="group/chip inline-flex shrink-0 items-center gap-1 bg-[var(--p-surface-hi)] border border-[rgba(212,232,230,0.06)] rounded-md pl-2 pr-1 py-0.5 text-xs min-h-7">
+      <span className="text-[var(--p-ink-muted)] font-medium whitespace-nowrap">{label}</span>
       <span className="flex items-center gap-0.5 text-foreground">{children}</span>
       {(onToggleRange || onRemove) && (
         <span className="flex items-center gap-0.5 ml-0.5">
@@ -107,8 +107,8 @@ function FixedChip({
               className={cn(
                 'w-5 h-5 rounded flex items-center justify-center transition-colors',
                 isRange
-                  ? 'text-[#E87A55] bg-[rgba(232,122,85,0.10)] hover:bg-[rgba(232,122,85,0.18)]'
-                  : 'text-[#9EB5B3] hover:text-foreground hover:bg-[rgba(212,232,230,0.06)]'
+                  ? 'text-[var(--p-brand)] bg-[rgba(232,122,85,0.10)] hover:bg-[rgba(232,122,85,0.18)]'
+                  : 'text-[var(--p-ink-muted)] hover:text-foreground hover:bg-[rgba(212,232,230,0.06)]'
               )}
             >
               <SlidersHorizontal className="w-3 h-3" />
@@ -119,7 +119,7 @@ function FixedChip({
               type="button"
               onClick={onRemove}
               title="Verwijder veld"
-              className="w-5 h-5 rounded flex items-center justify-center text-[#9EB5B3] hover:text-[#F0796C] hover:bg-[rgba(212,232,230,0.06)]"
+              className="w-5 h-5 rounded flex items-center justify-center text-[var(--p-ink-muted)] hover:text-[var(--p-danger)] hover:bg-[rgba(212,232,230,0.06)]"
             >
               <Trash2 className="w-3 h-3" />
             </button>
@@ -157,7 +157,7 @@ function PrescriptionChip({
       onChange={e => on(e.target.value === '' ? null : Number(e.target.value))}
       className={cn(
         w,
-        'h-5 text-center text-xs font-semibold bg-transparent rounded border-0 focus:outline-none focus:ring-1 focus:ring-[#E87A55]',
+        'h-5 text-center text-xs font-semibold bg-transparent rounded border-0 focus:outline-none focus:ring-1 focus:ring-[var(--p-brand)]',
       )}
     />
   )
@@ -169,10 +169,10 @@ function PrescriptionChip({
         // krijgt de chip een accent zodat 'ie niet wegvalt tussen de rest.
         t !== 'NONE'
           ? 'bg-[rgba(232,122,85,0.10)] border border-[rgba(232,122,85,0.40)]'
-          : 'bg-[#1C4448] border border-[rgba(212,232,230,0.06)]',
+          : 'bg-[var(--p-surface-hi)] border border-[rgba(212,232,230,0.06)]',
       )}
     >
-      <span className={cn('font-semibold', t !== 'NONE' ? 'text-[#E87A55]' : 'text-[#9EB5B3]')}>Doel</span>
+      <span className={cn('font-semibold', t !== 'NONE' ? 'text-[var(--p-brand)]' : 'text-[var(--p-ink-muted)]')}>Doel</span>
       <select
         value={t}
         onChange={e =>
@@ -180,24 +180,24 @@ function PrescriptionChip({
           // getal van het vorige type blijft hangen.
           set({ intensityType: e.target.value as IntensityType, intensityMin: null, intensityMax: null, intensityText: null })
         }
-        className="text-xs bg-transparent border-0 rounded px-0.5 h-5 focus:outline-none focus:ring-1 focus:ring-[#E87A55] text-foreground"
+        className="text-xs bg-transparent border-0 rounded px-0.5 h-5 focus:outline-none focus:ring-1 focus:ring-[var(--p-brand)] text-foreground"
       >
         {INTENSITY_TYPES.map(it => (
-          <option key={it} value={it} className="bg-[#1C4448]">{INTENSITY_TYPE_LABELS[it]}</option>
+          <option key={it} value={it} className="bg-[var(--p-surface-hi)]">{INTENSITY_TYPE_LABELS[it]}</option>
         ))}
       </select>
       {(t === 'RPE' || t === 'PERCENT_1RM') && (
         <span className="flex items-center gap-0.5 text-foreground">
           {numInput(exercise.intensityMin, n => set({ intensityMin: n }), t === 'RPE' ? '7' : '70')}
-          <span className="text-[#9EB5B3]">–</span>
+          <span className="text-[var(--p-ink-muted)]">–</span>
           {numInput(exercise.intensityMax, n => set({ intensityMax: n }), t === 'RPE' ? '8' : '75')}
-          {t === 'PERCENT_1RM' && <span className="text-[#9EB5B3]">%</span>}
+          {t === 'PERCENT_1RM' && <span className="text-[var(--p-ink-muted)]">%</span>}
         </span>
       )}
       {t === 'RELATIVE_DAILY_MAX' && (
         <span className="flex items-center gap-0.5 text-foreground">
           {numInput(exercise.intensityMin, n => set({ intensityMin: n }), '-10', 'w-12')}
-          <span className="text-[#9EB5B3]">kg</span>
+          <span className="text-[var(--p-ink-muted)]">kg</span>
         </span>
       )}
       {(t === 'TEXT' || t === 'TECHNIQUE') && (
@@ -206,7 +206,7 @@ function PrescriptionChip({
           value={exercise.intensityText ?? ''}
           placeholder={t === 'TECHNIQUE' ? 'techniek…' : 'vrij voorschrift'}
           onChange={e => set({ intensityText: e.target.value || null })}
-          className="w-28 h-5 text-xs bg-transparent border-0 rounded px-1 focus:outline-none focus:ring-1 focus:ring-[#E87A55] text-foreground"
+          className="w-28 h-5 text-xs bg-transparent border-0 rounded px-1 focus:outline-none focus:ring-1 focus:ring-[var(--p-brand)] text-foreground"
         />
       )}
     </div>
@@ -260,7 +260,7 @@ export function ProgramExerciseBlock({
   // de kleuren die de praktijk zelf heeft ingesteld terwijl de agenda ze wel
   // volgt, en dan lopen twee schermen uit elkaar zodra iemand iets aanpast.
   const catColors = useCategoryColors()
-  const color = catColors[exercise.category] ?? '#E87A55'
+  const color = catColors[exercise.category] ?? 'var(--p-brand)'
 
   const addParam = (tpl: { label: string; type: 'number' | 'text' | 'select' | 'slider'; unit?: string; options?: string[]; min?: number; max?: number; defaultValue?: string | number }) => {
     if (exercise.extraParams.find(p => p.label === tpl.label)) return
@@ -352,9 +352,9 @@ export function ProgramExerciseBlock({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'group rounded-lg border bg-[#15363A] transition-all',
+        'group rounded-lg border bg-[var(--p-surface)] transition-all',
         isDragging ? 'opacity-50 shadow-xl z-50' : 'hover:border-[rgba(212,232,230,0.16)]',
-        exercise.selected && 'ring-2 ring-[#E87A55] border-[#E87A55]',
+        exercise.selected && 'ring-2 ring-[var(--p-brand)] border-[var(--p-brand)]',
         isInSuperset && 'border-transparent'
       )}
     >
@@ -379,7 +379,7 @@ export function ProgramExerciseBlock({
             className="cursor-grab active:cursor-grabbing touch-none shrink-0 p-0.5 -m-0.5 rounded hover:bg-[rgba(212,232,230,0.05)]"
             aria-label="Sleep om te verplaatsen"
           >
-            <GripVertical className="w-4 h-4 text-[#9EB5B3]" />
+            <GripVertical className="w-4 h-4 text-[var(--p-ink-muted)]" />
           </button>
 
           <input
@@ -387,7 +387,7 @@ export function ProgramExerciseBlock({
             checked={exercise.selected}
             onChange={() => onToggleSelect(exercise.uid)}
             onClick={e => e.stopPropagation()}
-            className="w-3.5 h-3.5 shrink-0 accent-[#E87A55]"
+            className="w-3.5 h-3.5 shrink-0 accent-[var(--p-brand)]"
           />
 
           <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
@@ -410,14 +410,14 @@ export function ProgramExerciseBlock({
               title="Klik om te bewerken"
               className="hidden sm:flex items-center gap-1.5 shrink min-w-0 max-w-[60%] group/summary"
             >
-              <span className="athletic-mono text-[11px] whitespace-nowrap text-[#9EB5B3] group-hover/summary:text-foreground transition-colors">
+              <span className="athletic-mono text-[11px] whitespace-nowrap text-[var(--p-ink-muted)] group-hover/summary:text-foreground transition-colors">
                 {formatSetsReps(exercise.sets, exercise.setsMax, exercise.reps, exercise.repsMax, exercise.repUnit)}
-                {exercise.rest > 0 && <span className="text-[#86A3A1]"> · {exercise.rest}s</span>}
+                {exercise.rest > 0 && <span className="text-[var(--p-ink-dim)]"> · {exercise.rest}s</span>}
               </span>
               {prescriptionLabel && (
                 <span
                   className="text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap shrink-0"
-                  style={{ background: 'rgba(232,122,85,0.12)', color: '#E87A55', border: '1px solid rgba(232,122,85,0.30)' }}
+                  style={{ background: 'rgba(232,122,85,0.12)', color: 'var(--p-brand)', border: '1px solid rgba(232,122,85,0.30)' }}
                 >
                   {prescriptionLabel}
                 </span>
@@ -425,18 +425,18 @@ export function ProgramExerciseBlock({
               {filledParamLabels.slice(0, 2).map(label => (
                 <span
                   key={label}
-                  className="athletic-mono text-[10px] whitespace-nowrap truncate text-[#9EB5B3]"
+                  className="athletic-mono text-[10px] whitespace-nowrap truncate text-[var(--p-ink-muted)]"
                 >
                   {label}
                 </span>
               ))}
               {filledParamLabels.length > 2 && (
-                <span className="athletic-mono text-[10px] text-[#86A3A1] shrink-0">
+                <span className="athletic-mono text-[10px] text-[var(--p-ink-dim)] shrink-0">
                   +{filledParamLabels.length - 2}
                 </span>
               )}
               {!!exercise.notes?.trim() && (
-                <StickyNote className="w-3 h-3 shrink-0 text-[#9FCEC9]" aria-label="Heeft patiënt-notitie" />
+                <StickyNote className="w-3 h-3 shrink-0 text-[var(--p-ice)]" aria-label="Heeft patiënt-notitie" />
               )}
             </button>
           )}
@@ -452,7 +452,7 @@ export function ProgramExerciseBlock({
                   title={`Wissel naar gemakkelijker: ${easierEx.name}`}
                   className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide border transition-colors"
                   style={{
-                    color: '#9FCEC9',
+                    color: 'var(--p-ice)',
                     borderColor: 'rgba(159,206,201,0.3)',
                     background: 'rgba(159,206,201,0.08)',
                     letterSpacing: '0.08em',
@@ -469,7 +469,7 @@ export function ProgramExerciseBlock({
                   title={`Wissel naar zwaarder: ${harderEx.name}`}
                   className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide border transition-colors"
                   style={{
-                    color: '#F5B942',
+                    color: 'var(--p-gold)',
                     borderColor: 'rgba(245,185,66,0.3)',
                     background: 'rgba(245,185,66,0.08)',
                     letterSpacing: '0.08em',
@@ -489,7 +489,7 @@ export function ProgramExerciseBlock({
               type="button"
               onClick={e => { e.stopPropagation(); toggleExpanded() }}
               title={isExpanded ? 'Inklappen' : 'Uitklappen om te bewerken'}
-              className="shrink-0 w-6 h-6 rounded flex items-center justify-center text-[#9EB5B3] hover:text-foreground hover:bg-[rgba(212,232,230,0.06)] transition-colors"
+              className="shrink-0 w-6 h-6 rounded flex items-center justify-center text-[var(--p-ink-muted)] hover:text-foreground hover:bg-[rgba(212,232,230,0.06)] transition-colors"
             >
               {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
@@ -510,7 +510,7 @@ export function ProgramExerciseBlock({
                 </DropdownMenuItem>
               )}
               {harderEx && (
-                <DropdownMenuItem onClick={() => onSwapVariant(exercise.uid, 'harder')} className="gap-2 text-[#F5B942]">
+                <DropdownMenuItem onClick={() => onSwapVariant(exercise.uid, 'harder')} className="gap-2 text-[var(--p-gold)]">
                   <ArrowUp className="w-3.5 h-3.5" />
                   Progressie → {harderEx.name}
                 </DropdownMenuItem>
@@ -523,7 +523,7 @@ export function ProgramExerciseBlock({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <button onClick={e => { e.stopPropagation(); onRemove(exercise.uid) }} className="text-[#9EB5B3] hover:text-destructive shrink-0">
+          <button onClick={e => { e.stopPropagation(); onRemove(exercise.uid) }} className="text-[var(--p-ink-muted)] hover:text-destructive shrink-0">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -536,20 +536,20 @@ export function ProgramExerciseBlock({
             onClick={toggleExpanded}
             className="sm:hidden flex items-center gap-1.5 pl-10 pb-1 text-left min-w-0"
           >
-            <span className="athletic-mono text-[11px] whitespace-nowrap text-[#9EB5B3]">
+            <span className="athletic-mono text-[11px] whitespace-nowrap text-[var(--p-ink-muted)]">
               {formatSetsReps(exercise.sets, exercise.setsMax, exercise.reps, exercise.repsMax, exercise.repUnit)}
-              {exercise.rest > 0 && <span className="text-[#86A3A1]"> · {exercise.rest}s</span>}
+              {exercise.rest > 0 && <span className="text-[var(--p-ink-dim)]"> · {exercise.rest}s</span>}
             </span>
             {prescriptionLabel && (
               <span
                 className="text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap truncate"
-                style={{ background: 'rgba(232,122,85,0.12)', color: '#E87A55', border: '1px solid rgba(232,122,85,0.30)' }}
+                style={{ background: 'rgba(232,122,85,0.12)', color: 'var(--p-brand)', border: '1px solid rgba(232,122,85,0.30)' }}
               >
                 {prescriptionLabel}
               </span>
             )}
             {!!exercise.notes?.trim() && (
-              <StickyNote className="w-3 h-3 shrink-0 text-[#9FCEC9]" />
+              <StickyNote className="w-3 h-3 shrink-0 text-[var(--p-ice)]" />
             )}
           </button>
         )}
@@ -574,7 +574,7 @@ export function ProgramExerciseBlock({
               <InlineNumber value={exercise.sets} onChange={v => onUpdate(exercise.uid, { sets: v })} min={1} />
               {exercise.setsMax != null && (
                 <>
-                  <span className="text-[#9EB5B3]">–</span>
+                  <span className="text-[var(--p-ink-muted)]">–</span>
                   <InlineNumber
                     value={exercise.setsMax}
                     onChange={v => onUpdate(exercise.uid, { setsMax: Math.max(exercise.sets, v) })}
@@ -595,7 +595,7 @@ export function ProgramExerciseBlock({
               <InlineNumber value={exercise.reps} onChange={v => onUpdate(exercise.uid, { reps: v })} min={1} />
               {exercise.repsMax != null && (
                 <>
-                  <span className="text-[#9EB5B3]">–</span>
+                  <span className="text-[var(--p-ink-muted)]">–</span>
                   <InlineNumber
                     value={exercise.repsMax}
                     onChange={v => onUpdate(exercise.uid, { repsMax: Math.max(exercise.reps, v) })}
@@ -606,9 +606,9 @@ export function ProgramExerciseBlock({
               <select
                 value={exercise.repUnit}
                 onChange={e => onUpdate(exercise.uid, { repUnit: e.target.value as RepUnit })}
-                className="shrink-0 max-w-[7.5rem] text-xs bg-transparent border-0 rounded px-0.5 h-5 focus:outline-none focus:ring-1 focus:ring-[#E87A55] text-[#9EB5B3]"
+                className="shrink-0 max-w-[7.5rem] text-xs bg-transparent border-0 rounded px-0.5 h-5 focus:outline-none focus:ring-1 focus:ring-[var(--p-brand)] text-[var(--p-ink-muted)]"
               >
-                {REP_UNITS.map(u => <option key={u.value} value={u.value} className="bg-[#1C4448]">{u.label}</option>)}
+                {REP_UNITS.map(u => <option key={u.value} value={u.value} className="bg-[var(--p-surface-hi)]">{u.label}</option>)}
               </select>
             </FixedChip>
 
@@ -616,7 +616,7 @@ export function ProgramExerciseBlock({
                 enkele waarde. */}
             <FixedChip label="Pauze">
               <InlineNumber value={exercise.rest} onChange={v => onUpdate(exercise.uid, { rest: v })} min={0} />
-              <span className="text-[#9EB5B3]">s</span>
+              <span className="text-[var(--p-ink-muted)]">s</span>
             </FixedChip>
 
             {/* Intensiteits-voorschrift (RPE / %1RM / onder daily max / …) */}
@@ -651,7 +651,7 @@ export function ProgramExerciseBlock({
                       />
                       {isRange && (
                         <>
-                          <span className="text-[#9EB5B3]">–</span>
+                          <span className="text-[var(--p-ink-muted)]">–</span>
                           <InlineNumber
                             value={Number(param.valueMax) || 0}
                             onChange={v => updateParamFields(param.id, { valueMax: v })}
@@ -659,7 +659,7 @@ export function ProgramExerciseBlock({
                           />
                         </>
                       )}
-                      {param.unit && <span className="text-[#9EB5B3]">{param.unit}</span>}
+                      {param.unit && <span className="text-[var(--p-ink-muted)]">{param.unit}</span>}
                     </>
                   ) : param.type === 'slider' ? (
                     <>
@@ -669,24 +669,24 @@ export function ProgramExerciseBlock({
                         max={param.max ?? 10}
                         value={param.value as number}
                         onChange={e => updateParam(param.id, Number(e.target.value))}
-                        className="w-14 h-1 accent-[#E87A55]"
+                        className="w-14 h-1 accent-[var(--p-brand)]"
                       />
                       <span className="font-semibold w-4 text-center">{param.value}</span>
                       {isRange && (
                         <>
-                          <span className="text-[#9EB5B3]">–</span>
+                          <span className="text-[var(--p-ink-muted)]">–</span>
                           <input
                             type="range"
                             min={param.min ?? 0}
                             max={param.max ?? 10}
                             value={Number(param.valueMax) || 0}
                             onChange={e => updateParamFields(param.id, { valueMax: Number(e.target.value) })}
-                            className="w-14 h-1 accent-[#E87A55]"
+                            className="w-14 h-1 accent-[var(--p-brand)]"
                           />
                           <span className="font-semibold w-4 text-center">{param.valueMax}</span>
                         </>
                       )}
-                      {param.unit && <span className="text-[#9EB5B3]">{param.unit}</span>}
+                      {param.unit && <span className="text-[var(--p-ink-muted)]">{param.unit}</span>}
                     </>
                   ) : param.type === 'select' && param.options ? (
                     <select
@@ -694,7 +694,7 @@ export function ProgramExerciseBlock({
                       onChange={e => updateParam(param.id, e.target.value)}
                       className="bg-transparent border-0 text-xs font-semibold focus:outline-none"
                     >
-                      {param.options.map(o => <option key={o} className="bg-[#1C4448]">{o}</option>)}
+                      {param.options.map(o => <option key={o} className="bg-[var(--p-surface-hi)]">{o}</option>)}
                     </select>
                   ) : (
                     <input
@@ -714,7 +714,7 @@ export function ProgramExerciseBlock({
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-semibold border border-dashed border-[rgba(212,232,230,0.14)] text-[#9EB5B3] hover:text-[#E87A55] hover:border-[rgba(232,122,85,0.40)] hover:bg-[rgba(232,122,85,0.06)] transition-colors"
+                    className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-semibold border border-dashed border-[rgba(212,232,230,0.14)] text-[var(--p-ink-muted)] hover:text-[var(--p-brand)] hover:border-[rgba(232,122,85,0.40)] hover:bg-[rgba(232,122,85,0.06)] transition-colors"
                   >
                     <Plus className="w-3 h-3" strokeWidth={3} />
                     Parameter
@@ -756,7 +756,7 @@ export function ProgramExerciseBlock({
                 type="button"
                 onClick={() => onUpdate(exercise.uid, { notes: ' ' })}
                 title="Voeg een notitie toe die alleen voor deze patiënt zichtbaar is"
-                className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-semibold border border-dashed border-[rgba(212,232,230,0.14)] text-[#9EB5B3] hover:text-[#9FCEC9] hover:border-[rgba(159,206,201,0.40)] hover:bg-[rgba(159,206,201,0.06)] transition-colors"
+                className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-semibold border border-dashed border-[rgba(212,232,230,0.14)] text-[var(--p-ink-muted)] hover:text-[var(--p-ice)] hover:border-[rgba(159,206,201,0.40)] hover:bg-[rgba(159,206,201,0.06)] transition-colors"
               >
                 <StickyNote className="w-3 h-3" />
                 Notitie
@@ -769,7 +769,7 @@ export function ProgramExerciseBlock({
               programma. Wordt meegestuurd naar de patiënt-app. */}
           {exercise.notes !== null && exercise.notes !== undefined && (
             <div className="flex items-start gap-1.5 mt-1 group/note">
-              <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#9FCEC9] shrink-0 pt-1">
+              <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[var(--p-ice)] shrink-0 pt-1">
                 <StickyNote className="w-2.5 h-2.5" />
                 Voor patiënt
               </div>
@@ -778,13 +778,13 @@ export function ProgramExerciseBlock({
                 onChange={e => onUpdate(exercise.uid, { notes: e.target.value })}
                 placeholder="Specifieke instructie alleen voor deze patiënt, wordt met dit programma meegestuurd."
                 rows={2}
-                className="flex-1 text-xs bg-[#1C4448] border border-[rgba(159,206,201,0.20)] rounded-md px-2 py-1.5 resize-y min-h-[2.5rem] focus:outline-none focus:ring-1 focus:ring-[#9FCEC9] focus:border-[#9FCEC9] placeholder:text-[#86A3A1]"
+                className="flex-1 text-xs bg-[var(--p-surface-hi)] border border-[rgba(159,206,201,0.20)] rounded-md px-2 py-1.5 resize-y min-h-[2.5rem] focus:outline-none focus:ring-1 focus:ring-[var(--p-ice)] focus:border-[var(--p-ice)] placeholder:text-[var(--p-ink-dim)]"
               />
               <button
                 type="button"
                 onClick={() => onUpdate(exercise.uid, { notes: null })}
                 title="Verwijder notitie"
-                className="w-5 h-5 rounded flex items-center justify-center text-[#9EB5B3] hover:text-[#F0796C] hover:bg-[rgba(212,232,230,0.06)] mt-1 shrink-0"
+                className="w-5 h-5 rounded flex items-center justify-center text-[var(--p-ink-muted)] hover:text-[var(--p-danger)] hover:bg-[rgba(212,232,230,0.06)] mt-1 shrink-0"
               >
                 <Trash2 className="w-3 h-3" />
               </button>
@@ -794,7 +794,7 @@ export function ProgramExerciseBlock({
           {/* Inline autosave-status van defaults */}
           {exercise.extraParams.length > 0 && defaultsAutosave.status !== 'idle' && (
             <div
-              className="flex items-center gap-1 text-[10px] font-semibold text-[#9EB5B3]"
+              className="flex items-center gap-1 text-[10px] font-semibold text-[var(--p-ink-muted)]"
               title="Deze parameters worden automatisch als standaard onthouden voor deze oefening."
             >
               {defaultsAutosave.status === 'saving' && (
@@ -804,13 +804,13 @@ export function ProgramExerciseBlock({
                 <><Loader2 className="w-2.5 h-2.5 animate-spin opacity-50" /> Onthouden…</>
               )}
               {defaultsAutosave.status === 'saved' && (
-                <><Check className="w-2.5 h-2.5" style={{ color: '#5FD08A' }} /> Onthouden</>
+                <><Check className="w-2.5 h-2.5" style={{ color: 'var(--p-lime)' }} /> Onthouden</>
               )}
               {defaultsAutosave.status === 'error' && (
                 <button
                   type="button"
                   onClick={() => { void defaultsAutosave.saveNow() }}
-                  className="flex items-center gap-1 text-[#F0796C] hover:text-[#F59B92]"
+                  className="flex items-center gap-1 text-[var(--p-danger)] hover:text-[#F59B92]"
                 >
                   <AlertCircle className="w-2.5 h-2.5" /> Mislukt, opnieuw
                 </button>
@@ -834,8 +834,8 @@ export function ProgramExerciseBlock({
             <VideoPlayer url={exercise.videoUrl} />
           ) : (
             <div className="flex flex-col items-center justify-center py-8 px-4 text-center rounded-xl border-2 border-dashed gap-3">
-              <div className="w-12 h-12 rounded-full bg-[#1C4448] flex items-center justify-center">
-                <Play className="w-5 h-5 text-[#9EB5B3]" />
+              <div className="w-12 h-12 rounded-full bg-[var(--p-surface-hi)] flex items-center justify-center">
+                <Play className="w-5 h-5 text-[var(--p-ink-muted)]" />
               </div>
               <div>
                 <p className="text-sm font-medium">Nog geen video gekoppeld</p>
@@ -851,13 +851,13 @@ export function ProgramExerciseBlock({
                   value={videoUrlDraft}
                   onChange={e => setVideoUrlDraft(e.target.value)}
                   disabled={setVideoUrl.isPending}
-                  className="flex-1 h-9 px-3 text-sm bg-[#1C4448] rounded-md border border-[rgba(212,232,230,0.10)] focus:outline-none focus:ring-1 focus:ring-[#E87A55] focus:border-[#E87A55] placeholder:text-[#86A3A1]"
+                  className="flex-1 h-9 px-3 text-sm bg-[var(--p-surface-hi)] rounded-md border border-[rgba(212,232,230,0.10)] focus:outline-none focus:ring-1 focus:ring-[var(--p-brand)] focus:border-[var(--p-brand)] placeholder:text-[var(--p-ink-dim)]"
                 />
                 <Button
                   type="submit"
                   size="sm"
                   disabled={setVideoUrl.isPending || !videoUrlDraft.trim()}
-                  style={{ background: '#E87A55', color: '#0E2729' }}
+                  style={{ background: 'var(--p-brand)', color: 'var(--p-bg)' }}
                 >
                   {setVideoUrl.isPending ? '…' : 'Koppel'}
                 </Button>

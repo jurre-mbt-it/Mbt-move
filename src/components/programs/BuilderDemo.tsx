@@ -56,7 +56,7 @@ export function BuilderDemo() {
   return (
     <div
       className="mb-3 rounded-xl overflow-hidden"
-      style={{ background: '#15363A', border: '1px solid rgba(212,232,230,0.10)' }}
+      style={{ background: 'var(--p-surface)', border: '1px solid rgba(212,232,230,0.10)' }}
     >
       <div className="flex items-center justify-between gap-3 px-3 pt-2.5">
         <span
@@ -87,7 +87,7 @@ export function BuilderDemo() {
         <div className="flex items-center gap-2 mb-2">
           <div
             className="flex-1 min-w-0 flex items-center gap-1 rounded px-2 h-6"
-            style={{ background: '#1C4448', border: '1px solid rgba(212,232,230,0.10)' }}
+            style={{ background: 'var(--p-surface-hi)', border: '1px solid rgba(212,232,230,0.10)' }}
           >
             <span
               className="mbt-demo-type overflow-hidden whitespace-nowrap"
@@ -182,7 +182,7 @@ function DemoPill({ name, muted, lifted }: { name: string; muted?: boolean; lift
     <div
       className="flex items-center gap-1.5 rounded px-1.5 h-6"
       style={{
-        background: lifted ? '#1C4448' : '#123033',
+        background: lifted ? 'var(--p-surface-hi)' : 'var(--p-surface-low)',
         border: `1px solid ${lifted ? 'rgba(232,122,85,0.45)' : 'rgba(212,232,230,0.10)'}`,
         boxShadow: lifted ? '0 6px 14px rgba(0,0,0,0.35)' : undefined,
         opacity: muted ? 0.45 : 1,
