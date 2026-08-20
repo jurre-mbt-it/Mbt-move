@@ -35,6 +35,7 @@
 | `src/app/api/email/send/route.ts` (wijzigen) | Verliest inline layout en paletkopie. |
 | `src/server/insights/dispatcher.ts` (wijzigen) | `renderCriticalEmail()` over de shell, met BASE als afzender. |
 | `src/server/routers/invite.ts` (wijzigen) | Geeft de echte therapeutnaam en de praktijk door. |
+| `src/server/routers/practice.ts` (wijzigen) | `previewFooter` gaat over de nieuwe footer-API. Tweede aanroeper van de oude, via een dynamische import. |
 
 ---
 
@@ -1047,6 +1048,7 @@ git commit -m "feat(mail): uitnodiging over de gedeelde shell, met echte therape
 
 **Bestanden:**
 - Wijzigen: `src/app/api/email/send/route.ts:120-280` (het hele HTML-blok en de `BRAND`-constante)
+- Wijzigen: `src/server/routers/practice.ts:157-171` (de `previewFooter`-procedure)
 - Test: `src/server/email/__tests__/program-mail.test.ts`
 
 **Interfaces:**
@@ -1239,15 +1241,48 @@ return NextResponse.json({ success: true, sent: true })
 
 Verwijder de directe `fetch` naar `api.resend.com` uit deze route: die loopt nu via `sendMail()`, zodat er één plek is die met Resend praat.
 
-- [ ] **Stap 6: Controleer typecheck en volledige testrun**
+- [ ] **Stap 6: Repareer de tweede aanroeper van de oude footer**
+
+`renderEmailFooter` had twee aanroepers, niet één. De tweede staat in
+`src/server/routers/practice.ts`, in de procedure `previewFooter`, en gebruikt
+een dynamische import. Die rendert de live footer-preview op het scherm met
+praktijkinstellingen, met de nog niet opgeslagen invoer van de therapeut.
+
+Vervang het lichaam van de query:
+
+```ts
+    .query(async ({ ctx, input }) => {
+      const me = await ctx.prisma.user.findUnique({
+        where: { id: ctx.user!.id },
+        select: { firstName: true, lastName: true, jobTitle: true, name: true },
+      })
+      const { renderFooter } = await import('@/server/email/footer')
+      const { resolveSender } = await import('@/server/email/sender')
+      const sender = resolveSender({ therapist: me ?? {}, practice: input.practice ?? null })
+      return { html: renderFooter(sender) }
+    }),
+```
+
+Let op, dit is een bewuste gedragswijziging die je in de code moet vastleggen
+met een kort commentaar: de oude `renderEmailFooter` gaf een lege string terug
+zodra de praktijkgegevens onvolledig waren, dus de preview bleef leeg. De
+nieuwe versie toont dan de BASE-footer. Dat is precies wat de patiënt ook zou
+zien, dus de preview wordt eerlijker. Werk de doc-comment boven de procedure
+bij zodat die klopt.
+
+- [ ] **Stap 7: Controleer typecheck en volledige testrun**
 
 Draai: `npx tsc --noEmit && npm test`
-Verwacht: geen typefouten, alle tests groen.
+Verwacht: geen typefouten, alle tests groen. Vanaf dit punt is de oude
+`renderEmailFooter` nergens meer in gebruik.
 
-- [ ] **Stap 7: Commit**
+Controleer dat expliciet: `grep -rn "renderEmailFooter" src`
+Verwacht: geen resultaten.
+
+- [ ] **Stap 8: Commit**
 
 ```bash
-git add src/server/email/program-mail.ts src/server/email/__tests__/program-mail.test.ts src/app/api/email/send/route.ts
+git add src/server/email/program-mail.ts src/server/email/__tests__/program-mail.test.ts src/app/api/email/send/route.ts src/server/routers/practice.ts
 git commit -m "refactor(mail): programma-mail over de gedeelde shell"
 ```
 
