@@ -103,7 +103,7 @@ export function MfaChallenge() {
           <Button
             type="submit"
             className="w-full"
-            style={{ background: '#E87A55' }}
+            style={{ background: 'var(--p-brand)' }}
             disabled={loading || code.length !== 6}
           >
             {loading ? 'Verifying…' : 'Verify'}

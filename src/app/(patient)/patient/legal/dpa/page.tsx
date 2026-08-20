@@ -392,7 +392,7 @@ export default function DpaPage() {
               className="w-full"
               style={{
                 width: '100%',
-                backgroundColor: hasScrolled ? P.brand : P.surfaceHi,
+                backgroundColor: hasScrolled ? P.ink : P.surfaceHi,
                 color: hasScrolled ? P.bg : P.inkMuted,
                 transition: 'background 0.3s',
               }}

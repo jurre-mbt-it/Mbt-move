@@ -309,9 +309,9 @@ export function MessageThread({
             style={{
               width: 44,
               height: 44,
-              background: body.trim() && !send.isPending ? P.brand : P.surfaceHi,
+              background: body.trim() && !send.isPending ? P.ink : P.surfaceHi,
               color: body.trim() && !send.isPending ? P.bg : P.inkDim,
-              border: `1.5px solid ${body.trim() && !send.isPending ? P.brand : P.line}`,
+              border: `1.5px solid ${body.trim() && !send.isPending ? P.ink : P.line}`,
               fontFamily: mono,
             }}
           >

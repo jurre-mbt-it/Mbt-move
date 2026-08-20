@@ -147,9 +147,9 @@ export default function PatientProgramPage() {
                     onClick={() => router.replace(`/patient/program/${pr.id}`)}
                     className="athletic-tap shrink-0 px-4 py-1.5 rounded-full transition-colors max-w-[220px] truncate"
                     style={{
-                      background: active ? P.brand : P.surface,
+                      background: active ? P.ink : P.surface,
                       color: active ? P.bg : P.ink,
-                      border: `1px solid ${active ? P.brand : P.line}`,
+                      border: `1px solid ${active ? P.ink : P.line}`,
                       fontSize: 12,
                       fontWeight: 800,
                     }}
@@ -172,9 +172,9 @@ export default function PatientProgramPage() {
                 onClick={() => setActiveWeek(w)}
                 className="athletic-tap shrink-0 px-4 py-1.5 rounded-full athletic-mono transition-colors"
                 style={{
-                  background: active ? P.brand : P.surface,
+                  background: active ? P.ink : P.surface,
                   color: active ? P.bg : P.inkMuted,
-                  border: `1px solid ${active ? P.brand : P.line}`,
+                  border: `1px solid ${active ? P.ink : P.line}`,
                   fontSize: 12,
                   fontWeight: 900,
                   letterSpacing: '0.1em',

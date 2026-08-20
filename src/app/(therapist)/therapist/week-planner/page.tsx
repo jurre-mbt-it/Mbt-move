@@ -358,9 +358,9 @@ const isWorkoutKind = (k: ItemKind) => WORKOUT_KINDS.includes(k)
 /** Niet-workout items: eigen kleur, icoon en onderschrift. */
 const MARKER_META: Record<Exclude<ItemKind, 'PROGRAM' | 'WORKOUT'>, { color: string; label: string }> = {
   REST:  { color: P.inkDim, label: 'geen belasting' },
-  NOTE:  { color: '#F5B942', label: 'notitie' },
+  NOTE:  { color: 'var(--p-gold)', label: 'notitie' },
   TEST:  { color: P.ink,    label: 'testbatterij' },
-  EVENT: { color: '#5FD08A', label: 'streefdatum' },
+  EVENT: { color: 'var(--p-lime)', label: 'streefdatum' },
 }
 
 // `moved` = wél gedaan, maar op een andere dag dan gepland. De workout zelf
@@ -716,7 +716,7 @@ function ItemTile({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onRemove() }}
-            className="opacity-0 group-hover/tile:opacity-100 pointer-coarse:opacity-60 transition-opacity shrink-0 hover:!text-[#F0796C]"
+            className="opacity-0 group-hover/tile:opacity-100 pointer-coarse:opacity-60 transition-opacity shrink-0 hover:!text-[var(--p-danger)]"
             style={{ color: tileInk }}
             title="Verwijder"
           >
@@ -1056,8 +1056,8 @@ function DayCell({
         <span
           className={cn('text-xs athletic-mono font-bold', isToday && 'px-1.5 py-px rounded-md')}
           style={{
-            color: isToday ? P.bg : inMonth ? P.brand : P.inkMuted,
-            background: isToday ? P.brand : undefined,
+            color: isToday ? P.bg : inMonth ? P.ink : P.inkMuted,
+            background: isToday ? P.ink : undefined,
           }}
         >
           {date.getDate()}
@@ -1612,7 +1612,7 @@ function WeekMetaDialog({
               style={{ background: isDeload ? P.brand : P.lineStrong }}
             >
               <span
-                className="absolute top-0.5 w-4 h-4 rounded-full bg-[#F5F2ED] transition-transform"
+                className="absolute top-0.5 w-4 h-4 rounded-full bg-[var(--p-ink)] transition-transform"
                 style={{ transform: isDeload ? 'translateX(18px)' : 'translateX(2px)' }}
               />
             </span>
@@ -3160,7 +3160,7 @@ function WeekPlannerContent() {
                             className="p-1 rounded hover:bg-[rgba(212,232,230,0.05)]"
                             title={`Week ${weekNum} acties`}
                           >
-                            <MoreHorizontal className="w-3.5 h-3.5 text-[#9EB5B3]" />
+                            <MoreHorizontal className="w-3.5 h-3.5 text-[var(--p-ink-muted)]" />
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="w-60">

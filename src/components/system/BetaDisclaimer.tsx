@@ -62,42 +62,42 @@ export function BetaDisclaimer() {
         onPointerDownOutside={e => e.preventDefault()}
         onEscapeKeyDown={e => e.preventDefault()}
       >
-        <div className="px-5 pt-6 pb-4" style={{ background: '#15363A' }}>
+        <div className="px-5 pt-6 pb-4" style={{ background: 'var(--p-surface)' }}>
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
-            style={{ background: '#1C4448', border: '1px solid #F5B942' }}
+            style={{ background: 'var(--p-surface-hi)', border: '1px solid var(--p-gold)' }}
           >
-            <AlertTriangle className="w-5 h-5" style={{ color: '#F5B942' }} />
+            <AlertTriangle className="w-5 h-5" style={{ color: 'var(--p-gold)' }} />
           </div>
           <DialogTitle
             className="text-lg font-bold leading-tight tracking-normal"
-            style={{ color: '#F5F2ED' }}
+            style={{ color: 'var(--p-ink)' }}
           >
             Beta-versie
           </DialogTitle>
-          <DialogDescription className="text-sm mt-1" style={{ color: '#9EB5B3' }}>
+          <DialogDescription className="text-sm mt-1" style={{ color: 'var(--p-ink-muted)' }}>
             BASE is op dit moment in beta. Lees de voorwaarden hieronder
             en geef akkoord om door te gaan.
           </DialogDescription>
         </div>
 
-        <div className="px-5 py-4 space-y-3 text-sm" style={{ background: '#081A1C', color: '#F5F2ED' }}>
+        <div className="px-5 py-4 space-y-3 text-sm" style={{ background: 'var(--p-bg)', color: 'var(--p-ink)' }}>
           <p>
             Door gebruik te maken van BASE ga je ermee akkoord dat:
           </p>
-          <ul className="list-disc pl-5 space-y-1.5" style={{ color: '#9EB5B3' }}>
+          <ul className="list-disc pl-5 space-y-1.5" style={{ color: 'var(--p-ink-muted)' }}>
             <li>De software actief in ontwikkeling is, er kunnen bugs of fouten optreden.</li>
             <li>Data verloren kan gaan tijdens deploys, migraties of incidenten.</li>
-            <li>De applicatie <strong style={{ color: '#F5F2ED' }}>niet de leidende bron</strong> is voor klinische beslissingen, verifieer kritieke informatie altijd in jouw eigen systeem.</li>
+            <li>De applicatie <strong style={{ color: 'var(--p-ink)' }}>niet de leidende bron</strong> is voor klinische beslissingen, verifieer kritieke informatie altijd in jouw eigen systeem.</li>
             <li>Je incidenten en bugs zo snel mogelijk meldt zodat we ze kunnen fixen.</li>
           </ul>
         </div>
 
-        <div className="px-5 py-4 flex flex-col gap-2" style={{ background: '#15363A' }}>
+        <div className="px-5 py-4 flex flex-col gap-2" style={{ background: 'var(--p-surface)' }}>
           <Button
             onClick={handleAccept}
             className="w-full font-semibold"
-            style={{ background: '#E87A55', color: '#0E2729' }}
+            style={{ background: 'var(--p-brand)', color: 'var(--p-bg)' }}
           >
             Ik begrijp het en ga akkoord
           </Button>
@@ -105,7 +105,7 @@ export function BetaDisclaimer() {
             variant="ghost"
             onClick={handleLogout}
             className="w-full text-xs gap-1.5"
-            style={{ color: '#9EB5B3' }}
+            style={{ color: 'var(--p-ink-muted)' }}
           >
             <LogOut className="w-3 h-3" /> Uitloggen
           </Button>

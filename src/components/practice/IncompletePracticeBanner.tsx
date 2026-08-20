@@ -61,13 +61,13 @@ export function IncompletePracticeBanner({
         style={{
           background: 'rgba(245,185,66,0.08)',
           border: '1px solid rgba(245,185,66,0.30)',
-          color: '#F5B942',
+          color: 'var(--p-gold)',
         }}
       >
         <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
         <div className="flex-1">
           <p className="font-semibold">Praktijkgegevens incompleet</p>
-          <p className="opacity-90 mt-0.5" style={{ color: '#F5B942' }}>{ownerCopy}</p>
+          <p className="opacity-90 mt-0.5" style={{ color: 'var(--p-gold)' }}>{ownerCopy}</p>
           {isOwner && practice && (
             <Link
               href="/therapist/settings/practice"
@@ -89,19 +89,19 @@ export function IncompletePracticeBanner({
         border: '1px solid rgba(245,185,66,0.30)',
       }}
     >
-      <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" style={{ color: '#F5B942' }} />
+      <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" style={{ color: 'var(--p-gold)' }} />
       <div className="flex-1">
-        <p className="text-sm font-semibold" style={{ color: '#F5B942' }}>
+        <p className="text-sm font-semibold" style={{ color: 'var(--p-gold)' }}>
           Praktijkgegevens incompleet
         </p>
-        <p className="text-xs mt-1" style={{ color: '#F5B942' }}>
+        <p className="text-xs mt-1" style={{ color: 'var(--p-gold)' }}>
           {ownerCopy}
         </p>
         {isOwner && practice && (
           <Link
             href="/therapist/settings/practice"
             className="inline-block mt-2 text-xs font-semibold underline"
-            style={{ color: '#F5B942' }}
+            style={{ color: 'var(--p-gold)' }}
           >
             Praktijkprofiel openen →
           </Link>

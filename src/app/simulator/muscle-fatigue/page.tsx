@@ -22,13 +22,13 @@ import {
 import { MuscleStatusListView } from '@/components/recovery/MuscleStatusList'
 
 const IOS = {
-  bg: '#0E2729',
-  surface: '#15363A',
-  surfaceHi: '#1C4448',
+  bg: 'var(--p-bg)',
+  surface: 'var(--p-surface)',
+  surfaceHi: 'var(--p-surface-hi)',
   line: 'rgba(212,232,230,0.10)',
-  ink: '#F5F2ED',
-  inkMuted: '#9EB5B3',
-  accent: '#E87A55',
+  ink: 'var(--p-ink)',
+  inkMuted: 'var(--p-ink-muted)',
+  accent: 'var(--p-brand)',
 } as const
 
 type StrengthPreset = {
@@ -157,7 +157,7 @@ function Simulator() {
               ) : (
                 entries.map((e) => (
                   <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderTop: `1px solid ${IOS.line}` }}>
-                    <span style={{ width: 8, height: 8, borderRadius: 4, flex: 'none', background: e.kind === 'cardio' ? '#9FCEC9' : IOS.accent }} />
+                    <span style={{ width: 8, height: 8, borderRadius: 4, flex: 'none', background: e.kind === 'cardio' ? 'var(--p-ice)' : IOS.accent }} />
                     <span style={{ flex: 1, fontSize: 13 }}>{e.preset.label}</span>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: IOS.inkMuted }}>
                       <input
@@ -189,7 +189,7 @@ function Simulator() {
               Live resultaat (echt component)
             </div>
             <MuscleStatusListView states={states} />
-            <p style={{ color: '#86A3A1', fontSize: 11, lineHeight: 1.5, marginTop: 14 }}>
+            <p style={{ color: 'var(--p-ink-dim)', fontSize: 11, lineHeight: 1.5, marginTop: 14 }}>
               Herstelde regio&apos;s (≥95%) vallen weg. Cardio belast de benen mee: een duurloop meer dan een fietsrit. Kleuren: groen hersteld → goud → oranje → rood zwaar belast.
             </p>
           </div>

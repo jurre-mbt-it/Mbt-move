@@ -352,7 +352,7 @@ function ActiveProgramsPanel() {
                 id="asTemplate"
                 checked={duplicateAsTemplate}
                 onChange={e => setDuplicateAsTemplate(e.target.checked)}
-                className="accent-[#E87A55]"
+                className="accent-[var(--p-brand)]"
               />
               <label htmlFor="asTemplate" style={{ color: P.ink, fontSize: 13 }}>
                 Opslaan als template

@@ -1588,8 +1588,8 @@ function RepsInput({
               className="athletic-mono athletic-tap"
               style={{
                 color: active ? P.bg : P.inkMuted,
-                background: active ? P.brand : 'transparent',
-                border: `1px solid ${active ? P.brand : P.lineStrong}`,
+                background: active ? P.ink : 'transparent',
+                border: `1px solid ${active ? P.ink : P.lineStrong}`,
                 borderRadius: 4,
                 padding: '2px 6px',
                 fontSize: 10,
@@ -1883,9 +1883,9 @@ function ExercisePicker({
                     onClick={() => setQuickAddCategory(cat)}
                     className="athletic-mono athletic-tap px-2.5 py-1 rounded-full"
                     style={{
-                      background: quickAddCategory === cat ? P.brand : P.surfaceHi,
+                      background: quickAddCategory === cat ? P.ink : P.surfaceHi,
                       color: quickAddCategory === cat ? P.bg : P.inkMuted,
-                      border: `1px solid ${quickAddCategory === cat ? P.brand : P.lineStrong}`,
+                      border: `1px solid ${quickAddCategory === cat ? P.ink : P.lineStrong}`,
                       fontSize: 10,
                       letterSpacing: '0.1em',
                       fontWeight: 900,

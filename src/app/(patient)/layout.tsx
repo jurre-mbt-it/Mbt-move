@@ -13,7 +13,7 @@ export default async function PatientLayout({
   return (
     <div
       className="athletic-dark min-h-screen flex flex-col pb-16"
-      style={{ background: '#0E2729', color: '#F5F2ED' }}
+      style={{ background: 'var(--p-bg)', color: 'var(--p-ink)' }}
     >
       <main className="flex-1"><PageTransition>{children}</PageTransition></main>
       <PatientBottomNav />

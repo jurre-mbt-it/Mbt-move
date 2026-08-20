@@ -275,7 +275,7 @@ export function QuickExerciseBuilder({
                   <span className="flex-1 truncate text-xs" style={{ color: P.ink }}>{e.exerciseName}</span>
                   <button type="button" onClick={() => setList(l => l.filter((_, idx) => idx !== i))}
                     aria-label={`${e.exerciseName} verwijderen`}
-                    style={{ color: P.inkMuted }} className="shrink-0 hover:!text-[#F0796C]">
+                    style={{ color: P.inkMuted }} className="shrink-0 hover:!text-[var(--p-danger)]">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -399,7 +399,7 @@ export function QuickExerciseBuilder({
           const cat = (c.category as Category) ?? 'STRENGTH'
           return (
             <button key={c.id} type="button" onClick={() => add(c)}
-              className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-[#1C4448]"
+              className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-[var(--p-surface-hi)]"
               style={{...CARD }}>
               <span style={{ color: catColors[cat] }}><CategoryIcon category={cat} size={11} /></span>
               <span className="flex-1 truncate text-xs" style={{ color: P.ink }}>{c.name}</span>

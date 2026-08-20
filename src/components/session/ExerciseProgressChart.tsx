@@ -26,13 +26,13 @@ export function ExerciseProgressChart({
         <CartesianGrid stroke="rgba(212,232,230,0.05)" vertical={false} />
         <XAxis
           dataKey="label"
-          tick={{ fill: '#9EB5B3', fontSize: 9, fontFamily: mono }}
+          tick={{ fill: 'var(--p-ink-muted)', fontSize: 9, fontFamily: mono }}
           axisLine={{ stroke: 'rgba(212,232,230,0.12)' }}
           tickLine={false}
           interval="preserveStartEnd"
         />
         <YAxis
-          tick={{ fill: '#9EB5B3', fontSize: 9, fontFamily: mono }}
+          tick={{ fill: 'var(--p-ink-muted)', fontSize: 9, fontFamily: mono }}
           axisLine={false}
           tickLine={false}
           domain={['auto', 'auto']}

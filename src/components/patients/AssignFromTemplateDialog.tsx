@@ -123,12 +123,12 @@ export function AssignFromTemplateDialog({ open, onOpenChange, patient }: Props)
                   className="flex items-center gap-3 p-3 rounded-xl border transition-colors"
                   style={
                     selectedId === t.id
-                      ? { borderColor: '#E87A55', background: 'rgba(232,122,85,0.10)' }
+                      ? { borderColor: 'var(--p-brand)', background: 'rgba(232,122,85,0.10)' }
                       : { borderColor: 'rgba(212,232,230,0.12)' }
                   }
                 >
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: '#1C4448' }}>
-                    <ClipboardList className="w-4 h-4 text-[#9EB5B3]" />
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--p-surface-hi)' }}>
+                    <ClipboardList className="w-4 h-4 text-[var(--p-ink-muted)]" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{t.name}</p>
@@ -157,7 +157,7 @@ export function AssignFromTemplateDialog({ open, onOpenChange, patient }: Props)
             </Button>
             <Button
               className="flex-1 gap-2"
-              style={{ background: '#E87A55', color: '#0E2729' }}
+              style={{ background: 'var(--p-brand)', color: 'var(--p-bg)' }}
               disabled={!selected || !startDate || busy}
               onClick={handleAssignAndDeploy}
             >

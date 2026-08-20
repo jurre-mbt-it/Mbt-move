@@ -8,7 +8,7 @@ export default function LoginPage() {
   return (
     <div
       className="athletic-dark min-h-screen flex items-center justify-center p-4"
-      style={{ background: '#0E2729' }}
+      style={{ background: 'var(--p-bg)' }}
     >
       <LoginForm />
     </div>

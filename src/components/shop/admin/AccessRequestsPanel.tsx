@@ -51,7 +51,7 @@ export function AccessRequestsPanel() {
                 <span className="font-medium truncate">{r.name}</span>
                 <a
                   href={`mailto:${r.email}`}
-                  className="text-sm truncate hover:text-[#F5F2ED] transition-colors"
+                  className="text-sm truncate hover:text-[var(--p-ink)] transition-colors"
                   style={{ color: P.brand }}
                 >
                   {r.email}

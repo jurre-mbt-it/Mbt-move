@@ -372,7 +372,7 @@ export default function PracticeSettingsPage() {
                     onClick={() => removeLogoMutation.mutate()}
                     disabled={removeLogoMutation.isPending}
                     className="flex items-center gap-1 text-xs"
-                    style={{ color: P.danger ?? '#F0796C' }}
+                    style={{ color: P.danger ?? 'var(--p-danger)' }}
                   >
                     <Trash2 className="w-3 h-3" />
                     Verwijder logo
@@ -533,32 +533,32 @@ function buildPreviewHtml(footer: string): string {
   // Simuleert een ingekorte versie van de echte programma-mail (zelfde dark
   // MBT brand) zodat de therapeut ziet hoe de footer aansluit.
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-    <body style="margin:0;padding:0;background:#0E2729;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0E2729;padding:24px 16px;">
+    <body style="margin:0;padding:0;background:var(--p-bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:var(--p-bg);padding:24px 16px;">
         <tr><td align="center">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#15363A;border:1px solid rgba(212,232,230,0.12);border-radius:20px;overflow:hidden;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:var(--p-surface);border:1px solid rgba(212,232,230,0.12);border-radius:20px;overflow:hidden;">
             <tr><td style="padding:24px 24px 8px 24px;">
-              <div style="font-family:ui-monospace,Menlo,'SF Mono',monospace;font-size:11px;letter-spacing:0.2em;color:#E87A55;font-weight:900;">● MBT · GYM</div>
+              <div style="font-family:ui-monospace,Menlo,'SF Mono',monospace;font-size:11px;letter-spacing:0.2em;color:var(--p-brand);font-weight:900;">● MBT · GYM</div>
             </td></tr>
             <tr><td style="padding:6px 24px 0 24px;">
-              <h1 style="margin:0;padding:4px 0 0 0;font-size:26px;line-height:32px;font-weight:900;letter-spacing:-1px;color:#F5F2ED;text-transform:uppercase;">HALLO {voornaam}</h1>
+              <h1 style="margin:0;padding:4px 0 0 0;font-size:26px;line-height:32px;font-weight:900;letter-spacing:-1px;color:var(--p-ink);text-transform:uppercase;">HALLO {voornaam}</h1>
             </td></tr>
             <tr><td style="padding:12px 24px 0 24px;">
-              <p style="margin:0;color:#9EB5B3;font-size:14px;line-height:21px;">Je therapeut heeft een revalidatieprogramma voor je klaargezet.</p>
+              <p style="margin:0;color:var(--p-ink-muted);font-size:14px;line-height:21px;">Je therapeut heeft een revalidatieprogramma voor je klaargezet.</p>
             </td></tr>
             <tr><td style="padding:16px 24px 0 24px;">
-              <div style="background:#1C4448;border:1px solid rgba(212,232,230,0.12);border-radius:12px;padding:14px;">
-                <div style="font-family:ui-monospace,Menlo,monospace;font-size:10px;letter-spacing:0.14em;color:#9EB5B3;text-transform:uppercase;font-weight:700;">PROGRAMMA</div>
-                <div style="color:#F5F2ED;font-size:15px;font-weight:700;margin-top:4px;">Revalidatieprogramma, voorbeeld</div>
+              <div style="background:var(--p-surface-hi);border:1px solid rgba(212,232,230,0.12);border-radius:12px;padding:14px;">
+                <div style="font-family:ui-monospace,Menlo,monospace;font-size:10px;letter-spacing:0.14em;color:var(--p-ink-muted);text-transform:uppercase;font-weight:700;">PROGRAMMA</div>
+                <div style="color:var(--p-ink);font-size:15px;font-weight:700;margin-top:4px;">Revalidatieprogramma, voorbeeld</div>
               </div>
             </td></tr>
             <tr><td style="padding:18px 24px 0 24px;">
-              <div style="background:#E87A55;color:#0E2729;text-align:center;padding:14px 20px;border-radius:12px;font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:900;letter-spacing:0.16em;text-transform:uppercase;">PROGRAMMA OPENEN →</div>
+              <div style="background:var(--p-brand);color:var(--p-bg);text-align:center;padding:14px 20px;border-radius:12px;font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:900;letter-spacing:0.16em;text-transform:uppercase;">PROGRAMMA OPENEN →</div>
             </td></tr>
             ${footer
               ? `<tr><td style="padding:18px 24px 24px 24px;">${footer}</td></tr>`
               : `<tr><td style="padding:20px 24px 24px 24px;">
-                  <div style="background:rgba(245,185,66,0.10);border:1px solid rgba(245,185,66,0.30);border-radius:8px;padding:12px;font-size:12px;color:#F5B942;line-height:1.5;">
+                  <div style="background:rgba(245,185,66,0.10);border:1px solid rgba(245,185,66,0.30);border-radius:8px;padding:12px;font-size:12px;color:var(--p-gold);line-height:1.5;">
                     <IconWarning size={13} className="inline-block mr-1 align-[-2px]" /> Geen footer, vul minimaal praktijknaam, adres, plaats en telefoon óf email in.
                   </div>
                 </td></tr>`

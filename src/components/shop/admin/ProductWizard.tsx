@@ -277,9 +277,9 @@ function TogglePill({
         size === 'sm' ? 'px-3 py-1.5 text-xs' : 'px-4 py-1.5 text-sm'
       }`}
       style={{
-        background: active ? P.brand : P.surfaceHi,
+        background: active ? P.ink : P.surfaceHi,
         color: active ? P.bg : P.inkMuted,
-        border: `1px solid ${active ? P.brand : P.line}`,
+        border: `1px solid ${active ? P.ink : P.line}`,
       }}
     >
       {children}
@@ -490,7 +490,7 @@ export function ProductWizard({
                 <span
                   className="flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold"
                   style={{
-                    background: active ? P.brand : P.surfaceHi,
+                    background: active ? P.ink : P.surfaceHi,
                     color: active ? P.bg : P.inkMuted,
                   }}
                 >
@@ -677,9 +677,9 @@ export function ProductWizard({
                     <span
                       className="flex h-5 w-5 items-center justify-center rounded-md text-[11px] font-bold transition-colors"
                       style={{
-                        background: editor.requiresShipping ? P.brand : P.surfaceHi,
+                        background: editor.requiresShipping ? P.ink : P.surfaceHi,
                         color: editor.requiresShipping ? P.bg : 'transparent',
-                        border: `1px solid ${editor.requiresShipping ? P.brand : P.line}`,
+                        border: `1px solid ${editor.requiresShipping ? P.ink : P.line}`,
                       }}
                     >
                       ✓
@@ -963,7 +963,7 @@ export function ProductWizard({
               href={`/programma/${editor.slug}`}
               target="_blank"
               rel="noreferrer"
-              className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium transition-colors hover:text-[#F5F2ED]"
+              className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium transition-colors hover:text-[var(--p-ink)]"
               style={{ color: P.inkMuted }}
             >
               <ExternalLink size={13} /> Open productpagina in nieuw tabblad

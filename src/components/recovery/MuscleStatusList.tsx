@@ -23,11 +23,11 @@ import {
 // iOS-merktokens (petrol/oranje). Bewust hardgecodeerd zodat de lijst als de
 // iOS-app leest, los van de web dark-ui P (die is bijna-zwart).
 const IOS = {
-  surface: '#15363A',
-  surfaceHi: '#1C4448',
+  surface: 'var(--p-surface)',
+  surfaceHi: 'var(--p-surface-hi)',
   line: 'rgba(212,232,230,0.08)',
-  ink: '#F5F2ED',
-  inkMuted: '#9EB5B3',
+  ink: 'var(--p-ink)',
+  inkMuted: 'var(--p-ink-muted)',
 } as const
 
 const MONO = 'var(--font-mono-athletic)'

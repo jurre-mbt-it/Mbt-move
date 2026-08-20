@@ -20,7 +20,7 @@ export default async function TherapistLayout({
   return (
     <div
       className="athletic-dark flex h-screen overflow-hidden"
-      style={{ background: '#0E2729', color: '#F5F2ED' }}
+      style={{ background: 'var(--p-bg)', color: 'var(--p-ink)' }}
     >
       {/* Sidebar: alleen op desktop */}
       <div className="hidden md:flex">
@@ -32,7 +32,7 @@ export default async function TherapistLayout({
         {/* Extra padding-bottom op mobiel voor bottom nav */}
         <main
           className="flex-1 overflow-y-auto px-4 pt-4 pb-24 md:px-8 md:pt-6 md:pb-8"
-          style={{ background: '#0E2729' }}
+          style={{ background: 'var(--p-bg)' }}
         >
           <PageTransition>{children}</PageTransition>
         </main>

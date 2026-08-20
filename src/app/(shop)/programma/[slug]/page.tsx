@@ -58,7 +58,7 @@ export default async function ProductDetailPage({
     <div className="mx-auto max-w-6xl px-5 py-12">
       <Link
         href="/shop"
-        className="text-sm transition-colors hover:text-[#F5F2ED]"
+        className="text-sm transition-colors hover:text-[var(--p-ink)]"
         style={{ color: P.inkMuted }}
       >
         ← Terug naar de shop
@@ -176,7 +176,7 @@ export default async function ProductDetailPage({
                   href={product.previewVideoUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-8 inline-flex items-center gap-2 text-sm font-medium transition-colors hover:text-[#F5F2ED]"
+                  className="mt-8 inline-flex items-center gap-2 text-sm font-medium transition-colors hover:text-[var(--p-ink)]"
                   style={{ color: P.brand }}
                 >
                   ▶ Bekijk een preview-video

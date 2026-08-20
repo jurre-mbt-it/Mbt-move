@@ -41,7 +41,7 @@ export function VideoPlayer({ url, className }: VideoPlayerProps) {
           className="absolute inset-0 w-full h-full border-0"
         />
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center text-[#86A3A1] text-sm">
+        <div className="absolute inset-0 flex items-center justify-center text-[var(--p-ink-dim)] text-sm">
           Geen geldige video URL
         </div>
       )}

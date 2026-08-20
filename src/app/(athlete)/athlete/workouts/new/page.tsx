@@ -955,9 +955,9 @@ function ExercisePickerView({
             className="shrink-0 rounded-full transition-colors"
             style={{
               padding: '6px 14px',
-              background: !categoryFilter ? P.brand : P.surface,
+              background: !categoryFilter ? P.ink : P.surface,
               color: !categoryFilter ? P.bg : P.inkMuted,
-              border: `1px solid ${!categoryFilter ? P.brand : P.line}`,
+              border: `1px solid ${!categoryFilter ? P.ink : P.line}`,
               fontFamily: mono,
               fontSize: 10,
               fontWeight: 900,

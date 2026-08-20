@@ -6,11 +6,11 @@
  * de (webview-)app.
  */
 
-const BG = '#0E2729'
-const SURFACE_LOW = '#081A1C'
-const INK_MUTED = '#9EB5B3'
-const BRAND = '#E87A55'
-const LIME = '#5FD08A'
+const BG = 'var(--p-bg)'
+const SURFACE_LOW = 'var(--p-bg)'
+const INK_MUTED = 'var(--p-ink-muted)'
+const BRAND = 'var(--p-brand)'
+const LIME = 'var(--p-lime)'
 
 // Oplopende doelhoogtes (%) — leest als progressieve overbelasting: elke set
 // iets zwaarder dan de vorige.
@@ -146,7 +146,7 @@ export function AppLoader() {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
         <span
           style={{
-            color: '#F5F2ED',
+            color: 'var(--p-ink)',
             fontSize: 26,
             fontWeight: 900,
             letterSpacing: '0.18em',

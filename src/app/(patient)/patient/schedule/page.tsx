@@ -214,9 +214,9 @@ export default function PatientSchedulePage() {
                   onClick={() => { setSelectedProgramId(p.id); setSelectedDay(todayDayNum) }}
                   className="athletic-tap athletic-mono shrink-0 rounded-full px-3.5 py-2 transition-all"
                   style={{
-                    background: isActive ? P.brand : P.surface,
+                    background: isActive ? P.ink : P.surface,
                     color: isActive ? P.bg : P.inkMuted,
-                    border: `1.5px solid ${isActive ? P.brand : P.line}`,
+                    border: `1.5px solid ${isActive ? P.ink : P.line}`,
                     fontSize: 11,
                     fontWeight: 800,
                     letterSpacing: '0.06em',

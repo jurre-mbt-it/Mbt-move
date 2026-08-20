@@ -160,7 +160,7 @@ function FeedbackModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end">
-      <div className="absolute inset-0 bg-[#081A1C]/72" onClick={onSave} />
+      <div className="absolute inset-0 bg-[var(--p-bg)]/72" onClick={onSave} />
       <div
         className="relative w-full rounded-t-3xl px-5 pt-5 pb-8 space-y-5"
         style={{...CARD, maxWidth: 480, margin: '0 auto',}}

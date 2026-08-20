@@ -71,7 +71,7 @@ export function WorkoutPlayer({ slug }: { slug: string }) {
     <Shell>
       <Link
         href="/mijn-programmas"
-        className="text-sm transition-colors hover:text-[#F5F2ED]"
+        className="text-sm transition-colors hover:text-[var(--p-ink)]"
         style={{ color: P.inkMuted }}
       >
         ← Mijn programma&apos;s
@@ -95,9 +95,9 @@ export function WorkoutPlayer({ slug }: { slug: string }) {
               }}
               className="rounded-full px-4 py-1.5 text-sm font-semibold transition-colors"
               style={{
-                background: active ? P.brand : P.surface,
+                background: active ? P.ink : P.surface,
                 color: active ? P.bg : P.inkMuted,
-                border: `1px solid ${active ? P.brand : P.line}`,
+                border: `1px solid ${active ? P.ink : P.line}`,
               }}
             >
               Week {w.week}
@@ -182,8 +182,8 @@ export function WorkoutPlayer({ slug }: { slug: string }) {
                         onClick={() => toggle(item.id)}
                         className="shrink-0 flex h-9 w-9 items-center justify-center rounded-full transition-colors"
                         style={{
-                          background: isDone ? P.brand : 'transparent',
-                          border: `1.5px solid ${isDone ? P.brand : P.lineStrong}`,
+                          background: isDone ? P.ink : 'transparent',
+                          border: `1.5px solid ${isDone ? P.ink : P.lineStrong}`,
                           color: isDone ? P.bg : P.inkDim,
                         }}
                         aria-label={isDone ? 'Afgevinkt' : 'Vink af'}

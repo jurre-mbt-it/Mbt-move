@@ -350,9 +350,9 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
                     className="athletic-tap athletic-mono flex-1 rounded-lg transition-colors"
                     style={{
                       padding: '10px 0',
-                      background: active ? P.brand : P.surface,
+                      background: active ? P.ink : P.surface,
                       color: active ? P.bg : P.inkMuted,
-                      border: `1px solid ${active ? P.brand : P.line}`,
+                      border: `1px solid ${active ? P.ink : P.line}`,
                       fontSize: 11,
                       fontWeight: 900,
                       letterSpacing: '0.14em',
@@ -380,9 +380,9 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
                     className="athletic-tap athletic-mono rounded-full transition-colors"
                     style={{
                       padding: '6px 12px',
-                      background: active ? P.brand : P.surface,
+                      background: active ? P.ink : P.surface,
                       color: active ? P.bg : P.inkMuted,
-                      border: `1px solid ${active ? P.brand : P.line}`,
+                      border: `1px solid ${active ? P.ink : P.line}`,
                       fontSize: 10,
                       fontWeight: 900,
                       letterSpacing: '0.12em',
@@ -418,9 +418,9 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
                 disabled={!tagDraft.trim()}
                 className="athletic-tap rounded-xl shrink-0 flex items-center justify-center"
                 style={{
-                  background: tagDraft.trim() ? P.brand : P.surfaceHi,
+                  background: tagDraft.trim() ? P.ink : P.surfaceHi,
                   color: tagDraft.trim() ? P.bg : P.inkDim,
-                  border: `1px solid ${tagDraft.trim() ? P.brand : P.lineStrong}`,
+                  border: `1px solid ${tagDraft.trim() ? P.ink : P.lineStrong}`,
                   width: 48,
                   height: 48,
                   fontSize: 18,

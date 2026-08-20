@@ -50,14 +50,14 @@ export default async function ShopLayout({
             <span className="sm:hidden">{SHOP_BRAND.short}</span>
           </Link>
           <nav className="flex items-center gap-6 text-sm" style={{ color: P.inkMuted }}>
-            <Link href="/shop" className="hover:text-[#F5F2ED] transition-colors">
+            <Link href="/shop" className="hover:text-[var(--p-ink)] transition-colors">
               Programma&apos;s
             </Link>
-            <Link href="/intake" className="hover:text-[#F5F2ED] transition-colors">
+            <Link href="/intake" className="hover:text-[var(--p-ink)] transition-colors">
               Vind jouw schema
             </Link>
             {user ? (
-              <Link href="/mijn-programmas" className="hover:text-[#F5F2ED] transition-colors">
+              <Link href="/mijn-programmas" className="hover:text-[var(--p-ink)] transition-colors">
                 Mijn programma&apos;s
               </Link>
             ) : (

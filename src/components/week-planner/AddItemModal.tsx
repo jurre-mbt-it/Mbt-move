@@ -83,17 +83,17 @@ type Tile = {
 
 const TILES: Record<TileKey, Tile> = {
   strength:  { label: 'Kracht',      color: CATEGORY_COLORS.STRENGTH,   Icon: IconStrength,             category: 'STRENGTH',    minutes: 45 },
-  run:       { label: 'Hardlopen',   color: '#E87A55',                  Icon: CARDIO_ICON_MAP.RUNNING,  category: 'CARDIO',      minutes: 30, activity: 'RUNNING' },
-  bike:      { label: 'Fietsen',     color: '#9FCEC9',                  Icon: CARDIO_ICON_MAP.CYCLING,  category: 'CARDIO',      minutes: 45, activity: 'CYCLING' },
+  run:       { label: 'Hardlopen',   color: 'var(--p-brand)',                  Icon: CARDIO_ICON_MAP.RUNNING,  category: 'CARDIO',      minutes: 30, activity: 'RUNNING' },
+  bike:      { label: 'Fietsen',     color: 'var(--p-ice)',                  Icon: CARDIO_ICON_MAP.CYCLING,  category: 'CARDIO',      minutes: 45, activity: 'CYCLING' },
   mobility:  { label: 'Mobiliteit',  color: CATEGORY_COLORS.MOBILITY,   Icon: IconMobility,             category: 'MOBILITY',    minutes: 20 },
   aerobic:   { label: 'Aerobic',     color: CATEGORY_COLORS.CARDIO,     Icon: IconCardio,               category: 'CARDIO',      minutes: 30 },
   stability: { label: 'Stabiliteit', color: CATEGORY_COLORS.STABILITY,  Icon: IconCore,                 category: 'STABILITY',   minutes: 25 },
   plyo:      { label: 'Plyometrie',  color: CATEGORY_COLORS.PLYOMETRICS, Icon: IconPlyometrics,         category: 'PLYOMETRICS', minutes: 20 },
   rest:      { label: 'Rustdag',     color: P.inkDim,                   Icon: Moon },
   library:   { label: 'Bibliotheek', color: P.ink,                      Icon: Layers },
-  note:      { label: 'Notitie',     color: '#F5B942',                  Icon: StickyNote },
+  note:      { label: 'Notitie',     color: 'var(--p-gold)',                  Icon: StickyNote },
   test:      { label: 'Test/meting', color: P.ink,                      Icon: ClipboardCheck },
-  event:     { label: 'Doel/datum',  color: '#5FD08A',                  Icon: Flag },
+  event:     { label: 'Doel/datum',  color: 'var(--p-lime)',                  Icon: Flag },
 }
 
 const ROW_1: TileKey[] = ['strength', 'run', 'bike', 'mobility']
@@ -328,7 +328,7 @@ export function AddItemModal({
                   type="button"
                   onClick={() => send({ kind: 'program', programId: p.id, notes: null })}
                   disabled={busy}
-                  className="w-full text-left px-3 py-2 rounded-lg mbt-card-hover athletic-tap flex items-center gap-2 bg-[#15363A] border border-[rgba(212,232,230,0.12)]"
+                  className="w-full text-left px-3 py-2 rounded-lg mbt-card-hover athletic-tap flex items-center gap-2 bg-[var(--p-surface)] border border-[rgba(212,232,230,0.12)]"
                 >
                   <span className="flex-1 truncate text-sm">{p.name}</span>
                   {p.isTemplate && (

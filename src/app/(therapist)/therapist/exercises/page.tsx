@@ -246,7 +246,7 @@ export default function ExercisesPage() {
             onClick={() => setActiveCollection(null)}
             className="shrink-0 px-3 py-1.5 rounded-full athletic-mono transition-colors"
             style={{
-              background: activeCollection === null ? P.brand : 'transparent',
+              background: activeCollection === null ? P.ink : 'transparent',
               color: activeCollection === null ? P.bg : P.inkMuted,
               border: activeCollection === null ? 'none' : `1px solid ${P.lineStrong}`,
               fontSize: 11,
@@ -370,8 +370,8 @@ export default function ExercisesPage() {
             className="athletic-tap inline-flex items-center gap-1.5 px-3 py-2 rounded-xl transition-colors"
             style={{
               background: favoritesOnly ? 'rgba(240,121,108,0.12)' : 'transparent',
-              border: `1px solid ${favoritesOnly ? '#F0796C' : P.lineStrong}`,
-              color: favoritesOnly ? '#F0796C' : P.inkMuted,
+              border: `1px solid ${favoritesOnly ? 'var(--p-danger)' : P.lineStrong}`,
+              color: favoritesOnly ? 'var(--p-danger)' : P.inkMuted,
               fontSize: 12,
               fontWeight: 800,
               letterSpacing: '0.04em',
@@ -380,7 +380,7 @@ export default function ExercisesPage() {
             <Heart
               className="w-3.5 h-3.5"
               style={{
-                fill: favoritesOnly ? '#F0796C' : 'transparent',
+                fill: favoritesOnly ? 'var(--p-danger)' : 'transparent',
                 strokeWidth: 2,
               }}
             />
@@ -403,7 +403,7 @@ export default function ExercisesPage() {
               onClick={() => setView('grid')}
               className="px-3 py-2 athletic-mono transition-colors"
               style={{
-                background: view === 'grid' ? P.brand : 'transparent',
+                background: view === 'grid' ? P.ink : 'transparent',
                 color: view === 'grid' ? P.bg : P.inkMuted,
                 fontSize: 11,
                 fontWeight: 800,
@@ -416,7 +416,7 @@ export default function ExercisesPage() {
               onClick={() => setView('list')}
               className="px-3 py-2 athletic-mono transition-colors"
               style={{
-                background: view === 'list' ? P.brand : 'transparent',
+                background: view === 'list' ? P.ink : 'transparent',
                 color: view === 'list' ? P.bg : P.inkMuted,
                 fontSize: 11,
                 fontWeight: 800,
@@ -442,9 +442,9 @@ export default function ExercisesPage() {
                       onClick={() => setSelectedCategory(selectedCategory === c.value ? null : c.value)}
                       className="px-2.5 py-1 rounded-full athletic-mono transition-colors"
                       style={{
-                        background: selectedCategory === c.value ? P.brand : P.surfaceHi,
+                        background: selectedCategory === c.value ? P.ink : P.surfaceHi,
                         color: selectedCategory === c.value ? P.bg : P.inkMuted,
-                        border: `1px solid ${selectedCategory === c.value ? P.brand : P.lineStrong}`,
+                        border: `1px solid ${selectedCategory === c.value ? P.ink : P.lineStrong}`,
                         fontSize: 10,
                         fontWeight: 800,
                         letterSpacing: '0.08em',
@@ -466,9 +466,9 @@ export default function ExercisesPage() {
                       onClick={() => setSelectedRegion(selectedRegion === r.value ? null : r.value)}
                       className="px-2.5 py-1 rounded-full athletic-mono transition-colors"
                       style={{
-                        background: selectedRegion === r.value ? P.brand : P.surfaceHi,
+                        background: selectedRegion === r.value ? P.ink : P.surfaceHi,
                         color: selectedRegion === r.value ? P.bg : P.inkMuted,
-                        border: `1px solid ${selectedRegion === r.value ? P.brand : P.lineStrong}`,
+                        border: `1px solid ${selectedRegion === r.value ? P.ink : P.lineStrong}`,
                         fontSize: 10,
                         fontWeight: 800,
                         letterSpacing: '0.08em',
@@ -490,9 +490,9 @@ export default function ExercisesPage() {
                       onClick={() => setSelectedDifficulty(selectedDifficulty === d.value ? null : d.value)}
                       className="px-2.5 py-1 rounded-full athletic-mono transition-colors"
                       style={{
-                        background: selectedDifficulty === d.value ? P.brand : P.surfaceHi,
+                        background: selectedDifficulty === d.value ? P.ink : P.surfaceHi,
                         color: selectedDifficulty === d.value ? P.bg : P.inkMuted,
-                        border: `1px solid ${selectedDifficulty === d.value ? P.brand : P.lineStrong}`,
+                        border: `1px solid ${selectedDifficulty === d.value ? P.ink : P.lineStrong}`,
                         fontSize: 10,
                         fontWeight: 800,
                         letterSpacing: '0.08em',
@@ -608,8 +608,8 @@ export default function ExercisesPage() {
                       <Heart
                         className="w-3.5 h-3.5"
                         style={{
-                          color: ex.isFavorite ? '#F0796C' : P.inkMuted,
-                          fill: ex.isFavorite ? '#F0796C' : 'transparent',
+                          color: ex.isFavorite ? 'var(--p-danger)' : P.inkMuted,
+                          fill: ex.isFavorite ? 'var(--p-danger)' : 'transparent',
                           strokeWidth: 2,
                         }}
                       />

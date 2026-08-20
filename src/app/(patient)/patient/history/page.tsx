@@ -100,7 +100,7 @@ export default function HistoryPage() {
                   onClick={() => setActiveChart('volume')}
                   className="athletic-tap px-3 py-1.5 transition-all"
                   style={{
-                    backgroundColor: activeChart === 'volume' ? P.brand : 'transparent',
+                    backgroundColor: activeChart === 'volume' ? P.ink : 'transparent',
                     color: activeChart === 'volume' ? P.bg : P.inkMuted,
                     fontSize: 11,
                     fontWeight: 900,
@@ -114,7 +114,7 @@ export default function HistoryPage() {
                   onClick={() => setActiveChart('pain')}
                   className="athletic-tap px-3 py-1.5 transition-all"
                   style={{
-                    backgroundColor: activeChart === 'pain' ? P.brand : 'transparent',
+                    backgroundColor: activeChart === 'pain' ? P.ink : 'transparent',
                     color: activeChart === 'pain' ? P.bg : P.inkMuted,
                     fontSize: 11,
                     fontWeight: 900,

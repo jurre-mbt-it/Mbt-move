@@ -853,7 +853,7 @@ function AddItemDialog({
                 className="athletic-tap rounded-lg px-3 py-1.5 text-xs"
                 style={{
                   background: mode === m ? P.surfaceHi : 'transparent',
-                  border: `1px solid ${mode === m ? P.brand : P.lineStrong}`,
+                  border: `1px solid ${mode === m ? P.ink : P.lineStrong}`,
                   color: mode === m ? P.ink : P.inkMuted,
                 }}
               >

@@ -267,7 +267,7 @@ export default function AdminEducationPage() {
                       if (confirm(`"${r.title}" verwijderen?`)) del.mutate({ id: r.id })
                     }}
                     className="p-2 rounded-lg shrink-0"
-                    style={{ color: P.danger ?? '#F0796C' }}
+                    style={{ color: P.danger ?? 'var(--p-danger)' }}
                     aria-label="Verwijderen"
                   >
                     <Trash2 className="w-4 h-4" />

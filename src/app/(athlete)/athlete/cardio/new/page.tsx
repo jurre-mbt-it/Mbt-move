@@ -320,9 +320,9 @@ function AthleteCardioLogPageInner() {
               onClick={() => setUseIntervals((v) => !v)}
               className="athletic-tap rounded-full px-3 py-1.5"
               style={{
-                background: intervalsOn ? P.brand : P.surfaceHi,
+                background: intervalsOn ? P.ink : P.surfaceHi,
                 color: intervalsOn ? P.bg : P.inkMuted,
-                border: `1px solid ${intervalsOn ? P.brand : P.line}`,
+                border: `1px solid ${intervalsOn ? P.ink : P.line}`,
                 fontSize: 11, fontWeight: 800, letterSpacing: '0.08em',
                 opacity: protocol === 'INTERVALS' ? 0.6 : 1,
               }}

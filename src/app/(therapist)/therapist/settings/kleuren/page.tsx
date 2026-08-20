@@ -25,10 +25,10 @@ import { CATEGORY_COLORS } from '@/lib/palette'
 /** Statuskleuren van de kalender. Kiest iemand hier iets dat daar dicht bij
  *  ligt, dan gaan op een tegel de soort en de status weer op elkaar lijken. */
 const STATUS_KLEUREN: Array<[string, string]> = [
-  ['voltooid', '#5FD08A'],
-  ['bezig', '#F5B942'],
+  ['voltooid', 'var(--p-lime)'],
+  ['bezig', 'var(--p-gold)'],
   ['deels', '#EE8447'],
-  ['gemist', '#F0796C'],
+  ['gemist', 'var(--p-danger)'],
 ]
 
 function kanalen(hex: string): [number, number, number] {

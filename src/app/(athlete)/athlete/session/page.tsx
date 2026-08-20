@@ -1660,7 +1660,7 @@ function ExerciseRow({
       >
         <Heart
           className="w-4 h-4"
-          style={{ color: isFav ? '#F0796C' : P.inkMuted, fill: isFav ? '#F0796C' : 'transparent' }}
+          style={{ color: isFav ? 'var(--p-danger)' : P.inkMuted, fill: isFav ? 'var(--p-danger)' : 'transparent' }}
         />
       </button>
       {!alreadyAdded && <Plus className="w-4 h-4 shrink-0" style={{ color: P.inkMuted }} />}

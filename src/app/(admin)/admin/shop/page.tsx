@@ -137,7 +137,7 @@ export default function AdminShopPage() {
                     {soldOut && (
                       <span
                         className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-                        style={{ color: '#F0796C', background: P.surfaceHi }}
+                        style={{ color: 'var(--p-danger)', background: P.surfaceHi }}
                       >
                         Uitverkocht
                       </span>
@@ -145,7 +145,7 @@ export default function AdminShopPage() {
                     {lowStock && (
                       <span
                         className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-                        style={{ color: '#F5B942', background: P.surfaceHi }}
+                        style={{ color: 'var(--p-gold)', background: P.surfaceHi }}
                       >
                         Nog {p.stockQty} op voorraad
                       </span>
@@ -170,7 +170,7 @@ export default function AdminShopPage() {
                 <div className="flex gap-3 shrink-0">
                   <Link
                     href={`/programma/${p.slug}`}
-                    className="text-sm hover:text-[#F5F2ED] transition-colors"
+                    className="text-sm hover:text-[var(--p-ink)] transition-colors"
                     style={{ color: P.inkMuted }}
                   >
                     Preview

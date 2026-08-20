@@ -57,9 +57,9 @@ export default function SalesPage() {
               onClick={() => setGran(g)}
               className="rounded-full px-4 py-1.5 text-sm font-semibold transition-colors"
               style={{
-                background: active ? P.brand : P.surface,
+                background: active ? P.ink : P.surface,
                 color: active ? P.bg : P.inkMuted,
-                border: `1px solid ${active ? P.brand : P.line}`,
+                border: `1px solid ${active ? P.ink : P.line}`,
               }}
             >
               {GRAN_LABEL[g]}
@@ -217,7 +217,7 @@ function RecentOrders() {
                 <button
                   onClick={() => send.mutate({ orderId: o.id })}
                   disabled={send.isPending}
-                  className="text-sm transition-colors hover:text-[#F5F2ED] disabled:opacity-50"
+                  className="text-sm transition-colors hover:text-[var(--p-ink)] disabled:opacity-50"
                   style={{ color: P.inkMuted }}
                 >
                   E-mails versturen
