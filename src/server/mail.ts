@@ -13,12 +13,17 @@
  *        RESEND_FROM="Movement Based Therapy <noreply@mbt-gym.nl>"
  */
 
+import { buildFromHeader } from './email/from-header'
+import type { EmailSender } from './email/sender'
+
 export interface MailMessage {
   to: string
   subject: string
   html: string
   text?: string
   replyTo?: string
+  /** Zet afzendernaam en reply-to. Zonder deze valt hij terug op RESEND_FROM. */
+  sender?: EmailSender
 }
 
 export interface MailResult {
@@ -31,7 +36,12 @@ export interface MailResult {
 /** Verzend e-mail via Resend of log naar console bij ontbrekende config. */
 export async function sendMail(msg: MailMessage): Promise<MailResult> {
   const apiKey = process.env.RESEND_API_KEY
-  const from = process.env.RESEND_FROM ?? 'Movement Based Therapy <noreply@mbt-gym.nl>'
+  const from = msg.sender
+    ? buildFromHeader(msg.sender)
+    : (process.env.RESEND_FROM ?? 'BASE <noreply@getbase.coach>')
+
+  const replyTo =
+    msg.replyTo ?? (msg.sender?.kind === 'practice' ? msg.sender.replyTo ?? undefined : undefined)
 
   if (!apiKey) {
     // Dev / ontbrekende config — log voor traceability, faal niet
@@ -54,7 +64,7 @@ export async function sendMail(msg: MailMessage): Promise<MailResult> {
         subject: msg.subject,
         html: msg.html,
         text: msg.text,
-        reply_to: msg.replyTo,
+        reply_to: replyTo,
       }),
     })
 
