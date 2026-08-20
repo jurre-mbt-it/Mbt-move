@@ -1268,11 +1268,24 @@ const { subject, html } = programMail({
   extraInstructions,
 })
 const result = await sendMail({ to, subject, html, sender })
+// provider 'console' betekent dat er geen RESEND_API_KEY stond en de mail
+// alleen gelogd is. Dat moet zichtbaar blijven: bij een misconfiguratie leest
+// de therapeut anders "mail verstuurd" terwijl de patient niets kreeg.
+if (result.provider === 'console') {
+  return NextResponse.json({ success: true, sent: false, reason: 'no_api_key' })
+}
 if (!result.ok) {
   return NextResponse.json({ success: true, sent: false, reason: 'resend_error' })
 }
 return NextResponse.json({ success: true, sent: true })
 ```
+
+Let op: de oude `route.ts` had bovenaan een aparte controle op
+`process.env.RESEND_API_KEY` die vroeg terugkeerde. Die vervalt, want
+`sendMail()` doet die controle al. Het signaal naar de aanroeper moet wel
+blijven bestaan, vandaar de `provider`-check hierboven. `ProgramBuilder.tsx`
+kijkt naar `sent === false`, en het verkoopscherm van de beheerder toont de
+reden `no_api_key` letterlijk aan de gebruiker.
 
 Verwijder de directe `fetch` naar `api.resend.com` uit deze route: die loopt nu via `sendMail()`, zodat er één plek is die met Resend praat.
 
