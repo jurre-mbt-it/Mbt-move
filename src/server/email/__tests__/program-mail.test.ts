@@ -64,9 +64,13 @@ describe('programMail', () => {
 
   it('zet de login-URL ook als terugvallink onder de knop', () => {
     // Een mailclient die de gestileerde knop niet als link rendert, moet
-    // ergens anders de URL nog kunnen kopiëren. inviteMail had dit blok
-    // altijd al; het viel weg bij het overzetten naar de gedeelde shell.
+    // ergens anders de URL nog kunnen kopiëren. De URL moet twee keer voorkomen:
+    // eenmaal in de knop (via emailShell) en eenmaal in het terugvalblok hieronder.
+    // Alleen de knop controleren werkt niet: die rendert niet altijd, dus de
+    // patiënt zou geen bruikbare link hebben zonder het terugvalblok.
     const mail = programMail(basis)
-    expect(mail.html).toContain(basis.loginUrl)
+    expect(mail.html).toContain('Werkt de knop niet? Kopieer deze link:')
+    const aantal = mail.html.split(basis.loginUrl).length - 1
+    expect(aantal).toBe(2)
   })
 })
