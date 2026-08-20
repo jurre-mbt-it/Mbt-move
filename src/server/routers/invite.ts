@@ -47,6 +47,7 @@ import { hefUitbehandeldOp } from '@/server/lib/care-reactivate'
 import { auditLog } from '@/server/audit'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { inviteMail, sendMail } from '@/server/mail'
+import { resolveSender } from '@/server/email/sender'
 import { getAppUrl } from '@/lib/app-url'
 
 const CODE_TTL_HOURS = 24
@@ -236,10 +237,23 @@ export const inviteRouter = createTRPCRouter({
       // Supabase's OTP-mail wanneer de patiënt op de URL "Stuur code" klikt.
       const instructionUrl = `${getAppUrl()}/login/code?email=${encodeURIComponent(email)}`
 
+      const actor = await ctx.prisma.user.findUnique({
+        where: { id: ctx.user!.id },
+        select: {
+          firstName: true, lastName: true, jobTitle: true, name: true,
+          practice: true,
+        },
+      })
+
+      const sender = resolveSender({
+        therapist: actor ?? {},
+        practice: actor?.practice ?? null,
+      })
+
       const mail = inviteMail({
         recipientName: input.name.trim(),
         codeUrl: instructionUrl,
-        therapistName: ctx.user!.email.split('@')[0],
+        sender,
         expiresAt: invite.expiresAt,
       })
       mail.to = email
@@ -368,10 +382,25 @@ export const inviteRouter = createTRPCRouter({
 
       const instructionUrl = `${getAppUrl()}/login/code?email=${encodeURIComponent(email)}`
 
+      // Afzender is degene die de resend uitvoert (ctx.user, hierboven al
+      // geautoriseerd), niet per se de oorspronkelijke uitnodiger.
+      const actor = await ctx.prisma.user.findUnique({
+        where: { id: ctx.user!.id },
+        select: {
+          firstName: true, lastName: true, jobTitle: true, name: true,
+          practice: true,
+        },
+      })
+
+      const sender = resolveSender({
+        therapist: actor ?? {},
+        practice: actor?.practice ?? null,
+      })
+
       const mail = inviteMail({
         recipientName: patient.name ?? email,
         codeUrl: instructionUrl,
-        therapistName: ctx.user!.email.split('@')[0],
+        sender,
         expiresAt: invite.expiresAt,
       })
       mail.to = email
