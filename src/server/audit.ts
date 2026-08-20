@@ -71,6 +71,10 @@ export type AuditEvent =
   | 'MFA_RESET_BY_ADMIN'
   // Rate-limit
   | 'RATE_LIMIT_HIT'
+  // Kinvent-koppeling. Koppelen bepaalt welke externe metingen in dit dossier
+  // mogen landen, dus wie dat aanzet of uitzet hoort in de trail.
+  | 'KINVENT_LINKED'
+  | 'KINVENT_UNLINKED'
 
 export interface AuditInput {
   event: AuditEvent

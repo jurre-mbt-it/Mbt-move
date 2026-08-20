@@ -33,7 +33,9 @@ import {
 } from '@/lib/test-report/compute'
 import type { TestReportEntry } from '@prisma/client'
 
-type RouterEntry = TestReportEntry
+// Over de tRPC-lijn komen Date-velden als string terug. Zolang het model geen
+// datums had viel dat niet op; `importedAt` (Kinvent-herkomst) is de eerste.
+type RouterEntry = Omit<TestReportEntry, 'importedAt'> & { importedAt: string | null }
 
 const numOrNull = (s: string): number | null => {
   if (s.trim() === '') return null

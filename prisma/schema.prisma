@@ -292,6 +292,18 @@ model User {
   injuryInfo               String?
   injuryVisibleToTherapist Boolean @default(false)
 
+  // Kinvent-koppeling. Een therapeut koppelt deze patiënt eenmalig aan het
+  // gelijknamige profiel in KINVENT; daarna halen we alleen metingen op via
+  // findByParticipantCode. We slaan bewust ALLEEN de UUID op: naam, e-mail,
+  // geboortedatum en foto blijven bij Kinvent. Niet elke Kinvent-patiënt heeft
+  // een BASE-dossier en dat hoort ook niet zo te zijn, dus dit veld is de
+  // enige plek waar de twee systemen elkaar raken.
+  kinventParticipantCode String?             @unique
+  kinventLinkedAt        DateTime?
+  kinventLinkedById      String? // therapeut die koppelde (audit)
+  kinventSync            KinventSync?        @relation("KinventSyncPatient")
+  kinventJumpResults     KinventJumpResult[] @relation("KinventJumpPatient")
+
   // Cardio HR-profiel — voor het auto-berekenen van hartslagzones (1-5) als
   // bpm-bereiken. maxHeartRate ontbreekt → fallback op leeftijd (208 - 0.7·jaar)
   // via dateOfBirth. restingHeartRate aanwezig → Karvonen (HRR), anders %HRmax.
@@ -2465,6 +2477,20 @@ model TestReportEntry {
 
   criterionStatuses RehabCriterionStatus[]
 
+  // Herkomst. Leeg = handmatig ingevoerd, en dat blijft de norm: de import
+  // vult deze velden alleen voor regels die uit Kinvent komen, en overschrijft
+  // nooit een regel die een therapeut zelf heeft ingevuld. `kinventActivityCode`
+  // is uniek binnen een rapport, zodat een tweede import dezelfde meting niet
+  // nog een keer toevoegt.
+  kinventProtocolCode String?
+  kinventActivityCode String?
+  kinventRepCode      String?
+  importedAt          DateTime?
+  /// Eenheid zoals Kinvent hem leverde ("kg"). Kinvent zet dit per gebruiker om
+  /// en vermeldt het nergens in de respons, dus we leggen vast wat we aannamen.
+  importedUnit        String?
+
+  @@unique([reportId, kinventActivityCode])
   @@index([reportId])
   @@map("test_report_entries")
 }
@@ -2927,4 +2953,89 @@ model DailyGoal {
   updatedAt    DateTime @updatedAt
 
   @@map("daily_goals")
+}
+
+// ============================================================================
+// KINVENT
+// ============================================================================
+
+/// Syncstatus per gekoppelde patiënt. We pollen bewust niet de brede
+/// protocollenlijst: die heeft geen paginering, sleept ruwe sensorcurves mee
+/// (~253 KB per protocol) en geeft boven ongeveer een jaar een 504. In plaats
+/// daarvan vragen we per patiënt findByParticipantCode met updatedAfter, wat
+/// meteen dataminimalisatie oplevert: metingen van Kinvent-patiënten zonder
+/// BASE-dossier komen onze database niet binnen.
+model KinventSync {
+  id        String @id @default(cuid())
+  patientId String @unique
+  patient   User   @relation("KinventSyncPatient", fields: [patientId], references: [id], onDelete: Cascade)
+
+  /// Epoch-milliseconden; Kinvent verwacht deze eenheid in updatedAfter.
+  lastUpdatedAfter BigInt    @default(0)
+  lastSyncAt       DateTime?
+  lastError        String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@map("kinvent_syncs")
+}
+
+/// Eén sprongmeting (JUMP_ANALYSIS) uit Kinvent. Past niet op TestReportEntry,
+/// dat op links/rechts-kracht is gebouwd. v1 slaat alleen op en toont; de
+/// klinische score komt later en heeft Jurre's definitie nodig.
+///
+/// Let op: "readiness" betekent in BASE al wellness/herstel uit de Apple Watch.
+/// Kies voor de sprongscore straks een andere naam.
+model KinventJumpResult {
+  id        String @id @default(cuid())
+  patientId String
+  patient   User   @relation("KinventJumpPatient", fields: [patientId], references: [id], onDelete: Cascade)
+
+  protocolCode String   @unique
+  activityCode String
+  performedAt  DateTime
+  jumpType     String?
+  /// Zoals Kinvent hem gaf, in kg. Dubbelt als eenheidscontrole: wijkt dit ver
+  /// af van het gewicht dat BASE van de patiënt kent, dan staat de KINVENT-app
+  /// vermoedelijk op een andere eenheid en is de meting niet te vertrouwen.
+  bodyWeightKg Float?
+
+  numberOfJumps  Int?
+  peakJumpHeight Float?
+  heightAverage  Float?
+  rsi            Float?
+  mrsi           Float?
+  fatigueIndex   Float?
+
+  reps       KinventJumpRep[]
+  importedAt DateTime         @default(now())
+
+  @@index([patientId, performedAt])
+  @@map("kinvent_jump_results")
+}
+
+/// Eén sprong binnen een meting. Kinvent levert deze per rep, en het verloop
+/// binnen een set zegt meer over vermoeidheid dan alleen de beste sprong.
+model KinventJumpRep {
+  id       String            @id @default(cuid())
+  resultId String
+  result   KinventJumpResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+
+  ordinal                    Int
+  jumpHeight                 Float?
+  jumpHeightByVelocity       Float?
+  peakForceLeft              Float?
+  peakForceRight             Float?
+  peakForceTotal             Float?
+  peakPowerTotal             Float?
+  decelRfdTotal              Float?
+  landingTimeToStabilization Float?
+  propulsiveImpulsePhaseOne  Float?
+  propulsiveImpulsePhaseTwo  Float?
+  contactTime                Float?
+  flightTime                 Float?
+  reactiveStrengthIndex      Float?
+
+  @@unique([resultId, ordinal])
+  @@map("kinvent_jump_reps")
 }

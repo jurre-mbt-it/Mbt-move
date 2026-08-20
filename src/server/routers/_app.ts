@@ -27,6 +27,7 @@ import {
 } from './clinicalTests'
 import { educationRouter } from './education'
 import { testReportsRouter } from './testReports'
+import { kinventRouter } from './kinvent'
 import { runningAnalysisRouter } from './runningAnalysis'
 import { wearablesRouter } from './wearables'
 import { messagesRouter } from './messages'
@@ -62,6 +63,7 @@ export const appRouter = createTRPCRouter({
   shop: shopRouter,
   education: educationRouter,
   testReports: testReportsRouter,
+  kinvent: kinventRouter,
   runningAnalysis: runningAnalysisRouter,
   wearables: wearablesRouter,
   messages: messagesRouter,
