@@ -50,21 +50,7 @@ import { CardioWorkoutBuilder } from '@/components/week-planner/CardioWorkoutBui
 import { readWorkout, summarize as summarizeWorkout, totalDurationSec as workoutDuration, structuredLoad, type StructuredCardio } from '@/lib/cardio-workout'
 import { AddItemModal, type AddItemPayload } from '@/components/week-planner/AddItemModal'
 import { WorkoutProfileStrip } from '@/components/week-planner/WorkoutProfileStrip'
-import {
-  DarkButton,
-  DarkDialog as Dialog,
-  DarkDialogContent as DialogContent,
-  DarkDialogHeader as DialogHeader,
-  DarkDialogTitle as DialogTitle,
-  DarkInput,
-  DarkTextarea,
-  Display,
-  Kicker,
-  MetaLabel,
-  P,
-  SkeletonText,
-  Tile,
-} from '@/components/dark-ui'
+import { DarkButton, DarkDialog as Dialog, DarkDialogContent as DialogContent, DarkDialogHeader as DialogHeader, DarkDialogTitle as DialogTitle, DarkInput, DarkTextarea, Display, Kicker, MetaLabel, P, CARD, SkeletonText, Tile } from '@/components/dark-ui'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -202,7 +188,7 @@ function PatientPicker({
         <button
           type="button"
           className="mbt-btn-hover inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors"
-          style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
+          style={{...CARD, color: P.ink}}
         >
           <span>{current ? (current.name ?? current.email ?? 'Patiënt') : 'Kies patiënt…'}</span>
           {current?.dischargedAt ? <ArchiefBadge /> : null}
@@ -478,7 +464,7 @@ function CardioSummary({ item, onBuild }: { item: ScheduleItem; onBuild: (() => 
     <div className="space-y-2">
       <MetaLabel>Cardio-workout</MetaLabel>
       {w ? (
-        <div className="rounded-lg p-2.5" style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}>
+        <div className="rounded-lg p-2.5" style={{...CARD }}>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-semibold" style={{ color: P.ink }}>
               {CARDIO_ACTIVITIES[w.activity]?.label ?? 'Cardio'}
@@ -535,7 +521,7 @@ function PlannedExerciseList({ exercises }: { exercises: ItemExercise[] }) {
             <div
               key={ex.id}
               className="rounded-lg p-2.5 text-xs"
-              style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+              style={{...CARD }}
             >
               <div className="flex items-center gap-2">
                 <span style={{ color: c }} className="shrink-0"><CategoryIcon category={cat} size={12} /></span>
@@ -1385,7 +1371,7 @@ function ItemDetailContent({
                     <div
                       key={pe.id}
                       className="rounded-lg p-2.5 text-xs"
-                      style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, borderLeft: `3px solid ${c}` }}
+                      style={{...CARD, borderLeft: `3px solid ${c}`}}
                     >
                       <div className="flex items-center gap-2">
                         <span style={{ color: c }} className="shrink-0"><CategoryIcon category={cat} size={12} /></span>
@@ -1448,7 +1434,7 @@ function ItemDetailContent({
                     <div
                       key={log.id}
                       className="rounded-lg p-2.5 text-xs"
-                      style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, borderLeft: `3px solid ${c}` }}
+                      style={{...CARD, borderLeft: `3px solid ${c}`}}
                     >
                       <div className="flex items-center gap-2">
                         <span style={{ color: c }} className="shrink-0"><CategoryIcon category={cat} size={12} /></span>
@@ -2841,7 +2827,7 @@ function WeekPlannerContent() {
             type="button"
             onClick={() => navMonth(-1)}
             className="p-1.5 rounded-md transition-colors"
-            style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
+            style={{...CARD, color: P.ink}}
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -2849,7 +2835,7 @@ function WeekPlannerContent() {
             type="button"
             onClick={navToday}
             className="px-3 py-1.5 rounded-md text-xs font-semibold transition-colors"
-            style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
+            style={{...CARD, color: P.ink}}
           >
             Vandaag
           </button>
@@ -2857,7 +2843,7 @@ function WeekPlannerContent() {
             type="button"
             onClick={() => navMonth(1)}
             className="p-1.5 rounded-md transition-colors"
-            style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
+            style={{...CARD, color: P.ink}}
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -2994,7 +2980,7 @@ function WeekPlannerContent() {
             </button>
           </div>
         )}
-        <div className="rounded-2xl overflow-hidden" style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}>
+        <div className="rounded-2xl overflow-hidden" style={{...CARD }}>
           {/* Day-of-week header row */}
           <div className="grid grid-cols-[40px_repeat(7,1fr)_168px] border-b" style={{ borderColor: P.line }}>
             <div />
@@ -3287,7 +3273,7 @@ function WeekPlannerContent() {
               ? 'animate-out fade-out-0 slide-out-to-right-4'
               : 'animate-in fade-in-0 slide-in-from-right-4',
           )}
-          style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+          style={{...CARD }}
         >
           <ItemDetailContent
             // Key op het item: zonder dit reconcilieert React hetzelfde element

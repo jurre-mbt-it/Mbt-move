@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { ArrowDown, ArrowUp, X, Search, Loader2 } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
-import { P, DarkInput, MetaLabel } from '@/components/dark-ui'
+import { P, CARD, DarkInput, MetaLabel } from '@/components/dark-ui'
 
 interface ProgressionPickerProps {
   easierVariantId: string | null
@@ -102,11 +102,7 @@ function ExercisePicker({
           {open && (
             <div
               className="absolute top-full mt-1 w-full z-50 rounded-xl overflow-hidden"
-              style={{
-                background: P.surface,
-                border: `1px solid ${P.lineStrong}`,
-                boxShadow: '0 10px 30px -10px rgba(0,0,0,0.6)',
-              }}
+              style={{...CARD, boxShadow: '0 10px 30px -10px rgba(0,0,0,0.6)',}}
             >
               <div className="p-2" style={{ borderBottom: `1px solid ${P.line}` }}>
                 <DarkInput

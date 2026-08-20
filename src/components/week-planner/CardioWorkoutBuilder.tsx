@@ -39,11 +39,7 @@ import {
   type StepKind, type StructuredCardio, type WorkoutBlock, type WorkoutStep,
 } from '@/lib/cardio-workout'
 import { cardioChartBars } from '@/lib/cardio-chart'
-import {
-  DarkButton, DarkDialog as Dialog, DarkDialogContent as DialogContent,
-  DarkDialogHeader as DialogHeader, DarkDialogTitle as DialogTitle,
-  DarkInput, MetaLabel, NumberField, P,
-} from '@/components/dark-ui'
+import { DarkButton, DarkDialog as Dialog, DarkDialogContent as DialogContent, DarkDialogHeader as DialogHeader, DarkDialogTitle as DialogTitle, DarkInput, MetaLabel, NumberField, P, CARD } from '@/components/dark-ui'
 
 const uid = () => Math.random().toString(36).slice(2, 10)
 
@@ -445,7 +441,7 @@ function SortableBlock({
     <div ref={setNodeRef} style={style} className="rounded-lg" >
       <div
         className="flex items-center gap-2 px-2 py-1.5 rounded-lg"
-        style={{ background: P.surface, border: `1px solid ${P.line}` }}
+        style={{...CARD }}
       >
         <button type="button" {...attributes} {...listeners} className="cursor-grab shrink-0" aria-label="Versleep">
           <GripVertical className="w-3.5 h-3.5" style={{ color: P.inkDim }} />
@@ -534,7 +530,7 @@ function StepEditor({
       {/* Lengte: tijd of afstand */}
       <div>
         <MetaLabel>Lengte</MetaLabel>
-        <div className="grid grid-cols-2 gap-1 mt-1.5 p-0.5 rounded-lg" style={{ background: P.surface, border: `1px solid ${P.line}` }}>
+        <div className="grid grid-cols-2 gap-1 mt-1.5 p-0.5 rounded-lg" style={{...CARD }}>
           {([['tijd', !byDistance], ['afstand', byDistance]] as const).map(([label, on]) => (
             <button
               key={label}

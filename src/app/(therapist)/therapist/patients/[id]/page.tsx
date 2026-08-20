@@ -6,25 +6,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { trpc } from '@/lib/trpc/client'
 import { usePortal } from '@/lib/portal'
-import {
-  DarkButton,
-  DarkDialog as Dialog,
-  DarkDialogContent as DialogContent,
-  DarkDialogDescription as DialogDescription,
-  DarkDialogHeader as DialogHeader,
-  DarkDialogTitle as DialogTitle,
-  DarkInput,
-  DarkTabs as Tabs,
-  DarkTabsContent as TabsContent,
-  DarkTabsList as TabsList,
-  DarkTabsTrigger as TabsTrigger,
-  Display,
-  Kicker,
-  MetaLabel,
-  MetricTile,
-  P,
-  Tile,
-} from '@/components/dark-ui'
+import { DarkButton, DarkDialog as Dialog, DarkDialogContent as DialogContent, DarkDialogDescription as DialogDescription, DarkDialogHeader as DialogHeader, DarkDialogTitle as DialogTitle, DarkInput, DarkTabs as Tabs, DarkTabsContent as TabsContent, DarkTabsList as TabsList, DarkTabsTrigger as TabsTrigger, Display, Kicker, MetaLabel, MetricTile, P, CARD, Tile } from '@/components/dark-ui'
 import { AssignFromTemplateDialog } from '@/components/patients/AssignFromTemplateDialog'
 import { CoMonitorDialog } from '@/components/patients/CoMonitorDialog'
 import { UnlinkDialog } from '@/components/patients/UnlinkDialog'
@@ -556,13 +538,9 @@ export default function PatientDetailPage({
         <Tabs defaultValue={initialTab} className="space-y-4">
           <TabsList
             className="w-full grid rounded-xl"
-            style={{
-              background: P.surface,
-              border: `1px solid ${P.line}`,
-              // Aantal kolommen volgt de zichtbare tabs; een vaste klasse liep
+            style={{...CARD, // Aantal kolommen volgt de zichtbare tabs; een vaste klasse liep
               // scheef zodra er een tab wegviel.
-              gridTemplateColumns: `repeat(${zichtbareTabs.length}, minmax(0, 1fr))`,
-            }}
+              gridTemplateColumns: `repeat(${zichtbareTabs.length}, minmax(0, 1fr))`,}}
           >
             <TabsTrigger value="profiel" className="text-xs px-1">Profiel</TabsTrigger>
             <TabsTrigger value="programmas" className="text-xs px-1">Progr.</TabsTrigger>

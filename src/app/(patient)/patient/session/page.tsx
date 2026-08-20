@@ -10,7 +10,7 @@ import {
   ChevronLeft, ChevronRight, Clock, ChevronDown, ChevronUp, Lightbulb, LayoutList, Target,
   TrendingUp, TrendingDown, CheckCircle2, Trophy, Bell, RotateCcw,
 } from 'lucide-react'
-import { P, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-ui'
+import { P, CARD, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-ui'
 import {
   type SetEntry,
   type LastLog,
@@ -163,7 +163,7 @@ function FeedbackModal({
       <div className="absolute inset-0 bg-[#081A1C]/72" onClick={onSave} />
       <div
         className="relative w-full rounded-t-3xl px-5 pt-5 pb-8 space-y-5"
-        style={{ background: P.surface, maxWidth: 480, margin: '0 auto', border: `1px solid ${P.line}` }}
+        style={{...CARD, maxWidth: 480, margin: '0 auto',}}
       >
         {/* Handle */}
         <div className="w-10 h-1 rounded-full mx-auto mb-1" style={{ background: P.lineStrong }} />
@@ -1293,7 +1293,7 @@ function SessionPageInner() {
                 key={p.id}
                 onClick={() => router.replace(`/patient/session?programId=${p.id}`)}
                 className="athletic-tap w-full text-left rounded-2xl px-4 py-4 flex items-center gap-3"
-                style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+                style={{...CARD }}
               >
                 <span className="w-1 self-stretch rounded-full" style={{ background: P.brand }} />
                 <span className="flex-1 min-w-0">
@@ -1392,7 +1392,7 @@ function SessionPageInner() {
       <div className="min-h-screen flex items-center justify-center px-4" style={{ background: P.bg, color: P.ink }}>
         <div
           className="w-full max-w-sm rounded-2xl p-6 space-y-4"
-          style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+          style={{...CARD }}
         >
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center"

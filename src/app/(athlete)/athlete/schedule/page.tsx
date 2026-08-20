@@ -17,13 +17,7 @@ import { useRouter } from 'next/navigation'
 import { trpc } from '@/lib/trpc/client'
 import { ChevronLeft, ChevronRight, X, Clock, Flame, MapPin, HeartPulse } from 'lucide-react'
 import { formatSetsReps } from '@/lib/prescription'
-import {
-  P,
-  Kicker,
-  MetaLabel,
-  Tile,
-  DarkButton,
-} from '@/components/dark-ui'
+import { P, CARD, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-ui'
 import {
   IconStrength, IconMobility, IconPlyometrics, IconCardio, IconCore, IconSleep,
 } from '@/components/icons'
@@ -424,7 +418,7 @@ export default function AthleteSchedulePage() {
               type="button"
               onClick={() => navMonth(-1)}
               className="athletic-tap p-2 rounded-lg"
-              style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
+              style={{...CARD, color: P.ink}}
               aria-label="Vorige maand"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -433,14 +427,10 @@ export default function AthleteSchedulePage() {
               type="button"
               onClick={navToday}
               className="athletic-tap px-3 py-2 rounded-lg athletic-mono"
-              style={{
-                background: P.surface,
-                border: `1px solid ${P.lineStrong}`,
-                color: P.ink,
+              style={{...CARD, color: P.ink,
                 fontSize: 10,
                 fontWeight: 900,
-                letterSpacing: '0.12em',
-              }}
+                letterSpacing: '0.12em',}}
             >
               VANDAAG
             </button>
@@ -448,7 +438,7 @@ export default function AthleteSchedulePage() {
               type="button"
               onClick={() => navMonth(1)}
               className="athletic-tap p-2 rounded-lg"
-              style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
+              style={{...CARD, color: P.ink}}
               aria-label="Volgende maand"
             >
               <ChevronRight className="w-4 h-4" />
@@ -713,13 +703,9 @@ function EventCard({ event, onClick }: { event: CalEvent; onClick: () => void })
       type="button"
       onClick={onClick}
       className="athletic-tap mbt-card-hover w-full flex items-center gap-3 rounded-xl text-left"
-      style={{
-        background: P.surface,
-        borderLeft: `3px solid ${color}`,
-        border: `1px solid ${P.line}`,
+      style={{...CARD, borderLeft: `3px solid ${color}`,
         padding: '12px 14px',
-        opacity: event.kind === 'planned' && event.status === 'missed' ? 0.75 : 1,
-      }}
+        opacity: event.kind === 'planned' && event.status === 'missed' ? 0.75 : 1,}}
     >
       <div
         className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
@@ -819,13 +805,9 @@ function EventDetailSheet({
       <div className="mbt-backdrop absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={onClose} />
       <div
         className="mbt-sheet relative w-full rounded-t-3xl flex flex-col"
-        style={{
-          background: P.surface,
-          border: `1px solid ${P.line}`,
-          maxWidth: 480,
+        style={{...CARD, maxWidth: 480,
           margin: '0 auto',
-          maxHeight: '85dvh',
-        }}
+          maxHeight: '85dvh',}}
       >
         <div className="flex-none px-5 pt-4 pb-3" style={{ borderBottom: `1px solid ${P.line}` }}>
           <div className="w-10 h-1 rounded-full mx-auto mb-3" style={{ background: P.lineStrong }} />

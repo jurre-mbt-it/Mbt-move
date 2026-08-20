@@ -15,7 +15,7 @@ import {
   type StructuredCardio, type WorkoutStep,
 } from '@/lib/cardio-workout'
 import { cardioChartBars } from '@/lib/cardio-chart'
-import { P } from '@/components/dark-ui'
+import { P, CARD } from '@/components/dark-ui'
 
 const stepLen = (s: WorkoutStep) =>
   s.durationSec != null
@@ -42,7 +42,7 @@ export function PlannedCardioCard({ workout }: { workout: StructuredCardio }) {
   const total = bars.reduce((s, b) => s + b.sec, 0) || 1
 
   return (
-    <div className="rounded-xl p-3" style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}>
+    <div className="rounded-xl p-3" style={{...CARD }}>
       <div className="flex items-center justify-between gap-2 mb-2">
         <span className="text-xs font-semibold" style={{ color: P.ink }}>Jouw workout</span>
         <span className="athletic-mono text-[10px]" style={{ color: P.inkMuted }}>{Math.round(dur / 60)} min</span>

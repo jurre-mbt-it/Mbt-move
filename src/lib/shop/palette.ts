@@ -6,4 +6,4 @@
  * 'use client'-module, en in een servercomponent levert dat een client-
  * reference proxy op waardoor `P.lime` e.d. `undefined` zijn.
  */
-export { P } from '@/lib/palette'
+export { P, CARD } from '@/lib/palette'

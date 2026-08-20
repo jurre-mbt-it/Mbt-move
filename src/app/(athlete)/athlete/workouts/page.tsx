@@ -2,13 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import {
-  P,
-  Kicker,
-  MetaLabel,
-  Tile,
-  DarkInput,
-} from '@/components/dark-ui'
+import { P, CARD, Kicker, MetaLabel, Tile, DarkInput } from '@/components/dark-ui'
 import {
   getSavedWorkouts,
   deleteWorkout,
@@ -196,11 +190,7 @@ function WorkoutRow({
   return (
     <div
       className="flex items-stretch gap-0 rounded-xl overflow-hidden"
-      style={{
-        background: P.surface,
-        borderLeft: `3px solid ${color}`,
-        border: `1px solid ${P.line}`,
-      }}
+      style={{...CARD, borderLeft: `3px solid ${color}`,}}
     >
       <Link
         href={`/athlete/workouts/new?id=${workout.id}`}

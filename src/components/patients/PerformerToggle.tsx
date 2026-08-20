@@ -1,6 +1,6 @@
 'use client'
 
-import { P } from '@/components/dark-ui'
+import { P, CARD } from '@/components/dark-ui'
 
 export type PerformerFilter = 'all' | 'patient' | 'therapist'
 
@@ -24,7 +24,7 @@ export function PerformerToggle({
       role="tablist"
       aria-label={ariaLabel}
       className="grid grid-cols-3 rounded-xl"
-      style={{ background: P.surface, border: `1px solid ${P.line}`, padding: 3, gap: 3 }}
+      style={{...CARD, padding: 3, gap: 3}}
     >
       {OPTIONS.map((opt) => {
         const active = value === opt.key

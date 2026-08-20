@@ -10,26 +10,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { trpc } from '@/lib/trpc/client'
-import {
-  DarkButton,
-  DarkDialog,
-  DarkDialogContent,
-  DarkDialogHeader,
-  DarkDialogTitle,
-  DarkInput,
-  DarkTextarea,
-  DarkSelect,
-  DarkMenuSelect,
-  DarkTabs,
-  DarkTabsList,
-  DarkTabsTrigger,
-  DarkTabsContent,
-  Display,
-  Kicker,
-  MetaLabel,
-  Tile,
-  P,
-} from '@/components/dark-ui'
+import { DarkButton, DarkDialog, DarkDialogContent, DarkDialogHeader, DarkDialogTitle, DarkInput, DarkTextarea, DarkSelect, DarkMenuSelect, DarkTabs, DarkTabsList, DarkTabsTrigger, DarkTabsContent, Display, Kicker, MetaLabel, Tile, P, CARD } from '@/components/dark-ui'
 import { ChevronLeft, Plus, Pencil, Trash2, X, GripVertical } from 'lucide-react'
 
 // ── Mini progressiebalk: rood → oranje → groen op basis van axis + zones ──────
@@ -315,7 +296,7 @@ function BatteryForm({
               <div
                 key={it.catalogItemId}
                 className="flex items-center gap-2 rounded-lg px-2 py-1.5"
-                style={{ background: P.surface, border: `1px solid ${P.line}` }}
+                style={{...CARD }}
               >
                 <GripVertical className="h-3.5 w-3.5 shrink-0" style={{ color: P.inkDim }} />
                 <div className="flex-1 min-w-0">

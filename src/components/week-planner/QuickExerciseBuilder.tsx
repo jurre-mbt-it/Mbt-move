@@ -18,7 +18,7 @@
 import { useState } from 'react'
 import { Plus, Search, SlidersHorizontal, X } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
-import { DarkButton, DarkInput, MetaLabel, P } from '@/components/dark-ui'
+import { DarkButton, DarkInput, MetaLabel, P, CARD } from '@/components/dark-ui'
 import { IconStrength, IconMobility, IconPlyometrics, IconCardio, IconCore } from '@/components/icons'
 import { useCategoryColors } from '@/lib/useCategoryColors'
 import { PER_SIDE_UNIT, PER_SIDE_SEC_UNIT, isRepBasedUnit, isPerSideUnit } from '@/lib/program-constants'
@@ -267,7 +267,7 @@ export function QuickExerciseBuilder({
             const anderVoorschrift = e.intensityType && e.intensityType !== 'NONE' && e.intensityType !== 'RPE'
             return (
               <div key={e.id} className="rounded-lg px-2 py-1.5"
-                style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}>
+                style={{...CARD }}>
                 <div className="flex items-center gap-1.5">
                   <span className="shrink-0" style={{ color: catColors[cat] }}>
                     <CategoryIcon category={cat} size={12} />
@@ -400,7 +400,7 @@ export function QuickExerciseBuilder({
           return (
             <button key={c.id} type="button" onClick={() => add(c)}
               className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-[#1C4448]"
-              style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}>
+              style={{...CARD }}>
               <span style={{ color: catColors[cat] }}><CategoryIcon category={cat} size={11} /></span>
               <span className="flex-1 truncate text-xs" style={{ color: P.ink }}>{c.name}</span>
               <Plus className="w-3.5 h-3.5" style={{ color: P.inkMuted }} />

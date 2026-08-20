@@ -27,18 +27,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
-import {
-  DarkButton,
-  DarkHeader,
-  DarkInput,
-  DarkScreen,
-  DarkTextarea,
-  Kicker,
-  MetaLabel,
-  P,
-  PulsingDot,
-  Tile,
-} from '@/components/dark-ui'
+import { DarkButton, DarkHeader, DarkInput, DarkScreen, DarkTextarea, Kicker, MetaLabel, P, CARD, PulsingDot, Tile } from '@/components/dark-ui'
 import { trpc } from '@/lib/trpc/client'
 import { useDraftBackup, loadDraft, clearStoredDraft } from '@/hooks/useAutosave'
 import { PerformerToggle, type PerformerFilter } from '@/components/patients/PerformerToggle'
@@ -869,7 +858,7 @@ export default function TreatmentPage({
                 type="button"
                 onClick={() => setMode('free')}
                 className="athletic-tap rounded-xl p-5 text-left"
-                style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+                style={{...CARD }}
               >
                 <Kicker>Vrije workout</Kicker>
                 <p style={{ color: P.ink, fontSize: 15, fontWeight: 700, marginTop: 6 }}>
@@ -1097,7 +1086,7 @@ function DiscardSessionModal({
     >
       <div
         className="w-full max-w-sm rounded-2xl flex flex-col"
-        style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+        style={{...CARD }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 pt-5 pb-3 flex flex-col gap-0.5">
@@ -2363,7 +2352,7 @@ function FinishSessionModal({
     >
       <div
         className="w-full max-w-lg rounded-2xl flex flex-col max-h-[92vh]"
-        style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+        style={{...CARD }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

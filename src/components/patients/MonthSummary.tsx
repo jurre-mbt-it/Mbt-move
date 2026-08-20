@@ -13,7 +13,7 @@
 
 import { useMemo, useState } from 'react'
 import { trpc } from '@/lib/trpc/client'
-import { Kicker, MetaLabel, P, Tile } from '@/components/dark-ui'
+import { Kicker, MetaLabel, P, CARD, Tile } from '@/components/dark-ui'
 
 const BUCKETS = [
   { key: 'strength', label: 'Kracht', color: P.brand },
@@ -88,12 +88,8 @@ export function MonthSummary({ patientId }: { patientId: string }) {
           value={month}
           onChange={(e) => setMonth(e.target.value)}
           className="athletic-mono rounded-lg px-3 py-1.5"
-          style={{
-            background: P.surface,
-            border: `1px solid ${P.lineStrong}`,
-            color: P.ink,
-            fontSize: 12,
-          }}
+          style={{...CARD, color: P.ink,
+            fontSize: 12,}}
           aria-label="Kies een maand"
         >
           {options.map((o) => (

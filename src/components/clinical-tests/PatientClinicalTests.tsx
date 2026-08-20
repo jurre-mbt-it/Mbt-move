@@ -12,19 +12,7 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { trpc } from '@/lib/trpc/client'
-import {
-  DarkButton,
-  DarkDialog as Dialog,
-  DarkDialogContent as DialogContent,
-  DarkDialogHeader as DialogHeader,
-  DarkDialogTitle as DialogTitle,
-  DarkInput,
-  DarkSelect,
-  DarkTextarea,
-  MetaLabel,
-  P,
-  Tile,
-} from '@/components/dark-ui'
+import { DarkButton, DarkDialog as Dialog, DarkDialogContent as DialogContent, DarkDialogHeader as DialogHeader, DarkDialogTitle as DialogTitle, DarkInput, DarkSelect, DarkTextarea, MetaLabel, P, CARD, Tile } from '@/components/dark-ui'
 import {
   BODY_REGIONS,
   BODY_REGION_LABEL,
@@ -309,7 +297,7 @@ function AddTestDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent aria-describedby={undefined}
         className="max-w-lg"
-        style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
+        style={{...CARD, color: P.ink,}}
       >
         <DialogHeader>
           <DialogTitle style={{ color: P.ink }}>Test toewijzen</DialogTitle>
@@ -505,7 +493,7 @@ function LogResultDialog({
     <Dialog open={!!assignment} onOpenChange={v => !v && onClose()}>
       <DialogContent aria-describedby={undefined}
         className="max-w-md"
-        style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
+        style={{...CARD, color: P.ink,}}
       >
         <DialogHeader>
           <DialogTitle style={{ color: P.ink }}>

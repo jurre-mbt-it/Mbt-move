@@ -7,27 +7,7 @@ import { trpc } from '@/lib/trpc/client'
 import { usePortal } from '@/lib/portal'
 import { toast } from 'sonner'
 import { IconCardio } from '@/components/icons'
-import {
-  DarkButton,
-  DarkDialog as Dialog,
-  DarkDialogContent as DialogContent,
-  DarkDialogHeader as DialogHeader,
-  DarkDialogTitle as DialogTitle,
-  DarkInput,
-  DarkSelect,
-  DarkTabs as Tabs,
-  DarkTabsContent as TabsContent,
-  DarkTabsList as TabsList,
-  DarkTabsTrigger as TabsTrigger,
-  Display,
-  Kicker,
-  MetaLabel,
-  P,
-  Skeleton,
-  SkeletonList,
-  SkeletonText,
-  Tile,
-} from '@/components/dark-ui'
+import { DarkButton, DarkDialog as Dialog, DarkDialogContent as DialogContent, DarkDialogHeader as DialogHeader, DarkDialogTitle as DialogTitle, DarkInput, DarkSelect, DarkTabs as Tabs, DarkTabsContent as TabsContent, DarkTabsList as TabsList, DarkTabsTrigger as TabsTrigger, Display, Kicker, MetaLabel, P, CARD, Skeleton, SkeletonList, SkeletonText, Tile } from '@/components/dark-ui'
 
 const DAY_LABELS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 const LIBRARY_CATEGORIES = ['Alle', 'Knie', 'Schouder', 'Rug', 'Heup', 'Enkel', 'Full Body', 'Revalidatie', 'Preventie']
@@ -120,7 +100,7 @@ function ProgramsPageInner() {
         <Tabs value={tab} onValueChange={handleTabChange} className="space-y-4">
           <TabsList
             className="w-full grid grid-cols-2 rounded-xl"
-            style={{ background: P.surface, border: `1px solid ${P.line}` }}
+            style={{...CARD }}
           >
             <TabsTrigger value="lopende">Lopende programma&apos;s</TabsTrigger>
             <TabsTrigger value="templates">Schema-bibliotheek</TabsTrigger>
@@ -349,7 +329,7 @@ function ActiveProgramsPanel() {
       <Dialog open={!!duplicateTarget} onOpenChange={open => { if (!open) setDuplicateTarget(null) }}>
         <DialogContent aria-describedby={undefined}
           className="max-w-sm"
-          style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
+          style={{...CARD, color: P.ink,}}
         >
           <DialogHeader>
             <DialogTitle style={{ color: P.ink }}>Programma dupliceren</DialogTitle>
@@ -631,7 +611,7 @@ function ProgramExercisePreview({ programId }: { programId: string }) {
       <Dialog open={!!moveDialog} onOpenChange={open => { if (!open) setMoveDialog(null) }}>
         <DialogContent aria-describedby={undefined}
           className="max-w-sm"
-          style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
+          style={{...CARD, color: P.ink,}}
         >
           <DialogHeader>
             <DialogTitle style={{ color: P.ink }}>
@@ -826,7 +806,7 @@ function TemplateLibraryPanel() {
       <Dialog open={!!copyTarget} onOpenChange={open => { if (!open) setCopyTarget(null) }}>
         <DialogContent aria-describedby={undefined}
           className="max-w-sm"
-          style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
+          style={{...CARD, color: P.ink,}}
         >
           <DialogHeader>
             <DialogTitle style={{ color: P.ink }}>Kopieer naar patiënt</DialogTitle>

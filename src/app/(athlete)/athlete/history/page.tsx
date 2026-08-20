@@ -2,13 +2,7 @@
 
 import { useState } from 'react'
 import { trpc } from '@/lib/trpc/client'
-import {
-  P,
-  Kicker,
-  MetaLabel,
-  Tile,
-  MetricTile,
-} from '@/components/dark-ui'
+import { P, CARD, Kicker, MetaLabel, Tile, MetricTile } from '@/components/dark-ui'
 
 const mono =
   'var(--font-mono-athletic)'
@@ -83,11 +77,7 @@ export default function AthleteHistoryPage() {
               <div
                 key={session.id}
                 className="rounded-xl overflow-hidden"
-                style={{
-                  background: P.surface,
-                  borderLeft: `3px solid ${P.lime}`,
-                  border: `1px solid ${P.line}`,
-                }}
+                style={{...CARD, borderLeft: `3px solid ${P.lime}`,}}
               >
                 <button
                   type="button"

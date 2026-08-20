@@ -13,26 +13,7 @@ import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
 import { LoadCurveChart } from '@/components/workload/LoadCurveChart'
 import { PatientTagsPanel } from '@/components/tags/PatientTagsPanel'
 import { CARDIO_ICON_MAP } from '@/components/icons'
-import {
-  DARK_CHART_STYLES,
-  DarkButton,
-  DarkChartTooltip,
-  DarkDialog as Dialog,
-  DarkDialogContent as DialogContent,
-  DarkDialogFooter as DialogFooter,
-  DarkDialogHeader as DialogHeader,
-  DarkDialogTitle as DialogTitle,
-  DarkTabs as Tabs,
-  DarkTabsContent as TabsContent,
-  DarkTabsList as TabsList,
-  DarkTabsTrigger as TabsTrigger,
-  DarkTextarea,
-  Display,
-  Kicker,
-  MetaLabel,
-  P,
-  Tile,
-} from '@/components/dark-ui'
+import { DARK_CHART_STYLES, DarkButton, DarkChartTooltip, DarkDialog as Dialog, DarkDialogContent as DialogContent, DarkDialogFooter as DialogFooter, DarkDialogHeader as DialogHeader, DarkDialogTitle as DialogTitle, DarkTabs as Tabs, DarkTabsContent as TabsContent, DarkTabsList as TabsList, DarkTabsTrigger as TabsTrigger, DarkTextarea, Display, Kicker, MetaLabel, P, CARD, Tile } from '@/components/dark-ui'
 
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -51,7 +32,7 @@ function StatChip({ label, value, sub, tint }: {
   return (
     <div
       className="rounded-2xl p-4"
-      style={{ background: P.surface, border: `1px solid ${P.line}` }}
+      style={{...CARD }}
     >
       <MetaLabel>{label.toUpperCase()}</MetaLabel>
       <div className="flex items-baseline gap-2 mt-1">
@@ -272,12 +253,8 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
 
         <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
           <DialogContent aria-describedby={undefined}
-            style={{
-              borderRadius: '16px',
-              background: P.surface,
-              color: P.ink,
-              border: `1px solid ${P.lineStrong}`,
-            }}
+            style={{...CARD, borderRadius: '16px',
+              color: P.ink,}}
           >
             <DialogHeader>
               <DialogTitle style={{ color: P.ink }}>Voortgangsrapport exporteren</DialogTitle>
@@ -336,7 +313,7 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
           <Tabs defaultValue={defaultTab} className="space-y-4">
             <TabsList
               className="w-full grid grid-cols-5 rounded-xl"
-              style={{ background: P.surface, border: `1px solid ${P.line}` }}
+              style={{...CARD }}
             >
               <TabsTrigger value="belasting" className="text-xs">Belasting</TabsTrigger>
               <TabsTrigger value="sessies" className="text-xs">Sessies</TabsTrigger>

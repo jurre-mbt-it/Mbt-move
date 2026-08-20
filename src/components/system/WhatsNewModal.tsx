@@ -11,11 +11,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import {
-  DarkButton,
-  Kicker,
-  P,
-} from '@/components/dark-ui'
+import { DarkButton, Kicker, P, CARD } from '@/components/dark-ui'
 import { LAST_SEEN_RELEASE_KEY, latestRelease } from '@/lib/release-notes'
 
 export function WhatsNewModal() {
@@ -63,7 +59,7 @@ export function WhatsNewModal() {
     >
       <div
         className="rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6"
-        style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+        style={{...CARD }}
         onClick={(e) => e.stopPropagation()}
       >
         <Kicker>Wat is nieuw</Kicker>

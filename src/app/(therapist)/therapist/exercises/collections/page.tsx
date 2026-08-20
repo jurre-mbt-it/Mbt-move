@@ -7,18 +7,7 @@ import { trpc } from '@/lib/trpc/client'
 import { usePortal } from '@/lib/portal'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import {
-  DarkButton,
-  DarkDialog as Dialog,
-  DarkDialogContent as DialogContent,
-  DarkDialogHeader as DialogHeader,
-  DarkDialogTitle as DialogTitle,
-  DarkInput,
-  Kicker,
-  MetaLabel,
-  P,
-  Tile,
-} from '@/components/dark-ui'
+import { DarkButton, DarkDialog as Dialog, DarkDialogContent as DialogContent, DarkDialogHeader as DialogHeader, DarkDialogTitle as DialogTitle, DarkInput, Kicker, MetaLabel, P, CARD, Tile } from '@/components/dark-ui'
 
 export default function CollectionsPage() {
   const portal = usePortal()
@@ -303,7 +292,7 @@ export default function CollectionsPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent aria-describedby={undefined}
           className="max-w-sm"
-          style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
+          style={{...CARD, color: P.ink,}}
         >
           <DialogHeader>
             <DialogTitle style={{ color: P.ink }}>

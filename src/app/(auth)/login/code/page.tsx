@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
 import { createClient } from '@/lib/supabase/client'
-import { DarkButton, DarkInput, Kicker, MetaLabel, P } from '@/components/dark-ui'
+import { DarkButton, DarkInput, Kicker, MetaLabel, P, CARD } from '@/components/dark-ui'
 import { resolvePostLoginRedirect } from '@/lib/auth/post-login-redirect'
 
 export default function AccessCodePage() {
@@ -131,7 +131,7 @@ function AccessCodeInner() {
       <div className="w-full max-w-sm flex flex-col gap-6">
         <div
           className="rounded-3xl p-6 sm:p-8 flex flex-col gap-6"
-          style={{ background: P.surface, border: `1px solid ${P.line}` }}
+          style={{...CARD }}
         >
           {/* Hero */}
           <div className="flex flex-col gap-2">

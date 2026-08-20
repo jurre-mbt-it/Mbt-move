@@ -54,6 +54,23 @@ export const P = {
 } as const
 
 /**
+ * De Instrument-kaart als los stijlobject, zodat elk scherm hem op dezelfde
+ * manier krijgt: een verloop van licht naar donker, een haarlijn die bovenaan
+ * net iets lichter is, en een schaduw die de kaart op de grond legt.
+ *
+ * Gebruik `style={{ ...CARD }}`. Wil je een accentrand (P.brand, P.ice), zet
+ * die dan ná de spread, dan wint hij: `style={{ ...CARD, border: ... }}`.
+ *
+ * Spiegelt `.base-card` in globals.css. Verander je er een, verander ze allebei.
+ */
+export const CARD = {
+  background: `linear-gradient(180deg, ${P.cardTop} 0%, ${P.cardBot} 100%)`,
+  border: `1px solid ${P.cardEdge}`,
+  borderTopColor: P.cardEdgeTop,
+  boxShadow: P.cardShadow,
+} as const
+
+/**
  * Categorieën die naast elkaar leesbaar moeten zijn: collecties, cardio-
  * soorten, superset-groepen, grafiekreeksen. Acht tinten die alle acht boven
  * petrol staan; buren verschillen in tint én helderheid. Gelijk aan

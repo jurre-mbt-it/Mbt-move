@@ -7,16 +7,7 @@ import { wearablesEnabledForRole } from '@/lib/wearables-access'
 import { createClient } from '@/lib/supabase/client'
 import { WeeklyTrendChart } from '@/components/charts/WeeklyTrendChart'
 import { MuscleStatusList } from '@/components/recovery/MuscleStatusList'
-import {
-  P,
-  Kicker,
-  MetaLabel,
-  Tile,
-  ActionTile,
-  MetricTile,
-  DarkButton,
-  WeekProgress,
-} from '@/components/dark-ui'
+import { P, CARD, Kicker, MetaLabel, Tile, ActionTile, MetricTile, DarkButton, WeekProgress } from '@/components/dark-ui'
 import { DAY_LABELS } from '@/lib/program-constants'
 import { IconStrength, IconCelebration } from '@/components/icons'
 
@@ -140,10 +131,7 @@ export default function AthleteDashboard() {
             {programName ? (
               <span
                 className="inline-flex items-center gap-2 rounded-full px-3 py-1.5"
-                style={{
-                  background: P.surface,
-                  border: `1px solid ${P.lineStrong}`,
-                }}
+                style={{...CARD }}
               >
                 <span
                   aria-hidden

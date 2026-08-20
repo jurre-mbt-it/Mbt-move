@@ -17,7 +17,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { DarkButton, Kicker, P } from '@/components/dark-ui'
+import { DarkButton, Kicker, P, CARD } from '@/components/dark-ui'
 import { QUICK_START_DISMISSED_KEY, quickStartIntro, quickStartSteps } from '@/lib/quick-start'
 import { trpc } from '@/lib/trpc/client'
 import { ACCEPTANCE_KEY, BETA_ACCEPTED_EVENT } from './BetaDisclaimer'
@@ -72,7 +72,7 @@ export function QuickStartModal() {
     >
       <div
         className="rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6"
-        style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+        style={{...CARD }}
         onClick={(e) => e.stopPropagation()}
       >
         <Kicker>Quick start</Kicker>

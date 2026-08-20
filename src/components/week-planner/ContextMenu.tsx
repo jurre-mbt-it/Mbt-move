@@ -16,7 +16,7 @@
 import { useCallback, useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
-import { P } from '@/lib/palette'
+import { P, CARD } from '@/lib/palette'
 
 export type ContextMenuItem =
   | { type: 'separator' }
@@ -89,15 +89,11 @@ export function ContextMenu({ state, onClose }: { state: ContextMenuState; onClo
         ref={plaats}
         role="menu"
         className="fixed z-[61] overflow-hidden rounded-lg py-1 shadow-xl"
-        style={{
-          left: state.x,
+        style={{...CARD, left: state.x,
           top: state.y,
           width: BREEDTE,
-          background: P.surface,
-          border: `1px solid ${P.lineStrong}`,
           // `plaats` maakt 'm zichtbaar zodra hij goed staat.
-          visibility: 'hidden',
-        }}
+          visibility: 'hidden',}}
       >
         {state.items.map((item, i) =>
           item.type === 'separator' ? (

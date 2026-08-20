@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
-import { P } from '@/lib/shop/palette'
+import { P, CARD } from '@/lib/shop/palette'
 import { formatPriceCents } from '@/lib/shop/format'
 import { heroGradient } from '@/lib/shop/gradient'
 import { LEVEL_LABELS } from '@/lib/shop/labels'
@@ -216,7 +216,7 @@ export function IntakeWizard() {
         {phase === 'loading' && (
           <div
             className="inline-flex items-center gap-1.5 rounded-2xl rounded-bl-sm px-4 py-3"
-            style={{ background: P.surface, border: `1px solid ${P.line}` }}
+            style={{...CARD }}
           >
             <Dot delay="0ms" /> <Dot delay="150ms" /> <Dot delay="300ms" />
           </div>
@@ -228,7 +228,7 @@ export function IntakeWizard() {
         {phase === 'intro' && (
           <div
             className="rounded-2xl p-5"
-            style={{ background: P.surface, border: `1px solid ${P.line}` }}
+            style={{...CARD }}
           >
             <label className="flex items-start gap-3 cursor-pointer">
               <input
@@ -256,7 +256,7 @@ export function IntakeWizard() {
         {phase === 'redflags' && (
           <div
             className="rounded-2xl p-5"
-            style={{ background: P.surface, border: `1px solid ${P.line}` }}
+            style={{...CARD }}
           >
             <div className="space-y-2.5">
               {RED_FLAGS.map((f) => {
@@ -297,7 +297,7 @@ export function IntakeWizard() {
                 key={opt.value}
                 onClick={() => choose(opt)}
                 className="text-left rounded-xl px-4 py-3.5 text-[15px] font-medium transition-colors hover:border-[#E87A55]"
-                style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
+                style={{...CARD, color: P.ink}}
               >
                 {opt.label}
               </button>
@@ -319,7 +319,7 @@ export function IntakeWizard() {
             <Link
               href="/shop"
               className="rounded-xl px-5 py-3 text-sm font-semibold"
-              style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
+              style={{...CARD, color: P.ink}}
             >
               Toch de programma’s bekijken
             </Link>

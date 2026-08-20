@@ -23,15 +23,7 @@ import {
 import { X, ChevronDown, ChevronUp, Sparkles, Check, Loader2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { trpc } from '@/lib/trpc/client'
-import {
-  P,
-  Kicker,
-  MetaLabel,
-  DarkInput,
-  DarkTextarea,
-  DarkButton,
-  CATEGORY_COLORS,
-} from '@/components/dark-ui'
+import { P, CARD, Kicker, MetaLabel, DarkInput, DarkTextarea, DarkButton, CATEGORY_COLORS } from '@/components/dark-ui'
 
 interface ExerciseFormData {
   name: string
@@ -480,11 +472,7 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
           {isAdmin ? (
             <div
               className="flex items-center justify-between rounded-xl"
-              style={{
-                background: P.surface,
-                border: `1px solid ${P.line}`,
-                padding: '12px 14px',
-              }}
+              style={{...CARD, padding: '12px 14px',}}
             >
               <div>
                 <p
@@ -512,11 +500,7 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
           ) : (
             <div
               className="flex items-start gap-3 rounded-xl"
-              style={{
-                background: P.surface,
-                border: `1px solid ${P.line}`,
-                padding: '12px 14px',
-              }}
+              style={{...CARD, padding: '12px 14px',}}
             >
               <span
                 className="shrink-0 rounded-full"
@@ -652,11 +636,7 @@ export function ExerciseForm({ initialData, exerciseId }: ExerciseFormProps) {
           {/* Unilateral toggle */}
           <div
             className="flex items-center justify-between rounded-xl"
-            style={{
-              background: P.surface,
-              border: `1px solid ${P.line}`,
-              padding: '12px 14px',
-            }}
+            style={{...CARD, padding: '12px 14px',}}
           >
             <div>
               <p

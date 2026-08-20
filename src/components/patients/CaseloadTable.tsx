@@ -16,7 +16,7 @@
  * dan een raster dat zich in bochten wringt.
  */
 
-import { P, DATA_COLORS } from '@/lib/palette'
+import { P, CARD, DATA_COLORS } from '@/lib/palette'
 import { LOAD_UITLEG } from '@/lib/training-load'
 import { dischargeReasonTekst, formatDischargeDate } from '@/lib/care-status'
 
@@ -213,7 +213,7 @@ export function CaseloadTable({
   return (
     <div
       className="rounded-2xl overflow-hidden"
-      style={{ background: P.surface, border: `1px solid ${P.line}` }}
+      style={{...CARD }}
     >
       {/* Kop alleen waar de kolommen ook echt naast elkaar staan. */}
       <div

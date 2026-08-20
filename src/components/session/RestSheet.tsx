@@ -1,7 +1,7 @@
 'use client'
 
 import { SkipForward } from 'lucide-react'
-import { P, Kicker } from '@/components/dark-ui'
+import { P, CARD, Kicker } from '@/components/dark-ui'
 
 /**
  * Rusttimer tussen sets — bottom sheet met aftellende ring, +15s en overslaan.
@@ -32,7 +32,7 @@ export function RestSheet({
       <div className="mbt-backdrop absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={onSkip} />
       <div
         className="mbt-sheet relative w-full rounded-t-3xl flex flex-col items-center gap-4 px-5 pt-4 pb-[max(env(safe-area-inset-bottom),24px)]"
-        style={{ background: P.surface, border: `1px solid ${P.line}`, maxWidth: 480, margin: '0 auto' }}
+        style={{...CARD, maxWidth: 480, margin: '0 auto'}}
       >
         <div className="w-10 h-1 rounded-full" style={{ background: P.lineStrong }} />
         <Kicker>RUST</Kicker>

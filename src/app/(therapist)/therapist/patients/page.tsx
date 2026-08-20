@@ -5,21 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { trpc } from '@/lib/trpc/client'
 import { usePortal } from '@/lib/portal'
 import { toast } from 'sonner'
-import {
-  DarkButton,
-  DarkDialog as Dialog,
-  DarkDialogContent as DialogContent,
-  DarkDialogDescription as DialogDescription,
-  DarkDialogHeader as DialogHeader,
-  DarkDialogTitle as DialogTitle,
-  DarkInput,
-  Display,
-  Kicker,
-  MetaLabel,
-  P,
-  SkeletonList,
-  Tile,
-} from '@/components/dark-ui'
+import { DarkButton, DarkDialog as Dialog, DarkDialogContent as DialogContent, DarkDialogDescription as DialogDescription, DarkDialogHeader as DialogHeader, DarkDialogTitle as DialogTitle, DarkInput, Display, Kicker, MetaLabel, P, CARD, SkeletonList, Tile } from '@/components/dark-ui'
 import { CaseloadTable, type CaseloadRow } from '@/components/patients/CaseloadTable'
 
 
@@ -406,12 +392,8 @@ function PatientsPageInner() {
         {/* Invite modal */}
         <Dialog open={inviteOpen} onOpenChange={(open) => { setInviteOpen(open); if (!open) resetInviteForm() }}>
           <DialogContent
-            style={{
-              borderRadius: '16px',
-              background: P.surface,
-              color: P.ink,
-              border: `1px solid ${P.lineStrong}`,
-            }}
+            style={{...CARD, borderRadius: '16px',
+              color: P.ink,}}
           >
             <DialogHeader>
               <DialogTitle style={{ color: P.ink }}>Patiënt uitnodigen</DialogTitle>

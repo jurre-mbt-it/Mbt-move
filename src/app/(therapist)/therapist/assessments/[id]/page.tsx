@@ -8,23 +8,7 @@ import { use, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { trpc } from '@/lib/trpc/client'
-import {
-  DarkButton,
-  DarkHeader,
-  DarkInput,
-  DarkScreen,
-  DarkSelect,
-  DarkTabs as Tabs,
-  DarkTabsContent as TabsContent,
-  DarkTabsList as TabsList,
-  DarkTabsTrigger as TabsTrigger,
-  DarkTextarea,
-  Display,
-  Kicker,
-  MetaLabel,
-  P,
-  Tile,
-} from '@/components/dark-ui'
+import { DarkButton, DarkHeader, DarkInput, DarkScreen, DarkSelect, DarkTabs as Tabs, DarkTabsContent as TabsContent, DarkTabsList as TabsList, DarkTabsTrigger as TabsTrigger, DarkTextarea, Display, Kicker, MetaLabel, P, CARD, Tile } from '@/components/dark-ui'
 
 type ScoreValue = 'NOT_TESTED' | 'FAIL' | 'PARTIAL' | 'PASS'
 type Archetype =
@@ -249,7 +233,7 @@ export default function AssessmentDetailPage({ params }: { params: Promise<{ id:
         <Tabs defaultValue="LUMBAR_SPINE" className="space-y-4">
           <TabsList
             className="w-full grid grid-cols-5 md:grid-cols-10 rounded-xl"
-            style={{ background: P.surface, border: `1px solid ${P.line}` }}
+            style={{...CARD }}
           >
             {ARCHETYPE_ORDER.map((arch) => {
               const archTests = testsByArchetype.get(arch) ?? []
@@ -480,12 +464,8 @@ function TestRow({
                   <div
                     key={m.id}
                     className="flex items-center justify-between gap-2"
-                    style={{
-                      background: P.surface,
-                      borderRadius: 6,
-                      padding: '6px 10px',
-                      border: `1px solid ${P.line}`,
-                    }}
+                    style={{...CARD, borderRadius: 6,
+                      padding: '6px 10px',}}
                   >
                     <span style={{ color: P.ink, fontSize: 12, fontWeight: 700 }}>{m.exercise.name}</span>
                     <span
@@ -553,7 +533,7 @@ function ArchetypeSummaryEditor({
   }
 
   return (
-    <details className="rounded-xl" style={{ background: P.surface, padding: '14px 16px', marginTop: 8, border: `1px solid ${P.line}` }}>
+    <details className="rounded-xl" style={{...CARD, padding: '14px 16px', marginTop: 8,}}>
       <summary
         className="athletic-mono cursor-pointer"
         style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.14em' }}

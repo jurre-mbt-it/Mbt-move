@@ -8,15 +8,7 @@ import {
   Search, X, Plus, Play, Heart, RotateCcw, TrendingUp,
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  P,
-  Kicker,
-  MetaLabel,
-  Tile,
-  DarkButton,
-  DarkInput,
-  DarkTextarea,
-} from '@/components/dark-ui'
+import { P, CARD, Kicker, MetaLabel, Tile, DarkButton, DarkInput, DarkTextarea } from '@/components/dark-ui'
 import { useDraftBackup, loadDraft, clearStoredDraft } from '@/hooks/useAutosave'
 import {
   type SetEntry,
@@ -658,7 +650,7 @@ function AthleteSessionPageInner() {
       <div className="min-h-screen flex items-center justify-center px-4" style={{ background: P.bg, color: P.ink }}>
         <div
           className="w-full max-w-sm rounded-2xl p-6 space-y-4"
-          style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+          style={{...CARD }}
         >
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center"
@@ -741,11 +733,7 @@ function AthleteSessionPageInner() {
           {exercises.length > 0 && (
             <div
               className="rounded-xl flex items-center px-4 py-3"
-              style={{
-                background: P.surface,
-                borderLeft: `3px solid ${P.brand}`,
-                border: `1px solid ${P.line}`,
-              }}
+              style={{...CARD, borderLeft: `3px solid ${P.brand}`,}}
             >
               <span
                 className="athletic-mono"
@@ -837,11 +825,7 @@ function AthleteSessionPageInner() {
                   <div
                     key={e.uid}
                     className={`flex items-center gap-0 rounded-xl w-full overflow-hidden ${clickable ? 'mbt-card-hover' : ''}`}
-                    style={{
-                      background: P.surface,
-                      borderLeft: `3px solid ${P.brand}`,
-                      border: `1px solid ${P.line}`,
-                    }}
+                    style={{...CARD, borderLeft: `3px solid ${P.brand}`,}}
                   >
                     <Inner
                       type={clickable ? 'button' : undefined}
@@ -1107,7 +1091,7 @@ function AthleteSessionPageInner() {
                   <div
                     key={label}
                     className="rounded-xl px-3 py-2.5"
-                    style={{ background: P.surface, border: `1px solid ${P.line}` }}
+                    style={{...CARD }}
                   >
                     <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 9, letterSpacing: '0.16em' }}>
                       {label}
@@ -1362,7 +1346,7 @@ function AthleteSessionPageInner() {
                   type="button"
                   onClick={() => takeOverPrevious(current, seed)}
                   className="athletic-tap w-full flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left"
-                  style={{ background: P.surface, border: `1px solid ${P.line}` }}
+                  style={{...CARD }}
                 >
                   <span
                     aria-hidden
@@ -1557,7 +1541,7 @@ function VideoModal({
     >
       <div
         className="w-full max-w-2xl rounded-2xl overflow-hidden"
-        style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+        style={{...CARD }}
         onClick={(e) => e.stopPropagation()}
       >
         <div
@@ -1788,15 +1772,11 @@ function AddExerciseSheet({
       <div className="mbt-backdrop absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={onClose} />
       <div
         className="mbt-sheet relative w-full rounded-t-3xl flex flex-col"
-        style={{
-          background: P.surface,
-          border: `1px solid ${P.line}`,
-          maxWidth: 480,
+        style={{...CARD, maxWidth: 480,
           margin: '0 auto',
           // dvh i.p.v. vh: rekent de iOS Safari-toolbar mee, anders steekt de
           // sheet onder de zichtbare viewport uit.
-          maxHeight: '80dvh',
-        }}
+          maxHeight: '80dvh',}}
       >
         <div className="flex-none px-5 pt-4 pb-3">
           <div
@@ -1966,12 +1946,8 @@ function QuickEditRow({
   return (
     <div
       className="rounded-xl"
-      style={{
-        background: P.surface,
-        border: `1px solid ${P.line}`,
-        borderLeft: `3px solid ${P.brand}`,
-        padding: '12px 14px',
-      }}
+      style={{...CARD, borderLeft: `3px solid ${P.brand}`,
+        padding: '12px 14px',}}
     >
       <div className="flex items-center gap-3">
         <div
@@ -2197,7 +2173,7 @@ function QuickFinishModal({
     >
       <div
         className="w-full max-w-lg rounded-2xl flex flex-col max-h-[92vh]"
-        style={{ background: P.surface, border: `1px solid ${P.lineStrong}` }}
+        style={{...CARD }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 pt-5 pb-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${P.line}` }}>

@@ -7,7 +7,7 @@ import { formatSetsReps } from '@/lib/prescription'
 import { ExerciseVideoModal, type ExerciseForModal } from '@/components/exercises/ExerciseVideoModal'
 import { ChevronLeft, Moon, Dumbbell, Play, CheckCircle2 } from 'lucide-react'
 import { IconSleep } from '@/components/icons'
-import { P, Kicker, MetaLabel, Tile, CATEGORY_COLORS } from '@/components/dark-ui'
+import { P, CARD, Kicker, MetaLabel, Tile, CATEGORY_COLORS } from '@/components/dark-ui'
 
 const DAY_LABELS = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag', 'Zondag']
 
@@ -161,7 +161,7 @@ export default function ScheduleDayPage({ params }: Props) {
                   <button
                     key={pe.id}
                     className="athletic-tap w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all"
-                    style={{ background: P.surface, border: `1px solid ${P.line}` }}
+                    style={{...CARD }}
                     onClick={() => setModalExercise({
                       id: pe.exercise.id,
                       name: pe.exercise.name,

@@ -15,19 +15,7 @@ import {
   SortableContext, useSortable, arrayMove, verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import {
-  DarkButton,
-  DarkDialog as Dialog,
-  DarkDialogContent as DialogContent,
-  DarkDialogHeader as DialogHeader,
-  DarkDialogTitle as DialogTitle,
-  DarkInput,
-  InfoTip,
-  Kicker,
-  MetaLabel,
-  P,
-  Tile,
-} from '@/components/dark-ui'
+import { DarkButton, DarkDialog as Dialog, DarkDialogContent as DialogContent, DarkDialogHeader as DialogHeader, DarkDialogTitle as DialogTitle, DarkInput, InfoTip, Kicker, MetaLabel, P, CARD, Tile } from '@/components/dark-ui'
 import { usePortal } from '@/lib/portal'
 
 const TYPE_LABELS: Record<ParamType, string> = {
@@ -274,7 +262,7 @@ export default function ParametersPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent aria-describedby={undefined}
           className="max-w-sm"
-          style={{ background: P.surface, color: P.ink, border: `1px solid ${P.lineStrong}` }}
+          style={{...CARD, color: P.ink,}}
         >
           <DialogHeader>
             <DialogTitle style={{ color: P.ink }}>

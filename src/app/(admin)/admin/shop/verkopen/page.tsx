@@ -8,7 +8,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { trpc } from '@/lib/trpc/client'
-import { DarkButton, Kicker, Display, P } from '@/components/dark-ui'
+import { DarkButton, Kicker, Display, P, CARD } from '@/components/dark-ui'
 import { formatPriceCents } from '@/lib/shop/format'
 
 type Gran = 'month' | 'quarter' | 'year'
@@ -167,7 +167,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h2 className="text-xs font-bold uppercase tracking-[0.18em] mb-3" style={{ color: P.inkMuted }}>
         {title}
       </h2>
-      <div className="rounded-2xl p-5" style={{ background: P.surface, border: `1px solid ${P.line}` }}>
+      <div className="rounded-2xl p-5" style={{...CARD }}>
         {children}
       </div>
     </div>
@@ -192,7 +192,7 @@ function RecentOrders() {
       <h2 className="text-xs font-bold uppercase tracking-[0.18em] mb-3" style={{ color: P.inkMuted }}>
         Recente bestellingen
       </h2>
-      <div className="rounded-2xl p-5" style={{ background: P.surface, border: `1px solid ${P.line}` }}>
+      <div className="rounded-2xl p-5" style={{...CARD }}>
         <div className="space-y-3.5">
           {orders.map((o) => (
             <div key={o.id} className="flex items-center justify-between gap-3 flex-wrap">

@@ -6,15 +6,7 @@ import { trpc } from '@/lib/trpc/client'
 import { Search } from 'lucide-react'
 import { EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
 import { IconStrength } from '@/components/icons'
-import {
-  P,
-  Kicker,
-  MetaLabel,
-  Tile,
-  DarkButton,
-  DarkInput,
-  CATEGORY_COLORS,
-} from '@/components/dark-ui'
+import { P, CARD, Kicker, MetaLabel, Tile, DarkButton, DarkInput, CATEGORY_COLORS } from '@/components/dark-ui'
 
 const mono =
   'var(--font-mono-athletic)'
@@ -160,13 +152,9 @@ export default function AthleteExercisesPage() {
                   onPointerEnter={() => utils.exercises.get.prefetch({ id: ex.id })}
                   onFocus={() => utils.exercises.get.prefetch({ id: ex.id })}
                   className="athletic-tap flex items-center gap-3 rounded-xl"
-                  style={{
-                    background: P.surface,
-                    padding: '12px 14px',
+                  style={{...CARD, padding: '12px 14px',
                     borderLeft: `3px solid ${color}`,
-                    border: `1px solid ${P.line}`,
-                    textDecoration: 'none',
-                  }}
+                    textDecoration: 'none',}}
                 >
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"

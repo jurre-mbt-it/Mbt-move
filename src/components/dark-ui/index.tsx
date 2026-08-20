@@ -15,12 +15,12 @@ import * as TabsPrimitive from '@radix-ui/react-tabs'
 import * as SelectPrimitive from '@radix-ui/react-select'
 import { Check, ChevronDown, Search, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { P, DARK_CHART_COLORS } from '@/lib/palette'
+import { P, CARD, DARK_CHART_COLORS } from '@/lib/palette'
 
 // Het palet leeft in `@/lib/palette` (plain module) en wordt hier alleen
 // doorgegeven, zodat bestaande imports uit `@/components/dark-ui` blijven
 // werken. Servercomponenten importeren rechtstreeks uit `@/lib/palette`.
-export { P, DATA_COLORS, CATEGORY_COLORS, ZONE_COLORS, DARK_CHART_COLORS } from '@/lib/palette'
+export { P, CARD, DATA_COLORS, CATEGORY_COLORS, ZONE_COLORS, DARK_CHART_COLORS } from '@/lib/palette'
 
 // Uitleg-tooltip bij een instelling. Eigen bestand omdat dit ding zijn eigen
 // listeners en state heeft; hier alleen doorgegeven zodat imports uit
@@ -1276,7 +1276,7 @@ export function DarkMenuSelect({
           'mbt-btn-hover inline-flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm outline-none transition-colors focus:ring-2 focus:ring-[var(--p-brand)]/40 disabled:opacity-50 disabled:pointer-events-none data-[placeholder]:text-[var(--p-ink-muted)]',
           className,
         )}
-        style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
+        style={{...CARD, color: P.ink}}
       >
         <SelectPrimitive.Value placeholder={placeholder} />
         <SelectPrimitive.Icon asChild>
@@ -1465,7 +1465,7 @@ function DarkSearchSelect({
           'mbt-btn-hover inline-flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm outline-none transition-colors focus:ring-2 focus:ring-[var(--p-brand)]/40 disabled:opacity-50 disabled:pointer-events-none',
           className,
         )}
-        style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, color: P.ink }}
+        style={{...CARD, color: P.ink}}
       >
         <span className={cn('truncate', !selected && 'text-[var(--p-ink-muted)]')}>
           {selected ? selected.label : placeholder}

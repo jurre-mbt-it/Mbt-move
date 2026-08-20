@@ -15,7 +15,7 @@
  */
 
 import Link from 'next/link'
-import { P, MetaLabel } from '@/components/dark-ui'
+import { P, CARD, MetaLabel } from '@/components/dark-ui'
 import { trpc } from '@/lib/trpc/client'
 import type { LoadPoint, LoadStatusKey } from '@/lib/training-load'
 
@@ -40,7 +40,7 @@ export function PatientLoadStrip({ patientId }: { patientId: string }) {
     return (
       <div
         className="rounded-xl"
-        style={{ height: 78, background: P.surface, border: `1px solid ${P.lineStrong}`, opacity: 0.5 }}
+        style={{...CARD, height: 78, opacity: 0.5}}
         aria-hidden
       />
     )
@@ -61,7 +61,7 @@ export function PatientLoadStrip({ patientId }: { patientId: string }) {
       <Link href={href} className="block athletic-tap">
         <div
           className="rounded-xl"
-          style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, padding: '11px 13px' }}
+          style={{...CARD, padding: '11px 13px'}}
         >
           <div className="flex items-center gap-2">
             <span style={{ width: 9, height: 9, borderRadius: 999, background: P.inkDim, flexShrink: 0 }} />

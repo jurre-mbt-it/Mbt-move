@@ -5,7 +5,7 @@ import { X, TrendingUp } from 'lucide-react'
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
 } from 'recharts'
-import { P, Kicker, MetaLabel } from '@/components/dark-ui'
+import { P, CARD, Kicker, MetaLabel } from '@/components/dark-ui'
 
 const mono =
   'var(--font-mono-athletic)'
@@ -43,7 +43,7 @@ export function ExerciseProgressSheet({
       <div className="mbt-backdrop absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={onClose} />
       <div
         className="mbt-sheet relative w-full rounded-t-3xl px-5 pt-4 pb-[max(env(safe-area-inset-bottom),24px)]"
-        style={{ background: P.surface, border: `1px solid ${P.line}`, maxWidth: 480, margin: '0 auto' }}
+        style={{...CARD, maxWidth: 480, margin: '0 auto'}}
       >
         <div className="w-10 h-1 rounded-full mx-auto mb-3" style={{ background: P.lineStrong }} />
         <div className="flex items-start justify-between gap-3">

@@ -5,14 +5,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Play, Lightbulb } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
-import {
-  P,
-  Kicker,
-  MetaLabel,
-  Tile,
-  DarkButton,
-  CATEGORY_COLORS,
-} from '@/components/dark-ui'
+import { P, CARD, Kicker, MetaLabel, Tile, DarkButton, CATEGORY_COLORS } from '@/components/dark-ui'
 
 const mono =
   'var(--font-mono-athletic)'
@@ -171,12 +164,8 @@ export default function AthleteExerciseDetailPage({ params }: Props) {
                 type="button"
                 onClick={() => setVideoOpen(true)}
                 className="athletic-tap w-full flex items-center gap-3 rounded-xl"
-                style={{
-                  background: P.surface,
-                  border: `1px solid ${P.lineStrong}`,
-                  padding: 14,
-                  textAlign: 'left',
-                }}
+                style={{...CARD, padding: 14,
+                  textAlign: 'left',}}
               >
                 <div
                   className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
@@ -446,16 +435,12 @@ function MetaPill({ label }: { label: string }) {
   return (
     <span
       className="athletic-mono rounded"
-      style={{
-        background: P.surface,
-        border: `1px solid ${P.lineStrong}`,
-        color: P.inkMuted,
+      style={{...CARD, color: P.inkMuted,
         padding: '5px 10px',
         fontSize: 10,
         fontWeight: 900,
         letterSpacing: '0.14em',
-        textTransform: 'uppercase',
-      }}
+        textTransform: 'uppercase',}}
     >
       {label}
     </span>

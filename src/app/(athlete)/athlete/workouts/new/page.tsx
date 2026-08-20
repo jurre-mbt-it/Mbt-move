@@ -17,16 +17,7 @@ import {
   X, Plus, Search, Check,
   Play, Pause, Minus, ChevronDown,
 } from 'lucide-react'
-import {
-  P,
-  Kicker,
-  MetaLabel,
-  Tile,
-  DarkButton,
-  DarkInput,
-  DarkTextarea,
-  CATEGORY_COLORS,
-} from '@/components/dark-ui'
+import { P, CARD, Kicker, MetaLabel, Tile, DarkButton, DarkInput, DarkTextarea, CATEGORY_COLORS } from '@/components/dark-ui'
 
 type Step = 'pick-type' | 'build' | 'pick-exercises' | 'active' | 'complete'
 
@@ -1022,13 +1013,9 @@ function ExercisePickerView({
                   disabled={alreadyAdded}
                   onClick={() => !alreadyAdded && onAdd(ex as RealExercise)}
                   className="w-full flex items-center gap-3 rounded-xl text-left transition-all active:scale-[0.98]"
-                  style={{
-                    background: P.surface,
-                    padding: '12px 14px',
+                  style={{...CARD, padding: '12px 14px',
                     borderLeft: `3px solid ${color}`,
-                    border: `1px solid ${P.line}`,
-                    opacity: alreadyAdded ? 0.5 : 1,
-                  }}
+                    opacity: alreadyAdded ? 0.5 : 1,}}
                 >
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
