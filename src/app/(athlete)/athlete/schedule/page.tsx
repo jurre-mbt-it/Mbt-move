@@ -704,7 +704,7 @@ function EventCard({ event, onClick }: { event: CalEvent; onClick: () => void })
     if (event.zone) meta.push(`Z${event.zone}`)
     if (event.rpe != null) meta.push(`RPE ${event.rpe}`)
   } else {
-    meta.push(CATEGORY_LABELS[event.category])
+    meta.push(CATEGORY_LABELS[event.category].toUpperCase())
     if (event.durationSec) meta.push(fmtDuration(event.durationSec))
   }
 

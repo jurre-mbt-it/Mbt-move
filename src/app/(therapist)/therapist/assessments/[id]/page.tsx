@@ -558,7 +558,7 @@ function ArchetypeSummaryEditor({
         className="athletic-mono cursor-pointer"
         style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.14em' }}
       >
-        SAMENVATTING + PROGRAMMING TEMPLATE · {ARCHETYPE_LABEL[archetype]}
+        SAMENVATTING + PROGRAMMING TEMPLATE · {ARCHETYPE_LABEL[archetype].toUpperCase()}
       </summary>
       <div className="mt-3 flex flex-col gap-3">
         <div>

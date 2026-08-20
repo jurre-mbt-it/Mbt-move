@@ -53,7 +53,7 @@ function StatChip({ label, value, sub, tint }: {
       className="rounded-2xl p-4"
       style={{ background: P.surface, border: `1px solid ${P.line}` }}
     >
-      <MetaLabel>{label}</MetaLabel>
+      <MetaLabel>{label.toUpperCase()}</MetaLabel>
       <div className="flex items-baseline gap-2 mt-1">
         <span
           className="athletic-display"

@@ -172,7 +172,7 @@ function ModalityChip({
     <span className="inline-flex items-center gap-1.5" style={{ fontSize: 11 }}>
       <span style={{ width: 7, height: 7, borderRadius: 999, background: c, flexShrink: 0 }} />
       <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.08em', fontWeight: 800 }}>
-        {label}
+        {label.toUpperCase()}
       </span>
       <span style={{ color: c, fontSize: 11, fontWeight: 700 }}>{status.label}</span>
       {extra && (

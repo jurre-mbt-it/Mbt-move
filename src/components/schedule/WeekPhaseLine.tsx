@@ -59,7 +59,7 @@ export function WeekPhaseLine({ variant = 'line' }: { variant?: 'line' | 'deload
         style={{ color: P.inkMuted }}
         title={data.weekNote ?? undefined}
       >
-        {label && <span style={{ color }}>{label}</span>}
+        {label && <span style={{ color }}>{label.toUpperCase()}</span>}
         {label && data.weekNote ? ' · ' : ''}
         {data.weekNote ?? ''}
       </p>

@@ -351,7 +351,7 @@ function StatCard({
       className="rounded-2xl flex flex-col gap-2"
       style={{ background: P.surface, padding: 16 }}
     >
-      <MetaLabel>{label}</MetaLabel>
+      <MetaLabel>{label.toUpperCase()}</MetaLabel>
       <span
         className="athletic-display"
         style={{

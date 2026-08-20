@@ -1434,7 +1434,7 @@ function ExerciseTile({
               style={{ background: P.surfaceHi, border: `1px solid ${P.lineStrong}`, fontSize: 12 }}
             >
               <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.08em' }}>
-                {p.label}
+                {p.label.toUpperCase()}
               </span>
               {p.type === 'number' ? (
                 <input
@@ -1553,7 +1553,7 @@ function ExerciseTile({
                 className="athletic-mono athletic-tap text-left px-2 py-1 rounded"
                 style={{ color: P.ink, fontSize: 11, letterSpacing: '0.06em' }}
               >
-                + {p.label}
+                + {p.label.toUpperCase()}
                 {'unit' in p && p.unit && (
                   <span style={{ color: P.inkDim, marginLeft: 4 }}>{p.unit}</span>
                 )}
@@ -1610,7 +1610,7 @@ function RepsInput({
                 flexShrink: 0,
               }}
             >
-              {u.label}
+              {u.label.toUpperCase()}
             </button>
           )
         })}
@@ -1668,7 +1668,7 @@ function LabeledInput({
         </button>
       )}
       <span className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.12em' }}>
-        {label}
+        {label.toUpperCase()}
       </span>
       <DarkInput value={value} onChange={(e) => onChange(e.target.value)}
         inputMode={inputMode} style={{ padding: '8px 10px', fontSize: 14 }} />
@@ -1807,7 +1807,7 @@ function ExercisePicker({
               color={c.color}
               count={c.count}
             >
-              {c.name}
+              {c.name.toUpperCase()}
             </Chip>
           ))}
         </div>
@@ -2303,7 +2303,7 @@ function FeelPicker({
           >
             <Icon size={22} />
             <span className="athletic-mono" style={{ fontSize: 9, letterSpacing: '0.08em', fontWeight: 800 }}>
-              {label}
+              {label.toUpperCase()}
             </span>
           </button>
         )

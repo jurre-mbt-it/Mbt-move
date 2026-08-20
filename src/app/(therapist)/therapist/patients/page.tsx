@@ -268,7 +268,7 @@ function PatientsPageInner() {
                   : { border: `1.5px solid ${P.lineStrong}`, color: P.inkMuted, background: 'transparent', fontWeight: 700, letterSpacing: '0.1em' }
                 }
               >
-                {opt.label}
+                {opt.label.toUpperCase()}
               </button>
             )
           })}
@@ -592,7 +592,7 @@ function QuickStat({ value, label, tint, active, onClick }: {
         border: active ? `1px solid ${tint}` : `1px solid ${P.line}`,
       }}
     >
-      <MetaLabel>{label}</MetaLabel>
+      <MetaLabel>{label.toUpperCase()}</MetaLabel>
       <p
         className="athletic-display"
         style={{ color: tint, fontSize: 28, lineHeight: '32px', letterSpacing: '-0.03em', marginTop: 4 }}

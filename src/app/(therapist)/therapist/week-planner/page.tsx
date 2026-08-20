@@ -746,7 +746,7 @@ function ItemTile({
                         letterSpacing: '0.06em', padding: '1px 6px', borderRadius: 999,
                       }}
                     >
-                      {logged.rpe} {m.label}
+                      {logged.rpe} {m.label.toUpperCase()}
                     </span>
                   )
                 })()}
@@ -2804,7 +2804,7 @@ function WeekPlannerContent() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <Kicker>Week-planner</Kicker>
-          <Display size="md">{monthLabel}</Display>
+          <Display size="md">{monthLabel.toUpperCase()}</Display>
         </div>
         <div className="flex items-center gap-2">
           {/* Ook op de vergrendel-vlag: een selectie kan alleen ontstaan bij een

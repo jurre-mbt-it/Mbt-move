@@ -1299,7 +1299,7 @@ function AthleteSessionPageInner() {
                   className="athletic-mono rounded-full"
                   style={{ padding: '4px 10px', border: `1px solid color-mix(in srgb, ${P.brand} 33%, transparent)`, color: P.brand, fontSize: 9, letterSpacing: '0.14em', fontWeight: 800 }}
                 >
-                  {prescLabel}{targetKgLabel ? ` · ${targetKgLabel}` : ''}
+                  {prescLabel.toUpperCase()}{targetKgLabel ? ` · ${targetKgLabel.toUpperCase()}` : ''}
                 </span>
               )}
               {(current.programExtraParams ?? []).map(p => {
@@ -1311,7 +1311,7 @@ function AthleteSessionPageInner() {
                     className="athletic-mono rounded-full"
                     style={{ padding: '4px 10px', border: `1px solid ${P.lineStrong}`, color: P.inkMuted, fontSize: 9, letterSpacing: '0.14em', fontWeight: 700 }}
                   >
-                    {label}
+                    {label.toUpperCase()}
                   </span>
                 )
               })}
@@ -2099,7 +2099,7 @@ function FeelPicker({ value, onChange }: { value: number | null; onChange: (v: n
           >
             <Icon size={22} />
             <span className="athletic-mono" style={{ fontSize: 9, letterSpacing: '0.08em', fontWeight: 800 }}>
-              {label}
+              {label.toUpperCase()}
             </span>
           </button>
         )

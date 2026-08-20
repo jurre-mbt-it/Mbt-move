@@ -1,5 +1,5 @@
 /**
- * "Start behandeling" op het therapeut-dashboard: kies een patiënt en ga
+ * "START BEHANDELING" op het therapeut-dashboard: kies een patiënt en ga
  * rechtstreeks naar het behandelscherm.
  *
  * Gespiegeld van het home-scherm van de iOS-app (`app/(tabs)/index.tsx`,
@@ -73,8 +73,8 @@ export function StartTreatmentCard() {
       >
         <span className="min-w-0">
           <span
-            className="block"
-            style={{ color: P.bg, fontSize: 16, fontWeight: 700, letterSpacing: '-0.01em' }}
+            className="athletic-mono block"
+            style={{ color: P.bg, fontSize: 15, fontWeight: 900, letterSpacing: '0.06em' }}
           >
             Start behandeling
           </span>

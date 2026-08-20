@@ -166,7 +166,7 @@ export default function HardloopanalyseListPage() {
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div className="flex-1 min-w-0">
                       <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11, letterSpacing: '0.14em' }}>
-                        {new Date(a.performedAt).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {new Date(a.performedAt).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()}
                       </p>
                       <p style={{ color: P.ink, fontSize: 14, fontWeight: 700, marginTop: 3 }}>{a.goal ?? 'Hardloopanalyse'}</p>
                       <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 10, marginTop: 2, letterSpacing: '0.06em' }}>

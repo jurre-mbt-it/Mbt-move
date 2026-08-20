@@ -234,11 +234,11 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         // Gebruik dezelfde env-var als src/server/mail.ts (RESEND_FROM) zodat
         // afzender-display 1-op-1 matcht met de invite-mail. Default: brand-naam,
-        // niet bare email — dat zag de patient als "noreply@mbt-gym.nl".
+        // niet bare email — anders zag de patient enkel "noreply@getbase.coach".
         from:
           process.env.RESEND_FROM
           ?? process.env.RESEND_FROM_EMAIL
-          ?? 'BASE <noreply@mbt-gym.nl>',
+          ?? 'BASE <noreply@getbase.coach>',
         to,
         // Newlines eruit: een regelovergang in een subject-veld is een klassieke
         // header-injection-vector bij mail-API's.

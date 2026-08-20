@@ -85,7 +85,7 @@ export function Header({ title, userName, userEmail, userAvatar, settingsBase = 
           className="hidden md:block athletic-mono"
           style={{ color: P.ink, fontSize: 12, letterSpacing: '0.18em', fontWeight: 800 }}
         >
-          {title}
+          {title.toUpperCase()}
         </h1>
       )}
       <div className="flex items-center gap-3 ml-auto">

@@ -83,7 +83,7 @@ export default function AthleteRehabPage() {
         {/* Protocol header */}
         <div className="flex flex-col gap-1">
           <Kicker>Mijn protocol</Kicker>
-          <Display size="md">{tracker.protocol.name}</Display>
+          <Display size="md">{tracker.protocol.name.toUpperCase()}</Display>
           {tracker.protocol.description && (
             <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 4, lineHeight: 1.5 }}>
               {tracker.protocol.description}
@@ -350,7 +350,7 @@ function StatLine({
           letterSpacing: '0.08em',
         }}
       >
-        {label} {value}
+        {label.toUpperCase()} {value}
       </span>
     </div>
   )

@@ -132,7 +132,7 @@ function CardioEditView({ id, program }: { id: string; program: EditProgram }) {
             <Kicker>
               {program.isTemplate ? 'Cardio · Template' : 'Cardio-programma'}
             </Kicker>
-            <Display size="sm">{program.name}</Display>
+            <Display size="sm">{program.name.toUpperCase()}</Display>
           </div>
         </div>
 

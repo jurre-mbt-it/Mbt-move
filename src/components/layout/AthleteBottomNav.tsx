@@ -253,7 +253,7 @@ export function AthleteBottomNav({ personalMode = false }: { personalMode?: bool
               <Link
                 key={href}
                 href={href}
-                className={cn('athletic-tap flex flex-col items-center gap-1 py-2 athletic-label transition-colors')}
+                className={cn('athletic-tap flex flex-col items-center gap-1 py-2 athletic-mono transition-colors')}
                 style={{
                   color: active ? P.brand : P.inkMuted,
                   fontSize: 9,
@@ -309,7 +309,7 @@ export function AthleteBottomNav({ personalMode = false }: { personalMode?: bool
               <Link
                 key={href}
                 href={href}
-                className={cn('athletic-tap flex flex-col items-center gap-1 py-2 athletic-label transition-colors')}
+                className={cn('athletic-tap flex flex-col items-center gap-1 py-2 athletic-mono transition-colors')}
                 style={{
                   color: active ? P.brand : P.inkMuted,
                   fontSize: 9,
@@ -323,7 +323,7 @@ export function AthleteBottomNav({ personalMode = false }: { personalMode?: bool
           })}
           <button
             onClick={() => setDrawerOpen(true)}
-            className="athletic-tap flex flex-col items-center gap-1 py-2 athletic-label transition-colors"
+            className="athletic-tap flex flex-col items-center gap-1 py-2 athletic-mono transition-colors"
             style={{ color: P.inkMuted, fontSize: 9, letterSpacing: '0.14em' }}
             type="button"
           >

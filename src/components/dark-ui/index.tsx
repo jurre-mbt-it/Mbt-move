@@ -93,7 +93,7 @@ export function DarkHeader({
             className="athletic-mono text-[12px]"
             style={{ color: P.ink, letterSpacing: '0.15em', fontWeight: 800 }}
           >
-            {title}
+            {title.toUpperCase()}
           </span>
           {sub && (
             <span
@@ -408,9 +408,10 @@ export function ActionTile({
           className="block truncate"
           style={{
             color: P.ink,
-            fontSize: 15,
-            fontWeight: 600,
-            letterSpacing: '-0.01em',
+            fontSize: 14,
+            fontWeight: 800,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
           }}
         >
           {label}
@@ -485,9 +486,7 @@ export function MetricTile({
         ...style,
       }}
     >
-      {/* Bewust geen toUpperCase meer: labels staan in gewone schrijfwijze.
-          Die aanroep zat in JS en ontsnapte daardoor aan de CSS-wijziging. */}
-      <MetaLabel>{label}</MetaLabel>
+      <MetaLabel>{label.toUpperCase()}</MetaLabel>
       <div className="flex items-baseline gap-1">
         <span
           className="athletic-display"

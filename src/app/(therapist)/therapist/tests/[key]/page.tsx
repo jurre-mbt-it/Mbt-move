@@ -119,7 +119,7 @@ export default function ClinicalTestDetailPage({
             ))}
           </div>
           <Kicker>{test.shortGoal}</Kicker>
-          <Display size="md">{test.name}</Display>
+          <Display size="md">{test.name.toUpperCase()}</Display>
           {test.alternativeNames.length > 0 && (
             <p
               className="athletic-mono"
@@ -298,7 +298,7 @@ function StatTile({
       className="rounded-2xl flex flex-col gap-1.5"
       style={{ backgroundColor: P.surface, padding: 14 }}
     >
-      <MetaLabel>{label}</MetaLabel>
+      <MetaLabel>{label.toUpperCase()}</MetaLabel>
       <span
         className="athletic-display"
         style={{ color: tint, fontSize: 24, lineHeight: '28px', letterSpacing: '-0.02em' }}

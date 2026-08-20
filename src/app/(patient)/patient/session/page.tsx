@@ -1632,7 +1632,7 @@ function SessionPageInner() {
                   className="athletic-mono rounded-full"
                   style={{ padding: '4px 10px', border: `1px solid color-mix(in srgb, ${P.brand} 33%, transparent)`, color: P.brand, fontSize: 9, letterSpacing: '0.14em', fontWeight: 800 }}
                 >
-                  {prescLabel}{targetKgLabel ? ` · ${targetKgLabel}` : ''}
+                  {prescLabel.toUpperCase()}{targetKgLabel ? ` · ${targetKgLabel.toUpperCase()}` : ''}
                 </span>
               )}
               {(e.programExtraParams ?? []).map(p => {
@@ -1644,7 +1644,7 @@ function SessionPageInner() {
                     className="athletic-mono rounded-full"
                     style={{ padding: '4px 10px', border: `1px solid ${P.lineStrong}`, color: P.inkMuted, fontSize: 9, letterSpacing: '0.14em', fontWeight: 700 }}
                   >
-                    {label}
+                    {label.toUpperCase()}
                   </span>
                 )
               })}
@@ -1943,7 +1943,7 @@ function SessionPageInner() {
               className="athletic-mono"
               style={{ color: isCatchUp ? P.gold : P.inkMuted, fontSize: 10, letterSpacing: '0.14em', fontWeight: 700 }}
             >
-              {isCatchUp ? 'INHALEN · ' : ''}{sessionData.program.name} · WEEK {sessionData.program.currentWeek} · DAG {sessionData.program.currentDay}
+              {isCatchUp ? 'INHALEN · ' : ''}{sessionData.program.name.toUpperCase()} · WEEK {sessionData.program.currentWeek} · DAG {sessionData.program.currentDay}
             </span>
             <p
               className="athletic-mono"

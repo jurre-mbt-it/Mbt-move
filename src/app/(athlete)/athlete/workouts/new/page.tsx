@@ -346,7 +346,7 @@ function NewWorkoutPageInner() {
             </h1>
             <div className="flex items-center gap-2 mt-2">
               {(() => { const I = typeInfo ? WORKOUT_ICON_MAP[typeInfo.value] : null; return I ? <I size={20} /> : <span style={{ fontSize: 18 }}>{typeInfo?.icon}</span> })()}
-              <MetaLabel>{typeInfo?.label}</MetaLabel>
+              <MetaLabel>{typeInfo?.label?.toUpperCase()}</MetaLabel>
             </div>
           </div>
 
@@ -572,7 +572,7 @@ function NewWorkoutPageInner() {
         {/* Hero: workout name */}
         <div>
           <Kicker>
-            {typeInfo ? `${typeInfo.label}` : 'WORKOUT'}
+            {typeInfo ? `${typeInfo.label.toUpperCase()}` : 'WORKOUT'}
             {isActive && ` · ${completedSets}/${totalSets} SETS`}
           </Kicker>
           <input

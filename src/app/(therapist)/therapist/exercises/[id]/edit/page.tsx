@@ -69,7 +69,7 @@ export default function EditExercisePage({ params }: Props) {
             className="athletic-display"
             style={{ fontSize: 32, lineHeight: '38px', letterSpacing: '-0.025em', paddingTop: 2 }}
           >
-            {exercise.name}
+            {exercise.name.toUpperCase()}
           </h1>
           <MetaLabel style={{ marginTop: 2, textTransform: 'none', fontWeight: 500 }}>
             Wijzig de details van deze oefening
