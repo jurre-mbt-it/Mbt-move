@@ -40,7 +40,7 @@ export type SessionUser = {
   ghvAcceptedVersion: string | null
 }
 
-const ROLE_HOME: Record<RequiredRole, string> = {
+export const ROLE_HOME: Record<RequiredRole, string> = {
   ADMIN: '/admin/dashboard',
   THERAPIST: '/therapist/dashboard',
   PATIENT: '/patient/dashboard',

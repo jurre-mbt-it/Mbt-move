@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
+import { SHOP_BRAND } from '@/lib/shop/brand'
 import { P } from '@/lib/shop/palette'
 import { formatPriceCents } from '@/lib/shop/format'
 import { heroGradient } from '@/lib/shop/gradient'
@@ -91,7 +92,7 @@ export default async function ShopCatalogPage() {
                     className="absolute bottom-3 left-4 text-[10px] font-bold uppercase tracking-[0.22em]"
                     style={{ color: 'rgba(212,232,230,0.42)' }}
                   >
-                    MBT·Gym
+                    {SHOP_BRAND.short}
                   </span>
                 )}
               </div>

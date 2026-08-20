@@ -76,14 +76,14 @@ export function BetaDisclaimer() {
             Beta-versie
           </DialogTitle>
           <DialogDescription className="text-sm mt-1" style={{ color: '#9EB5B3' }}>
-            MBT Gym is op dit moment in beta. Lees de voorwaarden hieronder
+            BASE is op dit moment in beta. Lees de voorwaarden hieronder
             en geef akkoord om door te gaan.
           </DialogDescription>
         </div>
 
         <div className="px-5 py-4 space-y-3 text-sm" style={{ background: '#081A1C', color: '#F5F2ED' }}>
           <p>
-            Door gebruik te maken van MBT Gym ga je ermee akkoord dat:
+            Door gebruik te maken van BASE ga je ermee akkoord dat:
           </p>
           <ul className="list-disc pl-5 space-y-1.5" style={{ color: '#9EB5B3' }}>
             <li>De software actief in ontwikkeling is, er kunnen bugs of fouten optreden.</li>

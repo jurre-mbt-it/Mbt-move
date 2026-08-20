@@ -2,6 +2,7 @@ import { renderInvoicePdf, type InvoiceData, type InvoiceKind } from '@/lib/shop
 import { renderInvoiceUbl } from '@/lib/shop/invoice/ubl'
 import { getAppUrl } from '@/lib/app-url'
 import { INVOICE_COMPANY } from '@/lib/shop/invoice/company'
+import { SHOP_BRAND } from '@/lib/shop/brand'
 
 export type OrderEmailItem = {
   nameSnapshot: string
@@ -52,15 +53,15 @@ function shell(opts: { heading: string; bodyHtml: string; ctaUrl?: string; ctaLa
          <a href="${opts.ctaUrl}" style="display:block;background:${BRAND.brand};color:${BRAND.bg};text-decoration:none;text-align:center;padding:16px 24px;border-radius:12px;font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:900;letter-spacing:0.16em;text-transform:uppercase;">${opts.ctaLabel ?? 'OPENEN'}</a>
        </td></tr>`
     : ''
-  return `<!doctype html><html lang="nl"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>MBT·Gym</title></head>
+  return `<!doctype html><html lang="nl"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${SHOP_BRAND.name}</title></head>
 <body style="margin:0;padding:0;background:${BRAND.bg};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.bg};padding:32px 16px;"><tr><td align="center">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:${BRAND.surface};border:1px solid ${BRAND.line};border-radius:20px;overflow:hidden;">
-      <tr><td style="padding:28px 28px 12px 28px;"><div style="font-family:ui-monospace,Menlo,'SF Mono',monospace;font-size:11px;letter-spacing:0.2em;color:${BRAND.brand};font-weight:900;">● MBT · GYM</div></td></tr>
+      <tr><td style="padding:28px 28px 12px 28px;"><div style="font-family:ui-monospace,Menlo,'SF Mono',monospace;font-size:11px;letter-spacing:0.2em;color:${BRAND.brand};font-weight:900;">● ${SHOP_BRAND.name.toUpperCase()}</div></td></tr>
       <tr><td style="padding:8px 28px 0 28px;"><h1 style="margin:0;padding:4px 0 0 0;font-size:28px;line-height:34px;font-weight:900;letter-spacing:-1px;color:${BRAND.ink};text-transform:uppercase;">${opts.heading}</h1></td></tr>
       <tr><td style="padding:14px 28px 0 28px;color:${BRAND.inkMuted};font-size:15px;line-height:22px;">${opts.bodyHtml}</td></tr>
       ${cta}
-      <tr><td style="padding:24px 28px 28px 28px;border-top:1px solid ${BRAND.line};margin-top:20px;"><div style="font-family:ui-monospace,Menlo,'SF Mono',monospace;font-size:10px;letter-spacing:0.14em;color:${BRAND.inkMuted};text-transform:uppercase;font-weight:700;">MOVEMENT BASED THERAPY · movementbasedtherapy.nl</div></td></tr>
+      <tr><td style="padding:24px 28px 28px 28px;border-top:1px solid ${BRAND.line};margin-top:20px;"><div style="font-family:ui-monospace,Menlo,'SF Mono',monospace;font-size:10px;letter-spacing:0.14em;color:${BRAND.inkMuted};text-transform:uppercase;font-weight:700;">${SHOP_BRAND.name.toUpperCase()} · ${SHOP_BRAND.site}</div></td></tr>
     </table>
   </td></tr></table>
 </body></html>`
@@ -98,7 +99,7 @@ export function buildConfirmationEmail(order: OrderForEmail): { subject: string;
 export function buildInvoiceEmail(order: OrderForEmail): { subject: string; html: string } {
   const first = escapeHtml((order.buyerName ?? '').split(' ')[0] || 'sporter')
   const num = escapeHtml(order.invoiceNumber ?? '')
-  const subject = `Je factuur van MBT Gym · ${order.invoiceNumber ?? ''}`
+  const subject = `Je factuur van ${SHOP_BRAND.name} · ${order.invoiceNumber ?? ''}`
   const html = shell({
     heading: 'Je factuur',
     bodyHtml: `Hoi ${first}, in de bijlage vind je de factuur (${num}) voor je aankoop. Bewaar 'm voor je eigen administratie. Veel succes met trainen!`,
@@ -130,7 +131,12 @@ export function invoiceDataFromOrder(order: OrderForEmail): InvoiceData {
 async function resendSend(payload: Record<string, unknown>): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY
   if (!apiKey) return false
-  const from = process.env.RESEND_FROM ?? process.env.RESEND_FROM_EMAIL ?? 'MBT Gym <noreply@mbt-gym.nl>'
+  // Bewust géén terugval op RESEND_FROM: dat is de afzender van de app-mails
+  // van BASE, en dan zouden de facturen van de praktijk als BASE de deur uit
+  // gaan. De shop heeft zijn eigen variabele. Het standaardadres is het adres
+  // dat vandaag in Resend geverifieerd is; zet RESEND_FROM_SHOP zodra er een
+  // adres op movementbasedtherapy.nl geverifieerd is.
+  const from = process.env.RESEND_FROM_SHOP ?? `${SHOP_BRAND.name} <noreply@mbt-gym.nl>`
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',

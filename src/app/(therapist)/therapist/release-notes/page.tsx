@@ -29,7 +29,7 @@ export default function ReleaseNotesPage() {
             WAT IS NIEUW
           </h1>
           <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 4 }}>
-            Hier zie je wat er per release is veranderd in MBT-Gym.
+            Hier zie je wat er per release is veranderd in BASE.
           </p>
         </div>
 

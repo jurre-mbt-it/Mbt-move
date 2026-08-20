@@ -219,7 +219,13 @@ export function Tile({
         className,
       )}
       style={{
-        backgroundColor: P.surface,
+        // Instrument-kaart uit docs/app-ontwerpsysteem.md: een verloop, een
+        // lichtere bovenrand en een schaduw, zodat de kaart op de grond lígt.
+        // Geen lijn eromheen: lijnen zijn de taal van de praktijksite.
+        background: `linear-gradient(180deg, ${P.cardTop} 0%, ${P.cardBot} 100%)`,
+        border: `1px solid ${P.cardEdge}`,
+        borderTopColor: P.cardEdgeTop,
+        boxShadow: P.cardShadow,
         padding: 16,
         paddingLeft: accentBar ? 20 : 16,
         ...style,
@@ -384,7 +390,11 @@ export function ActionTile({
         className,
       )}
       style={{
-        backgroundColor: P.surface,
+        // Instrument-kaart, gelijk aan `Tile` en `MetricTile`.
+        background: `linear-gradient(180deg, ${P.cardTop} 0%, ${P.cardBot} 100%)`,
+        border: `1px solid ${P.cardEdge}`,
+        borderTopColor: P.cardEdgeTop,
+        boxShadow: P.cardShadow,
         padding: '18px 18px',
         marginBottom: 6,
       }}
@@ -466,7 +476,15 @@ export function MetricTile({
         interactive && 'athletic-tap mbt-card-hover cursor-pointer',
         className,
       )}
-      style={{ backgroundColor: P.surface, padding: 16, ...style }}
+      style={{
+        // Instrument-kaart, gelijk aan `Tile` (docs/app-ontwerpsysteem.md).
+        background: `linear-gradient(180deg, ${P.cardTop} 0%, ${P.cardBot} 100%)`,
+        border: `1px solid ${P.cardEdge}`,
+        borderTopColor: P.cardEdgeTop,
+        boxShadow: P.cardShadow,
+        padding: 16,
+        ...style,
+      }}
     >
       <MetaLabel>{label.toUpperCase()}</MetaLabel>
       <div className="flex items-baseline gap-1">

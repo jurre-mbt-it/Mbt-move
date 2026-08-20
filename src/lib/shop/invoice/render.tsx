@@ -9,6 +9,7 @@ import {
 } from '@react-pdf/renderer'
 import { INVOICE_COMPANY } from './company'
 import { MBT_LOGO_DATA_URI } from './logo'
+import { SHOP_BRAND } from '../brand'
 
 export type InvoiceKind = 'PROGRAM' | 'PHYSICAL' | 'SERVICE'
 
@@ -202,7 +203,7 @@ export function InvoiceDoc({ data }: { data: InvoiceData }) {
           <View style={s.metaCol}>
             <MetaRow label="Factuurnummer" value={data.invoiceNumber} />
             <MetaRow label="Factuurdatum" value={data.dateLabel} />
-            <MetaRow label="Omschrijving" value="Aankoop in de MBT Gym shop" />
+            <MetaRow label="Omschrijving" value={`Aankoop in de shop van ${SHOP_BRAND.name}`} />
           </View>
           <View style={s.metaCol}>
             <MetaRow label="Betaalwijze" value={paid ? method : 'Overboeking'} />

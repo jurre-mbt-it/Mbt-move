@@ -15,10 +15,13 @@
 export const P = {
   // Vlakken van donker naar licht: bg → surfaceLow → surface → surfaceHi.
   // surfaceLow is verdiept binnen een kaart en ligt dus bóven de pagina.
-  bg: '#0E2729',
-  surfaceLow: '#123033',
-  surface: '#15363A',
-  surfaceHi: '#1C4448',
+  // Waarden volgen docs/app-ontwerpsysteem.md: dieper dan de #0E2729 van de
+  // praktijksite, zodat de app niet als uitsnede daarvan leest. De tint blijft
+  // gelijk aan het origineel; alleen de diepte doet het werk.
+  bg: '#0A1C1D',
+  surfaceLow: '#0F2628',
+  surface: '#163539',
+  surfaceHi: '#1D4348',
   line: 'rgba(212,232,230,0.09)',
   lineStrong: 'rgba(212,232,230,0.20)',
   ink: '#F5F2ED',
@@ -37,6 +40,16 @@ export const P = {
   goldWarm: '#F09A4A',
   orange: '#EE8447',
   ice: '#9FCEC9',
+  // Instrument-kaart (docs/app-ontwerpsysteem.md). Spiegelt --p-card-* in
+  // globals.css; verander je er een, verander ze allebei.
+  cardTop: '#163539',
+  cardBot: '#0F2628',
+  cardEdge: 'rgba(255,255,255,0.05)',
+  cardEdgeTop: 'rgba(255,255,255,0.07)',
+  cardShadow: '0 8px 20px rgba(0,0,0,0.34)',
+  // Zonder kader: leesschermen, waar de haarlijn wél draagt.
+  flatBg: '#0C2224',
+  hairline: 'rgba(212,232,230,0.16)',
   teal: '#45A8A2',
 } as const
 

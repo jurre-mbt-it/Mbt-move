@@ -31,12 +31,31 @@
      dus tussen de pagina en de kaart te liggen, niet eronder. Ligt het lager
      dan `bg`, dan slaan roosters en ingelegde panelen als zwarte gaten in de
      pagina — precies wat er in de weekplanner misging. */
-  --p-bg: #0E2729;
-  --p-surface-low: #123033;
-  --p-surface: #15363A;
-  --p-surface-hi: #1C4448;
+  /* Vlakken volgens docs/app-ontwerpsysteem.md. De grond is bewust dieper
+     dan de #0E2729 van movementbasedtherapy.nl: de app deelde die letterlijk
+     met de site en leek daardoor een uitsnede ervan. De tint volgt wél die van
+     het origineel; een eerdere poging maakte het vlak ook koeler en dat zag er
+     te blauw uit. Alleen de diepte doet het onderscheidende werk.
+     De volgorde bg → surface-low → surface → surface-hi blijft intact. */
+  --p-bg: #0A1C1D;
+  --p-surface-low: #0F2628;
+  --p-surface: #163539;
+  --p-surface-hi: #1D4348;
   --p-line: rgba(212,232,230,0.09);
   --p-line-strong: rgba(212,232,230,0.20);
+
+  /* Instrument: een kaart ligt op de grond door een verloop, een lichtere
+     bovenrand en een schaduw. Niet door een lijn eromheen; lijnen zijn van de
+     site. Gebruik hiervoor de utility `.base-card` verderop. */
+  --p-card-top: #163539;
+  --p-card-bot: #0F2628;
+  --p-card-edge: rgba(255,255,255,0.05);
+  --p-card-edge-top: rgba(255,255,255,0.07);
+  --p-card-shadow: 0 8px 20px rgba(0,0,0,0.34);
+
+  /* Zonder kader: leesschermen zonder kaarten. Hier draagt de haarlijn wel. */
+  --p-flat-bg: #0C2224;
+  --p-hairline: rgba(212,232,230,0.16);
   --p-ink: #F5F2ED;
   --p-ink-muted: #9EB5B3;
   --p-ink-dim: #86A3A1;
@@ -85,24 +104,24 @@
   /* shadcn/ui tokens — de app draait overal in de donkere context, dus deze
      staan meteen op petrol in plaats van op een licht thema dat toch nooit
      te zien is. */
-  --background: #0E2729;
+  --background: #0A1C1D;
   --foreground: #F5F2ED;
-  --card: #15363A;
+  --card: #163539;
   --card-foreground: #F5F2ED;
-  --popover: #15363A;
+  --popover: #163539;
   --popover-foreground: #F5F2ED;
   --primary: #E87A55;
-  --primary-foreground: #0E2729;
-  --secondary: #1C4448;
+  --primary-foreground: #0A1C1D;
+  --secondary: #1D4348;
   --secondary-foreground: #F5F2ED;
-  --muted: #1C4448;
+  --muted: #1D4348;
   --muted-foreground: #9EB5B3;
-  --accent: #1C4448;
+  --accent: #1D4348;
   --accent-foreground: #F5F2ED;
   --destructive: #F0796C;
-  --destructive-foreground: #0E2729;
+  --destructive-foreground: #0A1C1D;
   --border: rgba(212,232,230,0.09);
-  --input: #1C4448;
+  --input: #1D4348;
   --ring: #E87A55;
   --radius: 0.5rem;
 
@@ -114,11 +133,11 @@
   --chart-5: var(--p-data-5);
 
   /* Sidebar */
-  --sidebar: #0E2729;
+  --sidebar: #0A1C1D;
   --sidebar-foreground: #F5F2ED;
   --sidebar-primary: #E87A55;
-  --sidebar-primary-foreground: #0E2729;
-  --sidebar-accent: #1C4448;
+  --sidebar-primary-foreground: #0A1C1D;
+  --sidebar-accent: #1D4348;
   --sidebar-accent-foreground: #F5F2ED;
   --sidebar-border: rgba(212,232,230,0.20);
   --sidebar-ring: #E87A55;
@@ -219,6 +238,28 @@ body {
    Een pagina/root die deze class krijgt, krijgt automatisch het near-black
    oppervlak + lime accents én override van shadcn-tokens zodat bestaande
    Radix/shadcn-componenten binnen de context mee-theme'en. */
+/* ── Instrument-kaart ───────────────────────────────────────────────────
+   De kaartstijl uit docs/app-ontwerpsysteem.md: een verloop, een lichtere
+   bovenrand en een schaduw, zodat de kaart op de grond lígt. Vervangt de
+   `bg-[var(--p-surface)] border` combinatie; gebruik deze klasse in plaats van
+   een eigen rand, anders krijg je de lijnentaal van de website terug.
+
+   Zonder kader (leesschermen) gebruikt `.base-flat` en heeft juist wél lijnen. */
+.base-card {
+  background: linear-gradient(180deg, var(--p-card-top) 0%, var(--p-card-bot) 100%);
+  border: 1px solid var(--p-card-edge);
+  border-top-color: var(--p-card-edge-top);
+  box-shadow: var(--p-card-shadow);
+}
+
+.base-flat {
+  background: var(--p-flat-bg);
+}
+
+.base-flat-rule {
+  border-top: 1px solid var(--p-hairline);
+}
+
 .athletic-dark {
   /* Override shadcn tokens naar athletic-dark equivalenten */
   --background: var(--p-bg);
@@ -285,6 +326,12 @@ body {
   color: var(--p-ink);
 }
 
+/* Labels: mono in hoofdletters. Dat is de tekentaal van deze app en past bij
+   een product dat meet. Het onderscheid met movementbasedtherapy.nl komt uit de
+   vlakken en het materiaal, niet uit de typografie. Zie
+   docs/app-ontwerpsysteem.md §4.
+
+   Deze twee dragen `Kicker` en `MetaLabel`, samen ruim duizend labels. */
 .athletic-kicker {
   font-family: var(--font-mono-athletic);
   font-stretch: 87.5%;
@@ -304,6 +351,18 @@ body {
   font-weight: 700;
   letter-spacing: 0.16em;
   color: var(--p-ink-muted);
+  text-transform: uppercase;
+}
+
+/* Zelfde stijl voor losse labels die niet via Kicker of MetaLabel lopen,
+   zoals de bottom-navs. */
+.athletic-label {
+  font-family: var(--font-mono-athletic);
+  font-stretch: 87.5%;
+  font-size-adjust: 0.55;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 

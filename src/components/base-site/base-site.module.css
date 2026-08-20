@@ -1,0 +1,847 @@
+/*
+ * Publieke BASE-site (route "/").
+ *
+ * Skelet van sensiq.co: gesegmenteerde menubalk, per sectie een klein label,
+ * een kop van drie regels en een datakaart ernaast, cijfers die vanaf nul
+ * oplopen.
+ *
+ * Huid van de nieuwe stijl van movementbasedtherapy.nl (spec:
+ * mbt-forest/docs/superpowers/specs/2026-08-19-redesign-performance-lab-stijl-design.md):
+ * nul afronding, haarlijnen dragen het ontwerp, mono micro-labels met
+ * scramble, oranje is actie en mint is meting, Big Shoulders voor de grote
+ * statements, Fraunces cursief voor nadruk, en het sectieritme dat wisselt
+ * tussen papier en diepgroen.
+ *
+ * Fonts staan self-hosted in /public/fonts/site (gekopieerd uit de
+ * praktijksite). De CSP staat font-src op 'self', dus Google Fonts wordt
+ * geweigerd; zie src/proxy.ts.
+ */
+
+@font-face {
+  font-family: 'Big Shoulders Display';
+  src: url('/fonts/site/big-shoulders-display-700-normal-latin.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'SiteInterTight';
+  src: url('/fonts/site/inter-tight-400-normal-latin.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'SiteInterTight';
+  src: url('/fonts/site/inter-tight-500-normal-latin.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'SiteMono';
+  src: url('/fonts/site/jetbrains-mono-400-normal-latin.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'SiteMono';
+  src: url('/fonts/site/jetbrains-mono-500-normal-latin.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'SiteSerif';
+  src: url('/fonts/site/fraunces-400-italic-latin.woff2') format('woff2');
+  font-weight: 400; font-style: italic; font-display: swap;
+}
+
+.page {
+  --display: 'Big Shoulders Display', 'Archivo Narrow', Impact, sans-serif;
+  --body: 'SiteInterTight', ui-sans-serif, system-ui, sans-serif;
+  --mono: 'SiteMono', ui-monospace, Menlo, monospace;
+  --serif: 'SiteSerif', Georgia, serif;
+
+  --petrol: #0E2729;
+  --petrol-deep: #081A1C;
+  --petrol-soft: #15363A;
+  --paper: #FBF9F3;
+  --paper-warm: #F1EDE3;
+  --orange: #E87A55;
+  --orange-deep: #C9613F;
+  --mint: #B8D8D5;
+  --mint-bright: #9FCEC9;
+  --gold: #F5B942;
+
+  /* out-expo van de referentie; alles beweegt hierop */
+  --e-out: var(--e-out);
+
+  /* Semantische tokens. Ze flippen per sectie via .secDark, zodat elk blok
+     dezelfde klassen gebruikt op zowel papier als diepgroen. */
+  /* "Mint is meting" komt van de praktijksite, waar alles op diepgroen staat.
+     Op papier is die mint niet leesbaar, dus flipt de metingkleur mee met de
+     sectie: diep op papier, helder op diepgroen. De regel blijft dezelfde. */
+  --measure: #3E8F89;
+
+  --ground: var(--paper);
+  --ink: var(--petrol);
+  --ink-soft: rgba(14, 39, 41, 0.66);
+  --ink-dim: rgba(14, 39, 41, 0.44);
+  --hair: rgba(14, 39, 41, 0.20);
+  --hair-strong: rgba(14, 39, 41, 0.38);
+  --hair-soft: rgba(14, 39, 41, 0.10);
+  --panel: #FFFFFF;
+
+  background: var(--paper);
+  color: var(--petrol);
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.55;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.sec {
+  background: var(--ground);
+  color: var(--ink);
+  border-top: 1px solid var(--hair);
+}
+
+.secDark {
+  --ground: var(--petrol);
+  --ink: var(--paper);
+  --ink-soft: rgba(251, 249, 243, 0.68);
+  --ink-dim: rgba(251, 249, 243, 0.44);
+  --hair: rgba(212, 232, 230, 0.20);
+  --hair-strong: rgba(212, 232, 230, 0.38);
+  --hair-soft: rgba(212, 232, 230, 0.10);
+  --panel: #15363A;
+  --measure: var(--mint-bright);
+}
+
+.shell {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-inline: clamp(18px, 4vw, 48px);
+}
+
+/* ── Menubalk: gesegmenteerd, vierkant, met scramble-letters ───────────── */
+.navBar {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  background: var(--paper);
+  border-bottom: 1px solid rgba(14, 39, 41, 0.16);
+}
+.navInner {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-left: clamp(18px, 4vw, 48px);
+}
+.navBrand {
+  display: flex;
+  align-items: center;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(20px, 2.4vw, 27px);
+  letter-spacing: 0.005em;
+  text-transform: uppercase;
+  color: var(--petrol);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.navCells {
+  display: flex;
+  align-items: stretch;
+  border-left: 1px solid rgba(14, 39, 41, 0.16);
+}
+.navCell {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 clamp(14px, 1.8vw, 26px);
+  min-height: 62px;
+  border-right: 1px solid rgba(14, 39, 41, 0.16);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  text-transform: uppercase;
+  color: var(--petrol);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 260ms var(--e-out), color 260ms ease;
+}
+.navCell:hover { background: var(--petrol); color: var(--paper); }
+.navCellAccent { background: var(--orange); color: var(--petrol); }
+.navCellAccent:hover { background: var(--petrol); color: var(--paper); }
+.navCellHome {
+  background: var(--petrol);
+  color: var(--paper);
+  padding-inline: clamp(16px, 1.8vw, 22px);
+}
+.navCellHome:hover { background: var(--orange); color: var(--petrol); }
+
+@media (max-width: 780px) {
+  .navHideSmall { display: none; }
+  .navCell { padding-inline: 14px; min-height: 54px; }
+}
+
+/* Losse letters van het scramble-effect. `white-space: pre` is geen detail: een
+   spatie in een inline-block valt anders weg, en dan leest de menubalk als
+   "PLANEENDEMO". */
+.ltr { display: inline-block; white-space: pre; }
+
+/* ── Typografie ───────────────────────────────────────────────────────── */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin: 0;
+}
+.eyebrow::before {
+  content: '+';
+  color: var(--orange);
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* Sensiq-ritme: koppen van drie regels, gemengde kast, strak gespatieerd. */
+.head {
+  font-family: var(--body);
+  font-weight: 500;
+  font-size: clamp(32px, 5.4vw, 68px);
+  line-height: 0.94;
+  letter-spacing: -0.035em;
+  margin: clamp(16px, 2vw, 26px) 0 0;
+  max-width: 15ch;
+}
+.ln { display: block; }
+.head em { font-family: var(--serif); font-style: italic; font-weight: 400; letter-spacing: -0.02em; }
+.headSmall { font-size: clamp(26px, 3.6vw, 44px); max-width: 18ch; }
+
+/* Statement-momenten: het MBT-signatuur, reuzenletters in Big Shoulders. */
+.giant {
+  font-family: var(--display);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: clamp(48px, 12.5vw, 190px);
+  line-height: 0.82;
+  letter-spacing: 0.005em;
+  margin: 0;
+}
+.giant span { display: block; }
+.giant i { font-style: normal; color: var(--orange); }
+
+.lede {
+  color: var(--ink-soft);
+  font-size: clamp(15px, 1.25vw, 18px);
+  line-height: 1.6;
+  max-width: 54ch;
+  margin: clamp(16px, 2vw, 24px) 0 0;
+}
+.lede em { font-family: var(--serif); font-style: italic; color: var(--ink); }
+
+/* ── Knoppen: vierkant, mono, vulling loopt van onderaf op ────────────── */
+.btnRow { display: flex; flex-wrap: wrap; gap: 10px; margin-top: clamp(22px, 3vw, 34px); }
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  min-width: 232px;
+  padding: 17px 20px;
+  border: 1px solid var(--ink);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-decoration: none;
+  overflow: hidden;
+  isolation: isolate;
+}
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--ink);
+  transform: translateY(101%);
+  transition: transform 520ms var(--e-out);
+  z-index: -1;
+}
+.btn:hover::before { transform: translateY(0); }
+.btn:hover { color: var(--ground); }
+.btnPrimary {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: var(--petrol);
+}
+.btnPrimary::before { background: var(--petrol); }
+.btnPrimary:hover { color: var(--paper); }
+.btnArrow { font-size: 13px; }
+
+/* ── Lopende band ─────────────────────────────────────────────────────── */
+.ticker {
+  overflow: hidden;
+  background: var(--petrol);
+  color: var(--paper);
+  border-block: 1px solid rgba(212, 232, 230, 0.2);
+  padding-block: 13px;
+}
+.tickerTrack { display: flex; gap: 34px; width: max-content; animation: slide 38s linear infinite; }
+.tickerTrack span {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(251, 249, 243, 0.72);
+  white-space: nowrap;
+}
+.tickerTrack .sep { color: var(--orange); }
+@keyframes slide { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+/* ── Sectie-indeling ──────────────────────────────────────────────────── */
+.block { padding-block: clamp(58px, 8vw, 120px); }
+.duo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(30px, 5vw, 76px);
+  align-items: center;
+}
+.duoTop { align-items: start; }
+@media (max-width: 880px) { .duo { grid-template-columns: 1fr; gap: 32px; } }
+
+/* ── Datakaarten: het sensiq-motief, hier vierkant en op haarlijnen ───── */
+.stage {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--hair);
+  padding: clamp(18px, 2.4vw, 30px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* Een donker paneel moet de hele tokenset omzetten, niet alleen de tekstkleur.
+   Alleen `color` omzetten gaf crèmekleurige tekst op witte kaarten. */
+.stageDark {
+  --ground: var(--petrol);
+  --ink: var(--paper);
+  --ink-soft: rgba(251, 249, 243, 0.68);
+  --ink-dim: rgba(251, 249, 243, 0.46);
+  --hair: rgba(212, 232, 230, 0.20);
+  --hair-strong: rgba(212, 232, 230, 0.38);
+  --hair-soft: rgba(212, 232, 230, 0.10);
+  --panel: var(--petrol-soft);
+  --measure: var(--mint-bright);
+  background: var(--petrol-deep);
+  border-color: rgba(212, 232, 230, 0.2);
+  color: var(--paper);
+}
+
+.dataCard {
+  background: var(--ground);
+  border: 1px solid var(--hair);
+  padding: 15px 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.dataCardRaised { background: var(--panel); }
+/* Schaduw alleen waar hij functie heeft, dus niet binnen een donker paneel. */
+.stage:not(.stageDark) .dataCardRaised { box-shadow: 0 18px 40px rgba(8, 26, 28, 0.12); }
+.dataTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.dataName {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.dataValue {
+  font-family: var(--mono);
+  font-size: clamp(19px, 2vw, 26px);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.pill {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  padding: 4px 9px;
+  border: 1px solid var(--measure);
+  color: var(--ink);
+  white-space: nowrap;
+}
+.pillWarm { border-color: var(--orange); }
+.meter { height: 5px; background: var(--hair-soft); position: relative; overflow: hidden; }
+.meter i { position: absolute; inset: 0 auto 0 0; background: var(--measure); }
+.meterWarm i { background: var(--orange); }
+.dataNote { margin: 0; font-size: 13.5px; color: var(--ink-soft); line-height: 1.45; }
+.dataNote em { font-family: var(--serif); font-style: italic; color: var(--ink); }
+
+/* Kruisjeskader uit het ontwerpsysteem: vier oranje kruisjes op de hoeken,
+   getekend als achtergrondlagen op één pseudo-element. Staat op precies één
+   beeld per pagina; meer wordt behang. Let op: een ouder met overflow:hidden
+   knipt het weg, want het steekt 7px buiten het element. */
+.xframe { position: relative; }
+.xframe::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--orange), var(--orange)), linear-gradient(var(--orange), var(--orange)),
+    linear-gradient(var(--orange), var(--orange)), linear-gradient(var(--orange), var(--orange)),
+    linear-gradient(var(--orange), var(--orange)), linear-gradient(var(--orange), var(--orange)),
+    linear-gradient(var(--orange), var(--orange)), linear-gradient(var(--orange), var(--orange));
+  background-size: 13px 1px, 1px 13px, 13px 1px, 1px 13px, 13px 1px, 1px 13px, 13px 1px, 1px 13px;
+  background-repeat: no-repeat;
+  background-position:
+    left top, left top, right top, right top,
+    left bottom, left bottom, right bottom, right bottom;
+}
+
+/* Drie gelijke blokken op één haarlijnraster, zoals het cijferblok. */
+.trio {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--hair);
+  border: 1px solid var(--hair);
+  margin-top: clamp(28px, 4vw, 48px);
+}
+@media (max-width: 880px) { .trio { grid-template-columns: 1fr; } }
+.trioCell {
+  background: var(--ground);
+  padding: clamp(22px, 2.6vw, 34px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.trioTitle {
+  font-family: var(--body);
+  font-weight: 500;
+  font-size: clamp(20px, 2.2vw, 28px);
+  line-height: 1.02;
+  letter-spacing: -0.028em;
+  margin: 0;
+}
+.trioList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.trioList li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 11px;
+  align-items: baseline;
+  padding-block: 10px;
+  border-top: 1px solid var(--hair-soft);
+  font-size: clamp(13.5px, 1.1vw, 15.5px);
+  color: var(--ink-soft);
+  line-height: 1.45;
+}
+.trioList li::before {
+  content: '+';
+  color: var(--orange);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+/* ── Genummerde rijen ─────────────────────────────────────────────────── */
+.rows { border-top: 1px solid var(--hair); }
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: clamp(14px, 3vw, 48px);
+  align-items: baseline;
+  padding: clamp(22px, 3vw, 38px) clamp(10px, 1.6vw, 20px);
+  border-bottom: 1px solid var(--hair);
+  isolation: isolate;
+  /* Zonder dit schuift de vulling met translateY(101%) precies over de rij
+     eronder in plaats van uit beeld: die rij staat dan permanent oranje en
+     haar nummer verdwijnt. De knoppen hebben om dezelfde reden overflow. */
+  overflow: hidden;
+  transition: color 420ms var(--e-out);
+}
+.row::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--orange);
+  transform: translateY(101%);
+  transition: transform 520ms var(--e-out);
+  z-index: -1;
+}
+.row:hover::before { transform: translateY(0); }
+.row:hover { color: var(--petrol); }
+.row:hover .rowNum, .row:hover .rowText { color: var(--petrol); }
+@media (max-width: 820px) {
+  .row { grid-template-columns: auto minmax(0, 1fr); }
+  .rowText { grid-column: 2; }
+}
+.rowNum {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--orange);
+  transition: color 420ms ease;
+}
+.rowTitle {
+  font-family: var(--body);
+  font-weight: 500;
+  font-size: clamp(20px, 2.4vw, 31px);
+  line-height: 1.0;
+  letter-spacing: -0.028em;
+  margin: 0;
+}
+.rowText { margin: 0; color: var(--ink-soft); font-size: clamp(14px, 1.15vw, 16px); line-height: 1.55; transition: color 420ms ease; }
+
+/* ── Cijferblok ───────────────────────────────────────────────────────── */
+.figures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--hair);
+  border: 1px solid var(--hair);
+}
+@media (max-width: 860px) { .figures { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.figure {
+  background: var(--ground);
+  padding: clamp(20px, 2.6vw, 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.figureVal {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(40px, 5.6vw, 76px);
+  line-height: 0.86;
+  letter-spacing: 0.005em;
+  font-variant-numeric: tabular-nums;
+  color: var(--measure);
+}
+.figureVal small { font-size: 0.42em; letter-spacing: 0.04em; margin-left: 4px; color: var(--ink-dim); }
+.figureLabel {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.figureNote { margin: 0; font-size: 13.5px; color: var(--ink-soft); line-height: 1.45; }
+
+/* ── Belastingcurve ───────────────────────────────────────────────────── */
+.curveWrap { position: relative; margin-top: clamp(24px, 3.4vw, 40px); border: 1px solid var(--hair); padding: clamp(16px, 2.2vw, 28px) clamp(12px, 1.8vw, 22px) clamp(10px, 1.4vw, 16px); }
+.curveChart { position: relative; }
+.curveChart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.curvePath { fill: none; stroke: var(--measure); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.curveTag {
+  position: absolute;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--ground);
+  border: 1px solid var(--hair);
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+.curveTag em { font-style: normal; color: var(--orange); }
+.tagDip { left: 18%; bottom: 26%; }
+.tagNow { right: 0; top: -7%; }
+@media (max-width: 720px) { .curveTag { position: static; display: inline-block; margin: 0 8px 8px 0; } }
+.curveAxis {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  color: var(--ink-dim);
+  border-top: 1px solid var(--hair);
+  padding-top: 10px;
+  margin-top: 6px;
+}
+
+/* ── Dashboardpaneel ──────────────────────────────────────────────────
+   Breed, donker vlak op het crème: het therapeutenscherm krijgt de ruimte die
+   het in de praktijk ook heeft. */
+.board {
+  background: var(--petrol);
+  border: 1px solid var(--hair-strong);
+  margin-top: clamp(28px, 4vw, 48px);
+  --ground: var(--petrol);
+  --ink: var(--paper);
+  --ink-soft: rgba(251, 249, 243, 0.68);
+  --ink-dim: rgba(251, 249, 243, 0.46);
+  --hair: rgba(212, 232, 230, 0.20);
+  --hair-soft: rgba(212, 232, 230, 0.10);
+  --measure: var(--mint-bright);
+  color: var(--paper);
+}
+.boardTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: clamp(14px, 1.8vw, 20px) clamp(16px, 2vw, 24px);
+  border-bottom: 1px solid var(--hair);
+}
+.boardStats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--hair);
+  border-bottom: 1px solid var(--hair);
+}
+@media (max-width: 760px) { .boardStats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.boardStat {
+  background: var(--petrol);
+  padding: clamp(16px, 2vw, 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+.boardVal {
+  font-family: var(--mono);
+  font-size: clamp(24px, 3vw, 36px);
+  line-height: 1;
+  color: var(--measure);
+  font-variant-numeric: tabular-nums;
+}
+.boardVal small { font-size: 0.44em; color: var(--ink-dim); margin-left: 4px; letter-spacing: 0.06em; text-transform: uppercase; }
+.boardFeed { padding: clamp(6px, 1vw, 10px) clamp(16px, 2vw, 24px) clamp(14px, 1.8vw, 20px); }
+.feedRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding-block: clamp(10px, 1.3vw, 14px);
+  border-bottom: 1px solid var(--hair-soft);
+  font-size: clamp(13.5px, 1.1vw, 15.5px);
+  color: var(--ink-soft);
+}
+.feedRow:last-child { border-bottom: none; }
+.feedDot { width: 7px; height: 7px; flex: none; background: var(--orange); }
+.feedDotCalm { background: var(--measure); }
+.feedWhen {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+
+/* ── Vastgezette scene met de telefoon ────────────────────────────────
+   Naar het model van de ring-sectie op sensiq.co: het blok is drie
+   schermhoogtes lang, de binnenkant plakt aan de bovenkant, en de inhoud
+   wisselt terwijl je erdoorheen scrollt. */
+.scene { height: 340svh; position: relative; }
+.scenePin {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+.sceneProgress { display: flex; gap: 6px; margin-bottom: clamp(18px, 3vh, 34px); }
+.sceneBar { flex: 1; height: 2px; background: var(--hair); overflow: hidden; }
+.sceneBar i { display: block; height: 100%; background: var(--orange); transform-origin: left center; }
+.sceneBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: clamp(24px, 5vw, 76px);
+  align-items: center;
+}
+@media (max-width: 900px) {
+  .sceneBody { grid-template-columns: 1fr; gap: 18px; }
+  .sceneCopy { order: 2; }
+  .phoneWrap { order: 1; }
+}
+.sceneCopy .head { margin-top: 12px; }
+.sceneCopy .lede { margin-top: 14px; }
+.sceneFoot {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin: clamp(18px, 3vh, 30px) 0 0;
+}
+
+/* ── De telefoon ───────────────────────────────────────────────────── */
+.phoneWrap { display: flex; justify-content: center; }
+.phone {
+  position: relative;
+  width: 300px;
+  height: 620px;
+  max-height: 76svh;
+  padding: 10px;
+  border: 1px solid var(--hair-strong);
+  background: #060f10;
+  flex: none;
+}
+/* Op smalle schermen de telefoon écht kleiner maken in plaats van hem te
+   schalen: een transform met negatieve marge liet hem over de tekst heen
+   vallen. De inhoud is vloeiend, dus die past zich vanzelf aan. */
+@media (max-width: 900px) {
+  .phone { width: 236px; height: 480px; padding: 8px; }
+  .phoneNotch { width: 72px; top: 8px; }
+  .phoneScroll { padding: 14px 11px 30px; gap: 10px; }
+}
+.phoneNotch {
+  position: absolute;
+  top: 10px; left: 50%;
+  width: 92px; height: 5px;
+  transform: translateX(-50%);
+  background: var(--hair-strong);
+}
+.phoneScreen { position: relative; width: 100%; height: 100%; overflow: hidden; background: #0b1a19; }
+.phoneScroll { position: absolute; inset: 0 0 auto 0; padding: 18px 14px 40px; display: flex; flex-direction: column; gap: 12px; will-change: transform; }
+
+.appHead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+.appTitle { font-family: var(--body); font-weight: 600; font-size: 21px; letter-spacing: -0.02em; color: #e8f1ef; }
+.appMeta { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; color: #7f9c98; }
+.appLabel { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.12em; text-transform: uppercase; color: #a9c2be; }
+.appCard {
+  position: relative;
+  background: linear-gradient(180deg, #17312f 0%, #112423 100%);
+  border: 1px solid rgba(255,255,255,0.06);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.appCardTop { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.appBadge {
+  font-family: var(--mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #4ecb71; border: 1px solid rgba(78,203,113,0.45); padding: 3px 6px;
+}
+.arcs { width: 100%; height: auto; display: block; margin-top: 2px; }
+.appCentre { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-top: -46px; }
+.appBig { font-family: var(--mono); font-size: 30px; line-height: 1; color: #e8f1ef; font-variant-numeric: tabular-nums; }
+.appBig small { font-size: 0.45em; color: #7f9c98; margin-left: 1px; }
+.appLegend { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+.appLegendItem {
+  display: flex; align-items: center; gap: 7px;
+  font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; color: #a9c2be;
+}
+.appLegendItem i { width: 7px; height: 7px; flex: none; }
+.appLegendItem b { margin-left: auto; font-weight: 400; color: #e8f1ef; }
+.appRow { display: grid; grid-template-columns: 46px 1fr auto; gap: 8px; align-items: center; font-family: var(--mono); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: #a9c2be; }
+.appBarTrack { display: block; height: 5px; background: rgba(255,255,255,0.08); position: relative; }
+.appBarTrack b { position: absolute; inset: 0 auto 0 0; }
+.appNum { color: #e8f1ef; font-variant-numeric: tabular-nums; }
+.appGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.appTile {
+  background: linear-gradient(180deg, #17312f 0%, #112423 100%);
+  border: 1px solid rgba(255,255,255,0.06);
+  padding: 10px;
+  display: flex; flex-direction: column; gap: 6px; min-width: 0;
+}
+.appTileVal { font-family: var(--mono); font-size: 21px; line-height: 1; color: #e8f1ef; font-variant-numeric: tabular-nums; }
+.appTileVal small { font-size: 0.42em; color: #7f9c98; margin-left: 3px; letter-spacing: 0.06em; text-transform: uppercase; }
+
+@media (prefers-reduced-motion: reduce) {
+  .scene { height: auto; }
+  .scenePin { position: static; height: auto; padding-block: clamp(58px, 8vw, 120px); }
+}
+
+/* Legenda bij de curve: welke bronnen samen de belasting vormen. */
+.legend { display: flex; flex-wrap: wrap; gap: 10px 26px; margin-top: clamp(14px, 1.8vw, 20px); }
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.legendKey { width: 15px; height: 3px; flex: none; background: var(--measure); }
+.legendKeyMid { opacity: 0.62; }
+.legendKeyLow { opacity: 0.34; }
+
+/* Vergelijking patiënt- tegenover atletenaccount. Geen prijstabel. */
+.compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--hair);
+  border: 1px solid var(--hair);
+  margin-top: clamp(28px, 4vw, 48px);
+}
+@media (max-width: 780px) { .compare { grid-template-columns: 1fr; } }
+
+/* ── Slot en voettekst ────────────────────────────────────────────────── */
+.closer { background: var(--petrol); color: var(--paper); }
+.footerMark {
+  font-family: var(--display);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: clamp(76px, 25vw, 380px);
+  line-height: 0.74;
+  letter-spacing: 0.01em;
+  color: var(--paper);
+  margin: 0;
+  padding-top: clamp(24px, 4vw, 56px);
+  opacity: 0.13;
+  user-select: none;
+}
+.footBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 30px;
+  align-items: baseline;
+  justify-content: space-between;
+  border-top: 1px solid rgba(212, 232, 230, 0.2);
+  padding-block: clamp(20px, 2.6vw, 32px);
+}
+.footLink {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(251, 249, 243, 0.62);
+  text-decoration: none;
+  transition: color 200ms ease;
+}
+.footLink:hover { color: var(--orange); }
+.footLinks { display: flex; flex-wrap: wrap; gap: 16px 26px; }
+
+/* ── Onthullen ────────────────────────────────────────────────────────── */
+.reveal { opacity: 0; transform: translateY(12px); transition: opacity 900ms var(--e-out), transform 900ms var(--e-out); }
+.revealIn { opacity: 1; transform: none; }
+
+.page :global(a):focus-visible,
+.page :global(button):focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tickerTrack { animation: none; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .btn::before, .row::before { transition: none; }
+}
