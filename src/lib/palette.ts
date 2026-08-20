@@ -109,7 +109,7 @@ export const DATA_COLORS = [
  * amber zijn zonder dat een geplande training als "bezig" leest.
  *
  * Wel blijft gelden dat ze onderling genoeg moeten verschillen, en dat ze in
- * allebei hun dieptes leesbaar zijn. Zie fillFor().
+ * allebei als vulling leesbaar zijn met donkere inkt. Zie textOn().
  */
 /**
  * Leesbare tekstkleur op een gekozen vlak.
@@ -123,57 +123,6 @@ export const DATA_COLORS = [
  * Relatieve helderheid volgens WCAG. Niet-hex waarden (rgba, gradient) leveren
  * lichte inkt op; dat is de veilige kant op een donkere app.
  */
-/**
- * Lichte variant van een categoriekleur, om een vlak mee te vullen.
- *
- * De rauwe categoriekleuren zijn bedoeld om een letter of icoon mee te kleuren.
- * Als vulling werken ze niet: `CARDIO` (#45A8A2) is een middendonkere turquoise,
- * en daar is geen tekstkleur voor die goed leest. Lichte tekst wordt modder,
- * donkere tekst valt weg.
- *
- * Daarom trekt deze functie elke tint naar dezelfde lichtheid. De kleur blijft
- * herkenbaar (dezelfde tint), maar het vlak is altijd licht genoeg voor donkere
- * inkt. Dat is ook hoe de gevulde blokjes in het ontwerpvoorbeeld werkten.
- *
- * Werkt ook op een zelfgekozen kleur uit /therapist/settings/kleuren.
- */
-export function fillFor(color: string, done: boolean): string {
-  const m = /^#?([0-9a-f]{6})$/i.exec(color.trim())
-  if (!m) return color
-  const n = parseInt(m[1], 16)
-  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255
-  const max = Math.max(r, g, b), min = Math.min(r, g, b)
-  const l0 = (max + min) / 2
-  let h = 0, sat = 0
-  if (max !== min) {
-    const d = max - min
-    sat = l0 > 0.5 ? d / (2 - max - min) : d / (max + min)
-    h = max === r ? (g - b) / d + (g < b ? 6 : 0)
-      : max === g ? (b - r) / d + 2
-      : (r - g) / d + 4
-    h /= 6
-  }
-  // Vaste lichtheid, verzadiging geknepen: anders gaat een fel gekozen kleur
-  // alsnog schreeuwen naast de oranje actiekleur.
-  // Nog te doen is donker en dicht: er staat toch alleen een naam in. Gedaan
-  // is licht, want daar staan de cijfers in en die lezen het best als donkere
-  // inkt op een licht vlak.
-  const L = done ? 0.78 : 0.29
-  const S = done
-    ? Math.min(Math.max(sat, 0.34), 0.62)
-    : Math.min(Math.max(sat, 0.30), 0.46)
-  const hue = (t: number) => {
-    t = (t + 1) % 1
-    if (t < 1 / 6) return q0 + (q1 - q0) * 6 * t
-    if (t < 1 / 2) return q1
-    if (t < 2 / 3) return q0 + (q1 - q0) * (2 / 3 - t) * 6
-    return q0
-  }
-  const q1 = L < 0.5 ? L * (1 + S) : L + S - L * S
-  const q0 = 2 * L - q1
-  const to = (v: number) => Math.round(v * 255).toString(16).padStart(2, '0')
-  return `#${to(hue(h + 1 / 3))}${to(hue(h))}${to(hue(h - 1 / 3))}`
-}
 
 /**
  * Kleur per cardio-activiteit.

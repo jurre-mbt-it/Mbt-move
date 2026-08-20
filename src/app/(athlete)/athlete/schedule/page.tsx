@@ -24,7 +24,7 @@ import {
 import { CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
 import { matchLoggedPlanned, type PlannedEntry } from '@/lib/planned-matching'
 import { WeekPhaseLine } from '@/components/schedule/WeekPhaseLine'
-import { CATEGORY_COLORS, CARDIO_ACTIVITY_COLORS, fillFor, textOn } from '@/lib/palette'
+import { CATEGORY_COLORS, CARDIO_ACTIVITY_COLORS, textOn } from '@/lib/palette'
 import { CARDIO_ICON_MAP } from '@/components/icons/icon-map'
 import { formatWeightsPerSet } from '@/lib/session-sets'
 
@@ -695,11 +695,10 @@ type CalendarData = {
 
 function EventCard({ event, onClick }: { event: CalEvent; onClick: () => void }) {
   const color = eventColor(event)
-  // Zelfde taal als de weekplanner van de therapeut: de kleur zegt de soort,
-  // de diepte van de vulling zegt of het gebeurd is. Een gelogde sessie of
-  // cardio is per definitie gedaan; alleen planning kan nog openstaan.
-  const isDone = event.kind !== 'planned'
-  const fill = fillFor(color, isDone)
+  // Zelfde taal als de weekplanner: alles even vol in de soortkleur, en de
+  // status staat op de chip. Een tussenversie dempte hier de vulling per
+  // status, maar dat maakte de agenda bleek en week af van de eindkeuze.
+  const fill = color
   const ink = textOn(fill)
   const statusChip =
     event.kind === 'session'
@@ -745,9 +744,11 @@ function EventCard({ event, onClick }: { event: CalEvent; onClick: () => void })
     >
       <div
         className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+        // De waas volgt de inkt: donkere inkt betekent een lichte kaart, dus
+        // een donkere waas; en andersom.
         style={{
-          background: isDone ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.10)',
-          border: `1px solid ${isDone ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.16)'}`,
+          background: ink === P.bg ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.10)',
+          border: `1px solid ${ink === P.bg ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.16)'}`,
           color: ink,
         }}
       >

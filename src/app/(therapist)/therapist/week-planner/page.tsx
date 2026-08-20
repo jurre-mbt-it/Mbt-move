@@ -56,7 +56,7 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { CATEGORY_COLORS, CARDIO_ACTIVITY_COLORS, textOn, fillFor } from '@/lib/palette'
+import { CATEGORY_COLORS, CARDIO_ACTIVITY_COLORS, textOn } from '@/lib/palette'
 import { formatWeightsPerSet } from '@/lib/session-sets'
 import { useCategoryColors } from '@/lib/useCategoryColors'
 import {
