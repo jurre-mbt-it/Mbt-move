@@ -1,5 +1,5 @@
 /**
- * "START BEHANDELING" op het therapeut-dashboard: kies een patiënt en ga
+ * "Start behandeling" op het therapeut-dashboard: kies een patiënt en ga
  * rechtstreeks naar het behandelscherm.
  *
  * Gespiegeld van het home-scherm van de iOS-app (`app/(tabs)/index.tsx`,
