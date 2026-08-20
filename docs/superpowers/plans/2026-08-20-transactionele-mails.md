@@ -489,7 +489,7 @@ export function renderFooter(sender: EmailSender): string {
 - [ ] **Stap 4: Draai de test en bevestig dat hij slaagt**
 
 Draai: `npm test -- src/server/email/__tests__/footer.test.ts`
-Verwacht: PASS, vier tests. Faalt hij op de import van `./shell`, doe dan eerst taak 3 en kom terug.
+Verwacht: PASS, vier tests. `footer.ts` importeert alleen uit `palette.ts` en `sender.ts`, dus deze taak staat op zichzelf en heeft taak 3 niet nodig.
 
 - [ ] **Stap 5: Commit**
 
