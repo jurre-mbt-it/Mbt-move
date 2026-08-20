@@ -15,7 +15,7 @@
 - Tests draaien met `npm test` (`vitest run`). Alleen bestanden die matchen op `src/**/*.test.ts` worden opgepikt (zie `vitest.config.ts`). Plaats tests in een `__tests__/`-map naast de bron, zoals de rest van de repo.
 - Testomgeving is `node`. Geen DOM, geen React in deze tests.
 - Alle mail-HTML is tabelgebaseerd. Geen flex, geen grid, geen CSS-variabelen: Outlook rendert die niet.
-- Elke waarde die van een gebruiker komt, gaat door `escapeHtml()` voordat hij in HTML belandt.
+- Elke waarde die van een gebruiker komt, gaat door `escapeHtml()` voordat hij in HTML belandt. **Een keer, niet twee keer.** `emailShell()` escapet zelf al de `heading` en de velden van de `cta`. Geef die dus rauw mee. De `bodyHtml` is het omgekeerde geval: die bouw je zelf op en escape je zelf, want de shell laat hem ongemoeid.
 - Teksten volgen `docs/tone-of-voice.md`. De blacklist is hard: geen em-dashes (—), geen en-dashes (–), geen dubbele streepjes, geen emoji, volledige zinnen, geen holle woorden.
 - Het afzenderadres blijft `noreply@getbase.coach`. Alleen de weergavenaam wisselt. Wijzig niets aan DNS of aan `RESEND_API_KEY`.
 - Raak `src/lib/shop/email/order-emails.ts` niet aan. De shop valt buiten scope.
@@ -944,6 +944,14 @@ describe('inviteMail', () => {
     const mail = inviteMail({ ...basis, recipientName: '<script>x</script> Vries', sender })
     expect(mail.html).not.toContain('<script>x</script>')
   })
+
+  it('escapet de voornaam precies een keer', () => {
+    // emailShell escapet de heading zelf. Doet inviteMail dat ook, dan leest
+    // een naam als D'Hondt in de mailclient als "D&#39;Hondt".
+    const mail = inviteMail({ ...basis, recipientName: "D'Hondt", sender })
+    expect(mail.html).toContain('Hallo D&#39;Hondt')
+    expect(mail.html).not.toContain('&amp;#39;')
+  })
 })
 ```
 
@@ -1008,7 +1016,7 @@ export function inviteMail({
     sender,
     html: emailShell({
       sender,
-      heading: `Hallo ${escapeHtml(firstName)}`,
+      heading: `Hallo ${firstName}`,
       bodyHtml: body,
       cta: { url: codeUrl, label: 'Start onboarding' },
     }),
@@ -1231,7 +1239,7 @@ export function programMail(opts: ProgramMailOptions): { subject: string; html: 
     subject: `Je programma staat klaar · ${programName.replace(/[\r\n]+/g, ' ').trim()}`,
     html: emailShell({
       sender,
-      heading: `Hallo ${escapeHtml(firstName)}`,
+      heading: `Hallo ${firstName}`,
       bodyHtml: body,
       cta: { url: loginUrl, label: accessCode ? 'Inloggen met code' : 'Programma openen' },
     }),
