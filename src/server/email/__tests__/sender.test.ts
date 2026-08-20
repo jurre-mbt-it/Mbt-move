@@ -68,4 +68,134 @@ describe('resolveSender', () => {
     if (sender.kind !== 'practice') throw new Error('verwachtte praktijk')
     expect(sender.therapistName).toBe('A. Jansen')
   })
+
+  it('controleert alle doorgeefvelden van practice op PracticeSender', () => {
+    const practice = {
+      name: 'Praktijk Volledig',
+      addressLine1: 'Straatweg 42',
+      addressLine2: null,
+      postalCode: '5678 CD',
+      city: 'Volledigsstad',
+      country: 'Nederland',
+      phone: '0123456789',
+      email: 'contact@volledig.nl',
+      website: 'volledig.nl',
+      logoUrl: 'https://example.com/logo.png',
+      agbCodePractice: '0512345',
+      privacyDisclaimer: 'Onze privacybeleid',
+    }
+    const sender = resolveSender({ therapist, practice })
+    expect(sender.kind).toBe('practice')
+    if (sender.kind !== 'practice') throw new Error('verwachtte praktijk')
+    expect(sender.phone).toBe('0123456789')
+    expect(sender.email).toBe('contact@volledig.nl')
+    expect(sender.website).toBe('volledig.nl')
+    expect(sender.logoUrl).toBe('https://example.com/logo.png')
+    expect(sender.agbCodePractice).toBe('0512345')
+    expect(sender.privacyDisclaimer).toBe('Onze privacybeleid')
+    expect(sender.jobTitle).toBe('fysiotherapeut')
+  })
+
+  it('bouwt adresregels correct op met alle velden', () => {
+    const practice = {
+      name: 'Praktijk Met Volledig Adres',
+      addressLine1: 'Rijksstraat 123',
+      addressLine2: 'Begane grond',
+      postalCode: '9999 ZZ',
+      city: 'Amsterdam',
+      country: 'Nederland',
+      phone: '0111111111',
+      email: 'info@volledig.nl',
+      website: null,
+      logoUrl: null,
+      agbCodePractice: null,
+      privacyDisclaimer: null,
+    }
+    const sender = resolveSender({ therapist, practice })
+    expect(sender.kind).toBe('practice')
+    if (sender.kind !== 'practice') throw new Error('verwachtte praktijk')
+    expect(sender.addressLines).toEqual(['Rijksstraat 123', 'Begane grond', '9999 ZZ Amsterdam'])
+  })
+
+  it('sluit "Nederland" uit van adresregels, met hoofdletterloze variant', () => {
+    const practiceWithNederland = {
+      name: 'Praktijk Nederland',
+      addressLine1: 'Straat 1',
+      addressLine2: null,
+      postalCode: '1111 AA',
+      city: 'Stad',
+      country: 'Nederland',
+      phone: '0222222222',
+      email: 'test@ned.nl',
+      website: null,
+      logoUrl: null,
+      agbCodePractice: null,
+      privacyDisclaimer: null,
+    }
+    const senderNed = resolveSender({ therapist, practice: practiceWithNederland })
+    expect(senderNed.kind).toBe('practice')
+    if (senderNed.kind !== 'practice') throw new Error('verwachtte praktijk')
+    expect(senderNed.addressLines).toEqual(['Straat 1', '1111 AA Stad'])
+
+    const practiceWithMinuscule = {
+      ...practiceWithNederland,
+      country: 'nederland',
+    }
+    const senderMin = resolveSender({ therapist, practice: practiceWithMinuscule })
+    expect(senderMin.kind).toBe('practice')
+    if (senderMin.kind !== 'practice') throw new Error('verwachtte praktijk')
+    expect(senderMin.addressLines).toEqual(['Straat 1', '1111 AA Stad'])
+
+    const practiceWithBuitenland = {
+      ...practiceWithNederland,
+      country: 'Duitsland',
+    }
+    const senderBuitenland = resolveSender({ therapist, practice: practiceWithBuitenland })
+    expect(senderBuitenland.kind).toBe('practice')
+    if (senderBuitenland.kind !== 'practice') throw new Error('verwachtte praktijk')
+    expect(senderBuitenland.addressLines).toEqual(['Straat 1', '1111 AA Stad', 'Duitsland'])
+  })
+
+  it('bouwt adresregels op met alleen straat en plaats', () => {
+    const practice = {
+      name: 'Praktijk Minimaal',
+      addressLine1: 'Minimalweg 1',
+      addressLine2: null,
+      postalCode: null,
+      city: 'Minimalstad',
+      country: 'Nederland',
+      phone: '0333333333',
+      email: 'min@min.nl',
+      website: null,
+      logoUrl: null,
+      agbCodePractice: null,
+      privacyDisclaimer: null,
+    }
+    const sender = resolveSender({ therapist, practice })
+    expect(sender.kind).toBe('practice')
+    if (sender.kind !== 'practice') throw new Error('verwachtte praktijk')
+    expect(sender.addressLines).toEqual(['Minimalweg 1', 'Minimalstad'])
+  })
+
+  it('controleert jobTitle doorgeefveld', () => {
+    const practice = {
+      name: 'Praktijk Beroep',
+      addressLine1: 'Beroepstraat 1',
+      addressLine2: null,
+      postalCode: '2222 BB',
+      city: 'Beroepstad',
+      country: 'Nederland',
+      phone: '0444444444',
+      email: 'job@beroep.nl',
+      website: null,
+      logoUrl: null,
+      agbCodePractice: null,
+      privacyDisclaimer: null,
+    }
+    const therapistSpeciaal = { firstName: 'Peter', lastName: 'Specialist', jobTitle: 'osteopaat', name: null }
+    const sender = resolveSender({ therapist: therapistSpeciaal, practice })
+    expect(sender.kind).toBe('practice')
+    if (sender.kind !== 'practice') throw new Error('verwachtte praktijk')
+    expect(sender.jobTitle).toBe('osteopaat')
+  })
 })
