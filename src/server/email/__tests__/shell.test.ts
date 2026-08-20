@@ -63,4 +63,57 @@ describe('emailShell', () => {
     const html = emailShell({ sender: BASE_SENDER, heading: '<script>alert(1)</script>', bodyHtml: '' })
     expect(html).not.toContain('<script>alert(1)</script>')
   })
+
+  it('weigert javascript:-URL in cta', () => {
+    expect(() =>
+      emailShell({
+        sender: BASE_SENDER,
+        heading: 'Kop',
+        bodyHtml: '',
+        cta: { url: 'javascript:alert(document.cookie)', label: 'Klik' },
+      })
+    ).toThrow()
+  })
+
+  it('weigert data:-URL in cta', () => {
+    expect(() =>
+      emailShell({
+        sender: BASE_SENDER,
+        heading: 'Kop',
+        bodyHtml: '',
+        cta: { url: 'data:text/html,<script>alert(1)</script>', label: 'Klik' },
+      })
+    ).toThrow()
+  })
+
+  it('accepteert https-URL in cta', () => {
+    const html = emailShell({
+      sender: BASE_SENDER,
+      heading: 'Kop',
+      bodyHtml: '',
+      cta: { url: 'https://getbase.coach/login', label: 'Inloggen' },
+    })
+    expect(html).toContain('href="https://getbase.coach/login"')
+  })
+
+  it('accepteert http-URL in cta', () => {
+    const html = emailShell({
+      sender: BASE_SENDER,
+      heading: 'Kop',
+      bodyHtml: '',
+      cta: { url: 'http://example.com', label: 'Link' },
+    })
+    expect(html).toContain('href="http://example.com"')
+  })
+
+  it('weigert protocol-relatieve URL in cta', () => {
+    expect(() =>
+      emailShell({
+        sender: BASE_SENDER,
+        heading: 'Kop',
+        bodyHtml: '',
+        cta: { url: '//kwaadaardig.example', label: 'Klik' },
+      })
+    ).toThrow()
+  })
 })

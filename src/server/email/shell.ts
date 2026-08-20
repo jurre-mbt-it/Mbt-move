@@ -29,6 +29,13 @@ export interface EmailShellOptions {
 export function emailShell(opts: EmailShellOptions): string {
   const { sender, heading, bodyHtml, cta } = opts
 
+  // Valideer CTA-URL tegen http(s)-schema. Een niet-http URL kan alleen een
+  // programmeerfout zijn. Een mail die niet verstuurd wordt is beter dan een
+  // mail met een javascript: of data: link erin.
+  if (cta && !/^https?:\/\//i.test(cta.url)) {
+    throw new Error(`emailShell: cta.url moet met http:// of https:// beginnen, kreeg "${cta.url}"`)
+  }
+
   const wordmark = escapeHtml(sender.displayName)
 
   const ctaBlock = cta
