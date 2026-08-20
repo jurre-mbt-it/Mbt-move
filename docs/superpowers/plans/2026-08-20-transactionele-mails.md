@@ -583,6 +583,24 @@ describe('emailShell', () => {
     const html = emailShell({ sender: BASE_SENDER, heading: '<script>alert(1)</script>', bodyHtml: '' })
     expect(html).not.toContain('<script>alert(1)</script>')
   })
+
+  it('weigert een cta-url met een ander schema dan http of https', () => {
+    // escapeHtml houdt het attribuut heel maar laat het schema ongemoeid, dus
+    // zonder deze controle rendert `javascript:` als werkende link.
+    for (const url of ['javascript:alert(1)', 'data:text/html,<script>x</script>', '//kwaadaardig.example']) {
+      expect(() =>
+        emailShell({ sender: BASE_SENDER, heading: 'Kop', bodyHtml: '', cta: { url, label: 'Klik' } }),
+      ).toThrow()
+    }
+  })
+
+  it('accepteert http en https', () => {
+    for (const url of ['https://getbase.coach/login', 'http://localhost:3000/login']) {
+      expect(() =>
+        emailShell({ sender: BASE_SENDER, heading: 'Kop', bodyHtml: '', cta: { url, label: 'Klik' } }),
+      ).not.toThrow()
+    }
+  })
 })
 ```
 
@@ -626,6 +644,15 @@ export interface EmailShellOptions {
 
 export function emailShell(opts: EmailShellOptions): string {
   const { sender, heading, bodyHtml, cta } = opts
+
+  // escapeHtml beschermt het href-attribuut tegen uitbreken, maar zegt niets
+  // over het schema: een `javascript:`-URL zou als werkende link renderen. In
+  // deze mails kan een niet-http URL alleen een programmeerfout zijn, en dan
+  // is een mail die niet verstuurd wordt beter dan een mail met een
+  // gevaarlijke link erin. Vandaar de harde fout.
+  if (cta && !/^https?:\/\//i.test(cta.url)) {
+    throw new Error(`emailShell: cta.url moet met http:// of https:// beginnen, kreeg "${cta.url}"`)
+  }
 
   const wordmark = escapeHtml(sender.displayName)
 
