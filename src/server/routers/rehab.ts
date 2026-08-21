@@ -92,6 +92,28 @@ const alsConflict = (bericht: string) => (err: unknown): never => {
   throw err
 }
 
+/**
+ * Een criterium mag alleen naar een GLOBALE catalogus-test wijzen
+ * (practiceId NULL): protocollen zijn globaal en admin-beheerd, en een
+ * koppeling naar een praktijk-eigen test zou voor elke andere praktijk naar
+ * iets onleesbaars verwijzen.
+ */
+async function assertGlobaleCatalogusTest(
+  prisma: typeof import('@/lib/prisma').prisma,
+  catalogItemId: string,
+) {
+  const item = await prisma.testCatalogItem.findFirst({
+    where: { id: catalogItemId, practiceId: null, isActive: true },
+    select: { id: true },
+  })
+  if (!item) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Alleen globale, actieve catalogus-testen kunnen aan een criterium gekoppeld worden',
+    })
+  }
+}
+
 const TRAJECT_AL_GESTART =
   'Er is zojuist al een traject gestart voor deze patiënt. Ververs het scherm en probeer het opnieuw.'
 
@@ -777,7 +799,14 @@ export const rehabRouter = createTRPCRouter({
         include: {
           phases: {
             orderBy: { order: 'asc' },
-            include: { criteria: { orderBy: { order: 'asc' } } },
+            include: {
+              criteria: {
+                orderBy: { order: 'asc' },
+                // De gekoppelde test erbij, zodat het beheerscherm de naam kan
+                // tonen zonder de hele catalogus te hoeven doorzoeken.
+                include: { catalogItem: { select: { name: true, subtitle: true } } },
+              },
+            },
           },
         },
       })
@@ -871,10 +900,12 @@ export const rehabRouter = createTRPCRouter({
         newtonMinOrange: z.number().int().nullable().optional(),
         lsiMinGreen: z.number().int().min(0).max(100).nullable().optional(),
         lsiMinOrange: z.number().int().min(0).max(100).nullable().optional(),
+        catalogItemId: z.string().nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const { id, ...patch } = input
+      if (input.catalogItemId) await assertGlobaleCatalogusTest(ctx.prisma, input.catalogItemId)
       await ctx.prisma.rehabCriterion.update({ where: { id }, data: patch })
       return { ok: true }
     }),
@@ -895,9 +926,11 @@ export const rehabRouter = createTRPCRouter({
         newtonMinOrange: z.number().int().optional(),
         lsiMinGreen: z.number().int().min(0).max(100).optional(),
         lsiMinOrange: z.number().int().min(0).max(100).optional(),
+        catalogItemId: z.string().nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      if (input.catalogItemId) await assertGlobaleCatalogusTest(ctx.prisma, input.catalogItemId)
       const maxOrder = await ctx.prisma.rehabCriterion.findFirst({
         where: { phaseId: input.phaseId },
         orderBy: { order: 'desc' },

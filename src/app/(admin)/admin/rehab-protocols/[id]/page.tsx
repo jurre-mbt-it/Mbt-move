@@ -195,6 +195,8 @@ function PhaseSection({
       targetUnit: string | null
       inputType: InputType
       isBonus: boolean
+      catalogItemId: string | null
+      catalogItem: { name: string; subtitle: string | null } | null
     }>
   }
   protocolId: string
@@ -252,6 +254,8 @@ function CriterionRow({
     targetUnit: string | null
     inputType: InputType
     isBonus: boolean
+    catalogItemId: string | null
+    catalogItem: { name: string; subtitle: string | null } | null
   }
   protocolId: string
 }) {
@@ -264,6 +268,10 @@ function CriterionRow({
   const [targetUnit, setTargetUnit] = useState(criterion.targetUnit ?? '')
   const [inputType, setInputType] = useState<InputType>(criterion.inputType)
   const [isBonus, setIsBonus] = useState(criterion.isBonus)
+  const [catalogItemId, setCatalogItemId] = useState<string | null>(criterion.catalogItemId)
+  // Alleen globale testen zijn koppelbaar; de server weigert de rest. Voor een
+  // admin (practiceId null) levert deze query precies die globale set.
+  const { data: catalogus = [] } = trpc.testReports.catalog.useQuery(undefined, { enabled: open })
 
   const update = trpc.rehab.adminUpdateCriterion.useMutation({
     onSuccess: () => {
@@ -324,6 +332,15 @@ function CriterionRow({
           {criterion.targetUnit && <> {criterion.targetUnit}</>}
           {criterion.reference && <> · {criterion.reference}</>}
         </p>
+        {criterion.catalogItem && (
+          <p
+            className="athletic-mono"
+            style={{ color: P.inkMuted, fontSize: 11, marginTop: 2, letterSpacing: '0.04em' }}
+          >
+            → {criterion.catalogItem.name}
+            {criterion.catalogItem.subtitle && <> · {criterion.catalogItem.subtitle}</>}
+          </p>
+        )}
       </div>
       <div className="flex gap-1.5 shrink-0">
         <DarkButton size="sm" variant="ghost" onClick={() => setOpen(true)}>
@@ -391,6 +408,25 @@ function CriterionRow({
                 </label>
               </div>
             </div>
+            <div>
+              <MetaLabel>Gekoppelde catalogus-test</MetaLabel>
+              <DarkSelect
+                value={catalogItemId ?? ''}
+                onChange={(e) => setCatalogItemId(e.target.value || null)}
+              >
+                <option value="">Geen koppeling (handmatig afvinken)</option>
+                {catalogus.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                    {c.subtitle ? ` · ${c.subtitle}` : ''}
+                  </option>
+                ))}
+              </DarkSelect>
+              <p style={{ color: P.inkDim, fontSize: 11, marginTop: 4, lineHeight: 1.45 }}>
+                Gekoppeld: een meting van deze test in een testrapport zet dit criterium
+                automatisch op de juiste kleur.
+              </p>
+            </div>
           </div>
           <div className="flex justify-end gap-2 mt-5">
             <DarkButton variant="ghost" size="sm" onClick={() => setOpen(false)}>
@@ -410,6 +446,7 @@ function CriterionRow({
                   targetUnit: targetUnit || null,
                   inputType,
                   isBonus,
+                  catalogItemId,
                 })
               }
             >
@@ -432,6 +469,8 @@ function AddCriterionButton({ phaseId, protocolId }: { phaseId: string; protocol
   const [targetUnit, setTargetUnit] = useState('')
   const [inputType, setInputType] = useState<InputType>('NUMERIC')
   const [isBonus, setIsBonus] = useState(false)
+  const [catalogItemId, setCatalogItemId] = useState<string | null>(null)
+  const { data: catalogus = [] } = trpc.testReports.catalog.useQuery(undefined, { enabled: open })
 
   const create = trpc.rehab.adminCreateCriterion.useMutation({
     onSuccess: () => {
@@ -444,6 +483,7 @@ function AddCriterionButton({ phaseId, protocolId }: { phaseId: string; protocol
       setTargetValue('')
       setTargetUnit('')
       setIsBonus(false)
+      setCatalogItemId(null)
     },
     onError: (e) => toast.error(e.message),
   })
@@ -496,6 +536,21 @@ function AddCriterionButton({ phaseId, protocolId }: { phaseId: string; protocol
               </label>
             </div>
           </div>
+          <div>
+            <MetaLabel>Gekoppelde catalogus-test (optioneel)</MetaLabel>
+            <DarkSelect
+              value={catalogItemId ?? ''}
+              onChange={(e) => setCatalogItemId(e.target.value || null)}
+            >
+              <option value="">Geen koppeling (handmatig afvinken)</option>
+              {catalogus.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                  {c.subtitle ? ` · ${c.subtitle}` : ''}
+                </option>
+              ))}
+            </DarkSelect>
+          </div>
         </div>
         <div className="flex justify-end gap-2 mt-5">
           <DarkButton variant="ghost" size="sm" onClick={() => setOpen(false)}>
@@ -515,6 +570,7 @@ function AddCriterionButton({ phaseId, protocolId }: { phaseId: string; protocol
                 targetUnit: targetUnit || undefined,
                 inputType,
                 isBonus,
+                catalogItemId,
               })
             }
           >
