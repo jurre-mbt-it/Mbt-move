@@ -6,7 +6,7 @@
  * dubbele slashes of (erger) spaties in de URL — een typefout in de Vercel
  * env-var zou anders alle invite-mails breken.
  */
-const FALLBACK = 'https://mbt-gym.nl'
+const FALLBACK = 'https://getbase.coach'
 
 export function getAppUrl(): string {
   const raw = process.env.NEXT_PUBLIC_APP_URL?.trim()
