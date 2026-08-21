@@ -15,6 +15,7 @@ import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { practiceScope } from '@/server/lib/patient-access'
 import { planningCutoffVoorPatient } from '@/server/lib/planning-cutoff'
 import { muscleLoadsRecord } from '@/server/lib/muscle-loads'
+import { computeSessionStats, type SessionStats } from '@/server/lib/training-totals'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { auditLog } from '@/server/audit'
 import { signEducationFile } from '@/lib/education/storage'
@@ -2054,21 +2055,20 @@ export const patientRouter = createTRPCRouter({
     }),
 
   /**
-   * Totale sessie-telling voor de "TOTAL · all-time logged"-tegel. Los van
-   * getSessionHistory: die is gemaximeerd op 100 rijen, waardoor de teller op
-   * het dashboard stil bleef staan zodra een patiënt daar overheen ging.
-   * Zelfde filter (COMPLETED, zonder tendinopathie-dagrondes).
+   * Cijfers voor de twee tegels op het beginscherm.
+   *
+   * `total` blijft precies wat het was (krachtsessies all-time, zonder de
+   * tendinopathie-dagrondes) omdat build 82 en ouder in TestFlight dat veld
+   * lezen. De rest is erbij gekomen; oude clients negeren die velden.
+   *
+   * Waarom de tellers hier zitten en niet in `getTodayExercises`: die telt
+   * `completedThisWeek` binnen één programma. Wie meerdere actieve programma's
+   * heeft ziet zijn sessie in het andere programma dan niet terug, en cardio
+   * telt daar sowieso niet mee.
    */
-  getSessionStats: protectedProcedure.query(async ({ ctx }) => {
-    const total = await ctx.prisma.sessionLog.count({
-      where: {
-        patientId: ctx.user.id,
-        status: 'COMPLETED',
-        NOT: { program: { tendinopathyMode: true, dailyTarget: { not: null } } },
-      },
-    })
-    return { total }
-  }),
+  getSessionStats: protectedProcedure.query(async ({ ctx }): Promise<SessionStats> =>
+    computeSessionStats(ctx.prisma, ctx.user.id, new Date()),
+  ),
 
   // ── Eigen kalender: gepland + gelogd binnen een datum-range ──────────────
   // Voor de atleet-kalender (maandweergave): alle eigen SessionLogs en
