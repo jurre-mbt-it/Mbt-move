@@ -451,18 +451,32 @@ function PatientsPageInner() {
                 </div>
                 <div className="flex flex-col gap-2">
                   {inviteResult.patientUserId && (
-                    <DarkButton
-                      variant="primary"
-                      className="w-full"
-                      onClick={() => {
-                        const pid = inviteResult.patientUserId!
-                        setInviteOpen(false)
-                        resetInviteForm()
-                        router.push(`${portal.base}/programs/new?patientId=${pid}`)
-                      }}
-                    >
-                      → Maak nu een programma voor deze patiënt
-                    </DarkButton>
+                    <>
+                      <DarkButton
+                        variant="primary"
+                        className="w-full"
+                        onClick={() => {
+                          const pid = inviteResult.patientUserId!
+                          setInviteOpen(false)
+                          resetInviteForm()
+                          router.push(`${portal.patients}/${pid}?traject=start`)
+                        }}
+                      >
+                        → Traject starten op de patiëntpagina
+                      </DarkButton>
+                      <DarkButton
+                        variant="secondary"
+                        className="w-full"
+                        onClick={() => {
+                          const pid = inviteResult.patientUserId!
+                          setInviteOpen(false)
+                          resetInviteForm()
+                          router.push(`${portal.base}/programs/new?patientId=${pid}`)
+                        }}
+                      >
+                        Maak een programma voor deze patiënt
+                      </DarkButton>
+                    </>
                   )}
                   <DarkButton
                     variant="secondary"
