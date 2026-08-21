@@ -53,13 +53,16 @@ export default function PatientDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ tab?: string }>
+  searchParams: Promise<{ tab?: string; traject?: string }>
 }) {
   const portal = usePortal()
   const { id } = use(params)
   // Deep-link vanaf het dashboard: /patients/[id]?tab=signalen opent direct
   // de juiste tab. Ongeldige waardes vallen terug op 'profiel'.
-  const { tab } = use(searchParams)
+  // `?traject=start` komt uit de invite-flow: de dialoog om een traject te
+  // starten gaat dan meteen open op deze pagina.
+  const { tab, traject } = use(searchParams)
+  const startTraject = traject === 'start'
   const router = useRouter()
   const { data: patient, isLoading } = trpc.patients.get.useQuery({ id })
   // Wearable-tab voorlopig alleen voor de admin (zie wearables-access.ts).
@@ -948,7 +951,11 @@ export default function PatientDetailPage({
               nergens in beeld kwam, dus de tab is er voor hem niet. */}
           {showRehab && (
             <TabsContent value="revalidatie" className="space-y-4">
-              <RehabActivationToggle patientId={patient.id} patientName={patient.name} />
+              <RehabActivationToggle
+                patientId={patient.id}
+                patientName={patient.name}
+                autoOpenSetup={startTraject}
+              />
               <RehabTracker patientId={patient.id} />
             </TabsContent>
           )}

@@ -1,7 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { trpc } from '@/lib/trpc/client'
+import { usePortal } from '@/lib/portal'
 import {
   DarkButton,
   DarkDialog,
@@ -37,10 +39,15 @@ function toInputDate(d: Date | string | null | undefined): string {
 export function RehabActivationToggle({
   patientId,
   patientName,
+  autoOpenSetup,
 }: {
   patientId: string
   patientName: string
+  /** Opent de start-dialoog vanzelf, voor de flow direct na patiënt aanmaken. */
+  autoOpenSetup?: boolean
 }) {
+  const router = useRouter()
+  const portal = usePortal()
   const utils = trpc.useUtils()
   const { data: tracker, refetch } = trpc.rehab.getPatientTracker.useQuery({ patientId })
   const { data: protocols = [] } = trpc.rehab.listProtocols.useQuery()
@@ -88,8 +95,59 @@ export function RehabActivationToggle({
   const [injuryDate, setInjuryDate] = useState('')
   const [outcome, setOutcome] = useState<TrajectOutcome>('COMPLETED')
   const [outcomeNote, setOutcomeNote] = useState('')
+  const [nulmetingAan, setNulmetingAan] = useState(true)
+  const [klaargezetRapportId, setKlaargezetRapportId] = useState<string | null>(null)
+
+  const createReport = trpc.testReports.create.useMutation()
+
+  // Opent de dialoog één keer, zodra duidelijk is dat er geen traject loopt.
+  // `undefined` betekent nog laden, `null` betekent geen lopend traject.
+  const autoOpened = useRef(false)
+  useEffect(() => {
+    if (!autoOpenSetup || autoOpened.current) return
+    if (tracker !== null) return
+    autoOpened.current = true
+    setSelectedProtocolId(protocols[0]?.id ?? '')
+    setSurgeryDate('')
+    setInjuryDate('')
+    setSetupOpen(true)
+  }, [autoOpenSetup, tracker, protocols])
 
   const isActive = !!tracker
+
+  // Staat bewust los van de setup-dialoog: zodra het traject is aangemaakt
+  // ververst `getPatientTracker` en wisselt deze component naar de actieve tak.
+  // Een succes-stap bínnen de setup-dialoog zou daardoor meteen verdwijnen.
+  const nulmetingDialoog = (
+    <DarkDialog
+      open={!!klaargezetRapportId}
+      onOpenChange={(o) => {
+        if (!o) setKlaargezetRapportId(null)
+      }}
+    >
+      <DarkDialogContent>
+        <DarkDialogHeader>
+          <DarkDialogTitle>Traject gestart</DarkDialogTitle>
+        </DarkDialogHeader>
+        <p style={{ color: P.inkMuted, fontSize: 13, lineHeight: 1.55 }}>
+          Het traject loopt en de nulmeting staat klaar. Je kunt de metingen nu invoeren, of
+          dat later doen via de kaart op deze pagina.
+        </p>
+        <div className="flex justify-end gap-2 mt-5">
+          <DarkButton variant="ghost" size="sm" onClick={() => setKlaargezetRapportId(null)}>
+            Klaar
+          </DarkButton>
+          <DarkButton
+            variant="primary"
+            size="sm"
+            onClick={() => router.push(`${portal.base}/test-reports/${klaargezetRapportId}`)}
+          >
+            Naar nulmeting
+          </DarkButton>
+        </div>
+      </DarkDialogContent>
+    </DarkDialog>
+  )
 
   if (!isActive) {
     return (
@@ -118,6 +176,8 @@ export function RehabActivationToggle({
                   setSelectedProtocolId(protocols[0]?.id ?? '')
                   setSurgeryDate('')
                   setInjuryDate('')
+                  setNulmetingAan(true)
+                  setKlaargezetRapportId(null)
                   setSetupOpen(true)
                 }}
                 disabled={protocols.length === 0}
@@ -170,6 +230,23 @@ export function RehabActivationToggle({
                     onChange={(e) => setInjuryDate(e.target.value)}
                   />
                 </div>
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={nulmetingAan}
+                    onChange={(e) => setNulmetingAan(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer"
+                    style={{ accentColor: P.brand }}
+                  />
+                  <span className="min-w-0">
+                    <span style={{ color: P.ink, fontSize: 13.5, display: 'block' }}>
+                      Nulmeting klaarzetten
+                    </span>
+                    <span style={{ color: P.inkDim, fontSize: 11.5, display: 'block', marginTop: 1 }}>
+                      Een testrapport met de testen die aan dit protocol gekoppeld zijn.
+                    </span>
+                  </span>
+                </label>
               </div>
               <div className="flex justify-end gap-2 mt-5">
                 <DarkButton variant="ghost" size="sm" onClick={() => setSetupOpen(false)}>
@@ -178,7 +255,7 @@ export function RehabActivationToggle({
                 <DarkButton
                   variant="primary"
                   size="sm"
-                  disabled={activate.isPending || !selectedProtocolId}
+                  disabled={activate.isPending || createReport.isPending || !selectedProtocolId}
                   onClick={() => {
                     activate.mutate(
                       {
@@ -187,7 +264,26 @@ export function RehabActivationToggle({
                         surgeryDate: surgeryDate || null,
                         injuryDate: injuryDate || null,
                       },
-                      { onSuccess: () => setSetupOpen(false) },
+                      {
+                        onSuccess: async (res) => {
+                          if (nulmetingAan && res.trackerId) {
+                            try {
+                              const rapport = await createReport.mutateAsync({
+                                patientId,
+                                fromTrackerId: res.trackerId,
+                              })
+                              // Dialoog blijft open voor de succes-stap.
+                              setKlaargezetRapportId(rapport.id)
+                              return
+                            } catch {
+                              toast.error(
+                                'Traject gestart, maar de nulmeting kon niet worden klaargezet. Maak het rapport handmatig aan via Testrapporten.',
+                              )
+                            }
+                          }
+                          setSetupOpen(false)
+                        },
+                      },
                     )
                   }}
                 >
@@ -197,6 +293,7 @@ export function RehabActivationToggle({
             </DarkDialogContent>
           </DarkDialog>
         </div>
+        {nulmetingDialoog}
       </Tile>
     )
   }
@@ -369,6 +466,7 @@ export function RehabActivationToggle({
           </DarkDialog>
         </div>
       </div>
+      {nulmetingDialoog}
     </Tile>
   )
 }
