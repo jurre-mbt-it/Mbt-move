@@ -163,7 +163,7 @@ nooit oranje. Schakelaars (aan/uit) blijven wél oranje: dat is een instelling.
 **Eén bron, instelbaar.** De web-staf leest kleuren via `useCategoryColors()`
 (volgt wat de praktijk instelt; de opgeslagen oude standaardset wordt server-
 en clientzijdig als "niets gekozen" behandeld). Patiënt-schermen en de app
-lezen de vaste set: `practice.categoryColors` is staff-only.
+lezen de vaste set: `practice.categoryColors` is staff-only. **Bewust besluit (21-08-2026): de kleuren zijn een werkinstrument van de therapeut; patiënten en atleten houden de standaardset.**
 
 Gaat de app ooit naar een lichte ondergrond, dan heb je een **tweede set
 datakleuren** nodig: mint en goud zijn op licht niet leesbaar. Dat is de reden dat

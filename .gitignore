@@ -76,3 +76,6 @@ jargon-final.json
 # Nooit committen: het zijn ad-hoc debug-scripts, niet reviewbare code.
 .tmp-*
 .verify-*
+
+# Commerciele stukken (prijzen, marges, verdienmodel). Repo is publiek.
+business/

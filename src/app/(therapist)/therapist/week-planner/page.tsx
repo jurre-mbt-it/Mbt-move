@@ -360,7 +360,9 @@ const MARKER_META: Record<Exclude<ItemKind, 'PROGRAM' | 'WORKOUT'>, { color: str
   REST:  { color: P.inkDim, label: 'geen belasting' },
   NOTE:  { color: 'var(--p-gold)', label: 'notitie' },
   TEST:  { color: P.ink,    label: 'testbatterij' },
-  EVENT: { color: 'var(--p-lime)', label: 'streefdatum' },
+  // Mint, niet groen of oranje: groen leest als behaald en oranje als actie,
+  // en een streefdatum is geen van beide. Gelijk aan de app.
+  EVENT: { color: P.ice, label: 'streefdatum' },
 }
 
 // `moved` = wél gedaan, maar op een andere dag dan gepland. De workout zelf
