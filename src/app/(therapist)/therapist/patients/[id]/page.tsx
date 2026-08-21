@@ -78,7 +78,11 @@ export default function PatientDetailPage({
   )
   const initialTab = zichtbareTabs.includes(tab as (typeof TAB_VALUES)[number])
     ? tab
-    : 'profiel'
+    : // Met `?traject=start` moet de revalidatie-tab open: een inactieve tab
+      // rendert niet, dus de start-dialoog zou anders nooit verschijnen.
+      startTraject && showRehab
+      ? 'revalidatie'
+      : 'profiel'
   const { data: programsRaw = [] } = trpc.programs.list.useQuery({ patientId: id })
   const [historyLimit, setHistoryLimit] = useState(5)
   const [historyPerformer, setHistoryPerformer] = useState<PerformerFilter>('all')
@@ -544,6 +548,19 @@ export default function PatientDetailPage({
           />
         </div>
 
+        {/* Wat er nog moet gebeuren voordat het traject echt loopt. Staat
+            BOVEN de tabs: in de revalidatie-tab zou de kaart pas zichtbaar zijn
+            na een klik, en dan doet hij zijn werk niet. Verdwijnt vanzelf zodra
+            alles af is of er geen traject loopt. */}
+        {showRehab && (
+          <TrajectChecklist
+            patientId={patient.id}
+            dpaAcceptedAt={patient.dpaAcceptedAt}
+            onResendInvite={() => resendInvite.mutate({ patientId: patient.id })}
+            resendPending={resendInvite.isPending}
+          />
+        )}
+
         {/* Tabs */}
         <Tabs defaultValue={initialTab} className="space-y-4">
           <TabsList
@@ -952,12 +969,6 @@ export default function PatientDetailPage({
               nergens in beeld kwam, dus de tab is er voor hem niet. */}
           {showRehab && (
             <TabsContent value="revalidatie" className="space-y-4">
-              <TrajectChecklist
-                patientId={patient.id}
-                dpaAcceptedAt={patient.dpaAcceptedAt}
-                onResendInvite={() => resendInvite.mutate({ patientId: patient.id })}
-                resendPending={resendInvite.isPending}
-              />
               <RehabActivationToggle
                 patientId={patient.id}
                 patientName={patient.name}
