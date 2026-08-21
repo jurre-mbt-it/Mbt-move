@@ -1524,6 +1524,13 @@ model RehabCriterion {
   lsiMinGreen     Int?
   lsiMinOrange    Int?
 
+  /// Optionele koppeling aan een globale catalogus-test (practiceId NULL).
+  /// Gezet: een meting van die test in een testrapport werkt dit criterium
+  /// automatisch bij (src/server/lib/rehab-criterion-sync.ts). NULL: criterium
+  /// blijft puur handmatig afvinkbaar.
+  catalogItemId String?
+  catalogItem   TestCatalogItem? @relation(fields: [catalogItemId], references: [id], onDelete: SetNull)
+
   statuses RehabCriterionStatus[]
 
   @@unique([phaseId, order])
@@ -1572,6 +1579,11 @@ model RehabCriterionStatus {
   measurementValue String? // vrije tekst: "128\u00b0", "95%", "22 reps"
   measurementDate  DateTime?
   notes            String?
+  /// Herkomst van een automatisch gezette status: de rapport-meting die dit
+  /// criterium kleurde. NULL bij handmatig gezette statussen. SetNull zodat
+  /// het verwijderen van een rapport de klinische registratie laat staan.
+  reportEntryId    String?
+  reportEntry      TestReportEntry?          @relation(fields: [reportEntryId], references: [id], onDelete: SetNull)
   updatedById      String
   updatedBy        User                      @relation("RehabStatusUpdater", fields: [updatedById], references: [id])
   createdAt        DateTime                  @default(now())
@@ -2179,6 +2191,7 @@ model TestCatalogItem {
 
   batteryItems  TestBatteryItem[]
   reportEntries TestReportEntry[]
+  rehabCriteria RehabCriterion[]
 
   @@index([category, order])
   @@index([practiceId])
@@ -2295,6 +2308,8 @@ model TestReportEntry {
   zoneOverride         TestZone?
   notes                String?
   order                Int              @default(0)
+
+  criterionStatuses RehabCriterionStatus[]
 
   @@index([reportId])
   @@map("test_report_entries")
