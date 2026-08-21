@@ -8,7 +8,6 @@ import {
   Display,
   Kicker,
   MetaLabel,
-  MetricTile,
   P,
   Tile,
 } from '@/components/dark-ui'
@@ -100,7 +99,9 @@ export default function ProgressPage() {
   )
 
   return (
-    <DarkScreen>
+    /* Zonder kader (fase 2): dit is een leesscherm, dus de vlakke leesgrond
+       en haarlijnen in plaats van kaarten. */
+    <DarkScreen style={{ background: P.flatBg }}>
       <div className="max-w-lg w-full mx-auto px-4 pt-10 pb-8 flex flex-col gap-4">
         <div className="flex flex-col gap-1">
           <Kicker>Voortgang</Kicker>
@@ -112,20 +113,26 @@ export default function ProgressPage() {
           )}
         </div>
 
-        {/* Top stats */}
-        <div className="grid grid-cols-2 gap-3">
-          <MetricTile label="Streak" value={streak} unit="dagen" tint={P.gold} />
-          <MetricTile label="Voltooid" value={history.length} unit="sessies" tint={P.lime} />
+        {/* Top stats: geen kaarten, de cijfers zelf zijn het beeld. */}
+        <div className="flex gap-10 mt-1">
+          <div>
+            <span className="athletic-display block" style={{ fontSize: 40, lineHeight: '44px', color: P.ink }}>{streak}</span>
+            <MetaLabel style={{ marginTop: 2 }}>DAGEN STREAK</MetaLabel>
+          </div>
+          <div>
+            <span className="athletic-display block" style={{ fontSize: 40, lineHeight: '44px', color: P.ink }}>{history.length}</span>
+            <MetaLabel style={{ marginTop: 2 }}>SESSIES VOLTOOID</MetaLabel>
+          </div>
         </div>
 
         {/* Belasting: fitness-fatigue curve over kracht + cardio */}
         {loadCurve && loadCurve.sessionCount > 0 && (
-          <LoadCurveChart data={loadCurve} compact />
+          <LoadCurveChart data={loadCurve} compact frameless />
         )}
 
         {/* Adherence */}
         {totalSessionsPlanned > 0 && (
-          <Tile>
+          <section className="base-flat-rule" style={{ paddingTop: 18, marginTop: 6 }}>
             <div className="flex items-center justify-between mb-2">
               <MetaLabel>Adherentie</MetaLabel>
               <span
@@ -147,12 +154,12 @@ export default function ProgressPage() {
             <p style={{ color: P.inkMuted, fontSize: 12 }}>
               {history.length} van {totalSessionsPlanned} geplande sessies gedaan
             </p>
-          </Tile>
+          </section>
         )}
 
         {/* Pain trend */}
         {painSessions.length > 0 && (
-          <Tile>
+          <section className="base-flat-rule" style={{ paddingTop: 18, marginTop: 6 }}>
             <div className="flex items-center gap-2 mb-3">
               <MetaLabel>Pijnverloop</MetaLabel>
               {avgPain !== null && (
@@ -212,12 +219,12 @@ export default function ProgressPage() {
                 ↓ Je pijn verbetert de laatste 3 sessies, goed bezig!
               </p>
             )}
-          </Tile>
+          </section>
         )}
 
         {/* Volume per week */}
         {weeklyVolume.length > 0 && (
-          <Tile>
+          <section className="base-flat-rule" style={{ paddingTop: 18, marginTop: 6 }}>
             <div className="flex items-center gap-2 mb-3">
               <MetaLabel>Volume per week</MetaLabel>
               <span
@@ -261,11 +268,11 @@ export default function ProgressPage() {
                 )
               })}
             </div>
-          </Tile>
+          </section>
         )}
 
         {/* This week calendar */}
-        <Tile>
+        <section className="base-flat-rule" style={{ paddingTop: 18, marginTop: 6 }}>
           <div className="flex items-center gap-2 mb-3">
             <MetaLabel>Sessies deze week</MetaLabel>
           </div>
@@ -309,11 +316,11 @@ export default function ProgressPage() {
               )
             })}
           </div>
-        </Tile>
+        </section>
 
         {/* ── 1RM Progressie ─────────────────────────────────────────────── */}
         {oneRmData.length > 0 && (
-        <Tile>
+        <section className="base-flat-rule" style={{ paddingTop: 18, marginTop: 6 }}>
           <div className="flex items-center gap-2 mb-3">
             <MetaLabel>1RM Progressie</MetaLabel>
           </div>
@@ -409,12 +416,12 @@ export default function ProgressPage() {
               )
             })}
           </div>
-        </Tile>
+        </section>
         )}
 
         {/* ── Tendinopathie monitor ──────────────────────────────────────── */}
         {tendinopathyData.length > 0 && (
-        <Tile>
+        <section className="base-flat-rule" style={{ paddingTop: 18, marginTop: 6 }}>
           <div className="flex items-center gap-2 mb-1">
             <MetaLabel>Tendinopathie monitor</MetaLabel>
           </div>
@@ -556,7 +563,7 @@ export default function ProgressPage() {
               </div>
             )
           })()}
-        </Tile>
+        </section>
         )}
 
         {/* Pain report CTA */}

@@ -13,16 +13,18 @@ import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
 import { LoadCurveChart } from '@/components/workload/LoadCurveChart'
 import { PatientTagsPanel } from '@/components/tags/PatientTagsPanel'
 import { CARDIO_ICON_MAP } from '@/components/icons'
-import { DARK_CHART_STYLES, DarkButton, DarkChartTooltip, DarkDialog as Dialog, DarkDialogContent as DialogContent, DarkDialogFooter as DialogFooter, DarkDialogHeader as DialogHeader, DarkDialogTitle as DialogTitle, DarkTabs as Tabs, DarkTabsContent as TabsContent, DarkTabsList as TabsList, DarkTabsTrigger as TabsTrigger, DarkTextarea, Display, Kicker, MetaLabel, P, CARD, Tile } from '@/components/dark-ui'
+import { DARK_CHART_STYLES, DarkButton, DarkChartTooltip, DarkDialog as Dialog, DarkDialogContent as DialogContent, DarkDialogFooter as DialogFooter, DarkDialogHeader as DialogHeader, DarkDialogTitle as DialogTitle, DarkTabs as Tabs, DarkTabsContent as TabsContent, DarkTabsList as TabsList, DarkTabsTrigger as TabsTrigger, DarkTextarea, Display, Kicker, MetaLabel, P, CARD } from '@/components/dark-ui'
 
+/* Zonder kader (fase 2): een grafieksectie is leeswerk. Haarlijn erboven,
+   geen kaart; de grafiek zelf is het beeld. */
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <Tile>
+    <section className="base-flat-rule" style={{ paddingTop: 18 }}>
       <div className="space-y-3">
         <MetaLabel>{title}</MetaLabel>
         {children}
       </div>
-    </Tile>
+    </section>
   )
 }
 
@@ -30,10 +32,7 @@ function StatChip({ label, value, sub, tint }: {
   label: string; value: string | number; sub?: string; tint?: string
 }) {
   return (
-    <div
-      className="rounded-2xl p-4"
-      style={{...CARD }}
-    >
+    <div className="py-1">
       <MetaLabel>{label.toUpperCase()}</MetaLabel>
       <div className="flex items-baseline gap-2 mt-1">
         <span
@@ -65,7 +64,7 @@ function WellnessReadinessStrip({ checks }: {
     : null
 
   return (
-    <Tile>
+    <section className="base-flat-rule" style={{ paddingTop: 18 }}>
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <MetaLabel>WELLNESS · SUBJECTIEF HERSTEL</MetaLabel>
@@ -102,7 +101,7 @@ function WellnessReadinessStrip({ checks }: {
           14 ingevulde dagen. Lage scores bij een diepe vorm-dip versterken het overbelasting-signaal.
         </p>
       </div>
-    </Tile>
+    </section>
   )
 }
 
@@ -196,7 +195,7 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
 
   if (isLoading) {
     return (
-      <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+      <div className="min-h-screen" style={{ background: P.flatBg, color: P.ink }}>
         <div className="max-w-3xl mx-auto px-4 pt-10 pb-8 space-y-4 animate-pulse">
           <div className="h-5 w-32 rounded" style={{ background: P.surfaceHi }} />
           <div className="h-24 rounded-xl" style={{ background: P.surfaceHi }} />
@@ -209,7 +208,7 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
   const painTrendLabel = painTrend === 'down' ? 'verbetering' : painTrend === 'up' ? 'verslechtering' : 'stabiel'
 
   return (
-    <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+    <div className="min-h-screen" style={{ background: P.flatBg, color: P.ink }}>
       <div className="max-w-3xl mx-auto px-4 pt-10 pb-8 space-y-5">
         {/* Back */}
         <Link
@@ -301,14 +300,12 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
         </div>
 
         {!hasAnyData ? (
-          <Tile>
-            <div className="py-12 text-center">
-              <p style={{ color: P.ink, fontSize: 14, fontWeight: 700 }}>Nog geen sessies</p>
-              <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 6 }}>
-                Zodra de patiënt sessies afrondt verschijnen hier de gegevens.
-              </p>
-            </div>
-          </Tile>
+          <div className="py-12 text-center">
+            <p style={{ color: P.ink, fontSize: 14, fontWeight: 700 }}>Nog geen sessies</p>
+            <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 6 }}>
+              Zodra de patiënt sessies afrondt verschijnen hier de gegevens.
+            </p>
+          </div>
         ) : (
           <Tabs defaultValue={defaultTab} className="space-y-4">
             <TabsList
@@ -325,13 +322,11 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
             {/* ── Belasting tab: fitness-fatigue curve (kracht + cardio) ── */}
             <TabsContent value="belasting" className="space-y-4">
               {loadCurve ? (
-                <LoadCurveChart data={loadCurve} />
+                <LoadCurveChart data={loadCurve} frameless />
               ) : (
-                <Tile>
-                  <div className="py-8 text-center">
+                <div className="py-8 text-center">
                     <MetaLabel>BELASTING LADEN…</MetaLabel>
                   </div>
-                </Tile>
               )}
               {/* Subjectief herstel naast de objectieve belasting */}
               {wellness && wellness.length > 0 && (
@@ -383,11 +378,9 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
             {/* ── Cardio tab ── */}
             <TabsContent value="cardio" className="space-y-4">
               {cardioCount === 0 ? (
-                <Tile>
-                  <div className="py-8 text-center">
+                <div className="py-8 text-center">
                     <p style={{ color: P.inkMuted, fontSize: 13 }}>Nog geen cardio gelogd</p>
                   </div>
-                </Tile>
               ) : (
                 <>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -500,11 +493,9 @@ export default function PatientProgressPage({ params }: { params: Promise<{ id: 
             {/* ── 1RM tab ── */}
             <TabsContent value="krachtopbouw" className="space-y-4">
               {exerciseNames.length === 0 ? (
-                <Tile>
-                  <div className="py-8 text-center">
+                <div className="py-8 text-center">
                     <p style={{ color: P.inkMuted, fontSize: 13 }}>Nog geen gewichtsdata gelogd</p>
                   </div>
-                </Tile>
               ) : (
                 <>
                   {/* Exercise selector — zoeken + cap met "zie meer" */}

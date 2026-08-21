@@ -71,7 +71,13 @@ export type LoadCurveData = ModalityCurve & {
 
 type Modality = 'all' | 'strength' | 'cardio'
 
-export function LoadCurveChart({ data, compact = false }: { data: LoadCurveData; compact?: boolean }) {
+/** `frameless`: voor Zonder kader-leesschermen (fase 2). De grafiek is daar
+ *  zelf het beeld; het dashboard houdt zijn Instrument-kaart. */
+export function LoadCurveChart({ data, compact = false, frameless = false }: { data: LoadCurveData; compact?: boolean; frameless?: boolean }) {
+  const Wrap = frameless
+    ? ({ children }: { children: React.ReactNode }) => <section className="base-flat-rule" style={{ paddingTop: 18 }}>{children}</section>
+    : Tile
+
   const [modality, setModality] = useState<Modality>('all')
 
   // Splitsing alleen aanbieden als de onderverdeling meegestuurd is.
@@ -88,14 +94,14 @@ export function LoadCurveChart({ data, compact = false }: { data: LoadCurveData;
   // Hele tegel leeg pas als er over ALLE modaliteiten niets gelogd is.
   if (data.sessionCount === 0) {
     return (
-      <Tile>
+      <Wrap>
         <MetaLabel>BELASTING</MetaLabel>
         <div className="py-6 text-center">
           <p style={{ color: P.inkMuted, fontSize: 13 }}>
             Nog geen gelogde trainingen, de belasting-curve verschijnt zodra er sessies of cardio gelogd zijn.
           </p>
         </div>
-      </Tile>
+      </Wrap>
     )
   }
 
@@ -131,7 +137,7 @@ export function LoadCurveChart({ data, compact = false }: { data: LoadCurveData;
     const cal = data.calibration
     const dag = Math.min(cal.daysLogged + 1, cal.daysNeeded)
     return (
-      <Tile>
+      <Wrap>
         <div className="space-y-3">
           <div>
             <MetaLabel>BELASTING · KRACHT + CARDIO</MetaLabel>
@@ -172,12 +178,12 @@ export function LoadCurveChart({ data, compact = false }: { data: LoadCurveData;
             verschijnen hier je vorm-lijn en de belasting-zones.
           </p>
         </div>
-      </Tile>
+      </Wrap>
     )
   }
 
   return (
-    <Tile>
+    <Wrap>
       <div className="space-y-3">
         {/* Modaliteit-toggle — alleen als de onderverdeling beschikbaar is */}
         {hasSplit && (
@@ -329,7 +335,7 @@ export function LoadCurveChart({ data, compact = false }: { data: LoadCurveData;
         </>
         )}
       </div>
-    </Tile>
+    </Wrap>
   )
 }
 
