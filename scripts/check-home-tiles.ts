@@ -189,6 +189,34 @@ async function main() {
     }
   })
 
+  check('de app leest geen sessie-velden die de server niet stuurt', () => {
+    // Zelfde bewaking als hierboven, maar voor de krachtsessie-tak: zonder
+    // deze check faalt geen enkele controle als de server bijvoorbeeld
+    // "rpe", "pain", "completedAll" of "id" hernoemt, terwijl taak 6 die
+    // velden nodig heeft om een CalEvent voor de detailweergave te bouwen.
+    const vanServer = pickLastActivity(
+      {
+        id: 's1',
+        completedAt: new Date('2026-08-21T12:39:04Z'),
+        duration: 4769,
+        exertionLevel: 9,
+        painLevel: 3,
+        completedAll: false,
+        program: { name: 'Schema B' },
+        _count: { exerciseLogs: 8 },
+      },
+      null,
+    )
+    assert.ok(vanServer, 'server gaf null terug')
+    const nodig = [
+      'kind', 'id', 'completedAt', 'programName', 'durationSec',
+      'rpe', 'pain', 'exerciseCount', 'completedAll',
+    ]
+    for (const veld of nodig) {
+      assert.ok(veld in (vanServer as object), `server stuurt "${veld}" niet mee`)
+    }
+  })
+
   console.log(fouten === 0 ? '\nOpmaak klopt.\n' : `\n${fouten} controle(s) gefaald.\n`)
   process.exit(fouten === 0 ? 0 : 1)
 }
