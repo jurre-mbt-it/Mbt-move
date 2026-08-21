@@ -13,6 +13,14 @@
   font-weight:100 900; font-stretch:62% 125%; font-style:normal; font-display:swap;
 }
 @font-face{
+  /* Figtree: de labelletter (besluit 21-08). Zelf-gehost, want de CSP staat
+     bewust geen externe fonthosts toe. Variabel 300-900, latin. */
+  font-family:'Figtree';
+  src:url('/fonts/Figtree-Variable.woff2') format('woff2-variations');
+  font-weight:300 900;
+  font-display:swap;
+}
+@font-face{
   font-family:'Martian';
   src:url('/fonts/MartianMono-Variable.woff2') format('woff2-variations');
   font-weight:100 800; font-stretch:75% 112.5%; font-style:normal; font-display:swap;
@@ -99,6 +107,9 @@
 
   /* Letterstapels */
   --font-mono-athletic: 'Martian', ui-monospace, Menlo, 'SF Mono', SFMono-Regular, Monaco, monospace;
+  /* Labels: Figtree (TeamBuildr-achtig, besluit 21-08). Mono blijft van de
+     cijfers en dataregels; zie sectie 4 van docs/app-ontwerpsysteem.md. */
+  --font-label: 'Figtree', 'Inter Tight', ui-sans-serif, system-ui, sans-serif;
   --font-athletic: 'Archivo', ui-sans-serif, system-ui, sans-serif;
 
   /* MBT-huisstijl (legacy-namen, nu op het nieuwe palet) */
@@ -339,23 +350,19 @@ body {
 
    Deze twee dragen `Kicker` en `MetaLabel`, samen ruim duizend labels. */
 .athletic-kicker {
-  font-family: var(--font-mono-athletic);
-  font-stretch: 87.5%;
-  font-size-adjust: 0.55;
+  font-family: var(--font-label);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.12em;
   color: var(--p-ink-muted);
   text-transform: uppercase;
 }
 
 .athletic-meta {
-  font-family: var(--font-mono-athletic);
-  font-stretch: 87.5%;
-  font-size-adjust: 0.55;
+  font-family: var(--font-label);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.08em;
   color: var(--p-ink-muted);
   text-transform: uppercase;
 }
@@ -363,12 +370,10 @@ body {
 /* Zelfde stijl voor losse labels die niet via Kicker of MetaLabel lopen,
    zoals de bottom-navs. */
 .athletic-label {
-  font-family: var(--font-mono-athletic);
-  font-stretch: 87.5%;
-  font-size-adjust: 0.55;
+  font-family: var(--font-label);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -613,4 +618,13 @@ body {
   .mbt-btn-hover:hover {
     transform: none !important;
   }
+}
+
+/* Tabs zijn labels, geen data: de labelletter wint van de mono-klasse die de
+   trigger ook draagt. De twee Martian-compensaties moeten mee uit. */
+.athletic-mono.dark-tab {
+  font-family: var(--font-label);
+  font-stretch: normal;
+  font-size-adjust: none;
+  letter-spacing: 0.08em;
 }

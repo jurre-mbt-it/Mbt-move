@@ -33,7 +33,7 @@ export function CoachBottomNav() {
               key={href}
               href={href}
               className={cn(
-                'athletic-tap flex flex-col items-center justify-center gap-1 flex-1 min-w-0 py-2 athletic-mono transition-colors',
+                'athletic-tap flex flex-col items-center justify-center gap-1 flex-1 min-w-0 py-2 athletic-label transition-colors',
               )}
               style={{
                 color: active ? P.brand : P.inkMuted,

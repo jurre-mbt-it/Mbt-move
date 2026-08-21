@@ -89,21 +89,26 @@ dus die ronding werkt in je voordeel. Zet hem niet op 0 "voor de consistentie".
 
 ## 4. Labels en cijfers
 
-**Labels staan in mono, in hoofdletters.** JetBrains Mono in de app, Martian op
-het web. Dat is de tekentaal van dit product en het past bij een app die meet.
+**Labels staan in Figtree, in hoofdletters. Cijfers en dataregels staan in
+mono.** Op het web: `--font-label` (Figtree, zelf-gehost) voor
+`.athletic-kicker` / `.athletic-meta` / `.athletic-label`, tabs en navs;
+`.athletic-mono` (Martian) blijft van tijden, gewichten, totalen en chips met
+meetwaarden. Tekst is de sans, data is de mono: dat verschil ís de informatie.
 
-Dit is in augustus 2026 heen en weer gegaan. Er is eerst geprobeerd de labels
-naar gewone schrijfwijze te brengen, omdat mono hoofdletters ook het handelsmerk
-van movementbasedtherapy.nl zijn. Dat is teruggedraaid: het maakte de app
-inderdaad anders dan de site, maar het haalde ook weg wat de app zíjn karakter
-gaf. **Het onderscheid met de site komt uit de vlakken en het materiaal, niet
-uit de typografie.**
+Dit is in augustus 2026 drie keer heen en weer gegaan, dus lees dit voordat je
+eraan komt. (1) Labels van mono naar gewone schrijfwijze: teruggedraaid, de
+hoofdletters bleven. (2) Alles mono gehouden met het argument "mono past bij
+een app die meet". (3) Besluit 21-08: labels naar Figtree
+(TeamBuildr-referentie, oogt professioneler), maar de cijfers blijven mono en
+de hoofdletters blijven ook. Wie hier opnieuw aan wil: eerst een proef op de
+draaiende app laten zien, dán pas code omzetten; dat is de enige volgorde die
+hier ooit gewerkt heeft.
 
 Wat wél proportioneel is: koppen en titels (Archivo op het web, Inter Tight in
 de app), en de subregel van een tegel als die een hele zin is.
 
-De conventie binnen een tegel, zie `ActionTile`: **titel proportioneel in
-hoofdletters, subregel in mono.** Wijk daar niet van af; twee stijlen die geen
+De conventie binnen een tegel, zie `ActionTile`: **titel in de labelletter in
+hoofdletters, subregel in mono als hij data is en anders in de tekstletter.** Wijk daar niet van af; twee stijlen die geen
 `fontFamily` zetten vielen ooit terug op de tekstletter en weken daardoor
 zichtbaar af van de rest van hetzelfde scherm.
 

@@ -20,6 +20,7 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import {
+  CARD,
   DarkDialog as Dialog,
   DarkDialogContent as DialogContent,
   DarkDialogHeader as DialogHeader,
@@ -66,26 +67,30 @@ export function StartTreatmentCard() {
           setZoek('')
           setOpen(true)
         }}
-        className={`athletic-tap mbt-btn-hover w-full flex items-center justify-between gap-3 rounded-2xl text-left${
+        // Instrument-kaart met een oranje pijl, geen gevulde groene plaat meer.
+        // Groen was hier dubbel verkeerd: het schreeuwde over de cijfers heen
+        // en actie is in het systeem oranje, niet groen. De pijl-chip draagt
+        // de actiekleur; de kaart zelf blijft rustig.
+        className={`athletic-tap mbt-card-hover w-full flex items-center justify-between gap-3 rounded-2xl text-left${
           highlight ? ' mbt-attention' : ''
         }`}
-        style={{ backgroundColor: P.lime, padding: '18px 18px' }}
+        style={{ ...CARD, padding: '14px 16px' }}
       >
         <span className="min-w-0">
           <span
-            className="athletic-mono block"
-            style={{ color: P.bg, fontSize: 15, fontWeight: 900, letterSpacing: '0.06em' }}
+            className="athletic-label block"
+            style={{ color: P.ink, fontSize: 13, fontWeight: 900, letterSpacing: '0.08em' }}
           >
             Start behandeling
           </span>
-          <span style={{ color: 'rgba(14,39,41,0.72)', fontSize: 12.5, marginTop: 2, display: 'block' }}>
+          <span style={{ color: P.inkMuted, fontSize: 12.5, marginTop: 2, display: 'block' }}>
             Kies een patiënt en log live mee
           </span>
         </span>
         <span
           aria-hidden
           className="shrink-0 flex items-center justify-center rounded-full"
-          style={{ width: 32, height: 32, background: 'rgba(14,39,41,0.14)', color: P.bg, fontSize: 16 }}
+          style={{ width: 30, height: 30, background: P.brand, color: P.bg, fontSize: 15 }}
         >
           →
         </span>
@@ -144,7 +149,7 @@ export function StartTreatmentCard() {
                     )}
                   </span>
                   <span
-                    className="athletic-mono shrink-0"
+                    className="athletic-label shrink-0"
                     style={{ color: P.lime, fontSize: 11, letterSpacing: '0.14em', fontWeight: 900 }}
                   >
                     START →

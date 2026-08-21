@@ -350,9 +350,12 @@ export default function TherapistDashboard() {
       {/* Quick start — verdwijnt vanzelf zodra de vijf stappen staan. */}
       <QuickStartCard />
 
-      {/* Stats — cijfers die per week bewegen i.p.v. statische totalen */}
+      {/* Stats — cijfers die per week bewegen i.p.v. statische totalen.
+          Kleine maat: de tint draagt het signaal al, het cijfer hoeft niet
+          ook nog eens 40 pixels te zijn. */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <MetricTile
+          size="sm"
           label="Signalen"
           value={signalsLoading ? '…' : insights.length}
           tint={insights.length === 0 ? P.lime : hasUrgent ? P.danger : P.gold}
@@ -360,12 +363,14 @@ export default function TherapistDashboard() {
           href={`${portal.base}/signals`}
         />
         <MetricTile
+          size="sm"
           label="Deze week"
           value={dashLoading ? '…' : dash?.weekSessions ?? 0}
           tint={P.brand}
           sub={dashLoading ? 'Sessies gelogd' : weekDeltaLabel}
         />
         <MetricTile
+          size="sm"
           label="Therapietrouw"
           value={patientsLoading ? '…' : compliancePct === null ? '—' : `${compliancePct}%`}
           tint={
@@ -381,6 +386,7 @@ export default function TherapistDashboard() {
           href={`${portal.patients}`}
         />
         <MetricTile
+          size="sm"
           label="Stil"
           value={dashLoading ? '…' : silent.length}
           tint={silent.length > 0 ? P.gold : P.lime}
