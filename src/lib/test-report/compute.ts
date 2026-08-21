@@ -124,7 +124,7 @@ export function zoneSegments(spec: TestSpec): ZoneSegment[] {
 export const ZONE_LABEL: Record<TestZone, string> = {
   RED: 'ONVOLDOENDE',
   ORANGE: 'IN OPBOUW',
-  GREEN: 'DOELZONE',
+  GREEN: 'BEHAALD',
 }
 
 /** Print-kleuren per zone (matcht het template, print-color-adjust exact). */

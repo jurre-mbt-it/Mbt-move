@@ -29,6 +29,7 @@ import {
   ZONE_COLOR,
   type TestSpec,
   type TestZone,
+  type TestValues,
 } from '@/lib/test-report/compute'
 import type { TestReportEntry } from '@prisma/client'
 
@@ -123,6 +124,9 @@ export default function TestReportEditorPage({
     onError: (e) => toast.error(e.message),
   })
 
+  // Zonder kader-leesweergave. Een definitief rapport opent lezend; de
+  // override onthoudt een handmatige wissel binnen deze paginaweergave.
+  const [bewerkOverride, setBewerkOverride] = useState<boolean | null>(null)
   const [pickCatalog, setPickCatalog] = useState('')
   const [pickBattery, setPickBattery] = useState('')
 
@@ -156,7 +160,75 @@ export default function TestReportEditorPage({
 
   const patientName = report.patient.name ?? report.patient.email
 
-  return (
+  const lezen = bewerkOverride === null ? report.status === 'FINAL' : !bewerkOverride
+  // Groepeer op categorie; de server sorteert al op categoryOrder + order.
+  const leesGroepen: Array<[string, typeof report.entries]> = []
+  for (const e of report.entries) {
+    const laatste = leesGroepen[leesGroepen.length - 1]
+    if (laatste && laatste[0] === e.category) laatste[1].push(e)
+    else leesGroepen.push([e.category, [e]])
+  }
+
+  return lezen ? (
+    /* ── Zonder kader: het rapport als leesstuk. Geen kaarten; de grond is de
+       vlakke leesgrond, haarlijnen scheiden, de cijfers dragen het beeld. ── */
+    <div className="min-h-screen" style={{ background: P.flatBg, color: P.ink }}>
+      <div className="max-w-2xl mx-auto px-5 pt-10 pb-32">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <Kicker>Testrapport</Kicker>
+            <h1 style={{ color: P.ink, fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', marginTop: 6 }}>
+              {meta.subtitle || 'Objectieve meting'}
+            </h1>
+            <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 6 }}>
+              {[meta.injuryGoal, meta.rehabPhaseLabel,
+                meta.performedAt ? new Date(meta.performedAt).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' }) : null]
+                .filter(Boolean).join(' · ')}
+            </p>
+            {meta.location && (
+              <p className="athletic-label" style={{ color: P.inkDim, fontSize: 10, marginTop: 4 }}>
+                {patientName.toUpperCase()} · {meta.location.toUpperCase()}
+              </p>
+            )}
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <DarkButton variant="ghost" size="sm" onClick={() => window.open(`/print/test-report/${id}`, '_blank', 'noopener')}>
+              Open PDF
+            </DarkButton>
+            <DarkButton variant="ghost" size="sm" onClick={() => setBewerkOverride(true)}>
+              Bewerken
+            </DarkButton>
+          </div>
+        </div>
+
+        {/* Metingen, gegroepeerd op categorie */}
+        {leesGroepen.map(([categorie, items]) => (
+          <section key={categorie} className="mt-8">
+            <Kicker>{categorie}</Kicker>
+            <div className="mt-1">
+              {items.map((e) => <LeesEntry key={e.id} entry={e as unknown as Entry} />)}
+            </div>
+          </section>
+        ))}
+        {report.entries.length === 0 && (
+          <p style={{ color: P.inkMuted, fontSize: 13, marginTop: 24 }}>Nog geen tests in dit rapport.</p>
+        )}
+
+        {/* Interpretatie als leestekst */}
+        {advice.length > 0 && (
+          <section className="mt-10">
+            <Kicker>Interpretatie &amp; vervolgadvies</Kicker>
+            {advice.map((a, i) => (
+              <div key={i} className={i === 0 ? 'mt-3' : 'base-flat-rule mt-4 pt-4'}>
+                {a.title && <p style={{ color: P.ink, fontSize: 14, fontWeight: 700 }}>{a.title}</p>}
+                <p style={{ color: P.inkMuted, fontSize: 14, lineHeight: 1.65, marginTop: 4, whiteSpace: 'pre-wrap' }}>{a.body}</p>
+              </div>
+            ))}
+          </section>
+        )}
+      </div>
+    </div>
+    ) : (
     <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
       <div className="max-w-3xl mx-auto px-4 pt-8 pb-32 space-y-5">
         {/* Kop */}
@@ -170,6 +242,9 @@ export default function TestReportEditorPage({
           <div className="flex gap-2 flex-wrap">
             <DarkButton variant="ghost" size="sm" onClick={() => window.open(`/print/test-report/${id}`, '_blank', 'noopener')}>
               Open PDF
+            </DarkButton>
+            <DarkButton variant="ghost" size="sm" onClick={() => setBewerkOverride(false)}>
+              Leesweergave
             </DarkButton>
             <DarkButton variant="primary" size="sm" onClick={() => saveMeta()}>
               Opslaan
@@ -379,6 +454,86 @@ function Labeled({ label, children, full }: { label: string; children: React.Rea
     </div>
   )
 }
+
+type Entry = {
+  id: string; name: string; subtitle: string | null; source: string | null
+  category: string; kind: string; metric: string; plotUnit: string | null
+  axisMin: number | null; axisMax: number | null
+  zoneOrangeMin: number | null; zoneGreenMin: number | null
+  higherIsBetter: boolean
+  leftPrimary: number | null; rightPrimary: number | null
+  singleValue: number | null; textValue: string | null
+  unitPrimary: string | null
+  plottedValueOverride: number | null; zoneOverride: string | null
+}
+
+
+/**
+ * Zonder kader: één meting als leesregel (docs/app-ontwerpsysteem.md §2).
+ * Geen kaart en geen invoervelden; de haarlijn scheidt, de cijfers dragen het
+ * beeld. Dit is het "Hertest knie"-beeld uit het ontwerpvoorstel, nu op echte
+ * data.
+ */
+function LeesEntry({ entry }: { entry: Entry }) {
+  const spec: TestSpec = {
+    kind: entry.kind as 'BILATERAL' | 'SINGLE',
+    metric: entry.metric as TestSpec['metric'],
+    plotUnit: entry.plotUnit ?? '',
+    axisMin: entry.axisMin ?? 0,
+    axisMax: entry.axisMax ?? 100,
+    zoneOrangeMin: entry.zoneOrangeMin ?? 80,
+    zoneGreenMin: entry.zoneGreenMin ?? 90,
+    higherIsBetter: entry.higherIsBetter,
+  }
+  const values = {
+    leftPrimary: entry.leftPrimary,
+    rightPrimary: entry.rightPrimary,
+    singleValue: entry.singleValue,
+    plottedValueOverride: entry.plottedValueOverride,
+    zoneOverride: (entry.zoneOverride ?? null) as TestValues['zoneOverride'],
+  }
+  const plotted = computePlottedValue(spec, values)
+  const zone = computeZone(spec, plotted)
+  const eenheid = entry.unitPrimary ? ` ${entry.unitPrimary}` : ''
+
+  return (
+    <div className="base-flat-rule grid items-baseline gap-x-4 gap-y-1 py-4"
+         style={{ gridTemplateColumns: 'minmax(0,1fr) auto auto' }}>
+      <div className="min-w-0">
+        <p style={{ color: P.ink, fontSize: 15, fontWeight: 700 }}>
+          {entry.name}
+          {entry.subtitle ? <span style={{ color: P.inkMuted, fontWeight: 500 }}> · {entry.subtitle}</span> : null}
+        </p>
+        {entry.source && (
+          <p className="athletic-mono" style={{ color: P.inkDim, fontSize: 10, letterSpacing: '0.08em', marginTop: 2 }}>
+            {entry.source}
+          </p>
+        )}
+      </div>
+      <div className="athletic-mono text-right" style={{ fontSize: 14, color: P.ink, lineHeight: 1.5 }}>
+        {entry.kind === 'BILATERAL' ? (
+          <>
+            <span className="block">L {entry.leftPrimary ?? '—'}{eenheid}</span>
+            <span className="block">R {entry.rightPrimary ?? '—'}{eenheid}</span>
+          </>
+        ) : entry.singleValue != null ? (
+          <span className="block">{entry.singleValue}{eenheid}</span>
+        ) : (
+          <span className="block">{entry.textValue ?? '—'}</span>
+        )}
+      </div>
+      <div className="text-right" style={{ minWidth: 86 }}>
+        <span className="athletic-display block" style={{ fontSize: 26, lineHeight: '28px', color: zone ? ZONE_COLOR[zone] : P.ink }}>
+          {formatPlotted(spec, plotted)}
+        </span>
+        <span className="athletic-label block" style={{ fontSize: 10, color: zone ? ZONE_COLOR[zone] : P.inkMuted, marginTop: 2 }}>
+          {zone ? ZONE_LABEL[zone] : ''}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 
 function EntryCard({ entry, onChanged }: { entry: RouterEntry; onChanged: () => void }) {
   const [open, setOpen] = useState(false)
