@@ -13,6 +13,10 @@ const ALLOWED_ORIGINS = new Set([
   process.env.NEXT_PUBLIC_APP_URL,
   'https://mbt-gym.nl',
   'https://www.mbt-gym.nl',
+  // Het nieuwe domein staat er alvast bij; toevoegen breekt niets en de
+  // omschakeling zelf wacht op de DNS bij Cloud86 (A-record naar Vercel).
+  'https://getbase.coach',
+  'https://www.getbase.coach',
   'http://localhost:3000',
   'http://localhost:3001',
   // Expo dev — web-preview / capacitor schemes
