@@ -36,6 +36,7 @@ import {
   type CardioStimulus,
 } from '@/lib/muscle-fatigue'
 import type { PrismaClient } from '@prisma/client'
+import { pickLastActivity, weekWindow, type SessionStats } from '@/server/lib/training-totals'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -2054,20 +2055,82 @@ export const patientRouter = createTRPCRouter({
     }),
 
   /**
-   * Totale sessie-telling voor de "TOTAL · all-time logged"-tegel. Los van
-   * getSessionHistory: die is gemaximeerd op 100 rijen, waardoor de teller op
-   * het dashboard stil bleef staan zodra een patiënt daar overheen ging.
-   * Zelfde filter (COMPLETED, zonder tendinopathie-dagrondes).
+   * Cijfers voor de twee tegels op het beginscherm.
+   *
+   * `total` blijft precies wat het was (krachtsessies all-time, zonder de
+   * tendinopathie-dagrondes) omdat build 82 en ouder in TestFlight dat veld
+   * lezen. De rest is erbij gekomen; oude clients negeren die velden.
+   *
+   * Waarom de tellers hier zitten en niet in `getTodayExercises`: die telt
+   * `completedThisWeek` binnen één programma. Wie meerdere actieve programma's
+   * heeft ziet zijn sessie in het andere programma dan niet terug, en cardio
+   * telt daar sowieso niet mee.
    */
-  getSessionStats: protectedProcedure.query(async ({ ctx }) => {
-    const total = await ctx.prisma.sessionLog.count({
-      where: {
-        patientId: ctx.user.id,
-        status: 'COMPLETED',
-        NOT: { program: { tendinopathyMode: true, dailyTarget: { not: null } } },
+  getSessionStats: protectedProcedure.query(async ({ ctx }): Promise<SessionStats> => {
+    const krachtBasis = {
+      patientId: ctx.user.id,
+      status: 'COMPLETED' as const,
+      NOT: { program: { tendinopathyMode: true, dailyTarget: { not: null } } },
+    }
+    const cardioBasis = { patientId: ctx.user.id }
+    const { from, to } = weekWindow(new Date())
+
+    const [total, cardioTotal, weekKracht, weekCardio, laatsteKracht, laatsteCardio] =
+      await Promise.all([
+        ctx.prisma.sessionLog.count({ where: krachtBasis }),
+        ctx.prisma.cardioLog.count({ where: cardioBasis }),
+        ctx.prisma.sessionLog.aggregate({
+          where: { ...krachtBasis, completedAt: { gte: from, lt: to } },
+          _count: { _all: true },
+          _sum: { duration: true },
+        }),
+        ctx.prisma.cardioLog.aggregate({
+          where: { ...cardioBasis, completedAt: { gte: from, lt: to } },
+          _count: { _all: true },
+          _sum: { durationSec: true },
+        }),
+        ctx.prisma.sessionLog.findFirst({
+          where: { ...krachtBasis, completedAt: { not: null } },
+          orderBy: { completedAt: 'desc' },
+          select: {
+            id: true,
+            completedAt: true,
+            duration: true,
+            exertionLevel: true,
+            painLevel: true,
+            completedAll: true,
+            program: { select: { name: true } },
+            _count: { select: { exerciseLogs: true } },
+          },
+        }),
+        ctx.prisma.cardioLog.findFirst({
+          where: cardioBasis,
+          orderBy: { completedAt: 'desc' },
+          select: {
+            id: true,
+            completedAt: true,
+            activity: true,
+            durationSec: true,
+            distanceM: true,
+            avgHeartRate: true,
+            zone: true,
+            rpe: true,
+            painLevel: true,
+            avgPaceSecPerKm: true,
+            notes: true,
+          },
+        }),
+      ])
+
+    return {
+      total,
+      week: {
+        count: weekKracht._count._all + weekCardio._count._all,
+        seconds: (weekKracht._sum.duration ?? 0) + (weekCardio._sum.durationSec ?? 0),
       },
-    })
-    return { total }
+      allTime: { count: total + cardioTotal },
+      last: pickLastActivity(laatsteKracht, laatsteCardio),
+    }
   }),
 
   // ── Eigen kalender: gepland + gelogd binnen een datum-range ──────────────
