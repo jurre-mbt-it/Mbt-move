@@ -477,6 +477,11 @@ export const patientsRouter = createTRPCRouter({
           phone: true,
           dateOfBirth: true,
           createdAt: true,
+          // Voor de traject-checklist: gezet zodra de patiënt de app heeft
+          // geactiveerd en de verwerkersvoorwaarden accepteerde. Dit is de
+          // betrouwbare "uitnodiging geaccepteerd"-marker; de placeholder-note
+          // op de koppeling is wisbaar en geldt maar per relatie.
+          dpaAcceptedAt: true,
           injuryInfo: true,
           injuryVisibleToTherapist: true,
           maxHeartRate: true,
@@ -554,6 +559,7 @@ export const patientsRouter = createTRPCRouter({
         avatarInitials: initials,
         dateOfBirth: p.dateOfBirth,
         createdAt: p.createdAt,
+        dpaAcceptedAt: p.dpaAcceptedAt,
         maxHeartRate: p.maxHeartRate,
         restingHeartRate: p.restingHeartRate,
         lthr: p.lthr,

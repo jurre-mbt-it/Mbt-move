@@ -283,6 +283,22 @@ export const testReportsRouter = createTRPCRouter({
           _count: { select: { entries: true } },
         },
       })
+      // Per rapport het aantal entries met een echt ingevulde waarde. Aparte
+      // groupBy omdat `_count` maar één telling per relatie kan geven.
+      const gevuld = await ctx.prisma.testReportEntry.groupBy({
+        by: ['reportId'],
+        where: {
+          report: { patientId: input.patientId },
+          OR: [
+            { leftPrimary: { not: null } },
+            { rightPrimary: { not: null } },
+            { singleValue: { not: null } },
+            { textValue: { not: null } },
+          ],
+        },
+        _count: { _all: true },
+      })
+      const gevuldPerRapport = new Map(gevuld.map((g) => [g.reportId, g._count._all]))
       return rows.map((r) => ({
         id: r.id,
         performedAt: r.performedAt,
@@ -292,6 +308,7 @@ export const testReportsRouter = createTRPCRouter({
         rehabPhaseLabel: r.rehabPhaseLabel,
         therapistName: r.therapist.name ?? r.therapist.email,
         entryCount: r._count.entries,
+        filledEntryCount: gevuldPerRapport.get(r.id) ?? 0,
       }))
     }),
 

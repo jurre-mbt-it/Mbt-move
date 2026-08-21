@@ -17,6 +17,7 @@ import { PerformerToggle, type PerformerFilter } from '@/components/patients/Per
 import { InsightActivationToggle } from '@/components/insights/InsightActivationToggle'
 import { InsightTimeline } from '@/components/insights/InsightTimeline'
 import { RehabActivationToggle } from '@/components/rehab/RehabActivationToggle'
+import { TrajectChecklist } from '@/components/rehab/TrajectChecklist'
 import { RehabTracker } from '@/components/rehab/RehabTracker'
 import { PatientClinicalTests } from '@/components/clinical-tests/PatientClinicalTests'
 import { PatientWearablesTab } from '@/components/wearables/PatientWearablesTab'
@@ -951,6 +952,12 @@ export default function PatientDetailPage({
               nergens in beeld kwam, dus de tab is er voor hem niet. */}
           {showRehab && (
             <TabsContent value="revalidatie" className="space-y-4">
+              <TrajectChecklist
+                patientId={patient.id}
+                dpaAcceptedAt={patient.dpaAcceptedAt}
+                onResendInvite={() => resendInvite.mutate({ patientId: patient.id })}
+                resendPending={resendInvite.isPending}
+              />
               <RehabActivationToggle
                 patientId={patient.id}
                 patientName={patient.name}
