@@ -13,6 +13,7 @@
     "db:studio": "prisma studio",
     "db:check": "tsx --env-file=.env.local scripts/check-migrations.ts",
     "check:mirror": "tsx scripts/check-mobile-mirror.ts",
+    "check:session-payload": "tsx scripts/check-session-payload.ts",
     "test": "vitest run"
   },
   "prisma": {

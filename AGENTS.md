@@ -104,6 +104,31 @@ de echte bestanden uit beide repo's en vergelijkt gedrag (zelfde blokken →
 zelfde samenvatting/duur/kleuren/RPE's) en constanten. Faalt hij, trek de
 andere kant gelijk vóór een release.
 
+De mobiele repo heeft zelf geen test-runner, dus cross-repo controles staan
+hier in `scripts/`. Naast de mirror-check geldt dat voor
+`npm run check:session-payload`: die toetst `lib/session-payload.ts` uit de
+app, het bestand dat bepaalt welke set-rijen van de sessie-runner bewaard
+blijven. Raak je dat aan, draai hem dan — er verdween eerder stil invoer mee
+(zie de kop hieronder).
+
+## Sessie-runner: voorgevulde rijen zijn geen ingevulde rijen
+
+De set-rijen in de runner staan bij het openen al vol met het gewicht van
+vorige keer en de doel-reps. "Er staat een getal in het veld" zegt dus niets
+over of die set gedaan is. Twee dingen mogen daarom niet door elkaar lopen:
+
+- een rij die alleen de suggestie bevat → **niet** loggen, anders komen er sets
+  in de historie die nooit gedaan zijn en vergiftigen ze `getLastWeights` en de
+  1RM-curve
+- een rij waar de patient zelf een gewicht of aantal in heeft gezet → **wel**
+  loggen, ook zonder vinkje
+
+Tot 21 aug 2026 stuurde de iOS-runner alleen afgevinkte rijen mee en viel geval
+twee onder geval één: alles wat je had ingevuld maar niet afgevinkt verdween bij
+het opslaan, zonder waarschuwing. Beide web-runners bewaarden die invoer al wel.
+De app markeert nu per set of de patient hem zelf heeft aangepast (`touched`) en
+noemt vóór het afronden welke oefeningen leeg de deur uit gaan.
+
 # Weekdatums: reken in NL-tijd, nooit in UTC
 
 `WeekSchedule.startDate` is "maandag 00:00 lokale tijd", opgeslagen als instant.
