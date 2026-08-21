@@ -249,7 +249,9 @@ export const rehabRouter = createTRPCRouter({
           },
           req: ctx.req,
         })
-        return { ok: true }
+        // `trackerId` is additief: de web-UI zet er meteen de nulmeting mee
+        // klaar. Bestaande iOS-builds negeren onbekende velden.
+        return { ok: true, trackerId: gestart.id }
       }
 
       // 2. Zelfde protocol: dit is "wijzigen", geen nieuw traject. Alleen de
@@ -285,7 +287,7 @@ export const rehabRouter = createTRPCRouter({
             notes: input.notes,
           },
         })
-        return { ok: true }
+        return { ok: true, trackerId: bestaand.id }
       }
 
       // 3. Ander protocol: dit is "overstappen". Vroeger overschreef de upsert
@@ -342,7 +344,7 @@ export const rehabRouter = createTRPCRouter({
         },
         req: ctx.req,
       })
-      return { ok: true }
+      return { ok: true, trackerId: nieuw.id }
     }),
 
   deactivateForPatient: therapistProcedure

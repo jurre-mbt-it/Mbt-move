@@ -23,6 +23,7 @@ import {
 } from '@/lib/test-report/compute'
 import { draftTestReportNarrative, type NarrativeTestLine } from '@/lib/ai/anthropic'
 import { syncCriteriaVoorEntry } from '@/server/lib/rehab-criterion-sync'
+import { getRehabTrackerDataById } from '@/lib/rehab-data'
 
 const ACTIVE_LINK = { isActive: true, status: 'APPROVED' as const }
 
@@ -150,6 +151,9 @@ function specFromCatalog(c: {
     zoneGreenMin: c.zoneGreenMin, higherIsBetter: c.higherIsBetter,
   }
 }
+
+/** Eén klaargezette rapport-entry: catalogus-spec plus herkomst en volgorde. */
+type EntrySeed = ReturnType<typeof specFromCatalog> & { catalogItemId: string; order: number }
 
 export const testReportsRouter = createTRPCRouter({
   // ── Catalogus + batterijen ──────────────────────────────────────────────
@@ -315,18 +319,69 @@ export const testReportsRouter = createTRPCRouter({
         performedAt: z.string().optional(),
         measurementNumber: z.number().int().nullable().optional(),
         subtitle: z.string().optional(),
+        /// Traject-id: zet het rapport klaar als nulmeting van dat traject, met
+        /// lege entries voor alle gekoppelde catalogus-testen van het protocol
+        /// en een vooringevulde kop.
+        fromTrackerId: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       await assertTreating(ctx.prisma, ctx.user, input.patientId)
+
+      let kop: {
+        measurementNumber: number | null
+        trajectLabel?: string
+        rehabPhaseLabel?: string | null
+        injuryGoal?: string | null
+      } = { measurementNumber: input.measurementNumber ?? null }
+      let entryData: EntrySeed[] = []
+
+      if (input.fromTrackerId) {
+        const traject = await getRehabTrackerDataById(ctx.prisma, input.fromTrackerId)
+        // Autoriseer op de patientId van de gevonden rij, nooit op de input.
+        if (!traject || traject.patientId !== input.patientId || traject.deactivatedAt) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Geen lopend traject gevonden' })
+        }
+        const criteria = await ctx.prisma.rehabCriterion.findMany({
+          where: { phase: { protocolId: traject.protocolId }, catalogItemId: { not: null } },
+          orderBy: [{ phase: { order: 'asc' } }, { order: 'asc' }],
+          select: { catalogItemId: true },
+        })
+        const catalogIds = [...new Set(criteria.map((c) => c.catalogItemId!))]
+        const items = await ctx.prisma.testCatalogItem.findMany({
+          where: { id: { in: catalogIds }, isActive: true },
+        })
+        const perId = new Map(items.map((i) => [i.id, i]))
+        entryData = catalogIds
+          .filter((cid) => perId.has(cid))
+          .map((cid, i) => ({ catalogItemId: cid, order: i, ...specFromCatalog(perId.get(cid)!) }))
+
+        const rapportTeller = await ctx.prisma.testReport.count({
+          where: { patientId: input.patientId },
+        })
+        const fase =
+          traject.expectedPhaseOrder != null
+            ? traject.phases.find((p) => p.order === traject.expectedPhaseOrder)
+            : null
+        kop = {
+          measurementNumber: input.measurementNumber ?? rapportTeller + 1,
+          trajectLabel: traject.protocol.name,
+          rehabPhaseLabel: fase
+            ? `${fase.shortName}${traject.weeksSinceSurgery != null ? ` · week ${traject.weeksSinceSurgery} post-op` : ''}`
+            : null,
+          injuryGoal: traject.notes ?? null,
+        }
+      }
+
       const report = await ctx.prisma.testReport.create({
         data: {
           patientId: input.patientId,
           therapistId: ctx.user.id,
           performedAt: input.performedAt ? new Date(input.performedAt) : new Date(),
-          measurementNumber: input.measurementNumber ?? null,
           subtitle:
             input.subtitle ?? 'Objectieve meting van kracht, power en mobiliteit',
+          ...kop,
+          ...(entryData.length > 0 ? { entries: { create: entryData } } : {}),
         },
       })
       return { id: report.id }
