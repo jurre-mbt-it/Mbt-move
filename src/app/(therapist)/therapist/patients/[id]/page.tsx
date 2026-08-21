@@ -563,20 +563,21 @@ export default function PatientDetailPage({
 
         {/* Tabs */}
         <Tabs defaultValue={initialTab} className="space-y-4">
-          <TabsList
-            className="w-full grid rounded-xl"
-            style={{...CARD, // Aantal kolommen volgt de zichtbare tabs; een vaste klasse liep
-              // scheef zodra er een tab wegviel.
-              gridTemplateColumns: `repeat(${zichtbareTabs.length}, minmax(0, 1fr))`,}}
-          >
-            <TabsTrigger value="profiel" className="text-xs px-1">Profiel</TabsTrigger>
-            <TabsTrigger value="programmas" className="text-xs px-1">Progr.</TabsTrigger>
-            <TabsTrigger value="geschiedenis" className="text-xs px-1">Historie</TabsTrigger>
-            {showRehab && <TabsTrigger value="revalidatie" className="text-xs px-1">Revalidatie</TabsTrigger>}
-            <TabsTrigger value="tests" className="text-xs px-1">Tests</TabsTrigger>
-            <TabsTrigger value="signalen" className="text-xs px-1">Signalen</TabsTrigger>
-            <TabsTrigger value="voortgang" className="text-xs px-1">Voortgang</TabsTrigger>
-            {showWearables && <TabsTrigger value="wearables" className="text-xs px-1">Watch</TabsTrigger>}
+          {/* Flexrij, geen grid van gelijke kolommen. Met acht kolommen was een
+              achtste van de breedte smaller dan "Revalidatie", waardoor het
+              woord buiten zijn eigen pil viel en tegen de buren plakte. De
+              tabs delen nu de ruimte als die er is (flex-1) maar krimpen
+              nooit onder hun tekst (whitespace-nowrap); past het geheel niet,
+              dan schuift de rij horizontaal. */}
+          <TabsList className="w-full flex gap-0.5 rounded-xl overflow-x-auto" style={CARD}>
+            <TabsTrigger value="profiel" className="text-xs px-2 flex-1 whitespace-nowrap">Profiel</TabsTrigger>
+            <TabsTrigger value="programmas" className="text-xs px-2 flex-1 whitespace-nowrap">Progr.</TabsTrigger>
+            <TabsTrigger value="geschiedenis" className="text-xs px-2 flex-1 whitespace-nowrap">Historie</TabsTrigger>
+            {showRehab && <TabsTrigger value="revalidatie" className="text-xs px-2 flex-1 whitespace-nowrap">Revalidatie</TabsTrigger>}
+            <TabsTrigger value="tests" className="text-xs px-2 flex-1 whitespace-nowrap">Tests</TabsTrigger>
+            <TabsTrigger value="signalen" className="text-xs px-2 flex-1 whitespace-nowrap">Signalen</TabsTrigger>
+            <TabsTrigger value="voortgang" className="text-xs px-2 flex-1 whitespace-nowrap">Voortgang</TabsTrigger>
+            {showWearables && <TabsTrigger value="wearables" className="text-xs px-2 flex-1 whitespace-nowrap">Watch</TabsTrigger>}
           </TabsList>
 
           {/* ── TAB: Profiel ─────────────────────────────────────── */}

@@ -90,7 +90,10 @@ export function RehabActivationToggle({
   const [setupOpen, setSetupOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [closeOpen, setCloseOpen] = useState(false)
-  const [selectedProtocolId, setSelectedProtocolId] = useState(protocols[0]?.id ?? '')
+  // Leeg beginnen, niet op het eerste protocol uit de lijst: de dialoog kan
+  // vanzelf opengaan, en dan is een alfabetisch toevallige voorselectie iets
+  // wat je per ongeluk bevestigt. De knop blijft uit tot er echt gekozen is.
+  const [selectedProtocolId, setSelectedProtocolId] = useState('')
   const [surgeryDate, setSurgeryDate] = useState('')
   const [injuryDate, setInjuryDate] = useState('')
   const [outcome, setOutcome] = useState<TrajectOutcome>('COMPLETED')
@@ -107,11 +110,11 @@ export function RehabActivationToggle({
     if (!autoOpenSetup || autoOpened.current) return
     if (tracker !== null) return
     autoOpened.current = true
-    setSelectedProtocolId(protocols[0]?.id ?? '')
+    setSelectedProtocolId('')
     setSurgeryDate('')
     setInjuryDate('')
     setSetupOpen(true)
-  }, [autoOpenSetup, tracker, protocols])
+  }, [autoOpenSetup, tracker])
 
   const isActive = !!tracker
 
@@ -173,7 +176,7 @@ export function RehabActivationToggle({
                 variant="primary"
                 size="sm"
                 onClick={() => {
-                  setSelectedProtocolId(protocols[0]?.id ?? '')
+                  setSelectedProtocolId('')
                   setSurgeryDate('')
                   setInjuryDate('')
                   setNulmetingAan(true)
@@ -207,6 +210,7 @@ export function RehabActivationToggle({
                     value={selectedProtocolId}
                     onChange={(e) => setSelectedProtocolId(e.target.value)}
                   >
+                    <option value="">Kies een protocol</option>
                     {protocols.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}

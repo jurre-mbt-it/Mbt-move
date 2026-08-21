@@ -72,7 +72,8 @@ export function TrajectChecklist({
     <Tile accentBar={P.brand}>
       <MetaLabel>Traject-start</MetaLabel>
       <div className="flex flex-col gap-2 mt-3">
-        <Regel af>Traject actief · {tracker.protocol.name}</Regel>
+        {/* Volgorde volgt de werkelijkheid: eerst uitnodigen, dan het traject,
+            dan meten. */}
         <Regel
           af={uitnodigingOk}
           actie={
@@ -83,6 +84,7 @@ export function TrajectChecklist({
         >
           {uitnodigingOk ? 'Uitnodiging geaccepteerd' : 'Uitnodiging nog niet geaccepteerd'}
         </Regel>
+        <Regel af>Traject actief · {tracker.protocol.name}</Regel>
         <Regel
           af={nulmetingOk}
           actie={
