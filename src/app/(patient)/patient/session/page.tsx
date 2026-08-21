@@ -1846,8 +1846,8 @@ function SessionPageInner() {
   // Zelfde data als oude `cards` maar gestructureerd zodat focus-mode er één
   // tegelijk kan tonen en de voortgang per stap kan tellen.
   type Step =
-    | { kind: 'single'; key: string; uids: string[]; render: () => React.ReactElement }
-    | { kind: 'superset'; key: string; uids: string[]; render: () => React.ReactElement }
+    | { kind: 'single'; key: string; uids: string[]; render: (vlak?: boolean) => React.ReactElement }
+    | { kind: 'superset'; key: string; uids: string[]; render: (vlak?: boolean) => React.ReactElement }
 
   const processedSupersets = new Set<string>()
   const steps: Step[] = []
@@ -1896,7 +1896,10 @@ function SessionPageInner() {
         kind: 'single',
         key: uid,
         uids: [uid],
-        render: () => (
+        render: (vlak?: boolean) => vlak ? (
+          /* Focus: geen kaart om de oefening; het scherm ís de oefening. */
+          <div key={uid}>{renderExercise(e)}</div>
+        ) : (
           <Tile key={uid} style={{ padding: 0 }}>
             {renderExercise(e)}
           </Tile>
@@ -1924,7 +1927,7 @@ function SessionPageInner() {
   const goNextStep = () => setCurrentStepIndex(i => Math.min(steps.length - 1, i + 1))
 
   return (
-    <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+    <div className="min-h-screen" style={{ background: P.flatBg, color: P.ink }}>
       {/* Top bar */}
       <div
         className="sticky top-0 z-10 px-4 pt-10 pb-3"
@@ -2026,7 +2029,7 @@ function SessionPageInner() {
         <WeekPhaseLine variant="deload" />
         {viewMode === 'focus' && steps.length > 0 ? (
           <>
-            {steps[safeStepIndex].render()}
+            {steps[safeStepIndex].render(true)}
 
             {/* Navigatie: vorige / volgende stap */}
             <div className="grid grid-cols-2 gap-2 pt-2">

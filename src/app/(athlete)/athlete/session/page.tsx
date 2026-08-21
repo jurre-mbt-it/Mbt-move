@@ -1149,7 +1149,8 @@ function AthleteSessionPageInner() {
 
   // Active state
   return (
-    <div className="min-h-screen" style={{ background: P.bg, color: P.ink }}>
+    /* Zonder kader (fase 2): tijdens de sessie is dit een focus-scherm. */
+    <div className="min-h-screen" style={{ background: P.flatBg, color: P.ink }}>
       <div className="max-w-lg mx-auto px-4 pt-10 pb-8 space-y-4">
         <div className="flex items-center justify-between">
           <button
@@ -1212,10 +1213,11 @@ function AthleteSessionPageInner() {
           />
         </div>
 
-        {/* Hero: current exercise — klikbaar als er een video is */}
+        {/* Hero: current exercise — klikbaar als er een video is.
+            Zonder kader: de oefening staat op de grond, niet in een doos. */}
         <Tile
           accentBar={P.brand}
-          style={{ padding: 20 }}
+          style={{ padding: '20px 0', background: 'transparent', border: 'none', boxShadow: 'none' }}
           onClick={
             current?.videoUrl
               ? () => setVideoModal({ url: current.videoUrl!, name: current.name })
@@ -1368,7 +1370,7 @@ function AthleteSessionPageInner() {
                 </button>
               )}
 
-              <Tile style={{ padding: 16 }}>
+              <section className="base-flat-rule" style={{ paddingTop: 16 }}>
                 <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
                   <Kicker>SETS</Kicker>
                   <div className="flex items-center gap-2">
@@ -1408,7 +1410,7 @@ function AthleteSessionPageInner() {
                     addable
                   />
                 </div>
-              </Tile>
+              </section>
             </>
           )
         })()}
