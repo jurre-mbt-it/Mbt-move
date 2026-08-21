@@ -21,12 +21,12 @@ export default function PatientSettingsPage() {
   const isTherapist = me?.role === 'THERAPIST' || me?.role === 'ADMIN'
 
   return (
-    <DarkScreen>
+    <DarkScreen style={{ background: P.flatBg }}>
       <DarkHeader title="Instellingen" backHref="/patient/dashboard" />
 
       <div className="max-w-lg w-full mx-auto px-4 py-4 flex flex-col gap-3">
         {isTherapist && (
-          <ActionTile
+          <ActionTile flat
             href="/therapist/dashboard"
             label="Schakel naar therapeut-modus"
             sub="Terug naar je therapeut-dashboard"
@@ -45,28 +45,28 @@ export default function PatientSettingsPage() {
 
         <Kicker style={{ marginTop: 12 }}>Privacy &amp; profiel</Kicker>
 
-        <ActionTile
+        <ActionTile flat
           href="/patient/settings/access"
           label={pendingCount > 0 ? `Toegang · ${pendingCount} nieuw` : 'Toegang therapeuten'}
           sub="Kies wie jouw schema en voortgang mag zien"
           bar={pendingCount > 0 ? P.gold : P.lime}
         />
 
-        <ActionTile
+        <ActionTile flat
           href="/patient/settings/privacy"
           label="Privacy & onderzoeksdata"
           sub="Toestemming voor geanonimiseerde dataverzameling"
           bar={P.ice}
         />
 
-        <ActionTile
+        <ActionTile flat
           href="/patient/legal/dpa"
           label="Verwerkingsovereenkomst"
           sub="Hoe wij uw persoonsgegevens verwerken (AVG/DPA)"
           bar={P.inkDim}
         />
 
-        <ActionTile
+        <ActionTile flat
           href="/patient/profile"
           label="Mijn profiel"
           sub="Bekijk je profielgegevens"
@@ -75,7 +75,7 @@ export default function PatientSettingsPage() {
 
         <Kicker style={{ marginTop: 12 }}>Mijn data (AVG)</Kicker>
 
-        <ActionTile
+        <ActionTile flat
           href="/patient/settings/data-rights"
           label="Mijn data downloaden of verwijderen"
           sub="AVG art. 15, 17 en 20: export of vergeetverzoek"

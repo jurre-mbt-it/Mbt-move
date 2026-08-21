@@ -61,52 +61,52 @@ export default function SettingsPage() {
         {/* Quick start bestaat alleen onder het therapeut-segment, dus niet
             tonen in de coach-shell (die deelt deze pagina). */}
         {!portal.isCoach && (
-          <ActionTile
+          <ActionTile flat
             href="/therapist/quick-start"
             label="Quick start"
             sub="De eerste vijf stappen, met je voortgang"
             bar={P.brand}
           />
         )}
-        <ActionTile
+        <ActionTile flat
           href={`${portal.base}/settings/profile`}
           label="Profiel"
           sub="Naam, functietitel en telefoon"
           bar={P.lime}
         />
         {me?.practiceId && (
-          <ActionTile
+          <ActionTile flat
             href={`${portal.base}/settings/practice`}
             label="Praktijkprofiel"
             sub={me.isPracticeOwner ? 'Adres, logo en email-footer' : 'Bekijken (alleen eigenaar mag bewerken)'}
             bar={P.lime}
           />
         )}
-        <ActionTile
+        <ActionTile flat
           href={`${portal.base}/settings/security`}
           label="Beveiliging & MFA"
           sub={mfaSub}
           bar={mfaBar}
         />
-        <ActionTile
+        <ActionTile flat
           href={`${portal.base}/settings/meldingen`}
           label="Meldingen"
           sub="Pushmeldingen op je telefoon · testmelding versturen"
           bar={P.ice}
         />
-        <ActionTile
+        <ActionTile flat
           href={`${portal.base}/settings/parameters`}
           label="Parameters"
           sub="Aangepaste meetparameters voor programma's"
           bar={P.ice}
         />
-        <ActionTile
+        <ActionTile flat
           href={`${portal.base}/settings/kleuren`}
           label="Kleuren"
           sub="Kleur per trainingssoort in de kalender"
           bar={P.ice}
         />
-        <ActionTile
+        <ActionTile flat
           href={`${portal.base}/settings/tag-vocabulary`}
           label="Klacht-tags"
           sub="Suggestielijst voor #hashtags bij het loggen"
@@ -114,25 +114,25 @@ export default function SettingsPage() {
         />
         {isAdmin && (
           <>
-            <ActionTile
+            <ActionTile flat
               href="/admin/dashboard"
               label="Admin-dashboard"
               sub="Beheer users, praktijken en protocollen"
               bar={P.lime}
             />
-            <ActionTile
+            <ActionTile flat
               href="/admin/users"
               label="Users & rollen"
               sub="Rollen wijzigen, aan praktijk koppelen"
               bar={P.ice}
             />
-            <ActionTile
+            <ActionTile flat
               href="/admin/practices"
               label="Praktijken"
               sub="Multi-tenant groepen beheren"
               bar={P.ice}
             />
-            <ActionTile
+            <ActionTile flat
               href="/admin/rehab-protocols"
               label="Revalidatie-protocollen"
               sub="Protocol-catalog + criteria bewerken"

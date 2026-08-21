@@ -1,6 +1,6 @@
 'use client'
 
-import { P, Tile } from '@/components/dark-ui'
+import { P } from '@/components/dark-ui'
 import { useBoolPref } from '@/hooks/useLocalPref'
 
 interface Props {
@@ -15,7 +15,13 @@ export function PrefToggleTile({ prefKey, defaultValue, label, sub, bar = P.bran
   const [enabled, setEnabled] = useBoolPref(prefKey, defaultValue)
 
   return (
-    <Tile accentBar={bar}>
+    /* Zonder kader-rij, gelijk aan de vlakke ActionTile ernaast: haarlijn
+       en kleurstip in plaats van kaart en balk. */
+    <div
+      className="w-full flex items-center gap-3"
+      style={{ borderTop: `1px solid ${P.hairline}`, padding: '14px 2px' }}
+    >
+      <span aria-hidden style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: bar }} />
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p style={{ color: P.ink, fontSize: 14, fontWeight: 700 }}>{label}</p>
@@ -61,6 +67,6 @@ export function PrefToggleTile({ prefKey, defaultValue, label, sub, bar = P.bran
           />
         </button>
       </div>
-    </Tile>
+    </div>
   )
 }

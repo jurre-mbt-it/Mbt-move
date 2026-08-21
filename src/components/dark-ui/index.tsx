@@ -366,6 +366,7 @@ export function ActionTile({
   bar,
   disabled,
   className,
+  flat,
 }: {
   label: string
   sub?: string
@@ -374,6 +375,9 @@ export function ActionTile({
   bar?: string
   disabled?: boolean
   className?: string
+  /** Zonder kader-rij voor leesschermen zoals instellingen: haarlijn in
+   *  plaats van kaart, de kleurstip vervangt de balk. */
+  flat?: boolean
 }) {
   const barColor = bar ?? P.inkDim
   const Wrapper: React.ElementType = href ? Link : 'button'
@@ -389,7 +393,11 @@ export function ActionTile({
         disabled && 'opacity-50 pointer-events-none',
         className,
       )}
-      style={{
+      style={flat ? {
+        borderTop: `1px solid ${P.hairline}`,
+        padding: '14px 2px',
+        borderRadius: 0,
+      } : {
         // Instrument-kaart, gelijk aan `Tile` en `MetricTile`.
         background: `linear-gradient(180deg, ${P.cardTop} 0%, ${P.cardBot} 100%)`,
         border: `1px solid ${P.cardEdge}`,
@@ -401,7 +409,9 @@ export function ActionTile({
     >
       <span
         aria-hidden
-        style={{ width: 3, height: 36, borderRadius: 1.5, backgroundColor: barColor }}
+        style={flat
+          ? { width: 7, height: 7, borderRadius: 999, backgroundColor: barColor }
+          : { width: 3, height: 36, borderRadius: 1.5, backgroundColor: barColor }}
       />
       <span className="flex-1 min-w-0">
         <span
