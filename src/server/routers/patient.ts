@@ -15,6 +15,7 @@ import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { practiceScope } from '@/server/lib/patient-access'
 import { planningCutoffVoorPatient } from '@/server/lib/planning-cutoff'
 import { muscleLoadsRecord } from '@/server/lib/muscle-loads'
+import { computeSessionStats, type SessionStats } from '@/server/lib/training-totals'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { auditLog } from '@/server/audit'
 import { signEducationFile } from '@/lib/education/storage'
@@ -36,7 +37,6 @@ import {
   type CardioStimulus,
 } from '@/lib/muscle-fatigue'
 import type { PrismaClient } from '@prisma/client'
-import { pickLastActivity, weekWindow, type SessionStats } from '@/server/lib/training-totals'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -2066,72 +2066,9 @@ export const patientRouter = createTRPCRouter({
    * heeft ziet zijn sessie in het andere programma dan niet terug, en cardio
    * telt daar sowieso niet mee.
    */
-  getSessionStats: protectedProcedure.query(async ({ ctx }): Promise<SessionStats> => {
-    const krachtBasis = {
-      patientId: ctx.user.id,
-      status: 'COMPLETED' as const,
-      NOT: { program: { tendinopathyMode: true, dailyTarget: { not: null } } },
-    }
-    const cardioBasis = { patientId: ctx.user.id }
-    const { from, to } = weekWindow(new Date())
-
-    const [total, cardioTotal, weekKracht, weekCardio, laatsteKracht, laatsteCardio] =
-      await Promise.all([
-        ctx.prisma.sessionLog.count({ where: krachtBasis }),
-        ctx.prisma.cardioLog.count({ where: cardioBasis }),
-        ctx.prisma.sessionLog.aggregate({
-          where: { ...krachtBasis, completedAt: { gte: from, lt: to } },
-          _count: { _all: true },
-          _sum: { duration: true },
-        }),
-        ctx.prisma.cardioLog.aggregate({
-          where: { ...cardioBasis, completedAt: { gte: from, lt: to } },
-          _count: { _all: true },
-          _sum: { durationSec: true },
-        }),
-        ctx.prisma.sessionLog.findFirst({
-          where: { ...krachtBasis, completedAt: { not: null } },
-          orderBy: { completedAt: 'desc' },
-          select: {
-            id: true,
-            completedAt: true,
-            duration: true,
-            exertionLevel: true,
-            painLevel: true,
-            completedAll: true,
-            program: { select: { name: true } },
-            _count: { select: { exerciseLogs: true } },
-          },
-        }),
-        ctx.prisma.cardioLog.findFirst({
-          where: cardioBasis,
-          orderBy: { completedAt: 'desc' },
-          select: {
-            id: true,
-            completedAt: true,
-            activity: true,
-            durationSec: true,
-            distanceM: true,
-            avgHeartRate: true,
-            zone: true,
-            rpe: true,
-            painLevel: true,
-            avgPaceSecPerKm: true,
-            notes: true,
-          },
-        }),
-      ])
-
-    return {
-      total,
-      week: {
-        count: weekKracht._count._all + weekCardio._count._all,
-        seconds: (weekKracht._sum.duration ?? 0) + (weekCardio._sum.durationSec ?? 0),
-      },
-      allTime: { count: total + cardioTotal },
-      last: pickLastActivity(laatsteKracht, laatsteCardio),
-    }
-  }),
+  getSessionStats: protectedProcedure.query(async ({ ctx }): Promise<SessionStats> =>
+    computeSessionStats(ctx.prisma, ctx.user.id, new Date()),
+  ),
 
   // ── Eigen kalender: gepland + gelogd binnen een datum-range ──────────────
   // Voor de atleet-kalender (maandweergave): alle eigen SessionLogs en

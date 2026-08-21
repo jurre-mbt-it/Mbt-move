@@ -1,10 +1,18 @@
 /**
- * Controleert de aggregatie achter `patient.getSessionStats` op echte data.
+ * Controleert `computeSessionStats` (de aggregatie achter `patient.getSessionStats`)
+ * op echte data, door de gedeelde functie zelf aan te roepen — niet door de
+ * queries hier te herbouwen. Zo toetst dit script of de router klopt, in
+ * plaats van of een eigen kopie intern consistent is.
  *
- * Er is geen test-database (zie AGENTS.md), dus dit draait dezelfde queries
- * als de procedure over alle gebruikers met activiteit en toetst invarianten.
- * Bewust geen vaste getallen: die gaan rood zodra iemand traint, en dan leert
- * niemand er nog iets van.
+ * Er is geen test-database (zie AGENTS.md), dus dit draait `computeSessionStats`
+ * over alle gebruikers met activiteit en toetst invarianten. Bewust geen vaste
+ * getallen: die gaan rood zodra iemand traint, en dan leert niemand er nog
+ * iets van.
+ *
+ * Twee invarianten halen zelf rauwe rijen op en vergelijken die met wat
+ * `computeSessionStats` teruggeeft (4 en 8) — dat zijn de enige echte
+ * onafhankelijke controles. De rest leest uitsluitend de uitvoer van
+ * `computeSessionStats`.
  *
  * De twee fouten die dit moet vangen:
  *   - cardio telde niet mee, waardoor cardio-only gebruikers nul zagen
@@ -15,7 +23,7 @@
  * Alleen lezen; dit script schrijft niets.
  */
 import { prisma } from '../src/lib/prisma'
-import { pickLastActivity, weekWindow } from '../src/server/lib/training-totals'
+import { computeSessionStats, weekWindow } from '../src/server/lib/training-totals'
 
 let fouten = 0
 const eis = (ok: boolean, bericht: string) => {
@@ -60,89 +68,91 @@ async function main() {
 
   for (const id of ids) {
     const krachtBasis = { patientId: id, ...KRACHT_FILTER }
+    const cardioBasis = { patientId: id }
 
-    const [total, cardioTotal, weekKracht, weekCardio, lk, lc, weekRijen] = await Promise.all([
-      prisma.sessionLog.count({ where: krachtBasis }),
-      prisma.cardioLog.count({ where: { patientId: id } }),
-      prisma.sessionLog.aggregate({
-        where: { ...krachtBasis, completedAt: { gte: from, lt: to } },
-        _count: { _all: true }, _sum: { duration: true },
-      }),
-      prisma.cardioLog.aggregate({
-        where: { patientId: id, completedAt: { gte: from, lt: to } },
-        _count: { _all: true }, _sum: { durationSec: true },
-      }),
-      prisma.sessionLog.findFirst({
-        where: { ...krachtBasis, completedAt: { not: null } },
-        orderBy: { completedAt: 'desc' },
-        select: {
-          id: true, completedAt: true, duration: true, exertionLevel: true,
-          painLevel: true, completedAll: true,
-          program: { select: { name: true } }, _count: { select: { exerciseLogs: true } },
-        },
-      }),
-      prisma.cardioLog.findFirst({
-        where: { patientId: id },
-        orderBy: { completedAt: 'desc' },
-        select: {
-          id: true, completedAt: true, activity: true, durationSec: true, distanceM: true,
-          avgHeartRate: true, zone: true, rpe: true, painLevel: true,
-          avgPaceSecPerKm: true, notes: true,
-        },
-      }),
-      // Rauwe rijen voor de hertelling: onafhankelijk van de aggregatie.
+    const [stats, cardioTotal, krachtWeekRijen, cardioWeekRijen, lk, lc] = await Promise.all([
+      // De functie die ook de router aanroept. Alles hieronder toetst zijn
+      // uitvoer, niets herbouwt zijn berekening.
+      computeSessionStats(prisma, id, nu),
+      prisma.cardioLog.count({ where: cardioBasis }),
+      // Rauwe rijen voor de hertelling (invariant 4): onafhankelijk van
+      // computeSessionStats, dus een bug daarin (zoals de cardio-term
+      // vergeten in week.seconds) wordt hier wel zichtbaar.
       prisma.sessionLog.findMany({
         where: { ...krachtBasis, completedAt: { gte: from, lt: to } },
         select: { programId: true, duration: true },
       }),
+      prisma.cardioLog.findMany({
+        where: { ...cardioBasis, completedAt: { gte: from, lt: to } },
+        select: { durationSec: true },
+      }),
+      // Rauwe rijen voor de hertelling (invariant 8): los van wat `last`
+      // aanwijst.
+      prisma.sessionLog.findFirst({
+        where: { ...krachtBasis, completedAt: { not: null } },
+        orderBy: { completedAt: 'desc' },
+        select: { completedAt: true },
+      }),
+      prisma.cardioLog.findFirst({
+        where: cardioBasis,
+        orderBy: { completedAt: 'desc' },
+        select: { completedAt: true },
+      }),
     ])
 
-    const allTime = total + cardioTotal
-    const weekCount = weekKracht._count._all + weekCardio._count._all
-    const weekSec = (weekKracht._sum.duration ?? 0) + (weekCardio._sum.durationSec ?? 0)
-    const last = pickLastActivity(lk, lc)
+    const { total, week, allTime, last } = stats
 
     // ── Invariant 2: cardio kan er alleen bij optellen ─────────────────────
-    eis(allTime >= total, `${id}: all-time (${allTime}) lager dan de krachtteller (${total})`)
+    // Nu echt: total en allTime.count komen allebei uit computeSessionStats,
+    // niet uit een lokale `total + cardioTotal`-optelling van het script zelf.
+    eis(allTime.count >= total, `${id}: all-time (${allTime.count}) lager dan de krachtteller (${total})`)
 
     // ── Invariant 3: DE BUG. Wie alleen cardio doet mag geen nul zien ──────
     if (total === 0 && cardioTotal > 0) {
       cardioOnly++
-      eis(allTime > 0, `${id}: cardio-only gebruiker komt op 0 uit`)
+      eis(allTime.count > 0, `${id}: cardio-only gebruiker komt op 0 uit`)
       eis(last?.kind === 'cardio', `${id}: cardio-only gebruiker heeft geen cardio als laatste`)
     }
 
     // ── Invariant 4: de weektelling klopt met een hertelling ───────────────
+    // Volledige onafhankelijke som (kracht + cardio) uit rauwe rijen, exact
+    // vergeleken met wat computeSessionStats teruggeeft.
+    const hertellingCount = krachtWeekRijen.length + cardioWeekRijen.length
+    const hertellingSec =
+      krachtWeekRijen.reduce((a, r) => a + (r.duration ?? 0), 0) +
+      cardioWeekRijen.reduce((a, r) => a + r.durationSec, 0)
     eis(
-      weekKracht._count._all === weekRijen.length,
-      `${id}: weekaggregatie (${weekKracht._count._all}) wijkt af van hertelling (${weekRijen.length})`,
+      week.count === hertellingCount,
+      `${id}: weekteller (${week.count}) wijkt af van hertelling (${hertellingCount})`,
     )
     eis(
-      (weekKracht._sum.duration ?? 0) === weekRijen.reduce((a, r) => a + (r.duration ?? 0), 0),
-      `${id}: weeksom duur wijkt af van hertelling`,
+      week.seconds === hertellingSec,
+      `${id}: weeksom (${week.seconds}) wijkt af van hertelling (${hertellingSec})`,
     )
 
     // ── Invariant 5: DE ANDERE BUG. Meerdere programma's tellen allemaal ───
-    const programmasDezeWeek = new Set(weekRijen.map((r) => r.programId).filter(Boolean))
+    const programmasDezeWeek = new Set(krachtWeekRijen.map((r) => r.programId).filter(Boolean))
     if (programmasDezeWeek.size > 1) {
       meerdereProgrammasDezeWeek++
       eis(
-        weekCount >= programmasDezeWeek.size,
-        `${id}: trainde in ${programmasDezeWeek.size} programma's maar de weekteller staat op ${weekCount}`,
+        week.count >= programmasDezeWeek.size,
+        `${id}: trainde in ${programmasDezeWeek.size} programma's maar de weekteller staat op ${week.count}`,
       )
     }
 
     // ── Invariant 6: week past binnen all-time, en tijd hoort bij telling ──
-    eis(weekCount <= allTime, `${id}: week (${weekCount}) groter dan all-time (${allTime})`)
-    eis(weekCount > 0 || weekSec === 0, `${id}: weektijd zonder weeksessies`)
+    eis(week.count <= allTime.count, `${id}: week (${week.count}) groter dan all-time (${allTime.count})`)
+    eis(week.count > 0 || week.seconds === 0, `${id}: weektijd zonder weeksessies`)
 
     // ── Invariant 7: last is er precies dan als er activiteit is ───────────
     eis(
-      (last === null) === (allTime === 0),
-      `${id}: last=${last === null ? 'null' : last.kind} bij all-time ${allTime}`,
+      (last === null) === (allTime.count === 0),
+      `${id}: last=${last === null ? 'null' : last.kind} bij all-time ${allTime.count}`,
     )
 
     // ── Invariant 8: last is echt de recentste van de twee ─────────────────
+    // lk/lc zijn hier los opgehaald, dus dit toetst `pickLastActivity`'s keuze
+    // binnen computeSessionStats, niet een aanname die het script zelf maakt.
     if (last) {
       const kandidaten = [lk?.completedAt?.getTime(), lc?.completedAt.getTime()]
         .filter((t): t is number => typeof t === 'number')

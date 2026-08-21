@@ -1,10 +1,15 @@
 /**
- * Tellingen voor de tegels op het beginscherm: wat deed je deze week, en wat
- * was je laatste training.
+ * Tellingen voor de tegels op het beginscherm: wat deed je deze week, wat all-
+ * time, en wat je laatste training was.
  *
- * De vorm zit hier los van `patient.getSessionStats` zodat de weekgrens en de
- * keuze van de laatste activiteit te testen zijn zonder database.
+ * `weekWindow` en `pickLastActivity` zijn puur en blijven dat, zodat de
+ * weekgrens en de keuze van de laatste activiteit te testen zijn zonder
+ * database. `computeSessionStats` erbij is dat niet meer: dat is de ene plek
+ * die de aggregatie tegen de database uitvoert, zodat `patient.getSessionStats`
+ * en `scripts/verify-home-tiles-live.ts` dezelfde code aanroepen in plaats van
+ * hem allebei te herbouwen.
  */
+import type { PrismaClient } from '@prisma/client'
 import { addDaysKey, amsMidnight, mondayKeyOf } from '@/lib/week-dates'
 
 /** Krachtsessie zoals de router hem selecteert. */
@@ -134,5 +139,89 @@ export function pickLastActivity(
     pain: session.painLevel,
     exerciseCount: session._count.exerciseLogs,
     completedAll: session.completedAll,
+  }
+}
+
+/**
+ * De aggregatie achter de twee tegels op het beginscherm. Draait zes queries
+ * parallel: all-time-tellers, weektellers (kracht + cardio) en de meest
+ * recente van elk voor `last`.
+ *
+ * `total` blijft precies wat het was (krachtsessies all-time, zonder de
+ * tendinopathie-dagrondes) omdat build 82 en ouder in TestFlight dat veld
+ * lezen. De rest is erbij gekomen; oude clients negeren die velden.
+ *
+ * Geen extra klem op duur bij het optellen: `clampSessionDurationSec`
+ * begrenst al bij het schrijven, en een tweede klem hier zou het weektotaal
+ * laten afwijken van de sessies die je in de app kunt openen.
+ */
+export async function computeSessionStats(
+  prisma: Pick<PrismaClient, 'sessionLog' | 'cardioLog'>,
+  patientId: string,
+  now: Date,
+): Promise<SessionStats> {
+  const krachtBasis = {
+    patientId,
+    status: 'COMPLETED' as const,
+    NOT: { program: { tendinopathyMode: true, dailyTarget: { not: null } } },
+  }
+  const cardioBasis = { patientId }
+  const { from, to } = weekWindow(now)
+
+  const [total, cardioTotal, weekKracht, weekCardio, laatsteKracht, laatsteCardio] =
+    await Promise.all([
+      prisma.sessionLog.count({ where: krachtBasis }),
+      prisma.cardioLog.count({ where: cardioBasis }),
+      prisma.sessionLog.aggregate({
+        where: { ...krachtBasis, completedAt: { gte: from, lt: to } },
+        _count: { _all: true },
+        _sum: { duration: true },
+      }),
+      prisma.cardioLog.aggregate({
+        where: { ...cardioBasis, completedAt: { gte: from, lt: to } },
+        _count: { _all: true },
+        _sum: { durationSec: true },
+      }),
+      prisma.sessionLog.findFirst({
+        where: { ...krachtBasis, completedAt: { not: null } },
+        orderBy: { completedAt: 'desc' },
+        select: {
+          id: true,
+          completedAt: true,
+          duration: true,
+          exertionLevel: true,
+          painLevel: true,
+          completedAll: true,
+          program: { select: { name: true } },
+          _count: { select: { exerciseLogs: true } },
+        },
+      }),
+      prisma.cardioLog.findFirst({
+        where: cardioBasis,
+        orderBy: { completedAt: 'desc' },
+        select: {
+          id: true,
+          completedAt: true,
+          activity: true,
+          durationSec: true,
+          distanceM: true,
+          avgHeartRate: true,
+          zone: true,
+          rpe: true,
+          painLevel: true,
+          avgPaceSecPerKm: true,
+          notes: true,
+        },
+      }),
+    ])
+
+  return {
+    total,
+    week: {
+      count: weekKracht._count._all + weekCardio._count._all,
+      seconds: (weekKracht._sum.duration ?? 0) + (weekCardio._sum.durationSec ?? 0),
+    },
+    allTime: { count: total + cardioTotal },
+    last: pickLastActivity(laatsteKracht, laatsteCardio),
   }
 }
