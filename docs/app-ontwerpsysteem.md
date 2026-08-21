@@ -44,6 +44,14 @@ Kaarten met diepte scheiden de rijen zodat je oog per blok kan stoppen.
 
 ### Zonder kader, waar je leest of één ding doet
 
+*(Uitgevoerd op het web op 21-08-2026: testrapport-leesweergave, voortgang op
+beide portalen, de focus-stand van de sessie-runner en de instellingen-indexen.
+Grenzen die daarbij zijn getrokken: invoer blijft een kaart, ook op een
+leesscherm; het sessie-overzicht en de superset-groepen blijven Instrument; de
+PDF-sjablonen waren al documenten en blijven onaangeraakt; en binnen de
+portaal-chrome houdt een leeslijst de portaalgrond, alleen de rijenvorm wordt
+vlak. iOS volgt dezelfde besluiten nog.)*
+
 Geen kaarten. Haarlijnen en witruimte dragen de structuur, en de cijfers worden
 het beeld.
 
