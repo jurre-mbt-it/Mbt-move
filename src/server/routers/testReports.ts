@@ -22,6 +22,7 @@ import {
   type TestSpec,
 } from '@/lib/test-report/compute'
 import { draftTestReportNarrative, type NarrativeTestLine } from '@/lib/ai/anthropic'
+import { syncCriteriaVoorEntry } from '@/server/lib/rehab-criterion-sync'
 
 const ACTIVE_LINK = { isActive: true, status: 'APPROVED' as const }
 
@@ -437,6 +438,9 @@ export const testReportsRouter = createTRPCRouter({
       if (!e) throw new TRPCError({ code: 'NOT_FOUND' })
       await assertTreating(ctx.prisma, ctx.user, await reportPatientId(ctx.prisma, e.reportId))
       await ctx.prisma.testReportEntry.update({ where: { id }, data })
+      // Doorwerking naar het lopende revalidatietraject. Mag de opslag van de
+      // meting zelf nooit laten falen.
+      await syncCriteriaVoorEntry(ctx.prisma, id, ctx.user.id).catch(() => {})
       return { ok: true }
     }),
 

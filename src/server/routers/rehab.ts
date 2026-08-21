@@ -12,7 +12,7 @@ import { createTRPCRouter, protectedProcedure, therapistProcedure, adminProcedur
 import { practiceScope } from '@/server/lib/patient-access'
 import { findOpenTracker, getPatientRehabTrackerData, getRehabTrackerDataById } from '@/lib/rehab-data'
 import { laatsteAfgeslotenTraject } from '@/lib/rehab-traject'
-import { notifyRehabCriterion, notifyRehabPhase } from '@/server/push/notify'
+import { meldMetOvergang } from '@/server/lib/rehab-criterion-sync'
 import { auditLog } from '@/server/audit'
 
 const ACTIVE_LINK = { isActive: true, status: 'APPROVED' as const }
@@ -726,35 +726,14 @@ export const rehabRouter = createTRPCRouter({
         )
 
       // Melding aan de patiënt bij de overgang naar MET. Faalt nooit de mutatie.
+      // Zelfde helper als de automatische route vanuit een testrapport, zodat
+      // handmatig afvinken en een gesynchroniseerde meting identiek melden.
       if (input.status === 'MET' && prevStatus?.status !== 'MET') {
-        await notifyRehabCriterion(input.patientId).catch(() => {})
-
-        // Fase compleet? Als álle criteria van deze fase nu MET zijn én er een
-        // volgende fase bestaat, ook een fase-overgang-melding sturen.
-        const phaseCriteria = await ctx.prisma.rehabCriterion.findMany({
-          where: { phaseId: criterion.phaseId },
-          select: { id: true },
-        })
-        // Op trackerId tellen: anders tellen vinkjes uit een afgesloten traject
-        // mee en krijgt de patiënt bij een nieuw traject meteen een onterechte
-        // "fase behaald"-melding.
-        const metCount = await ctx.prisma.rehabCriterionStatus.count({
-          where: {
-            trackerId: tracker.id,
-            criterionId: { in: phaseCriteria.map((c) => c.id) },
-            status: 'MET',
-          },
-        })
-        if (phaseCriteria.length > 0 && metCount === phaseCriteria.length) {
-          const nextPhase = await ctx.prisma.rehabPhase.findFirst({
-            where: {
-              protocolId: criterion.phase.protocolId,
-              order: { gt: criterion.phase.order },
-            },
-            select: { id: true },
-          })
-          if (nextPhase) await notifyRehabPhase(input.patientId).catch(() => {})
-        }
+        await meldMetOvergang(ctx.prisma, input.patientId, tracker.id, {
+          id: criterion.id,
+          phaseId: criterion.phaseId,
+          phase: { protocolId: criterion.phase.protocolId, order: criterion.phase.order },
+        }).catch(() => {})
       }
 
       return { ok: true }
