@@ -11,7 +11,7 @@ Bronnen: verbeterplan Master Manuele Therapie (door Jurre zelf geschreven), de w
 - **Aanspreekvormen:** de lezer of patiënt is "je". De praktijk is "wij", "we" of "onze praktijk".
 - **Evidence-based, in dienst van het punt.** Cijfers en onderzoek onderbouwen een praktisch advies, ze zijn geen versiering. Een bron noemen mag, jargon doseren.
 - **Kernfilosofie: criteria boven kalender.** Herstel en opbouw sturen op kracht, controle en pijnvrijheid, niet op een datum. Metingen bepalen wanneer de volgende stap veilig is.
-- **Motto:** "We meten om te weten, niet om het meten." Mag letterlijk terugkomen waar het past.
+- **Het motto "we meten om te weten" is vervallen** (2026-08-21). Gebruik die zin niet meer in nieuwe tekst. Hij staat nog in het ijkpunt van register 7 hieronder, maar dat is een citaat uit een ouder stuk van Jurre en dient daar als voorbeeld van zijn stem, niet als zin om over te nemen.
 - **Misverstanden eerst opruimen.** Als een mythe het advies in de weg zit ("pijn, dus rust"), ontkracht die eerst en geef daarna pas het plan.
 - **Concreet.** Weken, sets, percentages, locaties. Liever "78% ten opzichte van links" dan "goed op weg". Liever "2-3x per week" dan "regelmatig".
 - **Warm waar het over mensen gaat, zakelijk waar het over feiten gaat.** Teamcultuur en motivatie mogen menselijk klinken; metingen en afspraken blijven compact en feitelijk.
