@@ -445,6 +445,7 @@ export function MetricTile({
   unit,
   sub,
   tint = P.ink,
+  size = 'md',
   className,
   style,
   href,
@@ -455,6 +456,8 @@ export function MetricTile({
   unit?: string
   sub?: string
   tint?: string
+  /** 'sm' voor rijen die informeren maar niet het scherm hoeven te dragen. */
+  size?: 'md' | 'sm'
   className?: string
   style?: React.CSSProperties
   href?: string
@@ -482,7 +485,7 @@ export function MetricTile({
         border: `1px solid ${P.cardEdge}`,
         borderTopColor: P.cardEdgeTop,
         boxShadow: P.cardShadow,
-        padding: 16,
+        padding: size === 'sm' ? 12 : 16,
         ...style,
       }}
     >
@@ -490,7 +493,12 @@ export function MetricTile({
       <div className="flex items-baseline gap-1">
         <span
           className="athletic-display"
-          style={{ color: tint, fontSize: 40, lineHeight: '44px', letterSpacing: '-0.035em' }}
+          style={{
+            color: tint,
+            fontSize: size === 'sm' ? 24 : 40,
+            lineHeight: size === 'sm' ? '28px' : '44px',
+            letterSpacing: '-0.035em',
+          }}
         >
           {value}
         </span>
@@ -1069,7 +1077,9 @@ if (typeof document !== 'undefined' && !document.getElementById('dark-ui-styles'
   el.textContent = `
     .dark-tab[data-state="inactive"] { color: ${P.inkMuted}; background: transparent; }
     .dark-tab[data-state="inactive"]:hover { color: ${P.ink}; background: ${P.surfaceHi}; }
-    .dark-tab[data-state="active"] { color: ${P.bg}; background: ${P.brand}; }
+    /* Selectie is geen actie: de gekozen tab wordt licht, niet oranje.
+       Zelfde regel als de chips en filters (sweep 20-08). */
+    .dark-tab[data-state="active"] { color: ${P.bg}; background: ${P.ink}; }
   `
   document.head.appendChild(el)
 }

@@ -364,6 +364,7 @@ export default function PatientDetailPage({
             </DarkButton>
           )}
           <DarkButton
+            size="sm"
             variant="secondary"
             disabled={resendInvite.isPending}
             loading={resendInvite.isPending}
@@ -375,6 +376,7 @@ export default function PatientDetailPage({
             <span className="inline-flex items-center gap-1.5"><IconMail size={15} /> Stuur invite-link</span>
           </DarkButton>
           <DarkButton
+            size="sm"
             variant="secondary"
             href={`${portal.base}/week-planner?patientId=${patient.id}`}
           >
@@ -392,7 +394,7 @@ export default function PatientDetailPage({
           {/* Co-monitoring: een fysiotherapeut laten meekijken. De atleet
               keurt die koppeling zelf goed. */}
           {portal.isCoach && (
-            <DarkButton variant="secondary" onClick={() => setCoMonitorOpen(true)}>
+            <DarkButton size="sm" variant="secondary" onClick={() => setCoMonitorOpen(true)}>
               Therapeut laten meekijken
             </DarkButton>
           )}
@@ -400,7 +402,7 @@ export default function PatientDetailPage({
               account en zijn data. Alleen in het coach-portaal, want in de
               praktijk loopt afsluiten via de patiëntadministratie. */}
           {portal.isCoach && (
-            <DarkButton variant="secondary" onClick={() => setUnlinkOpen(true)}>
+            <DarkButton size="sm" variant="secondary" onClick={() => setUnlinkOpen(true)}>
               Koppeling verbreken
             </DarkButton>
           )}
@@ -409,7 +411,7 @@ export default function PatientDetailPage({
               inactief zetten laat het dossier heel. Wie al inactief staat ziet
               hier niets; die knop staat in de banner bovenaan. */}
           {!careStatus && (
-            <DarkButton variant="secondary" onClick={() => setDischargeOpen(true)}>
+            <DarkButton size="sm" variant="secondary" onClick={() => setDischargeOpen(true)}>
               Op inactief zetten
             </DarkButton>
           )}
@@ -426,12 +428,14 @@ export default function PatientDetailPage({
             </DarkButton>
           )}
           <DarkButton
+            size="sm"
             variant="secondary"
             onClick={() => setAssignTemplateOpen(true)}
           >
             <span className="inline-flex items-center gap-1.5"><IconClipboard size={15} /> Vanaf template</span>
           </DarkButton>
           <DarkButton
+            size="sm"
             variant="secondary"
             href={`${portal.base}/programs/new?patientId=${patient.id}`}
           >
@@ -510,27 +514,29 @@ export default function PatientDetailPage({
           </Tile>
         )}
 
-        {/* Stats row */}
+        {/* Stats row — bewust de kleine maat en zonder tint: dit is context
+            bij het dossier, niet het scherm zelf. De grote gekleurde cijfers
+            vochten om aandacht met de acties erboven. */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <MetricTile
+            size="sm"
             label="Actieve prog."
             value={activePrograms.length}
-            tint={P.lime}
           />
           <MetricTile
+            size="sm"
             label="Totaal prog."
             value={programs.length}
-            tint={P.ice}
           />
           <MetricTile
+            size="sm"
             label="Programma duur"
             value={patient.weeksTotal ? `${patient.weeksTotal}w` : '—'}
-            tint={P.teal}
           />
           <MetricTile
+            size="sm"
             label="Startdatum"
             value={patient.startDate ? new Date(patient.startDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) : '—'}
-            tint={P.gold}
           />
         </div>
 
