@@ -45,6 +45,18 @@ function buildCsp(nonce: string): string {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Domeinmigratie (21-08-2026): mbt-gym.nl is verhuisd naar getbase.coach.
+  // 308 behoudt methode en pad, en de browser neemt een eventueel hash-fragment
+  // (Supabase-tokens) zelf mee. De matcher sluit /api uit, dus webhooks van
+  // lopende betalingen op het oude domein blijven gewoon aankomen.
+  // www.getbase.coach gaat naar het kale domein: twee hosts betekent twee
+  // cookie-domeinen, en dus twee losse sessies voor dezelfde gebruiker.
+  const host = request.headers.get('host') ?? ''
+  if (host.endsWith('mbt-gym.nl') || host === 'www.getbase.coach') {
+    const doel = new URL(request.nextUrl.pathname + request.nextUrl.search, 'https://getbase.coach')
+    return NextResponse.redirect(doel, 308)
+  }
+
   // Verse nonce per request + CSP. De nonce gaat als request-header mee zodat
   // Next 'm tijdens SSR op zijn scripts kan zetten; en als response-header zodat
   // de browser 'm afdwingt.
