@@ -32,7 +32,7 @@
 | `src/server/lib/__tests__/training-totals.test.ts` (nieuw) | Vitest op bovenstaande |
 | `src/server/routers/patient.ts` (wijzigen) | `getSessionStats` doet de aggregaties en zet de payload samen |
 | `scripts/check-home-tiles.ts` (nieuw) | Toetst de pure formatters uit de mobiele repo |
-| `scripts/verify-home-tiles-live.ts` (nieuw) | Draait de aggregatie op productiedata en vergelijkt met bekende cijfers |
+| `scripts/verify-home-tiles-live.ts` (nieuw) | Draait de aggregatie op productiedata en toetst invarianten die niet verouderen |
 | `package.json` (wijzigen) | Twee npm-scripts erbij |
 
 **Mobiele repo (`/Users/eva/mbt-gym-mobile`)**
@@ -474,7 +474,7 @@ Verwacht: geen tsc-fouten, alle vitest-tests groen.
 
 - [ ] **Step 4: Schrijf het verificatiescript**
 
-De repo heeft geen test-database, dus de aggregatie wordt tegen productiedata gecontroleerd. De verwachte waarden zijn op 21 augustus 2026 handmatig nageteld.
+De repo heeft geen test-database, dus de aggregatie wordt tegen productiedata gecontroleerd. Niet met vaste getallen, want die verouderen zodra iemand traint. In plaats daarvan toetst het script invarianten: regels die blijven gelden hoeveel er ook bij komt, en die precies de twee fouten vangen die we repareren.
 
 Maak `scripts/verify-home-tiles-live.ts`:
 
@@ -482,10 +482,15 @@ Maak `scripts/verify-home-tiles-live.ts`:
 /**
  * Controleert de aggregatie achter `patient.getSessionStats` op echte data.
  *
- * Er is geen test-database (zie AGENTS.md), dus dit script draait dezelfde
- * queries als de procedure en vergelijkt ze met cijfers die op 21 augustus
- * 2026 met de hand zijn nageteld. Loopt er iets uiteen, dan is de aggregatie
- * of het weekvenster stuk.
+ * Er is geen test-database (zie AGENTS.md), dus dit draait dezelfde queries
+ * als de procedure over alle gebruikers met activiteit en toetst invarianten.
+ * Bewust geen vaste getallen: die gaan rood zodra iemand traint, en dan leert
+ * niemand er nog iets van.
+ *
+ * De twee fouten die dit moet vangen:
+ *   - cardio telde niet mee, waardoor cardio-only gebruikers nul zagen
+ *   - de weekteller bleef binnen een programma, waardoor een tweede programma
+ *     wegviel
  *
  * Draaien:  npm run verify:home-tiles
  * Alleen lezen; dit script schrijft niets.
@@ -493,37 +498,59 @@ Maak `scripts/verify-home-tiles-live.ts`:
 import { prisma } from '../src/lib/prisma'
 import { pickLastActivity, weekWindow } from '../src/server/lib/training-totals'
 
-// E-mail → verwacht all-time totaal (kracht + cardio), stand 21 aug 2026.
-const VERWACHT_ALLTIME: Record<string, number> = {
-  'frank@hkventures.nl': 4,
-  'jurre@movementbasedtherapy.nl': 56,
+let fouten = 0
+const eis = (ok: boolean, bericht: string) => {
+  if (!ok) {
+    fouten++
+    console.error(`  ✗ ${bericht}`)
+  }
+}
+
+const KRACHT_FILTER = {
+  status: 'COMPLETED' as const,
+  NOT: { program: { tendinopathyMode: true, dailyTarget: { not: null } } },
 }
 
 async function main() {
-  const { from, to } = weekWindow(new Date())
+  const nu = new Date()
+  const { from, to } = weekWindow(nu)
+
   console.log('weekvenster:', from.toISOString(), '→', to.toISOString())
 
-  let fouten = 0
-  const users = await prisma.user.findMany({
-    where: { email: { in: Object.keys(VERWACHT_ALLTIME) } },
-    select: { id: true, email: true },
-  })
+  // ── Invariant 1: het venster is een hele week en bevat nu ────────────────
+  eis(to.getTime() - from.getTime() === 7 * 864e5, 'venster is geen 7 dagen')
+  eis(from <= nu && nu < to, 'nu valt buiten het eigen weekvenster')
+  eis(
+    new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Amsterdam', weekday: 'long' }).format(from) === 'Monday',
+    'venster begint niet op maandag in NL-tijd',
+  )
+  eis(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Amsterdam', hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(from) === '00:00',
+    'venster begint niet om 00:00 NL-tijd',
+  )
 
-  for (const u of users) {
-    const krachtBasis = {
-      patientId: u.id,
-      status: 'COMPLETED' as const,
-      NOT: { program: { tendinopathyMode: true, dailyTarget: { not: null } } },
-    }
-    const [total, cardioTotal, weekKracht, weekCardio, lk, lc] = await Promise.all([
+  // ── Per gebruiker met activiteit ─────────────────────────────────────────
+  const ids = new Set<string>()
+  for (const r of await prisma.sessionLog.groupBy({ by: ['patientId'] })) ids.add(r.patientId)
+  for (const r of await prisma.cardioLog.groupBy({ by: ['patientId'] })) ids.add(r.patientId)
+
+  let cardioOnly = 0
+  let meerdereProgrammasDezeWeek = 0
+
+  for (const id of ids) {
+    const krachtBasis = { patientId: id, ...KRACHT_FILTER }
+
+    const [total, cardioTotal, weekKracht, weekCardio, lk, lc, weekRijen] = await Promise.all([
       prisma.sessionLog.count({ where: krachtBasis }),
-      prisma.cardioLog.count({ where: { patientId: u.id } }),
+      prisma.cardioLog.count({ where: { patientId: id } }),
       prisma.sessionLog.aggregate({
         where: { ...krachtBasis, completedAt: { gte: from, lt: to } },
         _count: { _all: true }, _sum: { duration: true },
       }),
       prisma.cardioLog.aggregate({
-        where: { patientId: u.id, completedAt: { gte: from, lt: to } },
+        where: { patientId: id, completedAt: { gte: from, lt: to } },
         _count: { _all: true }, _sum: { durationSec: true },
       }),
       prisma.sessionLog.findFirst({
@@ -536,7 +563,7 @@ async function main() {
         },
       }),
       prisma.cardioLog.findFirst({
-        where: { patientId: u.id },
+        where: { patientId: id },
         orderBy: { completedAt: 'desc' },
         select: {
           id: true, completedAt: true, activity: true, durationSec: true, distanceM: true,
@@ -544,42 +571,81 @@ async function main() {
           avgPaceSecPerKm: true, notes: true,
         },
       }),
+      // Rauwe rijen voor de hertelling: onafhankelijk van de aggregatie.
+      prisma.sessionLog.findMany({
+        where: { ...krachtBasis, completedAt: { gte: from, lt: to } },
+        select: { programId: true, duration: true },
+      }),
     ])
 
     const allTime = total + cardioTotal
     const weekCount = weekKracht._count._all + weekCardio._count._all
     const weekSec = (weekKracht._sum.duration ?? 0) + (weekCardio._sum.durationSec ?? 0)
     const last = pickLastActivity(lk, lc)
-    const verwacht = VERWACHT_ALLTIME[u.email]
-    const ok = allTime === verwacht
 
-    if (!ok) fouten++
-    console.log(
-      `${ok ? '✓' : '✗'} ${u.email} | all-time ${allTime} (verwacht ${verwacht}) ` +
-      `| deze week ${weekCount} sessies, ${Math.round(weekSec / 60)} min ` +
-      `| laatste ${last ? `${last.kind} ${last.completedAt.slice(0, 10)}` : 'geen'}`
+    // ── Invariant 2: cardio kan er alleen bij optellen ─────────────────────
+    eis(allTime >= total, `${id}: all-time (${allTime}) lager dan de krachtteller (${total})`)
+
+    // ── Invariant 3: DE BUG. Wie alleen cardio doet mag geen nul zien ──────
+    if (total === 0 && cardioTotal > 0) {
+      cardioOnly++
+      eis(allTime > 0, `${id}: cardio-only gebruiker komt op 0 uit`)
+      eis(last?.kind === 'cardio', `${id}: cardio-only gebruiker heeft geen cardio als laatste`)
+    }
+
+    // ── Invariant 4: de weektelling klopt met een hertelling ───────────────
+    eis(
+      weekKracht._count._all === weekRijen.length,
+      `${id}: weekaggregatie (${weekKracht._count._all}) wijkt af van hertelling (${weekRijen.length})`,
     )
-  }
+    eis(
+      (weekKracht._sum.duration ?? 0) === weekRijen.reduce((a, r) => a + (r.duration ?? 0), 0),
+      `${id}: weeksom duur wijkt af van hertelling`,
+    )
 
-  // Niemand mag nul all-time zien terwijl er cardio ligt: dat was de fout.
-  const cardioZonderKracht = await prisma.cardioLog.groupBy({
-    by: ['patientId'],
-    _count: { _all: true },
-  })
-  for (const rij of cardioZonderKracht) {
-    const kracht = await prisma.sessionLog.count({
-      where: {
-        patientId: rij.patientId,
-        status: 'COMPLETED',
-        NOT: { program: { tendinopathyMode: true, dailyTarget: { not: null } } },
-      },
-    })
-    if (kracht === 0 && rij._count._all > 0) {
-      console.log(`  (cardio-only gebruiker: ${rij._count._all} activiteiten, oude tegel toonde 0)`)
+    // ── Invariant 5: DE ANDERE BUG. Meerdere programma's tellen allemaal ───
+    const programmasDezeWeek = new Set(weekRijen.map((r) => r.programId).filter(Boolean))
+    if (programmasDezeWeek.size > 1) {
+      meerdereProgrammasDezeWeek++
+      eis(
+        weekCount >= programmasDezeWeek.size,
+        `${id}: trainde in ${programmasDezeWeek.size} programma's maar de weekteller staat op ${weekCount}`,
+      )
+    }
+
+    // ── Invariant 6: week past binnen all-time, en tijd hoort bij telling ──
+    eis(weekCount <= allTime, `${id}: week (${weekCount}) groter dan all-time (${allTime})`)
+    eis(weekCount > 0 || weekSec === 0, `${id}: weektijd zonder weeksessies`)
+
+    // ── Invariant 7: last is er precies dan als er activiteit is ───────────
+    eis(
+      (last === null) === (allTime === 0),
+      `${id}: last=${last === null ? 'null' : last.kind} bij all-time ${allTime}`,
+    )
+
+    // ── Invariant 8: last is echt de recentste van de twee ─────────────────
+    if (last) {
+      const kandidaten = [lk?.completedAt?.getTime(), lc?.completedAt.getTime()]
+        .filter((t): t is number => typeof t === 'number')
+      eis(
+        new Date(last.completedAt).getTime() === Math.max(...kandidaten),
+        `${id}: last is niet de recentste activiteit`,
+      )
     }
   }
 
-  console.log(fouten === 0 ? '\nAggregatie klopt.\n' : `\n${fouten} afwijking(en).\n`)
+  console.log(`gecontroleerd: ${ids.size} gebruikers`)
+  console.log(`  cardio-only (zagen voorheen 0): ${cardioOnly}`)
+  console.log(`  trainden deze week in meerdere programma's: ${meerdereProgrammasDezeWeek}`)
+
+  // De twee bugs moeten aantoonbaar dekking hebben. Is er geen enkele
+  // cardio-only gebruiker meer, dan bewijst dit script de fix niet en moet
+  // iemand daar met de hand naar kijken.
+  if (cardioOnly === 0) {
+    console.warn('  ! geen cardio-only gebruiker in de data: invariant 3 is niet uitgeoefend')
+  }
+
+  console.log(fouten === 0 ? '\nAlle invarianten houden.\n' : `\n${fouten} schending(en).\n`)
   process.exit(fouten === 0 ? 0 : 1)
 }
 
@@ -600,13 +666,14 @@ In `package.json`, direct onder `"check:session-payload"`:
 npm run verify:home-tiles
 ```
 
-Verwacht: beide regels met een vinkje, "Aggregatie klopt."
+Verwacht: geen enkele `✗`, en als slotregel "Alle invarianten houden."
 
-Frank's weekregel hoort `2 sessies, 151 min` te tonen (4299 plus 4769 seconden). **Dat is meteen de belangrijkste dekking van dit script:** Frank heeft twee actieve programma's en trainde deze week in allebei. De oude teller kwam op 1 uit omdat hij binnen één programma bleef. Staat hier 1, dan is de programma-scoping teruggeslopen.
+Kijk daarnaast naar de twee tellers die het script afdrukt, want die zeggen of de invarianten überhaupt zijn uitgeoefend:
 
-De regel van `jurre@movementbasedtherapy.nl` dekt de andere fout: 56 all-time terwijl de oude tegel 20 toonde, want die telde de 36 cardio-activiteiten niet mee.
+- **cardio-only** hoort boven nul te staan. Dat zijn de gebruikers die met de oude tegel op 0 uitkwamen terwijl ze uren hadden getraind. Staat hier 0, dan is invariant 3 niet getoetst en moet je met de hand naar de data kijken; het script waarschuwt daar zelf ook over.
+- **trainden deze week in meerdere programma's** hoort boven nul te staan zolang er zo iemand is. Dat is de andere fout: de oude teller bleef binnen één programma. Is die teller 0 omdat er deze week toevallig niemand in twee programma's trainde, dan is dat geen falen van de code, maar wel een gat in de dekking; noteer dat in het taakrapport.
 
-Wijkt het af doordat er sinds 21 augustus nieuwe sessies zijn gelogd, werk dan `VERWACHT_ALLTIME` bij naar de dan geldende stand en noteer de datum in het commentaar. Wijkt het af zonder nieuwe data, dan is de aggregatie stuk.
+Een schending noemt altijd de gebruiker-id en wat er niet klopte. Vertaal die id naar een naam met een losse query voordat je aan de code gaat sleutelen; soms is de data zelf raar en niet de aggregatie.
 
 - [ ] **Step 7: Commit**
 
@@ -625,7 +692,7 @@ git commit -m "feat(stats): getSessionStats telt cardio mee en geeft week plus l
 - Modify: `package.json` (web-repo)
 
 **Interfaces:**
-- Consumes: het `LastActivity`-type uit Task 1, hier opnieuw gedeclareerd omdat de repo's geen gedeeld package hebben
+- Consumes: het `LastActivity`-type uit Task 1, hier opnieuw gedeclareerd omdat de repo's geen gedeeld package hebben. Het controlescript importeert daarnaast `pickLastActivity` uit Task 1 om de echte serveruitvoer door de app-formatters te halen; die functie moet dus al bestaan.
 - Produces: `CARDIO_LABEL`, `dayLabel(iso, now)`, `formatSessionDuration(sec)`, `formatWeekDuration(sec)`, `lastActivityName(last)`, `lastActivitySub(last)`, `weekSub(seconds, allTimeCount)`. Task 5 importeert `CARDIO_LABEL`, Task 6 de rest.
 
 - [ ] **Step 1: Write the failing test**
@@ -647,6 +714,8 @@ Maak `scripts/check-home-tiles.ts` in de web-repo:
 import path from 'node:path'
 import { existsSync } from 'node:fs'
 import assert from 'node:assert/strict'
+
+import { pickLastActivity } from '../src/server/lib/training-totals'
 
 const MOBILE = process.env.MOBILE_REPO
   ?? path.resolve(__dirname, '..', '..', 'mbt-gym-mobile')
@@ -748,6 +817,78 @@ async function main() {
   check('lege week toont alleen de teller', () => {
     assert.equal(weekSub(0, 56), '56 totaal')
     assert.equal(weekSub(0, 0), 'nog niets gelogd')
+  })
+
+  // ── Drift tussen server en app ──────────────────────────────────────────
+  // `LastActivity` staat in beide repo's, want er is geen gedeeld package.
+  // Een commentaarregel dat ze elkaar spiegelen is geen bewaking, dus voeren
+  // we hier de ECHTE serverfunctie uit en stoppen haar uitvoer in de ECHTE
+  // formatters van de app. Hernoemt de server een veld, dan valt dit om.
+  console.log('\nserver-uitvoer past in de app-formatters')
+
+  check('krachtsessie van pickLastActivity is te renderen', () => {
+    const vanServer = pickLastActivity(
+      {
+        id: 's1',
+        completedAt: new Date('2026-08-21T12:39:04Z'),
+        duration: 4769,
+        exertionLevel: 9,
+        painLevel: 3,
+        completedAll: false,
+        program: { name: 'Schema B' },
+        _count: { exerciseLogs: 8 },
+      },
+      null,
+    )
+    assert.ok(vanServer, 'server gaf null terug')
+    assert.equal(lastActivityName(vanServer), 'Schema B')
+    assert.equal(lastActivitySub(vanServer), 'Schema B · 8 oef · 79 min')
+    assert.equal(dayLabel(vanServer.completedAt, nu), 'VANDAAG')
+  })
+
+  check('cardio van pickLastActivity is te renderen', () => {
+    const vanServer = pickLastActivity(null, {
+      id: 'c1',
+      completedAt: new Date('2026-08-19T16:13:00Z'),
+      activity: 'RUNNING',
+      durationSec: 2400,
+      distanceM: 8200,
+      avgHeartRate: 148,
+      zone: 3,
+      rpe: 6,
+      painLevel: null,
+      avgPaceSecPerKm: 293,
+      notes: null,
+    })
+    assert.ok(vanServer, 'server gaf null terug')
+    assert.equal(lastActivityName(vanServer), 'Hardlopen')
+    assert.equal(lastActivitySub(vanServer), 'Hardlopen · 40 min')
+    assert.equal(dayLabel(vanServer.completedAt, nu), '19 AUG')
+  })
+
+  check('de app leest geen velden die de server niet stuurt', () => {
+    // Alles wat de app van een cardio-activiteit gebruikt om een CalEvent te
+    // bouwen, moet de server ook echt meesturen.
+    const vanServer = pickLastActivity(null, {
+      id: 'c1',
+      completedAt: new Date('2026-08-19T16:13:00Z'),
+      activity: 'RUNNING',
+      durationSec: 2400,
+      distanceM: 8200,
+      avgHeartRate: 148,
+      zone: 3,
+      rpe: 6,
+      painLevel: null,
+      avgPaceSecPerKm: 293,
+      notes: null,
+    })
+    const nodig = [
+      'kind', 'id', 'completedAt', 'activity', 'durationSec', 'distanceM',
+      'avgHeartRate', 'zone', 'rpe', 'pain', 'paceSecPerKm', 'notes',
+    ]
+    for (const veld of nodig) {
+      assert.ok(veld in (vanServer as object), `server stuurt "${veld}" niet mee`)
+    }
   })
 
   console.log(fouten === 0 ? '\nOpmaak klopt.\n' : `\n${fouten} controle(s) gefaald.\n`)
