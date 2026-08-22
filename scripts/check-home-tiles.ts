@@ -107,14 +107,14 @@ async function main() {
 
   console.log('\nweek-subregel')
 
-  check('tijd plus all-time teller', () => {
-    assert.equal(weekSub(9068, 4), '2u31 · 4 totaal')
-    assert.equal(weekSub(2400, 56), '40 min · 56 totaal')
+  check('tijd plus de verdeling kracht en cardio', () => {
+    assert.equal(weekSub(9068, 2, 1), '2u31 · 2 kracht 1 cardio')
+    assert.equal(weekSub(2400, 0, 1), '40 min · 1 cardio')
+    assert.equal(weekSub(9068, 2, 0), '2u31 · 2 kracht')
   })
 
-  check('lege week toont alleen de teller', () => {
-    assert.equal(weekSub(0, 56), '56 totaal')
-    assert.equal(weekSub(0, 0), 'nog niets gelogd')
+  check('lege week zegt dat er niets is gelogd', () => {
+    assert.equal(weekSub(0, 0, 0), 'nog niets gelogd')
   })
 
   // ── Drift tussen server en app ──────────────────────────────────────────

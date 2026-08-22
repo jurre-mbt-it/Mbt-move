@@ -75,8 +75,17 @@ export type LastActivity =
 export type SessionStats = {
   /** ONGEWIJZIGD: krachtsessies all-time. Build 82 en ouder lezen dit veld. */
   total: number
-  /** Kracht plus cardio, maandag tot en met zondag in NL-tijd. */
-  week: { count: number; seconds: number }
+  /**
+   * Maandag tot en met zondag in NL-tijd. `count` en `seconds` zijn de som van
+   * beide soorten; de splitsing staat erbij omdat "2 kracht 1 cardio" op de
+   * tegel meer zegt dan een all-time teller die alleen maar oploopt.
+   */
+  week: {
+    count: number
+    seconds: number
+    strength: number
+    cardio: number
+  }
   /** Kracht plus cardio, all-time. */
   allTime: { count: number }
   last: LastActivity | null
@@ -220,6 +229,8 @@ export async function computeSessionStats(
     week: {
       count: weekKracht._count._all + weekCardio._count._all,
       seconds: (weekKracht._sum.duration ?? 0) + (weekCardio._sum.durationSec ?? 0),
+      strength: weekKracht._count._all,
+      cardio: weekCardio._count._all,
     },
     allTime: { count: total + cardioTotal },
     last: pickLastActivity(laatsteKracht, laatsteCardio),
