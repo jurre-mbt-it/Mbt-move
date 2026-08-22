@@ -6,6 +6,13 @@ datasource db {
   provider = "postgresql"
 }
 
+/// Taal van de gebruiker voor pushmeldingen en foutmeldingen. Gezet door de
+/// iOS-app (auth.setLocale); de website is Nederlands en raakt het niet.
+enum Locale {
+  NL
+  EN
+}
+
 enum UserRole {
   ADMIN
   THERAPIST
@@ -251,6 +258,7 @@ model User {
   /// Persoonlijke weergavevoorkeuren. Alleen gebruikt als er geen praktijk is
   /// (losse coach); anders wint `Practice.uiPrefs`.
   uiPrefs        Json      @default("{}")
+  locale         Locale    @default(NL)
   avatarUrl      String?
   phone          String?
   dateOfBirth    DateTime?

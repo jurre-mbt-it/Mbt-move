@@ -42,6 +42,133 @@ export type WellnessToday = {
 
 export type ContributorStatus = 'above' | 'within' | 'below' | 'na'
 
+/**
+ * Taal van de teksten die dit bestand teruggeeft (label, description,
+ * narrative, contributor-labels). Geen i18next hier: het bestand is bewust
+ * dependency-vrij zodat client en server dezelfde wiskunde delen. De caller
+ * geeft de taal van de lézer mee; de web-app blijft Nederlands.
+ */
+export type ReadinessLocale = 'nl' | 'en'
+
+type ReadinessText = {
+  contributor: Record<'hrv' | 'rhr' | 'respiratory' | 'wristTemp' | 'sleep' | 'wellness', string>
+  learningLabel: string
+  learning: (nights: number) => string
+  bands: Record<'green' | 'amber' | 'red' | 'illness', { label: string; description: string }>
+  narrative: {
+    sameAs: (baseline: number) => string
+    deviation: (pct: number, higher: boolean, baseline: number) => string
+    hrvPart: (value: number, dev: string) => string
+    rhrPart: (value: number, dev: string) => string
+    lead: (parts: string) => string
+    join: string
+    fallback: string
+    respiratory: (value: number, higher: boolean, baseline: number) => string
+    illness: string
+  }
+}
+
+const TEXT: Record<ReadinessLocale, ReadinessText> = {
+  nl: {
+    contributor: {
+      hrv: 'HRV',
+      rhr: 'Rust-HR',
+      respiratory: 'Ademhaling',
+      wristTemp: 'Huidtemp.',
+      sleep: 'Slaap',
+      wellness: 'Welzijn',
+    },
+    learningLabel: 'Baseline leren',
+    learning: (n: number) =>
+      `Nog ${n} ${n === 1 ? 'nacht' : 'nachten'} te gaan voordat je readiness betrouwbaar is. Draag je watch \u2019s nachts om je persoonlijke normaal op te bouwen.`,
+    bands: {
+      green: {
+        label: 'Klaar om te trainen',
+        description:
+          'Je herstel-signalen zitten op of boven je normaal. Een goed moment voor je geplande opbouw of een zwaardere sessie.',
+      },
+      amber: {
+        label: 'Onderhoud',
+        description:
+          'Enkele signalen zitten onder je normaal. Train op onderhoudsniveau, houd intensiteit gelijk en let op techniek en mobiliteit.',
+      },
+      red: {
+        label: 'Herstel aanbevolen',
+        description:
+          'Meerdere signalen zitten duidelijk onder je normaal. Plan actief herstel of een deload en bouw belasting pas weer op als je readiness herstelt.',
+      },
+      illness: {
+        label: 'Mogelijk ziek, rust',
+        description:
+          'Verhoogde ademhaling \u00e9n temperatuur-afwijking wijzen op een mogelijke infectie. Kies voor rust of licht actief herstel en overleg met je therapeut.',
+      },
+    },
+    narrative: {
+      sameAs: (baseline: number) => `gelijk aan je gemiddelde van ${baseline}`,
+      deviation: (pct: number, higher: boolean, baseline: number) =>
+        `${pct}% ${higher ? 'hoger' : 'lager'} dan je gemiddelde van ${baseline}`,
+      hrvPart: (value: number, dev: string) => `je HRV tijdens de slaap van ${value} ms (${dev} ms)`,
+      rhrPart: (value: number, dev: string) => `een rust-hartslag van ${value} bpm (${dev} bpm)`,
+      lead: (parts: string) => `Je herstelscore is vooral gebaseerd op ${parts}.`,
+      join: ' en ',
+      fallback:
+        'Je herstelscore is gebaseerd op je HRV, rust-hartslag en slaap. Zodra je watch meer nachten heeft gemeten, wordt deze uitleg specifieker.',
+      respiratory: (value: number, higher: boolean, baseline: number) =>
+        ` Je ademhaling ligt met ${value}/min ${higher ? 'hoger' : 'lager'} dan je normaal van ${baseline}/min.`,
+      illness: ' Let op: een verhoogde ademhaling \u00e9n huidtemperatuur kunnen op een opkomende infectie wijzen.',
+    },
+  },
+  en: {
+    contributor: {
+      hrv: 'HRV',
+      rhr: 'Resting HR',
+      respiratory: 'Breathing',
+      wristTemp: 'Skin temp.',
+      sleep: 'Sleep',
+      wellness: 'Wellbeing',
+    },
+    learningLabel: 'Learning your baseline',
+    learning: (n: number) =>
+      `${n} more ${n === 1 ? 'night' : 'nights'} to go before your readiness is reliable. Wear your watch at night to build up your personal normal.`,
+    bands: {
+      green: {
+        label: 'Ready to train',
+        description:
+          'Your recovery signals are at or above your normal. A good moment for your planned build-up or a harder session.',
+      },
+      amber: {
+        label: 'Maintain',
+        description:
+          'Some signals are below your normal. Train at maintenance level, keep the intensity the same and watch your technique and mobility.',
+      },
+      red: {
+        label: 'Recovery advised',
+        description:
+          'Several signals are clearly below your normal. Plan active recovery or a deload, and build load back up once your readiness recovers.',
+      },
+      illness: {
+        label: 'Possibly ill, rest',
+        description:
+          'A raised breathing rate and a temperature deviation point to a possible infection. Choose rest or light active recovery and check in with your therapist.',
+      },
+    },
+    narrative: {
+      sameAs: (baseline: number) => `the same as your average of ${baseline}`,
+      deviation: (pct: number, higher: boolean, baseline: number) =>
+        `${pct}% ${higher ? 'higher' : 'lower'} than your average of ${baseline}`,
+      hrvPart: (value: number, dev: string) => `your HRV during sleep of ${value} ms (${dev} ms)`,
+      rhrPart: (value: number, dev: string) => `a resting heart rate of ${value} bpm (${dev} bpm)`,
+      lead: (parts: string) => `Your recovery score is mainly based on ${parts}.`,
+      join: ' and ',
+      fallback:
+        'Your recovery score is based on your HRV, resting heart rate and sleep. Once your watch has measured more nights, this explanation gets more specific.',
+      respiratory: (value: number, higher: boolean, baseline: number) =>
+        ` Your breathing rate is ${value}/min, ${higher ? 'higher' : 'lower'} than your usual ${baseline}/min.`,
+      illness: ' Note: a raised breathing rate together with a raised skin temperature can point to an infection coming on.',
+    },
+  },
+}
+
 export type Contributor = {
   key: 'hrv' | 'rhr' | 'sleep' | 'respiratory' | 'wristTemp' | 'wellness'
   label: string
@@ -93,13 +220,16 @@ const WEIGHTS = {
  * @param sleep   slaapscores per nacht.
  * @param wellness vandaag's subjectieve check (of null).
  * @param today   'yyyy-mm-dd' van de te scoren dag (default: laatste vitals-dag).
+ * @param locale  taal van de teksten (default Nederlands; de web-app laat 'm leeg).
  */
 export function computeReadiness(
   vitals: VitalsDay[],
   sleep: SleepDay[],
   wellness: WellnessToday,
   today?: string,
+  locale: ReadinessLocale = 'nl',
 ): ReadinessResult {
+  const T = TEXT[locale] ?? TEXT.nl
   const byDateAsc = [...vitals].sort((a, b) => a.date.localeCompare(b.date))
   const targetDate = today ?? byDateAsc[byDateAsc.length - 1]?.date ?? null
 
@@ -121,7 +251,7 @@ export function computeReadiness(
   const todayLn = lnHrv(todayVitals?.hrv ?? null)
   const hrv = contributorFromDeviation({
     key: 'hrv',
-    label: 'HRV',
+    label: T.contributor.hrv,
     today: todayLn,
     mean: hrvMean,
     sd: hrvSd,
@@ -137,7 +267,7 @@ export function computeReadiness(
   const priorRhr = prior.map(v => v.restingHeartRate).filter((x): x is number => x != null)
   const rhr = contributorFromDeviation({
     key: 'rhr',
-    label: 'Rust-HR',
+    label: T.contributor.rhr,
     today: todayVitals?.restingHeartRate ?? null,
     mean: mean(priorRhr.slice(-BASELINE_WINDOW)),
     sd: sd(priorRhr.slice(-NORMAL_WINDOW)),
@@ -153,7 +283,7 @@ export function computeReadiness(
   const priorResp = prior.map(v => v.respiratoryRate).filter((x): x is number => x != null)
   const respiratory = contributorFromDeviation({
     key: 'respiratory',
-    label: 'Ademhaling',
+    label: T.contributor.respiratory,
     today: todayVitals?.respiratoryRate ?? null,
     mean: mean(priorResp.slice(-BASELINE_WINDOW)),
     sd: sd(priorResp.slice(-NORMAL_WINDOW)),
@@ -169,7 +299,7 @@ export function computeReadiness(
   const tempDev = todayVitals?.wristTempDeviation ?? null
   const wristTemp: Contributor = {
     key: 'wristTemp',
-    label: 'Huidtemp.',
+    label: T.contributor.wristTemp,
     value: tempDev,
     baseline: 0,
     weight: WEIGHTS.wristTemp,
@@ -191,7 +321,7 @@ export function computeReadiness(
   const sleepMean = mean(priorSleep.slice(-BASELINE_WINDOW))
   const sleepContrib: Contributor = {
     key: 'sleep',
-    label: 'Slaap',
+    label: T.contributor.sleep,
     value: lastSleep,
     baseline: sleepMean != null ? Math.round(sleepMean) : null,
     weight: WEIGHTS.sleep,
@@ -212,16 +342,14 @@ export function computeReadiness(
 
   // --- LEARNING-gate ---
   if (baselineNights < MIN_BASELINE_NIGHTS) {
-    const learningText = `Nog ${MIN_BASELINE_NIGHTS - baselineNights} ${
-      MIN_BASELINE_NIGHTS - baselineNights === 1 ? 'nacht' : 'nachten'
-    } te gaan voordat je readiness betrouwbaar is. Draag je watch ’s nachts om je persoonlijke normaal op te bouwen.`
+    const learningText = T.learning(MIN_BASELINE_NIGHTS - baselineNights)
     return {
       score: null,
       band: 'LEARNING',
-      label: 'Baseline leren',
+      label: T.learningLabel,
       description: learningText,
       narrative: learningText,
-      contributors: withWellness(physioContribs, wellness),
+      contributors: withWellness(physioContribs, wellness, T),
       baselineNights,
       illnessFlag: false,
     }
@@ -233,7 +361,7 @@ export function computeReadiness(
   const physio = Math.round(avail.reduce((a, c) => a + (c.points ?? 0) * c.weight, 0) / wSum)
 
   // --- Wellness als neerwaartse override ---
-  const wellnessContrib = wellnessContributor(wellness)
+  const wellnessContrib = wellnessContributor(wellness, T)
   let score = physio
   if (wellnessContrib.points != null) {
     const blend = Math.round(physio * 0.65 + wellnessContrib.points * 0.35)
@@ -255,13 +383,13 @@ export function computeReadiness(
   let band = bandFromScore(score)
   if (illnessFlag && band !== 'RED') band = 'RED'
 
-  const meta = bandMeta(band, illnessFlag)
+  const meta = bandMeta(band, illnessFlag, T)
   return {
     score,
     band,
     label: meta.label,
     description: meta.description,
-    narrative: buildNarrative(physioContribs, illnessFlag),
+    narrative: buildNarrative(physioContribs, illnessFlag, T),
     contributors: [...physioContribs, wellnessContrib],
     baselineNights,
     illnessFlag,
@@ -308,15 +436,15 @@ function contributorFromDeviation(args: {
   }
 }
 
-function wellnessContributor(w: WellnessToday): Contributor {
+function wellnessContributor(w: WellnessToday, T: ReadinessText): Contributor {
   if (!w) {
-    return { key: 'wellness', label: 'Welzijn', value: null, baseline: null, weight: 0, status: 'na', points: null }
+    return { key: 'wellness', label: T.contributor.wellness, value: null, baseline: null, weight: 0, status: 'na', points: null }
   }
   const total = w.sleep + w.soreness + w.fatigue + w.mood + w.stress // 5-25
   const pct = Math.round(((total - 5) / 20) * 100)
   return {
     key: 'wellness',
-    label: 'Welzijn',
+    label: T.contributor.wellness,
     value: pct,
     baseline: null,
     weight: 0, // telt niet mee in de fysio-som; werkt als override
@@ -325,8 +453,8 @@ function wellnessContributor(w: WellnessToday): Contributor {
   }
 }
 
-function withWellness(contribs: Contributor[], w: WellnessToday): Contributor[] {
-  return [...contribs, wellnessContributor(w)]
+function withWellness(contribs: Contributor[], w: WellnessToday, T: ReadinessText): Contributor[] {
+  return [...contribs, wellnessContributor(w, T)]
 }
 
 /** Procentuele afwijking van een waarde t.o.v. baseline (afgerond). */
@@ -340,37 +468,34 @@ function pctDiff(value: number, baseline: number): number {
  * met hun exacte afwijking t.o.v. de eigen baseline (Athlytic-stijl), en voegt
  * ademhaling/ziekte-signaal alleen toe als die duidelijk afwijken.
  */
-function buildNarrative(contribs: Contributor[], illness: boolean): string {
+function buildNarrative(contribs: Contributor[], illness: boolean, T: ReadinessText): string {
   const by = (k: Contributor['key']) => contribs.find(c => c.key === k)
-  const deviation = (c: Contributor | undefined, higherWord: string, lowerWord: string): string | null => {
+  const deviation = (c: Contributor | undefined): string | null => {
     if (!c || c.value == null || c.baseline == null) return null
     const p = pctDiff(c.value, c.baseline)
-    if (p === 0) return `gelijk aan je gemiddelde van ${c.baseline}`
-    return `${Math.abs(p)}% ${p > 0 ? higherWord : lowerWord} dan je gemiddelde van ${c.baseline}`
+    if (p === 0) return T.narrative.sameAs(c.baseline)
+    return T.narrative.deviation(Math.abs(p), p > 0, c.baseline)
   }
 
   const parts: string[] = []
   const hrv = by('hrv')
-  const hrvDev = deviation(hrv, 'hoger', 'lager')
-  if (hrv?.value != null && hrvDev) parts.push(`je HRV tijdens de slaap van ${hrv.value} ms (${hrvDev} ms)`)
+  const hrvDev = deviation(hrv)
+  if (hrv?.value != null && hrvDev) parts.push(T.narrative.hrvPart(hrv.value, hrvDev))
 
   const rhr = by('rhr')
-  const rhrDev = deviation(rhr, 'hoger', 'lager')
-  if (rhr?.value != null && rhrDev) parts.push(`een rust-hartslag van ${rhr.value} bpm (${rhrDev} bpm)`)
+  const rhrDev = deviation(rhr)
+  if (rhr?.value != null && rhrDev) parts.push(T.narrative.rhrPart(rhr.value, rhrDev))
 
-  let s =
-    parts.length === 0
-      ? 'Je herstelscore is gebaseerd op je HRV, rust-hartslag en slaap. Zodra je watch meer nachten heeft gemeten, wordt deze uitleg specifieker.'
-      : `Je herstelscore is vooral gebaseerd op ${parts.join(' en ')}.`
+  let s = parts.length === 0 ? T.narrative.fallback : T.narrative.lead(parts.join(T.narrative.join))
 
   // Ademhaling alleen noemen als ze duidelijk afwijkt (≥1/min).
   const resp = by('respiratory')
   if (resp?.value != null && resp.baseline != null && Math.abs(resp.value - resp.baseline) >= 1) {
     const p = pctDiff(resp.value, resp.baseline)
-    s += ` Je ademhaling ligt met ${resp.value}/min ${p > 0 ? 'hoger' : 'lager'} dan je normaal van ${resp.baseline}/min.`
+    s += T.narrative.respiratory(resp.value, p > 0, resp.baseline)
   }
   if (illness) {
-    s += ' Let op: een verhoogde ademhaling én huidtemperatuur kunnen op een opkomende infectie wijzen.'
+    s += T.narrative.illness
   }
   return s
 }
@@ -381,27 +506,20 @@ function bandFromScore(score: number): ReadinessBandKey {
   return 'RED'
 }
 
-function bandMeta(band: ReadinessBandKey, illness: boolean): { label: string; description: string } {
+function bandMeta(
+  band: ReadinessBandKey,
+  illness: boolean,
+  T: ReadinessText,
+): { label: string; description: string } {
   switch (band) {
     case 'GREEN':
-      return {
-        label: 'Klaar om te trainen',
-        description: 'Je herstel-signalen zitten op of boven je normaal. Een goed moment voor je geplande opbouw of een zwaardere sessie.',
-      }
+      return { ...T.bands.green }
     case 'AMBER':
-      return {
-        label: 'Onderhoud',
-        description: 'Enkele signalen zitten onder je normaal. Train op onderhoudsniveau, houd intensiteit gelijk en let op techniek en mobiliteit.',
-      }
+      return { ...T.bands.amber }
     case 'RED':
-      return {
-        label: illness ? 'Mogelijk ziek, rust' : 'Herstel aanbevolen',
-        description: illness
-          ? 'Verhoogde ademhaling én temperatuur-afwijking wijzen op een mogelijke infectie. Kies voor rust of licht actief herstel en overleg met je therapeut.'
-          : 'Meerdere signalen zitten duidelijk onder je normaal. Plan actief herstel of een deload en bouw belasting pas weer op als je readiness herstelt.',
-      }
+      return illness ? { ...T.bands.illness } : { ...T.bands.red }
     default:
-      return { label: 'Baseline leren', description: '' }
+      return { label: T.learningLabel, description: '' }
   }
 }
 

@@ -15,8 +15,11 @@ export async function notifyNewSchedule(patientId: string): Promise<void> {
   await sendPush(
     patientId,
     {
-      title: 'Nieuw schema',
-      body: 'Je therapeut heeft je oefeningen voor de komende periode klaargezet.',
+      title: { nl: 'Nieuw schema', en: 'New schedule' },
+      body: {
+        nl: 'Je therapeut heeft je oefeningen voor de komende periode klaargezet.',
+        en: 'Your therapist has set up your exercises for the coming period.',
+      },
       data: { type: 'schedule' },
     },
     'schedule',
@@ -28,8 +31,11 @@ export async function notifyTrainingToday(patientId: string): Promise<void> {
   await sendPush(
     patientId,
     {
-      title: 'Je training van vandaag',
-      body: 'Je hebt vandaag een training op het programma staan. Consistentie is enorm belangrijk voor je herstel en progressie.',
+      title: { nl: 'Je training van vandaag', en: 'Your training for today' },
+      body: {
+        nl: 'Je hebt vandaag een training op het programma staan. Consistentie is enorm belangrijk voor je herstel en progressie.',
+        en: 'You have a training session on the program today. Consistency matters a lot for your recovery and progress.',
+      },
       data: { type: 'reminder-training' },
     },
     'reminder',
@@ -42,12 +48,18 @@ export async function notifyRecovery(patientId: string, level: 'good' | 'low'): 
   const msg =
     level === 'good'
       ? {
-          title: 'Je bent goed hersteld',
-          body: 'Je slaap en herstel zien er goed uit vandaag. Een prima dag om iets steviger te trainen.',
+          title: { nl: 'Je bent goed hersteld', en: 'You are well recovered' },
+          body: {
+            nl: 'Je slaap en herstel zien er goed uit vandaag. Een prima dag om iets steviger te trainen.',
+            en: 'Your sleep and recovery look good today. A good day to train a bit harder.',
+          },
         }
       : {
-          title: 'Je herstel is wat lager',
-          body: 'Je lichaam heeft nog wat herstel nodig. Houd je training vandaag rustiger aan en geef je herstel de ruimte.',
+          title: { nl: 'Je herstel is wat lager', en: 'Your recovery is a bit lower' },
+          body: {
+            nl: 'Je lichaam heeft nog wat herstel nodig. Houd je training vandaag rustiger aan en geef je herstel de ruimte.',
+            en: 'Your body still needs some recovery. Keep today’s training easier and give recovery the room it needs.',
+          },
         }
   await sendPush(patientId, { ...msg, data: { type: 'recovery', level } }, 'insight')
 }
@@ -57,8 +69,11 @@ export async function notifyLoadWarning(patientId: string): Promise<void> {
   await sendPush(
     patientId,
     {
-      title: 'Let op je opbouw',
-      body: 'Je belasting loopt deze week flink op. Let goed op je herstel, zo blijf je klachtenvrij opbouwen.',
+      title: { nl: 'Let op je opbouw', en: 'Watch your build-up' },
+      body: {
+        nl: 'Je belasting loopt deze week flink op. Let goed op je herstel, zo blijf je klachtenvrij opbouwen.',
+        en: 'Your load is climbing fast this week. Pay close attention to your recovery so you keep building up without complaints.',
+      },
       data: { type: 'load' },
     },
     'insight',
@@ -70,8 +85,11 @@ export async function notifyRehabCriterion(patientId: string): Promise<void> {
   await sendPush(
     patientId,
     {
-      title: 'Criterium behaald',
-      body: 'Je hebt een doel behaald. Mooi werk, je bent weer een stap verder in je herstel!',
+      title: { nl: 'Criterium behaald', en: 'Criterion achieved' },
+      body: {
+        nl: 'Je hebt een doel behaald. Mooi werk, je bent weer een stap verder in je herstel!',
+        en: 'You reached a goal. Nice work, you are another step further in your recovery!',
+      },
       data: { type: 'rehab-criterion' },
     },
     'insight',

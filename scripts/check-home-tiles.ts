@@ -38,7 +38,7 @@ async function main() {
   const ht = await import(path.join(MOBILE, 'lib', 'home-tiles.ts'))
   const {
     CARDIO_LABEL, dayLabel, formatSessionDuration, formatWeekDuration,
-    lastActivityName, lastActivitySub, weekSub,
+    lastActivityDetails, lastActivityName, lastActivitySub, lastActivityTitle, weekSub,
   } = ht
 
   const nu = new Date('2026-08-21T17:39:00+02:00')
@@ -91,18 +91,33 @@ async function main() {
     assert.equal(CARDIO_LABEL.CYCLING, 'Fietsen')
   })
 
-  check('subregel krachtsessie', () => {
-    assert.equal(lastActivitySub(sessie), 'Schema B · 8 oef · 79 min')
-    assert.equal(lastActivitySub({ ...sessie, exerciseCount: 1 }), 'Schema B · 1 oef · 79 min')
+  // De tegel toont twee regels: wélke training ("Kracht · Schema B") en
+  // daaronder de cijfers. Een programmanaam zegt niet of je hebt getild of
+  // gefietst, dus noemt de titel de soort erbij.
+  check('titel krachtsessie noemt de soort', () => {
+    assert.equal(lastActivityTitle(sessie), 'Kracht · Schema B')
+    assert.equal(lastActivityTitle({ ...sessie, programName: null }), 'Kracht')
+    assert.equal(lastActivityTitle(sessie, 'en'), 'Strength · Schema B')
   })
 
-  check('subregel cardio', () => {
+  check('titel cardio is de activiteit', () => {
+    assert.equal(lastActivityTitle(rit), 'Hardlopen')
+    assert.equal(lastActivityTitle(rit, 'en'), 'Running')
+    assert.equal(lastActivityTitle({ ...rit, activity: 'ONBEKEND' }), 'Cardio')
+  })
+
+  check('cijferregel', () => {
+    assert.equal(lastActivityDetails(sessie), '8 oef · 79 min')
+    assert.equal(lastActivityDetails({ ...sessie, exerciseCount: 1 }), '1 oef · 79 min')
+    assert.equal(lastActivityDetails(rit), '40 min')
+    assert.equal(lastActivityDetails({ ...sessie, durationSec: null }), '8 oef')
+    assert.equal(lastActivityDetails({ ...sessie, exerciseCount: 0, durationSec: null }), '')
+  })
+
+  check('subregel op één regel plakt titel en cijfers aan elkaar', () => {
+    assert.equal(lastActivitySub(sessie), 'Kracht · Schema B · 8 oef · 79 min')
     assert.equal(lastActivitySub(rit), 'Hardlopen · 40 min')
-  })
-
-  check('subregel laat lege delen weg', () => {
-    assert.equal(lastActivitySub({ ...sessie, durationSec: null }), 'Schema B · 8 oef')
-    assert.equal(lastActivitySub({ ...sessie, exerciseCount: 0, durationSec: null }), 'Schema B')
+    assert.equal(lastActivitySub({ ...sessie, exerciseCount: 0, durationSec: null }), 'Kracht · Schema B')
   })
 
   console.log('\nweek-subregel')
@@ -140,7 +155,7 @@ async function main() {
     )
     assert.ok(vanServer, 'server gaf null terug')
     assert.equal(lastActivityName(vanServer), 'Schema B')
-    assert.equal(lastActivitySub(vanServer), 'Schema B · 8 oef · 79 min')
+    assert.equal(lastActivitySub(vanServer), 'Kracht · Schema B · 8 oef · 79 min')
     assert.equal(dayLabel(vanServer.completedAt, nu), 'VANDAAG')
   })
 

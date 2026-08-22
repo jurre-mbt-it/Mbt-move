@@ -165,8 +165,11 @@ export const pushRouter = createTRPCRouter({
     const result = await deliverToTokens(
       tokens.map((t) => t.token),
       {
-        title: 'Testmelding',
-        body: 'Als je dit ziet, komen pushmeldingen aan op dit toestel.',
+        title: ctx.user.locale === 'EN' ? 'Test notification' : 'Testmelding',
+        body:
+          ctx.user.locale === 'EN'
+            ? 'If you can see this, push notifications reach this device.'
+            : 'Als je dit ziet, komen pushmeldingen aan op dit toestel.',
         data: { type: 'test' },
       },
     )

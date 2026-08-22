@@ -9,6 +9,7 @@
 import type { PrismaClient } from '@prisma/client'
 import {
   computeReadiness,
+  type ReadinessLocale,
   type ReadinessResult,
   type SleepDay,
   type VitalsDay,
@@ -63,12 +64,16 @@ function startOfDay(d = new Date()): Date {
  * minimaal READINESS_HISTORY_DAYS terug dekkend) — de wearables-router geeft
  * die mee zodat dezelfde tabellen niet dubbel gelezen worden. Het datumvenster
  * wordt hier alsnog toegepast, dus een ruimere set is prima.
+ *
+ * `locale`: taal van de LEZER (niet van de patiënt) voor de uitleg-teksten.
+ * De iOS-app zet 'm via `User.locale`; de web-app laat 'm leeg en blijft NL.
  */
 export async function computeReadinessFor(
   prisma: Db,
   userId: string,
   date: Date = new Date(),
   preloaded?: { vitals: ReadinessVitalsRow[]; sleep: ReadinessSleepRow[] },
+  locale: ReadinessLocale = 'nl',
 ): Promise<ReadinessResult> {
   const target = startOfDay(date)
   const since = new Date(target)
@@ -131,7 +136,7 @@ export async function computeReadinessFor(
         : s.qualityScore,
   }))
 
-  return computeReadiness(vitals, sleep, wellness, isoDay(target))
+  return computeReadiness(vitals, sleep, wellness, isoDay(target), locale)
 }
 
 /** Bereken én bewaar de momentopname voor `date`. Idempotent (upsert op dag). */
