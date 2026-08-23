@@ -35,8 +35,17 @@ const URGENT_CATEGORIES: readonly PushCategory[] = ['message']
  */
 export { MORNING_PUSH_HOUR } from './timing'
 import { DEFAULT_QUIET_START, DEFAULT_QUIET_END } from './timing'
+import { pick, type Localized } from '@/server/i18n'
 
+/** Titel en tekst mogen in beide talen komen; `sendPush` kiest op `User.locale`. */
 export type PushMessage = {
+  title: Localized
+  body: Localized
+  data?: Record<string, unknown>
+}
+
+/** Wat er echt naar Expo en de in-app rij gaat: al in één taal. */
+export type ResolvedPushMessage = {
   title: string
   body: string
   data?: Record<string, unknown>
@@ -86,7 +95,15 @@ export async function sendPush(
     //    is onderdrukt (pushed: false) telt dan niet als "vandaag al verstuurd"
     //    en wordt bij de 09:00-run alsnog gepusht — voorheen blokkeerde zo'n
     //    stille rij de push voor de rest van de dag.
-    const prefs = await prisma.notificationPreference.findUnique({ where: { userId } })
+    const [prefs, user] = await Promise.all([
+      prisma.notificationPreference.findUnique({ where: { userId } }),
+      prisma.user.findUnique({ where: { id: userId }, select: { locale: true } }),
+    ])
+    const resolved: ResolvedPushMessage = {
+      title: pick(user?.locale, message.title),
+      body: pick(user?.locale, message.body),
+      data: message.data,
+    }
     let willPush = true
     if (prefs?.pushEnabled === false) willPush = false
     else if (prefs && !categoryEnabled(prefs.categories, category)) willPush = false
@@ -107,8 +124,8 @@ export async function sendPush(
       .create({
         data: {
           userId,
-          title: message.title,
-          body: message.body,
+          title: resolved.title,
+          body: resolved.body,
           type: `push.${category}`,
           data: { ...(message.data ?? {}), pushed: willPush } as Prisma.InputJsonValue,
         },
@@ -119,7 +136,7 @@ export async function sendPush(
     if (!willPush) return
     await deliverToTokens(
       tokens.map((t) => t.token),
-      message,
+      resolved,
     )
   } catch (err) {
     console.error('[push] sendPush faalde', { userId, category, err })
@@ -148,7 +165,7 @@ export type DeliveryResult = {
  */
 export async function deliverToTokens(
   tokens: string[],
-  message: PushMessage,
+  message: ResolvedPushMessage,
 ): Promise<DeliveryResult> {
   const empty: DeliveryResult = {
     attempted: tokens.length,

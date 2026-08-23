@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/server'
 import { DPA_VERSION } from '@/lib/dpa-constants'
 import { decodeAalClaim } from '@/lib/auth/aal'
 import { HIGH_VALUE_ROLES } from '@/server/lib/identity'
+import { translateErrorMessage } from '@/server/i18n/error-messages'
+import type { Locale } from '@/server/i18n'
 
 export interface Context {
   req?: NextRequest
@@ -19,6 +21,8 @@ export interface Context {
     supabaseUserId: string
     mfaEnabled: boolean
     dpaAcceptedVersion: string | null
+    /** Taal voor pushmeldingen en foutmeldingen; zie src/server/i18n. */
+    locale: Locale
   } | null
   /** Assurance level uit de `aal`-claim van de sessie-JWT ('aal1'|'aal2'|null).
    *  'aal2' = tweede factor (TOTP) is deze sessie daadwerkelijk doorlopen. */
@@ -59,13 +63,13 @@ export function invalidateUserCache(supabaseUserId: string) {
 async function resolveUser(supabaseUserId: string, email: string) {
   const byUuid = await prisma.user.findUnique({
     where: { supabaseUserId },
-    select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true, mfaEnabled: true, dpaAcceptedVersion: true },
+    select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true, mfaEnabled: true, dpaAcceptedVersion: true, locale: true },
   })
   if (byUuid) return byUuid
 
   const byEmail = await prisma.user.findUnique({
     where: { email },
-    select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true, mfaEnabled: true, dpaAcceptedVersion: true },
+    select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true, mfaEnabled: true, dpaAcceptedVersion: true, locale: true },
   })
   if (!byEmail) return null
   if (byEmail.supabaseUserId && byEmail.supabaseUserId !== supabaseUserId) {
@@ -108,7 +112,7 @@ async function resolveUser(supabaseUserId: string, email: string) {
       const updated = await prisma.user.update({
         where: { id: byEmail.id },
         data: { supabaseUserId },
-        select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true, mfaEnabled: true, dpaAcceptedVersion: true },
+        select: { id: true, email: true, role: true, practiceId: true, supabaseUserId: true, mfaEnabled: true, dpaAcceptedVersion: true, locale: true },
       })
       return updated
     } catch {
@@ -174,6 +178,7 @@ export async function createTRPCContext(opts: { req?: NextRequest }): Promise<Co
             supabaseUserId: dbUser.supabaseUserId,
             mfaEnabled: dbUser.mfaEnabled,
             dpaAcceptedVersion: dbUser.dpaAcceptedVersion,
+            locale: dbUser.locale,
           }
           userCache.set(supabaseUser.id, { user, expiresAt: Date.now() + USER_CACHE_TTL })
         }
@@ -192,9 +197,13 @@ export async function createTRPCContext(opts: { req?: NextRequest }): Promise<Co
 }
 
 const t = initTRPC.context<Context>().create({
-  errorFormatter({ shape, error }) {
+  errorFormatter({ shape, error, ctx }) {
+    // Engelse gebruiker (iOS-app): statische Nederlandse meldingen vertalen.
+    // Nederlands blijft letterlijk wat de throw-site zei.
+    const message = ctx?.user?.locale === 'EN' ? translateErrorMessage(shape.message) : shape.message
     return {
       ...shape,
+      message,
       data: {
         ...shape.data,
         zodError: error.cause instanceof ZodError ? error.cause.flatten() : null,

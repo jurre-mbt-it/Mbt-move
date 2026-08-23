@@ -43,8 +43,8 @@ async function notifyNewMessage(
         sendPush(
           t.therapistId,
           {
-            title: 'Nieuw bericht',
-            body: 'Je hebt een nieuw bericht van een atleet.',
+            title: { nl: 'Nieuw bericht', en: 'New message' },
+            body: { nl: 'Je hebt een nieuw bericht van een atleet.', en: 'You have a new message from an athlete.' },
             data: { type: 'message', route: '/messages', patientId: opts.patientId },
           },
           'message',
@@ -56,8 +56,11 @@ async function notifyNewMessage(
     await sendPush(
       opts.patientId,
       {
-        title: 'Bericht van je therapeut',
-        body: 'Je therapeut heeft je een bericht gestuurd. Open de app om te reageren.',
+        title: { nl: 'Bericht van je therapeut', en: 'Message from your therapist' },
+        body: {
+          nl: 'Je therapeut heeft je een bericht gestuurd. Open de app om te reageren.',
+          en: 'Your therapist sent you a message. Open the app to reply.',
+        },
         data: { type: 'message', route: '/messages' },
       },
       'message',

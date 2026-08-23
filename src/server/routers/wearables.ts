@@ -9,6 +9,15 @@ import {
   assertStaffMfaEnrolled,
 } from '@/server/trpc'
 import { computeReadinessFor, READINESS_HISTORY_DAYS } from '@/server/readiness'
+import type { ReadinessLocale } from '@/lib/readiness'
+
+/**
+ * Taal van de teksten in het overzicht: die van de LEZER, niet van de patiënt.
+ * Een Engelse therapeut die een Nederlandse patiënt bekijkt leest Engels.
+ */
+function readerLocale(user: { locale?: unknown } | null | undefined): ReadinessLocale {
+  return typeof user?.locale === 'string' && user.locale.toUpperCase() === 'EN' ? 'en' : 'nl'
+}
 import { exertionScore } from '@/lib/exertion'
 import { wearablesEnabledForRole } from '@/lib/wearables-access'
 import { auditLog } from '@/server/audit'
@@ -95,7 +104,7 @@ function isoDay(d: Date): string {
  * geen superjson-transformer, dus Date-velden komen toch als string binnen —
  * door hier te serialiseren matchen het afgeleide type en de runtime-waarde.
  */
-async function buildOverview(prisma: PrismaClient, userId: string) {
+async function buildOverview(prisma: PrismaClient, userId: string, locale: ReadinessLocale = 'nl') {
   const sleepSince = startOfDay()
   sleepSince.setDate(sleepSince.getDate() - SLEEP_DAYS)
   const vitalsSince = startOfDay()
@@ -148,7 +157,7 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
       select: { provider: true, deviceModel: true, enabled: true, lastSyncAt: true, connectedAt: true },
     }),
     Promise.all([vitalsPromise, sleepPromise]).then(([vitalsRows, sleepRows]) =>
-      computeReadinessFor(prisma, userId, new Date(), { vitals: vitalsRows, sleep: sleepRows }),
+      computeReadinessFor(prisma, userId, new Date(), { vitals: vitalsRows, sleep: sleepRows }, locale),
     ),
     sleepPromise,
     vitalsPromise,
@@ -290,10 +299,14 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
 
 export const wearablesRouter = createTRPCRouter({
   /** Volledig wearable-overzicht voor de ingelogde gebruiker. */
-  overview: wearablesProcedure.query(({ ctx }) => buildOverview(ctx.prisma, ctx.user!.id)),
+  overview: wearablesProcedure.query(({ ctx }) =>
+    buildOverview(ctx.prisma, ctx.user!.id, readerLocale(ctx.user)),
+  ),
 
   /** Alleen de readiness van vandaag (lichter, voor dashboard-tegel). */
-  readiness: wearablesProcedure.query(({ ctx }) => computeReadinessFor(ctx.prisma, ctx.user!.id)),
+  readiness: wearablesProcedure.query(({ ctx }) =>
+    computeReadinessFor(ctx.prisma, ctx.user!.id, new Date(), undefined, readerLocale(ctx.user)),
+  ),
 
   /** Verbindingsstatus (voor de instellingen / connect-flow). */
   connection: wearablesProcedure.query(async ({ ctx }) => {
@@ -618,6 +631,6 @@ export const wearablesRouter = createTRPCRouter({
           req: ctx.req,
         })
       }
-      return buildOverview(ctx.prisma as PrismaClient, input.patientId)
+      return buildOverview(ctx.prisma as PrismaClient, input.patientId, readerLocale(ctx.user))
     }),
 })

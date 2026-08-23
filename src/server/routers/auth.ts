@@ -80,6 +80,7 @@ export const authRouter = createTRPCRouter({
         restingHeartRate: true,
         lthr: true,
         mfaEnabled: true,
+        locale: true,
         createdAt: true,
         practiceId: true,
         practice: { select: { id: true, name: true } },
@@ -140,6 +141,23 @@ export const authRouter = createTRPCRouter({
         req: ctx.req,
       })
       return updated
+    }),
+
+  /**
+   * Taal van de gebruiker, gezet door de iOS-app bij inloggen en bij wisselen
+   * in Instellingen. Bepaalt de taal van pushmeldingen en foutmeldingen.
+   */
+  setLocale: protectedProcedure
+    .input(z.object({ locale: z.enum(['NL', 'EN']) }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.prisma.user.update({
+        where: { id: ctx.user.id },
+        data: { locale: input.locale },
+        select: { id: true },
+      })
+      // De context-cache (60 s) zou anders nog even de oude taal gebruiken.
+      invalidateUserCache(ctx.user.supabaseUserId)
+      return { locale: input.locale }
     }),
 
   updateProfile: protectedProcedure
