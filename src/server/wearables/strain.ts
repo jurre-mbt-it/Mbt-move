@@ -37,23 +37,34 @@ export function trimpOfMeasurement(
 }
 
 /**
- * Strain 0-100 voor een training op `date`, of null zonder genoeg
- * referentiedagen. `date` is de dag van de training zelf; die telt bewust niet
- * mee in zijn eigen anker, net als bij de dagbelasting.
+ * Strain van de training én de dagbelasting van diezelfde dag, allebei 0-100.
+ *
+ * Samen opgehaald omdat ze samen gelezen worden ("deze training 5,1 van je
+ * 6,3 vandaag") en omdat ze dan gegarandeerd op dezelfde referentiedagen
+ * geankerd zijn. Twee losse aanroepen zouden dat per ongeluk uit elkaar kunnen
+ * laten lopen.
+ *
+ * `date` is de dag van de training zelf; die telt bewust niet mee in zijn
+ * eigen anker, precies zoals bij de dagbelasting.
  */
 export async function strainForMeasurement(
   prisma: Db,
   userId: string,
   date: Date,
   trimp: number | null,
-): Promise<number | null> {
-  if (trimp == null) return null
+): Promise<{ strain: number | null; dayStrain: number | null }> {
   const day = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
   const since = new Date(day.getTime() - REFERENCE_DAYS * 24 * 3600 * 1000)
-  const refs = await prisma.exertionEntry.findMany({
-    where: { userId, date: { gte: since, lt: day } },
+  const rows = await prisma.exertionEntry.findMany({
+    where: { userId, date: { gte: since, lte: day } },
     orderBy: { date: 'asc' },
-    select: { trimp: true },
+    select: { date: true, trimp: true },
   })
-  return sessionStrain(trimp, refs.map((r) => r.trimp))
+  // De dag zelf hoort niet in zijn eigen referentie.
+  const refs = rows.filter((r) => r.date.getTime() < day.getTime()).map((r) => r.trimp)
+  const today = rows.find((r) => r.date.getTime() === day.getTime())
+  return {
+    strain: trimp == null ? null : sessionStrain(trimp, refs),
+    dayStrain: today ? sessionStrain(today.trimp, refs) : null,
+  }
 }

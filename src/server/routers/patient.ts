@@ -2367,6 +2367,8 @@ export const patientRouter = createTRPCRouter({
         startAt: string
         trimp: number | null
         strain: number | null
+        /** Dagbelasting van dezelfde dag, als context bij de strain. */
+        dayStrain: number | null
       } | null = null
       if (meting) {
         const profile = await ctx.prisma.user.findUnique({
@@ -2374,6 +2376,9 @@ export const patientRouter = createTRPCRouter({
           select: { maxHeartRate: true, restingHeartRate: true, dateOfBirth: true },
         })
         const trimp = trimpOfMeasurement(meting, profile)
+        const { strain, dayStrain } = await strainForMeasurement(
+          ctx.prisma, ctx.user.id, meting.completedAt, trimp,
+        )
         measurement = {
           avgHeartRate: meting.avgHeartRate,
           maxHeartRate: meting.maxHeartRate,
@@ -2385,7 +2390,8 @@ export const patientRouter = createTRPCRouter({
           // `completedAt` is op CardioLog het STARTmoment van de meting.
           startAt: meting.completedAt.toISOString(),
           trimp,
-          strain: await strainForMeasurement(ctx.prisma, ctx.user.id, meting.completedAt, trimp),
+          strain,
+          dayStrain,
         }
       }
 

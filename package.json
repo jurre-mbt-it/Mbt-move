@@ -16,7 +16,8 @@
     "check:session-payload": "tsx scripts/check-session-payload.ts",
     "check:home-tiles": "tsx scripts/check-home-tiles.ts",
     "verify:home-tiles": "tsx --env-file=.env.local scripts/verify-home-tiles-live.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dedupe:cardio": "tsx scripts/dedupe-cardio-logs.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
