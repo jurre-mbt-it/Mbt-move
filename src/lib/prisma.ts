@@ -16,14 +16,29 @@ function createPrismaClient(): PrismaClient {
     // In productie bestaat dit pad niet (DATABASE_URL altijd gezet); dit is
     // puur build-time vangnet sinds Prisma v7 een lege `new PrismaClient()`
     // niet meer toestaat.
-    return new Proxy({} as PrismaClient, {
+    //
+    // "Pas bij de eerste DB-call" betekent dat de stub het OPBOUWEN van de
+    // client moet overleven. Hieronder draait `basePrisma.$extends(...)` op
+    // moduleniveau, en dat is zelf al een property-toegang: een stub die op
+    // álles gooit, gooit dus tijdens de import en nekt precies de build die hij
+    // moest redden. Dat gebeurde ook — elke preview-build (geen DATABASE_URL op
+    // die omgeving) viel om op "Failed to collect configuration for
+    // /api/auth/sync-user". Daarom laat de stub twee dingen door:
+    //   - `$extends` geeft de stub zelf terug, zodat de keten hierboven bouwt;
+    //   - symbolen en `then` geven undefined, zodat de stub geen thenable is en
+    //     een await of een console.log er niet op stukloopt.
+    // Alles wat naar een echte query ruikt gooit onverminderd hard.
+    const stub: PrismaClient = new Proxy({} as PrismaClient, {
       get(_target, prop) {
+        if (prop === '$extends') return () => stub
+        if (typeof prop === 'symbol' || prop === 'then') return undefined
         throw new Error(
           `[prisma] DATABASE_URL/DIRECT_URL ontbreekt, kan ${String(prop)} niet uitvoeren. ` +
           `Stel de env var in via Vercel project settings of .env.local.`
         )
       },
     })
+    return stub
   }
 
   // Supabase PgBouncer (transaction mode) vereist pgbouncer=true
