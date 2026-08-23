@@ -126,7 +126,10 @@ export async function computeLoadCurve(
     }),
     prisma.cardioLog.findMany({
       where: { patientId, completedAt: { gte: from } },
-      select: { completedAt: true, durationSec: true, rpe: true, timeInZones: true },
+      select: {
+        completedAt: true, durationSec: true, rpe: true, timeInZones: true,
+        sessionLogId: true,
+      },
     }),
   ])
 
@@ -150,10 +153,17 @@ export async function computeLoadCurve(
   let hrSessionCount = 0
   for (const c of cardio) {
     const dateIso = isoDay(c.completedAt)
-    cardioLoads.push({
-      date: dateIso,
-      load: sessionLoad(clampSessionDurationSec(c.durationSec) / 60, c.rpe),
-    })
+    // Gekoppeld aan een krachtsessie = dit ís die sessie, gemeten op de watch.
+    // De sRPE staat hierboven al bij `strengthLoads`; hem hier nog eens
+    // meetellen betekende dat één training twee keer in de curve zat. De TRIMP
+    // hieronder telt wél mee: dat is de gemeten hartslagbelasting van die dag,
+    // en die stond nergens anders.
+    if (c.sessionLogId == null) {
+      cardioLoads.push({
+        date: dateIso,
+        load: sessionLoad(clampSessionDurationSec(c.durationSec) / 60, c.rpe),
+      })
+    }
     // TRIMP alleen meetellen voor het zichtbare venster (niet de warm-up).
     if (dateIso >= windowStartIso) {
       const t = edwardsTrimp(c.timeInZones as Record<string, number> | null)
@@ -167,7 +177,9 @@ export async function computeLoadCurve(
   const strengthCount = sessions.filter(
     (s) => s.completedAt && isoDay(s.completedAt) >= windowStartIso,
   ).length
-  const cardioCount = cardio.filter((c) => isoDay(c.completedAt) >= windowStartIso).length
+  const cardioCount = cardio.filter(
+    (c) => c.sessionLogId == null && isoDay(c.completedAt) >= windowStartIso,
+  ).length
 
   // Vroegste log over beide modaliteiten (volledige fetch, incl. warm-up).
   let firstSessionAt: string | null = null

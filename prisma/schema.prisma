@@ -117,10 +117,14 @@ enum CardioActivity {
   SWIMMING
   CROSSTRAINER
   WALKING
+  HIKING
   SKIERG
   ASSAULT_BIKE
   WATTBIKE
   STAIRCLIMBER
+  STRENGTH
+  HIIT
+  YOGA
   OTHER
 }
 
@@ -868,6 +872,11 @@ model CardioLog {
   patient               User                 @relation(fields: [patientId], references: [id], onDelete: Cascade)
   patientId             String
   activity              CardioActivity
+  /// Het ruwe type van de bron ("hiking", "VirtualRide", "padel"). Onze enum
+  /// dekt alleen wat de app anders behandelt; alles daarbuiten landt op OTHER
+  /// en leest zijn naam hieruit. Zonder dit veld heet elke onbekende sport
+  /// "Cardio" en kost elke nieuwe sport een migratie.
+  sourceActivity        String?
   protocol              CardioProtocol
   durationSec           Int // seconds
   distanceM             Int? // meters
@@ -911,6 +920,15 @@ model CardioLog {
   // aangeleverde UUID mag nooit de rij van een ándere patiënt raken.
   source                WorkoutSource        @default(MANUAL)
   externalId            String?
+  /// De krachtsessie die deze meting beschrijft. Wie zijn oefeningen in de app
+  /// logt én op zijn horloge een workout start, legt dezelfde training twee
+  /// keer vast: hier de tijd en de hartslag, in SessionLog de sets en reps.
+  /// Ongekoppeld telden ze allebei mee in de belastingscurve. Gekoppeld is dit
+  /// de meting BIJ die sessie: geen eigen kaart, geen eigen sRPE, wel de
+  /// hartslagcurve en de strain op het detailscherm. Uniek — één meting hoort
+  /// bij hoogstens één sessie.
+  sessionLog            SessionLog?          @relation(fields: [sessionLogId], references: [id], onDelete: SetNull)
+  sessionLogId          String?              @unique
   completedAt           DateTime             @default(now())
   createdAt             DateTime             @default(now())
 
@@ -1247,12 +1265,16 @@ model SessionLog {
   exerciseLogs  ExerciseLog[]
   messages      Message[]
   hashtagUsages HashTagUsage[]
+  /// De wearable-meting van deze sessie, als de sporter ook een workout op zijn
+  /// horloge startte. Levert hartslagcurve, tijd-in-zone en strain.
+  cardioLog     CardioLog?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([therapistId])
   @@index([weekScheduleDayItemId])
+  @@index([patientId, completedAt])
   @@map("session_logs")
 }
 

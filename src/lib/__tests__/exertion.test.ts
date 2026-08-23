@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 
-import { exertionScore } from '../exertion'
+import { exertionScore, sessionStrain } from '../exertion'
 
 /**
  * Negen dagen op 100 AU en één op 200: de p90-index (floor(10 × 0,9) = 9)
@@ -48,5 +48,27 @@ describe('exertionScore', () => {
   it('blijft binnen 0-100 en geeft 0 bij een lege dag', () => {
     expect(exertionScore(0, REF_200)).toBe(0)
     expect(exertionScore(100_000, REF_200)).toBe(100)
+  })
+})
+
+describe('sessionStrain', () => {
+  // Dezelfde referentiedagen als hierboven: p90 = 200.
+  const REF = [...Array(9).fill(100), 200]
+
+  it('gebruikt hetzelfde anker als de dagbelasting', () => {
+    expect(sessionStrain(200, REF)).toBe(exertionScore(200, REF))
+    expect(sessionStrain(200, REF)).toBe(63)
+  })
+
+  it('leest lager dan de dag waar de training in zit', () => {
+    // Een training van 120 AU binnen een dag van 200 AU: de training kan nooit
+    // zwaarder lezen dan zijn eigen dag, want beide gaan door dezelfde curve.
+    const training = sessionStrain(120, REF)!
+    const dag = exertionScore(200, REF)!
+    expect(training).toBeLessThan(dag)
+  })
+
+  it('geeft null zonder genoeg referentiedagen', () => {
+    expect(sessionStrain(120, [100, 100, 100])).toBeNull()
   })
 })

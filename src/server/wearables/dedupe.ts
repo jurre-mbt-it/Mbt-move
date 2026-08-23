@@ -1,17 +1,24 @@
 /**
- * Cross-source ontdubbeling van gesyncte workouts.
+ * Ontdubbeling van gesyncte workouts.
  *
- * Dezelfde training kan via meerdere integraties binnenkomen (Apple Watch →
- * HealthKit-sync én dezelfde workout ge-upload naar Strava). Binnen één bron
- * dedupliceert (patientId, externalId), maar over bronnen heen verschillen de
- * externalId's. Twee workouts van dezelfde persoon kunnen niet tegelijk
- * plaatsvinden, dus significante tijd-overlap = zelfde training.
+ * Dezelfde training kan meerdere keren binnenkomen. Over bronnen heen is dat
+ * duidelijk (Apple Watch én dezelfde workout via Strava), maar het gebeurt óók
+ * binnen één bron: schrijft een tweede app zijn eigen workout in Apple Health
+ * naast die van de watch, dan levert HealthKit twee records met verschillende
+ * UUID's voor één training. Op één dag stonden er zo drie identieke wandelingen
+ * van 5 uur in de kalender, die alle drie meetelden in de belastingscurve.
+ *
+ * De check keek eerst alleen naar ánders-bronnige rijen (`source != nieuw`) en
+ * liet die drie dus staan. Nu kijkt hij naar alle gesyncte rijen. Dat is veilig:
+ * we komen hier alleen langs als er nog géén rij met dezelfde externalId
+ * bestond — een hersync van dezelfde workout wordt eerder al bijgewerkt.
  *
  * Regel: overlap van de tijdvensters ≥ 50% van de kortste duur, of starts
- * binnen 2 minuten met vergelijkbare duur. Handmatig gelogde cardio (source
- * MANUAL, geen externalId) laten we met rust — een handmatige log kan bewust
- * naast een watch-workout bestaan (bv. nagelogd met eigen RPE) en de
- * beoordeel-popup koppelt die al.
+ * binnen 2 minuten met vergelijkbare duur. Twee workouts van dezelfde persoon
+ * kunnen niet tegelijk plaatsvinden. Handmatig gelogde cardio (source MANUAL,
+ * geen externalId) laten we met rust — een handmatige log kan bewust naast een
+ * watch-workout bestaan (bv. nagelogd met eigen RPE) en de beoordeel-popup
+ * koppelt die al.
  */
 import type { PrismaClient } from '@prisma/client'
 
@@ -45,15 +52,14 @@ export function overlapsAsDuplicate(
 }
 
 /**
- * Zoek een bestaande gesyncte CardioLog van een ÁNDERE integratie die dezelfde
- * training beschrijft. Null = geen duplicaat.
+ * Zoek een bestaande gesyncte CardioLog die dezelfde training beschrijft,
+ * ongeacht de bron. Null = geen duplicaat.
  */
-export async function findCrossSourceDuplicate(
+export async function findDuplicate(
   prisma: Db,
   patientId: string,
   completedAt: Date,
   durationSec: number,
-  sourceOfNew: string,
 ): Promise<OverlapCandidate | null> {
   // Kandidaten binnen een ruim venster rond de workout (duur + 30 min marge);
   // de precieze overlap-check gebeurt in JS.
@@ -61,7 +67,6 @@ export async function findCrossSourceDuplicate(
   const candidates = await prisma.cardioLog.findMany({
     where: {
       patientId,
-      source: { not: sourceOfNew as never },
       externalId: { not: null }, // alleen gesyncte rijen — handmatige logs met rust laten
       completedAt: {
         gte: new Date(completedAt.getTime() - windowMs),

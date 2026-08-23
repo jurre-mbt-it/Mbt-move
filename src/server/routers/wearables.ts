@@ -153,7 +153,9 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
     sleepPromise,
     vitalsPromise,
     prisma.cardioLog.findMany({
-      where: { patientId: userId, source: { in: ['APPLE_WATCH', 'STRAVA'] } },
+      // `sessionLogId: null` — een meting die aan een krachtsessie hangt is
+      // geen eigen activiteit; die leest de app via patient.sessionDetail.
+      where: { patientId: userId, source: { in: ['APPLE_WATCH', 'STRAVA'] }, sessionLogId: null },
       orderBy: { completedAt: 'desc' },
       take: ACTIVITY_LIMIT,
     }),
@@ -222,6 +224,8 @@ async function buildOverview(prisma: PrismaClient, userId: string) {
     activities: activities.map(a => ({
       id: a.id,
       activity: a.activity,
+      /** Ruw bron-type; de app leest hier de naam uit als `activity` OTHER is. */
+      sourceActivity: a.sourceActivity,
       protocol: a.protocol,
       durationSec: a.durationSec,
       distanceM: a.distanceM,

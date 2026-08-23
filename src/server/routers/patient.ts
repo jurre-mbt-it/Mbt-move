@@ -37,6 +37,7 @@ import {
   type CardioStimulus,
 } from '@/lib/muscle-fatigue'
 import type { PrismaClient } from '@prisma/client'
+import { strainForMeasurement, trimpOfMeasurement } from '@/server/wearables/strain'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -2121,11 +2122,19 @@ export const patientRouter = createTRPCRouter({
           orderBy: { scheduledAt: 'asc' },
         }),
         ctx.prisma.cardioLog.findMany({
-          where: { patientId: ctx.user.id, completedAt: { gte: fromDate, lt: toDate } },
+          where: {
+            patientId: ctx.user.id,
+            completedAt: { gte: fromDate, lt: toDate },
+            // Gekoppeld aan een krachtsessie = geen zelfstandige activiteit
+            // meer, maar de méting bij die sessie. Zonder dit filter staat
+            // dezelfde training twee keer op dezelfde dag in de kalender.
+            sessionLogId: null,
+          },
           select: {
             id: true,
             completedAt: true,
             activity: true,
+            sourceActivity: true,
             protocol: true,
             // Idem: identiteit boven dag-heuristiek. Een hardloop-log die aan
             // gisteren hangt mag het geplande fietsen van vandaag niet opeten.
@@ -2301,6 +2310,19 @@ export const patientRouter = createTRPCRouter({
           exertionLevel: true,
           notes: true,
           program: { select: { name: true } },
+          /**
+           * De wearable-meting van deze training, als de sporter naast zijn
+           * oefeningen ook een workout op zijn horloge startte. Levert de
+           * hartslagcurve, de tijd-in-zone en de strain; zonder horloge is dit
+           * null en toont het scherm alleen wat er gelogd is.
+           */
+          cardioLog: {
+            select: {
+              id: true, avgHeartRate: true, maxHeartRate: true, durationSec: true,
+              calories: true, timeInZones: true, series: true, source: true,
+              completedAt: true,
+            },
+          },
           exerciseLogs: {
             select: {
               id: true,
@@ -2331,8 +2353,45 @@ export const patientRouter = createTRPCRouter({
         : []
       const exerciseById = new Map(exercises.map(e => [e.id, e]))
 
+      // Strain op dezelfde schaal als de dagbelasting. Het HR-profiel is alleen
+      // nodig voor oude metingen zonder opgeslagen tijd-in-zone.
+      const meting = session.cardioLog
+      let measurement: {
+        avgHeartRate: number | null
+        maxHeartRate: number | null
+        durationSec: number
+        calories: number | null
+        timeInZones: unknown
+        series: unknown
+        source: string
+        startAt: string
+        trimp: number | null
+        strain: number | null
+      } | null = null
+      if (meting) {
+        const profile = await ctx.prisma.user.findUnique({
+          where: { id: ctx.user.id },
+          select: { maxHeartRate: true, restingHeartRate: true, dateOfBirth: true },
+        })
+        const trimp = trimpOfMeasurement(meting, profile)
+        measurement = {
+          avgHeartRate: meting.avgHeartRate,
+          maxHeartRate: meting.maxHeartRate,
+          durationSec: meting.durationSec,
+          calories: meting.calories,
+          timeInZones: meting.timeInZones as unknown,
+          series: meting.series as unknown,
+          source: meting.source,
+          // `completedAt` is op CardioLog het STARTmoment van de meting.
+          startAt: meting.completedAt.toISOString(),
+          trimp,
+          strain: await strainForMeasurement(ctx.prisma, ctx.user.id, meting.completedAt, trimp),
+        }
+      }
+
       return {
         id: session.id,
+        measurement,
         scheduledAt: session.scheduledAt,
         completedAt: session.completedAt,
         completedAll: session.completedAll,

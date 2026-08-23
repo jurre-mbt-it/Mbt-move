@@ -207,6 +207,7 @@ export function mockOverview(days = 30, end: Date = new Date()) {
     return {
       id: `mock-${i}`,
       activity: a.activity,
+      sourceActivity: null,
       protocol: 'STEADY_STATE' as const,
       durationSec: a.dur,
       distanceM: a.dist,
