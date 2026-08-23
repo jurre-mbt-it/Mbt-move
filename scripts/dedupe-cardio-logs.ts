@@ -130,6 +130,15 @@ async function main() {
 
   console.log(`\n${groepen} groep(en) met duplicaten, ${teVerwijderen.length} rij(en) te verwijderen.`)
 
+  // Id-lijst wegschrijven zodat er vóór het verwijderen een terugzetbare kopie
+  // van gemaakt kan worden. Gaat naar de scratch, niet de repo: dit zijn
+  // patiëntgegevens.
+  if (process.env.DEDUPE_IDS_OUT) {
+    const { writeFileSync } = await import('node:fs')
+    writeFileSync(process.env.DEDUPE_IDS_OUT, JSON.stringify(teVerwijderen.map((r) => r.id)))
+    console.log(`Id's weggeschreven naar ${process.env.DEDUPE_IDS_OUT}`)
+  }
+
   if (!APPLY) {
     console.log('Droogloop: er is niets gewijzigd. Draai opnieuw met --apply om dit door te voeren.')
   } else if (teVerwijderen.length > 0) {
