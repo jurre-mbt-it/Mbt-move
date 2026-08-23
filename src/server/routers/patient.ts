@@ -37,7 +37,7 @@ import {
   type CardioStimulus,
 } from '@/lib/muscle-fatigue'
 import type { PrismaClient } from '@prisma/client'
-import { strainForMeasurement, trimpOfMeasurement } from '@/server/wearables/strain'
+import { estimateTrimpFromSrpe, strainForSession, trimpOfMeasurement } from '@/server/wearables/strain'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -2353,8 +2353,16 @@ export const patientRouter = createTRPCRouter({
         : []
       const exerciseById = new Map(exercises.map(e => [e.id, e]))
 
-      // Strain op dezelfde schaal als de dagbelasting. Het HR-profiel is alleen
-      // nodig voor oude metingen zonder opgeslagen tijd-in-zone.
+      /**
+       * Strain hoort bij de TRAINING, niet bij de meting. De meeste
+       * krachttrainingen worden zonder horloge gedaan; zou de strain aan de
+       * meting hangen, dan bleef hij daar altijd leeg terwijl duur en RPE
+       * gewoon gelogd zijn.
+       *
+       * Volgorde: een echte hartslagmeting wint, anders schatten we uit duur en
+       * RPE. Beide leveren een TRIMP in dezelfde eenheid, dus ze gaan door
+       * dezelfde curve en hetzelfde ankerpunt.
+       */
       const meting = session.cardioLog
       let measurement: {
         avgHeartRate: number | null
@@ -2365,20 +2373,18 @@ export const patientRouter = createTRPCRouter({
         series: unknown
         source: string
         startAt: string
-        trimp: number | null
-        strain: number | null
-        /** Dagbelasting van dezelfde dag, als context bij de strain. */
-        dayStrain: number | null
       } | null = null
+      let trimp: number | null = null
+      let estimated = false
+
       if (meting) {
+        // Het HR-profiel is alleen nodig voor oude metingen zonder opgeslagen
+        // tijd-in-zone.
         const profile = await ctx.prisma.user.findUnique({
           where: { id: ctx.user.id },
           select: { maxHeartRate: true, restingHeartRate: true, dateOfBirth: true },
         })
-        const trimp = trimpOfMeasurement(meting, profile)
-        const { strain, dayStrain } = await strainForMeasurement(
-          ctx.prisma, ctx.user.id, meting.completedAt, trimp,
-        )
+        trimp = trimpOfMeasurement(meting, profile)
         measurement = {
           avgHeartRate: meting.avgHeartRate,
           maxHeartRate: meting.maxHeartRate,
@@ -2389,15 +2395,27 @@ export const patientRouter = createTRPCRouter({
           source: meting.source,
           // `completedAt` is op CardioLog het STARTmoment van de meting.
           startAt: meting.completedAt.toISOString(),
-          trimp,
-          strain,
-          dayStrain,
         }
       }
+      if (trimp == null) {
+        trimp = estimateTrimpFromSrpe(session.duration, session.exertionLevel)
+        estimated = trimp != null
+      }
+
+      const ankerDatum = meting?.completedAt ?? session.completedAt ?? session.scheduledAt
+      const { strain, dayStrain } = await strainForSession(
+        ctx.prisma, ctx.user.id, ankerDatum, trimp,
+      )
 
       return {
         id: session.id,
         measurement,
+        /**
+         * `estimated` = niet gemeten maar afgeleid uit duur en RPE. De app zegt
+         * dat erbij; een geschat cijfer als meting presenteren hoort niet in
+         * een dossier.
+         */
+        strain: { score: strain, dayScore: dayStrain, estimated },
         scheduledAt: session.scheduledAt,
         completedAt: session.completedAt,
         completedAll: session.completedAll,
