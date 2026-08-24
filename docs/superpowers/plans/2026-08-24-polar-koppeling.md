@@ -30,7 +30,7 @@
 **Interfaces:**
 - Produces: Prisma-model `PolarConnection` met velden `userId` (unique), `polarUserId` (unique), `memberId`, `accessToken`, `expiresAt`, `needsReauth`, `lastSyncAt`, `lastWellnessSyncAt`; enum-waarden `POLAR` op `WearableProvider` en `WorkoutSource`.
 
-- [ ] **Stap 1: enums + model + relatie in schema.prisma**
+- [x] **Stap 1: enums + model + relatie in schema.prisma**
 
 `WearableProvider` en `WorkoutSource` krijgen elk `POLAR // Polar AccessLink (cloud-to-cloud, OAuth 2.0 + REST-pull)`. Bij `User` naast `stravaConnection`: `polarConnection PolarConnection?`. Nieuw model naast StravaConnection:
 
@@ -59,7 +59,7 @@ model PolarConnection {
 }
 ```
 
-- [ ] **Stap 2: migratie schrijven** — `supabase/migrations/20260824_polar.sql`, idempotent naar het voorbeeld van `20260710_strava.sql`:
+- [x] **Stap 2: migratie schrijven** — `supabase/migrations/20260824_polar.sql`, idempotent naar het voorbeeld van `20260710_strava.sql`:
 
 ```sql
 -- Polar AccessLink-koppeling: enum-waarden + connectie-tabel + RLS.
@@ -101,8 +101,8 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 ```
 
-- [ ] **Stap 3: valideren + client genereren** — `npx prisma validate && npx prisma generate` (verwacht: succes; nog GEEN `db execute` — prod-migratie pas bij livegang).
-- [ ] **Stap 4: commit** — `git add prisma/schema.prisma supabase/migrations/20260824_polar.sql && git commit -m "feat(polar): datamodel + migratie voor PolarConnection"`
+- [x] **Stap 3: valideren + client genereren** — `npx prisma validate && npx prisma generate` (verwacht: succes; nog GEEN `db execute` — prod-migratie pas bij livegang).
+- [x] **Stap 4: commit** — `git add prisma/schema.prisma supabase/migrations/20260824_polar.sql && git commit -m "feat(polar): datamodel + migratie voor PolarConnection"`
 
 ### Taak 2: Gedeelde token-crypto extraheren
 
@@ -122,7 +122,7 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
   - `decryptAtRest(key: Buffer, stored: string): string` (legacy plaintext passthrough)
 - Consumes: niets nieuws; de implementatie is een 1-op-1 verplaatsing uit `strava/config.ts` met de sleutel als parameter.
 
-- [ ] **Stap 1: falende test schrijven** — roundtrips + Strava-bitcompatibiliteit:
+- [x] **Stap 1: falende test schrijven** — roundtrips + Strava-bitcompatibiliteit:
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -157,11 +157,11 @@ describe('token-crypto', () => {
 })
 ```
 
-- [ ] **Stap 2: test draaien** — `npx vitest run src/server/wearables/__tests__/token-crypto.test.ts` → FAIL (module bestaat niet).
-- [ ] **Stap 3: token-crypto.ts implementeren** — de bestaande functies uit `strava/config.ts` letterlijk verplaatsen en de sleutel/het secret als parameter geven. Het state-formaat (`base64url(userId.exp).hmac`), het blob-formaat (iv|tag|ct base64url met `exp` in de JSON) en de `enc:v1:`-prefix blijven byte-voor-byte identiek, anders breken bestaande DB-rijen en lopende OAuth-flows.
-- [ ] **Stap 4: strava/config.ts laten delegeren** — de exports `signState`, `verifyState`, `sealTokens`, `openTokens`, `encryptToken`, `decryptToken` blijven bestaan met dezelfde signatures, maar roepen de gedeelde functies aan met `getStravaConfig().clientSecret` resp. `sha256Key(clientSecret)` (seal) en `sha256Key('strava-at-rest:' + clientSecret)` (at rest). `openTokens` houdt zijn typed veld-validatie bovenop `openJson`.
-- [ ] **Stap 5: alles draaien** — `npx vitest run && npx tsc --noEmit` → PASS.
-- [ ] **Stap 6: commit** — `feat(polar): gedeelde token-crypto (extractie uit strava/config)`
+- [x] **Stap 2: test draaien** — `npx vitest run src/server/wearables/__tests__/token-crypto.test.ts` → FAIL (module bestaat niet).
+- [x] **Stap 3: token-crypto.ts implementeren** — de bestaande functies uit `strava/config.ts` letterlijk verplaatsen en de sleutel/het secret als parameter geven. Het state-formaat (`base64url(userId.exp).hmac`), het blob-formaat (iv|tag|ct base64url met `exp` in de JSON) en de `enc:v1:`-prefix blijven byte-voor-byte identiek, anders breken bestaande DB-rijen en lopende OAuth-flows.
+- [x] **Stap 4: strava/config.ts laten delegeren** — de exports `signState`, `verifyState`, `sealTokens`, `openTokens`, `encryptToken`, `decryptToken` blijven bestaan met dezelfde signatures, maar roepen de gedeelde functies aan met `getStravaConfig().clientSecret` resp. `sha256Key(clientSecret)` (seal) en `sha256Key('strava-at-rest:' + clientSecret)` (at rest). `openTokens` houdt zijn typed veld-validatie bovenop `openJson`.
+- [x] **Stap 5: alles draaien** — `npx vitest run && npx tsc --noEmit` → PASS.
+- [x] **Stap 6: commit** — `feat(polar): gedeelde token-crypto (extractie uit strava/config)`
 
 ### Taak 3: polar/config.ts + polar/api.ts
 
@@ -173,7 +173,7 @@ describe('token-crypto', () => {
 - Produces (config): `POLAR_ENDPOINTS`, `POLAR_SCOPE`, `isPolarConfigured()`, `getPolarConfig(): { clientId, clientSecret, redirectUri }`, `buildAuthorizeUrl(userId): string`, `verifyPolarState(state): string | null`, `sealPolarTokens(t: SealedPolarTokens): string`, `openPolarTokens(blob): SealedPolarTokens | null`, `encryptPolarToken(plain): string`, `decryptPolarToken(stored): string`, type `SealedPolarTokens = { accessToken: string; expiresAt: number; polarUserId: string }` (expiresAt = unix-seconden).
 - Produces (api): `exchangeCode(code): Promise<{ access_token: string; expires_in: number; x_user_id: number }>`, `registerPolarUser(accessToken, memberId): Promise<void>` (409 = ok), `deregisterPolarUser(accessToken, polarUserId): Promise<void>` (best-effort, 204/404 = ok), `polarGet<T>(accessToken, path): Promise<T | null>` (204/404 → null), `PolarAuthError` (bij 401/403 — token verlopen/ingetrokken).
 
-- [ ] **Stap 1: falende test** — authorize-URL + seal-roundtrip:
+- [x] **Stap 1: falende test** — authorize-URL + seal-roundtrip:
 
 ```ts
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -206,9 +206,9 @@ describe('polar/config', () => {
 })
 ```
 
-- [ ] **Stap 2: test draaien** → FAIL.
-- [ ] **Stap 3: config implementeren** — spiegel `strava/config.ts`, maar dan via token-crypto uit taak 2. Sleutels: seal = `sha256Key(clientSecret)`, at rest = `sha256Key('polar-at-rest:' + clientSecret)` (bewust andere afleiding dan Strava én dan de seal-key). State-TTL 10 min, blob-TTL 10 min. `redirectUri` = `${NEXT_PUBLIC_APP_URL}/api/wearable/polar/callback` met dezelfde `.trim()`-guard als Strava.
-- [ ] **Stap 4: api implementeren** — met commentaar dat Polar géén refresh-token uitgeeft:
+- [x] **Stap 2: test draaien** → FAIL.
+- [x] **Stap 3: config implementeren** — spiegel `strava/config.ts`, maar dan via token-crypto uit taak 2. Sleutels: seal = `sha256Key(clientSecret)`, at rest = `sha256Key('polar-at-rest:' + clientSecret)` (bewust andere afleiding dan Strava én dan de seal-key). State-TTL 10 min, blob-TTL 10 min. `redirectUri` = `${NEXT_PUBLIC_APP_URL}/api/wearable/polar/callback` met dezelfde `.trim()`-guard als Strava.
+- [x] **Stap 4: api implementeren** — met commentaar dat Polar géén refresh-token uitgeeft:
 
 ```ts
 export class PolarAuthError extends Error {}
@@ -243,8 +243,8 @@ export async function polarGet<T>(accessToken: string, path: string): Promise<T 
 ```
 
 `registerPolarUser`: POST `${api}/users` met Bearer + JSON `{ 'member-id': memberId }`, ok bij 2xx; 409 = al geregistreerd → stil ok; anders throw. `deregisterPolarUser`: DELETE `${api}/users/${polarUserId}` met Bearer; 204/404 = ok; anders alleen `console.warn` (best-effort — loskoppelen in de app mag nooit stranden op een Polar-storing).
-- [ ] **Stap 5: draaien** — `npx vitest run && npx tsc --noEmit` → PASS.
-- [ ] **Stap 6: commit** — `feat(polar): config + API-client (OAuth, registratie, GET-helper)`
+- [x] **Stap 5: draaien** — `npx vitest run && npx tsc --noEmit` → PASS.
+- [x] **Stap 6: commit** — `feat(polar): config + API-client (OAuth, registratie, GET-helper)`
 
 ### Taak 4: Callback-route
 
@@ -255,9 +255,9 @@ export async function polarGet<T>(accessToken: string, path: string): Promise<T 
 - Consumes: `isPolarConfigured`, `verifyPolarState`, `sealPolarTokens` (taak 3-config), `exchangeCode` (taak 3-api).
 - Produces: 302 naar `mbtgym://polar?status=pending&blob=…` of `mbtgym://polar?status=error&reason=…` — de app (taak 11) parseert exact deze parameters.
 
-- [ ] **Stap 1: route schrijven** — spiegel `strava/callback/route.ts` (zelfde deep-link-helper, `APP_SCHEME = 'mbtgym'`, host `polar`). Verschillen: geen scope-check-parameter (Polar stuurt geen `scope` terug in de callback) en de seal bevat `{ accessToken, expiresAt: Math.floor(Date.now() / 1000) + t.expires_in, polarUserId: String(t.x_user_id) }`. Ontbreekt `x_user_id` → `reason=no_user`. `export const dynamic = 'force-dynamic'`, `runtime = 'nodejs'`. De route slaat bewust niets op (claim-model, zie strava-callback-kopcommentaar).
-- [ ] **Stap 2: draaien** — `npx tsc --noEmit` → PASS (routes hebben in deze repo geen unit-tests; de flow-onderdelen zijn in taak 2/3 getest).
-- [ ] **Stap 3: commit** — `feat(polar): OAuth-callback (claim-model, deep-link naar de app)`
+- [x] **Stap 1: route schrijven** — spiegel `strava/callback/route.ts` (zelfde deep-link-helper, `APP_SCHEME = 'mbtgym'`, host `polar`). Verschillen: geen scope-check-parameter (Polar stuurt geen `scope` terug in de callback) en de seal bevat `{ accessToken, expiresAt: Math.floor(Date.now() / 1000) + t.expires_in, polarUserId: String(t.x_user_id) }`. Ontbreekt `x_user_id` → `reason=no_user`. `export const dynamic = 'force-dynamic'`, `runtime = 'nodejs'`. De route slaat bewust niets op (claim-model, zie strava-callback-kopcommentaar).
+- [x] **Stap 2: draaien** — `npx tsc --noEmit` → PASS (routes hebben in deze repo geen unit-tests; de flow-onderdelen zijn in taak 2/3 getest).
+- [x] **Stap 3: commit** — `feat(polar): OAuth-callback (claim-model, deep-link naar de app)`
 
 ### Taak 5: Trainingen-sync (polar/sync.ts, deel 1)
 
@@ -269,7 +269,7 @@ export async function polarGet<T>(accessToken: string, path: string): Promise<T 
 - Consumes: `polarGet`, `PolarAuthError`, `decryptPolarToken`; `rpeFromHeartRate`, `updateExistingSyncedLog` (ingest); `findCrossSourceDuplicate`, `enrichExistingLog` (dedupe); `resolveMaxHr` (cardio-zones).
 - Produces: `parseIsoDuration(s: string | undefined): number | null` (seconden), `mapPolarSport(detailed: string | undefined, sport: string | undefined): CardioActivity`, `polarStartToDate(startTime: string, utcOffsetMin: number | undefined): Date`, `buildSeriesFromPolarSamples(samples: PolarSample[] | undefined, durationSec: number): SeriesPoint[] | undefined`, `syncPolarExercises(prisma, userId): Promise<number>`, `getPolarAccessToken(prisma, userId): Promise<string>` (gooit `polar_not_connected` / `polar_needs_reauth`), `markNeedsReauth(prisma, userId): Promise<void>`.
 
-- [ ] **Stap 1: falende tests voor de pure mappers**
+- [x] **Stap 1: falende tests voor de pure mappers**
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -323,10 +323,10 @@ describe('polar/sync mappers', () => {
 })
 ```
 
-- [ ] **Stap 2: draaien** → FAIL.
-- [ ] **Stap 3: mappers implementeren.** `parseIsoDuration`: regex `/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/`, som × eenheden, `Math.round`, null bij mismatch of 0-lege match. `mapPolarSport`: uppercase op `detailed ?? sport ?? ''`, daarna substring-checks in deze volgorde: RUN/JOGGING → RUNNING; CYCLING/BIKING/BIKE/SPINNING → CYCLING; WALK/HIKING → WALKING; SWIM → SWIMMING; ROWING → ROWING; CROSS_TRAINER/ELLIPTICAL → CROSSTRAINER; STAIR → STAIRCLIMBER; anders OTHER. `polarStartToDate`: bevat de string al `Z` of een `±hh:mm`-offset → `new Date(s)`; anders `new Date(Date.parse(s + 'Z') - (offsetMin ?? 0) * 60_000)`. `buildSeriesFromPolarSamples`: pak sample-type '0' (HR) en '1' (snelheid); per sample-reeks `data.split(',')` met `''`/`'null'` → null; tijdstip i × `recording-rate` (default 5); bucket per 60 s zoals `buildSeries` in `strava/sync.ts` (gemiddelde per bucket, HR afgerond, snelheid km/h ÷ 3.6 op 2 decimalen, cap 240 punten, ≥2 HR-punten vereist).
-- [ ] **Stap 4: draaien** → PASS.
-- [ ] **Stap 5: token-helper + syncPolarExercises implementeren** — patroon = `syncStravaActivities`, zonder paginering (de lijst is per definitie ≤30 dagen):
+- [x] **Stap 2: draaien** → FAIL.
+- [x] **Stap 3: mappers implementeren.** `parseIsoDuration`: regex `/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/`, som × eenheden, `Math.round`, null bij mismatch of 0-lege match. `mapPolarSport`: uppercase op `detailed ?? sport ?? ''`, daarna substring-checks in deze volgorde: RUN/JOGGING → RUNNING; CYCLING/BIKING/BIKE/SPINNING → CYCLING; WALK/HIKING → WALKING; SWIM → SWIMMING; ROWING → ROWING; CROSS_TRAINER/ELLIPTICAL → CROSSTRAINER; STAIR → STAIRCLIMBER; anders OTHER. `polarStartToDate`: bevat de string al `Z` of een `±hh:mm`-offset → `new Date(s)`; anders `new Date(Date.parse(s + 'Z') - (offsetMin ?? 0) * 60_000)`. `buildSeriesFromPolarSamples`: pak sample-type '0' (HR) en '1' (snelheid); per sample-reeks `data.split(',')` met `''`/`'null'` → null; tijdstip i × `recording-rate` (default 5); bucket per 60 s zoals `buildSeries` in `strava/sync.ts` (gemiddelde per bucket, HR afgerond, snelheid km/h ÷ 3.6 op 2 decimalen, cap 240 punten, ≥2 HR-punten vereist).
+- [x] **Stap 4: draaien** → PASS.
+- [x] **Stap 5: token-helper + syncPolarExercises implementeren** — patroon = `syncStravaActivities`, zonder paginering (de lijst is per definitie ≤30 dagen):
 
 ```ts
 export async function getPolarAccessToken(prisma: Db, userId: string): Promise<string> {
@@ -343,9 +343,9 @@ export async function markNeedsReauth(prisma: Db, userId: string): Promise<void>
 ```
 
 `syncPolarExercises(prisma, userId)`: token ophalen; `polarGet<PolarExercise[]>(token, '/exercises?samples=true')` (null → 0 en `lastSyncAt` bijwerken); HR-profiel + `resolveMaxHr` zoals in strava/sync; per exercise: `durationSec = parseIsoDuration(ex.duration)`, skip `< 60`; `completedAt = polarStartToDate(...)`; datablok met `activity: mapPolarSport(...)`, `protocol: 'STEADY_STATE'`, afstand/HR/calorieën, `rpe: rpeFromHeartRate(avg, maxHr, restHr)`, `avgPaceSecPerKm`, `series: buildSeriesFromPolarSamples(ex.samples, durationSec)`, `source: 'POLAR' as const`; `externalId = \`polar:${ex.id}\``; dan exact de Strava-afhandeling: `updateExistingSyncedLog` → anders `findCrossSourceDuplicate(..., 'POLAR')` → `enrichExistingLog` of `create` met P2002-vangnet. `PolarAuthError` → `markNeedsReauth` + rethrow `new Error('polar_needs_reauth')`. Afsluiten met `lastSyncAt: new Date()`.
-- [ ] **Stap 6: sync-test met prisma-stub** (patroon `ingest.test.ts`): mock `fetch` via `vi.stubGlobal('fetch', …)` die één exercise teruggeeft (id `'2AC312F'`, `duration: 'PT30M'`, `heart_rate: { average: 140, maximum: 168 }`, `start_time: '2026-08-20T18:00:00'`, `start_time_utc_offset: 120`); stub-db met `polarConnection.findUnique` (geldige, versleutelde token via `encryptPolarToken`), `polarConnection.update`, `user.findUnique` (profiel met maxHeartRate 190, restingHeartRate 50), `cardioLog.updateMany` (count 0), `cardioLog.findMany` ([]), `cardioLog.create`. Asserts: `create` aangeroepen met `externalId: 'polar:2AC312F'`, `source: 'POLAR'`, `durationSec: 1800`, `completedAt` = `2026-08-20T16:00:00.000Z`, `rpe` niet null. Tweede test: 401-respons → `polarConnection.updateMany` met `needsReauth: true`.
-- [ ] **Stap 7: draaien** — `npx vitest run && npx tsc --noEmit` → PASS.
-- [ ] **Stap 8: commit** — `feat(polar): trainingen-sync naar CardioLog (mappers + dedupe)`
+- [x] **Stap 6: sync-test met prisma-stub** (patroon `ingest.test.ts`): mock `fetch` via `vi.stubGlobal('fetch', …)` die één exercise teruggeeft (id `'2AC312F'`, `duration: 'PT30M'`, `heart_rate: { average: 140, maximum: 168 }`, `start_time: '2026-08-20T18:00:00'`, `start_time_utc_offset: 120`); stub-db met `polarConnection.findUnique` (geldige, versleutelde token via `encryptPolarToken`), `polarConnection.update`, `user.findUnique` (profiel met maxHeartRate 190, restingHeartRate 50), `cardioLog.updateMany` (count 0), `cardioLog.findMany` ([]), `cardioLog.create`. Asserts: `create` aangeroepen met `externalId: 'polar:2AC312F'`, `source: 'POLAR'`, `durationSec: 1800`, `completedAt` = `2026-08-20T16:00:00.000Z`, `rpe` niet null. Tweede test: 401-respons → `polarConnection.updateMany` met `needsReauth: true`.
+- [x] **Stap 7: draaien** — `npx vitest run && npx tsc --noEmit` → PASS.
+- [x] **Stap 8: commit** — `feat(polar): trainingen-sync naar CardioLog (mappers + dedupe)`
 
 ### Taak 6: Ingest-source-parameter + wellness-sync (polar/sync.ts, deel 2)
 
@@ -358,10 +358,10 @@ export async function markNeedsReauth(prisma: Db, userId: string): Promise<void>
 - Modified: `ingestWearableData(prisma, userId, payload, opts?: { source?: WorkoutSource; provider?: WearableProvider; deviceModel?: string })` — defaults `'APPLE_WATCH'`/`'APPLE_HEALTH'`, dus alle bestaande aanroepen ongewijzigd.
 - Produces: `polarSleepToNight(s: PolarSleep): SyncPayload['sleep'][number] | null`, `polarRechargeToVitals(r: PolarRecharge): SyncPayload['vitals'][number] | null`, `polarActivityToVitals(a: PolarActivity): SyncPayload['vitals'][number] | null`, `polarContinuousHrToDay(d: PolarHrDay): SyncPayload['hrIntraday'][number] | null`, `syncPolarWellness(prisma, userId): Promise<IngestResult>`.
 
-- [ ] **Stap 1: regressietest ingest-opties** in `ingest.test.ts`: zelfde `stubDb`, aanroep met `opts { source: 'POLAR', provider: 'POLAR' }` en lege payload → connection-upsert `where.userId_provider.provider === 'POLAR'`; en één zonder opts → `'APPLE_HEALTH'` (bestaand gedrag geborgd).
-- [ ] **Stap 2: draaien** → FAIL (parameter bestaat nog niet).
-- [ ] **Stap 3: ingest.ts aanpassen** — `const source = opts?.source ?? 'APPLE_WATCH'` en `const provider = opts?.provider ?? 'APPLE_HEALTH'` bovenin; alle `'APPLE_WATCH' as const`-literalen in de datablokken en de twee provider-plekken in de connection-upsert vervangen; `deviceModel` uit `opts?.deviceModel ?? payload.device?.model`. De cross-source-dedupe-aanroep in het workouts-pad krijgt `source` i.p.v. het literal. Gedrag verder ongewijzigd.
-- [ ] **Stap 4: falende wellness-mapper-tests**
+- [x] **Stap 1: regressietest ingest-opties** in `ingest.test.ts`: zelfde `stubDb`, aanroep met `opts { source: 'POLAR', provider: 'POLAR' }` en lege payload → connection-upsert `where.userId_provider.provider === 'POLAR'`; en één zonder opts → `'APPLE_HEALTH'` (bestaand gedrag geborgd).
+- [x] **Stap 2: draaien** → FAIL (parameter bestaat nog niet).
+- [x] **Stap 3: ingest.ts aanpassen** — `const source = opts?.source ?? 'APPLE_WATCH'` en `const provider = opts?.provider ?? 'APPLE_HEALTH'` bovenin; alle `'APPLE_WATCH' as const`-literalen in de datablokken en de twee provider-plekken in de connection-upsert vervangen; `deviceModel` uit `opts?.deviceModel ?? payload.device?.model`. De cross-source-dedupe-aanroep in het workouts-pad krijgt `source` i.p.v. het literal. Gedrag verder ongewijzigd.
+- [x] **Stap 4: falende wellness-mapper-tests**
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -421,17 +421,17 @@ describe('polar wellness-mappers', () => {
 })
 ```
 
-- [ ] **Stap 5: draaien** → FAIL.
-- [ ] **Stap 6: mappers implementeren.**
+- [x] **Stap 5: draaien** → FAIL.
+- [x] **Stap 6: mappers implementeren.**
   - `polarSleepToNight`: zonder bruikbaar hypnogram (≥1 entry) of start/eindtijd → null. Offset-string uit `sleep_start_time` knippen (`Z` of `±hh:mm`); lokale datum = de eerste 10 tekens; per hypnogram-key (`HH:MM`) een ISO-string `${dag}T${key}:00${offset}` bouwen, waarbij een kloktijd < de kloktijd van `sleep_start_time` één dag opschuift; sorteren; segment i loopt tot start van segment i+1, de laatste tot `sleep_end_time`. Stage-map met commentaar: `0 → 'awake'`, `1 → 'rem'`, `2/3 → 'light'`, `4 → 'deep'`, `5 → 'light'` (UNKNOWN door slecht huidcontact; 'light' is de minst sturende keuze — 'awake' zou de efficiëntie/TST onterecht drukken).
   - `polarRechargeToVitals`: alleen aanwezige velden meegeven; `heart_rate_avg` → `restingHeartRate` met commentaar dat dit het nachtgemiddelde is (zelfde signaal als Whoop/Oura gebruiken; besluit Jurre 2026-08-24); hrv altijd samen met `hrvType: 'RMSSD'` (NOOIT met Apple's SDNN in één baseline — zie stap 9).
   - `polarActivityToVitals`: datum uit `start_time`; `basalEnergyKcal = calories - active_calories` alleen als beide aanwezig en het verschil > 0.
   - `polarContinuousHrToDay`: samples op tijd sorteren; `dt_i = clamp(volgende - huidige, 60, 600)` seconden, laatste sample 300; bin = `String(Math.floor(bpm / 5) * 5)`; som per bin, gecapt op 86 400; `buckets: []`.
-- [ ] **Stap 7: draaien** → PASS.
-- [ ] **Stap 8: syncPolarWellness implementeren.** Token via `getPolarAccessToken`; parallel ophalen: `polarGet<{ nights?: PolarSleep[] }>(token, '/users/sleep')`, `polarGet<{ recharges?: PolarRecharge[] }>(token, '/users/nightly-recharge')`, `polarGet<PolarActivity[]>(token, \`/users/activities?from=${from}&to=${to}\`)` en `polarGet<unknown>(token, \`/users/continuous-heart-rate?from=${from}&to=${to}\`)` met `from` = vandaag − 27 d, `to` = vandaag (Polar-limiet: max 28 dagen). Continue-HR-respons defensief normaliseren (het swagger-schema is hier één dag-object; de praktijk kan een array of `{ heart_rates: [...] }` zijn — alle drie de vormen naar `PolarHrDay[]`). Vitals per datum mergen (recharge + activity in één object). **Eerste bron wint:** vóór de ingest per tabel de datums opvragen die al een rij van een ándere bron hebben (`sleepEntry`/`vitalsEntry`/`exertionEntry`, `where: { userId, date: { gte: … }, source: { not: 'POLAR' } }, select: { date: true }`) en die datums uit de payload filteren — een Apple-nacht mag nooit door een Polar-nacht overschreven worden (en andersom, bij dubbeldragers). Daarna `ingestWearableData(prisma, userId, payload, { source: 'POLAR', provider: 'POLAR', deviceModel: 'Polar' })`, per `affectedDates` `computeAndStoreReadiness`, `lastWellnessSyncAt` bijwerken, `IngestResult` teruggeven. `PolarAuthError` → `markNeedsReauth` + `polar_needs_reauth`.
-- [ ] **Stap 9: baseline-check HRV-typen** — lees `src/server/readiness.ts` en verifieer dat de HRV-baseline niet stilzwijgend SDNN- en RMSSD-nachten mengt wanneer een gebruiker van bron wisselt. Mengt hij wél: baseline-window filteren op het hrvType van de meest recente meting (kleinste ingreep die het klinische probleem oplost). Zo niet: alleen een verwijzend commentaar toevoegen bij `hrvType` in de mapper.
-- [ ] **Stap 10: draaien** — `npx vitest run && npx tsc --noEmit` → PASS.
-- [ ] **Stap 11: commit** — `feat(polar): wellness-sync via ingest (slaap, recharge, activiteit, dag-HR)`
+- [x] **Stap 7: draaien** → PASS.
+- [x] **Stap 8: syncPolarWellness implementeren.** Token via `getPolarAccessToken`; parallel ophalen: `polarGet<{ nights?: PolarSleep[] }>(token, '/users/sleep')`, `polarGet<{ recharges?: PolarRecharge[] }>(token, '/users/nightly-recharge')`, `polarGet<PolarActivity[]>(token, \`/users/activities?from=${from}&to=${to}\`)` en `polarGet<unknown>(token, \`/users/continuous-heart-rate?from=${from}&to=${to}\`)` met `from` = vandaag − 27 d, `to` = vandaag (Polar-limiet: max 28 dagen). Continue-HR-respons defensief normaliseren (het swagger-schema is hier één dag-object; de praktijk kan een array of `{ heart_rates: [...] }` zijn — alle drie de vormen naar `PolarHrDay[]`). Vitals per datum mergen (recharge + activity in één object). **Eerste bron wint:** vóór de ingest per tabel de datums opvragen die al een rij van een ándere bron hebben (`sleepEntry`/`vitalsEntry`/`exertionEntry`, `where: { userId, date: { gte: … }, source: { not: 'POLAR' } }, select: { date: true }`) en die datums uit de payload filteren — een Apple-nacht mag nooit door een Polar-nacht overschreven worden (en andersom, bij dubbeldragers). Daarna `ingestWearableData(prisma, userId, payload, { source: 'POLAR', provider: 'POLAR', deviceModel: 'Polar' })`, per `affectedDates` `computeAndStoreReadiness`, `lastWellnessSyncAt` bijwerken, `IngestResult` teruggeven. `PolarAuthError` → `markNeedsReauth` + `polar_needs_reauth`.
+- [x] **Stap 9: baseline-check HRV-typen** — lees `src/server/readiness.ts` en verifieer dat de HRV-baseline niet stilzwijgend SDNN- en RMSSD-nachten mengt wanneer een gebruiker van bron wisselt. Mengt hij wél: baseline-window filteren op het hrvType van de meest recente meting (kleinste ingreep die het klinische probleem oplost). Zo niet: alleen een verwijzend commentaar toevoegen bij `hrvType` in de mapper.
+- [x] **Stap 10: draaien** — `npx vitest run && npx tsc --noEmit` → PASS.
+- [x] **Stap 11: commit** — `feat(polar): wellness-sync via ingest (slaap, recharge, activiteit, dag-HR)`
 
 ### Taak 7: tRPC-procedures + zichtbaarheid web
 
@@ -442,16 +442,16 @@ describe('polar wellness-mappers', () => {
 **Interfaces:**
 - Produces (router `wearables.`): `polarAuthorizeUrl` (query → `{ url }`), `polarClaim` (mutation, input `{ blob: string }` → `{ ok: true }`), `polarStatus` (query → `{ connected: boolean; lastSyncAt: string | null; needsReauth: boolean }`), `polarSync` (mutation → `{ synced: number }`), `polarDisconnect` (mutation → `{ ok: true }`) — exact wat de app in taak 11 aanroept.
 
-- [ ] **Stap 1: RATE_LIMITS uitbreiden** — naast `stravaSync`: `polarSync: { max: 12, windowSec: 3600, message: 'Te veel Polar-syncs. Probeer het later opnieuw.' }` (zelfde reden: applicatie-breed Polar-quotum, audit 2026-07-27 L5-patroon).
-- [ ] **Stap 2: procedures toevoegen** — blok `// ── Polar (AccessLink, cloud-to-cloud) ──` naast het Strava-blok, alles op `wearablesProcedure`:
+- [x] **Stap 1: RATE_LIMITS uitbreiden** — naast `stravaSync`: `polarSync: { max: 12, windowSec: 3600, message: 'Te veel Polar-syncs. Probeer het later opnieuw.' }` (zelfde reden: applicatie-breed Polar-quotum, audit 2026-07-27 L5-patroon).
+- [x] **Stap 2: procedures toevoegen** — blok `// ── Polar (AccessLink, cloud-to-cloud) ──` naast het Strava-blok, alles op `wearablesProcedure`:
   - `polarAuthorizeUrl`: als `!isPolarConfigured()` → `NOT_IMPLEMENTED 'polar_not_configured'`; anders `{ url: buildAuthorizeUrl(ctx.user!.id) }`.
   - `polarClaim`: `openPolarTokens(blob)` → BAD_REQUEST bij null; bestaand `memberId` hergebruiken (`polarConnection.findUnique`) of `crypto.randomUUID()`; `registerPolarUser(t.accessToken, memberId)` (409 is daar al stil ok — bij re-koppelen van dezelfde gebruiker); daarna `$transaction` met `polarConnection.upsert` (`polarUserId`, `memberId`, `accessToken: encryptPolarToken(...)`, `expiresAt: new Date(t.expiresAt * 1000)`, `needsReauth: false`) + `wearableConnection.upsert` provider `'POLAR'`, `deviceModel: 'Polar'`, `enabled: true`; P2002 → `CONFLICT 'polar_already_linked'` (zelfde Polar-account kan niet aan twee app-accounts hangen).
   - `polarStatus`: `findUnique` → `{ connected, lastSyncAt, needsReauth }`.
   - `polarSync`: rate-limit; `syncPolarExercises` + `syncPolarWellness` na elkaar (wellness-fouten niet de trainingen laten maskeren: exercises eerst, fouten door laten borrelen); return `{ synced }`.
   - `polarDisconnect`: connectie lezen; bestaat hij → best-effort `deregisterPolarUser(decryptPolarToken(accessToken), polarUserId)` (try/catch — het token ook aan Polar-zijde intrekken hoort bij netjes loskoppelen); dan `polarConnection.deleteMany` + `wearableConnection.deleteMany` provider POLAR.
-- [ ] **Stap 3: source-filters en labels verruimen** — in `wearables.ts`: de activiteitenlijst in `buildOverview` en het filter in `unratedActivities` van `['APPLE_WATCH', 'STRAVA']` naar `['APPLE_WATCH', 'STRAVA', 'POLAR']`. Daarna repo-breed `rg -n "'STRAVA'"` en `rg -n "APPLE_WATCH.*STRAVA|STRAVA.*APPLE_WATCH" src`: elke source-lijst en elk bron-label (bv. "via Strava"-badges op activity/detail-schermen web) krijgt de POLAR-variant met label `Polar`. Ook de connection-status in `buildOverview` (nu alleen provider `APPLE_HEALTH`): laat de integraties-status zoals hij is als hij providerspecifiek is — Polar-status loopt via `polarStatus`, zoals Strava via `stravaStatus`.
-- [ ] **Stap 4: draaien** — `npx vitest run && npx tsc --noEmit` → PASS.
-- [ ] **Stap 5: commit** — `feat(polar): tRPC-koppelflow + Polar zichtbaar in web-overzichten`
+- [x] **Stap 3: source-filters en labels verruimen** — in `wearables.ts`: de activiteitenlijst in `buildOverview` en het filter in `unratedActivities` van `['APPLE_WATCH', 'STRAVA']` naar `['APPLE_WATCH', 'STRAVA', 'POLAR']`. Daarna repo-breed `rg -n "'STRAVA'"` en `rg -n "APPLE_WATCH.*STRAVA|STRAVA.*APPLE_WATCH" src`: elke source-lijst en elk bron-label (bv. "via Strava"-badges op activity/detail-schermen web) krijgt de POLAR-variant met label `Polar`. Ook de connection-status in `buildOverview` (nu alleen provider `APPLE_HEALTH`): laat de integraties-status zoals hij is als hij providerspecifiek is — Polar-status loopt via `polarStatus`, zoals Strava via `stravaStatus`.
+- [x] **Stap 4: draaien** — `npx vitest run && npx tsc --noEmit` → PASS.
+- [x] **Stap 5: commit** — `feat(polar): tRPC-koppelflow + Polar zichtbaar in web-overzichten`
 
 ### Taak 8: Webhook-route
 
@@ -464,7 +464,7 @@ describe('polar wellness-mappers', () => {
 - Produces (webhook.ts): `verifyPolarSignature(rawBody: string, signature: string | null, secret: string): boolean`, `handlePolarWebhookEvent(prisma, body: { event?: string; user_id?: number | string }): Promise<{ handled: boolean }>`.
 - Consumes: `syncPolarExercises`, `syncPolarWellness` (taak 5/6), `maybeNotifyRecoveryOnSync` uit `@/server/push/morning-insight`.
 
-- [ ] **Stap 1: falende tests**
+- [x] **Stap 1: falende tests**
 
 ```ts
 import { createHmac } from 'crypto'
@@ -486,9 +486,9 @@ describe('polar webhook-signatuur', () => {
 })
 ```
 
-- [ ] **Stap 2: draaien** → FAIL.
-- [ ] **Stap 3: webhook.ts implementeren.** `verifyPolarSignature`: HMAC-SHA256 hex over de raw body, vergelijking met `timingSafeEqual` (lengte eerst checken, lowercase-normaliseren). `handlePolarWebhookEvent`: `polarConnection.findUnique({ where: { polarUserId: String(body.user_id) } })` — onbekend of `needsReauth` → `{ handled: false }` (bewust géén fout: een losgekoppelde gebruiker mag geen 500-retry-storm veroorzaken); `event === 'EXERCISE'` → `syncPolarExercises` (idempotent; gerichte entity-pull is een latere optimalisatie); `SLEEP`/`CONTINUOUS_HEART_RATE`/`ACTIVITY_SUMMARY` → `syncPolarWellness` en daarna `maybeNotifyRecoveryOnSync(prisma, userId, result.affectedDates)` — de herstelmelding hangt hiermee aan het moment dat de Polar-nacht binnenkomt, precies zoals de Apple-sync-route dat doet; onbekende events → `{ handled: false }`.
-- [ ] **Stap 4: route.ts implementeren** — `runtime nodejs`, `dynamic force-dynamic`, `maxDuration = 60`:
+- [x] **Stap 2: draaien** → FAIL.
+- [x] **Stap 3: webhook.ts implementeren.** `verifyPolarSignature`: HMAC-SHA256 hex over de raw body, vergelijking met `timingSafeEqual` (lengte eerst checken, lowercase-normaliseren). `handlePolarWebhookEvent`: `polarConnection.findUnique({ where: { polarUserId: String(body.user_id) } })` — onbekend of `needsReauth` → `{ handled: false }` (bewust géén fout: een losgekoppelde gebruiker mag geen 500-retry-storm veroorzaken); `event === 'EXERCISE'` → `syncPolarExercises` (idempotent; gerichte entity-pull is een latere optimalisatie); `SLEEP`/`CONTINUOUS_HEART_RATE`/`ACTIVITY_SUMMARY` → `syncPolarWellness` en daarna `maybeNotifyRecoveryOnSync(prisma, userId, result.affectedDates)` — de herstelmelding hangt hiermee aan het moment dat de Polar-nacht binnenkomt, precies zoals de Apple-sync-route dat doet; onbekende events → `{ handled: false }`.
+- [x] **Stap 4: route.ts implementeren** — `runtime nodejs`, `dynamic force-dynamic`, `maxDuration = 60`:
 
 ```ts
 export async function POST(req: NextRequest) {
@@ -524,8 +524,8 @@ export async function POST(req: NextRequest) {
 }
 ```
 
-- [ ] **Stap 5: draaien** — `npx vitest run && npx tsc --noEmit` → PASS.
-- [ ] **Stap 6: commit** — `feat(polar): webhook-endpoint met HMAC-verificatie + herstelmelding-hook`
+- [x] **Stap 5: draaien** — `npx vitest run && npx tsc --noEmit` → PASS.
+- [x] **Stap 6: commit** — `feat(polar): webhook-endpoint met HMAC-verificatie + herstelmelding-hook`
 
 ### Taak 9: Cron-vangnet + opruimen bij verwijdering
 
@@ -533,20 +533,20 @@ export async function POST(req: NextRequest) {
 - Create: `src/app/api/cron/polar-sync/route.ts`
 - Modify: `vercel.json` (cron-entry), gdpr-cleanup-flow (deregistratie)
 
-- [ ] **Stap 1: cron-route** — spiegel `sync-readiness/route.ts` (`authorizeCron`, `maxDuration = 300`): alle `polarConnection.findMany({ where: { needsReauth: false } })`; per gebruiker `syncPolarExercises` + `syncPolarWellness` in try/catch (fout per gebruiker loggen, doorgaan — één kapot token mag de rest niet blokkeren); response `{ ok, connections, synced, elapsedMs }`.
-- [ ] **Stap 2: vercel.json** — cron `{ "path": "/api/cron/polar-sync", "schedule": "30 4 * * *" }` (vóór daily-reminders om 05:00, ná sync-readiness — de wellness-sync herrekent readiness zelf al voor geraakte dagen).
-- [ ] **Stap 3: deregistratie bij account-verwijdering** — lees `src/app/api/cron/gdpr-cleanup/route.ts`; op de plek waar een user met al zijn data definitief verwijderd wordt: eerst `polarConnection` lezen en best-effort `deregisterPolarUser(decryptPolarToken(accessToken), polarUserId)` (try/catch), zodat het token ook aan Polar-zijde wordt ingetrokken; de rij zelf cascadet mee. Raakt de cleanup users alleen via soft-delete/Prisma-cascade zonder eigen verwijderlus, documenteer dan in een commentaar bij `polarDisconnect` dat harde verwijdering via de bestaande cascade loopt en de Polar-zijde alleen bij expliciet loskoppelen wordt ingetrokken.
-- [ ] **Stap 4: draaien** — `npx tsc --noEmit` → PASS.
-- [ ] **Stap 5: commit** — `feat(polar): dagelijkse vangnet-cron + deregistratie bij opruimen`
+- [x] **Stap 1: cron-route** — spiegel `sync-readiness/route.ts` (`authorizeCron`, `maxDuration = 300`): alle `polarConnection.findMany({ where: { needsReauth: false } })`; per gebruiker `syncPolarExercises` + `syncPolarWellness` in try/catch (fout per gebruiker loggen, doorgaan — één kapot token mag de rest niet blokkeren); response `{ ok, connections, synced, elapsedMs }`.
+- [x] **Stap 2: vercel.json** — cron `{ "path": "/api/cron/polar-sync", "schedule": "30 4 * * *" }` (vóór daily-reminders om 05:00, ná sync-readiness — de wellness-sync herrekent readiness zelf al voor geraakte dagen).
+- [x] **Stap 3: deregistratie bij account-verwijdering** — lees `src/app/api/cron/gdpr-cleanup/route.ts`; op de plek waar een user met al zijn data definitief verwijderd wordt: eerst `polarConnection` lezen en best-effort `deregisterPolarUser(decryptPolarToken(accessToken), polarUserId)` (try/catch), zodat het token ook aan Polar-zijde wordt ingetrokken; de rij zelf cascadet mee. Raakt de cleanup users alleen via soft-delete/Prisma-cascade zonder eigen verwijderlus, documenteer dan in een commentaar bij `polarDisconnect` dat harde verwijdering via de bestaande cascade loopt en de Polar-zijde alleen bij expliciet loskoppelen wordt ingetrokken.
+- [x] **Stap 4: draaien** — `npx tsc --noEmit` → PASS.
+- [x] **Stap 5: commit** — `feat(polar): dagelijkse vangnet-cron + deregistratie bij opruimen`
 
 ### Taak 10: Webhook-setup-script
 
 **Files:**
 - Create: `scripts/polar-webhook-setup.ts`
 
-- [ ] **Stap 1: script schrijven** — CLI met subcommando's `create | get | activate | deactivate | delete`, draaien als `npx tsx scripts/polar-webhook-setup.ts <cmd>`. Leest `POLAR_CLIENT_ID`/`POLAR_CLIENT_SECRET` uit env (`.env.local` laden zoals andere scripts in `scripts/` dat doen — patroon overnemen). Alle calls met Basic auth naar `https://www.polaraccesslink.com/v3/webhooks`. `create`: body `{ events: ['EXERCISE', 'SLEEP', 'CONTINUOUS_HEART_RATE', 'ACTIVITY_SUMMARY'], url: 'https://getbase.coach/api/wearable/polar/webhook' }` (URL overschrijfbaar met `--url`); print het webhook-id én de `signature_secret_key` met de instructie die als `POLAR_WEBHOOK_SECRET` in Vercel + `.env.local` te zetten — **het secret is alleen bij create zichtbaar**. Kopcommentaar met de uitrolvolgorde: eerst de app met de webhook-route deployen (de PING moet 200 krijgen), dán `create` draaien, dán het secret als env zetten en herdeployen. `get` toont status (voor het geval Polar 'm na 7 dagen fouten deactiveert → `activate`).
-- [ ] **Stap 2: droog testen** — `npx tsx scripts/polar-webhook-setup.ts get` (verwacht: nette output, 200 met lege/bestaande webhook of duidelijke foutmelding; geen create draaien — de prod-route bestaat nog niet).
-- [ ] **Stap 3: commit** — `feat(polar): eenmalig webhook-setup-script`
+- [x] **Stap 1: script schrijven** — CLI met subcommando's `create | get | activate | deactivate | delete`, draaien als `npx tsx scripts/polar-webhook-setup.ts <cmd>`. Leest `POLAR_CLIENT_ID`/`POLAR_CLIENT_SECRET` uit env (`.env.local` laden zoals andere scripts in `scripts/` dat doen — patroon overnemen). Alle calls met Basic auth naar `https://www.polaraccesslink.com/v3/webhooks`. `create`: body `{ events: ['EXERCISE', 'SLEEP', 'CONTINUOUS_HEART_RATE', 'ACTIVITY_SUMMARY'], url: 'https://getbase.coach/api/wearable/polar/webhook' }` (URL overschrijfbaar met `--url`); print het webhook-id én de `signature_secret_key` met de instructie die als `POLAR_WEBHOOK_SECRET` in Vercel + `.env.local` te zetten — **het secret is alleen bij create zichtbaar**. Kopcommentaar met de uitrolvolgorde: eerst de app met de webhook-route deployen (de PING moet 200 krijgen), dán `create` draaien, dán het secret als env zetten en herdeployen. `get` toont status (voor het geval Polar 'm na 7 dagen fouten deactiveert → `activate`).
+- [x] **Stap 2: droog testen** — `npx tsx scripts/polar-webhook-setup.ts get` (verwacht: nette output, 200 met lege/bestaande webhook of duidelijke foutmelding; geen create draaien — de prod-route bestaat nog niet).
+- [x] **Stap 3: commit** — `feat(polar): eenmalig webhook-setup-script`
 
 ### Taak 11: Mobiel — koppel-UI (repo mbt-gym-mobile)
 
@@ -557,24 +557,51 @@ export async function POST(req: NextRequest) {
 **Interfaces:**
 - Consumes: de tRPC-procedures uit taak 7 (`wearables.polarAuthorizeUrl` etc.) en de deep-link `mbtgym://polar?status=…&blob=…` uit taak 4.
 
-- [ ] **Stap 1: branch** — `cd /Users/eva/mbt-gym-mobile && git checkout -b feat/polar-koppeling` (repo staat schoon op main).
-- [ ] **Stap 2: lib/polar.ts** — letterlijke spiegel van `lib/strava.ts` met `RETURN_URL = 'mbtgym://polar'` en de procedures `wearables.polarStatus` (type `{ connected: boolean; lastSyncAt: string | null; needsReauth: boolean }`), `polarSync`, `polarDisconnect`, `polarAuthorizeUrl`, `polarClaim`. Zelfde claim-afhandeling (`status=pending` + blob → `polarClaim`).
-- [ ] **Stap 3: integrations.tsx** — Strava-tegel als sjabloon: zelfde kaartopbouw/stijl, Polar-naam, status uit `getPolarStatus`, knoppen koppelen/sync/loskoppelen; bij `needsReauth` de koppel-knop tonen met de "opnieuw koppelen"-tekst. Na een geslaagde connect direct `syncPolar()` aftrappen zoals de Strava-tegel dat na koppelen doet (gedrag daar eerst nalezen en exact spiegelen).
-- [ ] **Stap 4: i18n** — nl/en-keys voor de tegel (titel "Polar", status- en knopteksten, "opnieuw koppelen"-melding), register en toon volgens `docs/tone-of-voice.md` (geen em-dashes, geen holle woorden); `npm run check:i18n` als de repo dat script heeft (zie `scripts/check-i18n.mjs`).
-- [ ] **Stap 5: bron-labels** — overal waar `source === 'STRAVA'` een naam/badge oplevert ook `POLAR → 'Polar'` (zoeken met `rg -n "STRAVA" --glob '!node_modules'`).
-- [ ] **Stap 6: checks** — `npx tsc --noEmit` in de mobiele repo → PASS. GEEN build starten.
-- [ ] **Stap 7: commit** — `feat(polar): Polar-koppeling in integraties (tegel + deep-link-claim)`
+- [x] **Stap 1: branch** — `cd /Users/eva/mbt-gym-mobile && git checkout -b feat/polar-koppeling` (repo staat schoon op main).
+- [x] **Stap 2: lib/polar.ts** — letterlijke spiegel van `lib/strava.ts` met `RETURN_URL = 'mbtgym://polar'` en de procedures `wearables.polarStatus` (type `{ connected: boolean; lastSyncAt: string | null; needsReauth: boolean }`), `polarSync`, `polarDisconnect`, `polarAuthorizeUrl`, `polarClaim`. Zelfde claim-afhandeling (`status=pending` + blob → `polarClaim`).
+- [x] **Stap 3: integrations.tsx** — Strava-tegel als sjabloon: zelfde kaartopbouw/stijl, Polar-naam, status uit `getPolarStatus`, knoppen koppelen/sync/loskoppelen; bij `needsReauth` de koppel-knop tonen met de "opnieuw koppelen"-tekst. Na een geslaagde connect direct `syncPolar()` aftrappen zoals de Strava-tegel dat na koppelen doet (gedrag daar eerst nalezen en exact spiegelen).
+- [x] **Stap 4: i18n** — nl/en-keys voor de tegel (titel "Polar", status- en knopteksten, "opnieuw koppelen"-melding), register en toon volgens `docs/tone-of-voice.md` (geen em-dashes, geen holle woorden); `npm run check:i18n` als de repo dat script heeft (zie `scripts/check-i18n.mjs`).
+- [x] **Stap 5: bron-labels** — overal waar `source === 'STRAVA'` een naam/badge oplevert ook `POLAR → 'Polar'` (zoeken met `rg -n "STRAVA" --glob '!node_modules'`).
+- [x] **Stap 6: checks** — `npx tsc --noEmit` in de mobiele repo → PASS. GEEN build starten.
+- [x] **Stap 7: commit** — `feat(polar): Polar-koppeling in integraties (tegel + deep-link-claim)`
 
 ### Taak 12: Compliance + eindcontrole
 
 **Files:**
 - Modify (hoofd-checkout, gitignored): `/Users/eva/mbt-gym/compliance/avg-verwerkers.md`, `/Users/eva/mbt-gym/compliance/DPIA.md`, `/Users/eva/mbt-gym/compliance/OPENSTAANDE-ACTIES.md`
 
-- [ ] **Stap 1: AVG-docs** — Polar Electro Oy (Finland, EU) toevoegen als **databron/derde partij** (geen verwerker van ons: zelfstandig verantwoordelijke; wij ontvangen data op grond van expliciete toestemming van de gebruiker via OAuth). Categorieën: trainings-, slaap-, hartslag-/HRV- en activiteitsgegevens (bijzondere persoonsgegevens, art. 9: uitdrukkelijke toestemming). Vermelden: pseudonieme member-id richting Polar (random UUID), tokens versleuteld at rest, loskoppelen = deregistratie bij Polar. DPIA-dataflowdiagram/-tabel bijwerken; in OPENSTAANDE-ACTIES: privacyverklaring-tekst over wearable-bronnen nalopen vóór livegang.
-- [ ] **Stap 2: eindcontrole web** — in de worktree: `npx vitest run && npx tsc --noEmit && npx prisma validate` → alles PASS; `git log --oneline main..` toont de taakcommits.
-- [ ] **Stap 3: zelfreview tegen het ontwerp** — elk punt van de security-checklist uit de spec afvinken (state HMAC+TTL, claim-model, at-rest-encryptie, webhook-HMAC + eigen lookup, rate-limit, pseudoniem member-id, RLS, env-secrets, geen info-disclosure) en de "Randgevallen"-sectie nalopen.
-- [ ] **Stap 4: rapport aan Jurre** — wat klaar is, wat bij livegang moet gebeuren (volgorde!): (1) prod-migratie `npx prisma db execute --file supabase/migrations/20260824_polar.sql`, (2) `POLAR_CLIENT_ID`/`SECRET` in Vercel, (3) mergen + deployen, (4) webhook-setup-script `create` + `POLAR_WEBHOOK_SECRET` in Vercel + herdeploy, (5) Jurre koppelt zijn eigen Polar als eerste echte test, (6) veldnamen verifiëren tegen de echte responses (les Kinvent), (7) EAS-build op startsein.
+- [x] **Stap 1: AVG-docs** — Polar Electro Oy (Finland, EU) toevoegen als **databron/derde partij** (geen verwerker van ons: zelfstandig verantwoordelijke; wij ontvangen data op grond van expliciete toestemming van de gebruiker via OAuth). Categorieën: trainings-, slaap-, hartslag-/HRV- en activiteitsgegevens (bijzondere persoonsgegevens, art. 9: uitdrukkelijke toestemming). Vermelden: pseudonieme member-id richting Polar (random UUID), tokens versleuteld at rest, loskoppelen = deregistratie bij Polar. DPIA-dataflowdiagram/-tabel bijwerken; in OPENSTAANDE-ACTIES: privacyverklaring-tekst over wearable-bronnen nalopen vóór livegang.
+- [x] **Stap 2: eindcontrole web** — in de worktree: `npx vitest run && npx tsc --noEmit && npx prisma validate` → alles PASS; `git log --oneline main..` toont de taakcommits.
+- [x] **Stap 3: zelfreview tegen het ontwerp** — elk punt van de security-checklist uit de spec afvinken (state HMAC+TTL, claim-model, at-rest-encryptie, webhook-HMAC + eigen lookup, rate-limit, pseudoniem member-id, RLS, env-secrets, geen info-disclosure) en de "Randgevallen"-sectie nalopen.
+- [x] **Stap 4: rapport aan Jurre** — wat klaar is, wat bij livegang moet gebeuren (volgorde!): (1) prod-migratie `npx prisma db execute --file supabase/migrations/20260824_polar.sql`, (2) `POLAR_CLIENT_ID`/`SECRET` in Vercel, (3) mergen + deployen, (4) webhook-setup-script `create` + `POLAR_WEBHOOK_SECRET` in Vercel + herdeploy, (5) Jurre koppelt zijn eigen Polar als eerste echte test, (6) veldnamen verifiëren tegen de echte responses (les Kinvent), (7) EAS-build op startsein.
 
 ## Bewust niet in dit plan
 
 Web-koppelflow, gerichte entity-pull in de webhook, StressEntry uit Polar-data, FIT/TCX/GPX, physical-info-sync, Polar sleep score / Training Load Pro / SleepWise — zie de spec ("Bewust NIET in scope").
+
+---
+
+## Uitvoeringsnotities (2026-08-24, na afronding)
+
+Alle taken uitgevoerd; 282 tests groen, tsc en eslint schoon. Afwijkingen van
+het plan, ontdekt tijdens de uitvoering:
+
+1. **Main bleek nieuwer dan de checkout waarop het plan was verkend.** De
+   hoofd-checkout stond op het verouderde `feat/app-locale`; main heeft sinds
+   23-08 `findDuplicate` (i.p.v. `findCrossSourceDuplicate`), `sourceActivity`,
+   `zonesFromSeries` en de sessie-koppeling (`session-match.ts`). De
+   Polar-trainingen-sync volgt die nieuwe API, inclusief tijd-in-zone uit de
+   hartslagcurve en het koppelen van krachttrainingen aan gelogde sessies.
+2. **HRV-baseline-fix vervangen door een cherry-pick.** Op de onontdekte,
+   niet-gemergde branch `feat/oura-integratie` (2026-08-01) bleek ccbc1ec
+   ditzelfde probleem al netjes op te lossen (alleen de HRV-bijdrage vervalt
+   naar 'na' i.p.v. een week LEARNING na een bronwissel) mét tests. Die commit
+   is gecherry-pickt (conflictresolutie: i18n-labels van main behouden).
+3. **`linkSessionToMeasurement`** (omgekeerde richting) kreeg ook POLAR in zijn
+   bronfilter — stond niet in het plan maar hoort bij taak 7 stap 3.
+4. **Webhook-setup-script**: Polar wikkelt responses in `{ data: ... }`; de
+   secret-extractie dekt object én array. `get` is live getest (200, nog geen
+   webhook; de client-credentials in .env.local werken).
+5. **DPA-onboarding-tekst** noemt nu "Apple Watch, Polar of Strava"; de
+   DPA-versie is bewust niet opgehoogd — als vraag bij de AVG-specialist
+   belegd (compliance/OPENSTAANDE-ACTIES.md).
