@@ -187,7 +187,7 @@ export function mockOverview(days = 30, end: Date = new Date()) {
 
   // Readiness vandaag + trend (per dag het model draaien).
   const vitalsDays: VitalsDay[] = vitals.map(v => ({
-    date: v.date, hrv: v.hrv, restingHeartRate: v.restingHeartRate,
+    date: v.date, hrv: v.hrv, hrvType: 'SDNN', restingHeartRate: v.restingHeartRate,
     respiratoryRate: v.respiratoryRate, wristTempDeviation: v.wristTempDeviation,
   }))
   const sleepDays: SleepDay[] = sleep.map(s => ({ date: s.date, qualityScore: s.qualityScore }))
