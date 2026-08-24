@@ -25,6 +25,13 @@
 /.superpowers/
 /graphify-out/
 
+# Tijdelijke schermopnames uit /api/dev-snapshot. Die route schrijft alleen
+# lokaal, maar het BESTAND blijft daarna in public/ liggen en zou dus gewoon
+# mee-uploaden. In de opname van het dashboard stonden namen gemaskeerd maar
+# zaten de echte patient-id's nog in de HTML; publiek serveerbaar op
+# getbase.coach/_opname-*.html is dat een dossierlek.
+/public/_opname-*.html
+
 # Werkdocumenten en migraties. Draaien niet mee in de build.
 /docs/
 /supabase/

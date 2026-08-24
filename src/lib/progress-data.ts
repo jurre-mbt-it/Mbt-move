@@ -22,6 +22,8 @@ export type ProgressDataResult = {
       id: string
       date: string
       activity: string
+      /** Ruw bron-type (padel, hike) — benoemt de sport waar de enum OTHER zegt. */
+      sourceActivity: string | null
       protocol: string
       durationMinutes: number
       distanceKm: number | null
@@ -121,6 +123,7 @@ export async function getPatientProgressData(
       id: true,
       completedAt: true,
       activity: true,
+      sourceActivity: true,
       protocol: true,
       durationSec: true,
       distanceM: true,
@@ -182,6 +185,7 @@ export async function getPatientProgressData(
         id: c.id,
         date: c.completedAt.toISOString(),
         activity: c.activity,
+        sourceActivity: c.sourceActivity,
         protocol: c.protocol,
         durationMinutes: Math.round(c.durationSec / 60),
         distanceKm: c.distanceM != null ? Math.round(c.distanceM / 10) / 100 : null,

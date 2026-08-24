@@ -99,6 +99,14 @@ stukken uit deze repo: het cardio-blokkenmodel (`src/lib/cardio-workout.ts` ↔
 (`src/lib/prescription.ts` + `src/lib/program-constants.ts` ↔
 `lib/prescription-mirror.ts`). Er is geen gedeeld package.
 
+Twee stukken lopen de andere kant op, omdat het trainingsdetailscherm in de app
+begon: de namen van activiteiten (`src/lib/cardio-labels.ts` ↔ `lib/home-tiles.ts`)
+en het rekenwerk achter de hartslagsectie (`src/lib/hr-series-view.ts` ↔
+`lib/hr-series-view.ts`). Ook die staan in de drift-check. Zet labels voor een
+gelogde activiteit dus **niet** in `cardio-constants.ts`: dat bestand beschrijft
+wat je kunt voorschrijven, `cardio-labels.ts` beschrijft wat er terugkomt uit
+een sync (hiken, HIIT, yoga, padel via het ruwe bron-type).
+
 **Wijzig je een van die bronnen, draai dan `npm run check:mirror`** — dat laadt
 de echte bestanden uit beide repo's en vergelijkt gedrag (zelfde blokken →
 zelfde samenvatting/duur/kleuren/RPE's) en constanten. Faalt hij, trek de

@@ -79,3 +79,8 @@ jargon-final.json
 
 # Commerciele stukken (prijzen, marges, verdienmodel). Repo is publiek.
 business/
+
+# Tijdelijke schermopnames uit /api/dev-snapshot (public/_opname-*.html).
+# Bevatten echte patient-id's; horen niet in een publieke repo en niet in een
+# deploy. Zie ook .vercelignore.
+public/_opname-*.html

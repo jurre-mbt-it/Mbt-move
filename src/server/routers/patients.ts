@@ -26,6 +26,7 @@ import { auditLog } from '@/server/audit'
 import { amsMidnight, dateKey } from '@/lib/week-dates'
 import { deriveTopSet, estimateOneRepMax } from '@/lib/one-rep-max'
 import { clampSessionDurationSec, sessionLoad } from '@/lib/training-load'
+import { estimateTrimpFromSrpe, strainForSession, trimpOfMeasurement } from '@/server/wearables/strain'
 import { syncHashtagsForLog } from '@/server/tags'
 
 const createId = () => crypto.randomUUID()
@@ -920,9 +921,28 @@ export const patientsRouter = createTRPCRouter({
         const s = await ctx.prisma.sessionLog.findUnique({
           where: { id: input.id },
           include: {
-            patient: { select: { id: true, name: true, email: true } },
+            patient: {
+              select: {
+                id: true, name: true, email: true,
+                maxHeartRate: true, restingHeartRate: true, dateOfBirth: true,
+              },
+            },
             program: { select: { name: true } },
             therapist: { select: { id: true, name: true } },
+            /**
+             * De wearable-meting bij deze krachtsessie. Startte de sporter op
+             * zijn horloge ook een workout, dan hangt die als MÉTING aan de
+             * sessie; zonder horloge is dit null. Zelfde bron als
+             * `patient.sessionDetail`, zodat therapeut en sporter naar
+             * hetzelfde scherm kijken.
+             */
+            cardioLog: {
+              select: {
+                id: true, avgHeartRate: true, maxHeartRate: true, durationSec: true,
+                calories: true, timeInZones: true, series: true, source: true,
+                completedAt: true,
+              },
+            },
             exerciseLogs: {
               select: {
                 id: true,
@@ -932,6 +952,10 @@ export const patientsRouter = createTRPCRouter({
                 painLevel: true,
                 weight: true,
                 weightsPerSet: true,
+                // Per-set detail en de eenheid. Zonder `repUnit` leest een
+                // oefening van 30 seconden in het dossier als 30 herhalingen.
+                repsPerSet: true,
+                repUnit: true,
                 notes: true,
               },
             },
@@ -947,6 +971,54 @@ export const patientsRouter = createTRPCRouter({
             })
           : []
         const nameById = new Map(exercises.map((e) => [e.id, e.name]))
+
+        /**
+         * Strain hoort bij de TRAINING, niet bij de meting: de meeste
+         * krachttrainingen gaan zonder horloge, en dan zijn duur en RPE genoeg
+         * voor een eerlijke schatting. Zelfde volgorde en dezelfde functies als
+         * `patient.sessionDetail`, zodat het cijfer dat de therapeut ziet niet
+         * kan afwijken van het cijfer dat de sporter ziet.
+         */
+        const meting = s.cardioLog
+        let measurement: {
+          avgHeartRate: number | null
+          maxHeartRate: number | null
+          durationSec: number
+          calories: number | null
+          timeInZones: unknown
+          series: unknown
+          source: string
+          startAt: string
+        } | null = null
+        let trimp: number | null = null
+        let estimated = false
+        if (meting) {
+          trimp = trimpOfMeasurement(meting, {
+            maxHeartRate: s.patient.maxHeartRate,
+            restingHeartRate: s.patient.restingHeartRate,
+            dateOfBirth: s.patient.dateOfBirth,
+          })
+          measurement = {
+            avgHeartRate: meting.avgHeartRate,
+            maxHeartRate: meting.maxHeartRate,
+            durationSec: meting.durationSec,
+            calories: meting.calories,
+            timeInZones: meting.timeInZones as unknown,
+            series: meting.series as unknown,
+            source: meting.source,
+            // `completedAt` is op CardioLog het STARTmoment van de meting.
+            startAt: meting.completedAt.toISOString(),
+          }
+        }
+        if (trimp == null) {
+          trimp = estimateTrimpFromSrpe(s.duration, s.exertionLevel)
+          estimated = trimp != null
+        }
+        const ankerDatum = meting?.completedAt ?? s.completedAt ?? s.scheduledAt
+        const { strain, dayStrain } = await strainForSession(
+          ctx.prisma, s.patientId, ankerDatum, trimp,
+        )
+
         return {
           type: 'strength' as const,
           patientId: s.patientId,
@@ -956,9 +1028,13 @@ export const patientsRouter = createTRPCRouter({
           therapistId: s.therapistId,
           therapistName: s.therapist?.name ?? null,
           durationMinutes: s.duration ? Math.round(s.duration / 60) : null,
+          durationSec: s.duration,
           painLevel: s.painLevel,
           exertionLevel: s.exertionLevel,
           notes: s.notes,
+          measurement,
+          /** `estimated` = afgeleid uit duur en RPE, niet gemeten. */
+          strain: { score: strain, dayScore: dayStrain, estimated },
           exercises: s.exerciseLogs.map((el) => ({
             id: el.id,
             name: nameById.get(el.exerciseId) ?? 'Oefening',
@@ -966,6 +1042,8 @@ export const patientsRouter = createTRPCRouter({
             reps: el.repsCompleted,
             weight: el.weight,
             weightsPerSet: el.weightsPerSet,
+            repsPerSet: el.repsPerSet,
+            repUnit: el.repUnit,
             painLevel: el.painLevel,
             notes: el.notes,
           })),
@@ -983,12 +1061,19 @@ export const patientsRouter = createTRPCRouter({
             patientId: true,
             completedAt: true,
             activity: true,
+            sourceActivity: true,
             protocol: true,
             durationSec: true,
             distanceM: true,
             avgPaceSecPerKm: true,
             avgHeartRate: true,
             maxHeartRate: true,
+            calories: true,
+            // Tijd-in-zone en de hartslagcurve: hetzelfde beeld dat de sporter
+            // in de app ziet. Zonder deze twee bleef het dossier bij "gemiddeld
+            // 148 bpm" steken terwijl de verdeling het verhaal draagt.
+            timeInZones: true,
+            series: true,
             zone: true,
             targetZone: true,
             rpe: true,
@@ -1007,12 +1092,16 @@ export const patientsRouter = createTRPCRouter({
           completedAt: c.completedAt,
           programName: c.program?.name ?? null,
           activity: c.activity,
+          sourceActivity: c.sourceActivity,
           protocol: c.protocol,
           durationSec: c.durationSec,
           distanceM: c.distanceM,
           avgPaceSecPerKm: c.avgPaceSecPerKm,
           avgHeartRate: c.avgHeartRate,
           maxHeartRate: c.maxHeartRate,
+          calories: c.calories,
+          timeInZones: c.timeInZones as unknown,
+          series: c.series as unknown,
           zone: c.zone,
           targetZone: c.targetZone,
           rpe: c.rpe,
@@ -2506,6 +2595,9 @@ export const patientsRouter = createTRPCRouter({
           id: true,
           completedAt: true,
           activity: true,
+          // Ruw bron-type: benoemt de sport (padel, hike) waar onze enum OTHER
+          // zegt. Zonder dit heet elke onbekende sport in het dossier "Cardio".
+          sourceActivity: true,
           protocol: true,
           durationSec: true,
           distanceM: true,
@@ -2526,6 +2618,7 @@ export const patientsRouter = createTRPCRouter({
         id: l.id,
         completedAt: l.completedAt,
         activity: l.activity,
+        sourceActivity: l.sourceActivity,
         protocol: l.protocol,
         durationSec: l.durationSec,
         distanceM: l.distanceM,
