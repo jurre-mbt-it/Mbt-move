@@ -410,6 +410,7 @@ model User {
   // Wearables (Apple Watch / HealthKit + Strava)
   wearableConnections WearableConnection[]
   stravaConnection    StravaConnection?
+  polarConnection     PolarConnection?
   sleepEntries        SleepEntry[]
   vitalsEntries       VitalsEntry[]
   readinessSnapshots  ReadinessSnapshot[]
@@ -2466,12 +2467,14 @@ model RunningAnalysisAdvice {
 enum WearableProvider {
   APPLE_HEALTH
   STRAVA // Strava API (cloud-to-cloud, OAuth 2.0 + activity/stream-pull)
+  POLAR // Polar AccessLink (cloud-to-cloud, OAuth 2.0 + REST-pull)
 }
 
 enum WorkoutSource {
   MANUAL // handmatig gelogd in de app
   APPLE_WATCH // gesynct vanuit HealthKit
   STRAVA // gesynct via de Strava API (OAuth 2.0 + activity/stream-pull)
+  POLAR // gesynct via Polar AccessLink (OAuth 2.0 + REST-pull)
 }
 
 enum HrvType {
@@ -2524,6 +2527,29 @@ model StravaConnection {
 
   @@index([athleteId])
   @@map("strava_connections")
+}
+
+/// Polar AccessLink-koppeling per user. Access-token is langlevend (~1 jaar)
+/// en Polar geeft GEEN refresh-token: bij 401/verloop zet de sync
+/// `needsReauth` en moet de gebruiker opnieuw koppelen. `polarUserId` =
+/// x_user_id uit de token-respons (webhook-lookup); `memberId` = ons eigen
+/// pseudoniem bij Polar (random UUID — bewust niet het interne user-id).
+model PolarConnection {
+  id                 String    @id @default(cuid())
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId             String    @unique
+  polarUserId        String    @unique
+  memberId           String
+  accessToken        String // AES-versleuteld at rest (token-crypto)
+  expiresAt          DateTime
+  needsReauth        Boolean   @default(false)
+  lastSyncAt         DateTime? // laatste geslaagde exercises-sync
+  lastWellnessSyncAt DateTime? // laatste geslaagde slaap/vitals/HR-sync
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([polarUserId])
+  @@map("polar_connections")
 }
 
 /// Eén nacht slaap, geaggregeerd uit HealthKit sleep-analysis-segmenten.
