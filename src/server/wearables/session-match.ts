@@ -163,7 +163,7 @@ export async function linkSessionToMeasurement(
     where: {
       patientId,
       sessionLogId: null,
-      source: { in: ['APPLE_WATCH', 'STRAVA'] },
+      source: { in: ['APPLE_WATCH', 'STRAVA', 'POLAR'] },
       activity: { in: [...LINKABLE] },
       completedAt: { gte: new Date(anchor - SEARCH_MARGIN_MS), lte: new Date(anchor + SEARCH_MARGIN_MS) },
     },

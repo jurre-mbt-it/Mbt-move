@@ -23,6 +23,15 @@ import { wearablesEnabledForRole } from '@/lib/wearables-access'
 import { auditLog } from '@/server/audit'
 import { buildAuthorizeUrl, encryptToken, isStravaConfigured, openTokens } from '@/server/wearables/strava/config'
 import { syncStravaActivities } from '@/server/wearables/strava/sync'
+import {
+  buildAuthorizeUrl as buildPolarAuthorizeUrl,
+  decryptPolarToken,
+  encryptPolarToken,
+  isPolarConfigured,
+  openPolarTokens,
+} from '@/server/wearables/polar/config'
+import { deregisterPolarUser, registerPolarUser } from '@/server/wearables/polar/api'
+import { syncPolarExercises, syncPolarWellness } from '@/server/wearables/polar/sync'
 import { shouldOfferRatingMute } from '@/server/wearables/rating'
 import { syncHashtagsForLog } from '@/server/tags'
 import { heartRateLooksImplausible } from '@/lib/heart-rate-plausibility'
@@ -164,7 +173,7 @@ async function buildOverview(prisma: PrismaClient, userId: string, locale: Readi
     prisma.cardioLog.findMany({
       // `sessionLogId: null` — een meting die aan een krachtsessie hangt is
       // geen eigen activiteit; die leest de app via patient.sessionDetail.
-      where: { patientId: userId, source: { in: ['APPLE_WATCH', 'STRAVA'] }, sessionLogId: null },
+      where: { patientId: userId, source: { in: ['APPLE_WATCH', 'STRAVA', 'POLAR'] }, sessionLogId: null },
       orderBy: { completedAt: 'desc' },
       take: ACTIVITY_LIMIT,
     }),
@@ -408,6 +417,110 @@ export const wearablesRouter = createTRPCRouter({
     return { ok: true }
   }),
 
+  // ── Polar (AccessLink, cloud-to-cloud) ─────────────────────────────────────
+
+  /** Geautoriseerde Polar authorize-URL; de app opent 'm in de browser. */
+  polarAuthorizeUrl: wearablesProcedure.query(({ ctx }) => {
+    if (!isPolarConfigured()) {
+      throw new TRPCError({ code: 'NOT_IMPLEMENTED', message: 'polar_not_configured' })
+    }
+    return { url: buildPolarAuthorizeUrl(ctx.user!.id) }
+  }),
+
+  /**
+   * Claim de tokens uit de verzegelde callback-blob voor de INGELOGDE
+   * gebruiker (zelfde claim-model als Strava, zie polar/config.ts). Hier
+   * gebeurt ook de verplichte registratie bij Polar, met een random UUID als
+   * member-id — bewust niet het interne user-id.
+   */
+  polarClaim: wearablesProcedure
+    .input(z.object({ blob: z.string().min(1).max(4096) }))
+    .mutation(async ({ ctx, input }) => {
+      const t = openPolarTokens(input.blob)
+      if (!t) throw new TRPCError({ code: 'BAD_REQUEST', message: 'invalid_blob' })
+      const userId = ctx.user!.id
+      // Bestaand member-id hergebruiken bij opnieuw koppelen: Polar kent deze
+      // gebruiker dan al (registratie geeft 409 = stil ok).
+      const existing = await ctx.prisma.polarConnection.findUnique({
+        where: { userId }, select: { memberId: true },
+      })
+      const memberId = existing?.memberId ?? crypto.randomUUID()
+      await registerPolarUser(t.accessToken, memberId)
+      const data = {
+        polarUserId: t.polarUserId,
+        memberId,
+        accessToken: encryptPolarToken(t.accessToken),
+        expiresAt: new Date(t.expiresAt * 1000),
+        needsReauth: false,
+      }
+      try {
+        await ctx.prisma.$transaction([
+          ctx.prisma.polarConnection.upsert({
+            where: { userId },
+            update: data,
+            create: { userId, ...data },
+          }),
+          ctx.prisma.wearableConnection.upsert({
+            where: { userId_provider: { userId, provider: 'POLAR' } },
+            update: { enabled: true },
+            create: { userId, provider: 'POLAR', enabled: true, deviceModel: 'Polar' },
+          }),
+        ])
+      } catch (err) {
+        // polarUserId is uniek: dezelfde Polar-account kan niet aan twee
+        // app-accounts hangen.
+        if (err && typeof err === 'object' && 'code' in err && err.code === 'P2002') {
+          throw new TRPCError({ code: 'CONFLICT', message: 'polar_already_linked' })
+        }
+        throw err
+      }
+      return { ok: true }
+    }),
+
+  /** Polar-koppelingsstatus (voor de integraties-tegel). */
+  polarStatus: wearablesProcedure.query(async ({ ctx }) => {
+    const c = await ctx.prisma.polarConnection.findUnique({
+      where: { userId: ctx.user!.id },
+      select: { lastSyncAt: true, needsReauth: true, expiresAt: true },
+    })
+    return {
+      connected: !!c,
+      lastSyncAt: c?.lastSyncAt?.toISOString() ?? null,
+      // Geen refresh-token bij Polar: verlopen = opnieuw koppelen.
+      needsReauth: !!c && (c.needsReauth || c.expiresAt.getTime() <= Date.now()),
+    }
+  }),
+
+  /** Polar: handmatig (her)synchroniseren (trainingen + wellness). */
+  polarSync: wearablesProcedure.mutation(async ({ ctx }) => {
+    // Polar's quota is applicatie-breed, niet per gebruiker: zonder limiet kan
+    // één account de sync voor alle anderen opbranden (zelfde reden als L5).
+    const rl = await rateLimit('wearables.polarSync', ctx.user!.id, RATE_LIMITS.polarSync)
+    if (!rl.ok) throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
+    const synced = await syncPolarExercises(ctx.prisma, ctx.user!.id)
+    await syncPolarWellness(ctx.prisma, ctx.user!.id)
+    return { synced }
+  }),
+
+  /**
+   * Polar: loskoppelen. Best-effort ook de-registreren bij Polar zodat het
+   * token aan hun kant wordt ingetrokken; daarna tokens + connectie weg.
+   */
+  polarDisconnect: wearablesProcedure.mutation(async ({ ctx }) => {
+    const conn = await ctx.prisma.polarConnection.findUnique({
+      where: { userId: ctx.user!.id },
+      select: { accessToken: true, polarUserId: true },
+    })
+    if (conn) {
+      await deregisterPolarUser(decryptPolarToken(conn.accessToken), conn.polarUserId)
+    }
+    await ctx.prisma.polarConnection.deleteMany({ where: { userId: ctx.user!.id } })
+    await ctx.prisma.wearableConnection.deleteMany({
+      where: { userId: ctx.user!.id, provider: 'POLAR' },
+    })
+    return { ok: true }
+  }),
+
   // ── Beoordelen van gesyncte activiteiten ───────────────────────────────────
 
   /**
@@ -429,7 +542,7 @@ export const wearablesRouter = createTRPCRouter({
     const rows = await ctx.prisma.cardioLog.findMany({
       where: {
         patientId: ctx.user!.id,
-        source: { in: ['APPLE_WATCH', 'STRAVA'] },
+        source: { in: ['APPLE_WATCH', 'STRAVA', 'POLAR'] },
         ratedAt: null,
         skippedAt: null,
         ...(mutedTypes.length ? { activity: { notIn: mutedTypes } } : {}),
