@@ -12,9 +12,17 @@
  */
 import type { CardioActivity, PrismaClient } from '@prisma/client'
 import { resolveMaxHr } from '@/lib/cardio-zones'
-import { rpeFromHeartRate, updateExistingSyncedLog, zonesFromSeries } from '@/server/wearables/ingest'
+import {
+  ingestWearableData,
+  rpeFromHeartRate,
+  updateExistingSyncedLog,
+  zonesFromSeries,
+  type IngestResult,
+  type SyncPayload,
+} from '@/server/wearables/ingest'
 import { linkMeasurementToSession } from '@/server/wearables/session-match'
 import { findDuplicate, enrichExistingLog } from '@/server/wearables/dedupe'
+import { computeAndStoreReadiness } from '@/server/readiness'
 import { PolarAuthError, polarGet } from './api'
 import { decryptPolarToken } from './config'
 
@@ -269,4 +277,261 @@ export async function syncPolarExercises(prisma: Db, userId: string): Promise<nu
 
   await prisma.polarConnection.update({ where: { userId }, data: { lastSyncAt: new Date() } })
   return count
+}
+
+// ── Wellness: slaap, Nightly Recharge, dagactiviteit, continue HR ───────────
+// Polar-responses worden naar het bestaande `syncPayloadSchema`-formaat gemapt
+// en via `ingestWearableData` (source POLAR) verwerkt — dezelfde pijplijn als
+// de HealthKit-bridge, inclusief qualityScore, exertion en readiness.
+
+export type PolarSleep = {
+  date?: string
+  sleep_start_time?: string
+  sleep_end_time?: string
+  /** { "HH:MM": stage } — 0=WAKE, 1=REM, 2/3=LIGHT, 4=DEEP, 5=UNKNOWN */
+  hypnogram?: Record<string, number>
+}
+
+export type PolarRecharge = {
+  date?: string
+  heart_rate_avg?: number
+  heart_rate_variability_avg?: number
+  breathing_rate_avg?: number
+}
+
+export type PolarActivity = {
+  start_time?: string
+  calories?: number
+  active_calories?: number
+  steps?: number
+}
+
+export type PolarHrDay = {
+  date?: string
+  heart_rate_samples?: { heart_rate?: number; sample_time?: string }[]
+}
+
+type SleepNight = SyncPayload['sleep'][number]
+type VitalsDay = SyncPayload['vitals'][number]
+type HrIntradayDay = SyncPayload['hrIntraday'][number]
+
+// Polar-hypnogram-stadia → onze segment-stadia. 5 (UNKNOWN, bv. slecht
+// huidcontact) telt als 'light': 'awake' zou TST en efficiëntie onterecht
+// drukken, en de vensters zijn doorgaans kort.
+const HYPNOGRAM_STAGE: Record<number, 'awake' | 'light' | 'deep' | 'rem'> = {
+  0: 'awake', 1: 'rem', 2: 'light', 3: 'light', 4: 'deep', 5: 'light',
+}
+
+/**
+ * Polar-slaapnacht → ingest-formaat. Het hypnogram heeft kloktijden ("HH:MM")
+ * zonder datum; de datum komt uit `sleep_start_time`, en een kloktijd vóór de
+ * start-kloktijd hoort bij de volgende kalenderdag (nacht-wrap over 00:00).
+ * Zonder hypnogram → null (zeldzaam op ondersteunde horloges).
+ */
+export function polarSleepToNight(s: PolarSleep): SleepNight | null {
+  if (!s.date || !s.sleep_start_time || !s.sleep_end_time) return null
+  const entries = Object.entries(s.hypnogram ?? {})
+  if (entries.length === 0) return null
+
+  // Zone-offset van de nacht ("+02:00" of "Z"); zonder nemen we UTC.
+  const offset = /(?:Z|[+-]\d\d:\d\d)$/.exec(s.sleep_start_time)?.[0] ?? 'Z'
+  const startDay = s.sleep_start_time.slice(0, 10)
+  const startClock = s.sleep_start_time.slice(11, 16)
+  const nextDay = new Date(Date.parse(`${startDay}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10)
+
+  const stamped = entries
+    .map(([clock, stage]) => {
+      const day = clock < startClock ? nextDay : startDay
+      const at = new Date(`${day}T${clock}:00${offset}`)
+      return { at, stage: HYPNOGRAM_STAGE[stage] }
+    })
+    .filter((e): e is { at: Date; stage: 'awake' | 'light' | 'deep' | 'rem' } => !!e.stage && !Number.isNaN(e.at.getTime()))
+    .sort((a, b) => a.at.getTime() - b.at.getTime())
+  if (stamped.length === 0) return null
+
+  const end = new Date(s.sleep_end_time)
+  const segments = stamped.map((e, i) => ({
+    stage: e.stage,
+    startAt: e.at.toISOString(),
+    endAt: (i + 1 < stamped.length ? stamped[i + 1].at : end).toISOString(),
+  }))
+  return { externalId: `polar:sleep:${s.date}`, date: s.date, segments }
+}
+
+/**
+ * Nightly Recharge → vitals. `heart_rate_avg` is het nachtgemiddelde (4 uur
+ * vanaf 30 min na inslapen) — geen klassieke rust-HR, maar hetzelfde signaal
+ * dat Whoop/Oura als nachtelijke baseline gebruiken (besluit 2026-08-24).
+ * HRV is RMSSD; die mag NOOIT met Apple's SDNN in één baseline belanden
+ * (VitalsEntry.hrvType bewaakt dat).
+ */
+export function polarRechargeToVitals(r: PolarRecharge): VitalsDay | null {
+  if (!r.date) return null
+  const v: VitalsDay = { date: r.date }
+  if (r.heart_rate_avg != null) v.restingHeartRate = Math.round(r.heart_rate_avg)
+  if (r.heart_rate_variability_avg != null) {
+    v.hrv = r.heart_rate_variability_avg
+    v.hrvType = 'RMSSD'
+  }
+  if (r.breathing_rate_avg != null) v.respiratoryRate = r.breathing_rate_avg
+  return v.restingHeartRate == null && v.hrv == null && v.respiratoryRate == null ? null : v
+}
+
+/** Dagactiviteit → vitals (stappen + kcal; basaal = totaal − actief). */
+export function polarActivityToVitals(a: PolarActivity): VitalsDay | null {
+  const date = a.start_time?.slice(0, 10)
+  if (!date) return null
+  const v: VitalsDay = { date }
+  if (a.steps != null) v.steps = Math.round(a.steps)
+  if (a.active_calories != null) v.activeEnergyKcal = Math.round(a.active_calories)
+  if (a.calories != null && a.active_calories != null && a.calories > a.active_calories) {
+    v.basalEnergyKcal = Math.round(a.calories - a.active_calories)
+  }
+  return v.steps == null && v.activeEnergyKcal == null ? null : v
+}
+
+/**
+ * Continue HR (5-min-samples) → bpm-histogram voor de dagbelasting (exertion).
+ * Duur per sample = afstand tot het volgende sample, geklemd op [60, 600] s
+ * (Polar sampelt soms vaker dan elke 5 min); het laatste sample telt 300 s.
+ * Bewust GEEN intraday-buckets voor de stress-meter: die verwacht
+ * rust-periodes zonder workouts, en die scheiding kan hier niet betrouwbaar.
+ */
+export function polarContinuousHrToDay(d: PolarHrDay): HrIntradayDay | null {
+  if (!d.date) return null
+  const samples = (d.heart_rate_samples ?? [])
+    .filter(s => s.heart_rate != null && s.heart_rate >= 20 && s.heart_rate <= 240 && !!s.sample_time)
+    .map(s => {
+      const [h, m, sec] = (s.sample_time as string).split(':').map(Number)
+      return { bpm: s.heart_rate as number, t: (h ?? 0) * 3600 + (m ?? 0) * 60 + (sec ?? 0) }
+    })
+    .sort((a, b) => a.t - b.t)
+  if (samples.length === 0) return null
+
+  const histogram: Record<string, number> = {}
+  for (let i = 0; i < samples.length; i++) {
+    const next = samples[i + 1]
+    const dt = next ? Math.min(600, Math.max(60, next.t - samples[i].t)) : 300
+    const bin = String(Math.floor(samples[i].bpm / 5) * 5)
+    histogram[bin] = Math.min(86_400, (histogram[bin] ?? 0) + dt)
+  }
+  return { date: d.date, buckets: [], histogram }
+}
+
+type WellnessDb = Parameters<typeof ingestWearableData>[0] &
+  Pick<PrismaClient, 'polarConnection'> &
+  Parameters<typeof computeAndStoreReadiness>[0]
+
+function isoDay(d: Date): string {
+  return d.toISOString().slice(0, 10)
+}
+
+/**
+ * Sync slaap, Nightly Recharge, dagactiviteit en continue HR (max 28 dagen —
+ * de Polar-lijstvensters) en verwerk alles via de bestaande ingest-pijplijn.
+ * Herrekent readiness voor elke geraakte dag en geeft het IngestResult terug
+ * zodat de webhook er de herstelmelding aan kan hangen.
+ */
+export async function syncPolarWellness(prisma: WellnessDb, userId: string): Promise<IngestResult> {
+  const token = await getPolarAccessToken(prisma, userId)
+  const to = new Date()
+  const from = new Date(to.getTime() - 27 * 86_400_000)
+  const range = `from=${isoDay(from)}&to=${isoDay(to)}`
+
+  let nights: { nights?: PolarSleep[] } | null
+  let recharges: { recharges?: PolarRecharge[] } | null
+  let activities: PolarActivity[] | null
+  let hrRaw: unknown
+  try {
+    ;[nights, recharges, activities, hrRaw] = await Promise.all([
+      polarGet<{ nights?: PolarSleep[] }>(token, '/users/sleep'),
+      polarGet<{ recharges?: PolarRecharge[] }>(token, '/users/nightly-recharge'),
+      polarGet<PolarActivity[]>(token, `/users/activities?${range}`),
+      polarGet<unknown>(token, `/users/continuous-heart-rate?${range}`),
+    ])
+  } catch (err) {
+    if (err instanceof PolarAuthError) {
+      await markNeedsReauth(prisma, userId)
+      throw new Error('polar_needs_reauth')
+    }
+    throw err
+  }
+
+  // Het swagger-schema belooft hier één dag-object; in de praktijk kan het
+  // ook een array of een `{ heart_rates: [...] }`-omslag zijn. Normaliseer
+  // alle drie de vormen (les uit de Kinvent-koppeling: verifieer tegen echte
+  // responses, en wees hier alvast tolerant).
+  const hrDays: PolarHrDay[] = Array.isArray(hrRaw)
+    ? (hrRaw as PolarHrDay[])
+    : hrRaw && Array.isArray((hrRaw as { heart_rates?: PolarHrDay[] }).heart_rates)
+      ? ((hrRaw as { heart_rates: PolarHrDay[] }).heart_rates)
+      : hrRaw
+        ? [hrRaw as PolarHrDay]
+        : []
+
+  const sleep = (nights?.nights ?? []).map(polarSleepToNight).filter((n): n is SleepNight => n !== null)
+
+  // Vitals per datum mergen: recharge (nacht) + activiteit (dag) horen in
+  // dezelfde rij.
+  const vitalsByDate = new Map<string, VitalsDay>()
+  for (const src of [
+    ...(recharges?.recharges ?? []).map(polarRechargeToVitals),
+    ...(activities ?? []).map(polarActivityToVitals),
+  ]) {
+    if (!src) continue
+    vitalsByDate.set(src.date, { ...(vitalsByDate.get(src.date) ?? { date: src.date }), ...src })
+  }
+
+  const hrIntraday = hrDays.map(polarContinuousHrToDay).filter((d): d is HrIntradayDay => d !== null)
+
+  // Eerste bron wint: nachten/dagen die al door een ándere bron gevuld zijn
+  // (Apple Watch bij dubbeldragers) niet overschrijven — anders flip-flopt
+  // dezelfde nacht tussen bronnen bij elke sync.
+  const gte = new Date(from.getTime() - 86_400_000)
+  const [takenSleep, takenVitals, takenExertion] = await Promise.all([
+    prisma.sleepEntry.findMany({
+      where: { userId, date: { gte }, source: { not: 'POLAR' } }, select: { date: true },
+    }),
+    prisma.vitalsEntry.findMany({
+      where: { userId, date: { gte }, source: { not: 'POLAR' } }, select: { date: true },
+    }),
+    prisma.exertionEntry.findMany({
+      where: { userId, date: { gte }, source: { not: 'POLAR' } }, select: { date: true },
+    }),
+  ])
+  const asKeySet = (rows: { date: Date }[]) => new Set(rows.map(r => localDayKey(r.date)))
+  const sleepTaken = asKeySet(takenSleep)
+  const vitalsTaken = asKeySet(takenVitals)
+  const exertionTaken = asKeySet(takenExertion)
+
+  const payload: SyncPayload = {
+    device: { model: 'Polar' },
+    workouts: [],
+    sleep: sleep.filter(n => !sleepTaken.has(n.date)),
+    vitals: [...vitalsByDate.values()].filter(v => !vitalsTaken.has(v.date)),
+    hrIntraday: hrIntraday.filter(d => !exertionTaken.has(d.date)),
+  }
+
+  const result = await ingestWearableData(prisma, userId, payload, {
+    source: 'POLAR',
+    provider: 'POLAR',
+    deviceModel: 'Polar',
+  })
+  for (const date of result.affectedDates) {
+    await computeAndStoreReadiness(prisma, userId, date)
+  }
+  await prisma.polarConnection.update({ where: { userId }, data: { lastWellnessSyncAt: new Date() } })
+  return result
+}
+
+/**
+ * Dag-sleutel in LOKALE tijd, spiegelbeeld van `startOfDayUTCLocal` in de
+ * ingest: die parseert 'yyyy-mm-dd' als lokale start-of-day, dus hier moet
+ * dezelfde lokale kalenderdag uit de opgeslagen Date terugrollen.
+ */
+function localDayKey(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }

@@ -9,7 +9,7 @@
  * hun eigen tabellen.
  */
 import { z } from 'zod'
-import type { PrismaClient, CardioActivity, Prisma } from '@prisma/client'
+import type { PrismaClient, CardioActivity, Prisma, WorkoutSource, WearableProvider } from '@prisma/client'
 import { aggregateNight, sleepQualityScore, type SleepSegment } from '@/lib/sleep-metrics'
 import { resolveMaxHr } from '@/lib/cardio-zones'
 import { bpmHistogramFromSeries, computeExertionDay, type SeriesPoint } from '@/lib/exertion'
@@ -277,7 +277,13 @@ export async function ingestWearableData(
   prisma: Db,
   userId: string,
   payload: SyncPayload,
+  // Polar (en straks andere cloud-bronnen) hergebruiken deze pijplijn voor
+  // slaap/vitals/dag-HR. De defaults houden het HealthKit-gedrag exact gelijk.
+  opts?: { source?: WorkoutSource; provider?: WearableProvider; deviceModel?: string },
 ): Promise<IngestResult> {
+  const source = opts?.source ?? ('APPLE_WATCH' as const)
+  const provider = opts?.provider ?? ('APPLE_HEALTH' as const)
+  const deviceModel = opts?.deviceModel ?? payload.device?.model
   const affected = new Set<number>() // start-of-day epoch ms
 
   // HR-profiel ophalen voor de sRPE-afleiding van workouts.
@@ -288,7 +294,7 @@ export async function ingestWearableData(
 
   // ── Connection bijwerken (upsert) ──────────────────────
   await prisma.wearableConnection.upsert({
-    where: { userId_provider: { userId, provider: 'APPLE_HEALTH' } },
+    where: { userId_provider: { userId, provider } },
     update: {
       lastSyncAt: new Date(),
       // Een aankomende sync ís een actieve koppeling: de app synct alleen als
@@ -300,14 +306,14 @@ export async function ingestWearableData(
       // readiness-cron sloeg de gebruiker over. Zelfde patroon als de
       // Strava-claim (routers/wearables.ts).
       enabled: true,
-      ...(payload.device?.model ? { deviceModel: payload.device.model } : {}),
+      ...(deviceModel ? { deviceModel } : {}),
       ...(payload.anchors ? { anchors: payload.anchors } : {}),
     },
     create: {
       id: createId(),
       userId,
-      provider: 'APPLE_HEALTH',
-      deviceModel: payload.device?.model ?? null,
+      provider,
+      deviceModel: deviceModel ?? null,
       anchors: payload.anchors ?? undefined,
       lastSyncAt: new Date(),
     },
@@ -343,7 +349,7 @@ export async function ingestWearableData(
       timeInZones,
       series: w.series ?? undefined,
       avgPaceSecPerKm,
-      source: 'APPLE_WATCH' as const,
+      source,
       completedAt,
     }
 
@@ -431,7 +437,7 @@ export async function ingestWearableData(
       latencyMin: night.latencyMin,
       qualityScore: quality,
       stages: s.segments as unknown as object,
-      source: 'APPLE_WATCH' as const,
+      source,
       ...(s.externalId ? { externalId: s.externalId } : {}),
     }
 
@@ -451,7 +457,7 @@ export async function ingestWearableData(
   // HRV/rust-HR/ademhaling van eerdere batches op dezelfde dag.
   for (const v of payload.vitals) {
     const date = startOfDayUTCLocal(v.date)
-    const patch: Record<string, unknown> = { source: 'APPLE_WATCH' }
+    const patch: Record<string, unknown> = { source }
     if (v.restingHeartRate !== undefined) patch.restingHeartRate = v.restingHeartRate
     if (v.hrv !== undefined) patch.hrv = v.hrv
     if (v.hrvType !== undefined) patch.hrvType = v.hrvType
@@ -477,7 +483,7 @@ export async function ingestWearableData(
         activeEnergyKcal: v.activeEnergyKcal != null ? Math.round(v.activeEnergyKcal) : null,
         basalEnergyKcal: v.basalEnergyKcal != null ? Math.round(v.basalEnergyKcal) : null,
         vo2Max: v.vo2Max ?? null,
-        source: 'APPLE_WATCH',
+        source,
       },
     })
     affected.add(date.getTime())
@@ -511,7 +517,7 @@ export async function ingestWearableData(
         restingHeartRate: result.restingHeartRate,
         samples: result.samples,
         timeInBands: result.timeInBands,
-        source: 'APPLE_WATCH' as const,
+        source,
       }
       await prisma.stressEntry.upsert({
         where: { userId_date: { userId, date } },
@@ -541,7 +547,7 @@ export async function ingestWearableData(
         timeInZones: ex.timeInZones,
         hrHistogram: day.histogram,
         maxHrUsed: maxHrRes.maxHr,
-        source: 'APPLE_WATCH' as const,
+        source,
       }
       await prisma.exertionEntry.upsert({
         where: { userId_date: { userId, date } },

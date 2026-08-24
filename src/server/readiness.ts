@@ -31,6 +31,12 @@ export const READINESS_HISTORY_DAYS = HISTORY_DAYS
 export type ReadinessVitalsRow = {
   date: Date
   hrv: number | null
+  /**
+   * SDNN (Apple) vs RMSSD (Polar/Garmin/Whoop) — andere schaal, nooit in één
+   * baseline mengen. Optioneel voor oudere callers; ontbrekend ≈ SDNN (Apple
+   * was de enige bron vóór dit veld bestond).
+   */
+  hrvType?: string | null
   restingHeartRate: number | null
   respiratoryRate: number | null
   wristTempDeviation: number | null
@@ -87,7 +93,7 @@ export async function computeReadinessFor(
           where: { userId, date: { gte: since, lte: target } },
           orderBy: { date: 'asc' },
           select: {
-            date: true, hrv: true, restingHeartRate: true,
+            date: true, hrv: true, hrvType: true, restingHeartRate: true,
             respiratoryRate: true, wristTempDeviation: true,
           },
         }),
@@ -107,9 +113,17 @@ export async function computeReadinessFor(
     }),
   ])
 
+  // HRV-baseline mag nooit SDNN- (Apple) en RMSSD-nachten (Polar) mengen —
+  // andere schaal, dus een bronwissel zou de baseline scheeftrekken. De meest
+  // recente meting bepaalt het type; nachten van het andere type tellen niet
+  // mee. `hrvType` ontbreekt op oude rijen ≈ SDNN (Apple was toen de enige bron).
+  const hrvTypeOf = (row: { hrvType?: string | null }) => row.hrvType ?? 'SDNN'
+  const refHrvRow = [...vitalsRows].reverse().find(v => v.hrv != null)
+  const refHrvType = refHrvRow ? hrvTypeOf(refHrvRow) : null
+
   const vitals: VitalsDay[] = vitalsRows.map(v => ({
     date: isoDay(v.date),
-    hrv: v.hrv,
+    hrv: refHrvType == null || hrvTypeOf(v) === refHrvType ? v.hrv : null,
     restingHeartRate: v.restingHeartRate,
     respiratoryRate: v.respiratoryRate,
     wristTempDeviation: v.wristTempDeviation,
