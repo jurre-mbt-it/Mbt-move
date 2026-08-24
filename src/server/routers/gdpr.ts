@@ -21,6 +21,7 @@ import {
   mfaAdminProcedure,
 } from '@/server/trpc'
 import { auditLog } from '@/server/audit'
+import { deregisterPolarForUser } from '@/server/wearables/polar/sync'
 import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 
 const GRACE_PERIOD_DAYS = 30
@@ -431,6 +432,9 @@ export const gdprRouter = createTRPCRouter({
           // We gaan door met Prisma-delete alsnog
         }
       }
+
+      // Token ook aan Polar-zijde intrekken; de rij zelf cascadet mee.
+      await deregisterPolarForUser(ctx.prisma, user.id)
 
       // Stap 2: Prisma hard-delete (cascade via schema)
       await ctx.prisma.user.delete({ where: { id: user.id } })

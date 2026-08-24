@@ -23,7 +23,7 @@ import {
 import { linkMeasurementToSession } from '@/server/wearables/session-match'
 import { findDuplicate, enrichExistingLog } from '@/server/wearables/dedupe'
 import { computeAndStoreReadiness } from '@/server/readiness'
-import { PolarAuthError, polarGet } from './api'
+import { deregisterPolarUser, PolarAuthError, polarGet } from './api'
 import { decryptPolarToken } from './config'
 
 const createId = () => crypto.randomUUID()
@@ -522,6 +522,28 @@ export async function syncPolarWellness(prisma: WellnessDb, userId: string): Pro
   }
   await prisma.polarConnection.update({ where: { userId }, data: { lastWellnessSyncAt: new Date() } })
   return result
+}
+
+/**
+ * Best-effort de-registratie bij Polar vóór een hard-delete van de user
+ * (gdpr-cleanup, gdpr.confirmDeletion, admin.deleteUser): zo wordt het token
+ * ook aan Polar-zijde ingetrokken. Mag de verwijdering nooit blokkeren —
+ * de PolarConnection-rij zelf cascadet mee met de user-delete.
+ */
+export async function deregisterPolarForUser(
+  prisma: Pick<PrismaClient, 'polarConnection'>,
+  userId: string,
+): Promise<void> {
+  try {
+    const conn = await prisma.polarConnection.findUnique({
+      where: { userId },
+      select: { accessToken: true, polarUserId: true },
+    })
+    if (!conn) return
+    await deregisterPolarUser(decryptPolarToken(conn.accessToken), conn.polarUserId)
+  } catch (err) {
+    console.warn('[polar] deregistratie vóór user-delete mislukt', err)
+  }
 }
 
 /**
