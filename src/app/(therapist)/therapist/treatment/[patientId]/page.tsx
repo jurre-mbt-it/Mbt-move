@@ -39,6 +39,8 @@ import {
   SUPERSET_LETTERS,
 } from '@/lib/program-constants'
 import { formatWeightsPerSet } from '@/lib/session-sets'
+import { formatSessionForDossier, type DossierSession } from '@/lib/dossier-report'
+import { CopyForDossierButton } from '@/components/patients/CopyForDossierButton'
 
 type ParamType = 'number' | 'text' | 'select' | 'slider'
 
@@ -632,6 +634,39 @@ export default function TreatmentPage({
     }
   }
 
+  /**
+   * Dossier-tekst uit de LIVE invoer — niet uit de opgeslagen sessie. Zo is
+   * wat je kopieert gegarandeerd wat je opslaat, ook als je de duur of RPE in
+   * de afrond-popup nog aanpast na het kopiëren.
+   */
+  function buildDossierSession(): DossierSession {
+    const minutes = Math.max(1, Math.round(Number(durationMinInput) || durationMin))
+    return {
+      date: new Date(),
+      durationMinutes: minutes,
+      painLevel: painEnabled ? (painLevel ?? 0) : 0,
+      exertionLevel,
+      feelScore,
+      notes,
+      exercises: rows.map((r) => {
+        const setsCount = Math.max(1, Number(r.setsCompleted) || 1)
+        return {
+          name: r.name,
+          phase: r.phase,
+          supersetGroup: r.supersetGroup,
+          sets: r.setsCompleted,
+          reps: r.repsCompleted,
+          repUnit: r.repUnit,
+          // Verborgen parameters worden ook niet gekopieerd — zelfde regel als
+          // bij opslaan, anders staat er in het dossier iets wat niet gelogd is.
+          weightsPerSet: r.visible.weight ? r.weightsPerSet.slice(0, setsCount) : null,
+          extraParams: r.extraParams,
+          painDuring: r.visible.pain ? r.painDuring : null,
+        }
+      }),
+    }
+  }
+
   function handleSubmit() {
     const now = new Date()
     // Duur: handmatig ingevulde waarde uit de popup, met de live-getelde tijd
@@ -1035,6 +1070,7 @@ export default function TreatmentPage({
           durationMin={durationMin}
           durationMinInput={durationMinInput}
           onDurationChange={setDurationMinInput}
+          getDossierText={() => formatSessionForDossier(buildDossierSession())}
           exertionLevel={exertionLevel}
           onExertionChange={setExertionLevel}
           feelScore={feelScore}
@@ -2310,6 +2346,7 @@ function FinishSessionModal({
   durationMin,
   durationMinInput,
   onDurationChange,
+  getDossierText,
   exertionLevel,
   onExertionChange,
   feelScore,
@@ -2327,6 +2364,7 @@ function FinishSessionModal({
   durationMin: number
   durationMinInput: string
   onDurationChange: (v: string) => void
+  getDossierText: () => string
   exertionLevel: number | null
   onExertionChange: (v: number) => void
   feelScore: number | null
@@ -2482,7 +2520,12 @@ function FinishSessionModal({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 flex items-center gap-3" style={{ borderTop: `1px solid ${P.line}` }}>
+        <div className="px-5 py-4 flex flex-col gap-3" style={{ borderTop: `1px solid ${P.line}` }}>
+          {/* Kopiëren vóór opslaan: de therapeut plakt in het EPD en rondt
+              daarna pas af. De tekst komt uit de invoer hierboven, dus wat je
+              kopieert is wat je opslaat. */}
+          <CopyForDossierButton getText={getDossierText} label="KOPIEER VOOR DOSSIER" variant="block" />
+          <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={onCancel}
@@ -2496,6 +2539,7 @@ function FinishSessionModal({
             <DarkButton size="lg" onClick={onSubmit} disabled={loading} loading={loading}>
               {loading ? 'OPSLAAN…' : 'OPSLAAN'}
             </DarkButton>
+          </div>
           </div>
         </div>
       </div>

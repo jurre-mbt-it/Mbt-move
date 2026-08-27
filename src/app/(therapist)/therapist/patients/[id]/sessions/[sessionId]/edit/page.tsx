@@ -21,6 +21,8 @@ import {
   Tile,
 } from '@/components/dark-ui'
 import { trpc } from '@/lib/trpc/client'
+import { formatSessionForDossier } from '@/lib/dossier-report'
+import { CopyForDossierButton } from '@/components/patients/CopyForDossierButton'
 import {
   STANDARD_PARAMS,
   SUPERSET_COLORS,
@@ -50,6 +52,13 @@ type EditRow = {
   extraParams: EditExtraParam[]
   supersetGroup: string | null
   painDuring: string
+  // Niet bewerkbaar in dit scherm, wel nodig voor de dossier-kopie: zonder
+  // deze velden levert dezelfde sessie hier een andere tekst op dan in de
+  // historie of live.
+  repUnit: string | null
+  phase: string | null
+  painLevel: number | null
+  exerciseNotes: string | null
 }
 
 function fromServerParams(raw: unknown): EditExtraParam[] {
@@ -139,6 +148,10 @@ export default function EditSessionPage({
         extraParams: fromServerParams(ex.extraParams),
         supersetGroup: ex.supersetGroup ?? null,
         painDuring: ex.painDuring != null ? String(ex.painDuring) : '',
+        repUnit: ex.repUnit ?? null,
+        phase: ex.phase ?? null,
+        painLevel: ex.painLevel ?? null,
+        exerciseNotes: ex.notes ?? null,
       }
     }))
     setHydrated(true)
@@ -375,6 +388,39 @@ export default function EditSessionPage({
           <MetaLabel>Notities</MetaLabel>
           <DarkTextarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
         </section>
+
+        {/* Kopieert de waarden zoals ze nu op het scherm staan, niet zoals ze
+            in de database staan — corrigeer eerst, kopieer daarna. */}
+        <CopyForDossierButton
+          label="KOPIEER VOOR DOSSIER"
+          variant="block"
+          getText={() =>
+            formatSessionForDossier({
+              date: session?.completedAt ?? session?.scheduledAt ?? null,
+              durationMinutes: durationMin,
+              painLevel,
+              exertionLevel,
+              feelScore: session?.feelScore ?? null,
+              notes,
+              exercises: rows.map((r) => {
+                const setsCount = Math.max(1, Number(r.setsCompleted) || 1)
+                return {
+                  name: r.name,
+                  phase: r.phase,
+                  supersetGroup: r.supersetGroup,
+                  sets: r.setsCompleted,
+                  reps: r.repsCompleted,
+                  repUnit: r.repUnit,
+                  weightsPerSet: r.weightsPerSet.slice(0, setsCount),
+                  extraParams: r.extraParams,
+                  painLevel: r.painLevel,
+                  painDuring: r.painDuring,
+                  notes: r.exerciseNotes,
+                }
+              }),
+            })
+          }
+        />
 
         <DarkButton size="lg" onClick={handleSubmit} loading={updateMutation.isPending}>
           {updateMutation.isPending ? 'OPSLAAN…' : 'WIJZIGINGEN OPSLAAN'}
