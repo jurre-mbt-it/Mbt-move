@@ -27,6 +27,8 @@ import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, type CardioActivityKey, type Cardi
 import { cardioLabel } from '@/lib/cardio-labels'
 import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
 import { formatWeightsPerSet } from '@/lib/session-sets'
+import { formatCardioForDossier, formatSessionForDossier } from '@/lib/dossier-report'
+import { CopyForDossierButton } from '@/components/patients/CopyForDossierButton'
 import { CARDIO_ICON_MAP, IconMail, IconCalendar, IconClipboard } from '@/components/icons'
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
@@ -128,15 +130,23 @@ export default function PatientDetailPage({
     therapistName: string | null
     painLevel: number | null
     exertionLevel: number | null
+    feelScore: number | null
     notes: string | null
     exercises: Array<{
       id: string
       name: string
       sets: number | null
       reps: number | null
+      repUnit: string | null
       painLevel: number | null
       weight: number | null
       weightsPerSet: unknown
+      repsPerSet: unknown
+      extraParams: unknown
+      supersetGroup: string | null
+      phase: string | null
+      painDuring: number | null
+      notes: string | null
     }>
   }
   // therapistId-semantiek: null = legacy/onbekend, === patientId = patient
@@ -780,6 +790,27 @@ export default function PatientDetailPage({
                             {' · '}{proto?.label ?? c.protocol}
                             {c.programName ? ` · ${c.programName}` : ''}
                           </p>
+                          <div className="mt-1.5">
+                            <CopyForDossierButton
+                              getText={() =>
+                                formatCardioForDossier({
+                                  date: c.completedAt,
+                                  activity: c.activity,
+                                  protocol: c.protocol,
+                                  durationSec: c.durationSec,
+                                  distanceM: c.distanceM,
+                                  avgPaceSecPerKm: c.avgPaceSecPerKm,
+                                  avgHeartRate: c.avgHeartRate,
+                                  maxHeartRate: c.maxHeartRate,
+                                  zone: c.zone,
+                                  targetZone: c.targetZone,
+                                  rpe: c.rpe,
+                                  painLevel: c.painLevel,
+                                  notes: c.notes,
+                                })
+                              }
+                            />
+                          </div>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap justify-end">
                           <span className="athletic-mono" style={{ color: P.ice, fontSize: 11, letterSpacing: '0.08em' }}>
@@ -874,6 +905,33 @@ export default function PatientDetailPage({
                           >
                             BEWERK
                           </Link>
+                          <CopyForDossierButton
+                            getText={() =>
+                              formatSessionForDossier({
+                                date: session.completedAt,
+                                durationMinutes: session.durationMinutes,
+                                painLevel: session.painLevel,
+                                exertionLevel: session.exertionLevel,
+                                feelScore: session.feelScore,
+                                notes: session.notes,
+                                exercises: session.exercises.map((ex) => ({
+                                  name: ex.name,
+                                  phase: ex.phase,
+                                  supersetGroup: ex.supersetGroup,
+                                  sets: ex.sets,
+                                  reps: ex.reps,
+                                  repUnit: ex.repUnit,
+                                  weight: ex.weight,
+                                  weightsPerSet: ex.weightsPerSet,
+                                  repsPerSet: ex.repsPerSet,
+                                  extraParams: ex.extraParams,
+                                  painLevel: ex.painLevel,
+                                  painDuring: ex.painDuring,
+                                  notes: ex.notes,
+                                })),
+                              })
+                            }
+                          />
                         </div>
                         <p
                           className="athletic-mono"

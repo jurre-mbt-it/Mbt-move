@@ -2093,6 +2093,7 @@ export const patientsRouter = createTRPCRouter({
         durationSeconds: session.duration,
         painLevel: session.painLevel,
         exertionLevel: session.exertionLevel,
+        feelScore: session.feelScore,
         notes: session.notes,
         exercises: session.exerciseLogs.map((el) => ({
           id: el.id,
@@ -2101,14 +2102,21 @@ export const patientsRouter = createTRPCRouter({
           category: nameById.get(el.exerciseId)?.category ?? 'STRENGTH',
           setsCompleted: el.setsCompleted,
           repsCompleted: el.repsCompleted,
+          // repUnit/repsPerSet/phase zijn niet bewerkbaar in dit scherm, maar
+          // de dossier-kopie moet dezelfde tekst opleveren als de live-kopie.
+          repUnit: el.repUnit,
           weight: el.weight,
           weightsPerSet: Array.isArray(el.weightsPerSet)
             ? (el.weightsPerSet as Array<number | null>)
+            : null,
+          repsPerSet: Array.isArray(el.repsPerSet)
+            ? (el.repsPerSet as Array<number | null>)
             : null,
           extraParams: Array.isArray(el.extraParams)
             ? (el.extraParams as Array<Record<string, unknown>>)
             : [],
           supersetGroup: el.supersetGroup,
+          phase: el.phase,
           painLevel: el.painLevel,
           painDuring: el.painDuring,
           notes: el.notes,
@@ -2520,8 +2528,10 @@ export const patientsRouter = createTRPCRouter({
               painLevel: true,
               weight: true,
               weightsPerSet: true,
+              repsPerSet: true,
               extraParams: true,
               supersetGroup: true,
+              phase: true,
               painDuring: true,
               notes: true,
             },
@@ -2562,8 +2572,10 @@ export const patientsRouter = createTRPCRouter({
           painLevel: el.painLevel,
           weight: el.weight,
           weightsPerSet: el.weightsPerSet,
+          repsPerSet: el.repsPerSet,
           extraParams: el.extraParams,
           supersetGroup: el.supersetGroup,
+          phase: el.phase,
           painDuring: el.painDuring,
           notes: el.notes,
         })),
