@@ -1,10 +1,11 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import styles from './base-site.module.css'
 import { Reveal } from './Reveal'
-import { LoadCurve } from './LoadCurve'
 import { ScrambleText } from './ScrambleText'
-import { Counter } from './Counter'
-import { MetricScene } from './MetricScene'
+import { IpadScene } from './IpadScene'
+import { BuildScene } from './BuildScene'
+import { PhoneScene } from './PhoneScene'
 
 /**
  * Publieke BASE-site.
@@ -14,30 +15,44 @@ import { MetricScene } from './MetricScene'
  * BASE staat vooraan als platform voor fysiotherapiepraktijken, en de pagina
  * loopt het hele traject af van uitnodigen tot rapporteren.
  *
- * VORM volgt het skelet van sensiq.co (gesegmenteerde menubalk, per sectie een
- * label met een kop en een productbeeld ernaast) met de huid van
- * movementbasedtherapy.nl (docs/design-systeem.md daar): vierkant, haarlijnen
- * dragen het ontwerp, oranje is actie en mint is meting, mono labels met
- * scramble.
+ * VORM, herzien 21-08-2026 na het oordeel van Jurre dat de pagina te veel op
+ * een gegenereerde landingspagina leek. Drie dingen veroorzaakten dat, en die
+ * zijn alle drie aangepakt. Wie hier iets toevoegt, houdt ze in stand:
  *
- * Waar de spec en de latere vraag van Jurre botsten:
- * - De spec schrapt de bewegende ticker. Die is eruit.
- * - De spec schrapt mono hoofdletters als algemeen stijlelement, maar Jurre
- *   vroeg later expliciet om de menubalk met omspringende letters. Mono blijft
- *   daarom op de menubalk, de sectielabels en echte datalabels, en staat niet
- *   in lopende tekst.
+ * 1. TWAALF KEER HETZELFDE RITME. Elke sectie was label, kop, alinea, paneel
+ *    ernaast. Nu wisselen de vormen bewust van schaal: een schermbreed beeld,
+ *    een rij korte kolommen, twee plakscenes met lange verblijfstijd (het
+ *    dragende sensiq-mechanisme, zie docs/sensiq-dna.md §2), een curve, een
+ *    vergelijking. Voeg niet opnieuw een sectie toe in het standaardstramien.
+ * 2. EEN GENUMMERDE LIJST 01 TOT 06. Weg als lijst. De stappen die echt een
+ *    volgorde zijn (bouwen, criteria, plannen) leven nu in BuildScene, waar
+ *    de volgorde informatie draagt.
+ * 3. NAGETEKENDE PANELEN. Dit is de belangrijkste. Sensiq, de referentie, wordt
+ *    gedragen door foto's van een fysieke ring. Software heeft dat niet, dus
+ *    stonden hier tekeningen die op de app leken, en juist die lezen als
+ *    gegenereerd. Onze versie van die ringfoto is het echte scherm: zie
+ *    ScreenShot.tsx en de frames in BuildScene. Zet er nooit een natekening
+ *    van de app terug. Eén uitzondering, op verzoek van Jurre: PhoneScene is
+ *    een bewegende demonstratie (bogen die zich uittekenen kan een foto
+ *    niet), expliciet gelabeld met voorbeeldwaarden.
  *
- * NOG NIET GEREED VOLGENS DE SPEC: die vraagt vijf echte, gesaniteerde
- * BASE-schermen als productbeeld. Die zijn er nog niet. De panelen hieronder
- * zijn opgebouwd uit dezelfde componenten en waarden als de app, maar ze zijn
- * geen screenshot. Zie het rapport bij deze wijziging.
+ * De grond is die van de app zelf (#0A1C1D), niet het crème van de
+ * praktijksite. Daardoor valt een opname zonder naad in de pagina en staat BASE
+ * ook visueel los van movementbasedtherapy.nl. Zie de tokens boven in
+ * base-site.module.css.
+ *
+ * Wat uit de praktijkstijl blijft gelden: vierkant, haarlijnen dragen het
+ * ontwerp, oranje is actie en mint is meting, mono labels met scramble.
  */
 const DEMO_MAIL =
   'mailto:jurre@movementbasedtherapy.nl?subject=BASE%20demo%20voor%20mijn%20praktijk&body=Hoi%20Jurre%2C%20ik%20zou%20graag%20een%20demo%20van%20BASE%20voor%20mijn%20praktijk.'
 
 export function BaseLanding() {
   return (
-    <main className={styles.page}>
+    // De vaste klasse `base-site` naast de module-klasse: globals.css gebruikt
+    // hem om overflow-x op html/body naar `clip` te zetten, anders plakken de
+    // plakscenes niet (zie het commentaar bij .page in de module).
+    <main className={`base-site ${styles.page}`}>
       {/* ── Menubalk ─────────────────────────────────────────────────── */}
       <nav className={styles.navBar} aria-label="Hoofdmenu">
         <div className={styles.navInner}>
@@ -48,9 +63,6 @@ export function BaseLanding() {
                 <path d="M2 7l6-5 6 5v7H2z" />
               </svg>
             </span>
-            <a className={`${styles.navCell} ${styles.navHideSmall}`} href="#werkwijze">
-              <ScrambleText text="Werkwijze" />
-            </a>
             <a className={`${styles.navCell} ${styles.navHideSmall}`} href="#platform">
               <ScrambleText text="Platform" />
             </a>
@@ -67,398 +79,176 @@ export function BaseLanding() {
         </div>
       </nav>
 
-      {/* ── Hero ─────────────────────────────────────────────────────── */}
-      <header className={styles.sec}>
-        <div className={`${styles.shell} ${styles.block}`}>
-          <div className={`${styles.duo} ${styles.duoTop}`}>
-            <div>
-              <p className={styles.eyebrow}>
-                <ScrambleText text="Van programma tot voortgangsrapport" />
-              </p>
-              <h1 className={styles.head}>
-                <span className={styles.ln}>Houd het hele</span>
-                <span className={styles.ln}>traject in beeld</span>
-              </h1>
-              <p className={styles.lede}>
-                In BASE komen programma&#39;s, trainingen, criteria en metingen samen. Jij plant en
-                beoordeelt, je patiënt traint en logt, en <em>jullie kijken naar dezelfde
-                voortgang</em>. Het platform ondersteunt de beslissing en neemt de klinische regie
-                niet over.
-              </p>
-              <div className={styles.btnRow}>
-                <a className={`${styles.btn} ${styles.btnPrimary}`} href={DEMO_MAIL}>
-                  <ScrambleText text="Plan een demo" />
-                  <span className={styles.btnArrow} aria-hidden="true">&rarr;</span>
-                </a>
-                <a className={styles.btn} href="#werkwijze">
-                  <ScrambleText text="Bekijk de werkwijze" />
-                  <span className={styles.btnArrow} aria-hidden="true">&rarr;</span>
-                </a>
-              </div>
-            </div>
-
-            {/* Het kruisjeskader staat op precies dit ene beeld, één per pagina. */}
-            <div className={`${styles.stage} ${styles.stageDark} ${styles.xframe}`}>
-              <p className={styles.dataName} style={{ marginBottom: 4 }}>
-                Therapeutoverzicht &middot; week 31
-              </p>
-              <div className={`${styles.dataCard} ${styles.dataCardRaised}`}>
-                <div className={styles.dataTop}>
-                  <span className={styles.dataName}>Actieve trajecten</span>
-                  <span className={styles.pill}>4 lopen</span>
-                </div>
-                <span className={styles.dataValue}>18</span>
-                <p className={styles.dataNote}>
-                  Vier patiënten hebben deze week een hertest openstaan.
-                </p>
-              </div>
-              <div className={styles.dataCard}>
-                <div className={styles.dataTop}>
-                  <span className={styles.dataName}>Criteria VKB-traject</span>
-                  <span className={styles.pill}>Fase 5 van 8</span>
-                </div>
-                <div className={styles.meter}><i style={{ width: '62%' }} /></div>
-                <p className={styles.dataNote}>
-                  Symmetrie quadriceps 78 procent. <em>Doel voor fase 6 is 90 procent.</em>
-                </p>
-              </div>
-              <div className={styles.dataCard}>
-                <div className={styles.dataTop}>
-                  <span className={styles.dataName}>Belasting deze week</span>
-                  <span className={styles.pill}>+12%</span>
-                </div>
-                <div className={styles.meter}><i style={{ width: '74%' }} /></div>
-                <p className={styles.dataNote}>
-                  Programma, therapiesessie en eigen training bij elkaar opgeteld.
-                </p>
-              </div>
-            </div>
-          </div>
+      {/* ── Hero: de titel met de iPad ernaast ────────────────────────── */}
+      {/* De scene draagt de hele hero: de tekst blijft staan terwijl de
+          schermen langsschuiven. Het kruisjeskader staat op dit beeld, en op
+          precies dit ene beeld van de pagina. */}
+      <IpadScene>
+        <p className={styles.eyebrow}>
+          <ScrambleText text="Van programma tot voortgangsrapport" />
+        </p>
+        <h1 className={`${styles.head} ${styles.headSmall}`}>
+          <span className={styles.ln}>Houd het hele</span>
+          <span className={styles.ln}>traject in beeld</span>
+        </h1>
+        <p className={styles.lede}>
+          In BASE komen programma&#39;s, trainingen, criteria en metingen samen. Jij plant en
+          beoordeelt, je patiënt traint en logt, en <em>jullie kijken naar dezelfde
+          voortgang</em>.
+        </p>
+        <div className={styles.btnRow}>
+          <a className={`${styles.btn} ${styles.btnPrimary}`} href={DEMO_MAIL}>
+            <ScrambleText text="Plan een demo" />
+            <span className={styles.btnArrow} aria-hidden="true">&rarr;</span>
+          </a>
+          <a className={styles.btn} href="#platform">
+            <ScrambleText text="Bekijk het platform" />
+            <span className={styles.btnArrow} aria-hidden="true">&rarr;</span>
+          </a>
         </div>
-      </header>
+      </IpadScene>
 
-      {/* ── Therapeutendashboard ─────────────────────────────────────── */}
-      <section className={styles.sec}>
+      {/* ── Wat je ziet als je opent ──────────────────────────────────── */}
+      <section className={`${styles.sec} ${styles.secBand}`}>
         <div className={`${styles.shell} ${styles.block}`}>
           <Reveal>
-            <p className={styles.eyebrow}><ScrambleText text="Therapeutendashboard" /></p>
+            <p className={styles.eyebrow}><ScrambleText text="Signalen" /></p>
             <h2 className={styles.head}>
-              <span className={styles.ln}>Zie wie deze week</span>
-              <span className={styles.ln}>aandacht nodig heeft</span>
+              <span className={styles.ln}>Zie in één oogopslag</span>
+              <span className={styles.ln}>wie er aandacht</span>
+              <span className={styles.ln}>nodig heeft</span>
             </h2>
             <p className={styles.lede}>
-              Je opent BASE en ziet meteen waar het schuurt: wie is gestopt met loggen, wie zit
-              boven zijn belasting, bij wie staat een hertest open. <em>Geen lijst met alles, maar
-              een lijst met wat afwijkt.</em>
+              Met ons dashboard zie je direct wie aandacht nodig heeft, welk programma
+              gecontroleerd moet worden en welke patiënt recent iets heeft gelogd.
             </p>
-
-            <div className={styles.board}>
-              <div className={styles.boardTop}>
-                <span className={styles.dataName}>Praktijk Houthavens &middot; week 31</span>
-                <span className={styles.dataName}>18 actieve trajecten</span>
-              </div>
-              <div className={styles.boardStats}>
-                <div className={styles.boardStat}>
-                  <span className={styles.boardVal}><Counter to={3} /></span>
-                  <span className={styles.figureLabel}>Signalen</span>
-                </div>
-                <div className={styles.boardStat}>
-                  <span className={styles.boardVal}><Counter to={86} /><small>%</small></span>
-                  <span className={styles.figureLabel}>Therapietrouw</span>
-                </div>
-                <div className={styles.boardStat}>
-                  <span className={styles.boardVal}><Counter to={2} /></span>
-                  <span className={styles.figureLabel}>Stilgevallen</span>
-                </div>
-                <div className={styles.boardStat}>
-                  <span className={styles.boardVal}><Counter to={4} /></span>
-                  <span className={styles.figureLabel}>Hertesten open</span>
-                </div>
-              </div>
-              <div className={styles.boardFeed}>
-                <div className={styles.feedRow}>
-                  <i className={styles.feedDot} aria-hidden="true" />
-                  <span>Belasting 52 procent boven de weekopbouw, drie dagen op rij</span>
-                  <span className={styles.feedWhen}>Vandaag</span>
-                </div>
-                <div className={styles.feedRow}>
-                  <i className={styles.feedDot} aria-hidden="true" />
-                  <span>Zeven dagen niets gelogd, laatste sessie was een afgebroken programma</span>
-                  <span className={styles.feedWhen}>2 dagen</span>
-                </div>
-                <div className={styles.feedRow}>
-                  <i className={`${styles.feedDot} ${styles.feedDotCalm}`} aria-hidden="true" />
-                  <span>Symmetrie quadriceps van 71 naar 78 procent, fase 6 komt in zicht</span>
-                  <span className={styles.feedWhen}>Gisteren</span>
-                </div>
-                <div className={styles.feedRow}>
-                  <i className={`${styles.feedDot} ${styles.feedDotCalm}`} aria-hidden="true" />
-                  <span>Hertest hop-batterij ingepland voor week 33</span>
-                  <span className={styles.feedWhen}>Deze week</span>
-                </div>
-              </div>
+            <div className={styles.trio}>
+              <article className={styles.trioCell}>
+                <h3 className={styles.trioTitle}>Stilgevallen</h3>
+                <p className={styles.rowText}>
+                  Zeven dagen niets gelogd, en de laatste sessie was een afgebroken programma.
+                </p>
+              </article>
+              <article className={styles.trioCell}>
+                <h3 className={styles.trioTitle}>Boven de opbouw</h3>
+                <p className={styles.rowText}>
+                  Belasting 52 procent boven de weekopbouw, drie dagen op rij.
+                </p>
+              </article>
+              <article className={styles.trioCell}>
+                <h3 className={styles.trioTitle}>Hertest open</h3>
+                <p className={styles.rowText}>
+                  Symmetrie quadriceps van 71 naar 78 procent, de hop-batterij staat in week 33.
+                </p>
+              </article>
             </div>
           </Reveal>
         </div>
       </section>
 
-      {/* ── Patiëntprofiel ───────────────────────────────────────────── */}
-      <section className={`${styles.sec} ${styles.secDark}`}>
-        <div className={`${styles.shell} ${styles.block}`}>
-          <Reveal>
-            <div className={styles.duo}>
-              <div className={styles.stage}>
-                <p className={styles.dataName}>Vandaag &middot; dinsdag 29 juli</p>
-                <div className={`${styles.dataCard} ${styles.dataCardRaised}`}>
-                  <div className={styles.dataTop}>
-                    <span className={styles.dataName}>Knie 3B</span>
-                    <span className={styles.pill}>3 oefeningen</span>
-                  </div>
-                  <p className={styles.dataNote}>
-                    Split squat 4 &times; 8, nordic curl 3 &times; 6, calf raise 3 &times; 12. Bij elke
-                    oefening staat een video.
-                  </p>
-                </div>
-                <div className={styles.dataCard}>
-                  <div className={styles.dataTop}>
-                    <span className={styles.dataName}>Na afloop</span>
-                    <span className={styles.pill}>Pijn 2 van 10</span>
-                  </div>
-                  <div className={styles.meter}><i style={{ width: '20%' }} /></div>
-                  <p className={styles.dataNote}>Pijn en gevoel per sessie, zodat het verloop zichtbaar blijft.</p>
-                </div>
-                <div className={styles.dataCard}>
-                  <div className={styles.dataTop}>
-                    <span className={styles.dataName}>Mijn voortgang</span>
-                    <span className={styles.pill}>5 van 8</span>
-                  </div>
-                  <p className={styles.dataNote}>Dezelfde criteria die jij ziet, in gewone taal.</p>
-                </div>
-              </div>
-              <div>
-                <p className={styles.eyebrow}><ScrambleText text="Patiëntprofiel" /></p>
-                <h2 className={styles.head}>
-                  <span className={styles.ln}>Je patiënt weet</span>
-                  <span className={styles.ln}>wat er vandaag</span>
-                  <span className={styles.ln}>moet gebeuren</span>
-                </h2>
-                <p className={styles.lede}>
-                  Geen papieren schema dat kwijtraakt. Het programma staat per dag klaar met video,
-                  en wat er gelogd wordt komt bij jou terug. <em>Doelen en criteria staan er in
-                  gewone taal bij</em>, zodat iemand snapt waar hij naartoe werkt.
-                </p>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      {/* ── Plakscene: bouwen, criteria, plannen ──────────────────────── */}
+      {/* De id zit op een wrapper omdat de scene zelf zijn sticky-hoogte
+          nodig heeft; het menu-anker moet op de bovenkant landen. */}
+      <div id="platform">
+        <BuildScene />
+      </div>
 
-      {/* ── Werkwijze, de zes stappen ────────────────────────────────── */}
-      <section id="werkwijze" className={`${styles.sec} ${styles.secDark}`}>
-        <div className={`${styles.shell} ${styles.block}`}>
-          <Reveal>
-            <p className={styles.eyebrow}><ScrambleText text="Werkwijze" /></p>
-            <h2 className={`${styles.head} ${styles.headSmall}`}>
-              Van intake naar evaluatie, in zes stappen
-            </h2>
-            <p className={styles.lede}>
-              De intake en je klinische werkhypothese blijven jouw werk. BASE begint op het moment
-              dat je een patiënt uitnodigt en loopt door tot het rapport dat je met de verwijzer
-              deelt.
-            </p>
-            <div className={styles.rows}>
-              <div className={styles.row}>
-                <span className={styles.rowNum}>01</span>
-                <h3 className={styles.rowTitle}>Uitnodigen</h3>
-                <p className={styles.rowText}>
-                  Je voert de patiënt in en verstuurt vanuit dezelfde flow een uitnodiging. De
-                  patiënt krijgt toegang tot het toegewezen traject.
-                </p>
-              </div>
-              <div className={styles.row}>
-                <span className={styles.rowNum}>02</span>
-                <h3 className={styles.rowTitle}>Plannen</h3>
-                <p className={styles.rowText}>
-                  Meerdere programma&#39;s tegelijk op één patiënt: dagelijkse oefeningen, een
-                  krachtschema en een meerweeks trainingsplan kunnen naast elkaar in dezelfde week
-                  staan, flexibel doorlopend of op vaste dagen.
-                </p>
-              </div>
-              <div className={styles.row}>
-                <span className={styles.rowNum}>03</span>
-                <h3 className={styles.rowTitle}>Criteria koppelen</h3>
-                <p className={styles.rowText}>
-                  Koppel een bestaand protocol aan het traject, voeg losse testen toe of stel een
-                  eigen testbatterij samen. Patiënt en therapeut zien dezelfde doelen, criteria en
-                  openstaande onderdelen.
-                </p>
-              </div>
-              <div className={styles.row}>
-                <span className={styles.rowNum}>04</span>
-                <h3 className={styles.rowTitle}>Trainen en loggen</h3>
-                <p className={styles.rowText}>
-                  De patiënt logt de toegewezen trainingen. Train je tijdens een afspraak mee, dan
-                  registreer je die sessie direct, zodat behandeltijd meetelt in dezelfde totale
-                  belasting.
-                </p>
-              </div>
-              <div className={styles.row}>
-                <span className={styles.rowNum}>05</span>
-                <h3 className={styles.rowTitle}>Voortgang volgen</h3>
-                <p className={styles.rowText}>
-                  De belastingcurve laat zien hoe de belasting zich over meerdere weken ontwikkelt
-                  en waar die vandaan komt. Dat is context voor jouw evaluatie, geen automatische
-                  beslissing.
-                </p>
-              </div>
-              <div className={styles.row}>
-                <span className={styles.rowNum}>06</span>
-                <h3 className={styles.rowTitle}>Evalueren en rapporteren</h3>
-                <p className={styles.rowText}>
-                  Doelen, criteria, testen, uitvoering en belasting staan naast elkaar. Wat relevant
-                  is deel je als verzorgde PDF met de patiënt en de verwijzer.
-                </p>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── Programmeren ─────────────────────────────────────────────── */}
-      <section id="platform" className={styles.sec}>
+      {/* ── Het rapport ───────────────────────────────────────────────── */}
+      <section className={`${styles.sec} ${styles.secBand}`}>
         <div className={`${styles.shell} ${styles.block}`}>
           <Reveal>
             <div className={styles.duo}>
               <div>
-                <p className={styles.eyebrow}><ScrambleText text="Programmeren" /></p>
+                <p className={styles.eyebrow}><ScrambleText text="Evalueren en rapporteren" /></p>
                 <h2 className={styles.head}>
-                  <span className={styles.ln}>Meerdere</span>
-                  <span className={styles.ln}>programma&#39;s in</span>
-                  <span className={styles.ln}>dezelfde week</span>
+                  <span className={styles.ln}>Eén rapport</span>
+                  <span className={styles.ln}>voor patiënt</span>
+                  <span className={styles.ln}>en verwijzer</span>
                 </h2>
                 <p className={styles.lede}>
-                  De weekplanner zet kalenderweken onder elkaar met de zeven dagen als vaste
-                  kolommen en een weektotaal aan het eind. Programma&#39;s lopen flexibel door of
-                  staan op vaste dagen, en een meerweeks trainingsplan zet je in één keer op de
-                  kalender van je patiënt.
+                  Doelen, criteria, testen, uitvoering en belasting staan naast elkaar. Jij
+                  interpreteert de uitslag en wijzigt het programma; wat relevant is deel je als
+                  verzorgde PDF met de patiënt en de verwijzer.
                 </p>
               </div>
-              <div className={`${styles.stage} ${styles.stageDark}`}>
-                <p className={styles.dataName}>Weekplanner &middot; W31 tot W33</p>
-                <div className={styles.dataCard}>
-                  <div className={styles.dataTop}>
-                    <span className={styles.dataName}>Maandag 28 juli</span>
-                    <span className={styles.dataValue} style={{ fontSize: '14px' }}>Knie 3B</span>
-                  </div>
-                  <p className={styles.dataNote}>Programma-item, drie oefeningen met video.</p>
-                </div>
-                <div className={styles.dataCard}>
-                  <div className={styles.dataTop}>
-                    <span className={styles.dataName}>Woensdag 30 juli</span>
-                    <span className={styles.dataValue} style={{ fontSize: '14px' }}>Kracht A</span>
-                  </div>
-                  <p className={styles.dataNote}>Meerweeks trainingsplan, week 2 van 8.</p>
-                </div>
-                <div className={styles.dataCard}>
-                  <div className={styles.dataTop}>
-                    <span className={styles.dataName}>Weektotaal</span>
-                    <span className={styles.pill}>5 sessies</span>
-                  </div>
-                  <p className={styles.dataNote}>3 uur 20 in totaal, belasting 342.</p>
-                </div>
-              </div>
+              {/* Het rapport zelf, zoals de verwijzer het krijgt. Stond hier eerst
+                  als vier verzonnen cijfers; een echte pagina zegt meer dan een
+                  cijfer dat niemand kan narekenen. Gemaakt op het demo-account
+                  met scripts/seed-demo-test-report.ts en afgedrukt via de eigen
+                  printroute (/print/test-report/[id]). */}
+              <figure className={styles.rapport}>
+                <Image
+                  src="/base-site/rapport-verwijzer-2.png"
+                  alt="De eerste pagina van een testrapport uit BASE: kopgegevens van patiënt en behandelaar, en per test de waarde links en rechts met de symmetrie in een gekleurde zonebalk"
+                  width={1240}
+                  height={1753}
+                  sizes="(max-width: 880px) 100vw, 520px"
+                  className={styles.rapportImg}
+                />
+              </figure>
             </div>
           </Reveal>
         </div>
       </section>
 
-      {/* ── Criteria en testen ───────────────────────────────────────── */}
+      {/* ── Totale trainingsbelasting ─────────────────────────────────── */}
       <section className={styles.sec}>
-        <div className={`${styles.shell} ${styles.block}`} style={{ paddingTop: 0 }}>
-          <Reveal>
-            <div className={styles.duo}>
-              <div className={`${styles.stage} ${styles.stageDark}`}>
-                <p className={styles.dataName}>VKB-traject &middot; fase 5 van 8</p>
-                <div className={styles.dataCard}>
-                  <div className={styles.dataTop}>
-                    <span className={styles.dataName}>Symmetrie quadriceps</span>
-                    <span className={styles.pill}>78%</span>
-                  </div>
-                  <div className={styles.meter}><i style={{ width: '78%' }} /></div>
-                  <p className={styles.dataNote}>Rechts 167 N tegen links 214 N, gemeten met de dynamometer.</p>
-                </div>
-                <div className={styles.dataCard}>
-                  <div className={styles.dataTop}>
-                    <span className={styles.dataName}>Single leg hop</span>
-                    <span className={styles.pill}>Behaald</span>
-                  </div>
-                  <p className={styles.dataNote}>Hertest staat gepland in week 33.</p>
-                </div>
-                <div className={styles.dataCard}>
-                  <div className={styles.dataTop}>
-                    <span className={styles.dataName}>Openstaand</span>
-                    <span className={styles.dataValue} style={{ fontSize: '15px' }}>2 testen</span>
-                  </div>
-                  <p className={styles.dataNote}>Patiënt ziet dezelfde lijst in de app.</p>
-                </div>
-              </div>
-              <div>
-                <p className={styles.eyebrow}><ScrambleText text="Criteria en testen" /></p>
-                <h2 className={styles.head}>
-                  <span className={styles.ln}>Criteria bepalen</span>
-                  <span className={styles.ln}>de volgende stap</span>
-                </h2>
-                <p className={styles.lede}>
-                  Koppel een bestaand revalidatieprotocol aan het traject, voeg losse testen toe of
-                  stel je eigen testbatterij samen. Wat behaald is en wat nog openstaat is voor
-                  jullie allebei zichtbaar. <em>Jij interpreteert de uitslag en wijzigt het
-                  programma.</em>
-                </p>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── Totale trainingsbelasting ────────────────────────────────── */}
-      <section className={`${styles.sec} ${styles.secDark}`}>
         <div className={`${styles.shell} ${styles.block}`}>
           <Reveal>
             <p className={styles.eyebrow}><ScrambleText text="Totale trainingsbelasting" /></p>
             <h2 className={styles.head}>
-              <span className={styles.ln}>Alle belasting</span>
-              <span className={styles.ln}>in één lijn</span>
+              <span className={styles.ln}>Zie de opbouw van</span>
+              <span className={styles.ln}>de afgelopen weken</span>
             </h2>
             <p className={styles.lede}>
-              De curve telt op wat de patiënt zelf logt, wat jij tijdens een afspraak registreert en,
-              bij een atletenaccount, de eigen training en wearable-data. Een terugval door ziekte of
+              De curve telt op wat je patiënt zelf logt, wat jij tijdens een afspraak registreert en,
+              bij een atletenaccount, de eigen training en wearable-data. Kracht en cardio staan
+              apart, met de vorm ernaast: fitheid tegenover vermoeidheid. Een terugval door ziekte of
               een drukke week valt meteen op.
             </p>
-            <LoadCurve />
+            {/* Stond hier eerst als getekende curve (LoadCurve.tsx, verwijderd);
+                dit is het echte belastingsscherm uit de app. De kop is meegegaan:
+                het beeld toont twee lijnen, kracht en cardio apart, dus "alle
+                belasting in één lijn" klopte niet meer. */}
+            <figure className={styles.curve}>
+              <Image
+                src="/base-site/ipad-belastingcurve-2.png"
+                alt="Het belastingsscherm van BASE: dertig dagen cardio- en krachtbelasting als twee curves met doelzones, en onder de grafiek de aangetikte trainingsdag met duur, RPE en belasting"
+                width={1668}
+                height={1340}
+                sizes="(max-width: 1100px) 100vw, 1040px"
+                className={styles.curveImg}
+              />
+            </figure>
           </Reveal>
         </div>
       </section>
 
-      {/* ── Atletenprofiel, uitbreiding ──────────────────────────────── */}
-      <section className={styles.sec}>
-        <div className={`${styles.shell} ${styles.block}`} style={{ paddingBottom: 0 }}>
+      {/* ── Wat de patiënt ziet ───────────────────────────────────────── */}
+      <section className={`${styles.sec} ${styles.secBand}`}>
+        <div className={`${styles.shell} ${styles.block}`}>
           <Reveal>
-            <p className={styles.eyebrow}><ScrambleText text="Atletenaccount, uitbreiding" /></p>
-            <h2 className={`${styles.head} ${styles.headSmall}`}>
-              Voor wie ook zelfstandig traint
+            <p className={styles.eyebrow}><ScrambleText text="Aan de kant van de patiënt" /></p>
+            <h2 className={styles.head}>
+              <span className={styles.ln}>Je patiënt weet wat er</span>
+              <span className={styles.ln}>vandaag moet gebeuren</span>
             </h2>
             <p className={styles.lede}>
-              Traint iemand naast de revalidatie door, dan koppelt hij zijn wearable en komen slaap,
-              hartslag en herstel mee in hetzelfde beeld. Scroll door het scherm hieronder.
+              Geen papieren schema dat kwijtraakt. Het programma staat per dag klaar met video, en
+              wat er gelogd wordt komt bij jou terug. <em>Doelen en criteria staan er in gewone taal
+              bij</em>, zodat iemand snapt waar hij naartoe werkt. Traint iemand naast de revalidatie
+              door, dan koppelt hij zijn wearable en komen slaap, hartslag en herstel mee in
+              hetzelfde beeld.
             </p>
           </Reveal>
         </div>
       </section>
 
-      <MetricScene />
+      {/* ── Plakscene: de telefoon met de gezondheidsfuncties ─────────── */}
+      <PhoneScene />
 
-      {/* ── Accounts ─────────────────────────────────────────────────── */}
-      <section id="voor-praktijken" className={styles.sec}>
+      {/* ── De twee accounts ──────────────────────────────────────────── */}
+      <section id="voor-praktijken" className={`${styles.sec} ${styles.secBand}`}>
         <div className={`${styles.shell} ${styles.block}`}>
           <Reveal>
             <p className={styles.eyebrow}><ScrambleText text="Accounts" /></p>
@@ -488,55 +278,8 @@ export function BaseLanding() {
         </div>
       </section>
 
-      {/* ── Evalueren en rapporteren ─────────────────────────────────── */}
-      <section className={styles.sec}>
-        <div className={`${styles.shell} ${styles.block}`} style={{ paddingTop: 0 }}>
-          <Reveal>
-            <div className={styles.duo}>
-              <div>
-                <p className={styles.eyebrow}><ScrambleText text="Evalueren en rapporteren" /></p>
-                <h2 className={styles.head}>
-                  <span className={styles.ln}>Eén rapport</span>
-                  <span className={styles.ln}>voor patiënt</span>
-                  <span className={styles.ln}>en verwijzer</span>
-                </h2>
-                <p className={styles.lede}>
-                  Testontwikkeling en trainingsbelasting komen samen in een verzorgde PDF. Je deelt
-                  wat relevant is en houdt de rest bij je in het dossier.
-                </p>
-              </div>
-              <div className={styles.figures}>
-                <div className={styles.figure}>
-                  <span className={styles.figureVal}><Counter to={8} /></span>
-                  <span className={styles.figureLabel}>Fases in traject</span>
-                  <p className={styles.figureNote}>Van eerste meting tot terugkeer naar sport.</p>
-                </div>
-                <div className={styles.figure}>
-                  <span className={styles.figureVal}><Counter to={78} /><small>%</small></span>
-                  <span className={styles.figureLabel}>Symmetrie nu</span>
-                  <p className={styles.figureNote}>Gemeten met de dynamometer, links tegen rechts.</p>
-                </div>
-                <div className={styles.figure}>
-                  <span className={styles.figureVal}><Counter to={342} /></span>
-                  <span className={styles.figureLabel}>Belasting deze week</span>
-                  <p className={styles.figureNote}>Programma, therapiesessie en eigen training.</p>
-                </div>
-                <div className={styles.figure}>
-                  <span className={styles.figureVal}><Counter to={2} /></span>
-                  <span className={styles.figureLabel}>Openstaande testen</span>
-                  <p className={styles.figureNote}>Ingepland voor de hertest in week 33.</p>
-                </div>
-              </div>
-            </div>
-            <p className={styles.eyebrow} style={{ marginTop: 18 }}>
-              <ScrambleText text="Voorbeeldwaarden uit een fictief traject" />
-            </p>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ── Praktijkcontext en slot ──────────────────────────────────── */}
-      <section className={`${styles.sec} ${styles.secDark} ${styles.closer}`}>
+      {/* ── Praktijkcontext en slot ───────────────────────────────────── */}
+      <section className={`${styles.sec} ${styles.closer}`}>
         <div className={`${styles.shell} ${styles.block}`}>
           <Reveal>
             <p className={styles.eyebrow}><ScrambleText text="Waar BASE vandaan komt" /></p>
@@ -565,7 +308,7 @@ export function BaseLanding() {
       </section>
 
       {/* ── Voettekst ────────────────────────────────────────────────── */}
-      <footer className={`${styles.sec} ${styles.secDark} ${styles.closer}`}>
+      <footer className={`${styles.sec} ${styles.closer}`}>
         <div className={styles.shell}>
           <p className={styles.footerMark} aria-hidden="true">BASE</p>
           <div className={styles.footBar}>

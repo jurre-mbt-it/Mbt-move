@@ -1,16 +1,20 @@
 /*
  * Publieke BASE-site (route "/").
  *
- * Skelet van sensiq.co: gesegmenteerde menubalk, per sectie een klein label,
- * een kop van drie regels en een datakaart ernaast, cijfers die vanaf nul
- * oplopen.
+ * Vormregels uit movementbasedtherapy.nl (docs/design-systeem.md daar): nul
+ * afronding, haarlijnen dragen het ontwerp, oranje is actie en mint is meting,
+ * mono micro-labels met scramble, Big Shoulders voor de grote statements,
+ * Fraunces cursief voor nadruk.
  *
- * Huid van de nieuwe stijl van movementbasedtherapy.nl (spec:
- * mbt-forest/docs/superpowers/specs/2026-08-19-redesign-performance-lab-stijl-design.md):
- * nul afronding, haarlijnen dragen het ontwerp, mono micro-labels met
- * scramble, oranje is actie en mint is meting, Big Shoulders voor de grote
- * statements, Fraunces cursief voor nadruk, en het sectieritme dat wisselt
- * tussen papier en diepgroen.
+ * Wat hier NIET van de praktijksite komt is de grond. Die pagina is crème; deze
+ * staat op #0A1C1D, de grond van de app zelf. Reden: het productbeeld is een
+ * echt scherm uit BASE, en op crème zou daar altijd een kader omheen zitten.
+ * Nu loopt het beeld door in de pagina. Het sectieritme komt daarom niet meer
+ * uit een kleuromslag maar uit schaal: een schermbreed beeld tegenover korte
+ * kolommen, en `.secBand` dat de grond één tint verschuift.
+ *
+ * De pagina is 21-08-2026 teruggebracht van twaalf secties naar zes; de
+ * afwegingen daarachter staan boven in BaseLanding.tsx.
  *
  * Fonts staan self-hosted in /public/fonts/site (gekopieerd uit de
  * praktijksite). De CSP staat font-src op 'self', dus Google Fonts wordt
@@ -54,42 +58,46 @@
   --mono: 'SiteMono', ui-monospace, Menlo, monospace;
   --serif: 'SiteSerif', Georgia, serif;
 
-  --petrol: #0E2729;
-  --petrol-deep: #081A1C;
-  --petrol-soft: #15363A;
-  --paper: #FBF9F3;
-  --paper-warm: #F1EDE3;
-  --orange: #E87A55;
-  --orange-deep: #C9613F;
-  --mint: #B8D8D5;
-  --mint-bright: #9FCEC9;
-  --gold: #F5B942;
+  /* De grond komt uit de app zelf (src/lib/palette.ts), niet uit de
+     praktijksite. Dat is de hele reden dat deze pagina donker is: een echt
+     scherm uit BASE moet er naadloos in vallen, zonder kader eromheen. Wijkt
+     dit af van het palet van de app, dan zie je de naad. */
+  --app-bg: #0A1C1D;        /* P.bg */
+  --app-flat: #0C2224;      /* P.flatBg */
+  --app-surface: #163539;   /* P.surface */
+  --app-control: #1D4348;   /* P.control */
+
+  --orange: #E87A55;        /* P.brand, gelijk aan de app */
+  --mint-bright: #9FCEC9;   /* P.ice */
 
   /* out-expo van de referentie; alles beweegt hierop */
-  --e-out: var(--e-out);
+  --e-out: cubic-bezier(0.16, 1, 0.3, 1);
 
-  /* Semantische tokens. Ze flippen per sectie via .secDark, zodat elk blok
-     dezelfde klassen gebruikt op zowel papier als diepgroen. */
-  /* "Mint is meting" komt van de praktijksite, waar alles op diepgroen staat.
-     Op papier is die mint niet leesbaar, dus flipt de metingkleur mee met de
-     sectie: diep op papier, helder op diepgroen. De regel blijft dezelfde. */
-  --measure: #3E8F89;
+  /* Semantische tokens. Eén set voor de hele pagina: de site staat volledig op
+     de grond van de app. `.secBand` schuift alleen de grond een tint op voor
+     ritme, en flipt dus geen inkt of lijnen meer. */
+  --measure: var(--mint-bright);
 
-  --ground: var(--paper);
-  --ink: var(--petrol);
-  --ink-soft: rgba(14, 39, 41, 0.66);
-  --ink-dim: rgba(14, 39, 41, 0.44);
-  --hair: rgba(14, 39, 41, 0.20);
-  --hair-strong: rgba(14, 39, 41, 0.38);
-  --hair-soft: rgba(14, 39, 41, 0.10);
-  --panel: #FFFFFF;
+  --ground: var(--app-bg);
+  --ink: #F5F2ED;                        /* P.ink */
+  --ink-soft: rgba(245, 242, 237, 0.68);
+  --ink-dim: rgba(158, 181, 179, 1);     /* P.inkMuted */
+  --hair: rgba(212, 232, 230, 0.16);     /* P.hairline */
+  --hair-strong: rgba(212, 232, 230, 0.32);
+  --hair-soft: rgba(212, 232, 230, 0.09);
+  --panel: var(--app-surface);
 
-  background: var(--paper);
-  color: var(--petrol);
+  background: var(--ground);
+  color: var(--ink);
   font-family: var(--body);
   font-size: 17px;
   line-height: 1.55;
-  overflow-x: hidden;
+  /* `clip` en niet `hidden`: een voorouder met overflow-x:hidden wordt een
+     scroll-container en dan plakt position:sticky aan die container in plaats
+     van aan het venster; de plakscenes stonden daardoor stil. `clip` knipt
+     wel af maar maakt geen scroll-container. html/body krijgen dezelfde
+     behandeling in globals.css (html:has(main.base-site)). */
+  overflow-x: clip;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -99,16 +107,12 @@
   border-top: 1px solid var(--hair);
 }
 
-.secDark {
-  --ground: var(--petrol);
-  --ink: var(--paper);
-  --ink-soft: rgba(251, 249, 243, 0.68);
-  --ink-dim: rgba(251, 249, 243, 0.44);
-  --hair: rgba(212, 232, 230, 0.20);
-  --hair-strong: rgba(212, 232, 230, 0.38);
-  --hair-soft: rgba(212, 232, 230, 0.10);
-  --panel: #15363A;
-  --measure: var(--mint-bright);
+/* Ritme zonder kleuromslag: de grond schuift twee tinten op, inkt en lijnen
+   blijven staan. Bedoeld voor de secties waar geen schermbeeld in staat, zodat
+   de beeldsecties de diepste grond voor zich houden. */
+.secBand {
+  --ground: var(--app-flat);
+  --panel: var(--app-control);
 }
 
 .shell {
@@ -123,8 +127,8 @@
   position: sticky;
   top: 0;
   z-index: 60;
-  background: var(--paper);
-  border-bottom: 1px solid rgba(14, 39, 41, 0.16);
+  background: var(--app-bg);
+  border-bottom: 1px solid var(--hair);
 }
 .navInner {
   display: flex;
@@ -143,40 +147,42 @@
   font-size: clamp(20px, 2.4vw, 27px);
   letter-spacing: 0.005em;
   text-transform: uppercase;
-  color: var(--petrol);
+  color: var(--ink);
   text-decoration: none;
   white-space: nowrap;
 }
 .navCells {
   display: flex;
   align-items: stretch;
-  border-left: 1px solid rgba(14, 39, 41, 0.16);
+  border-left: 1px solid var(--hair);
 }
 .navCell {
   display: inline-flex;
   align-items: center;
   padding: 0 clamp(14px, 1.8vw, 26px);
   min-height: 62px;
-  border-right: 1px solid rgba(14, 39, 41, 0.16);
+  border-right: 1px solid var(--hair);
   font-family: var(--mono);
   font-size: 0.72rem;
   font-weight: 400;
   letter-spacing: -0.035em;
   text-transform: uppercase;
-  color: var(--petrol);
+  color: var(--ink);
   text-decoration: none;
   white-space: nowrap;
   transition: background-color 260ms var(--e-out), color 260ms ease;
 }
-.navCell:hover { background: var(--petrol); color: var(--paper); }
-.navCellAccent { background: var(--orange); color: var(--petrol); }
-.navCellAccent:hover { background: var(--petrol); color: var(--paper); }
+/* Op donkere grond keert de omkering om: een vulling is licht, de letter erop
+   is de grond zelf. Oranje blijft voorbehouden aan de actie (demo aanvragen). */
+.navCell:hover { background: var(--ink); color: var(--app-bg); }
+.navCellAccent { background: var(--orange); color: var(--app-bg); }
+.navCellAccent:hover { background: var(--ink); color: var(--app-bg); }
 .navCellHome {
-  background: var(--petrol);
-  color: var(--paper);
+  background: var(--app-control);
+  color: var(--ink);
   padding-inline: clamp(16px, 1.8vw, 22px);
 }
-.navCellHome:hover { background: var(--orange); color: var(--petrol); }
+.navCellHome:hover { background: var(--orange); color: var(--app-bg); }
 
 @media (max-width: 780px) {
   .navHideSmall { display: none; }
@@ -220,7 +226,6 @@
 }
 .ln { display: block; }
 .head em { font-family: var(--serif); font-style: italic; font-weight: 400; letter-spacing: -0.02em; }
-.headSmall { font-size: clamp(26px, 3.6vw, 44px); max-width: 18ch; }
 
 /* Statement-momenten: het MBT-signatuur, reuzenletters in Big Shoulders. */
 .giant {
@@ -279,21 +284,11 @@
 .btnPrimary {
   background: var(--orange);
   border-color: var(--orange);
-  color: var(--petrol);
+  color: var(--app-bg);
 }
-.btnPrimary::before { background: var(--petrol); }
-.btnPrimary:hover { color: var(--paper); }
+.btnPrimary::before { background: var(--app-bg); }
+.btnPrimary:hover { color: var(--ink); }
 .btnArrow { font-size: 13px; }
-
-/* ── Lopende band ─────────────────────────────────────────────────────── */
-.ticker {
-  overflow: hidden;
-  background: var(--petrol);
-  color: var(--paper);
-  border-block: 1px solid rgba(212, 232, 230, 0.2);
-  padding-block: 13px;
-}
-.tickerTrack { display: flex; gap: 34px; width: max-content; animation: slide 38s linear infinite; }
 .tickerTrack span {
   font-family: var(--mono);
   font-size: 11px;
@@ -302,7 +297,6 @@
   color: rgba(251, 249, 243, 0.72);
   white-space: nowrap;
 }
-.tickerTrack .sep { color: var(--orange); }
 @keyframes slide { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
 /* ── Sectie-indeling ──────────────────────────────────────────────────── */
@@ -313,82 +307,49 @@
   gap: clamp(30px, 5vw, 76px);
   align-items: center;
 }
-.duoTop { align-items: start; }
 @media (max-width: 880px) { .duo { grid-template-columns: 1fr; gap: 32px; } }
 
-/* ── Datakaarten: het sensiq-motief, hier vierkant en op haarlijnen ───── */
-.stage {
+/* ── Schermopname ─────────────────────────────────────────────────────
+   Een echt scherm uit BASE, zo groot als de kolom toelaat. De pagina staat op
+   dezelfde grond als de app (--app-bg), dus het beeld heeft geen omlijsting
+   nodig om te bestaan: één haarlijn volstaat en de opname loopt visueel door in
+   de pagina. Géén overflow:hidden hier, dat knipt het kruisjeskader weg. */
+.shotWrap {
+  margin: clamp(28px, 4vw, 52px) 0 0;
+}
+.shot {
   position: relative;
-  background: var(--panel);
-  border: 1px solid var(--hair);
-  padding: clamp(18px, 2.4vw, 30px);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  border: 1px solid var(--hair-strong);
+  background: var(--app-bg);
+  line-height: 0;
 }
-/* Een donker paneel moet de hele tokenset omzetten, niet alleen de tekstkleur.
-   Alleen `color` omzetten gaf crèmekleurige tekst op witte kaarten. */
-.stageDark {
-  --ground: var(--petrol);
-  --ink: var(--paper);
-  --ink-soft: rgba(251, 249, 243, 0.68);
-  --ink-dim: rgba(251, 249, 243, 0.46);
-  --hair: rgba(212, 232, 230, 0.20);
-  --hair-strong: rgba(212, 232, 230, 0.38);
-  --hair-soft: rgba(212, 232, 230, 0.10);
-  --panel: var(--petrol-soft);
-  --measure: var(--mint-bright);
-  background: var(--petrol-deep);
-  border-color: rgba(212, 232, 230, 0.2);
-  color: var(--paper);
+.shotImg {
+  display: block;
+  width: 100%;
+  height: auto;
 }
-
-.dataCard {
-  background: var(--ground);
-  border: 1px solid var(--hair);
-  padding: 15px 17px;
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-}
-.dataCardRaised { background: var(--panel); }
-/* Schaduw alleen waar hij functie heeft, dus niet binnen een donker paneel. */
-.stage:not(.stageDark) .dataCardRaised { box-shadow: 0 18px 40px rgba(8, 26, 28, 0.12); }
-.dataTop {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-}
-.dataName {
+.shotLeeg {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 10;
   font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.18em;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  line-height: 1.4;
+}
+.shotVul { aspect-ratio: 16 / 10; line-height: 1.45; }
+.shotCap {
+  margin-top: 12px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--ink-dim);
 }
-.dataValue {
-  font-family: var(--mono);
-  font-size: clamp(19px, 2vw, 26px);
-  letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink);
-}
-.pill {
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  padding: 4px 9px;
-  border: 1px solid var(--measure);
-  color: var(--ink);
-  white-space: nowrap;
-}
-.pillWarm { border-color: var(--orange); }
-.meter { height: 5px; background: var(--hair-soft); position: relative; overflow: hidden; }
 .meter i { position: absolute; inset: 0 auto 0 0; background: var(--measure); }
 .meterWarm i { background: var(--orange); }
-.dataNote { margin: 0; font-size: 13.5px; color: var(--ink-soft); line-height: 1.45; }
 .dataNote em { font-family: var(--serif); font-style: italic; color: var(--ink); }
 
 /* Kruisjeskader uit het ontwerpsysteem: vier oranje kruisjes op de hoeken,
@@ -457,56 +418,9 @@
   font-family: var(--mono);
   font-size: 11px;
 }
-
-/* ── Genummerde rijen ─────────────────────────────────────────────────── */
-.rows { border-top: 1px solid var(--hair); }
-.row {
-  position: relative;
-  display: grid;
-  grid-template-columns: auto minmax(0, 0.85fr) minmax(0, 1.15fr);
-  gap: clamp(14px, 3vw, 48px);
-  align-items: baseline;
-  padding: clamp(22px, 3vw, 38px) clamp(10px, 1.6vw, 20px);
-  border-bottom: 1px solid var(--hair);
-  isolation: isolate;
-  /* Zonder dit schuift de vulling met translateY(101%) precies over de rij
-     eronder in plaats van uit beeld: die rij staat dan permanent oranje en
-     haar nummer verdwijnt. De knoppen hebben om dezelfde reden overflow. */
-  overflow: hidden;
-  transition: color 420ms var(--e-out);
-}
-.row::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--orange);
-  transform: translateY(101%);
-  transition: transform 520ms var(--e-out);
-  z-index: -1;
-}
-.row:hover::before { transform: translateY(0); }
-.row:hover { color: var(--petrol); }
-.row:hover .rowNum, .row:hover .rowText { color: var(--petrol); }
-@media (max-width: 820px) {
-  .row { grid-template-columns: auto minmax(0, 1fr); }
-  .rowText { grid-column: 2; }
-}
-.rowNum {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  color: var(--orange);
-  transition: color 420ms ease;
-}
-.rowTitle {
-  font-family: var(--body);
-  font-weight: 500;
-  font-size: clamp(20px, 2.4vw, 31px);
-  line-height: 1.0;
-  letter-spacing: -0.028em;
-  margin: 0;
-}
-.rowText { margin: 0; color: var(--ink-soft); font-size: clamp(14px, 1.15vw, 16px); line-height: 1.55; transition: color 420ms ease; }
+/* Restant van de genummerde rijen 01-06: alleen de tekststijl is nog in
+   gebruik, in de korte kolommen van de signalensectie. */
+.rowText { margin: 0; color: var(--ink-soft); font-size: clamp(14px, 1.15vw, 16px); line-height: 1.55; }
 
 /* ── Cijferblok ───────────────────────────────────────────────────────── */
 .figures {
@@ -577,84 +491,16 @@
   padding-top: 10px;
   margin-top: 6px;
 }
-
-/* ── Dashboardpaneel ──────────────────────────────────────────────────
-   Breed, donker vlak op het crème: het therapeutenscherm krijgt de ruimte die
-   het in de praktijk ook heeft. */
-.board {
-  background: var(--petrol);
-  border: 1px solid var(--hair-strong);
-  margin-top: clamp(28px, 4vw, 48px);
-  --ground: var(--petrol);
-  --ink: var(--paper);
-  --ink-soft: rgba(251, 249, 243, 0.68);
-  --ink-dim: rgba(251, 249, 243, 0.46);
-  --hair: rgba(212, 232, 230, 0.20);
-  --hair-soft: rgba(212, 232, 230, 0.10);
-  --measure: var(--mint-bright);
-  color: var(--paper);
-}
-.boardTop {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
-  padding: clamp(14px, 1.8vw, 20px) clamp(16px, 2vw, 24px);
-  border-bottom: 1px solid var(--hair);
-}
-.boardStats {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1px;
-  background: var(--hair);
-  border-bottom: 1px solid var(--hair);
-}
-@media (max-width: 760px) { .boardStats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.boardStat {
-  background: var(--petrol);
-  padding: clamp(16px, 2vw, 24px);
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  min-width: 0;
-}
-.boardVal {
-  font-family: var(--mono);
-  font-size: clamp(24px, 3vw, 36px);
-  line-height: 1;
-  color: var(--measure);
-  font-variant-numeric: tabular-nums;
-}
 .boardVal small { font-size: 0.44em; color: var(--ink-dim); margin-left: 4px; letter-spacing: 0.06em; text-transform: uppercase; }
-.boardFeed { padding: clamp(6px, 1vw, 10px) clamp(16px, 2vw, 24px) clamp(14px, 1.8vw, 20px); }
-.feedRow {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 14px;
-  align-items: center;
-  padding-block: clamp(10px, 1.3vw, 14px);
-  border-bottom: 1px solid var(--hair-soft);
-  font-size: clamp(13.5px, 1.1vw, 15.5px);
-  color: var(--ink-soft);
-}
-.feedRow:last-child { border-bottom: none; }
-.feedDot { width: 7px; height: 7px; flex: none; background: var(--orange); }
-.feedDotCalm { background: var(--measure); }
-.feedWhen {
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--ink-dim);
-  white-space: nowrap;
-}
 
-/* ── Vastgezette scene met de telefoon ────────────────────────────────
-   Naar het model van de ring-sectie op sensiq.co: het blok is drie
-   schermhoogtes lang, de binnenkant plakt aan de bovenkant, en de inhoud
-   wisselt terwijl je erdoorheen scrollt. */
-.scene { height: 340svh; position: relative; }
+.headSmall { font-size: clamp(26px, 3.6vw, 44px); max-width: 18ch; }
+
+/* ── Plakscene, het sensiq-mechanisme ─────────────────────────────────
+   Zie docs/sensiq-dna.md §2: één beeld blijft op vensterhoogte staan terwijl
+   je er twee tot drie schermen aan scrollt, en verandert onderweg. De wrapper
+   is drie vensters hoog, de binnenkant plakt. Progressie komt uit
+   useSceneProgress; de CSS kent alleen de vorm. */
+.scene { height: 300svh; position: relative; }
 .scenePin {
   position: sticky;
   top: 0;
@@ -668,102 +514,432 @@
 .sceneBar i { display: block; height: 100%; background: var(--orange); transform-origin: left center; }
 .sceneBody {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
   gap: clamp(24px, 5vw, 76px);
   align-items: center;
 }
+.sceneBodyPhone { grid-template-columns: minmax(0, 1fr) auto; }
 @media (max-width: 900px) {
-  .sceneBody { grid-template-columns: 1fr; gap: 18px; }
+  .sceneBody, .sceneBodyPhone { grid-template-columns: 1fr; gap: 18px; }
   .sceneCopy { order: 2; }
-  .phoneWrap { order: 1; }
+  .phone3d, .frameStage { order: 1; }
 }
 .sceneCopy .head { margin-top: 12px; }
 .sceneCopy .lede { margin-top: 14px; }
-.sceneFoot {
+
+/* Het belastingsscherm uit de app. Zelfde kader als de andere opnames; wel
+   begrensd in breedte, want de opname komt van een iPad van 834 punten en
+   wordt boven ~1040px zichtbaar zachter. */
+.curve {
+  margin: clamp(26px, 4vw, 44px) auto 0;
+  max-width: 1040px;
+  border: 1px solid var(--hair-strong);
+  background: var(--app-bg);
+  line-height: 0;
+}
+.curveImg { display: block; width: 100%; height: auto; }
+
+/* Het rapport als document: wit vel op de donkere grond, met dezelfde
+   haarlijn als de schermkaders. Bewust géén afronding (eigen vlak) en geen
+   schaduw; de pagina moet als papier lezen, niet als kaartje. */
+.rapport {
+  margin: 0;
+  border: 1px solid var(--hair-strong);
+  background: #ffffff;
+  line-height: 0;
+  max-width: 560px;
+  justify-self: end;
+}
+.rapportImg { display: block; width: 100%; height: auto; }
+@media (max-width: 880px) { .rapport { justify-self: stretch; max-width: none; } }
+
+/* ── iPad-scene in de hero (IpadScene.tsx) ────────────────────────────
+   Het toestel staat naast de titel en blijft daar staan terwijl de schermen
+   er horizontaal doorheen schuiven. Hij hangt schuin in de ruimte: een recht
+   vooraanzicht las als een los vak midden op de pagina, met veel leegte
+   eromheen. De kanteling is klein en verandert nauwelijks; het toestel dat
+   écht ronddraait is de telefoon verderop, en die truc hoort maar één keer
+   op een pagina te staan. */
+.sceneHero { height: 280svh; background: var(--ground); }
+.pinHero { padding-top: 62px; }
+@media (max-width: 780px) { .pinHero { padding-top: 54px; } }
+.sceneBodyHero { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: center; }
+
+.ipadWrap { position: relative; perspective: 1600px; perspective-origin: 62% 45%; }
+.ipadStage {
+  --rand: clamp(8px, 1vw, 15px);
+  position: relative;
+  width: 100%;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+/* Grondschaduw los van de behuizing: een slagschaduw op een gekanteld vlak
+   kantelt mee en gaat zweven (zelfde reden als bij .phone3d). */
+.ipadWrap::after {
+  content: '';
+  position: absolute;
+  left: 6%;
+  right: 10%;
+  bottom: -4%;
+  height: 12%;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.62) 0%, transparent 70%);
+  filter: blur(14px);
+  pointer-events: none;
+}
+.ipadBody {
+  position: relative;
+  padding: var(--rand);
+  border-radius: clamp(14px, 1.8vw, 26px);
+  transform-style: preserve-3d;
+  background: linear-gradient(158deg, #33403f 0%, #16232400 14%, #121e20 52%, #1e2c2d 100%), #131f21;
+  box-shadow:
+    0 0 0 1px rgba(212, 232, 230, 0.11),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    -18px 40px 60px -34px rgba(0, 0, 0, 0.95);
+}
+/* Laagjes voor de dikte: bij een gekanteld toestel vangt de zijkant licht,
+   zonder deze leest de iPad als een vel papier. */
+.ipadSlice {
+  position: absolute;
+  inset: 0;
+  border-radius: clamp(14px, 1.8vw, 26px);
+  background: #162325;
+  border: 1px solid rgba(212, 232, 230, 0.13);
+}
+.ipadCam {
+  position: absolute;
+  top: calc(var(--rand) / 2);
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: #0a1113;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  transform: translateZ(0.6px);
+}
+.ipadScreen {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: clamp(6px, 0.8vw, 12px);
+  background: var(--app-bg);
+  transform: translateZ(0.6px);
+}
+.ipadTrack {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+  /* De overgang loopt op tijd, niet op scrollafstand: waar je ook stopt, het
+     spoor komt altijd op een heel scherm uit. Zie IpadScene.tsx. */
+  transition: transform 640ms var(--e-out);
+}
+.ipadSlide { position: absolute; top: 0; width: 100%; height: 100%; }
+/* Het beeld loopt iets achter op zijn eigen dia; dat maakt van een schuif een
+   passeerbeweging in plaats van een dichtgeschoven vlak. */
+.ipadImg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Loopt met dezelfde duur mee als het spoor, maar over een kortere afstand;
+     daardoor lijkt het beeld iets achter te blijven op zijn eigen dia. */
+  transform: translateX(calc(var(--rel, 0) * 7%));
+  transition: transform 640ms var(--e-out);
+}
+.ipadGloss {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(116deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0) 36%);
+}
+.sceneProgressOnder { margin: clamp(16px, 2.6vh, 26px) 0 0; }
+
+@media (max-width: 900px) {
+  .sceneBodyHero { grid-template-columns: 1fr; }
+  .ipadWrap { order: 2; margin-top: 6px; }
+  .sceneBodyHero .sceneCopy { order: 1; }
+}
+
+/* Frames van de praktijkscene: drie schermkaders op elkaar, alleen de actieve
+   is zichtbaar. Bedoeld voor echte opnames; tot die er zijn staat er een leeg
+   kader met een label, dezelfde afspraak als bij ScreenShot.tsx. */
+/* 4:3 = de maat van een iPad-scherm; een opname valt er zo precies in. */
+.frameStage { position: relative; aspect-ratio: 4 / 3; min-width: 0; }
+.frameSlot {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--hair-strong);
+  background: var(--app-bg);
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 420ms var(--e-out), transform 420ms var(--e-out);
+}
+.frameSlotActive { opacity: 1; transform: translateY(0); }
+.frameSlot img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.frameLeeg {
+  height: 100%;
+  display: grid;
+  place-items: center;
   font-family: var(--mono);
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--ink-dim);
-  margin: clamp(18px, 3vh, 30px) 0 0;
 }
+.frameVul { height: 100%; line-height: 1.45; }
 
-/* ── De telefoon ───────────────────────────────────────────────────── */
-.phoneWrap { display: flex; justify-content: center; }
+/* ── De telefoon, als ding ─────────────────────────────────────────────
+   Een echte telefoon heeft ronde hoeken; de regel "vierkant" uit het
+   ontwerpsysteem gaat over onze eigen vlakken, niet over de afbeelding van
+   een bestaand apparaat. De behuizing draait in 3D (rotateY op .phone),
+   voor- en achterkant zijn twee vlakken met backface-visibility:hidden, zodat
+   je op 90° tot 270° de achterkant ziet en het scherm ongezien kan wisselen. */
+.phone3d {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  perspective: 1100px;
+  perspective-origin: 50% 40%;
+}
+/* Grondschaduw los van de behuizing: een slagschaduw op een draaiend vlak
+   draait mee en gaat zweven. */
+.phone3d::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -26px;
+  width: 62%;
+  height: 44px;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.6) 0%, transparent 68%);
+  filter: blur(10px);
+  pointer-events: none;
+}
 .phone {
   position: relative;
   width: 300px;
   height: 620px;
   max-height: 76svh;
-  padding: 10px;
-  border: 1px solid var(--hair-strong);
-  background: #060f10;
   flex: none;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+/* De laagjes die de dikte maken. Iets lichter aan de rand dan de grond,
+   zodat de zijkant het licht vangt. */
+.phoneSlice {
+  position: absolute;
+  inset: 0;
+  border-radius: 48px;
+  background: #0f1f21;
+  border: 1px solid rgba(212, 232, 230, 0.16);
+}
+.phoneFace,
+.phoneBack {
+  position: absolute;
+  inset: 0;
+  border-radius: 48px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border: 1px solid rgba(212, 232, 230, 0.22);
+}
+.phoneFace {
+  padding: 10px;
+  background: linear-gradient(160deg, #1c2f31 0%, #0a1617 55%, #111f21 100%);
+  box-shadow:
+    inset 0 0 0 3px #0b1819,
+    inset 0 0 0 4px rgba(212, 232, 230, 0.08),
+    0 40px 80px -30px rgba(0, 0, 0, 0.75);
+}
+.phoneScreen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 40px;
+  background: #0b1a19;
+}
+/* Glans over het glas, licht van linksboven. */
+.phoneScreen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(118deg, rgba(255, 255, 255, 0.085) 0%, rgba(255, 255, 255, 0.02) 32%, transparent 48%);
+  pointer-events: none;
+  z-index: 3;
+}
+.phoneShot {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* Zijknoppen: dunne vlakjes net buiten de behuizing. */
+.phoneBtn {
+  position: absolute;
+  width: 3px;
+  border-radius: 2px;
+  background: #223638;
+}
+.phoneBtnMute { left: -3px; top: 118px; height: 28px; }
+.phoneBtnVolUp { left: -3px; top: 166px; height: 54px; }
+.phoneBtnVolDown { left: -3px; top: 232px; height: 54px; }
+.phoneBtnPower { right: -3px; top: 186px; height: 84px; }
+.phoneBack {
+  transform: rotateY(180deg);
+  background: linear-gradient(160deg, #22393b 0%, #0d1c1d 60%, #15292b 100%);
+  box-shadow: inset 0 0 0 3px #0b1819, 0 40px 80px -30px rgba(0, 0, 0, 0.75);
+}
+.phoneCam {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  width: 104px;
+  height: 104px;
+  border-radius: 30px;
+  background: #0a1516;
+  border: 1px solid rgba(212, 232, 230, 0.12);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 14px;
+}
+.phoneCam i {
+  display: block;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #2a4447 0%, #050b0c 70%);
+  border: 1px solid rgba(212, 232, 230, 0.18);
+}
+.phoneCam i:nth-child(3) { grid-column: 1; }
+.phoneBackMark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 26px;
+  letter-spacing: 0.12em;
+  color: rgba(212, 232, 230, 0.18);
 }
 /* Op smalle schermen de telefoon écht kleiner maken in plaats van hem te
    schalen: een transform met negatieve marge liet hem over de tekst heen
    vallen. De inhoud is vloeiend, dus die past zich vanzelf aan. */
 @media (max-width: 900px) {
-  .phone { width: 236px; height: 480px; padding: 8px; }
-  .phoneNotch { width: 72px; top: 8px; }
-  .phoneScroll { padding: 14px 11px 30px; gap: 10px; }
+  .phone { width: 236px; height: 480px; }
+  .phoneFace, .phoneBack, .phoneSlice { border-radius: 38px; }
+  .phoneFace { padding: 8px; }
+  .phoneScreen { border-radius: 31px; }
+      .phoneCam { width: 80px; height: 80px; border-radius: 24px; padding: 11px; gap: 8px; }
+  .phoneCam i { width: 24px; height: 24px; }
 }
-.phoneNotch {
-  position: absolute;
-  top: 10px; left: 50%;
-  width: 92px; height: 5px;
-  transform: translateX(-50%);
-  background: var(--hair-strong);
-}
-.phoneScreen { position: relative; width: 100%; height: 100%; overflow: hidden; background: #0b1a19; }
-.phoneScroll { position: absolute; inset: 0 0 auto 0; padding: 18px 14px 40px; display: flex; flex-direction: column; gap: 12px; will-change: transform; }
 
-.appHead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
-.appTitle { font-family: var(--body); font-weight: 600; font-size: 21px; letter-spacing: -0.02em; color: #e8f1ef; }
-.appMeta { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; color: #7f9c98; }
-.appLabel { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.12em; text-transform: uppercase; color: #a9c2be; }
-.appCard {
-  position: relative;
-  background: linear-gradient(180deg, #17312f 0%, #112423 100%);
-  border: 1px solid rgba(255,255,255,0.06);
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.appCardTop { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.appBadge {
-  font-family: var(--mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase;
-  color: #4ecb71; border: 1px solid rgba(78,203,113,0.45); padding: 3px 6px;
-}
-.arcs { width: 100%; height: auto; display: block; margin-top: 2px; }
-.appCentre { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-top: -46px; }
-.appBig { font-family: var(--mono); font-size: 30px; line-height: 1; color: #e8f1ef; font-variant-numeric: tabular-nums; }
-.appBig small { font-size: 0.45em; color: #7f9c98; margin-left: 1px; }
-.appLegend { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
-.appLegendItem {
-  display: flex; align-items: center; gap: 7px;
-  font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; color: #a9c2be;
-}
-.appLegendItem i { width: 7px; height: 7px; flex: none; }
-.appLegendItem b { margin-left: auto; font-weight: 400; color: #e8f1ef; }
-.appRow { display: grid; grid-template-columns: 46px 1fr auto; gap: 8px; align-items: center; font-family: var(--mono); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: #a9c2be; }
-.appBarTrack { display: block; height: 5px; background: rgba(255,255,255,0.08); position: relative; }
-.appBarTrack b { position: absolute; inset: 0 auto 0 0; }
-.appNum { color: #e8f1ef; font-variant-numeric: tabular-nums; }
-.appGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.appTile {
-  background: linear-gradient(180deg, #17312f 0%, #112423 100%);
-  border: 1px solid rgba(255,255,255,0.06);
-  padding: 10px;
-  display: flex; flex-direction: column; gap: 6px; min-width: 0;
-}
-.appTileVal { font-family: var(--mono); font-size: 21px; line-height: 1; color: #e8f1ef; font-variant-numeric: tabular-nums; }
-.appTileVal small { font-size: 0.42em; color: #7f9c98; margin-left: 3px; letter-spacing: 0.06em; text-transform: uppercase; }
 
 @media (prefers-reduced-motion: reduce) {
-  .scene { height: auto; }
+  .scene, .sceneHero { height: auto; }
   .scenePin { position: static; height: auto; padding-block: clamp(58px, 8vw, 120px); }
+  .frameSlot { position: static; opacity: 1; transform: none; margin-top: 14px; }
+  .frameStage { aspect-ratio: auto; display: flex; flex-direction: column; }
+  /* De iPad-scene wordt een gewone kolom beelden; de inline transform van het
+     spoor moet daarvoor wijken, vandaar !important. */
+  .ipadTrack {
+    position: static;
+    transform: none !important;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(10px, 1.6vw, 18px);
+  }
+  .ipadSlide { position: static; left: auto !important; width: 100%; height: auto; }
+  .ipadStage { transform: none !important; }
+  .ipadSlice { display: none; }
+  .ipadTrack, .ipadImg { transition: none; }
+  .ipadImg { height: auto; transform: none; }
+  .ipadScreen { aspect-ratio: auto; }
+  .ipadGloss { display: none; }
+}
+
+/* ── Proefbeelden (MockScreens.tsx) ───────────────────────────────────
+   Tijdelijke composities in de opnamekaders om het ontwerp te testen; gaan
+   eruit zodra de echte gemaskeerde opnames er zijn. */
+.mock {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.6vw, 18px);
+  padding: clamp(14px, 2vw, 26px);
+  background: var(--app-bg);
+  font-size: clamp(11px, 1.05vw, 14px);
+}
+.mockTopbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: clamp(8px, 1.2vw, 14px);
+  border-bottom: 1px solid var(--hair);
+}
+.mockBrand { font-family: var(--display); font-weight: 700; letter-spacing: 0.06em; font-size: 1.15em; }
+.mockLabel {
+  font-family: var(--mono);
+  font-size: 0.72em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+.mockStats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--hair); border: 1px solid var(--hair); }
+.mockStat { background: var(--app-surface); padding: clamp(8px, 1.4vw, 16px); display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.mockStat b { font-family: var(--mono); font-weight: 500; font-size: 1.7em; font-variant-numeric: tabular-nums; }
+.mockRows { display: flex; flex-direction: column; gap: 6px; }
+.mockRow {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(8px, 1.2vw, 14px);
+  background: var(--app-surface);
+  border: 1px solid var(--hair-soft);
+  padding: clamp(7px, 1.1vw, 12px) clamp(9px, 1.4vw, 16px);
+}
+.mockRow i { width: 7px; height: 7px; flex: none; }
+.mockRow b { font-weight: 600; white-space: nowrap; }
+.mockRow > span { color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mockNum { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink) !important; }
+.mockVideo { width: 26px; height: 17px; border: 1px solid; opacity: 0.9; flex: none; }
+.mockChip {
+  font-family: var(--mono);
+  font-size: 0.68em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 5px 9px;
+  white-space: nowrap;
+}
+.mockFoot { display: flex; gap: 8px; align-items: center; margin-top: auto; }
+.mockGrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; background: var(--hair); border: 1px solid var(--hair); flex: 1; }
+.mockDag { background: var(--app-surface); padding: clamp(6px, 1vw, 12px); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.mockPil {
+  font-family: var(--mono);
+  font-size: 0.66em;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #0A1C1D;
+  padding: 5px 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mockRust { font-family: var(--mono); font-size: 0.66em; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-dim); }
+.mockTag {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  font-family: var(--mono);
+  font-size: 0.62em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
 }
 
 /* Legenda bij de curve: welke bronnen samen de belasting vormen. */
@@ -794,7 +970,9 @@
 @media (max-width: 780px) { .compare { grid-template-columns: 1fr; } }
 
 /* ── Slot en voettekst ────────────────────────────────────────────────── */
-.closer { background: var(--petrol); color: var(--paper); }
+/* De diepste grond van de pagina: het slot en de voettekst zakken één tint
+   onder de rest weg, zodat de pagina naar beneden toe dichtklapt. */
+.closer { background: var(--app-flat); color: var(--ink); }
 .footerMark {
   font-family: var(--display);
   font-weight: 700;
@@ -802,7 +980,7 @@
   font-size: clamp(76px, 25vw, 380px);
   line-height: 0.74;
   letter-spacing: 0.01em;
-  color: var(--paper);
+  color: var(--ink);
   margin: 0;
   padding-top: clamp(24px, 4vw, 56px);
   opacity: 0.13;
@@ -841,7 +1019,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tickerTrack { animation: none; }
   .reveal { opacity: 1; transform: none; transition: none; }
   .btn::before, .row::before { transition: none; }
 }

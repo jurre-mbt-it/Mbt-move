@@ -628,3 +628,14 @@ body {
   font-size-adjust: none;
   letter-spacing: 0.08em;
 }
+
+/* Publieke BASE-pagina: de plakscenes (position: sticky) plakken niet zolang
+   een voorouder overflow-x: hidden heeft, want zo'n voorouder is een
+   scroll-container en sticky plakt dan dáár aan in plaats van aan het venster.
+   De root-layout zet overflow-x-hidden op html en body voor de hele app; op
+   de route met de publieke pagina (herkenbaar aan main.base-site) zetten we
+   hem om naar clip, dat wel afknipt maar geen scroll-container maakt. */
+html:has(main.base-site),
+html:has(main.base-site) body {
+  overflow-x: clip;
+}
