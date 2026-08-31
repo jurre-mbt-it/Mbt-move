@@ -21,6 +21,7 @@ import { HR_ZONES, type HRZone } from '../src/lib/cardio-constants'
 import { INTENSITY_TYPES, INTENSITY_TYPE_LABELS } from '../src/lib/prescription'
 import { STANDARD_PARAMS, REP_UNITS } from '../src/lib/program-constants'
 import { durationFromExercises } from '../src/lib/planned-load'
+import { searchMatch, searchSegments } from '../src/lib/exercise-search'
 
 const MOBILE = process.env.MOBILE_REPO
   ?? path.resolve(__dirname, '..', '..', 'mbt-gym-mobile')
@@ -123,6 +124,26 @@ async function main() {
   check('werk-seconden voor een onbekende eenheid',
     durationFromExercises([{ sets: 1, reps: 30, repUnit: 'onzin', restTime: 0 }]),
     mirror.estimateSetActiveSec(30, 'onzin'))
+
+  // ── Zoek-matching (lib/exercise-search) ───────────────────────────────────
+  // Web en app moeten dezelfde oefeningen vinden én dezelfde stukken markeren,
+  // anders vindt de therapeut op het web wat de patient in de app niet ziet.
+  console.log('\nZoek-matching (lib/exercise-search):')
+  const zoek = await import(path.join(MOBILE, 'lib', 'exercise-search.ts'))
+  const zoekCases: Array<[string, string]> = [
+    ['push up', 'Push-Up Plus'],
+    ['pushup', 'Push-Up Plus'],
+    ['push-up', 'Scapula Push Up'],
+    ['been', 'Béén Curl'],
+    ['squat', 'Push-Up'],
+    ['', 'Push-Up'],
+  ]
+  for (const [q, naam] of zoekCases) {
+    check(`searchMatch("${q}", "${naam}")`,
+      searchMatch(q, [naam]), zoek.searchMatch(q, [naam]))
+    check(`searchSegments("${naam}", "${q}")`,
+      searchSegments(naam, q), zoek.searchSegments(naam, q))
+  }
 
   console.log(fouten === 0
     ? '\nGeen drift: web en app rekenen en benoemen gelijk.'

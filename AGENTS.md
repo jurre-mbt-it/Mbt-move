@@ -95,9 +95,11 @@ endpoints raken, server-side afgedwongen in
 
 De iOS-app (`/Users/eva/mbt-gym-mobile`, aparte repo) spiegelt bewust een paar
 stukken uit deze repo: het cardio-blokkenmodel (`src/lib/cardio-workout.ts` ↔
-`lib/cardio-workout.ts`) en de voorschrift/parameter-constanten
+`lib/cardio-workout.ts`), de voorschrift/parameter-constanten
 (`src/lib/prescription.ts` + `src/lib/program-constants.ts` ↔
-`lib/prescription-mirror.ts`). Er is geen gedeeld package.
+`lib/prescription-mirror.ts`) en de woord-tolerante oefening-zoekmatching
+(`src/lib/exercise-search.ts` ↔ `lib/exercise-search.ts`, óók de bron van de
+zoekmarkering in beide UI's). Er is geen gedeeld package.
 
 **Wijzig je een van die bronnen, draai dan `npm run check:mirror`** — dat laadt
 de echte bestanden uit beide repo's en vergelijkt gedrag (zelfde blokken →

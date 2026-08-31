@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Heart } from 'lucide-react'
 import { ExerciseCard } from '@/components/exercises/ExerciseCard'
 import { MarkMatch } from '@/components/exercises/MarkMatch'
+import { searchMatch } from '@/lib/exercise-search'
 import { ExerciseVideoModal, type ExerciseForModal } from '@/components/exercises/ExerciseVideoModal'
 import {
   EXERCISE_CATEGORIES,
@@ -140,7 +141,7 @@ export default function ExercisesPage() {
     const woordBegin = (tekst: string) =>
       tekst.toLowerCase().split(/[^a-z0-9]+/i).some(w => w.startsWith(q))
     return filtered.some(ex =>
-      ex.name.toLowerCase().includes(q) ||
+      searchMatch(debouncedQuery, [ex.name]) ||
       (ex.tags ?? []).some((t: string) => woordBegin(t)),
     )
   }, [filtered, debouncedQuery])

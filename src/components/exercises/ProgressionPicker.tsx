@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { ArrowDown, ArrowUp, X, Search, Loader2 } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
+import { searchMatch } from '@/lib/exercise-search'
+import { MarkMatch } from '@/components/exercises/MarkMatch'
 import { P, CARD, DarkInput, MetaLabel } from '@/components/dark-ui'
 
 interface ProgressionPickerProps {
@@ -37,7 +39,7 @@ function ExercisePicker({
   const allExercises = (data ?? []) as Array<{ id: string; name: string; difficulty: string }>
 
   const exercises = allExercises.filter(
-    e => e.id !== excludeId && e.name.toLowerCase().includes(query.toLowerCase()),
+    e => e.id !== excludeId && searchMatch(query, [e.name]),
   )
   const selected = allExercises.find(e => e.id === selectedId)
 
@@ -152,7 +154,7 @@ function ExercisePicker({
                         setQuery('')
                       }}
                     >
-                      <span>{ex.name}</span>
+                      <span><MarkMatch text={ex.name} query={query} /></span>
                       <MetaLabel style={{ color: P.inkMuted }}>{ex.difficulty}</MetaLabel>
                     </button>
                   ))

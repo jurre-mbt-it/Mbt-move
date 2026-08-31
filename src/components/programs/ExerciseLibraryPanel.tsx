@@ -4,6 +4,8 @@ import { useState, useMemo } from 'react'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { EXERCISE_CATEGORIES } from '@/lib/exercise-constants'
+import { searchMatch } from '@/lib/exercise-search'
+import { MarkMatch } from '@/components/exercises/MarkMatch'
 import { SUPERSET_COLORS } from '@/lib/program-constants'
 import { cn } from '@/lib/utils'
 import { Search, Plus, GripVertical, X } from 'lucide-react'
@@ -36,9 +38,11 @@ interface LibraryExercise {
 function DraggableLibraryItem({
   exercise,
   onAdd,
+  query,
 }: {
   exercise: LibraryExercise
   onAdd: (ex: LibraryExercise) => void
+  query: string
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `library-${exercise.id}`,
@@ -70,7 +74,9 @@ function DraggableLibraryItem({
         style={{ background: color }}
       />
 
-      <span className="flex-1 truncate font-medium text-xs">{exercise.name}</span>
+      <span className="flex-1 truncate font-medium text-xs">
+        <MarkMatch text={exercise.name} query={query} />
+      </span>
 
       <button
         type="button"
@@ -149,8 +155,7 @@ export function ExerciseLibraryPanel({ onAdd, exercises: propExercises, onAddRes
   const filteredResources = useMemo(() => {
     const all = resourcesQuery.data ?? []
     if (!resourceQuery.trim()) return all
-    const q = resourceQuery.toLowerCase()
-    return all.filter(r => r.title.toLowerCase().includes(q))
+    return all.filter(r => searchMatch(resourceQuery, [r.title]))
   }, [resourcesQuery.data, resourceQuery])
 
   const allExercises = (propExercises ?? []) as LibraryExercise[]
@@ -158,7 +163,7 @@ export function ExerciseLibraryPanel({ onAdd, exercises: propExercises, onAddRes
   const filtered = useMemo(() =>
     allExercises.filter(e => {
       if (category && e.category !== category) return false
-      if (query && !e.name.toLowerCase().includes(query.toLowerCase())) return false
+      if (query && !searchMatch(query, [e.name, ...(e.tags ?? [])])) return false
       return true
     }), [allExercises, query, category])
 
@@ -283,7 +288,7 @@ export function ExerciseLibraryPanel({ onAdd, exercises: propExercises, onAddRes
           <p className="text-xs text-muted-foreground text-center py-6">Geen oefeningen</p>
         ) : (
           filtered.map(ex => (
-            <DraggableLibraryItem key={ex.id} exercise={ex} onAdd={onAdd} />
+            <DraggableLibraryItem key={ex.id} exercise={ex} onAdd={onAdd} query={query} />
           ))
         )}
 

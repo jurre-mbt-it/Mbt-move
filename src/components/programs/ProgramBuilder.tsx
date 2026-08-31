@@ -26,6 +26,8 @@ import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 
+import { searchMatch } from '@/lib/exercise-search'
+import { MarkMatch } from '@/components/exercises/MarkMatch'
 import { ExerciseLibraryPanel } from './ExerciseLibraryPanel'
 import { ProgramExerciseBlock } from './ProgramExerciseBlock'
 import { SupersetGroupBlock } from './SupersetGroupBlock'
@@ -2002,7 +2004,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             {(libraryExercises)
               .filter(ex => {
                 if (mobileCategory && ex.category !== mobileCategory) return false
-                if (mobileQuery && !ex.name.toLowerCase().includes(mobileQuery.toLowerCase())) return false
+                if (mobileQuery && !searchMatch(mobileQuery, [ex.name])) return false
                 return true
               })
               .map(ex => {
@@ -2030,7 +2032,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                       // Nu dezelfde bron als de rest, inclusief wat de praktijk instelt.
                       style={{ background: catColors[ex.category] ?? P.brand }}
                     />
-                    <span className="flex-1 text-sm font-medium">{ex.name}</span>
+                    <span className="flex-1 text-sm font-medium"><MarkMatch text={ex.name} query={mobileQuery} /></span>
                     {selected && <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: 'var(--p-brand)' }} />}
                   </button>
                 )
