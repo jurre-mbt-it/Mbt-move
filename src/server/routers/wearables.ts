@@ -269,7 +269,9 @@ async function buildOverview(prisma: PrismaClient, userId: string, locale: Readi
     // Dag-belasting uit continue hartslag (hele etmaal, workouts inbegrepen).
     // Losse readout naast de sRPE-curve, zie src/lib/exertion.ts. De 0-100
     // schaal rekenen we hier zodat de app die logica niet hoeft te dupliceren:
-    // elke dag afgezet tegen de p90 van de dagen ervóór.
+    // elke dag geankerd op de p90 van de dagen ervóór. Let op: de p90 is het
+    // anker, niet het plafond — de p90-dag zelf leest 6,3. Het doelbereik
+    // hieronder is op diezelfde absolute schaal geijkt en hoort daarbij.
     exertion: exertion.map((e, i) => ({
       date: isoDay(e.date),
       trimp: e.trimp,

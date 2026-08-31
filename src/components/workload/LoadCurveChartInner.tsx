@@ -24,6 +24,7 @@ import {
   Tile,
 } from '@/components/dark-ui'
 import type { LoadPoint, LoadStatus, LoadStatusKey } from '@/lib/training-load'
+import { CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
 
 const STATUS_COLORS: Record<LoadStatusKey, string> = {
   overreaching: P.danger,
@@ -45,12 +46,25 @@ const ZONES: { key: LoadStatusKey; from: number; to: number; color: string; labe
   { key: 'overreaching', from: -Infinity, to: -30, color: P.danger, label: 'Overreaching' },
 ]
 
+/** Eén workout achter een dagpunt (server LoadSession): gevoed door
+ *  computeLoadCurve sinds 25-08-2026, voor de trainingsdag-stippen en de
+ *  dag-inzage in de tooltip. */
+export type LoadSessionRow = {
+  date: string
+  label: string | null
+  activity: string | null
+  load: number
+  durationMin: number
+  rpe: number | null
+}
+
 type ModalityCurve = {
   points: LoadPoint[]
   acwr: number | null
   status: LoadStatus
   today: LoadPoint | null
   sessionCount: number
+  sessions?: LoadSessionRow[]
 }
 
 export type LoadCurveData = ModalityCurve & {
@@ -105,12 +119,29 @@ export function LoadCurveChart({ data, compact = false, frameless = false }: { d
     )
   }
 
+  // Trainingen per dag: bij "alles" kracht en cardio samen, anders die van de
+  // gekozen modaliteit. Voedt de stippen op de lijn en de tooltip-inzage.
+  const sessiesVanDag = new Map<string, LoadSessionRow[]>()
+  const sessieBron =
+    modality === 'strength' ? data.strength?.sessions ?? []
+    : modality === 'cardio' ? data.cardio?.sessions ?? []
+    : [...(data.strength?.sessions ?? []), ...(data.cardio?.sessions ?? [])]
+  for (const sessie of sessieBron) {
+    const lijst = sessiesVanDag.get(sessie.date) ?? []
+    lijst.push(sessie)
+    sessiesVanDag.set(sessie.date, lijst)
+  }
+  const sessieNaam = (x: LoadSessionRow) =>
+    x.label ??
+    (x.activity ? CARDIO_ACTIVITIES[x.activity as CardioActivityKey]?.label ?? 'Cardio' : 'Krachtsessie')
+
   // NL korte datum op de x-as; alleen begin/eind + maandwissels leesbaar houden.
   const allData = points.map(p => ({
     ...p,
     dag: p.date.slice(8, 10) + '/' + p.date.slice(5, 7),
     Vorm: p.form,
     Belasting: p.load, // dag-totaal sRPE — de staafjes tijdens de ijkperiode
+    heeftSessie: sessiesVanDag.has(p.date),
   }))
 
   // Lege aanloop (geen activiteit) wegsnijden zodat we op de actieve periode
@@ -128,6 +159,24 @@ export function LoadCurveChart({ data, compact = false, frameless = false }: { d
   const clamp = (v: number) => (v === Infinity ? hi : v === -Infinity ? lo : v)
 
   const lastDag = chartData[chartData.length - 1]?.dag
+  const dagNaarDatum = new Map(chartData.map(p => [p.dag, p.date]))
+  const tooltipVoet = (label: string | number | undefined) => {
+    const datum = label != null ? dagNaarDatum.get(String(label)) : undefined
+    const rijen = datum ? sessiesVanDag.get(datum) ?? [] : []
+    if (rijen.length === 0) return null
+    return (
+      <div className="flex flex-col gap-1">
+        {rijen.map((x, i) => (
+          <div key={i} className="flex items-baseline gap-2" style={{ fontSize: 11, color: P.ink }}>
+            <span style={{ fontWeight: 700 }}>{sessieNaam(x)}</span>
+            <span style={{ color: P.inkMuted, marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' }}>
+              {x.durationMin} min{x.rpe != null ? ` · RPE ${x.rpe}` : ''} · +{x.load}
+            </span>
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   // ── IJkperiode: gelogde belasting tonen, zone-oordeel nog niet ──────────
   // Zonder bekend startniveau leest de eerste week als "van 0 naar 100" en
@@ -169,7 +218,7 @@ export function LoadCurveChart({ data, compact = false, frameless = false }: { d
               <CartesianGrid {...DARK_CHART_STYLES.grid} />
               <XAxis dataKey="dag" {...DARK_CHART_STYLES.axis} interval="preserveStartEnd" minTickGap={28} />
               <YAxis {...DARK_CHART_STYLES.axis} width={42} />
-              <Tooltip content={<DarkChartTooltip />} />
+              <Tooltip content={<DarkChartTooltip footer={tooltipVoet} />} />
               <Bar dataKey="Belasting" fill={P.inkMuted} radius={[3, 3, 0, 0]} maxBarSize={18} />
             </ComposedChart>
           </ResponsiveContainer>
@@ -301,11 +350,34 @@ export function LoadCurveChart({ data, compact = false, frameless = false }: { d
             ))}
             <XAxis dataKey="dag" {...DARK_CHART_STYLES.axis} interval="preserveStartEnd" minTickGap={28} />
             <YAxis {...DARK_CHART_STYLES.axis} width={42} domain={[lo, hi]} allowDataOverflow />
-            <Tooltip content={<DarkChartTooltip />} />
+            <Tooltip content={<DarkChartTooltip footer={tooltipVoet} />} />
             {/* Nullijn + harde overreaching-grens (vorm = −30) */}
             <ReferenceLine y={0} stroke={P.lineStrong} />
             <ReferenceLine y={-30} stroke={P.danger} strokeDasharray="4 4" strokeOpacity={0.6} />
-            <Line type="monotone" dataKey="Vorm" stroke={P.ink} strokeWidth={2.5} dot={false} />
+            {/* Stip op elke trainingsdag; rustdagen blijven kale lijn. Straal 0
+                i.p.v. null op lege dagen: Recharts wil altijd een element terug. */}
+            <Line
+              type="monotone"
+              dataKey="Vorm"
+              stroke={P.ink}
+              strokeWidth={2.5}
+              dot={(props: unknown) => {
+                // Recharts' DotType-props zijn niet exact getypeerd voor de
+                // payload; smal casten naar wat we gebruiken.
+                const d = props as { key?: string; cx?: number; cy?: number; payload?: { heeftSessie?: boolean } }
+                return (
+                  <circle
+                    key={d.key}
+                    cx={d.cx}
+                    cy={d.cy}
+                    r={d.payload?.heeftSessie ? 3.5 : 0}
+                    fill={P.ink}
+                    stroke={P.bg}
+                    strokeWidth={1.5}
+                  />
+                )
+              }}
+            />
             {today && lastDag && (
               <ReferenceDot x={lastDag} y={today.form} r={4} fill={P.ink} stroke={P.bg} strokeWidth={2} />
             )}

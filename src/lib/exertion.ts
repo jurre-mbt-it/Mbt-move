@@ -134,19 +134,40 @@ export function computeExertionDay(
 }
 
 /**
- * Persoonlijke schaal 0-100 voor de weergave: de dag afgezet tegen het
- * eigen zwaarste recente etmaal. Zonder referentie (nieuwe gebruiker) geven we
- * null terug in plaats van een verzonnen schaal.
+ * Persoonlijke schaal 0-100 voor de weergave: de dag afgezet tegen de eigen
+ * p90-dag van het venster. Zonder referentie (nieuwe gebruiker) geven we null
+ * terug in plaats van een verzonnen schaal.
+ *
+ * De p90 is het ANKERPUNT van de schaal, niet de bovenkant ervan. Dat verschil
+ * is de hele reden dat hier een curve staat en geen deling:
+ *
+ *   score = 100 × (1 − e^(−trimp / p90))
+ *
+ * Eerst deelden we recht door de p90 en klemden we op 100. Per definitie zit
+ * dan een tiende van je dagen op precies 10,0: je p90 ís je gewone zware dag.
+ * Een normale duurloop las daardoor hetzelfde als een dag die twee keer zo
+ * zwaar was, en omdat het doelbereik in wearables.ts op een ABSOLUTE schaal
+ * geijkt is (max 8,0 bij een perfect herstel) sloeg de kop na élke training om
+ * naar "eerst herstellen". Op een echt profiel van 60 dagen gebeurde dat 16
+ * van de 46 keer — een waarschuwing die altijd afgaat, waarschuwt niet meer.
+ *
+ * De curve verzadigt in plaats van af te kappen. Bij kleine ratio's valt hij
+ * samen met de oude lineaire schaal, dus de Athlytic-ijking van 2026-07-23
+ * (kantoordag ~0,8, rustige dag ~2,3) blijft staan. Daarboven blijft er ruimte:
+ * de p90-dag leest 6,3, tweemaal je p90 leest 8,6, en 10,0 vraagt ruim vijf
+ * keer je p90 — precies de bedoeling, want 10 hoort "buiten alles wat je tot nu
+ * toe gedaan hebt" te betekenen.
  *
  * `recentTrimps` = TRIMP-waarden van de voorgaande dagen (zonder vandaag).
  */
 export function exertionScore(trimp: number, recentTrimps: number[]): number | null {
   const valid = recentTrimps.filter((t) => Number.isFinite(t) && t > 0)
   if (valid.length < 7) return null
-  // p90 i.p.v. het maximum: één uitschieter mag de schaal niet permanent
-  // platdrukken.
+  // p90 i.p.v. het maximum: één uitschieter mag het anker niet permanent
+  // omhoog trekken.
   const sorted = [...valid].sort((a, b) => a - b)
   const p90 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.9))]
   if (!p90 || p90 <= 0) return null
-  return Math.max(0, Math.min(100, Math.round((trimp / p90) * 100)))
+  if (!Number.isFinite(trimp) || trimp <= 0) return 0
+  return Math.max(0, Math.min(100, Math.round(100 * (1 - Math.exp(-trimp / p90)))))
 }

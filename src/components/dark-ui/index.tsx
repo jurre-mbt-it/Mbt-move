@@ -1160,14 +1160,19 @@ export function DarkChartTooltip({
   label,
   valueFormatter,
   labelFormatter,
+  footer,
 }: {
   active?: boolean
   payload?: Array<{ name?: string; value?: number | string; color?: string; dataKey?: string }>
   label?: string | number
   valueFormatter?: (v: number | string) => string
   labelFormatter?: (v: string | number) => string
+  /** Extra regels onder de waarden, per datapunt (bv. de trainingen van die
+   *  dag in de belasting-curve). Krijgt het x-label van het punt. */
+  footer?: (label: string | number | undefined) => React.ReactNode
 }) {
   if (!active || !payload || payload.length === 0) return null
+  const voet = footer?.(label)
   return (
     <div
       style={{
@@ -1236,6 +1241,9 @@ export function DarkChartTooltip({
           </div>
         ))}
       </div>
+      {voet ? (
+        <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${P.line}` }}>{voet}</div>
+      ) : null}
     </div>
   )
 }

@@ -40,6 +40,20 @@ import {
 
 const WARMUP_DAYS = 42 // EWMA-inloop vóór het weergavevenster
 
+/** Eén gelogde workout achter een dagpunt, voor de tik-inzage in de app:
+ *  tik op een punt in de LOAD-grafiek en zie welke training dat punt maakte
+ *  en hoeveel belasting hij bijdroeg (dezelfde sessionLoad als de curve). */
+export type LoadSession = {
+  date: string
+  /** Programmanaam (kracht); cardio draagt zijn naam via `activity`. */
+  label: string | null
+  /** CardioActivity-enum; de app vertaalt hem naar de activiteitsnaam. */
+  activity: string | null
+  load: number
+  durationMin: number
+  rpe: number | null
+}
+
 /** Eén modaliteit-curve (kracht of cardio) of de gecombineerde. */
 export type ModalityCurve = {
   points: LoadPoint[]        // alleen het weergavevenster
@@ -53,6 +67,9 @@ export type ModalityCurve = {
   monotony: number | null
   /** Foster strain: weektotaal × monotony. */
   strain: number | null
+  /** Workouts in het venster, voor de punt-inzage. Alleen op de per-modaliteit
+   *  curves gezet; de gecombineerde heeft ze niet nodig. */
+  sessions?: LoadSession[]
 }
 
 /** Cardio-curve + optionele HR-gebaseerde load (Edwards TRIMP). */
@@ -122,11 +139,11 @@ export async function computeLoadCurve(
         completedAt: { gte: from },
         status: 'COMPLETED',
       },
-      select: { completedAt: true, duration: true, exertionLevel: true },
+      select: { completedAt: true, duration: true, exertionLevel: true, program: { select: { name: true } } },
     }),
     prisma.cardioLog.findMany({
       where: { patientId, completedAt: { gte: from } },
-      select: { completedAt: true, durationSec: true, rpe: true, timeInZones: true },
+      select: { completedAt: true, durationSec: true, rpe: true, timeInZones: true, activity: true },
     }),
   ])
 
@@ -134,26 +151,47 @@ export async function computeLoadCurve(
 
   // ── Kracht: sRPE per krachtsessie ──────────────────────────────────────
   const strengthLoads: DailyLoad[] = []
+  const strengthSessions: LoadSession[] = []
   for (const s of sessions) {
     if (!s.completedAt) continue
-    strengthLoads.push({
-      date: isoDay(s.completedAt),
-      // Duur defensief afkappen: legacy-rijen met een doorgelopen timer mogen
-      // de curve niet vergiftigen, ook vóór ze in de DB gecorrigeerd zijn.
-      load: sessionLoad(clampSessionDurationSec(s.duration) / 60, s.exertionLevel),
-    })
+    const dateIso = isoDay(s.completedAt)
+    // Duur defensief afkappen: legacy-rijen met een doorgelopen timer mogen
+    // de curve niet vergiftigen, ook vóór ze in de DB gecorrigeerd zijn.
+    const durMin = clampSessionDurationSec(s.duration) / 60
+    const load = sessionLoad(durMin, s.exertionLevel)
+    strengthLoads.push({ date: dateIso, load })
+    if (dateIso >= windowStartIso) {
+      strengthSessions.push({
+        date: dateIso,
+        label: s.program?.name ?? null,
+        activity: null,
+        load: Math.round(load),
+        durationMin: Math.round(durMin),
+        rpe: s.exertionLevel ?? null,
+      })
+    }
   }
 
   // ── Cardio: sRPE per cardiosessie + losse Edwards-TRIMP waar HR is ──────
   const cardioLoads: DailyLoad[] = []
+  const cardioSessions: LoadSession[] = []
   let cardioTrimp = 0
   let hrSessionCount = 0
   for (const c of cardio) {
     const dateIso = isoDay(c.completedAt)
-    cardioLoads.push({
-      date: dateIso,
-      load: sessionLoad(clampSessionDurationSec(c.durationSec) / 60, c.rpe),
-    })
+    const durMin = clampSessionDurationSec(c.durationSec) / 60
+    const load = sessionLoad(durMin, c.rpe)
+    cardioLoads.push({ date: dateIso, load })
+    if (dateIso >= windowStartIso) {
+      cardioSessions.push({
+        date: dateIso,
+        label: null,
+        activity: c.activity,
+        load: Math.round(load),
+        durationMin: Math.round(durMin),
+        rpe: c.rpe ?? null,
+      })
+    }
     // TRIMP alleen meetellen voor het zichtbare venster (niet de warm-up).
     if (dateIso >= windowStartIso) {
       const t = edwardsTrimp(c.timeInZones as Record<string, number> | null)
@@ -182,8 +220,8 @@ export async function computeLoadCurve(
     }
   }
 
-  const strength = buildModality(strengthLoads, from, to, strengthCount)
-  const cardioBase = buildModality(cardioLoads, from, to, cardioCount)
+  const strength = { ...buildModality(strengthLoads, from, to, strengthCount), sessions: strengthSessions.sort((a, b) => a.date.localeCompare(b.date)) }
+  const cardioBase = { ...buildModality(cardioLoads, from, to, cardioCount), sessions: cardioSessions.sort((a, b) => a.date.localeCompare(b.date)) }
   const combined = buildModality([...strengthLoads, ...cardioLoads], from, to, strengthCount + cardioCount)
 
   const historyDays = firstSessionAt
