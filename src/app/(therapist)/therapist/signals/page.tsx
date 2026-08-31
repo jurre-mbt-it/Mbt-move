@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { trpc } from '@/lib/trpc/client'
 import { usePortal } from '@/lib/portal'
 import { Display, Kicker, MetaLabel, P, Tile } from '@/components/dark-ui'
@@ -14,9 +14,40 @@ const URGENCY_ORDER: Record<string, number> = {
   LOW: 3,
 }
 
+/** Zelfde relatieve tijd als op het dashboard, waar de stil-lijst vandaan komt. */
+function timeAgo(d: Date | string, now: number): string {
+  const t = new Date(d).getTime()
+  const min = Math.round((now - t) / 60000)
+  if (min < 1) return 'zojuist'
+  if (min < 60) return `${min} min`
+  const hours = Math.round(min / 60)
+  if (hours < 24) return `${hours} u`
+  const days = Math.floor((now - t) / 86400000)
+  if (days === 1) return 'gisteren'
+  if (days < 7) return `${days} dgn`
+  return new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+}
+
 export default function SignalsDashboardPage() {
   const portal = usePortal()
   const { data, isLoading, refetch } = trpc.insights.getDashboard.useQuery()
+
+  // Dag/weekgrenzen één keer bij mount vastleggen — zelfde waarden als op het
+  // dashboard, zodat beide pagina's dezelfde query-cache delen.
+  const [{ now, dayStart, weekStart }] = useState(() => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    const monday = new Date(d)
+    monday.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+    return { now: Date.now(), dayStart: d.toISOString(), weekStart: monday.toISOString() }
+  })
+  // Stil (≥ 7 dagen niets gelogd) hoort bij de signalen, niet op het dashboard:
+  // het is een signaal om op te volgen, geen dagelijks cijfer.
+  const { data: dash, isLoading: dashLoading } = trpc.patients.therapistDashboard.useQuery({
+    dayStart,
+    weekStart,
+  })
+  const silent = dash?.silentPatients ?? []
 
   const insights = (data?.insights ?? []) as unknown as InsightCardData[]
   const silentPatients = data?.silentPatients ?? []
@@ -62,7 +93,7 @@ export default function SignalsDashboardPage() {
           </div>
         )}
 
-        {!isLoading && insights.length === 0 && silentPatients.length === 0 && (
+        {!isLoading && !dashLoading && insights.length === 0 && silentPatients.length === 0 && silent.length === 0 && (
           <Tile>
             <div className="py-10 text-center space-y-3">
               <p style={{ color: P.ink, fontSize: 14 }}>
@@ -96,6 +127,46 @@ export default function SignalsDashboardPage() {
             {thisWeek.map((i) => (
               <InsightCard key={i.id} insight={i} onChange={refetch} />
             ))}
+          </section>
+        )}
+
+        {/* Stil · geen enkele log in 7+ dagen. Stond eerder op het dashboard;
+            hoort hier omdat het om opvolging vraagt, niet om een dagcijfer. */}
+        {!dashLoading && silent.length > 0 && (
+          <section className="space-y-3">
+            <MetaLabel>Stil · al 7+ dagen niets gelogd · {silent.length}</MetaLabel>
+            <Tile>
+              <div className="flex flex-wrap gap-2">
+                {silent.map((p) => (
+                  <Link
+                    key={p.patientId}
+                    href={`${portal.patients}/${p.patientId}`}
+                    className="athletic-mono athletic-tap inline-flex items-center gap-2 px-3 py-2 rounded-lg"
+                    style={{
+                      background: P.control,
+                      color: P.inkMuted,
+                      fontSize: 11,
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    <span
+                      aria-hidden
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 999,
+                        background: P.gold,
+                        display: 'inline-block',
+                      }}
+                    />
+                    {p.name}
+                    <span style={{ color: P.inkDim }}>
+                      {p.lastActivityAt ? timeAgo(p.lastActivityAt, now) : 'nooit'}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </Tile>
           </section>
         )}
 

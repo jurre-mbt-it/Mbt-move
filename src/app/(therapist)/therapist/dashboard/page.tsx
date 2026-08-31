@@ -26,32 +26,6 @@ import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, type CardioActivityKey, type Cardi
 import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
 import { formatWeightsPerSet } from '@/lib/session-sets'
 
-const URGENCY_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
-  CRITICAL: { color: P.danger, bg: 'rgba(240,121,108,0.18)', label: 'Kritiek' },
-  HIGH: { color: P.orange, bg: 'rgba(240,154,74,0.15)', label: 'Hoog' },
-  MEDIUM: { color: P.gold, bg: 'rgba(245,185,66,0.14)', label: 'Middel' },
-  LOW: { color: P.ice, bg: 'rgba(159,206,201,0.15)', label: 'Laag' },
-}
-
-/**
- * Deep-link per signaaltype: belasting/voortgang-signalen landen op de
- * voortgangspagina (load-curve), pijn op de signalen-tab, therapietrouw op
- * de historie-tab.
- */
-function signalHref(portal: Portal, i: { signalType: string; patientId: string }): string {
-  switch (i.signalType) {
-    case 'deload_needed':
-    case 'overload_risk':
-    case 'plateau':
-    case 'ready_for_progression':
-      return `${portal.patients}/${i.patientId}/progress`
-    case 'adherence_drop':
-      return `${portal.patients}/${i.patientId}?tab=geschiedenis`
-    default:
-      return `${portal.patients}/${i.patientId}?tab=signalen`
-  }
-}
-
 type ActivityType = 'strength' | 'cardio' | 'wellness' | 'pain'
 
 const ACTIVITY_CONFIG: Record<
@@ -250,7 +224,6 @@ export default function TherapistDashboard() {
     urgency: string
     title: string
   }>
-  const topSignals = insights.slice(0, 4)
   const silent = dash?.silentPatients ?? []
   const todayPlanned = dash?.todayPlanned ?? []
   const activity = dash?.recentActivity ?? []
@@ -391,6 +364,7 @@ export default function TherapistDashboard() {
           value={dashLoading ? '…' : silent.length}
           tint={silent.length > 0 ? P.gold : P.lime}
           sub="> 7 dagen geen activiteit"
+          href={`${portal.base}/signals`}
         />
       </div>
 
@@ -399,99 +373,6 @@ export default function TherapistDashboard() {
       <Suspense fallback={null}>
         <StartTreatmentCard />
       </Suspense>
-
-      {/* Vraagt aandacht — top-signalen uit de Clinical Insight Engine.
-          Sectie verschijnt alleen als er echt iets speelt; bij rust volstaat
-          de SIGNALEN-stat hierboven. */}
-      {(topSignals.length > 0 || silent.length > 0) && (
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <Kicker>Vraagt aandacht</Kicker>
-          <Link
-            href={`${portal.base}/signals`}
-            className="athletic-mono"
-            style={{ color: P.brand, fontSize: 11, letterSpacing: '0.12em' }}
-          >
-            Alles →
-          </Link>
-        </div>
-        {topSignals.map((i) => {
-            const cfg = URGENCY_CONFIG[i.urgency] ?? URGENCY_CONFIG.MEDIUM
-            return (
-              <Tile key={i.id} href={signalHref(portal, i)} accentBar={cfg.color}>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span
-                        className="athletic-mono"
-                        style={{
-                          background: cfg.bg,
-                          color: cfg.color,
-                          fontSize: 10,
-                          padding: '3px 9px',
-                          borderRadius: 999,
-                          fontWeight: 900,
-                          letterSpacing: '0.1em',
-                          textTransform: 'uppercase',
-                        }}
-                      >
-                        {cfg.label}
-                      </span>
-                      <span style={{ color: P.ink, fontSize: 14, fontWeight: 700 }}>
-                        {i.patientName}
-                      </span>
-                    </div>
-                    <p
-                      className="truncate"
-                      style={{ color: P.inkMuted, fontSize: 13, marginTop: 6 }}
-                    >
-                      {i.title}
-                    </p>
-                  </div>
-                  <span style={{ color: P.inkMuted, fontSize: 18 }} aria-hidden>
-                    →
-                  </span>
-                </div>
-              </Tile>
-            )
-          })}
-        {!dashLoading && silent.length > 0 && (
-          <Tile>
-            <MetaLabel style={{ marginBottom: 10 }}>Stil · al 7+ dagen niets gelogd</MetaLabel>
-            <div className="flex flex-wrap gap-2">
-              {silent.map((p) => (
-                <Link
-                  key={p.patientId}
-                  href={`${portal.patients}/${p.patientId}`}
-                  className="athletic-mono athletic-tap inline-flex items-center gap-2 px-3 py-2 rounded-lg"
-                  style={{
-                    background: P.control,
-                    color: P.inkMuted,
-                    fontSize: 11,
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  <span
-                    aria-hidden
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: 999,
-                      background: P.gold,
-                      display: 'inline-block',
-                    }}
-                  />
-                  {p.name}
-                  <span style={{ color: P.inkDim }}>
-                    {p.lastActivityAt ? timeAgo(p.lastActivityAt, now) : 'nooit'}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </Tile>
-        )}
-      </div>
-      )}
 
       {/* Schema's om te controleren — programma's die langer dan hun drempel
           (ingesteld of standaard 8 weken) ongewijzigd zijn. Klik → patiënt-
