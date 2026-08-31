@@ -18,13 +18,13 @@ import { Pool } from 'pg'
 import { createClient } from '@supabase/supabase-js'
 import { config } from 'dotenv'
 import { resolve } from 'path'
+import { DPA_VERSION } from '@/lib/dpa-constants'
 
 config({ path: resolve(process.cwd(), '.env.local') })
 
 const EMAIL = 'mbtamsterdam_test@live.nl'
 const PASSWORD = 'Appletest2026'
 const NAME = 'Apple Review'
-const DPA_VERSION = 'v1.0' // moet gelijk zijn aan src/lib/dpa-constants.ts
 const PROG_NAME = 'App Review Demo — Krachtschema'
 
 function createPrisma() {
