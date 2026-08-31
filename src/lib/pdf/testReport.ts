@@ -13,7 +13,6 @@ import {
   computePlottedValue,
   computeZone,
   axisFraction,
-  zoneSegments,
   formatNumber,
   formatPlotted,
   ZONE_LABEL,
@@ -39,6 +38,9 @@ type EntryInput = TestSpec & {
   textValue: string | null
   plottedValueOverride: number | null
   zoneOverride: TestZone | null
+  /** Vrije toelichting van de therapeut bij deze test; komt onder de rij te
+   *  staan. Stond eerder in het model maar werd niet afgedrukt. */
+  notes: string | null
 }
 
 export type TestReportForPdf = {
@@ -101,77 +103,57 @@ function renderValues(e: EntryInput): string {
   return `${side('L', e.leftPrimary, e.leftSecondary)}${side('R', e.rightPrimary, e.rightSecondary)}`
 }
 
-/** Tick-label: getal + eenheid (symbolen overal, woord-eenheden op de randen). */
-function tickLabel(spec: TestSpec, value: number, outer: boolean): string {
-  const symbol = /^[%°]/.test(spec.plotUnit)
-  const showUnit = spec.plotUnit && (symbol || outer)
-  return `${formatNumber(value)}${showUnit ? esc(spec.plotUnit) : ''}`
+/** Kolomkop boven de gemeten waarde: "Symmetrie", "Score", of wat de plot meet. */
+function plotKolom(entries: EntryInput[]): string {
+  const eersteEenheid = entries.find((e) => e.plotUnit)?.plotUnit ?? ''
+  return eersteEenheid === '%' ? 'Symmetrie' : 'Uitslag'
 }
 
-/** De doelzone-balk: gekleurde segmenten + ticks + marker. */
-function renderBar(spec: TestSpec, plotted: number | null, opts?: { mini?: boolean }): string {
-  const segs = zoneSegments(spec)
-  const segHtml = segs
-    .map(
-      (s) =>
-        `<span class="tr-seg" style="left:${(s.from * 100).toFixed(2)}%;width:${((s.to - s.from) * 100).toFixed(2)}%;background:${ZONE_COLOR[s.zone]};"></span>`,
-    )
-    .join('')
-
-  const frac = axisFraction(spec, plotted)
-  const pin =
-    frac == null
-      ? ''
-      : `<span class="tr-pin" style="left:${(frac * 100).toFixed(2)}%;"></span>`
-
-  if (opts?.mini) {
-    return `<div class="tr-track tr-track--mini">${segHtml}${pin}</div>`
-  }
-
-  // Marker-label boven de balk + ticks eronder.
-  const zone = computeZone(spec, plotted)
-  const pinLabel =
-    frac == null
-      ? ''
-      : `<span class="tr-pinlabel" style="left:${(frac * 100).toFixed(2)}%;color:${zone ? ZONE_COLOR[zone] : '#0A0E0F'};">${esc(formatPlotted(spec, plotted))}</span>`
-
-  const ticks = [spec.axisMin, spec.zoneOrangeMin, spec.zoneGreenMin, spec.axisMax]
-    .map((v, i, arr) => {
-      const f = axisFraction(spec, v) ?? 0
-      const outer = i === 0 || i === arr.length - 1
-      const align = i === 0 ? 'left:0;' : i === arr.length - 1 ? 'right:0;' : `left:${(f * 100).toFixed(2)}%;transform:translateX(-50%);`
-      return `<span class="tr-tick" style="${align}">${tickLabel(spec, v, outer)}</span>`
-    })
-    .join('')
-
-  return `
-    <div class="tr-barblock">
-      <div class="tr-pinrow">${pinLabel}</div>
-      <div class="tr-track">${segHtml}${pin}</div>
-      <div class="tr-ticks">${ticks}</div>
-    </div>
-  `
+/** De drempel waar deze test op beoordeeld wordt, als tekst. */
+function doelTekst(spec: TestSpec): string {
+  const teken = spec.higherIsBetter ? '≥' : '≤'
+  return `${teken} ${formatNumber(spec.zoneGreenMin)}${esc(spec.plotUnit ?? '')}`
 }
 
-function renderTestRow(e: EntryInput): string {
+/** Eén waarde in een cel: getal plus eenheid klein erachter. */
+function cel(value: number | null, eenheid: string | null): string {
+  if (value == null) return '<span class="tr-tab__leeg">—</span>'
+  return `${formatNumber(value)}${eenheid ? `<i>${esc(eenheid)}</i>` : ''}`
+}
+
+function renderTestRij(e: EntryInput): string {
   const spec = e as TestSpec
   const plotted = computePlottedValue(spec, e)
   const zone = computeZone(spec, e)
+  // Kleur alleen als de uitslag BUITEN de doelzone valt. Een rapport waarin
+  // elke regel een kleur heeft, leest als een dashboard en niet als een
+  // bevinding; het oog moet naar de twee waarden die aandacht vragen.
+  const kleur = zone === 'GREEN' || zone == null ? '' : ` style="color:${ZONE_COLOR[zone]};"`
+
+  const waarden =
+    e.kind === 'SINGLE'
+      ? `<td class="tr-tab__num" colspan="2">${e.textValue ? esc(e.textValue) : cel(e.singleValue, e.unitPrimary)}</td>`
+      : `<td class="tr-tab__num">${cel(e.leftPrimary, e.unitPrimary)}</td>
+         <td class="tr-tab__num">${cel(e.rightPrimary, e.unitPrimary)}</td>`
+
+  const notitie = e.notes?.trim()
+    ? `<tr class="tr-tab__notitierij"><td colspan="5" class="tr-tab__notitie">${esc(e.notes.trim())}</td></tr>`
+    : ''
+
   return `
-    <div class="tr-test avoid-break">
-      <div class="tr-test__top">
-        <div class="tr-test__name">
-          <span class="tr-test__title">${esc(e.name)}</span>
-          ${e.subtitle ? `<span class="tr-test__sub">${esc(e.subtitle)}</span>` : ''}
-        </div>
-        <div class="tr-test__values">${renderValues(e)}</div>
-        <div class="tr-test__headline" style="color:${zone ? ZONE_COLOR[zone] : '#0A0E0F'};">
-          <span class="tr-test__hl">${esc(formatPlotted(spec, plotted))}</span>
-          ${zone ? `<span class="tr-test__zone">${esc(ZONE_LABEL[zone])}</span>` : ''}
-        </div>
-      </div>
-      ${renderBar(spec, plotted)}
-    </div>
+    <tr class="avoid-break">
+      <th scope="row">
+        <span class="tr-tab__naam">${esc(e.name)}</span>
+        ${e.subtitle ? `<span class="tr-tab__sub">${esc(e.subtitle)}</span>` : ''}
+      </th>
+      ${waarden}
+      <td class="tr-tab__num tr-tab__uitslag"${kleur}>
+        ${esc(formatPlotted(spec, plotted))}
+        ${zone && zone !== 'GREEN' ? `<span class="tr-tab__zone">${esc(ZONE_LABEL[zone])}</span>` : ''}
+      </td>
+      <td class="tr-tab__num tr-tab__doel">${doelTekst(spec)}</td>
+    </tr>
+    ${notitie}
   `
 }
 
@@ -181,40 +163,74 @@ function renderCategory(num: number, category: string, source: string | null, en
       <div class="tr-cat__head avoid-break">
         <span class="tr-cat__num">${CATEGORY_NUM(num)}</span>
         <span class="tr-cat__title">${esc(category)}</span>
-        ${source ? `<span class="tr-cat__src">→ ${esc(source)}</span>` : ''}
+        ${source ? `<span class="tr-cat__src">${esc(source)}</span>` : ''}
       </div>
-      ${entries.map(renderTestRow).join('')}
+      <table class="tr-tab">
+        <thead>
+          <tr>
+            <th scope="col">Test</th>
+            <th scope="col" class="tr-tab__num">Links</th>
+            <th scope="col" class="tr-tab__num">Rechts</th>
+            <th scope="col" class="tr-tab__num">${plotKolom(entries)}</th>
+            <th scope="col" class="tr-tab__num">Doel</th>
+          </tr>
+        </thead>
+        <tbody>${entries.map(renderTestRij).join('')}</tbody>
+      </table>
     </section>
   `
 }
 
+/**
+ * Het enige beeld in het rapport: elke test op zijn eigen as, met de doelzone
+ * als lichte band en de uitslag als één streep. Hiervoor stond onder iedere
+ * test een balk in rood-oranje-groen, negen keer op één pagina; dat was de
+ * reden dat het rapport als een gegenereerd dashboard las (oordeel Jurre,
+ * 25-08). Nu draagt één figuur de vergelijking en blijft de rest tekst.
+ *
+ * De assen verschillen per test (mobiliteit wordt op 95% beoordeeld, kracht op
+ * 90%), dus ze staan bewust onder elkaar en niet op één gedeelde schaal: dat
+ * zou de vergelijking suggereren die er niet is.
+ */
 function renderOverview(groups: Array<{ category: string; entries: EntryInput[] }>): string {
-  const rows = groups
+  const rijen = groups
     .flatMap((g, gi) =>
       g.entries.map((e) => {
         const spec = e as TestSpec
         const plotted = computePlottedValue(spec, e)
         const zone = computeZone(spec, e)
+        const f = axisFraction(spec, plotted)
+        const doel = axisFraction(spec, spec.zoneGreenMin) ?? 0
+        // Doelzone: van de drempel naar de kant waar "goed" ligt.
+        const band = spec.higherIsBetter
+          ? `left:${(doel * 100).toFixed(2)}%;right:0;`
+          : `left:0;right:${((1 - doel) * 100).toFixed(2)}%;`
+        const merk =
+          f == null
+            ? ''
+            : `<span class="tr-fig__merk" style="left:${(f * 100).toFixed(2)}%;${zone && zone !== 'GREEN' ? `background:${ZONE_COLOR[zone]};` : ''}"></span>`
         return `
-          <div class="tr-ov__row avoid-break">
-            <div class="tr-ov__label">
-              <span class="tr-ov__cat">${CATEGORY_NUM(gi)} · ${esc(g.category.toUpperCase())}</span>
-              <span class="tr-ov__name">${esc(e.name)}</span>
-            </div>
-            <div class="tr-ov__bar">${renderBar(spec, plotted, { mini: true })}</div>
-            <div class="tr-ov__val" style="color:${zone ? ZONE_COLOR[zone] : '#0A0E0F'};">
-              <span class="tr-ov__dot" style="background:${zone ? ZONE_COLOR[zone] : '#8A9594'};"></span>
-              ${esc(formatPlotted(spec, plotted))}
-            </div>
-          </div>
+          <tr class="avoid-break">
+            <th scope="row">
+              <span class="tr-fig__cat">${esc(g.category)}</span>
+              <span class="tr-fig__naam">${esc(e.name)}</span>
+            </th>
+            <td class="tr-fig__spoor">
+              <span class="tr-fig__as"></span>
+              <span class="tr-fig__band" style="${band}"></span>
+              ${merk}
+            </td>
+            <td class="tr-fig__val">${esc(formatPlotted(spec, plotted))}</td>
+          </tr>
         `
       }),
     )
     .join('')
   return `
     <section class="tr-section">
-      <div class="tr-h2"><span class="tr-h2__dot"></span> TOTAALOVERZICHT</div>
-      <div class="tr-ov">${rows}</div>
+      <div class="tr-h3">Alle testen tegen hun doel</div>
+      <table class="tr-fig">${rijen}</table>
+      <p class="tr-fig__legenda">De lichte band is de doelzone van die test, de streep is de uitslag van vandaag.</p>
     </section>
   `
 }
@@ -239,7 +255,6 @@ function renderAdvice(advice: Array<{ title: string; body: string }>, num: numbe
     .map(
       (a) => `
         <div class="tr-adv__row avoid-break">
-          <span class="tr-adv__arrow">→</span>
           <span class="tr-adv__text"><strong>${esc(a.title)}</strong> ${esc(a.body)}</span>
         </div>
       `,
@@ -259,7 +274,7 @@ function renderNextMoment(moment: string | null, goal: string | null): string {
     <section class="tr-next avoid-break">
       <div>
         <div class="tr-next__label">Volgend testmoment</div>
-        ${moment ? `<div class="tr-next__moment">→ ${esc(moment)}</div>` : ''}
+        ${moment ? `<div class="tr-next__moment">${esc(moment)}</div>` : ''}
       </div>
       ${goal ? `<div class="tr-next__goal">${esc(goal)}</div>` : ''}
     </section>
@@ -301,11 +316,11 @@ export function renderTestReportPdfHtml(opts: {
     <style>${TESTREPORT_CSS}</style>
 
     <section class="tr-hero avoid-break">
-      <p class="tr-hero__kicker">● Return to sport · voortgangsmeting</p>
+      <p class="tr-hero__kicker">Return to sport · voortgangsmeting</p>
       <h1 class="tr-hero__title">TESTRAPPORT</h1>
       <div class="tr-hero__subrow">
         <span>${esc(r.subtitle ?? '')}</span>
-        ${meting ? `<span class="tr-hero__meting">→ ${esc(meting)}</span>` : ''}
+        ${meting ? `<span class="tr-hero__meting">${esc(meting)}</span>` : ''}
       </div>
     </section>
 
@@ -318,14 +333,7 @@ export function renderTestReportPdfHtml(opts: {
       ${cell('Fase revalidatie', esc(r.rehabPhaseLabel ?? '—'))}
     </section>
 
-    <div class="tr-h2 tr-h2--results"><span class="tr-h2__dot"></span> TESTRESULTATEN</div>
-    <div class="tr-legend avoid-break">
-      <span class="tr-legend__label">Zones</span>
-      ${legend(ZONE_COLOR.RED, 'Rood · onvoldoende')}
-      ${legend(ZONE_COLOR.ORANGE, 'Oranje · in opbouw')}
-      ${legend(ZONE_COLOR.GREEN, 'Groen · doelzone')}
-      <span class="tr-legend__marker">▾ = huidige score</span>
-    </div>
+    <div class="tr-h2 tr-h2--results">Testresultaten</div>
 
     ${groups.map((g, i) => renderCategory(i, g.category, g.source, g.entries)).join('')}
 
@@ -354,183 +362,243 @@ export function renderTestReportPdfHtml(opts: {
 function cell(label: string, value: string): string {
   return `
     <div class="tr-grid__cell">
-      <div class="tr-grid__label">● ${esc(label)}</div>
+      <div class="tr-grid__label">${esc(label)}</div>
       <div class="tr-grid__value">${value}</div>
     </div>
   `
 }
 
-function legend(color: string, label: string): string {
-  return `<span class="tr-legend__item"><span class="tr-legend__chip" style="background:${color};"></span>${esc(label)}</span>`
-}
-
 // ── CSS ────────────────────────────────────────────────────────────────────
 const TESTREPORT_CSS = `
-  .tr-hero { margin-bottom: 16px; }
+  /* ────────────────────────────────────────────────────────────────────
+     HUISSTIJL, omgezet 25-08-2026 naar de stijl van movementbasedtherapy.nl
+     (docs/design-systeem.md daar). Drie dragende regels, ook op papier:
+
+       1. Vierkant. Nergens een afgeronde hoek.
+       2. Oranje is actie en aanwijzing, mint is meting. Mint is op wit te
+          licht voor tekst, dus die kleur draagt hier één vlak: het
+          totaaloverzicht, het enige blok dat puur uitslag is.
+       3. Lijnen dragen het ontwerp. Haarlijnen op 20% en 38% dekking, geen
+          enkele slagschaduw, geen grijze vulvlakken meer.
+
+     Het blijft een wit, zakelijk document: dit gaat naar een verwijzer of een
+     collega die het uitprint en in een dossier stopt. De donkere grond van de
+     app hoort daar niet; de herkenning zit in de letter, de haarlijn en het
+     oranje.
+
+     De regels hieronder overschrijven bewust ook een paar klassen uit
+     styles.ts (.pdf-header, .pdf-footer): die stylesheet staat nog op de oude
+     print-variant en wordt gedeeld met assessment.ts, progress.ts en
+     runningAnalysis.ts. Die drie zijn NIET omgezet; converteer je die later,
+     haal deze overrides dan hierheen weg en zet ze centraal.
+     ──────────────────────────────────────────────────────────────────── */
+
+  @import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  .pdf-root {
+    --ink: #0A1C1D;
+    --ink-zacht: rgba(10, 28, 29, 0.66);
+    --ink-dof: rgba(10, 28, 29, 0.45);
+    --lijn: rgba(10, 28, 29, 0.20);
+    --lijn-sterk: rgba(10, 28, 29, 0.38);
+    --oranje: #e87a55;
+    --mint: #b8d8d5;
+    --mint-vlak: #eef6f5;
+    --display: 'Big Shoulders Display', 'Archivo Narrow', Impact, sans-serif;
+    --body: 'Inter Tight', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, Menlo, "SF Mono", monospace;
+  }
+
+  body { font-family: var(--body); color: var(--ink); }
+  .pdf-root * { border-radius: 0 !important; }
+
+  /* ── Briefhoofd en voettekst (uit shell.ts) ───────────────────────── */
+  .pdf-header {
+    border-bottom: 1px solid var(--lijn-sterk);
+    padding-bottom: 12px;
+    margin-bottom: 20px;
+  }
+  .pdf-header__name {
+    font-family: var(--display); font-weight: 700; font-size: 15px;
+    letter-spacing: 0.005em; text-transform: uppercase; color: var(--ink);
+  }
+  .pdf-header__tag, .pdf-header__meta {
+    font-family: var(--mono); font-weight: 400; font-size: 8px;
+    letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-dof);
+  }
+  .pdf-header__meta { font-size: 8.5px; line-height: 1.7; }
+  .pdf-footer {
+    border-top: 1px solid var(--lijn);
+    font-family: var(--mono); font-weight: 400; font-size: 8px;
+    letter-spacing: 0.05em; color: var(--ink-dof);
+  }
+
+  /* ── Hero ─────────────────────────────────────────────────────────── */
+  .tr-hero { margin-bottom: 18px; }
   .tr-hero__kicker {
-    font-family: ui-monospace, Menlo, monospace; font-size: 9.5px; font-weight: 900;
-    letter-spacing: 0.18em; text-transform: uppercase; color: #e87a55; margin: 0;
+    font-family: var(--mono); font-size: 8.5px; font-weight: 500;
+    letter-spacing: 0.05em; text-transform: uppercase; color: var(--oranje); margin: 0;
   }
   .tr-hero__title {
-    font-weight: 900; font-size: 56px; line-height: 0.95; letter-spacing: -0.03em;
-    margin: 4px 0 8px 0; color: #0A0E0F;
+    font-family: var(--display); font-weight: 700; font-size: 62px; line-height: 0.92;
+    letter-spacing: 0.005em; text-transform: uppercase;
+    margin: 6px 0 10px 0; color: var(--ink);
   }
   .tr-hero__subrow {
     display: flex; justify-content: space-between; gap: 12px; align-items: baseline;
-    border-top: 2px solid #0A0E0F; padding-top: 6px;
-    font-size: 11px; color: #4A5454;
+    border-top: 1px solid var(--lijn-sterk); padding-top: 7px;
+    font-size: 11.5px; color: var(--ink-zacht);
   }
-  .tr-hero__meting { font-family: ui-monospace, Menlo, monospace; font-size: 10px; color: #4A5454; white-space: nowrap; }
+  .tr-hero__meting {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.05em;
+    color: var(--ink-dof); white-space: nowrap;
+  }
 
+  /* ── Kopgegevens: haarlijnenraster ────────────────────────────────── */
   .tr-grid {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;
-    border: 1px solid #0A0E0F; margin-bottom: 18px;
+    border: 1px solid var(--lijn-sterk); margin-bottom: 20px;
   }
-  .tr-grid__cell { padding: 9px 12px; border-right: 1px solid #E4E8E2; border-bottom: 1px solid #E4E8E2; }
+  .tr-grid__cell { padding: 10px 12px; border-right: 1px solid var(--lijn); border-bottom: 1px solid var(--lijn); }
   .tr-grid__cell:nth-child(3n) { border-right: 0; }
   .tr-grid__cell:nth-child(n+4) { border-bottom: 0; }
   .tr-grid__label {
-    font-family: ui-monospace, Menlo, monospace; font-size: 8px; font-weight: 700;
-    letter-spacing: 0.14em; text-transform: uppercase; color: #e87a55; margin-bottom: 3px;
+    font-family: var(--mono); font-size: 7.5px; font-weight: 400;
+    letter-spacing: 0.05em; text-transform: uppercase; color: var(--oranje); margin-bottom: 4px;
   }
-  .tr-grid__value { font-size: 13px; color: #0A0E0F; line-height: 1.35; }
-  .tr-grid__value strong { font-weight: 800; }
-  .tr-grid__muted { color: #8A9594; font-weight: 500; font-size: 11px; }
+  .tr-grid__value { font-size: 12.5px; color: var(--ink); line-height: 1.4; }
+  .tr-grid__value strong { font-weight: 600; }
+  .tr-grid__muted { color: var(--ink-dof); font-weight: 400; font-size: 11px; }
 
+  /* ── Sectiekoppen ─────────────────────────────────────────────────── */
   .tr-h2 {
-    display: flex; align-items: center; gap: 8px;
-    font-weight: 900; font-size: 15px; letter-spacing: 0.04em; text-transform: uppercase;
-    color: #0A0E0F; margin: 22px 0 10px 0;
+    display: flex; align-items: center; gap: 9px;
+    font-family: var(--display); font-weight: 700; font-size: 19px;
+    letter-spacing: 0.005em; text-transform: uppercase;
+    color: var(--ink); margin: 24px 0 10px 0;
   }
-  .tr-h2--results { margin-top: 8px; }
-  .tr-h2__dot { width: 9px; height: 9px; border-radius: 999px; background: #e87a55; display: inline-block; }
+  .tr-h2--results { margin-top: 10px; }
 
-  .tr-legend {
-    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-    background: #F7F8F6; border: 1px solid #E4E8E2; border-radius: 6px;
-    padding: 7px 12px; margin-bottom: 16px;
-  }
-  .tr-legend__label, .tr-legend__marker {
-    font-family: ui-monospace, Menlo, monospace; font-size: 8.5px; font-weight: 700;
-    letter-spacing: 0.12em; text-transform: uppercase; color: #4A5454;
-  }
-  .tr-legend__marker { margin-left: auto; }
-  .tr-legend__item {
-    display: inline-flex; align-items: center; gap: 5px;
-    font-family: ui-monospace, Menlo, monospace; font-size: 8.5px; font-weight: 700;
-    letter-spacing: 0.1em; text-transform: uppercase; color: #0A0E0F;
-  }
-  .tr-legend__chip { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
-
-  /* Categorie */
-  .tr-cat { margin-top: 18px; }
+  /* ── Categorie ────────────────────────────────────────────────────── */
+  .tr-cat { margin-top: 22px; }
   .tr-cat__head {
     display: flex; align-items: baseline; gap: 10px;
-    border-bottom: 2px solid #0A0E0F; padding-bottom: 5px; margin-bottom: 12px;
+    border-bottom: 1px solid var(--lijn-sterk); padding-bottom: 6px;
   }
-  .tr-cat__num { font-family: ui-monospace, Menlo, monospace; font-size: 13px; font-weight: 900; color: #e87a55; }
-  .tr-cat__title { font-weight: 900; font-size: 19px; letter-spacing: -0.01em; text-transform: uppercase; color: #0A0E0F; }
+  .tr-cat__num { font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: 0.05em; color: var(--oranje); }
+  .tr-cat__title {
+    font-family: var(--display); font-weight: 700; font-size: 23px;
+    letter-spacing: 0.005em; text-transform: uppercase; color: var(--ink);
+  }
   .tr-cat__src {
-    margin-left: auto; font-family: ui-monospace, Menlo, monospace; font-size: 8.5px;
-    letter-spacing: 0.12em; text-transform: uppercase; color: #8A9594;
+    margin-left: auto; font-family: var(--mono); font-size: 8px; font-weight: 400;
+    letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-dof);
   }
 
-  /* Test-rij */
-  .tr-test { margin-bottom: 16px; }
-  .tr-test__top { display: flex; align-items: flex-start; gap: 12px; }
-  .tr-test__name { flex: 0 0 34%; }
-  .tr-test__title { font-weight: 800; font-size: 13px; color: #0A0E0F; }
-  .tr-test__sub { color: #8A9594; font-size: 11px; margin-left: 5px; }
-  .tr-test__values { flex: 1 1 auto; text-align: right; font-size: 11.5px; color: #0A0E0F; }
-  .tr-side { font-family: ui-monospace, Menlo, monospace; white-space: nowrap; margin-left: 12px; }
-  .tr-side__l { color: #8A9594; }
-  .tr-val { font-family: ui-monospace, Menlo, monospace; }
-  .tr-test__headline { flex: 0 0 auto; text-align: right; min-width: 78px; }
-  .tr-test__hl { display: block; font-weight: 900; font-size: 20px; letter-spacing: -0.02em; line-height: 1; }
-  .tr-test__zone {
-    display: block; font-family: ui-monospace, Menlo, monospace; font-size: 7.5px;
-    font-weight: 700; letter-spacing: 0.1em; margin-top: 2px;
+  /* ── Testtabel ────────────────────────────────────────────────────────
+     Eén tabel per categorie in plaats van acht losse kaartrijen met elk een
+     stoplichtbalk. Getallen rechts uitgelijnd op tabulaire cijfers, zodat de
+     kolom leest als een meting en niet als een opsomming. */
+  .tr-tab { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+  .tr-tab thead th {
+    font-family: var(--mono); font-size: 7.5px; font-weight: 400;
+    letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-dof);
+    text-align: left; padding: 8px 0 5px 0; border-bottom: 1px solid var(--lijn);
+    vertical-align: bottom;
+  }
+  .tr-tab thead th.tr-tab__num { text-align: right; }
+  .tr-tab tbody th {
+    text-align: left; font-weight: 400; padding: 9px 10px 9px 0; vertical-align: baseline;
+    border-bottom: 1px solid var(--lijn);
+  }
+  .tr-tab tbody td { padding: 9px 0 9px 10px; vertical-align: baseline; border-bottom: 1px solid var(--lijn); }
+  .tr-tab__naam { font-weight: 600; font-size: 12.5px; color: var(--ink); }
+  .tr-tab__sub { display: block; color: var(--ink-dof); font-size: 10.5px; margin-top: 1px; }
+  .tr-tab__num {
+    text-align: right; white-space: nowrap;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.01em;
+    font-variant-numeric: tabular-nums; color: var(--ink);
+  }
+  .tr-tab__num i { font-style: normal; color: var(--ink-dof); font-size: 9px; margin-left: 3px; }
+  .tr-tab__leeg { color: var(--ink-dof); }
+  .tr-tab__uitslag { font-size: 14px; font-weight: 500; }
+  .tr-tab__zone {
+    display: block; font-family: var(--mono); font-size: 7.5px; font-weight: 400;
+    letter-spacing: 0.05em; text-transform: uppercase; margin-top: 2px;
+  }
+  .tr-tab__doel { color: var(--ink-dof); }
+  .tr-tab__notitierij td { padding: 0 0 10px 0; border-bottom: 1px solid var(--lijn); }
+  .tr-tab__notitie { font-size: 11px; line-height: 1.55; color: var(--ink-zacht); }
+
+  /* ── De figuur: alle testen tegen hun eigen doel ──────────────────── */
+  .tr-fig { width: 100%; border-collapse: collapse; margin-top: 2px; }
+  .tr-fig th, .tr-fig td { padding: 8px 0; vertical-align: middle; border-bottom: 1px solid var(--lijn); }
+  .tr-fig tr:last-child th, .tr-fig tr:last-child td { border-bottom: 0; }
+  .tr-fig th { text-align: left; font-weight: 400; width: 32%; padding-right: 14px; }
+  .tr-fig__cat {
+    display: block; font-family: var(--mono); font-size: 7px; font-weight: 400;
+    letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-dof);
+  }
+  .tr-fig__naam { font-size: 11.5px; color: var(--ink); }
+  .tr-fig__spoor { position: relative; height: 15px; }
+  .tr-fig__as { position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--lijn); }
+  .tr-fig__band { position: absolute; top: 4px; bottom: 4px; background: var(--mint); }
+  .tr-fig__merk { position: absolute; top: 1px; bottom: 1px; width: 2px; margin-left: -1px; background: var(--ink); }
+  .tr-fig__val {
+    width: 62px; text-align: right; font-family: var(--mono); font-size: 11px;
+    font-variant-numeric: tabular-nums; color: var(--ink); padding-left: 12px;
+  }
+  .tr-fig__legenda {
+    margin: 10px 0 0 0; font-family: var(--mono); font-size: 7.5px; font-weight: 400;
+    letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-dof);
   }
 
-  /* Doelzone-balk */
-  .tr-barblock { margin-top: 4px; }
-  .tr-pinrow { position: relative; height: 13px; }
-  .tr-pinlabel {
-    position: absolute; transform: translateX(-50%); bottom: 0;
-    font-family: ui-monospace, Menlo, monospace; font-size: 9px; font-weight: 900; white-space: nowrap;
-  }
-  .tr-track {
-    position: relative; height: 13px; border-radius: 2px; overflow: hidden; background: #E4E8E2;
-  }
-  .tr-track--mini { height: 9px; }
-  .tr-seg { position: absolute; top: 0; bottom: 0; }
-  .tr-pin {
-    position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px;
-    background: #0A0E0F; z-index: 2;
-  }
-  .tr-ticks {
-    position: relative; height: 12px; margin-top: 2px;
-  }
-  .tr-tick {
-    position: absolute; top: 0;
-    font-family: ui-monospace, Menlo, monospace; font-size: 8px; color: #8A9594; white-space: nowrap;
-  }
-
-  /* Totaaloverzicht */
-  .tr-ov { margin-top: 6px; }
-  .tr-ov__row { display: flex; align-items: center; gap: 12px; padding: 5px 0; border-top: 1px solid #EFF1ED; }
-  .tr-ov__row:first-child { border-top: 0; }
-  .tr-ov__label { flex: 0 0 30%; }
-  .tr-ov__cat {
-    display: block; font-family: ui-monospace, Menlo, monospace; font-size: 7.5px;
-    letter-spacing: 0.1em; color: #8A9594;
-  }
-  .tr-ov__name { font-weight: 700; font-size: 12px; color: #0A0E0F; }
-  .tr-ov__bar { flex: 1 1 auto; }
-  .tr-ov__val {
-    flex: 0 0 auto; min-width: 64px; text-align: right; display: flex; align-items: center;
-    justify-content: flex-end; gap: 6px; font-weight: 900; font-size: 14px; letter-spacing: -0.02em;
-  }
-  .tr-ov__dot { width: 7px; height: 7px; border-radius: 999px; display: inline-block; }
-
-  /* Interpretatie / advies */
-  .tr-section { margin-top: 22px; }
+  /* ── Interpretatie en advies ──────────────────────────────────────── */
+  .tr-section { margin-top: 24px; }
   .tr-h3 {
-    display: flex; align-items: center; gap: 8px;
-    font-weight: 900; font-size: 15px; letter-spacing: 0.03em; text-transform: uppercase;
-    color: #0A0E0F; border-bottom: 2px solid #0A0E0F; padding-bottom: 5px; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 9px;
+    font-family: var(--display); font-weight: 700; font-size: 19px;
+    letter-spacing: 0.005em; text-transform: uppercase;
+    color: var(--ink); border-bottom: 1px solid var(--lijn-sterk); padding-bottom: 6px; margin-bottom: 11px;
   }
-  .tr-h3__num { font-family: ui-monospace, Menlo, monospace; color: #e87a55; font-size: 12px; }
-  .tr-h2__dot { flex: 0 0 auto; }
-  .tr-para { font-size: 12px; line-height: 1.6; color: #0A0E0F; margin: 0 0 8px 0; }
+  .tr-h3__num { font-family: var(--mono); font-weight: 500; color: var(--oranje); font-size: 11px; letter-spacing: 0.05em; }
+  .tr-para { font-size: 12px; line-height: 1.65; color: var(--ink); margin: 0 0 9px 0; }
 
-  .tr-adv__row { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid #EFF1ED; }
-  .tr-adv__arrow { color: #e87a55; font-weight: 900; }
-  .tr-adv__text { font-size: 12px; line-height: 1.55; color: #0A0E0F; }
-  .tr-adv__text strong { font-weight: 800; }
+  .tr-adv__row { padding: 9px 0; border-bottom: 1px solid var(--lijn); }
+  .tr-adv__text { font-size: 12px; line-height: 1.6; color: var(--ink); }
+  .tr-adv__text strong { font-weight: 600; }
 
+  /* ── Volgend testmoment ───────────────────────────────────────────── */
   .tr-next {
     display: flex; justify-content: space-between; align-items: center; gap: 16px;
-    background: #0A0E0F; color: #fff; border-radius: 6px; padding: 12px 16px; margin-top: 18px;
+    background: #ffffff; color: var(--ink);
+    border: 1px solid var(--lijn-sterk); border-left: 3px solid var(--oranje);
+    padding: 13px 16px; margin-top: 20px;
   }
   .tr-next__label {
-    font-family: ui-monospace, Menlo, monospace; font-size: 8px; font-weight: 700;
-    letter-spacing: 0.14em; text-transform: uppercase; color: #8A9594;
+    font-family: var(--mono); font-size: 7.5px; font-weight: 400;
+    letter-spacing: 0.05em; text-transform: uppercase; color: var(--oranje);
   }
-  .tr-next__moment { font-weight: 800; font-size: 14px; margin-top: 3px; }
+  .tr-next > div:first-child { flex: 1 1 auto; min-width: 0; }
+  .tr-next__moment {
+    font-family: var(--display); font-weight: 700; font-size: 17px;
+    letter-spacing: 0.005em; margin-top: 4px; line-height: 1.15;
+  }
   .tr-next__goal {
-    text-align: right; font-family: ui-monospace, Menlo, monospace; font-size: 10px;
-    color: #BEF264; letter-spacing: 0.04em; white-space: pre-line;
+    flex: 0 0 auto; max-width: 42%;
+    text-align: right; font-family: var(--mono); font-size: 9px; font-weight: 400;
+    color: var(--ink-zacht); letter-spacing: 0.02em; white-space: pre-line; line-height: 1.5;
   }
 
+  /* ── Contactregel ─────────────────────────────────────────────────── */
   .tr-contact {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
-    border-top: 3px solid #e87a55; padding-top: 10px; margin-top: 26px;
-    font-size: 11px; color: #0A0E0F;
+    border-top: 1px solid var(--oranje); padding-top: 11px; margin-top: 28px;
+    font-size: 11px; color: var(--ink);
   }
   .tr-contact div:nth-child(3) { text-align: right; }
   .tr-contact__h {
-    display: block; font-family: ui-monospace, Menlo, monospace; font-size: 8px; font-weight: 700;
-    letter-spacing: 0.14em; text-transform: uppercase; color: #8A9594; margin-bottom: 3px;
+    display: block; font-family: var(--mono); font-size: 7.5px; font-weight: 400;
+    letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-dof); margin-bottom: 4px;
   }
 `
