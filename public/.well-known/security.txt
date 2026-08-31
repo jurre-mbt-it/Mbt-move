@@ -1,0 +1,8 @@
+# Responsible disclosure, BASE by Movement Based Therapy
+# Beleid en spelregels: https://www.movementbasedtherapy.nl/responsible-disclosure.html
+
+Contact: mailto:info@movementbasedtherapy.nl
+Expires: 2027-08-19T12:00:00.000Z
+Preferred-Languages: nl, en
+Canonical: https://www.mbt-gym.nl/.well-known/security.txt
+Policy: https://www.movementbasedtherapy.nl/responsible-disclosure.html
