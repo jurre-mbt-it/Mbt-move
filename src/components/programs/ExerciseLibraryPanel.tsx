@@ -74,7 +74,17 @@ function DraggableLibraryItem({
         style={{ background: color }}
       />
 
-      <span className="flex-1 truncate font-medium text-xs">
+      {/* Lange namen ("Single Leg Pallof Pr…") kapt de smalle kolom af; bij
+          hover mag de naam op een tweede regel doorlopen zodat je 'm heel
+          leest. In de rij zelf en niet in een zwevende tooltip: die zou door
+          de overflow van het scrollpaneel worden afgeknipt. Tijdens slepen
+          niet, anders verspringt de lijst onder je cursor. */}
+      <span
+        className={cn(
+          'flex-1 min-w-0 truncate font-medium text-xs',
+          !isDragging && 'group-hover:whitespace-normal group-hover:break-words',
+        )}
+      >
         <MarkMatch text={exercise.name} query={query} />
       </span>
 
