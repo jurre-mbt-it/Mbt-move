@@ -84,3 +84,11 @@ business/
 # Bevatten echte patient-id's; horen niet in een publieke repo en niet in een
 # deploy. Zie ook .vercelignore.
 public/_opname-*.html
+
+# Lokale agent-tooling. Geen repo-inhoud: .claude/ bevat lokale settings en
+# achtergebleven worktrees, .superpowers/ o.a. een token-bestand, en
+# graphify-out/ is 54MB gegenereerde graaf (in de mobiele repo ook ongetrackt).
+.claude/
+.hermes/
+.superpowers/
+graphify-out/
