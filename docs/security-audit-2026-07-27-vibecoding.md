@@ -143,8 +143,8 @@ De keten, elke stap geverifieerd tegen productie:
    `patient_rehab_trackers`, `patient_therapists`, `research_consents` en
    `users`.
 
-**Dit is geen theorie.** `daphnestruik@hotmail.com` (11 juli) en
-`rall.kaya.04@gmail.com` (13 juli) zijn allebei zo aangemaakt, met `role` in
+**Dit is geen theorie.** een hotmail-adres (11 juli) en
+een gmail-adres (13 juli) zijn allebei zo aangemaakt, met `role` in
 client-metadata. Hun `users.id` is uuid-vormig, wat aantoont dat de trigger de
 rij schreef. Had een van beide `ADMIN` meegestuurd in plaats van `ATHLETE`, dan
 hadden ze dat gekregen.

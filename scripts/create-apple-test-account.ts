@@ -9,7 +9,8 @@
  * De reviewer logt in met e-mail + wachtwoord (nieuwe wachtwoord-login in de
  * app) en kan via Profiel → "Preview als…" ook de patiënt-weergave bekijken.
  *
- * Draaien:  npx tsx scripts/create-apple-test-account.ts
+ * Draaien:  DEMO_EMAIL en DEMO_PASSWORD in .env.local, dan
+ *           npx tsx scripts/create-apple-test-account.ts
  * Verwijderen kan met scripts/delete-user.ts.
  */
 import { PrismaClient } from '@prisma/client'
@@ -22,8 +23,16 @@ import { DPA_VERSION } from '@/lib/dpa-constants'
 
 config({ path: resolve(process.cwd(), '.env.local') })
 
-const EMAIL = 'mbtamsterdam_test@live.nl'
-const PASSWORD = 'Appletest2026'
+// E-mail en wachtwoord komen uit .env.local. Ze stonden hier tot 2026-09-02
+// hardcoded, en deze repo is publiek: dat was een werkend productie-login in
+// een openbare GitHub-repo. De oude waarde staat nog in de git-historie en moet
+// dus geroteerd worden (dit script doet dat met een nieuwe DEMO_PASSWORD).
+const EMAIL = process.env.DEMO_EMAIL ?? ''
+const PASSWORD = process.env.DEMO_PASSWORD ?? ''
+if (!EMAIL || !PASSWORD) {
+  console.error('Zet DEMO_EMAIL en DEMO_PASSWORD in .env.local. Nooit in de code: de repo is publiek.')
+  process.exit(1)
+}
 const NAME = 'Apple Review'
 const PROG_NAME = 'App Review Demo — Krachtschema'
 
@@ -157,7 +166,7 @@ async function main() {
 
   console.log('\n✅ Klaar. Login voor de reviewer:')
   console.log(`   e-mail:    ${EMAIL}`)
-  console.log(`   wachtwoord: ${PASSWORD}`)
+  console.log('   wachtwoord: zie DEMO_PASSWORD in .env.local')
 }
 
 main()
