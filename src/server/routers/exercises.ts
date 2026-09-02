@@ -227,7 +227,15 @@ export const exercisesRouter = createTRPCRouter({
         include: { muscleLoads: true },
       })
       if (!ex) throw new TRPCError({ code: 'NOT_FOUND' })
-      if (!ex.isPublic && ex.createdById !== ctx.user!.id) {
+      // Zelfde zichtbaarheidsregel als `list` en `toggleFavorite`: publiek,
+      // eigen, of van dezelfde praktijk. Hier gold alleen publiek-of-eigen,
+      // waardoor een praktijk-oefening wél in de lijst stond maar het
+      // detailscherm (web en app) een FORBIDDEN gaf. Audit 2026-09-02.
+      const visible =
+        ex.isPublic ||
+        ex.createdById === ctx.user!.id ||
+        (ex.practiceId != null && ex.practiceId === ctx.user!.practiceId)
+      if (!visible) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
       const fav = await ctx.prisma.favoriteExercise.findUnique({
@@ -590,11 +598,17 @@ export const exercisesRouter = createTRPCRouter({
         },
         orderBy: { addedAt: 'asc' },
       })
-      // Filter: alleen oefeningen die de caller hoort te zien (public of eigen).
-      // Voorkomt dat een collectie met een private oefening van een andere
-      // therapeut alsnog lekt als die oefening aan deze collectie is toegevoegd.
+      // Filter: alleen oefeningen die de caller hoort te zien (publiek, eigen,
+      // of dezelfde praktijk; zelfde regel als `list`). Voorkomt dat een
+      // collectie met een private oefening van een andere praktijk alsnog lekt
+      // als die oefening aan deze collectie is toegevoegd.
       return items
-        .filter((item) => item.exercise.isPublic || item.exercise.createdById === ctx.user!.id)
+        .filter(
+          (item) =>
+            item.exercise.isPublic ||
+            item.exercise.createdById === ctx.user!.id ||
+            (item.exercise.practiceId != null && item.exercise.practiceId === ctx.user!.practiceId),
+        )
         .map((item) => ({
           ...item.exercise,
           muscleLoads: muscleLoadsRecord(item.exercise),
