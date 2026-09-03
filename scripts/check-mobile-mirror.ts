@@ -17,6 +17,8 @@ import path from 'node:path'
 import { existsSync } from 'node:fs'
 
 import * as web from '../src/lib/cardio-workout'
+import * as webLabels from '../src/lib/cardio-labels'
+import * as webHr from '../src/lib/hr-series-view'
 import { HR_ZONES, type HRZone } from '../src/lib/cardio-constants'
 import { INTENSITY_TYPES, INTENSITY_TYPE_LABELS } from '../src/lib/prescription'
 import { STANDARD_PARAMS, REP_UNITS } from '../src/lib/program-constants'
@@ -42,6 +44,8 @@ async function main() {
   }
   const mob = await import(path.join(MOBILE, 'lib', 'cardio-workout.ts'))
   const mirror = await import(path.join(MOBILE, 'lib', 'prescription-mirror.ts'))
+  const mobLabels = await import(path.join(MOBILE, 'lib', 'home-tiles.ts'))
+  const mobHr = await import(path.join(MOBILE, 'lib', 'hr-series-view.ts'))
 
   // ── Cardio-blokkenmodel: zelfde invoer → zelfde uitkomst ──────────────────
   console.log('\nCardio-blokkenmodel (lib/cardio-workout):')
@@ -143,6 +147,87 @@ async function main() {
       searchMatch(q, [naam]), zoek.searchMatch(q, [naam]))
     check(`searchSegments("${naam}", "${q}")`,
       searchSegments(naam, q), zoek.searchSegments(naam, q))
+  }
+
+  // ── Namen van activiteiten (cardio-labels ↔ home-tiles) ──────────────────
+  // Een hike van 18 kilometer heette in het web "Cardio" terwijl de app hem
+  // "Hiken" noemde: de app had de nieuwe enum-waarden en het ruwe bron-type wel
+  // in zijn tabel staan, het web niet. Zelfde dossier, twee namen.
+  console.log('\nNamen van activiteiten (cardio-labels ↔ home-tiles):')
+
+  check('CARDIO_LABEL (nl)', webLabels.CARDIO_LABEL, mobLabels.CARDIO_LABEL)
+  check('CARDIO_LABEL (en)', webLabels.CARDIO_LABEL_EN, mobLabels.CARDIO_LABEL_EN)
+
+  // Het ruwe bron-type: alleen als onze eigen enum niets zegt (OTHER) mag het
+  // winnen, en dan moeten beide kanten dezelfde naam kiezen.
+  const labelGevallen: Array<[string, string | null]> = [
+    ['HIKING', null],
+    ['STRENGTH', null],
+    ['HIIT', null],
+    ['YOGA', null],
+    ['RUNNING', 'padel'],          // enum wint van het bron-type
+    ['OTHER', 'padel'],
+    ['OTHER', 'Pickleball'],
+    ['OTHER', 'table_tennis'],
+    ['OTHER', 'trackAndField'],    // onbekend, maar netjes gespeld
+    ['OTHER', 'gravel_ride'],
+    ['OTHER', 'other'],            // zegt niets meer dan onze eigen terugval
+    ['OTHER', 'hk-3000'],
+    ['OTHER', null],
+    ['ONBEKEND_TYPE', null],
+  ]
+  for (const [activity, source] of labelGevallen) {
+    for (const locale of ['nl', 'en'] as const) {
+      check(`cardioLabel(${activity}, ${locale}, ${source ?? 'null'})`,
+        webLabels.cardioLabel(activity, locale, source),
+        mobLabels.cardioLabel(activity, locale, source))
+    }
+  }
+
+  // ── Hartslagsectie bij één training (hr-series-view) ──────────────────────
+  console.log('\nHartslagsectie bij één training (hr-series-view):')
+
+  check('ZONE_COLOR', webHr.ZONE_COLOR, mobHr.ZONE_COLOR)
+
+  // De zonekleuren van de grafiek MOETEN de kleuren van HR_ZONES zijn. Ze
+  // liepen uiteen: zone 1 was mint in een voorgeschreven blok en blauw in de
+  // zoneverdeling van dezelfde training.
+  for (const z of [1, 2, 3, 4, 5] as HRZone[]) {
+    check(`ZONE_COLOR[${z}] == HR_ZONES[${z}].color`,
+      HR_ZONES[z].color, webHr.ZONE_COLOR[String(z) as '1'])
+  }
+
+  const tizGevallen: Array<Record<string, number> | null> = [
+    null,
+    {},
+    { '1': 600, '2': 1800, '3': 300, '4': 0, '5': 0 },
+    { '0': 5400, '1': 600, '2': 1800, '3': 0, '4': 0, '5': 0 },  // lange wandeling
+    { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 },                   // alles nul
+    { '3': 900 },                                                  // gaten in de sleutels
+  ]
+  for (const tiz of tizGevallen) {
+    check(`readZones(${JSON.stringify(tiz)})`, webHr.readZones(tiz), mobHr.readZones(tiz))
+  }
+
+  // Reeks met oplopende hartslag bij gelijk tempo: dat is precies wat
+  // ontkoppeling meet.
+  const drift = Array.from({ length: 20 }, (_, i) => ({
+    t: i * 60, hr: 130 + i * 2, spd: 3.2,
+  }))
+  const vlak = Array.from({ length: 20 }, (_, i) => ({ t: i * 60, hr: 140, spd: 3.2 }))
+  const kort = [{ t: 0, hr: 140, spd: 3 }, { t: 60, hr: 145, spd: 3 }]
+  const zonderTempo = Array.from({ length: 20 }, (_, i) => ({ t: i * 60, hr: 140, spd: null }))
+  for (const [naam, reeks] of [
+    ['oplopende hartslag bij gelijk tempo', drift],
+    ['vlakke reeks', vlak],
+    ['te kort voor een uitspraak', kort],
+    ['meting zonder tempo', zonderTempo],
+  ] as const) {
+    check(`computeDecoupling(${naam})`, webHr.computeDecoupling(reeks), mobHr.computeDecoupling(reeks))
+  }
+
+  for (const sec of [0, 59, 60, 3599, 3600, 4320, 7200]) {
+    check(`fmtDuration(${sec})`, webHr.fmtDuration(sec), mobHr.fmtDuration(sec))
   }
 
   console.log(fouten === 0

@@ -143,7 +143,10 @@ export async function computeLoadCurve(
     }),
     prisma.cardioLog.findMany({
       where: { patientId, completedAt: { gte: from } },
-      select: { completedAt: true, durationSec: true, rpe: true, timeInZones: true, activity: true },
+      select: {
+        completedAt: true, durationSec: true, rpe: true, timeInZones: true,
+        sessionLogId: true, activity: true,
+      },
     }),
   ])
 
@@ -181,16 +184,25 @@ export async function computeLoadCurve(
     const dateIso = isoDay(c.completedAt)
     const durMin = clampSessionDurationSec(c.durationSec) / 60
     const load = sessionLoad(durMin, c.rpe)
-    cardioLoads.push({ date: dateIso, load })
-    if (dateIso >= windowStartIso) {
-      cardioSessions.push({
-        date: dateIso,
-        label: null,
-        activity: c.activity,
-        load: Math.round(load),
-        durationMin: Math.round(durMin),
-        rpe: c.rpe ?? null,
-      })
+    // Gekoppeld aan een krachtsessie = dit ís die sessie, gemeten op de watch.
+    // De sRPE staat hierboven al bij `strengthLoads`; hem hier nog eens
+    // meetellen betekende dat één training twee keer in de curve zat. Om
+    // dezelfde reden hoort hij niet nog eens in de punt-inzage: de krachtsessie
+    // staat daar al met zijn programmanaam. De TRIMP hieronder telt wél mee:
+    // dat is de gemeten hartslagbelasting van die dag, en die stond nergens
+    // anders.
+    if (c.sessionLogId == null) {
+      cardioLoads.push({ date: dateIso, load })
+      if (dateIso >= windowStartIso) {
+        cardioSessions.push({
+          date: dateIso,
+          label: null,
+          activity: c.activity,
+          load: Math.round(load),
+          durationMin: Math.round(durMin),
+          rpe: c.rpe ?? null,
+        })
+      }
     }
     // TRIMP alleen meetellen voor het zichtbare venster (niet de warm-up).
     if (dateIso >= windowStartIso) {
@@ -205,7 +217,9 @@ export async function computeLoadCurve(
   const strengthCount = sessions.filter(
     (s) => s.completedAt && isoDay(s.completedAt) >= windowStartIso,
   ).length
-  const cardioCount = cardio.filter((c) => isoDay(c.completedAt) >= windowStartIso).length
+  const cardioCount = cardio.filter(
+    (c) => c.sessionLogId == null && isoDay(c.completedAt) >= windowStartIso,
+  ).length
 
   // Vroegste log over beide modaliteiten (volledige fetch, incl. warm-up).
   let firstSessionAt: string | null = null

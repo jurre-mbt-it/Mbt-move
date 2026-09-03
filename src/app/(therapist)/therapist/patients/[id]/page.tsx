@@ -24,6 +24,7 @@ import { PatientWearablesTab } from '@/components/wearables/PatientWearablesTab'
 import { wearablesEnabledForRole } from '@/lib/wearables-access'
 import { isReviewDue, weeksSince } from '@/lib/program-review'
 import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, type CardioActivityKey, type CardioProtocolKey } from '@/lib/cardio-constants'
+import { cardioLabel } from '@/lib/cardio-labels'
 import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
 import { formatWeightsPerSet } from '@/lib/session-sets'
 import { formatCardioForDossier, formatSessionForDossier } from '@/lib/dossier-report'
@@ -102,6 +103,8 @@ export default function PatientDetailPage({
     id: string
     completedAt: Date | string
     activity: string
+    /** Ruw bron-type (padel, hike); benoemt de sport waar de enum OTHER zegt. */
+    sourceActivity: string | null
     protocol: string
     durationSec: number
     distanceM: number | null
@@ -780,7 +783,7 @@ export default function PatientDetailPage({
                       <div className="flex items-start justify-between gap-3 flex-wrap">
                         <div>
                           <p className="athletic-mono" style={{ color: P.ink, fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                            {(() => { const Icon = CARDIO_ICON_MAP[c.activity as CardioActivityKey]; return Icon ? <Icon size={13} /> : act?.icon })()} {act?.label ?? c.activity}
+                            {(() => { const Icon = CARDIO_ICON_MAP[c.activity as CardioActivityKey]; return Icon ? <Icon size={13} /> : act?.icon })()} {cardioLabel(c.activity, 'nl', c.sourceActivity)}
                           </p>
                           <p className="athletic-mono" style={{ color: P.inkMuted, fontSize: 11, marginTop: 2 }}>
                             {new Date(c.completedAt).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}

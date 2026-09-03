@@ -31,6 +31,8 @@ export const READINESS_HISTORY_DAYS = HISTORY_DAYS
 export type ReadinessVitalsRow = {
   date: Date
   hrv: number | null
+  /** Segmenteert de HRV-baseline: SDNN (Apple) en RMSSD (ring) niet mengen. */
+  hrvType: 'SDNN' | 'RMSSD' | null
   restingHeartRate: number | null
   respiratoryRate: number | null
   wristTempDeviation: number | null
@@ -87,7 +89,7 @@ export async function computeReadinessFor(
           where: { userId, date: { gte: since, lte: target } },
           orderBy: { date: 'asc' },
           select: {
-            date: true, hrv: true, restingHeartRate: true,
+            date: true, hrv: true, hrvType: true, restingHeartRate: true,
             respiratoryRate: true, wristTempDeviation: true,
           },
         }),
@@ -110,6 +112,7 @@ export async function computeReadinessFor(
   const vitals: VitalsDay[] = vitalsRows.map(v => ({
     date: isoDay(v.date),
     hrv: v.hrv,
+    hrvType: v.hrvType,
     restingHeartRate: v.restingHeartRate,
     respiratoryRate: v.respiratoryRate,
     wristTempDeviation: v.wristTempDeviation,

@@ -9,31 +9,47 @@
  * hun eigen tabellen.
  */
 import { z } from 'zod'
-import type { PrismaClient, CardioActivity, Prisma } from '@prisma/client'
+import type { PrismaClient, CardioActivity, Prisma, WorkoutSource, WearableProvider } from '@prisma/client'
 import { aggregateNight, sleepQualityScore, type SleepSegment } from '@/lib/sleep-metrics'
 import { resolveMaxHr } from '@/lib/cardio-zones'
-import { computeExertionDay } from '@/lib/exertion'
+import { bpmHistogramFromSeries, computeExertionDay, type SeriesPoint } from '@/lib/exertion'
 import { computeStressDay } from '@/lib/stress'
-import { findCrossSourceDuplicate, enrichExistingLog } from '@/server/wearables/dedupe'
+import { findDuplicate, enrichExistingLog } from '@/server/wearables/dedupe'
+import { linkMeasurementToSession } from '@/server/wearables/session-match'
 
 const createId = () => crypto.randomUUID()
 
 // HealthKit-workout-typen → onze CardioActivity. De bridge mag ook direct een
 // CardioActivity-waarde sturen; onbekend → OTHER.
+//
+// Alleen typen die de app ÁNDERS behandelt staan hier. Alles daarbuiten is
+// bewust OTHER en leest zijn naam uit `sourceActivity`; dat scheelt een
+// migratie per sport en houdt de enum klein genoeg om over na te denken.
 const ACTIVITY_MAP: Record<string, CardioActivity> = {
   running: 'RUNNING',
   cycling: 'CYCLING',
   rowing: 'ROWING',
   swimming: 'SWIMMING',
   walking: 'WALKING',
+  hiking: 'HIKING',
   elliptical: 'CROSSTRAINER',
   stairClimbing: 'STAIRCLIMBER',
   stairs: 'STAIRCLIMBER',
+  // Kracht komt in twee smaken uit HealthKit; voor de belasting is dat één ding.
+  traditionalStrengthTraining: 'STRENGTH',
+  functionalStrengthTraining: 'STRENGTH',
+  coreTraining: 'STRENGTH',
+  highIntensityIntervalTraining: 'HIIT',
+  yoga: 'YOGA',
+  pilates: 'YOGA',
+  flexibility: 'YOGA',
+  mindAndBody: 'YOGA',
   // directe enum-waarden (idempotent door uppercasing hieronder)
 }
 const VALID_ACTIVITIES = new Set<CardioActivity>([
   'RUNNING', 'CYCLING', 'ROWING', 'SWIMMING', 'CROSSTRAINER', 'WALKING',
-  'SKIERG', 'ASSAULT_BIKE', 'WATTBIKE', 'STAIRCLIMBER', 'OTHER',
+  'HIKING', 'SKIERG', 'ASSAULT_BIKE', 'WATTBIKE', 'STAIRCLIMBER',
+  'STRENGTH', 'HIIT', 'YOGA', 'OTHER',
 ])
 
 function mapActivity(raw: string): CardioActivity {
@@ -58,9 +74,30 @@ export function rpeFromHeartRate(
   return Math.max(1, Math.min(10, Math.round(frac * 10)))
 }
 
+/**
+ * Tijd-in-zone uit de hartslagcurve, voor bronnen die het niet meesturen.
+ * Null wanneer er geen bruikbare curve of geen HR-profiel is.
+ */
+export function zonesFromSeries(
+  series: SeriesPoint[] | undefined,
+  profile: { maxHeartRate: number | null; restingHeartRate: number | null; dateOfBirth: Date | null } | null,
+): Record<string, number> | null {
+  if (!series || !profile) return null
+  const hist = bpmHistogramFromSeries(series)
+  if (!hist) return null
+  const day = computeExertionDay(hist, {
+    maxHeartRate: profile.maxHeartRate,
+    restingHeartRate: profile.restingHeartRate,
+    dateOfBirth: profile.dateOfBirth,
+  })
+  return day?.timeInZones ?? null
+}
+
 const workoutSchema = z.object({
   externalId: z.string().min(1),
   activity: z.string().min(1),
+  /** Ruw type van de bron, zoals HealthKit het noemt ("hiking", "padel"). */
+  sourceActivity: z.string().min(1).max(64).optional(),
   startAt: z.string(),
   endAt: z.string().optional(),
   durationSec: z.number().int().positive(),
@@ -157,7 +194,7 @@ function startOfDayUTCLocal(dateStr: string): Date {
   return new Date(y, (m ?? 1) - 1, d ?? 1, 0, 0, 0, 0)
 }
 
-type Db = Pick<PrismaClient, 'wearableConnection' | 'cardioLog' | 'sleepEntry' | 'vitalsEntry' | 'stressEntry' | 'exertionEntry' | 'user'>
+type Db = Pick<PrismaClient, 'wearableConnection' | 'cardioLog' | 'sessionLog' | 'sleepEntry' | 'vitalsEntry' | 'stressEntry' | 'exertionEntry' | 'user'>
 
 /**
  * Max-HR bepalen met een extra vangnet. `resolveMaxHr` kent alleen het profiel
@@ -240,7 +277,13 @@ export async function ingestWearableData(
   prisma: Db,
   userId: string,
   payload: SyncPayload,
+  // Polar (en straks andere cloud-bronnen) hergebruiken deze pijplijn voor
+  // slaap/vitals/dag-HR. De defaults houden het HealthKit-gedrag exact gelijk.
+  opts?: { source?: WorkoutSource; provider?: WearableProvider; deviceModel?: string },
 ): Promise<IngestResult> {
+  const source = opts?.source ?? ('APPLE_WATCH' as const)
+  const provider = opts?.provider ?? ('APPLE_HEALTH' as const)
+  const deviceModel = opts?.deviceModel ?? payload.device?.model
   const affected = new Set<number>() // start-of-day epoch ms
 
   // HR-profiel ophalen voor de sRPE-afleiding van workouts.
@@ -251,7 +294,7 @@ export async function ingestWearableData(
 
   // ── Connection bijwerken (upsert) ──────────────────────
   await prisma.wearableConnection.upsert({
-    where: { userId_provider: { userId, provider: 'APPLE_HEALTH' } },
+    where: { userId_provider: { userId, provider } },
     update: {
       lastSyncAt: new Date(),
       // Een aankomende sync ís een actieve koppeling: de app synct alleen als
@@ -263,14 +306,14 @@ export async function ingestWearableData(
       // readiness-cron sloeg de gebruiker over. Zelfde patroon als de
       // Strava-claim (routers/wearables.ts).
       enabled: true,
-      ...(payload.device?.model ? { deviceModel: payload.device.model } : {}),
+      ...(deviceModel ? { deviceModel } : {}),
       ...(payload.anchors ? { anchors: payload.anchors } : {}),
     },
     create: {
       id: createId(),
       userId,
-      provider: 'APPLE_HEALTH',
-      deviceModel: payload.device?.model ?? null,
+      provider,
+      deviceModel: deviceModel ?? null,
       anchors: payload.anchors ?? undefined,
       lastSyncAt: new Date(),
     },
@@ -284,8 +327,18 @@ export async function ingestWearableData(
     const avgPaceSecPerKm =
       w.distanceM && w.distanceM > 0 ? Math.round(w.durationSec / (w.distanceM / 1000)) : null
 
+    // Tijd-in-zone zelf afleiden als de bron het niet meestuurt. De
+    // HealthKit-brug heeft dat veld nooit gevuld, waardoor `edwardsTrimp` op
+    // vrijwel elke gesyncte activiteit null gaf en het TRIMP-deel van de
+    // belastingscurve in de praktijk uit stond. De hartslagcurve is er wél,
+    // dus we rekenen het hier uit — via hetzelfde histogram als de
+    // dagbelasting, zodat training en dag dezelfde zone-regels volgen.
+    const timeInZones =
+      w.timeInZones ?? zonesFromSeries(w.series, profile) ?? undefined
+
     const data = {
       activity,
+      sourceActivity: w.sourceActivity ?? w.activity,
       protocol: 'STEADY_STATE' as const,
       durationSec: w.durationSec,
       distanceM: w.distanceM ?? null,
@@ -293,10 +346,10 @@ export async function ingestWearableData(
       maxHeartRate: w.maxHeartRate ?? null,
       calories: w.activeEnergyKcal != null ? Math.round(w.activeEnergyKcal) : null,
       rpe,
-      timeInZones: w.timeInZones ?? undefined,
+      timeInZones,
       series: w.series ?? undefined,
       avgPaceSecPerKm,
-      source: 'APPLE_WATCH' as const,
+      source,
       completedAt,
     }
 
@@ -305,18 +358,31 @@ export async function ingestWearableData(
     // `updateExistingSyncedLog` bewaakt de hand-gezette RPE en een handmatig
     // gecorrigeerde hartslag (anchor-reset levert workouts opnieuw aan).
     const existed = await updateExistingSyncedLog(prisma, userId, w.externalId, data)
+    // Id van de rij waar deze workout uiteindelijk in landde, voor het koppelen
+    // hieronder. Een rij die al aan een sessie hangt slaan we over: dat werk is
+    // gedaan en hoeft niet bij elke sync opnieuw.
+    let logId: string | null = null
+    if (existed) {
+      const row = await prisma.cardioLog.findUnique({
+        where: { patientId_externalId: { patientId: userId, externalId: w.externalId } },
+        select: { id: true, sessionLogId: true },
+      })
+      logId = row && row.sessionLogId == null ? row.id : null
+    }
     if (!existed) {
       // Cross-source check: dezelfde workout kan al via Strava binnen zijn
       // (of andersom). Tijd-overlap = zelfde training → niet dupliceren,
       // alleen ontbrekende velden op de bestaande rij aanvullen.
-      const dup = await findCrossSourceDuplicate(prisma, userId, completedAt, w.durationSec, 'APPLE_WATCH')
+      const dup = await findDuplicate(prisma, userId, completedAt, w.durationSec)
       if (dup) {
         await enrichExistingLog(prisma, dup, data)
+        logId = dup.id
       } else {
         try {
-          await prisma.cardioLog.create({
+          const created = await prisma.cardioLog.create({
             data: { id: createId(), patientId: userId, externalId: w.externalId, ...data },
           })
+          logId = created.id
         } catch (err) {
           // P2002 = parallelle sync creëerde de rij zojuist; die is dan al bijgewerkt.
           if (!(err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === 'P2002')) {
@@ -325,6 +391,24 @@ export async function ingestWearableData(
         }
       }
     }
+
+    // Krachttraining die de sporter ook in de app logde: hang de meting aan die
+    // sessie. Zonder dit staat dezelfde training twee keer in de kalender en
+    // telt hij twee keer mee in de belastingscurve. Best-effort — een mislukte
+    // koppeling mag de rest van de sync niet omver trekken.
+    if (logId) {
+      try {
+        await linkMeasurementToSession(prisma, userId, {
+          id: logId,
+          activity,
+          startAt: completedAt,
+          durationSec: w.durationSec,
+        })
+      } catch {
+        // Volgende sync probeert het opnieuw.
+      }
+    }
+
     affected.add(startOfDayUTCLocal(completedAt.toISOString().slice(0, 10)).getTime())
   }
 
@@ -353,7 +437,7 @@ export async function ingestWearableData(
       latencyMin: night.latencyMin,
       qualityScore: quality,
       stages: s.segments as unknown as object,
-      source: 'APPLE_WATCH' as const,
+      source,
       ...(s.externalId ? { externalId: s.externalId } : {}),
     }
 
@@ -373,7 +457,7 @@ export async function ingestWearableData(
   // HRV/rust-HR/ademhaling van eerdere batches op dezelfde dag.
   for (const v of payload.vitals) {
     const date = startOfDayUTCLocal(v.date)
-    const patch: Record<string, unknown> = { source: 'APPLE_WATCH' }
+    const patch: Record<string, unknown> = { source }
     if (v.restingHeartRate !== undefined) patch.restingHeartRate = v.restingHeartRate
     if (v.hrv !== undefined) patch.hrv = v.hrv
     if (v.hrvType !== undefined) patch.hrvType = v.hrvType
@@ -399,7 +483,7 @@ export async function ingestWearableData(
         activeEnergyKcal: v.activeEnergyKcal != null ? Math.round(v.activeEnergyKcal) : null,
         basalEnergyKcal: v.basalEnergyKcal != null ? Math.round(v.basalEnergyKcal) : null,
         vo2Max: v.vo2Max ?? null,
-        source: 'APPLE_WATCH',
+        source,
       },
     })
     affected.add(date.getTime())
@@ -433,7 +517,7 @@ export async function ingestWearableData(
         restingHeartRate: result.restingHeartRate,
         samples: result.samples,
         timeInBands: result.timeInBands,
-        source: 'APPLE_WATCH' as const,
+        source,
       }
       await prisma.stressEntry.upsert({
         where: { userId_date: { userId, date } },
@@ -463,7 +547,7 @@ export async function ingestWearableData(
         timeInZones: ex.timeInZones,
         hrHistogram: day.histogram,
         maxHrUsed: maxHrRes.maxHr,
-        source: 'APPLE_WATCH' as const,
+        source,
       }
       await prisma.exertionEntry.upsert({
         where: { userId_date: { userId, date } },

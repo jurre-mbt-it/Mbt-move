@@ -8,6 +8,7 @@ import {
   invalidateUserCache,
 } from '@/server/trpc'
 import { auditLog } from '@/server/audit'
+import { deregisterPolarForUser } from '@/server/wearables/polar/sync'
 
 /**
  * Admin-only router. Beheer van users, rollen en praktijken.
@@ -196,6 +197,9 @@ export const adminRouter = createTRPCRouter({
       } catch (err) {
         console.warn('[admin.deleteUser] supabase-delete failed:', (err as Error).message)
       }
+
+      // Token ook aan Polar-zijde intrekken; de rij zelf cascadet mee.
+      await deregisterPolarForUser(ctx.prisma, target.id)
 
       // Stap 2: Prisma hard-delete (cascade via schema)
       await ctx.prisma.user.delete({ where: { id: target.id } })

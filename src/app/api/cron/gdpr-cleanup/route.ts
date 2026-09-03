@@ -18,6 +18,7 @@
  *     admin-panel).
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { deregisterPolarForUser } from '@/server/wearables/polar/sync'
 import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
 import { auditLog } from '@/server/audit'
@@ -78,6 +79,9 @@ export async function GET(req: NextRequest) {
           )
         }
       }
+
+      // Token ook aan Polar-zijde intrekken; de rij zelf cascadet mee.
+      await deregisterPolarForUser(prisma, u.id)
 
       await prisma.user.delete({ where: { id: u.id } })
 

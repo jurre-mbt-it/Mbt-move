@@ -133,6 +133,63 @@ export function computeExertionDay(
   return { timeInZones, trimp, activeSec: Math.round(activeSec) }
 }
 
+/** Eén punt uit `CardioLog.series`: seconden vanaf de start + gemeten bpm. */
+export type SeriesPoint = { t: number; hr: number | null; spd?: number | null }
+
+/**
+ * Zet de hartslagcurve van één training om in hetzelfde bpm-histogram dat de
+ * dagbelasting gebruikt, zodat `computeExertionDay` er daarna overheen kan.
+ *
+ * Waarom via het histogram en niet rechtstreeks naar zones: de dag en de
+ * training MOETEN dezelfde regels volgen. Een training zit ín een dag, dus een
+ * losse zone-berekening die de lichte band anders behandelt kan een training
+ * hoger laten uitkomen dan de dag eromheen. Door hier alleen te bucketen en het
+ * rekenen aan `computeExertionDay` te laten, kan dat per constructie niet.
+ *
+ * De brug levert 1-minuut-buckets, maar de afstand tussen punten is niet
+ * gegarandeerd: bij een lange sessie zijn de buckets breder, en een pauze laat
+ * een gat vallen. Elk punt telt daarom voor de afstand tot het vólgende punt,
+ * begrensd op de mediaan — anders schrijft één meting na een uur pauze een vol
+ * uur in de zwaarste zone bij. Het laatste punt krijgt die mediaan.
+ *
+ * Punten zonder hartslag leveren geen tijd op: niet gemeten is niet belast.
+ */
+export function bpmHistogramFromSeries(
+  series: SeriesPoint[] | null | undefined,
+): BpmHistogram | null {
+  if (!Array.isArray(series)) return null
+  const all = series
+    .filter((p) => p && Number.isFinite(p.t))
+    .sort((a, b) => a.t - b.t)
+  const pts = all.filter((p) => p.hr != null && Number.isFinite(p.hr))
+  if (pts.length < 2) return null
+
+  // Meetinterval uit de VOLLEDIGE reeks, dus inclusief de punten zonder
+  // hartslag. Zou je alleen de gemeten punten pakken, dan wordt het interval
+  // groter zodra er een meting ontbreekt en schrijft het punt ervóór die
+  // ongemeten minuut alsnog op zijn eigen zone bij.
+  const gaps: number[] = []
+  for (let i = 1; i < all.length; i++) {
+    const gap = all[i].t - all[i - 1].t
+    if (gap > 0) gaps.push(gap)
+  }
+  if (gaps.length === 0) return null
+  const sorted = [...gaps].sort((a, b) => a - b)
+  const median = sorted[Math.floor(sorted.length / 2)]
+  if (!median || median <= 0) return null
+
+  const hist: BpmHistogram = {}
+  for (let i = 0; i < pts.length; i++) {
+    const raw = i < pts.length - 1 ? pts[i + 1].t - pts[i].t : median
+    const dwell = Math.min(Math.max(raw, 0), median)
+    if (dwell <= 0) continue
+    const bin = Math.floor((pts[i].hr as number) / HR_BIN_BPM) * HR_BIN_BPM
+    const key = String(bin)
+    hist[key] = (hist[key] ?? 0) + dwell
+  }
+  return Object.keys(hist).length > 0 ? hist : null
+}
+
 /**
  * Persoonlijke schaal 0-100 voor de weergave: de dag afgezet tegen de eigen
  * p90-dag van het venster. Zonder referentie (nieuwe gebruiker) geven we null
@@ -170,4 +227,21 @@ export function exertionScore(trimp: number, recentTrimps: number[]): number | n
   if (!p90 || p90 <= 0) return null
   if (!Number.isFinite(trimp) || trimp <= 0) return 0
   return Math.max(0, Math.min(100, Math.round(100 * (1 - Math.exp(-trimp / p90)))))
+}
+
+/**
+ * Strain van één training, op precies dezelfde schaal als de dagbelasting.
+ *
+ * Bewust geen eigen ankerpunt. Een training is een stuk van je dag, dus als
+ * beide 0-10 lezen moeten ze hetzelfde betekenen — anders staat er straks
+ * "training 7,1 · dag 6,3" op één scherm en klopt er zichtbaar iets niet. Door
+ * dezelfde referentiedagen door te geven aan dezelfde curve is die volgorde
+ * gegarandeerd: de TRIMP van de training is per definitie kleiner dan die van
+ * de dag, en de curve is monotoon.
+ *
+ * `recentDayTrimps` = de dag-TRIMP's van de voorgaande dagen, identiek aan wat
+ * `exertionScore` krijgt. Niet de TRIMP's van eerdere trainingen.
+ */
+export function sessionStrain(trimp: number, recentDayTrimps: number[]): number | null {
+  return exertionScore(trimp, recentDayTrimps)
 }

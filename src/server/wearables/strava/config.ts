@@ -16,7 +16,15 @@
  *   NEXT_PUBLIC_APP_URL  — basis voor de callback-URL (moet matchen met de
  *                          "Authorization Callback Domain" in de Strava-app)
  */
-import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto'
+import {
+  decryptAtRest,
+  encryptAtRest,
+  openJson,
+  sealJson,
+  sha256Key,
+  signState as signStateShared,
+  verifyState as verifyStateShared,
+} from '@/server/wearables/token-crypto'
 
 export const STRAVA_ENDPOINTS = {
   authorize: 'https://www.strava.com/oauth/authorize',
@@ -61,32 +69,15 @@ export function buildAuthorizeUrl(userId: string): string {
   return `${STRAVA_ENDPOINTS.authorize}?${params.toString()}`
 }
 
-// ── State signing (HMAC met de client-secret) ────────────────────────────────
+// ── State signing (HMAC met de client-secret; gedeelde implementatie) ────────
 
 export function signState(userId: string): string {
-  const payload = `${userId}.${Date.now() + STATE_TTL_MS}`
-  const sig = createHmac('sha256', getStravaConfig().clientSecret).update(payload).digest('base64url')
-  return `${Buffer.from(payload).toString('base64url')}.${sig}`
+  return signStateShared(getStravaConfig().clientSecret, userId, STATE_TTL_MS)
 }
 
 /** Verifieer de state en geef de userId terug, of null bij ongeldig/verlopen. */
 export function verifyState(state: string | null | undefined): string | null {
-  if (!state) return null
-  const [payloadB64, sig] = state.split('.')
-  if (!payloadB64 || !sig) return null
-  let payload: string
-  try {
-    payload = Buffer.from(payloadB64, 'base64url').toString()
-  } catch {
-    return null
-  }
-  const expected = createHmac('sha256', getStravaConfig().clientSecret).update(payload).digest('base64url')
-  const a = Buffer.from(sig)
-  const b = Buffer.from(expected)
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return null
-  const [userId, expStr] = payload.split('.')
-  if (!userId || !expStr || Date.now() > Number(expStr)) return null
-  return userId
+  return verifyStateShared(getStravaConfig().clientSecret, state)
 }
 
 // ── Token-handoff: verzegelde blob callback → app (AES-256-GCM) ─────────────
@@ -102,17 +93,12 @@ export type SealedStravaTokens = {
 const BLOB_TTL_MS = 10 * 60 * 1000
 
 function sealKey(): Buffer {
-  return createHash('sha256').update(getStravaConfig().clientSecret).digest()
+  return sha256Key(getStravaConfig().clientSecret)
 }
 
 /** Versleutel de tokens voor de deep-link terug naar de app. */
 export function sealTokens(t: SealedStravaTokens): string {
-  const iv = randomBytes(12)
-  const cipher = createCipheriv('aes-256-gcm', sealKey(), iv)
-  const plain = JSON.stringify({ ...t, exp: Date.now() + BLOB_TTL_MS })
-  const ct = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()])
-  const tag = cipher.getAuthTag()
-  return Buffer.concat([iv, tag, ct]).toString('base64url')
+  return sealJson(sealKey(), { ...t }, BLOB_TTL_MS)
 }
 
 // ── Token-versleuteling AT REST (AES-256-GCM) ───────────────────────────────
@@ -120,21 +106,16 @@ export function sealTokens(t: SealedStravaTokens): string {
 // database-dump of backup-lek geen bruikbare `activity:read_all`-tokens
 // prijsgeeft. De sleutel leeft alleen in de app-env (afgeleid van de
 // client-secret), niet in de database — een DB-lek zonder de env is dus waardeloos.
-const AT_REST_PREFIX = 'enc:v1:'
 
 function atRestKey(): Buffer {
   // Andere afleiding dan sealKey() zodat de at-rest-sleutel en de
   // in-transit-handoff-sleutel niet identiek zijn.
-  return createHash('sha256').update(`strava-at-rest:${getStravaConfig().clientSecret}`).digest()
+  return sha256Key(`strava-at-rest:${getStravaConfig().clientSecret}`)
 }
 
 /** Versleutel een token voor opslag in de DB. */
 export function encryptToken(plain: string): string {
-  const iv = randomBytes(12)
-  const cipher = createCipheriv('aes-256-gcm', atRestKey(), iv)
-  const ct = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()])
-  const tag = cipher.getAuthTag()
-  return AT_REST_PREFIX + Buffer.concat([iv, tag, ct]).toString('base64url')
+  return encryptAtRest(atRestKey(), plain)
 }
 
 /**
@@ -143,39 +124,19 @@ export function encryptToken(plain: string): string {
  * teruggegeven — ze versleutelen vanzelf bij de eerstvolgende token-refresh.
  */
 export function decryptToken(stored: string): string {
-  if (!stored.startsWith(AT_REST_PREFIX)) return stored
-  const raw = Buffer.from(stored.slice(AT_REST_PREFIX.length), 'base64url')
-  const iv = raw.subarray(0, 12)
-  const tag = raw.subarray(12, 28)
-  const ct = raw.subarray(28)
-  const decipher = createDecipheriv('aes-256-gcm', atRestKey(), iv)
-  decipher.setAuthTag(tag)
-  return Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8')
+  return decryptAtRest(atRestKey(), stored)
 }
 
 /** Ontsleutel + valideer de blob; null bij ongeldig/verlopen/geknoeid. */
 export function openTokens(blob: string | null | undefined): SealedStravaTokens | null {
-  if (!blob) return null
-  try {
-    const raw = Buffer.from(blob, 'base64url')
-    if (raw.length < 12 + 16 + 2) return null
-    const iv = raw.subarray(0, 12)
-    const tag = raw.subarray(12, 28)
-    const ct = raw.subarray(28)
-    const decipher = createDecipheriv('aes-256-gcm', sealKey(), iv)
-    decipher.setAuthTag(tag)
-    const plain = Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8')
-    const parsed = JSON.parse(plain) as SealedStravaTokens & { exp: number }
-    if (!parsed.accessToken || !parsed.refreshToken || !parsed.athleteId) return null
-    if (!parsed.exp || Date.now() > parsed.exp) return null
-    return {
-      accessToken: parsed.accessToken,
-      refreshToken: parsed.refreshToken,
-      expiresAt: parsed.expiresAt,
-      athleteId: parsed.athleteId,
-      scope: parsed.scope ?? null,
-    }
-  } catch {
-    return null
+  const parsed = openJson(sealKey(), blob) as (SealedStravaTokens & { exp: number }) | null
+  if (!parsed) return null
+  if (!parsed.accessToken || !parsed.refreshToken || !parsed.athleteId) return null
+  return {
+    accessToken: parsed.accessToken,
+    refreshToken: parsed.refreshToken,
+    expiresAt: parsed.expiresAt,
+    athleteId: parsed.athleteId,
+    scope: parsed.scope ?? null,
   }
 }

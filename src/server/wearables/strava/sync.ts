@@ -8,19 +8,28 @@
  */
 import type { CardioActivity, PrismaClient } from '@prisma/client'
 import { resolveMaxHr } from '@/lib/cardio-zones'
-import { rpeFromHeartRate, updateExistingSyncedLog } from '@/server/wearables/ingest'
-import { findCrossSourceDuplicate, enrichExistingLog } from '@/server/wearables/dedupe'
+import { rpeFromHeartRate, updateExistingSyncedLog, zonesFromSeries } from '@/server/wearables/ingest'
+import { linkMeasurementToSession } from '@/server/wearables/session-match'
+import { findDuplicate, enrichExistingLog } from '@/server/wearables/dedupe'
 import { getValidAccessToken, stravaGet } from './oauth'
 
 const createId = () => crypto.randomUUID()
 
+// Alleen sporten die de app ánders behandelt. De rest landt op OTHER en leest
+// zijn naam uit `sourceActivity` — Strava heeft er tientallen, en padel hoeft
+// geen migratie te kosten.
 const SPORT_MAP: Record<string, CardioActivity> = {
   Run: 'RUNNING', TrailRun: 'RUNNING', VirtualRun: 'RUNNING',
   Ride: 'CYCLING', VirtualRide: 'CYCLING', MountainBikeRide: 'CYCLING', GravelRide: 'CYCLING',
-  Walk: 'WALKING', Hike: 'WALKING',
+  // Hike los van Walk: een bergwandeling van vijf uur is geen ommetje, en de
+  // twee horen niet dezelfde naam en kleur te krijgen in de kalender.
+  Walk: 'WALKING', Hike: 'HIKING',
   Swim: 'SWIMMING',
   Rowing: 'ROWING',
   Elliptical: 'CROSSTRAINER', StairStepper: 'STAIRCLIMBER',
+  WeightTraining: 'STRENGTH', Workout: 'STRENGTH', Crossfit: 'STRENGTH',
+  HighIntensityIntervalTraining: 'HIIT',
+  Yoga: 'YOGA', Pilates: 'YOGA',
 }
 
 type StravaActivity = {
@@ -81,7 +90,7 @@ function buildSeries(s: StreamResponse | null): { t: number; hr: number | null; 
   return out.slice(0, 240)
 }
 
-type Db = Pick<PrismaClient, 'stravaConnection' | 'user' | 'cardioLog'>
+type Db = Pick<PrismaClient, 'stravaConnection' | 'user' | 'cardioLog' | 'sessionLog'>
 
 /** Sync de laatste `days` dagen aan Strava-activiteiten. Retourneert het aantal. */
 export async function syncStravaActivities(prisma: Db, userId: string, opts?: { days?: number }): Promise<number> {
@@ -148,8 +157,10 @@ export async function syncStravaActivities(prisma: Db, userId: string, opts?: { 
       }
     }
 
+    const sportType = a.sport_type ?? a.type ?? ''
     const data = {
-      activity: SPORT_MAP[a.sport_type ?? a.type ?? ''] ?? 'OTHER',
+      activity: SPORT_MAP[sportType] ?? 'OTHER',
+      sourceActivity: sportType || null,
       protocol: 'STEADY_STATE' as const,
       durationSec,
       distanceM,
@@ -161,6 +172,9 @@ export async function syncStravaActivities(prisma: Db, userId: string, opts?: { 
       rpe: rpeFromHeartRate(avgHeartRate, maxHr, profile?.restingHeartRate),
       avgPaceSecPerKm,
       series: series ?? undefined,
+      // Strava stuurt geen tijd-in-zone; die leiden we net als bij de watch uit
+      // de hartslagcurve af, zodat de belastingscurve er ook hier op kan rekenen.
+      timeInZones: zonesFromSeries(series ?? undefined, profile) ?? undefined,
       source: 'STRAVA' as const,
       completedAt: a.start_date ? new Date(a.start_date) : new Date(),
     }
@@ -169,24 +183,48 @@ export async function syncStravaActivities(prisma: Db, userId: string, opts?: { 
     // gecorrigeerde hartslag: beide sloten zitten in de WHERE zelf, dus een
     // parallelle sync kan ze niet overrijden.
     const existed = await updateExistingSyncedLog(prisma, userId, externalId, data)
+    let logId: string | null = null
+    if (existed) {
+      const row = await prisma.cardioLog.findUnique({
+        where: { patientId_externalId: { patientId: userId, externalId } },
+        select: { id: true, sessionLogId: true },
+      })
+      logId = row && row.sessionLogId == null ? row.id : null
+    }
     if (!existed) {
       // Cross-source check: dezelfde workout kan al via de Apple Watch-sync
       // binnen zijn. Tijd-overlap = zelfde training → niet dupliceren, alleen
       // ontbrekende velden (bv. tempo/afstand) op de bestaande rij aanvullen.
-      const dup = await findCrossSourceDuplicate(prisma, userId, data.completedAt, durationSec, 'STRAVA')
+      const dup = await findDuplicate(prisma, userId, data.completedAt, durationSec)
       if (dup) {
         await enrichExistingLog(prisma, dup, data)
+        logId = dup.id
       } else {
         try {
-          await prisma.cardioLog.create({
+          const created = await prisma.cardioLog.create({
             data: { id: createId(), patientId: userId, externalId, ...data },
           })
+          logId = created.id
         } catch (err) {
           // P2002 = parallelle sync creëerde de rij zojuist; die is dan al bijgewerkt.
           if (!(err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === 'P2002')) {
             throw err
           }
         }
+      }
+    }
+
+    // Krachttraining die ook in de app gelogd is → meting bij die sessie.
+    if (logId) {
+      try {
+        await linkMeasurementToSession(prisma, userId, {
+          id: logId,
+          activity: data.activity,
+          startAt: data.completedAt,
+          durationSec,
+        })
+      } catch {
+        // Volgende sync probeert het opnieuw.
       }
     }
     count++

@@ -195,6 +195,7 @@ export const RATE_LIMITS = {
   // Strava heeft een applicatie-brede quota: zonder limiet kan een enkele
   // gebruiker de sync voor iedereen breken.
   stravaSync:         { max: 12, windowSec: 3600, message: 'Te veel Strava-syncs. Probeer het later opnieuw.' },
+  polarSync:          { max: 12, windowSec: 3600, message: 'Te veel Polar-syncs. Probeer het later opnieuw.' },
   // Elke checkout maakt een ShopOrder-rij en een Mollie-betaling aan.
   shopCheckout:       { max: 10, windowSec: 3600, message: 'Te veel bestellingen. Probeer het later opnieuw.' },
   // Push-tokens registreren is goedkoop, maar niet gratis en niet ongelimiteerd.

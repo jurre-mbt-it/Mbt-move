@@ -79,6 +79,13 @@ export {
   Bike as IconAssaultBike,
   Bike as IconWattbike,
   Activity as IconStairclimber,
+  // Typen die uit de sync binnenkomen en niet voor te schrijven zijn: hiken,
+  // een krachtworkout van het horloge, HIIT en yoga. Zonder deze vier had een
+  // hike in het dossier helemaal geen icoon, terwijl de app er wel een toonde.
+  Mountain as IconHiking,
+  Dumbbell as IconStrengthActivity,
+  Flame as IconHiit,
+  PersonStanding as IconYoga,
   Activity as IconOtherCardio,
 
   // ── Pijn-contexten ────────────────────────────────────────────────────────

@@ -4,6 +4,13 @@
  */
 
 // ── Activiteiten ─────────────────────────────────────────────────────────────
+//
+// LET OP: dit is de lijst met activiteiten die je kunt VOORSCHRIJVEN — label,
+// icoon, eenheid, omschrijving. De enum in de database is langer: alles wat uit
+// een sync binnenkomt (hiken, HIIT, yoga, een krachtworkout van het horloge)
+// hoort daar wel bij en hier niet. Voor het BENOEMEN van een gelogde activiteit
+// gebruik je `cardioLabel()` uit `@/lib/cardio-labels`; die kent de hele enum en
+// het ruwe bron-type. Voeg hier dus geen tweede labeltabel toe.
 
 export type CardioActivityKey =
   | 'RUNNING' | 'CYCLING' | 'ROWING' | 'SWIMMING' | 'CROSSTRAINER'

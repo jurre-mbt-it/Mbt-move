@@ -61,3 +61,30 @@ describe('ingestWearableData · connection-upsert', () => {
     expect(call.create.enabled).not.toBe(false)
   })
 })
+
+describe('ingestWearableData · source/provider-opties', () => {
+  it('zonder opts blijft het HealthKit-gedrag exact gelijk (APPLE_HEALTH)', async () => {
+    const { db, upsert } = stubDb()
+    await ingestWearableData(db, 'user-1', legePayload)
+    const call = upsert.mock.calls[0][0] as { where: { userId_provider: { provider: string } } }
+    expect(call.where.userId_provider.provider).toBe('APPLE_HEALTH')
+  })
+
+  it('met opts landt de connection onder de opgegeven provider', async () => {
+    // Polar hergebruikt deze pijplijn voor slaap/vitals/dag-HR; de bron mag
+    // dan niet als Apple-koppeling geregistreerd worden.
+    const { db, upsert } = stubDb()
+    await ingestWearableData(db, 'user-1', legePayload, {
+      source: 'POLAR',
+      provider: 'POLAR',
+      deviceModel: 'Polar',
+    })
+    const call = upsert.mock.calls[0][0] as {
+      where: { userId_provider: { provider: string } }
+      create: Record<string, unknown>
+    }
+    expect(call.where.userId_provider.provider).toBe('POLAR')
+    expect(call.create.provider).toBe('POLAR')
+    expect(call.create.deviceModel).toBe('Polar')
+  })
+})

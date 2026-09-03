@@ -22,7 +22,9 @@ import {
 import { IconCardio, IconSleep, IconStrength, IconWarning } from '@/components/icons'
 import { QuickStartCard } from '@/components/system/QuickStartCard'
 import { StartTreatmentCard } from '@/components/system/StartTreatmentCard'
-import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, type CardioActivityKey, type CardioProtocolKey } from '@/lib/cardio-constants'
+import { CARDIO_PROTOCOLS, type CardioActivityKey, type CardioProtocolKey } from '@/lib/cardio-constants'
+import { cardioLabel } from '@/lib/cardio-labels'
+import { SessionHeartRate, SessionMeasurement, type Measurement, type Strain } from '@/components/training/SessionMeasurement'
 import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
 import { formatWeightsPerSet } from '@/lib/session-sets'
 
@@ -63,8 +65,12 @@ type ActivityDetail = ActivityDetailBase &
         therapistId: string | null
         therapistName: string | null
         durationMinutes: number | null
+        durationSec: number | null
         painLevel: number | null
         exertionLevel: number | null
+        /** Wearable-meting bij deze krachtsessie; null zonder horloge. */
+        measurement: Measurement | null
+        strain: Strain | null
         exercises: Array<{
           id: string
           name: string
@@ -72,6 +78,8 @@ type ActivityDetail = ActivityDetailBase &
           reps: number | null
           weight: number | null
           weightsPerSet: unknown
+          repsPerSet: unknown
+          repUnit: string | null
           painLevel: number | null
           notes: string | null
         }>
@@ -80,12 +88,16 @@ type ActivityDetail = ActivityDetailBase &
         type: 'cardio'
         programName: string | null
         activity: string
+        sourceActivity: string | null
         protocol: string
         durationSec: number
         distanceM: number | null
         avgPaceSecPerKm: number | null
         avgHeartRate: number | null
         maxHeartRate: number | null
+        calories: number | null
+        timeInZones: unknown
+        series: unknown
         zone: number | null
         targetZone: number | null
         rpe: number | null
@@ -646,6 +658,18 @@ export default function TherapistDashboard() {
                       value={detail.painLevel != null ? `${detail.painLevel}/10` : '—'}
                     />
                   </div>
+                  {/* Strain en hartslag bij deze training. Zonder dit blok zag de
+                      therapeut alleen duur, RPE en pijn, terwijl de sporter in de
+                      app de meting erbij kreeg — hetzelfde dossier, twee
+                      verschillende verhalen. */}
+                  <SessionMeasurement
+                    measurement={detail.measurement}
+                    strain={detail.strain}
+                    durationSec={detail.durationSec}
+                    exertionLevel={detail.exertionLevel}
+                    painLevel={detail.painLevel}
+                  />
+
                   <div>
                     <MetaLabel style={{ marginBottom: 6 }}>
                       {detail.programName ?? 'Losse krachtsessie'}
@@ -672,6 +696,9 @@ export default function TherapistDashboard() {
                               style={{ color: P.inkMuted, fontSize: 12, letterSpacing: '0.04em' }}
                             >
                               {ex.sets ?? '—'}×{ex.reps ?? '—'}
+                              {/* Zonder de eenheid leest "3×30" van een plank als
+                                  30 herhalingen in plaats van 30 seconden. */}
+                              {ex.repUnit && ex.repUnit !== 'reps' ? ` ${ex.repUnit}` : ''}
                               {weightLabel(ex) ? ` · ${weightLabel(ex)}` : ''}
                             </span>
                           </div>
@@ -698,7 +725,7 @@ export default function TherapistDashboard() {
               {detail?.type === 'cardio' && (
                 <>
                   <MetaLabel>
-                    {CARDIO_ACTIVITIES[detail.activity as CardioActivityKey]?.label ?? detail.activity}
+                    {cardioLabel(detail.activity, 'nl', detail.sourceActivity)}
                     {' · '}
                     {CARDIO_PROTOCOLS[detail.protocol as CardioProtocolKey]?.label ?? detail.protocol}
                     {detail.programName ? ` · ${detail.programName}` : ''}
@@ -746,6 +773,19 @@ export default function TherapistDashboard() {
                       Pijn tijdens sessie: {detail.painLevel}/10
                     </p>
                   )}
+                  {/* De verdeling over de zones draagt het verhaal dat "gemiddeld
+                      148 bpm" niet vertelt. De sporter zag dit al in de app. */}
+                  <SessionHeartRate
+                    measurement={{
+                      avgHeartRate: detail.avgHeartRate,
+                      maxHeartRate: detail.maxHeartRate,
+                      durationSec: detail.durationSec,
+                      calories: detail.calories,
+                      timeInZones: detail.timeInZones,
+                      series: detail.series,
+                      source: 'MANUAL',
+                    }}
+                  />
                 </>
               )}
 

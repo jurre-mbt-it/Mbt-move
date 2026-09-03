@@ -11,7 +11,7 @@ import {
   IconCarry, IconFullBody,
   IconRunning, IconCycling, IconRowing, IconSwimming, IconCrosstrainer,
   IconWalking, IconSkiErg, IconAssaultBike, IconWattbike, IconStairclimber,
-  IconOtherCardio,
+  IconHiking, IconStrengthActivity, IconHiit, IconYoga, IconOtherCardio,
   IconRest, IconMovement, IconExercise, IconAfterExertion, IconAlways,
   IconMoon, IconStrength as IconSoreness, IconLightning, IconSun, IconMobility as IconStress,
   IconMoodVeryLow, IconMoodLow, IconMoodNeutral, IconMoodGood, IconMoodGreat,
@@ -56,10 +56,14 @@ export const CARDIO_ICON_MAP: Record<string, LucideIcon> = {
   SWIMMING: IconSwimming,
   CROSSTRAINER: IconCrosstrainer,
   WALKING: IconWalking,
+  HIKING: IconHiking,
   SKIERG: IconSkiErg,
   ASSAULT_BIKE: IconAssaultBike,
   WATTBIKE: IconWattbike,
   STAIRCLIMBER: IconStairclimber,
+  STRENGTH: IconStrengthActivity,
+  HIIT: IconHiit,
+  YOGA: IconYoga,
   OTHER: IconOtherCardio,
 }
 

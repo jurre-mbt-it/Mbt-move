@@ -23,6 +23,8 @@
 export type VitalsDay = {
   date: string
   hrv: number | null // ms (SDNN of RMSSD)
+  /** Welke metriek `hrv` is. Bepaalt met welke nachten hij vergeleken mag worden. */
+  hrvType: 'SDNN' | 'RMSSD' | null
   restingHeartRate: number | null
   respiratoryRate: number | null
   wristTempDeviation: number | null // °C afwijking van baseline
@@ -245,23 +247,56 @@ export function computeReadiness(
   const baselineNights = priorLnHrv.length
 
   // --- HRV ---
-  const recentLn = priorLnHrv.slice(-BASELINE_WINDOW)
-  const hrvMean = mean(recentLn)
-  const hrvSd = sd(priorLnHrv.slice(-NORMAL_WINDOW))
+  // Apple meet SDNN, Oura/Whoop/Garmin meten RMSSD. Die zijn niet onderling
+  // vergelijkbaar (zie de kop van dit bestand), dus de baseline gebruikt
+  // uitsluitend nachten van dezelfde metriek als de nacht die gescoord wordt.
+  // Zonder die segmentatie is de eerste nacht na een device-wissel een
+  // ongedempte sprong in juist de zwaarst wegende bijdrage, en de LEARNING-gate
+  // vangt dat niet: die telt nachten, geen metriektypes.
+  //
+  // Kent de te scoren nacht zijn type niet, dan valt hij terug op de volledige
+  // historie. Dat is exact het gedrag van vóór deze segmentatie en houdt
+  // legacy-rijen zonder hrvType scoorbaar.
+  const todayType = todayVitals?.hrvType ?? null
+  const priorSameType = todayType == null ? prior : prior.filter(v => v.hrvType === todayType)
+  const segmentLnHrv = priorSameType
+    .map(v => lnHrv(v.hrv))
+    .filter((x): x is number => x != null)
+
+  const segMean = mean(segmentLnHrv.slice(-BASELINE_WINDOW))
+  const segSd = sd(segmentLnHrv.slice(-NORMAL_WINDOW))
   const todayLn = lnHrv(todayVitals?.hrv ?? null)
-  const hrv = contributorFromDeviation({
-    key: 'hrv',
-    label: T.contributor.hrv,
-    today: todayLn,
-    mean: hrvMean,
-    sd: hrvSd,
-    direction: 'higherBetter',
-    sensitivity: 20,
-    minSd: 0.1, // lnHRV: ~10% nacht-op-nacht is normale ruis, geen signaal
-    rawValue: todayVitals?.hrv ?? null,
-    rawBaseline: hrvMean != null ? Math.round(Math.exp(hrvMean)) : null,
-    weight: WEIGHTS.hrv,
-  })
+
+  // Te weinig nachten van deze metriek: laat alleen de HRV-bijdrage vervallen
+  // in plaats van de hele score op LEARNING te zetten. De gewogen som
+  // normaliseert al over de beschikbare bijdragen, dus je houdt een verzwakte
+  // maar levende score, en de trendgrafiek houdt geen gat van een week.
+  // Baseline bewust op null: een vergelijking met een vreemde metriek zou in de
+  // uitleg-zin als feit worden gepresenteerd.
+  const hrv: Contributor =
+    segmentLnHrv.length < MIN_BASELINE_NIGHTS
+      ? {
+          key: 'hrv',
+          label: T.contributor.hrv,
+          value: todayVitals?.hrv ?? null,
+          baseline: null,
+          weight: WEIGHTS.hrv,
+          status: 'na',
+          points: null,
+        }
+      : contributorFromDeviation({
+          key: 'hrv',
+          label: T.contributor.hrv,
+          today: todayLn,
+          mean: segMean,
+          sd: segSd,
+          direction: 'higherBetter',
+          sensitivity: 20,
+          minSd: 0.1, // lnHRV: ~10% nacht-op-nacht is normale ruis, geen signaal
+          rawValue: todayVitals?.hrv ?? null,
+          rawBaseline: segMean != null ? Math.round(Math.exp(segMean)) : null,
+          weight: WEIGHTS.hrv,
+        })
 
   // --- Rust-HR (lager = beter) ---
   const priorRhr = prior.map(v => v.restingHeartRate).filter((x): x is number => x != null)

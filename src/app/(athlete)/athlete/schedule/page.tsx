@@ -21,7 +21,8 @@ import { P, CARD, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-
 import {
   IconStrength, IconMobility, IconPlyometrics, IconCardio, IconCore, IconSleep,
 } from '@/components/icons'
-import { CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constants'
+import { cardioLabel } from '@/lib/cardio-labels'
+import { SessionMeasurement, type Measurement, type Strain } from '@/components/training/SessionMeasurement'
 import { matchLoggedPlanned, type PlannedEntry } from '@/lib/planned-matching'
 import { WeekPhaseLine } from '@/components/schedule/WeekPhaseLine'
 import { CATEGORY_COLORS, CARDIO_ACTIVITY_COLORS, textOn } from '@/lib/palette'
@@ -239,7 +240,7 @@ export default function AthleteSchedulePage() {
       push(isoDate(new Date(c.completedAt)), {
         kind: 'cardio',
         id: c.id,
-        name: CARDIO_ACTIVITIES[c.activity as CardioActivityKey]?.label ?? 'Cardio',
+        name: cardioLabel(c.activity, 'nl', c.sourceActivity),
         category: 'CARDIO',
         activity: c.activity ?? null,
         durationSec: c.durationSec,
@@ -642,6 +643,8 @@ type CalendarData = {
     id: string
     completedAt: string | Date
     activity: string
+    /** Ruw bron-type (padel, hike); benoemt de sport als onze enum OTHER zegt. */
+    sourceActivity: string | null
     protocol: string
     /** Gevuld = deze cardio hoort bij een gepland item. */
     weekScheduleDayItemId?: string | null
@@ -954,6 +957,19 @@ function EventDetailSheet({
             </>
           )}
 
+          {/* Kracht-sessie: strain, hartslag en zones — hetzelfde blok als in de
+              app. Deze velden kwamen al mee uit patient.sessionDetail; het web
+              liet ze tot augustus 2026 alleen ongebruikt liggen. */}
+          {event.kind === 'session' && detailQuery.data && (
+            <SessionMeasurement
+              measurement={detailQuery.data.measurement}
+              strain={detailQuery.data.strain}
+              durationSec={detailQuery.data.duration}
+              exertionLevel={detailQuery.data.exertionLevel}
+              painLevel={detailQuery.data.painLevel}
+            />
+          )}
+
           {/* Kracht-sessie: gelogde oefeningen */}
           {event.kind === 'session' && (
             detailQuery.isLoading ? (
@@ -1012,6 +1028,11 @@ function EventDetailSheet({
 type SessionDetailData = {
   id: string
   notes: string | null
+  duration: number | null
+  painLevel: number | null
+  exertionLevel: number | null
+  measurement: Measurement | null
+  strain: Strain | null
   exerciseLogs: Array<{
     id: string
     name: string
