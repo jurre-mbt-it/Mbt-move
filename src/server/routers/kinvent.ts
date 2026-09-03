@@ -1,9 +1,14 @@
 /**
- * Kinvent-router: koppelen en metingen ophalen.
+ * Kinvent-router: aanmelden, koppelen en metingen ophalen.
  *
  * Toegangsmodel: therapistProcedure, en per patiënt via de gedeelde
  * `hasPatientAccess()`. Niet zelf een where-clause schrijven; dat is precies
  * hoe de praktijk-tak eerder naar de verkeerde rollen lekte (zie AGENTS.md).
+ *
+ * De aanmelding is één per praktijk (KinventConnection). Kinvent kent geen
+ * service-credential en het JWT is niet te verversen zonder de tweede factor,
+ * dus elke 31 dagen tikt een therapeut een code over. Wie dat doet staat in
+ * `connectedById`; de rest van de praktijk werkt op dezelfde verbinding.
  *
  * Twee dingen die dit bestand bewust NIET doet:
  *
@@ -14,9 +19,10 @@
  *     opgeslagen of gelogd.
  *
  *   - Zelf besluiten wat er in het dossier komt. `pullForPatient` haalt op en
- *     geeft een voorstel terug; pas `commitImport` schrijft weg, na een keuze
- *     van de therapeut. Handmatig invoeren blijft daarmee overal mogelijk en
- *     een geïmporteerde waarde overschrijft nooit stilzwijgend een ingetypte.
+ *     geeft een voorstel terug; pas een aparte commit schrijft weg, na een
+ *     keuze van de therapeut. Handmatig invoeren blijft daarmee overal
+ *     mogelijk en een import overschrijft nooit stilzwijgend een ingetypte
+ *     waarde.
  */
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
@@ -26,30 +32,84 @@ import { auditLog } from '@/server/audit'
 import {
   KinventError,
   analyzeProtocols,
+  completeSecondFactor,
   fetchParticipants,
   fetchProtocolsForParticipant,
+  requestSecondFactor,
 } from '@/lib/kinvent/client'
+import { decryptToken, encryptToken, jwtExpiry } from '@/lib/kinvent/crypto'
 import { parseActivityResults, parseJump, parseStrength } from '@/lib/kinvent/parse'
 import { checkUnit, lsi, type UnitCheck } from '@/lib/kinvent/units'
+
+type Prisma = typeof import('@/lib/prisma').prisma
+type Ctx = { prisma: Prisma; user: { id: string; role: string; practiceId: string | null } }
+
+/** Zoveel dagen vóór het verlopen begint de vraag om opnieuw aan te melden. */
+const RENEW_WARNING_DAYS = 5
 
 /** Zet een Kinvent-fout om in iets dat de therapeut kan lezen. */
 function toTRPC(err: unknown): never {
   if (err instanceof KinventError) {
     throw new TRPCError({
-      code: err.needsSecondFactor ? 'PRECONDITION_FAILED' : 'BAD_GATEWAY',
+      code: err.needsSignIn ? 'PRECONDITION_FAILED' : 'BAD_GATEWAY',
       message: err.message,
     })
   }
   throw err
 }
 
-async function assertAccess(
-  prisma: typeof import('@/lib/prisma').prisma,
-  user: { id: string; role: string; practiceId: string | null },
-  patientId: string,
-) {
+function practiceOf(user: Ctx['user']): string {
+  if (!user.practiceId) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Kinvent is aan een praktijk gekoppeld, niet aan een los account.' })
+  }
+  return user.practiceId
+}
+
+async function assertAccess(prisma: Prisma, user: Ctx['user'], patientId: string) {
   if (!(await hasPatientAccess(prisma, user, patientId))) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Geen toegang tot deze patiënt' })
+  }
+}
+
+/**
+ * Het bewaarde JWT van deze praktijk, of een duidelijke fout als er geen
+ * (geldige) aanmelding is. Het token zelf verlaat de server nooit.
+ */
+async function tokenFor(ctx: Ctx): Promise<string> {
+  const practiceId = practiceOf(ctx.user)
+  const conn = await ctx.prisma.kinventConnection.findUnique({ where: { practiceId } })
+  if (!conn) {
+    throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'De praktijk is nog niet aangemeld bij Kinvent.' })
+  }
+  if (conn.tokenExpiresAt <= new Date()) {
+    throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'De Kinvent-aanmelding is verlopen. Meld opnieuw aan.' })
+  }
+  return decryptToken(conn.token)
+}
+
+/** Bewaart een vers JWT versleuteld, met de vervaldatum uit het token zelf. */
+async function storeToken(ctx: Ctx, token: string) {
+  const practiceId = practiceOf(ctx.user)
+  const expiresAt = jwtExpiry(token)
+  if (!expiresAt) {
+    throw new TRPCError({ code: 'BAD_GATEWAY', message: 'Kinvent gaf een token zonder vervaldatum terug.' })
+  }
+  await ctx.prisma.kinventConnection.upsert({
+    where: { practiceId },
+    create: { practiceId, token: encryptToken(token), tokenExpiresAt: expiresAt, connectedById: ctx.user.id },
+    update: { token: encryptToken(token), tokenExpiresAt: expiresAt, connectedById: ctx.user.id, connectedAt: new Date(), lastError: null },
+  })
+  await auditLog({ event: 'KINVENT_SIGNED_IN', userId: ctx.user.id, resource: 'practice', resourceId: practiceId })
+  return { expiresAt }
+}
+
+/** Een mislukte call met verlopen token noteren, zodat de status het toont. */
+async function noteError(ctx: Ctx, err: unknown) {
+  if (err instanceof KinventError && ctx.user.practiceId) {
+    await ctx.prisma.kinventConnection.updateMany({
+      where: { practiceId: ctx.user.practiceId },
+      data: { lastError: err.message },
+    })
   }
 }
 
@@ -73,6 +133,73 @@ export type ImportCandidate = {
 }
 
 export const kinventRouter = createTRPCRouter({
+  // ── Aanmelding van de praktijk ─────────────────────────────────────────────
+
+  connectionStatus: therapistProcedure.query(async ({ ctx }) => {
+    const practiceId = practiceOf(ctx.user)
+    const conn = await ctx.prisma.kinventConnection.findUnique({
+      where: { practiceId },
+      select: { tokenExpiresAt: true, connectedAt: true, connectedById: true, lastUsedAt: true, lastError: true },
+    })
+    if (!conn) return { connected: false as const }
+    const msLeft = conn.tokenExpiresAt.getTime() - Date.now()
+    const daysLeft = Math.max(0, Math.floor(msLeft / 86_400_000))
+    const connectedBy = await ctx.prisma.user.findUnique({
+      where: { id: conn.connectedById },
+      select: { name: true },
+    })
+    return {
+      connected: msLeft > 0,
+      expiresAt: conn.tokenExpiresAt,
+      daysLeft,
+      needsRenewal: daysLeft <= RENEW_WARNING_DAYS,
+      connectedAt: conn.connectedAt,
+      connectedByName: connectedBy?.name ?? null,
+      lastUsedAt: conn.lastUsedAt,
+      lastError: conn.lastError,
+    }
+  }),
+
+  /**
+   * Stap 1: laat Kinvent de code versturen. Staat 2FA uit op het account, dan
+   * is de aanmelding hiermee meteen rond.
+   */
+  startSignIn: therapistProcedure.mutation(async ({ ctx }) => {
+    practiceOf(ctx.user)
+    try {
+      const result = await requestSecondFactor()
+      if (result.kind === 'signed-in') {
+        const { expiresAt } = await storeToken(ctx, result.token)
+        return { done: true as const, expiresAt }
+      }
+      return { done: false as const, method: result.method }
+    } catch (err) {
+      toTRPC(err)
+    }
+  }),
+
+  /** Stap 2: de code uit mail of sms. */
+  completeSignIn: therapistProcedure
+    .input(z.object({ code: z.string().trim().min(4).max(12) }))
+    .mutation(async ({ ctx, input }) => {
+      practiceOf(ctx.user)
+      try {
+        const token = await completeSecondFactor(input.code)
+        return await storeToken(ctx, token)
+      } catch (err) {
+        toTRPC(err)
+      }
+    }),
+
+  disconnect: therapistProcedure.mutation(async ({ ctx }) => {
+    const practiceId = practiceOf(ctx.user)
+    await ctx.prisma.kinventConnection.deleteMany({ where: { practiceId } })
+    await auditLog({ event: 'KINVENT_SIGNED_OUT', userId: ctx.user.id, resource: 'practice', resourceId: practiceId })
+    return { ok: true }
+  }),
+
+  // ── Koppelen van een patiënt ───────────────────────────────────────────────
+
   /**
    * Zoek een Kinvent-profiel op naam, voor het koppelmoment.
    *
@@ -82,10 +209,10 @@ export const kinventRouter = createTRPCRouter({
    */
   searchParticipants: therapistProcedure
     .input(z.object({ query: z.string().min(2).max(60) }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const needle = input.query.trim().toLowerCase()
       try {
-        const all = await fetchParticipants()
+        const all = await fetchParticipants(await tokenFor(ctx))
         return all
           .filter((p) => `${p.firstName ?? ''} ${p.lastName ?? ''}`.toLowerCase().includes(needle))
           .slice(0, 25)
@@ -95,6 +222,7 @@ export const kinventRouter = createTRPCRouter({
             birthYear: p.dateOfBirth ? new Date(p.dateOfBirth).getUTCFullYear() : null,
           }))
       } catch (err) {
+        await noteError(ctx, err)
         toTRPC(err)
       }
     }),
@@ -130,30 +258,18 @@ export const kinventRouter = createTRPCRouter({
         select: { id: true },
       })
       if (taken && taken.id !== input.patientId) {
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message: 'Dit Kinvent-profiel is al aan een andere patiënt gekoppeld.',
-        })
+        throw new TRPCError({ code: 'CONFLICT', message: 'Dit Kinvent-profiel is al aan een andere patiënt gekoppeld.' })
       }
       await ctx.prisma.user.update({
         where: { id: input.patientId },
-        data: {
-          kinventParticipantCode: input.participantCode,
-          kinventLinkedAt: new Date(),
-          kinventLinkedById: ctx.user.id,
-        },
+        data: { kinventParticipantCode: input.participantCode, kinventLinkedAt: new Date(), kinventLinkedById: ctx.user.id },
       })
       await ctx.prisma.kinventSync.upsert({
         where: { patientId: input.patientId },
         create: { patientId: input.patientId },
         update: { lastError: null },
       })
-      await auditLog({
-        event: 'KINVENT_LINKED',
-        userId: ctx.user.id,
-        resource: 'user',
-        resourceId: input.patientId,
-      })
+      await auditLog({ event: 'KINVENT_LINKED', userId: ctx.user.id, resource: 'user', resourceId: input.patientId })
       return { ok: true }
     }),
 
@@ -166,14 +282,11 @@ export const kinventRouter = createTRPCRouter({
         data: { kinventParticipantCode: null, kinventLinkedAt: null, kinventLinkedById: null },
       })
       await ctx.prisma.kinventSync.deleteMany({ where: { patientId: input.patientId } })
-      await auditLog({
-        event: 'KINVENT_UNLINKED',
-        userId: ctx.user.id,
-        resource: 'user',
-        resourceId: input.patientId,
-      })
+      await auditLog({ event: 'KINVENT_UNLINKED', userId: ctx.user.id, resource: 'user', resourceId: input.patientId })
       return { ok: true }
     }),
+
+  // ── Metingen ophalen ───────────────────────────────────────────────────────
 
   /**
    * Haalt nieuwe metingen op en geeft ze terug als voorstel. Schrijft niets.
@@ -205,18 +318,24 @@ export const kinventRouter = createTRPCRouter({
       const since = input.all ? 0 : Number(sync?.lastUpdatedAfter ?? 0)
 
       let protocols
+      let analyses
       try {
-        protocols = await fetchProtocolsForParticipant(patient.kinventParticipantCode, since)
+        const token = await tokenFor(ctx)
+        protocols = await fetchProtocolsForParticipant(token, patient.kinventParticipantCode, since)
+        if (protocols.length === 0) return { candidates: [] }
+        analyses = await analyzeProtocols(token, protocols.map((p) => p.code))
+        await ctx.prisma.kinventConnection.updateMany({
+          where: { practiceId: ctx.user.practiceId ?? '' },
+          data: { lastUsedAt: new Date() },
+        })
       } catch (err) {
+        await noteError(ctx, err)
         await ctx.prisma.kinventSync.updateMany({
           where: { patientId: input.patientId },
           data: { lastError: err instanceof Error ? err.message : 'Onbekende fout' },
         })
         toTRPC(err)
       }
-      if (protocols.length === 0) return { candidates: [] }
-
-      const analyses = await analyzeProtocols(protocols.map((p) => p.code)).catch(toTRPC)
       const byProtocol = new Map(analyses.map((a) => [a.protocolCode, a]))
 
       // Wat al eens is geïmporteerd, markeren we in plaats van te verbergen:

@@ -666,6 +666,7 @@ model Practice {
   // Clinical Insight Engine — gefaseerde rollout per praktijk.
   cieEnabled        Boolean             @default(false)
   users             User[]
+  kinventConnection KinventConnection?
   exercises         Exercise[]
   inviteCodes       InviteCode[]
   careStatuses      PatientCareStatus[]
@@ -3038,4 +3039,36 @@ model KinventJumpRep {
 
   @@unique([resultId, ordinal])
   @@map("kinvent_jump_reps")
+}
+
+/// De aanmelding bij Kinvent, één per praktijk.
+///
+/// Kinvent kent geen service-credential. Inloggen gaat met het praktijkaccount
+/// (e-mail en wachtwoord in env) plus een tweede factor die per mail of sms
+/// komt en die een mens moet overtikken. Het JWT dat daaruit rolt is 31 dagen
+/// geldig, en dát bewaren we hier: versleuteld, want het is een maandlange
+/// sleutel tot het hele Kinvent-account inclusief hun schrijf-endpoints.
+///
+/// Eén rij per praktijk, niet per therapeut: dan blijft de koppeling werken als
+/// degene die hem aanmeldde vrij is, en hoeft niet iedereen apart te koppelen.
+/// `connectedById` legt wél vast wie het was.
+model KinventConnection {
+  id         String   @id @default(cuid())
+  practiceId String   @unique
+  practice   Practice @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+
+  /// AES-256-GCM, prefix enc:v1:, sleutel uit KINVENT_TOKEN_SECRET. Zie
+  /// src/lib/kinvent/crypto.ts. Nooit onversleuteld loggen of teruggeven.
+  token          String
+  /// Uit de exp-claim van het JWT. Ruim vóór dit moment melden dat iemand
+  /// opnieuw moet aanmelden, anders valt de sync stil zonder dat het opvalt.
+  tokenExpiresAt DateTime
+
+  connectedById String
+  connectedAt   DateTime  @default(now())
+  lastUsedAt    DateTime?
+  lastError     String?
+  updatedAt     DateTime  @updatedAt
+
+  @@map("kinvent_connections")
 }

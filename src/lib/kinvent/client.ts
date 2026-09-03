@@ -6,17 +6,22 @@
  * de bron van waarheid voor metingen, en een bug in BASE mag daar nooit iets
  * aan kunnen veranderen.
  *
- * Authenticatie: Basic Auth op /login geeft een JWT, daarna gaat die mee als
- * `X-Auth-Token`. Er is geen refresh-token; het token is 31 dagen geldig en we
- * loggen bij een 401 gewoon opnieuw in.
+ * Authenticatie, zoals door Kinvent bevestigd op 2026-08-20:
  *
- * LET OP — tweefactorauthenticatie. Staat 2FA aan op het account, dan slaagt
- * /login wél maar levert het een challenge op in plaats van een sessie: de
- * respons bevat `twoFaPreferredMethod` en een token van een paar tekens, en de
- * eerstvolgende call geeft 401. In de gepubliceerde API bestaat geen endpoint
- * om die challenge af te ronden, dus een onbemande sync kan er niet doorheen.
- * `login()` herkent dat geval en zegt het met zoveel woorden, in plaats van te
- * stranden op een onverklaarbare 401 verderop.
+ *   1. Basic Auth op /login. Met 2FA aan levert dat geen sessie op maar een
+ *      challenge (`twoFaPreferredMethod` plus een kort token); Kinvent stuurt
+ *      dan een code per mail of sms.
+ *   2. Basic Auth op /twoFaLogin met `{ token: "<code>" }` geeft het echte JWT.
+ *   3. Dat JWT is 31 dagen geldig, is NIET te verversen zonder stap 1 en 2
+ *      opnieuw te doen, en gaat mee als `X-Auth-Token`.
+ *
+ * Een onbemande sync kan stap 2 niet doen. Daarom bewaart BASE het JWT
+ * (versleuteld, zie crypto.ts en KinventConnection) en meldt een therapeut
+ * zich één keer per maand opnieuw aan. Eind 2026 komt Kinvent met API-sleutels;
+ * dan vervangt dat alleen dit bestand en niets daarbuiten.
+ *
+ * De leesfuncties krijgen het token als argument. Waar het vandaan komt (de
+ * database, via de router) hoort hier niet thuis.
  */
 
 const BASE_URL = process.env.KINVENT_BASE_URL ?? 'https://api.k-invent.com'
@@ -28,7 +33,8 @@ export class KinventError extends Error {
   constructor(
     message: string,
     readonly status?: number,
-    readonly needsSecondFactor = false,
+    /** Het bewaarde token is niet (meer) geldig; iemand moet opnieuw aanmelden. */
+    readonly needsSignIn = false,
   ) {
     super(message)
     this.name = 'KinventError'
@@ -50,12 +56,6 @@ export type KinventActivityRep = {
   maxLeftRatio?: number | null
   bodyPartSide?: string | null
   startTime?: number | null
-  measurements?: Array<{
-    deviceType?: string | null
-    bodyPart?: string | null
-    bodyPartSide?: string | null
-    serialCode?: string | null
-  }> | null
 }
 
 export type KinventProtocol = {
@@ -88,61 +88,71 @@ export type KinventAnalysis = {
   }> | null
 }
 
-let cachedToken: { value: string; fetchedAt: number } | null = null
+// ── Aanmelden ────────────────────────────────────────────────────────────────
 
-/** Ruim onder de 31 dagen die Kinvent geeft, zodat we nooit op de rand zitten. */
-const TOKEN_MAX_AGE_MS = 24 * 60 * 60 * 1000
-
-function credentials() {
+function basicAuth(): string {
   const email = process.env.KINVENT_EMAIL
   const password = process.env.KINVENT_PASSWORD
   if (!email || !password) {
     throw new KinventError('KINVENT_EMAIL en KINVENT_PASSWORD ontbreken in de omgeving.')
   }
-  return { email, password }
+  return `Basic ${Buffer.from(`${email}:${password}`).toString('base64')}`
 }
 
-export async function login(): Promise<string> {
-  const { email, password } = credentials()
+type LoginBody = { token?: string; twoFaPreferredMethod?: string }
+
+const isJwt = (t: string | undefined): t is string => !!t && t.split('.').length === 3
+
+/**
+ * Stap 1: vraagt Kinvent om de tweede factor te versturen.
+ *
+ * Geeft terug via welk kanaal de code komt, zodat de therapeut weet waar hij
+ * moet kijken. Staat 2FA uit op het account, dan komt hier meteen een JWT
+ * terug en is stap 2 niet nodig.
+ */
+export async function requestSecondFactor(): Promise<
+  { kind: 'code-sent'; method: string } | { kind: 'signed-in'; token: string }
+> {
   const res = await fetch(`${BASE_URL}/api/authorization/login`, {
     method: 'POST',
-    headers: {
-      Authorization: `Basic ${Buffer.from(`${email}:${password}`).toString('base64')}`,
-    },
+    headers: { Authorization: basicAuth() },
   })
   if (!res.ok) {
     throw new KinventError(`Inloggen bij Kinvent mislukt (HTTP ${res.status}).`, res.status)
   }
-  const body = (await res.json()) as { token?: string; twoFaPreferredMethod?: string }
-  const token = body.token
-  // Een echte sessie is een JWT (drie delen). Komt er iets korters terug, of
-  // meldt Kinvent een tweede factor, dan hebben we een challenge te pakken.
-  if (!token || body.twoFaPreferredMethod || token.split('.').length !== 3) {
+  const body = (await res.json()) as LoginBody
+  if (isJwt(body.token)) return { kind: 'signed-in', token: body.token }
+  return { kind: 'code-sent', method: body.twoFaPreferredMethod ?? 'onbekend' }
+}
+
+/** Stap 2: wisselt de code uit mail of sms in voor het JWT. */
+export async function completeSecondFactor(code: string): Promise<string> {
+  const res = await fetch(`${BASE_URL}/api/authorization/twoFaLogin`, {
+    method: 'POST',
+    headers: { Authorization: basicAuth(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: code.trim() }),
+  })
+  if (!res.ok) {
     throw new KinventError(
-      'Kinvent vraagt een tweede factor voor dit account. Een automatische koppeling ' +
-        'kan die niet beantwoorden; er is een service-credential of app-wachtwoord nodig.',
-      undefined,
-      true,
+      res.status === 401
+        ? 'Kinvent accepteerde de code niet. Controleer de code of vraag een nieuwe aan.'
+        : `Aanmelden bij Kinvent mislukt (HTTP ${res.status}).`,
+      res.status,
     )
   }
-  cachedToken = { value: token, fetchedAt: Date.now() }
-  return token
-}
-
-async function token(): Promise<string> {
-  if (cachedToken && Date.now() - cachedToken.fetchedAt < TOKEN_MAX_AGE_MS) {
-    return cachedToken.value
+  const body = (await res.json()) as LoginBody
+  if (!isJwt(body.token)) {
+    throw new KinventError('Kinvent gaf na de tweede factor geen geldig token terug.')
   }
-  return login()
+  return body.token
 }
 
-async function get<T>(path: string, retryOn401 = true): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'X-Auth-Token': await token() },
-  })
-  if (res.status === 401 && retryOn401) {
-    cachedToken = null
-    return get<T>(path, false)
+// ── Lezen ────────────────────────────────────────────────────────────────────
+
+async function get<T>(token: string, path: string): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, { headers: { 'X-Auth-Token': token } })
+  if (res.status === 401) {
+    throw new KinventError('De Kinvent-aanmelding is verlopen. Meld opnieuw aan.', 401, true)
   }
   if (!res.ok) {
     throw new KinventError(`Kinvent gaf HTTP ${res.status} op ${path}.`, res.status)
@@ -155,8 +165,8 @@ async function get<T>(path: string, retryOn401 = true): Promise<T> {
  * zodat de therapeut de juiste persoon kan aanwijzen; we slaan hier niets van
  * op behalve de gekozen `code`. Bevat namen en geboortedata, dus niet loggen.
  */
-export async function fetchParticipants(): Promise<KinventParticipant[]> {
-  return get<KinventParticipant[]>('/api/participants/v1?includeDeleted=false')
+export async function fetchParticipants(token: string): Promise<KinventParticipant[]> {
+  return get<KinventParticipant[]>(token, '/api/participants/v1?includeDeleted=false')
 }
 
 /**
@@ -168,6 +178,7 @@ export async function fetchParticipants(): Promise<KinventParticipant[]> {
  * want metingen van patiënten zonder BASE-dossier bereiken ons niet.
  */
 export async function fetchProtocolsForParticipant(
+  token: string,
   participantCode: string,
   updatedAfter = 0,
 ): Promise<KinventProtocol[]> {
@@ -176,19 +187,22 @@ export async function fetchProtocolsForParticipant(
     updatedAfter: String(updatedAfter),
     includeDeleted: 'false',
   })
-  return get<KinventProtocol[]>(`/api/protocols/v1/findByParticipantCode?${params}`)
+  return get<KinventProtocol[]>(token, `/api/protocols/v1/findByParticipantCode?${params}`)
 }
 
 /** Berekende uitkomsten. Schrijft niets, ondanks de POST. */
-export async function analyzeProtocols(protocolCodes: string[]): Promise<KinventAnalysis[]> {
+export async function analyzeProtocols(token: string, protocolCodes: string[]): Promise<KinventAnalysis[]> {
   const out: KinventAnalysis[] = []
   for (let i = 0; i < protocolCodes.length; i += ANALYZE_BATCH_SIZE) {
     const chunk = protocolCodes.slice(i, i + ANALYZE_BATCH_SIZE)
     const res = await fetch(`${BASE_URL}/api/protocols/v2/analyze`, {
       method: 'POST',
-      headers: { 'X-Auth-Token': await token(), 'Content-Type': 'application/json' },
+      headers: { 'X-Auth-Token': token, 'Content-Type': 'application/json' },
       body: JSON.stringify(chunk),
     })
+    if (res.status === 401) {
+      throw new KinventError('De Kinvent-aanmelding is verlopen. Meld opnieuw aan.', 401, true)
+    }
     if (!res.ok) {
       throw new KinventError(`Analyse mislukt (HTTP ${res.status}) voor ${chunk.length} protocollen.`, res.status)
     }
@@ -196,9 +210,4 @@ export async function analyzeProtocols(protocolCodes: string[]): Promise<Kinvent
     out.push(...(body.protocolsResults ?? []))
   }
   return out
-}
-
-/** Alleen voor tests: gooit het gecachete token weg. */
-export function __resetTokenCache() {
-  cachedToken = null
 }
