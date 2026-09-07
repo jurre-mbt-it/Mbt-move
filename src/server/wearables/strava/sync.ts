@@ -5,6 +5,11 @@
  *
  * Idempotent op (patientId, externalId = "strava:<activityId>"), dus opnieuw
  * syncen overschrijft veilig.
+ *
+ * Drie ingangen, één ingest-pad (`ingestStravaActivity`):
+ *   - syncStravaActivities  — venster van N dagen (handmatige knop, cron-vangnet)
+ *   - syncStravaActivity    — één activiteit op id (webhook create/update)
+ *   - removeStravaActivity  — één activiteit weg (webhook delete)
  */
 import type { CardioActivity, PrismaClient } from '@prisma/client'
 import { resolveMaxHr } from '@/lib/cardio-zones'
@@ -117,6 +122,28 @@ export async function syncStravaActivities(prisma: Db, userId: string, opts?: { 
   // Nieuwste eerst: zo gaat het stream-budget naar de recentste activiteiten.
   activities.sort((a, b) => (b.start_date ?? '').localeCompare(a.start_date ?? ''))
 
+  const ctx = await loadIngestContext(prisma, userId, token)
+  let count = 0
+  for (const a of activities) {
+    if (await ingestStravaActivity(prisma, userId, a, ctx)) count++
+  }
+
+  await prisma.stravaConnection.update({ where: { userId }, data: { lastSyncAt: new Date() } })
+  return count
+}
+
+type IngestContext = {
+  token: string
+  maxHr: number | null
+  profile: { maxHeartRate: number | null; restingHeartRate: number | null; dateOfBirth: Date | null } | null
+  // Strava's read-limit is 100 req/15 min; 1 lijst-call + 1 stream-call per
+  // activiteit kan daar bij een grote eerste sync overheen. Budget de streams;
+  // activiteiten zonder budget krijgen ze bij een volgende sync alsnog
+  // (upsert vult series dan aan).
+  streamBudget: number
+}
+
+async function loadIngestContext(prisma: Db, userId: string, token: string): Promise<IngestContext> {
   const profile = await prisma.user.findUnique({
     where: { id: userId },
     select: { maxHeartRate: true, restingHeartRate: true, dateOfBirth: true },
@@ -127,109 +154,131 @@ export async function syncStravaActivities(prisma: Db, userId: string, opts?: { 
       restingHeartRate: profile?.restingHeartRate,
       dateOfBirth: profile?.dateOfBirth,
     })?.maxHr ?? null
+  return { token, maxHr, profile, streamBudget: 40 }
+}
 
-  // Strava's read-limit is 100 req/15 min; 1 lijst-call + 1 stream-call per
-  // activiteit kan daar bij een grote eerste sync overheen. Budget de streams;
-  // activiteiten zonder budget krijgen ze bij een volgende sync alsnog
-  // (upsert vult series dan aan).
-  let streamBudget = 40
+/**
+ * Eén Strava-activiteit naar CardioLog. Retourneert false als de activiteit
+ * te kort is (< 60s) en dus overgeslagen wordt.
+ */
+async function ingestStravaActivity(prisma: Db, userId: string, a: StravaActivity, ctx: IngestContext): Promise<boolean> {
+  const { token, maxHr, profile } = ctx
+  const durationSec = a.moving_time ?? a.elapsed_time
+  if (!durationSec || durationSec < 60) return false
 
-  let count = 0
-  for (const a of activities) {
-    const durationSec = a.moving_time ?? a.elapsed_time
-    if (!durationSec || durationSec < 60) continue
+  const distanceM = a.distance != null ? Math.round(a.distance) : null
+  const avgHeartRate = a.average_heartrate != null ? Math.round(a.average_heartrate) : null
+  const avgPaceSecPerKm = distanceM && distanceM > 0 ? Math.round(durationSec / (distanceM / 1000)) : null
 
-    const distanceM = a.distance != null ? Math.round(a.distance) : null
-    const avgHeartRate = a.average_heartrate != null ? Math.round(a.average_heartrate) : null
-    const avgPaceSecPerKm = distanceM && distanceM > 0 ? Math.round(durationSec / (distanceM / 1000)) : null
+  let series: ReturnType<typeof buildSeries> = undefined
+  if (a.has_heartrate && ctx.streamBudget > 0) {
+    ctx.streamBudget--
+    try {
+      const streams = await stravaGet<StreamResponse>(
+        token,
+        `/activities/${a.id}/streams?keys=time,heartrate,velocity_smooth&key_by_type=true`,
+      )
+      series = buildSeries(streams)
+    } catch {
+      // streams optioneel — grafiek degradeert netjes
+    }
+  }
 
-    let series: ReturnType<typeof buildSeries> = undefined
-    if (a.has_heartrate && streamBudget > 0) {
-      streamBudget--
+  const sportType = a.sport_type ?? a.type ?? ''
+  const data = {
+    activity: SPORT_MAP[sportType] ?? 'OTHER',
+    sourceActivity: sportType || null,
+    protocol: 'STEADY_STATE' as const,
+    durationSec,
+    distanceM,
+    avgHeartRate,
+    maxHeartRate: a.max_heartrate != null ? Math.round(a.max_heartrate) : null,
+    // SummaryActivity heeft geen calories; voor rides is kilojoules ≈ kcal.
+    calories:
+      a.calories != null ? Math.round(a.calories) : a.kilojoules != null ? Math.round(a.kilojoules) : null,
+    rpe: rpeFromHeartRate(avgHeartRate, maxHr, profile?.restingHeartRate),
+    avgPaceSecPerKm,
+    series: series ?? undefined,
+    // Strava stuurt geen tijd-in-zone; die leiden we net als bij de watch uit
+    // de hartslagcurve af, zodat de belastingscurve er ook hier op kan rekenen.
+    timeInZones: zonesFromSeries(series ?? undefined, profile) ?? undefined,
+    source: 'STRAVA' as const,
+    completedAt: a.start_date ? new Date(a.start_date) : new Date(),
+  }
+  const externalId = `strava:${a.id}`
+  // Atomisch t.o.v. gelijktijdig beoordelen én t.o.v. een handmatig
+  // gecorrigeerde hartslag: beide sloten zitten in de WHERE zelf, dus een
+  // parallelle sync kan ze niet overrijden.
+  const existed = await updateExistingSyncedLog(prisma, userId, externalId, data)
+  let logId: string | null = null
+  if (existed) {
+    const row = await prisma.cardioLog.findUnique({
+      where: { patientId_externalId: { patientId: userId, externalId } },
+      select: { id: true, sessionLogId: true },
+    })
+    logId = row && row.sessionLogId == null ? row.id : null
+  }
+  if (!existed) {
+    // Cross-source check: dezelfde workout kan al via de Apple Watch-sync
+    // binnen zijn. Tijd-overlap = zelfde training → niet dupliceren, alleen
+    // ontbrekende velden (bv. tempo/afstand) op de bestaande rij aanvullen.
+    const dup = await findDuplicate(prisma, userId, data.completedAt, durationSec)
+    if (dup) {
+      await enrichExistingLog(prisma, dup, data)
+      logId = dup.id
+    } else {
       try {
-        const streams = await stravaGet<StreamResponse>(
-          token,
-          `/activities/${a.id}/streams?keys=time,heartrate,velocity_smooth&key_by_type=true`,
-        )
-        series = buildSeries(streams)
-      } catch {
-        // streams optioneel — grafiek degradeert netjes
-      }
-    }
-
-    const sportType = a.sport_type ?? a.type ?? ''
-    const data = {
-      activity: SPORT_MAP[sportType] ?? 'OTHER',
-      sourceActivity: sportType || null,
-      protocol: 'STEADY_STATE' as const,
-      durationSec,
-      distanceM,
-      avgHeartRate,
-      maxHeartRate: a.max_heartrate != null ? Math.round(a.max_heartrate) : null,
-      // SummaryActivity heeft geen calories; voor rides is kilojoules ≈ kcal.
-      calories:
-        a.calories != null ? Math.round(a.calories) : a.kilojoules != null ? Math.round(a.kilojoules) : null,
-      rpe: rpeFromHeartRate(avgHeartRate, maxHr, profile?.restingHeartRate),
-      avgPaceSecPerKm,
-      series: series ?? undefined,
-      // Strava stuurt geen tijd-in-zone; die leiden we net als bij de watch uit
-      // de hartslagcurve af, zodat de belastingscurve er ook hier op kan rekenen.
-      timeInZones: zonesFromSeries(series ?? undefined, profile) ?? undefined,
-      source: 'STRAVA' as const,
-      completedAt: a.start_date ? new Date(a.start_date) : new Date(),
-    }
-    const externalId = `strava:${a.id}`
-    // Atomisch t.o.v. gelijktijdig beoordelen én t.o.v. een handmatig
-    // gecorrigeerde hartslag: beide sloten zitten in de WHERE zelf, dus een
-    // parallelle sync kan ze niet overrijden.
-    const existed = await updateExistingSyncedLog(prisma, userId, externalId, data)
-    let logId: string | null = null
-    if (existed) {
-      const row = await prisma.cardioLog.findUnique({
-        where: { patientId_externalId: { patientId: userId, externalId } },
-        select: { id: true, sessionLogId: true },
-      })
-      logId = row && row.sessionLogId == null ? row.id : null
-    }
-    if (!existed) {
-      // Cross-source check: dezelfde workout kan al via de Apple Watch-sync
-      // binnen zijn. Tijd-overlap = zelfde training → niet dupliceren, alleen
-      // ontbrekende velden (bv. tempo/afstand) op de bestaande rij aanvullen.
-      const dup = await findDuplicate(prisma, userId, data.completedAt, durationSec)
-      if (dup) {
-        await enrichExistingLog(prisma, dup, data)
-        logId = dup.id
-      } else {
-        try {
-          const created = await prisma.cardioLog.create({
-            data: { id: createId(), patientId: userId, externalId, ...data },
-          })
-          logId = created.id
-        } catch (err) {
-          // P2002 = parallelle sync creëerde de rij zojuist; die is dan al bijgewerkt.
-          if (!(err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === 'P2002')) {
-            throw err
-          }
+        const created = await prisma.cardioLog.create({
+          data: { id: createId(), patientId: userId, externalId, ...data },
+        })
+        logId = created.id
+      } catch (err) {
+        // P2002 = parallelle sync creëerde de rij zojuist; die is dan al bijgewerkt.
+        if (!(err && typeof err === 'object' && 'code' in err && (err as { code?: string }).code === 'P2002')) {
+          throw err
         }
       }
     }
-
-    // Krachttraining die ook in de app gelogd is → meting bij die sessie.
-    if (logId) {
-      try {
-        await linkMeasurementToSession(prisma, userId, {
-          id: logId,
-          activity: data.activity,
-          startAt: data.completedAt,
-          durationSec,
-        })
-      } catch {
-        // Volgende sync probeert het opnieuw.
-      }
-    }
-    count++
   }
 
+  // Krachttraining die ook in de app gelogd is → meting bij die sessie.
+  if (logId) {
+    try {
+      await linkMeasurementToSession(prisma, userId, {
+        id: logId,
+        activity: data.activity,
+        startAt: data.completedAt,
+        durationSec,
+      })
+    } catch {
+      // Volgende sync probeert het opnieuw.
+    }
+  }
+  return true
+}
+
+/**
+ * Eén activiteit op id ophalen en ingesten (webhook create/update). Het
+ * detail-endpoint levert dezelfde velden als de lijst plús `calories`.
+ * Retourneert false als de activiteit te kort is en overgeslagen wordt.
+ */
+export async function syncStravaActivity(prisma: Db, userId: string, activityId: number | string): Promise<boolean> {
+  const token = await getValidAccessToken(prisma, userId)
+  const a = await stravaGet<StravaActivity>(token, `/activities/${activityId}`)
+  const ctx = await loadIngestContext(prisma, userId, token)
+  const ingested = await ingestStravaActivity(prisma, userId, a, ctx)
   await prisma.stravaConnection.update({ where: { userId }, data: { lastSyncAt: new Date() } })
-  return count
+  return ingested
+}
+
+/**
+ * Activiteit die in Strava verwijderd is ook hier weg (webhook delete). Alleen
+ * de rij die wij zelf uit Strava aanmaakten (source STRAVA); een watch-log die
+ * met Strava-velden verrijkt werd heeft een ander externalId en blijft staan.
+ */
+export async function removeStravaActivity(prisma: Db, userId: string, activityId: number | string): Promise<boolean> {
+  const res = await prisma.cardioLog.deleteMany({
+    where: { patientId: userId, externalId: `strava:${activityId}`, source: 'STRAVA' },
+  })
+  return res.count > 0
 }
