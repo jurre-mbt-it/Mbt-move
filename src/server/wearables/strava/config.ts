@@ -15,6 +15,9 @@
  *   STRAVA_CLIENT_SECRET — geheim; nooit naar de client
  *   NEXT_PUBLIC_APP_URL  — basis voor de callback-URL (moet matchen met de
  *                          "Authorization Callback Domain" in de Strava-app)
+ *   STRAVA_WEBHOOK_VERIFY_TOKEN — zelfgekozen geheim waarmee Strava de
+ *                          webhook-callback valideert bij het aanmaken van de
+ *                          push-subscription (scripts/strava-webhook-setup.ts)
  */
 import {
   decryptAtRest,
