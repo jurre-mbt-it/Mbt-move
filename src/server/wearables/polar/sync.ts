@@ -29,9 +29,27 @@ import { decryptPolarToken } from './config'
 const createId = () => crypto.randomUUID()
 
 export type PolarSample = {
+  // Polar levert deze velden met ONDERSTREPINGEN en `sample_type` als getal,
+  // terwijl de eigen swagger koppeltekens en een string belooft. Beide vormen
+  // zijn in het wild gezien, dus we accepteren ze allebei.
+  sample_type?: number | string
+  'sample-type'?: number | string
+  recording_rate?: number | null
   'recording-rate'?: number | null
-  'sample-type'?: string
   data?: string
+}
+
+/** Sample-soort als getal: 0 = hartslag, 1 = snelheid (km/u). */
+function sampleSoort(s: PolarSample): number | null {
+  const t = s.sample_type ?? s['sample-type']
+  if (t == null || t === '') return null
+  const n = Number(t)
+  return Number.isNaN(n) ? null : n
+}
+
+/** Meetinterval in seconden; de M430 levert 1s, oudere toestellen 5s. */
+function meetInterval(s: PolarSample): number {
+  return Number(s.recording_rate ?? s['recording-rate']) || 5
 }
 
 export type PolarExercise = {
@@ -94,11 +112,17 @@ function mean(xs: number[]): number {
   return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0
 }
 
-function parseSampleData(data: string | undefined): (number | null)[] {
+/**
+ * `nulIsLeeg` voor hartslag: Polar vult de seconden vóór de eerste meting met
+ * nullen, en 0 bpm bestaat niet. Bij snelheid is 0 juist een echte waarde
+ * (stilstaan), dus daar tellen nullen wél mee.
+ */
+function parseSampleData(data: string | undefined, nulIsLeeg: boolean): (number | null)[] {
   if (!data) return []
   return data.split(',').map(v => {
     const n = Number(v)
-    return v === '' || v === 'null' || Number.isNaN(n) ? null : n
+    if (v === '' || v === 'null' || Number.isNaN(n)) return null
+    return nulIsLeeg && n === 0 ? null : n
   })
 }
 
@@ -112,13 +136,13 @@ export function buildSeriesFromPolarSamples(
   durationSec: number,
 ): SeriesPoint[] | undefined {
   if (!Array.isArray(samples) || durationSec <= 0) return undefined
-  const hrSample = samples.find(s => s['sample-type'] === '0')
-  const spdSample = samples.find(s => s['sample-type'] === '1')
+  const hrSample = samples.find(s => sampleSoort(s) === 0)
+  const spdSample = samples.find(s => sampleSoort(s) === 1)
   if (!hrSample?.data) return undefined
 
   const buckets = new Map<number, { hrs: number[]; spds: number[] }>()
   const add = (sample: PolarSample, values: (number | null)[], kind: 'hrs' | 'spds') => {
-    const rate = sample['recording-rate'] ?? 5
+    const rate = meetInterval(sample)
     if (rate <= 0) return
     for (let i = 0; i < values.length; i++) {
       const v = values[i]
@@ -132,8 +156,8 @@ export function buildSeriesFromPolarSamples(
       e[kind].push(v)
     }
   }
-  add(hrSample, parseSampleData(hrSample.data), 'hrs')
-  if (spdSample?.data) add(spdSample, parseSampleData(spdSample.data), 'spds')
+  add(hrSample, parseSampleData(hrSample.data, true), 'hrs')
+  if (spdSample?.data) add(spdSample, parseSampleData(spdSample.data, false), 'spds')
 
   const out = [...buckets.entries()]
     .sort((a, b) => a[0] - b[0])

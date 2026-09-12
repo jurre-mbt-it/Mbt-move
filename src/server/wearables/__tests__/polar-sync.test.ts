@@ -53,6 +53,35 @@ describe('polar/sync mappers', () => {
     expect(series![1].spd).toBe(3)
   })
 
+  it('leest de vorm die Polar ECHT stuurt: onderstrepingen en een getal als type', () => {
+    // De swagger belooft `sample-type: '0'` (koppelteken, string), maar een
+    // Polar M430 stuurt `sample_type: 0` (onderstreping, getal). Gezien op
+    // 12-09-2026 bij de eerste echte hardloop van Jurre.
+    const hr = Array.from({ length: 120 }, (_, i) => 100 + (i % 10)).join(',')
+    const series = buildSeriesFromPolarSamples(
+      [{ sample_type: 0, recording_rate: 1, data: hr }] as never,
+      120,
+    )
+    expect(series).toHaveLength(2)
+    expect(series![0].hr).toBeGreaterThan(100)
+  })
+
+  it('telt een hartslag van 0 niet mee, maar een snelheid van 0 wel', () => {
+    // Polar vult de seconden vóór de eerste meting met nullen. Zonder deze
+    // uitzondering zakt de eerste minuut van de curve naar beneden.
+    const hr = ['0', '0', '0', ...Array.from({ length: 117 }, () => '150')].join(',')
+    const spd = ['0', '0', '0', ...Array.from({ length: 117 }, () => '10.8')].join(',')
+    const series = buildSeriesFromPolarSamples(
+      [
+        { sample_type: 0, recording_rate: 1, data: hr },
+        { sample_type: 1, recording_rate: 1, data: spd },
+      ] as never,
+      120,
+    )
+    expect(series![0].hr).toBe(150) // de drie nullen tellen niet mee
+    expect(series![0].spd).toBeLessThan(3) // stilstaan drukt het gemiddelde wél
+  })
+
   it('buildSeriesFromPolarSamples: null-gaten en <2 HR-punten → undefined', () => {
     expect(buildSeriesFromPolarSamples([{ 'recording-rate': 60, 'sample-type': '0', data: '100' }], 60)).toBeUndefined()
     expect(buildSeriesFromPolarSamples(undefined, 600)).toBeUndefined()
