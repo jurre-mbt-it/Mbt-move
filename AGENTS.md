@@ -199,6 +199,41 @@ aan de mobiele app teruggeeft, en filtert daarom hard op
 verschijnen — in het verleden zelfs als "gemist", en als start-knop naar de
 sessie-runner. Ruim het filter pas op ná een mobiele release die `kind` leest.
 
+# Twee wearables op één dag: de eerste bron wint, en dat slot zit in de WHERE
+
+Een gebruiker kan tegelijk een Apple Watch, een Polar en Strava hebben. Die
+meten deels hetzelfde, dus iemand moet de dag "bezitten". De regel staat op
+één plek, [`src/server/wearables/source-lock.ts`](src/server/wearables/source-lock.ts),
+en luidt: **strikt de eerste bron die een dag of nacht levert houdt hem, een
+tweede bron vult alleen aan wat leeg bleef.**
+
+Hoe het misging: de regel bestond alleen als voorfilter in de Polar-sync,
+terwijl `ingestWearableData` een kale `upsert` op `userId_date` deed. Polar
+week dus voor de Apple Watch, maar Apple overschreef een Polar-nacht compleet
+inclusief het bronlabel. In de praktijk was het geen "eerste wint" maar "Apple
+wint altijd", en een dubbeldrager zag van zijn tweede wearable nooit iets.
+
+Drie dingen om te onthouden als je hier komt:
+
+- **Het slot hoort in de WHERE van de schrijfactie**, niet in een
+  lees-dan-schrijf. Twee syncs kunnen tegelijk binnenkomen; de database
+  beslist wie er eerst was.
+- **Stil weggooien mag alleen als een ánder de dag al vastlegde.** De
+  iOS-bridge schuift zijn HealthKit-anker door zodra de server 200 teruggeeft,
+  ongeacht of de rij is weggeschreven. Een genegeerde nacht komt daar nooit
+  meer langs. Een dag die nog niemand heeft bestaat niet als rij en wordt dus
+  altijd aangemaakt, dus gaten vult iedereen.
+- **`VitalsEntry` heeft twee eigenaars**, `source` voor de nachtgroep (rust-HR,
+  HRV, ademhaling, polstemperatuur) en `daySource` voor de daggroep (stappen,
+  energie, VO2max). Zonder die splitsing kaapt een middagsync met alleen
+  stappen het label van een rij waarvan de HRV van een ander apparaat kwam, en
+  kan de bron van die stappen ze daarna niet meer bijwerken terwijl ze de hele
+  dag oplopen.
+
+Workouts vallen hier buiten: die ontdubbelen op tijd-overlap in
+[`dedupe.ts`](src/server/wearables/dedupe.ts) en vullen elkaars lege velden
+daar al aan.
+
 # RLS verplicht op ELKE nieuwe public-tabel
 
 De anon-key (`NEXT_PUBLIC_SUPABASE_ANON_KEY`) zit in de browserbundle. Een
