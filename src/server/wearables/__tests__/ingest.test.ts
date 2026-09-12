@@ -88,3 +88,70 @@ describe('ingestWearableData · source/provider-opties', () => {
     expect(call.create.deviceModel).toBe('Polar')
   })
 })
+
+describe('ingestWearableData · bronvoorrang', () => {
+  /** Stub met echte slaap- en vitals-modellen, zodat het slot meetbaar is. */
+  function bronDb(opts: { nachtVanAnder?: boolean } = {}) {
+    const p2002 = Object.assign(new Error('unique'), { code: 'P2002' })
+    const sleepEntry = {
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      create: opts.nachtVanAnder
+        ? vi.fn().mockRejectedValue(p2002)
+        : vi.fn().mockResolvedValue({}),
+    }
+    const vitalsEntry = {
+      create: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    }
+    const db = {
+      user: {
+        findUnique: vi
+          .fn()
+          .mockResolvedValue({ maxHeartRate: null, restingHeartRate: null, dateOfBirth: null }),
+      },
+      wearableConnection: { upsert: vi.fn().mockResolvedValue({}) },
+      cardioLog: { findFirst: vi.fn().mockResolvedValue(null) },
+      sleepEntry,
+      vitalsEntry,
+      stressEntry: {},
+      exertionEntry: {},
+    } as unknown as Db
+    return { db, sleepEntry, vitalsEntry }
+  }
+
+  const nacht = {
+    date: '2026-09-11',
+    segments: [
+      { stage: 'light' as const, startAt: '2026-09-10T23:00:00Z', endAt: '2026-09-11T03:00:00Z' },
+      { stage: 'deep' as const, startAt: '2026-09-11T03:00:00Z', endAt: '2026-09-11T06:00:00Z' },
+    ],
+  }
+
+  it('laat een nacht van de Apple Watch staan als Polar hem later aanlevert', async () => {
+    // De afspraak met Jurre: strikt de eerste bron wint. Polar mag de nacht
+    // niet overschrijven, en de sync mag daar ook niet op stuklopen.
+    const { db, sleepEntry } = bronDb({ nachtVanAnder: true })
+
+    await ingestWearableData(db, 'user-1', { ...legePayload, sleep: [nacht] }, { source: 'POLAR' })
+
+    expect(sleepEntry.updateMany.mock.calls[0][0].where).toMatchObject({ source: 'POLAR' })
+    expect(sleepEntry.create).toHaveBeenCalled() // geprobeerd, en netjes afgeketst
+  })
+
+  it('splitst vitals in een nacht- en een daggroep met een eigen eigenaar', async () => {
+    // Zonder die splitsing kaapt een middagsync met alleen stappen het label
+    // van een rij waarvan de HRV van een ander apparaat kwam.
+    const { db, vitalsEntry } = bronDb()
+
+    await ingestWearableData(
+      db,
+      'user-1',
+      { ...legePayload, vitals: [{ date: '2026-09-11', hrv: 41, hrvType: 'RMSSD', steps: 8000 }] },
+      { source: 'POLAR' },
+    )
+
+    expect(vitalsEntry.create.mock.calls[0][0].data).toMatchObject({
+      hrv: 41, hrvType: 'RMSSD', steps: 8000, source: 'POLAR', daySource: 'POLAR',
+    })
+  })
+})

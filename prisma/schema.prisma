@@ -2601,7 +2601,14 @@ model VitalsEntry {
   activeEnergyKcal   Int? // dagelijkse actieve verbranding in kcal (HealthKit activeEnergyBurned, dagsom)
   basalEnergyKcal    Int? // dagelijkse basaalverbranding in kcal (HealthKit basalEnergyBurned, dagsom); totaal = actief + basaal
   vo2Max             Float? // ml/kg/min — Apple cardio-fitness VO2max (één waarde, uit outdoor loop/wandel/hike)
-  source             WorkoutSource @default(APPLE_WATCH)
+  /// Eigenaar van de NACHTgroep (rust-HR, HRV, ademhaling, polstemperatuur).
+  /// Strikt de eerste bron die die groep vulde; NULL = nog niemand. Zie
+  /// src/server/wearables/source-lock.ts voor de regel.
+  source             WorkoutSource?
+  /// Eigenaar van de DAGgroep (stappen, energie, VO2max). Apart van `source`
+  /// omdat een middagsync met alleen stappen anders het label kaapt van een
+  /// rij waarvan de HRV van een ander apparaat kwam.
+  daySource          WorkoutSource?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 

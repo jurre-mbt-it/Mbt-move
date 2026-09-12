@@ -15,6 +15,12 @@ import { resolveMaxHr } from '@/lib/cardio-zones'
 import { bpmHistogramFromSeries, computeExertionDay, type SeriesPoint } from '@/lib/exertion'
 import { computeStressDay } from '@/lib/stress'
 import { findDuplicate, enrichExistingLog } from '@/server/wearables/dedupe'
+import {
+  schrijfDagbelasting,
+  schrijfSlaapnacht,
+  schrijfStress,
+  schrijfVitals,
+} from '@/server/wearables/source-lock'
 import { linkMeasurementToSession } from '@/server/wearables/session-match'
 
 const createId = () => crypto.randomUUID()
@@ -437,15 +443,13 @@ export async function ingestWearableData(
       latencyMin: night.latencyMin,
       qualityScore: quality,
       stages: s.segments as unknown as object,
-      source,
       ...(s.externalId ? { externalId: s.externalId } : {}),
     }
 
-    await prisma.sleepEntry.upsert({
-      where: { userId_date: { userId, date } },
-      update: data,
-      create: { id: createId(), userId, date, ...data },
-    })
+    // Strikt eerste wint: een nacht die een andere bron al leverde blijft van
+    // die bron. Een nacht die nog niemand heeft wordt gewoon aangemaakt, dus
+    // gaten vult iedereen. Zie source-lock.ts voor het waarom.
+    await schrijfSlaapnacht(prisma, userId, date, source, data)
     affected.add(date.getTime())
   }
 
@@ -455,37 +459,27 @@ export async function ingestWearableData(
   // stappen/energie. De update mag daarom ALLEEN meegeleverde velden raken;
   // afwezig veld = ongemoeid laten. Voorheen wiste `?? null` hier de
   // HRV/rust-HR/ademhaling van eerdere batches op dezelfde dag.
+  //
+  // De rij draagt twee groepen met een eigen eigenaar: de NACHTgroep (rust-HR,
+  // HRV, ademhaling, polstemperatuur) en de DAGgroep (stappen, energie,
+  // VO2max). Een tweede wearable mag binnen andermans groep alleen vullen wat
+  // nog leeg is; zie source-lock.ts.
   for (const v of payload.vitals) {
     const date = startOfDayUTCLocal(v.date)
-    const patch: Record<string, unknown> = { source }
-    if (v.restingHeartRate !== undefined) patch.restingHeartRate = v.restingHeartRate
-    if (v.hrv !== undefined) patch.hrv = v.hrv
-    if (v.hrvType !== undefined) patch.hrvType = v.hrvType
-    if (v.respiratoryRate !== undefined) patch.respiratoryRate = v.respiratoryRate
-    if (v.wristTempDeviation !== undefined) patch.wristTempDeviation = v.wristTempDeviation
-    if (v.steps !== undefined) patch.steps = Math.round(v.steps)
-    if (v.activeEnergyKcal !== undefined) patch.activeEnergyKcal = Math.round(v.activeEnergyKcal)
-    if (v.basalEnergyKcal !== undefined) patch.basalEnergyKcal = Math.round(v.basalEnergyKcal)
-    if (v.vo2Max !== undefined) patch.vo2Max = v.vo2Max
-    await prisma.vitalsEntry.upsert({
-      where: { userId_date: { userId, date } },
-      update: patch,
-      create: {
-        id: createId(),
-        userId,
-        date,
-        restingHeartRate: v.restingHeartRate ?? null,
-        hrv: v.hrv ?? null,
-        hrvType: v.hrvType ?? null,
-        respiratoryRate: v.respiratoryRate ?? null,
-        wristTempDeviation: v.wristTempDeviation ?? null,
-        steps: v.steps != null ? Math.round(v.steps) : null,
-        activeEnergyKcal: v.activeEnergyKcal != null ? Math.round(v.activeEnergyKcal) : null,
-        basalEnergyKcal: v.basalEnergyKcal != null ? Math.round(v.basalEnergyKcal) : null,
-        vo2Max: v.vo2Max ?? null,
-        source,
-      },
-    })
+    const nacht: Record<string, unknown> = {}
+    if (v.restingHeartRate !== undefined) nacht.restingHeartRate = v.restingHeartRate
+    if (v.hrv !== undefined) nacht.hrv = v.hrv
+    if (v.hrvType !== undefined) nacht.hrvType = v.hrvType
+    if (v.respiratoryRate !== undefined) nacht.respiratoryRate = v.respiratoryRate
+    if (v.wristTempDeviation !== undefined) nacht.wristTempDeviation = v.wristTempDeviation
+
+    const dag: Record<string, unknown> = {}
+    if (v.steps !== undefined) dag.steps = Math.round(v.steps)
+    if (v.activeEnergyKcal !== undefined) dag.activeEnergyKcal = Math.round(v.activeEnergyKcal)
+    if (v.basalEnergyKcal !== undefined) dag.basalEnergyKcal = Math.round(v.basalEnergyKcal)
+    if (v.vo2Max !== undefined) dag.vo2Max = v.vo2Max
+
+    await schrijfVitals(prisma, userId, date, source, nacht, dag)
     affected.add(date.getTime())
   }
 
@@ -517,13 +511,8 @@ export async function ingestWearableData(
         restingHeartRate: result.restingHeartRate,
         samples: result.samples,
         timeInBands: result.timeInBands,
-        source,
       }
-      await prisma.stressEntry.upsert({
-        where: { userId_date: { userId, date } },
-        update: data,
-        create: { id: createId(), userId, date, ...data },
-      })
+      await schrijfStress(prisma, userId, date, source, data)
       affected.add(date.getTime())
     }
 
@@ -547,13 +536,8 @@ export async function ingestWearableData(
         timeInZones: ex.timeInZones,
         hrHistogram: day.histogram,
         maxHrUsed: maxHrRes.maxHr,
-        source,
       }
-      await prisma.exertionEntry.upsert({
-        where: { userId_date: { userId, date } },
-        update: data,
-        create: { id: createId(), userId, date, ...data },
-      })
+      await schrijfDagbelasting(prisma, userId, date, source, data)
       affected.add(date.getTime())
     }
   }

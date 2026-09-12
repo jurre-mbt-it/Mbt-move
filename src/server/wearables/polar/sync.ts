@@ -484,32 +484,16 @@ export async function syncPolarWellness(prisma: WellnessDb, userId: string): Pro
 
   const hrIntraday = hrDays.map(polarContinuousHrToDay).filter((d): d is HrIntradayDay => d !== null)
 
-  // Eerste bron wint: nachten/dagen die al door een ándere bron gevuld zijn
-  // (Apple Watch bij dubbeldragers) niet overschrijven — anders flip-flopt
-  // dezelfde nacht tussen bronnen bij elke sync.
-  const gte = new Date(from.getTime() - 86_400_000)
-  const [takenSleep, takenVitals, takenExertion] = await Promise.all([
-    prisma.sleepEntry.findMany({
-      where: { userId, date: { gte }, source: { not: 'POLAR' } }, select: { date: true },
-    }),
-    prisma.vitalsEntry.findMany({
-      where: { userId, date: { gte }, source: { not: 'POLAR' } }, select: { date: true },
-    }),
-    prisma.exertionEntry.findMany({
-      where: { userId, date: { gte }, source: { not: 'POLAR' } }, select: { date: true },
-    }),
-  ])
-  const asKeySet = (rows: { date: Date }[]) => new Set(rows.map(r => localDayKey(r.date)))
-  const sleepTaken = asKeySet(takenSleep)
-  const vitalsTaken = asKeySet(takenVitals)
-  const exertionTaken = asKeySet(takenExertion)
-
+  // Geen voorfilter meer op wat er al ligt: de bronvoorrang zit sinds
+  // 12-09-2026 in de ingest zelf (source-lock.ts), zodat hij voor élke bron
+  // geldt en niet alleen voor Polar. Voorheen week Polar voor de Apple Watch
+  // terwijl Apple andersom gewoon overschreef.
   const payload: SyncPayload = {
     device: { model: 'Polar' },
     workouts: [],
-    sleep: sleep.filter(n => !sleepTaken.has(n.date)),
-    vitals: [...vitalsByDate.values()].filter(v => !vitalsTaken.has(v.date)),
-    hrIntraday: hrIntraday.filter(d => !exertionTaken.has(d.date)),
+    sleep,
+    vitals: [...vitalsByDate.values()],
+    hrIntraday,
   }
 
   const result = await ingestWearableData(prisma, userId, payload, {
@@ -546,14 +530,3 @@ export async function deregisterPolarForUser(
   }
 }
 
-/**
- * Dag-sleutel in LOKALE tijd, spiegelbeeld van `startOfDayUTCLocal` in de
- * ingest: die parseert 'yyyy-mm-dd' als lokale start-of-day, dus hier moet
- * dezelfde lokale kalenderdag uit de opgeslagen Date terugrollen.
- */
-function localDayKey(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
