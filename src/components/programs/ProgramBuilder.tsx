@@ -30,11 +30,12 @@ import { searchMatch } from '@/lib/exercise-search'
 import { MarkMatch } from '@/components/exercises/MarkMatch'
 import { ExerciseLibraryPanel } from './ExerciseLibraryPanel'
 import { BlockRows } from '@/components/week-planner/BlockRows'
+import { LassoSelect } from '@/components/week-planner/LassoSelect'
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from '@/components/week-planner/ContextMenu'
 import { ExerciseBlockDialog } from '@/components/week-planner/ExerciseBlockDialog'
 import { DarkButton } from '@/components/dark-ui'
-import { programDayKey, type BlockDraft, type ItemGroup, type PlannerBlock } from '@/lib/planner-blocks'
-import { Coffee, CopyPlus, Dumbbell, Pencil, StickyNote } from 'lucide-react'
+import { nextFreeGroupLetter, programDayKey, type BlockDraft, type ItemGroup, type PlannerBlock } from '@/lib/planner-blocks'
+import { Coffee, CopyPlus, Dumbbell, MousePointer2, Pencil, RefreshCw, StickyNote } from 'lucide-react'
 import { builderToBlock, draftToBuilderPatch } from './builder-blocks'
 import { MuscleBalancePanel } from './MuscleBalancePanel'
 import { IncompletePracticeBanner } from '@/components/practice/IncompletePracticeBanner'
@@ -314,6 +315,32 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
   const dagGroepen = program.groups[dagSleutel] ?? {}
   const [blokDialoog, setBlokDialoog] = useState<{ edit: PlannerBlock | null; letter: string | null; insertAt?: number | null; type?: 'exercise' | 'note' | 'break' } | null>(null)
   const [rijMenu, setRijMenu] = useState<ContextMenuState>(null)
+  // Meervoudige selectie (lasso of shift-klik) → superset of circuit.
+  const [selectie, setSelectie] = useState<Set<string>>(() => new Set())
+  const [selectiestand, setSelectiestand] = useState(false)
+  useEffect(() => { setSelectie(new Set()); setSelectiestand(false) }, [program.currentWeek, program.currentDay])
+
+  /** Geselecteerde oefeningen aaneengesloten op de plek van de eerste, met de eerstvolgende vrije letter. */
+  const groepeerSelectie = useCallback((kind: 'SUPERSET' | 'CIRCUIT') => {
+    const ids = [...selectie]
+    const letter = nextFreeGroupLetter(dagBlokken, dagGroepen)
+    if (!letter) { toast.error('Alle zes de groepsletters zijn in gebruik'); return }
+    setExercises(prev => {
+      const gekozen = prev.filter(e => ids.includes(e.uid) && (e.blockKind ?? 'EXERCISE') === 'EXERCISE')
+      if (gekozen.length === 0) return prev
+      const eerste = prev.findIndex(e => e.uid === gekozen[0].uid)
+      const rest = prev.filter(e => !gekozen.some(g => g.uid === e.uid))
+      const groep = gekozen.map((e, i) => ({ ...e, supersetGroup: letter, supersetOrder: i, selected: false }))
+      return [...rest.slice(0, eerste), ...groep, ...rest.slice(eerste)]
+    })
+    if (kind === 'CIRCUIT') {
+      setProgram(prev => ({ ...prev, groups: { ...prev.groups, [dagSleutel]: { ...(prev.groups[dagSleutel] ?? {}), [letter]: { kind: 'CIRCUIT', rounds: 3 } } } }))
+      setBlokDialoog({ edit: null, letter })
+    } else {
+      toast.success(`Superset ${letter} gemaakt`)
+    }
+    setSelectie(new Set()); setSelectiestand(false)
+  }, [selectie, dagBlokken, dagGroepen, dagSleutel])
 
   /** Verplaats een rij binnen de dag; de volgorde in `exercises` is de programmavolgorde. */
   const moveBlok = useCallback((uid: string, dir: -1 | 1) => {
@@ -1933,16 +1960,45 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
               <DayDropZone day={program.currentDay} week={program.currentWeek} isEmpty={dayExercises.length === 0}>
                 {/* Dezelfde rijen en pop-up als de weekplanner: één lijn. */}
                 <div className="space-y-2">
-                  <BlockRows
-                    sortable={`dag:${dagSleutel}`}
-                    blocks={dagBlokken}
-                    groups={dagGroepen}
-                    onContextMenu={openRijMenu}
-                    onEdit={b => setBlokDialoog({ edit: b, letter: null })}
-                    onRemove={b => removeEx(b.id)}
-                    onMove={(b, dir) => moveBlok(b.id, dir)}
-                    onEditGroup={l => setBlokDialoog({ edit: null, letter: l })}
-                  />
+                  {dagBlokken.length > 1 && (
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => { setSelectiestand(v => !v); if (selectiestand) setSelectie(new Set()) }}
+                        aria-pressed={selectiestand}
+                        title={selectiestand ? 'Selectiestand uit' : 'Rijen selecteren: klik, of trek een kader'}
+                        className="inline-flex items-center gap-1 px-2 h-6 rounded text-[10px] font-semibold"
+                        style={selectiestand
+                          ? { background: 'rgba(232,122,85,0.15)', color: P.brand, border: '1px solid rgba(232,122,85,0.5)' }
+                          : { color: P.inkMuted, border: `1px solid ${P.line}` }}
+                      >
+                        <MousePointer2 className="w-3 h-3" /> {selectiestand ? 'Klaar' : 'Selecteren'}
+                      </button>
+                    </div>
+                  )}
+                  <LassoSelect actief={selectiestand} selected={selectie} onChange={setSelectie}>
+                    <BlockRows
+                      sortable={`dag:${dagSleutel}`}
+                      blocks={dagBlokken}
+                      groups={dagGroepen}
+                      onContextMenu={openRijMenu}
+                      onEdit={b => setBlokDialoog({ edit: b, letter: null })}
+                      onRemove={b => removeEx(b.id)}
+                      onMove={(b, dir) => moveBlok(b.id, dir)}
+                      onEditGroup={l => setBlokDialoog({ edit: null, letter: l })}
+                      selectedIds={selectie}
+                      selectiestand={selectiestand}
+                      onToggleSelect={(b) => { setSelectie(prev => { const n = new Set(prev); if (n.has(b.id)) n.delete(b.id); else n.add(b.id); return n }); setSelectiestand(true) }}
+                    />
+                  </LassoSelect>
+                  {selectie.size > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 rounded-lg px-2 py-1.5" style={{ background: 'rgba(232,122,85,0.08)', border: '1px solid rgba(232,122,85,0.35)' }}>
+                      <span className="athletic-mono text-[10px] mr-1" style={{ color: P.brand }}>{selectie.size} GESELECTEERD</span>
+                      <DarkButton variant="secondary" size="sm" className="text-xs" onClick={() => groepeerSelectie('SUPERSET')}><Layers className="w-3.5 h-3.5 mr-1" /> Superset</DarkButton>
+                      <DarkButton variant="secondary" size="sm" className="text-xs" onClick={() => groepeerSelectie('CIRCUIT')}><RefreshCw className="w-3.5 h-3.5 mr-1" /> Circuit</DarkButton>
+                      <DarkButton variant="ghost" size="sm" className="text-xs" style={{ color: P.danger }} onClick={() => { const ids = [...selectie]; setExercises(prev => prev.filter(e => !ids.includes(e.uid))); setSelectie(new Set()); setSelectiestand(false) }}><Trash2 className="w-3.5 h-3.5 mr-1" /> Verwijderen</DarkButton>
+                    </div>
+                  )}
                   <DarkButton variant="secondary" size="sm" className="w-full text-xs" onClick={() => setBlokDialoog({ edit: null, letter: null })}>
                     <Plus className="w-3.5 h-3.5 mr-1.5" /> Oefening toevoegen
                   </DarkButton>

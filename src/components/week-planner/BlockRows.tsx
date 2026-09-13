@@ -47,6 +47,10 @@ type RowProps = {
   onMove?: (b: PlannerBlock, dir: -1 | 1) => void
   onEditGroup?: (letter: string) => void
   onContextMenu?: (b: PlannerBlock, e: React.MouseEvent) => void
+  /** Selectiestand: geselecteerd = rand in de merkkleur; klik wisselt in plaats van bewerkt. */
+  geselecteerd?: boolean
+  selectiestand?: boolean
+  onToggleSelect?: (b: PlannerBlock, e: React.MouseEvent) => void
   /** Van useSortable, of leeg als de rij niet sleepbaar is. */
   sortRef?: (el: HTMLElement | null) => void
   sortStyle?: React.CSSProperties
@@ -54,7 +58,7 @@ type RowProps = {
   isDragging?: boolean
 }
 
-function Row({ b, index, total, groups, readOnly, compact, onEdit, onRemove, onMove, onEditGroup, onContextMenu, sortRef, sortStyle, sortProps, isDragging }: RowProps) {
+function Row({ b, index, total, groups, readOnly, compact, onEdit, onRemove, onMove, onEditGroup, onContextMenu, geselecteerd, selectiestand, onToggleSelect, sortRef, sortStyle, sortProps, isDragging }: RowProps) {
   const catColors = useCategoryColors()
   const fs = compact ? 10 : 12
   const cat = (b.exerciseCategory as Category) ?? 'STRENGTH'
@@ -62,22 +66,26 @@ function Row({ b, index, total, groups, readOnly, compact, onEdit, onRemove, onM
   const groep = b.supersetGroup ? SUPERSET_COLORS[b.supersetGroup] : null
   const naam = blockLabel(b)
   const voorschrift = b.blockKind === 'EXERCISE' ? formatBlockPrescription(b) : ''
-  const klikbaar = !readOnly && !!onEdit
+  const klikbaar = !readOnly && !!onEdit && !selectiestand
 
   return (
     <div
       ref={sortRef}
-      {...(sortProps ?? {})}
+      data-block-id={b.id}
+      {...(selectiestand ? {} : (sortProps ?? {}))}
       className={`group/row relative flex ${compact ? 'items-start' : 'items-center'} gap-1.5 rounded-md min-w-0 ${klikbaar ? 'cursor-pointer hover:bg-[rgba(255,255,255,0.05)]' : ''}`}
       style={{
         padding: compact ? '2px 4px' : '6px 8px',
         fontStyle: b.blockKind === 'NOTE' ? 'italic' : undefined,
         opacity: isDragging ? 0.35 : undefined,
-        ...(sortStyle ?? {}),
+        outline: geselecteerd ? `2px solid ${P.brand}` : undefined,
+        outlineOffset: -2,
+        background: geselecteerd ? 'rgba(232,122,85,0.12)' : undefined,
+        ...(selectiestand ? {} : (sortStyle ?? {})),
       }}
       role={klikbaar ? 'button' : undefined}
       tabIndex={klikbaar ? 0 : undefined}
-      onClick={klikbaar ? () => onEdit!(b) : undefined}
+      onClick={klikbaar ? (e) => { if (onToggleSelect && (e.shiftKey || e.metaKey || e.ctrlKey)) { e.preventDefault(); onToggleSelect(b, e); return } onEdit!(b) } : undefined}
       onKeyDown={klikbaar ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEdit!(b) } } : undefined}
       onContextMenu={onContextMenu && !readOnly ? e => { e.preventDefault(); e.stopPropagation(); onContextMenu(b, e) } : undefined}
       title={b.notes ?? undefined}
@@ -176,7 +184,7 @@ function SortableRow({ containerId, ...props }: RowProps & { containerId: string
   )
 }
 
-export function BlockRows({ blocks, groups, readOnly = false, compact = false, sortable, onEdit, onRemove, onMove, onEditGroup, onContextMenu }: {
+export function BlockRows({ blocks, groups, readOnly = false, compact = false, sortable, onEdit, onRemove, onMove, onEditGroup, onContextMenu, selectedIds, selectiestand = false, onToggleSelect }: {
   blocks: PlannerBlock[]
   groups: ItemGroups
   readOnly?: boolean
@@ -188,6 +196,10 @@ export function BlockRows({ blocks, groups, readOnly = false, compact = false, s
   onMove?: (b: PlannerBlock, dir: -1 | 1) => void
   onEditGroup?: (letter: string) => void
   onContextMenu?: (b: PlannerBlock, e: React.MouseEvent) => void
+  /** Geselecteerde rij-id's (meervoudige selectie) en of de selectiestand aan staat. */
+  selectedIds?: Set<string>
+  selectiestand?: boolean
+  onToggleSelect?: (b: PlannerBlock, e: React.MouseEvent) => void
 }) {
   if (blocks.length === 0) return null
 
@@ -196,7 +208,7 @@ export function BlockRows({ blocks, groups, readOnly = false, compact = false, s
     const faseKop = b.phase && (i === 0 || vorige?.phase !== b.phase) ? FASE_KOP[b.phase] : null
     const hoofdKop = !b.phase && vorige?.phase && b.blockKind !== 'NOTE' ? 'Hoofddeel' : null
     const kop = faseKop ?? hoofdKop
-    const rowProps: RowProps = { b, index: i, total: blocks.length, groups, readOnly, compact, onEdit, onRemove, onMove, onEditGroup, onContextMenu }
+    const rowProps: RowProps = { b, index: i, total: blocks.length, groups, readOnly, compact, onEdit, onRemove, onMove, onEditGroup, onContextMenu, geselecteerd: selectedIds?.has(b.id) ?? false, selectiestand, onToggleSelect }
     return (
       <div key={b.id}>
         {kop && (
@@ -204,7 +216,7 @@ export function BlockRows({ blocks, groups, readOnly = false, compact = false, s
             {kop}
           </p>
         )}
-        {sortable && !readOnly ? <SortableRow {...rowProps} containerId={sortable} /> : <Row {...rowProps} />}
+        {sortable && !readOnly && !selectiestand ? <SortableRow {...rowProps} containerId={sortable} /> : <Row {...rowProps} />}
       </div>
     )
   })

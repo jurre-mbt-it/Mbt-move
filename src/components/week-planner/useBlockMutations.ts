@@ -9,7 +9,7 @@
 import { useCallback } from 'react'
 import { toast } from 'sonner'
 import { trpc } from '@/lib/trpc/client'
-import { toBlockPayload, type BlockDraft, type ItemGroup, type ItemGroups, type PlannerBlock } from '@/lib/planner-blocks'
+import { nextFreeGroupLetter, toBlockPayload, type BlockDraft, type ItemGroup, type ItemGroups, type PlannerBlock } from '@/lib/planner-blocks'
 
 export function useBlockMutations() {
   const utils = trpc.useUtils()
@@ -83,6 +83,10 @@ export function useBlockMutations() {
     await saveList(from.itemId, from.blocks.filter(b => b.id !== blockId))
   }, [saveList])
 
+  const removeBlocks = useCallback(async (itemId: string, blocks: PlannerBlock[], ids: string[]) => {
+    await saveList(itemId, blocks.filter(b => !ids.includes(b.id)))
+  }, [saveList])
+
   const removeBlock = useCallback(async (itemId: string, blocks: PlannerBlock[], id: string) => {
     await saveList(itemId, blocks.filter(b => b.id !== id))
   }, [saveList])
@@ -96,6 +100,28 @@ export function useBlockMutations() {
     await saveList(itemId, next)
   }, [saveList])
 
+  /**
+   * Superset of circuit van een selectie: de gekozen rijen komen aaneengesloten
+   * op de plek van de eerste, krijgen de eerstvolgende vrije letter en bij een
+   * circuit ook een groep met 3 rondes. Geeft de letter terug (null = geen
+   * letter meer vrij).
+   */
+  const groupBlocks = useCallback(async (itemId: string, blocks: PlannerBlock[], groups: ItemGroups, ids: string[], kind: 'SUPERSET' | 'CIRCUIT') => {
+    const gekozen = blocks.filter(b => ids.includes(b.id) && b.blockKind === 'EXERCISE')
+    if (gekozen.length < 1) return null
+    const letter = nextFreeGroupLetter(blocks, groups)
+    if (!letter) return null
+    const eerste = blocks.findIndex(b => b.id === gekozen[0].id)
+    const rest = blocks.filter(b => !gekozen.some(g => g.id === b.id))
+    const groep: BlockDraft[] = gekozen.map((b, i) => ({ ...b, supersetGroup: letter, supersetOrder: i }))
+    const next: BlockDraft[] = [...rest.slice(0, eerste), ...groep, ...rest.slice(eerste)]
+    if (kind === 'CIRCUIT') {
+      await setItemGroups.mutateAsync({ itemId, groups: { ...groups, [letter]: { kind: 'CIRCUIT', rounds: 3 } } })
+    }
+    await saveList(itemId, next)
+    return letter
+  }, [saveList, setItemGroups])
+
   const setGroup = useCallback(async (itemId: string, groups: ItemGroups, letter: string, group: ItemGroup | null) => {
     const next: ItemGroups = { ...groups }
     if (group) next[letter] = group
@@ -105,6 +131,6 @@ export function useBlockMutations() {
 
   return {
     saving: setItemExercises.isPending || setItemGroups.isPending,
-    submitBlock, insertBlocks, duplicateBlock, reorderBlocks, moveBlockToItem, removeBlock, moveBlock, setGroup,
+    submitBlock, insertBlocks, duplicateBlock, reorderBlocks, moveBlockToItem, removeBlock, removeBlocks, moveBlock, setGroup, groupBlocks,
   }
 }

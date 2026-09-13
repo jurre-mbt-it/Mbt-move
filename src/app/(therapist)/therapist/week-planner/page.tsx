@@ -25,7 +25,7 @@ import {
   Search, Building2, Copy, CopyPlus, Pencil, BookmarkPlus, GripVertical,
   CalendarRange, Layers, Moon, CalendarPlus, StickyNote, ClipboardCheck, Flag,
   Scissors, ClipboardPaste, Archive, Check, Clock3, CornerUpRight,
-Trash2, Coffee, Dumbbell, } from 'lucide-react'
+Trash2, Coffee, Dumbbell, RefreshCw, MousePointer2, } from 'lucide-react'
 import {
   PHASE_TYPES, PHASE_META, phaseMeta, DELOAD_LOAD_FRACTION,
   type PhaseType,
@@ -61,6 +61,7 @@ import { formatWeightsPerSet } from '@/lib/session-sets'
 import { useCategoryColors } from '@/lib/useCategoryColors'
 import { CategoryIcon, CATEGORY_LABELS } from '@/components/week-planner/CategoryIcon'
 import { BlockRows, blockLabel } from '@/components/week-planner/BlockRows'
+import { LassoSelect } from '@/components/week-planner/LassoSelect'
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from '@/components/week-planner/ContextMenu'
 import { ExerciseBlockDialog, type BlockDialogType } from '@/components/week-planner/ExerciseBlockDialog'
 import { useBlockMutations } from '@/components/week-planner/useBlockMutations'
@@ -981,7 +982,7 @@ function DayCell({
   selected, onSelectStart, onSelectEnter,
   onAddWorkout, onAddTemplate, onCopyDay,
   onItemClick, onRemoveItem, statusFor, sessionIdFor, loggedFor, movedToFor, openItemId,
-  onAddBlock, onEditBlock, onRemoveBlock, onMoveBlock, onEditGroup, toonRijen, onDayMenu, onRowMenu, krap = false,
+  onAddBlock, onEditBlock, onRemoveBlock, onMoveBlock, onEditGroup, toonRijen, onDayMenu, onRowMenu, onSelectBlock, krap = false,
   readOnly = false,
 }: {
   date: Date
@@ -1008,6 +1009,7 @@ function DayCell({
   /** Weinig breedte per dag: knoppen zonder tekst. */
   krap?: boolean
   onRowMenu: (item: ScheduleItem, block: PlannerBlock, date: Date, dayId: string | null, e: React.MouseEvent) => void
+  onSelectBlock: (item: ScheduleItem, block: PlannerBlock, date: Date, dayId: string | null, sessionId: string | null) => void
   statusFor: (date: Date, item: ScheduleItem) => ItemStatus
   sessionIdFor: (date: Date, item: ScheduleItem) => string | null
   loggedFor: (date: Date, item: ScheduleItem) => LoggedInfo | null
@@ -1130,6 +1132,7 @@ function DayCell({
                     groups={item.groups ?? {}}
                     readOnly={readOnly}
                     onContextMenu={(b, e) => onRowMenu(item, b, date, dayId, e)}
+                    onToggleSelect={(b) => onSelectBlock(item, b, date, dayId, sId)}
                     onEdit={b => onEditBlock(item, b, date, dayId)}
                     onRemove={b => onRemoveBlock(item, b)}
                     onMove={(b, dir) => onMoveBlock(item, b, dir)}
@@ -1227,6 +1230,7 @@ function ItemDetailContent({
   detail, onClose, showClose = false,
   onSaveTemplate, onCopy, onSaveQuick, onBuildCardio,
   onAddBlock, onEditBlock, onRemoveBlock, onMoveBlock, onEditGroup, onRowMenu,
+  selectie, selectiestand, onSelectiestand, onSelectieChange, onGroepeer, onKopieerSelectie, onVerwijderSelectie,
   savingTemplate, copying, readOnly = false,
 }: {
   detail: DetailItem
@@ -1247,6 +1251,14 @@ function ItemDetailContent({
   onMoveBlock: (b: PlannerBlock, dir: -1 | 1) => void
   onEditGroup: (letter: string) => void
   onRowMenu: (b: PlannerBlock, e: React.MouseEvent) => void
+  /** Meervoudige selectie (lasso of shift-klik) met acties op de selectie. */
+  selectie: Set<string>
+  selectiestand: boolean
+  onSelectiestand: (aan: boolean) => void
+  onSelectieChange: (next: Set<string>) => void
+  onGroepeer: (kind: 'SUPERSET' | 'CIRCUIT') => void
+  onKopieerSelectie: () => void
+  onVerwijderSelectie: () => void
   /** Opent de blokken-bouwer als volledig scherm — het zijpaneel is te smal. */
   onBuildCardio: (item: ScheduleItem) => void
   savingTemplate: boolean
@@ -1505,23 +1517,53 @@ function ItemDetailContent({
               />
             ) : (
               <div className="space-y-2">
-                <MetaLabel>Geplande oefeningen</MetaLabel>
+                <div className="flex items-center justify-between gap-2">
+                  <MetaLabel>Geplande oefeningen</MetaLabel>
+                  {!readOnly && (item.blocks?.length ?? 0) > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => onSelectiestand(!selectiestand)}
+                      aria-pressed={selectiestand}
+                      title={selectiestand ? 'Selectiestand uit' : 'Rijen selecteren: klik, of trek een kader'}
+                      className="inline-flex items-center gap-1 px-2 h-6 rounded text-[10px] font-semibold"
+                      style={selectiestand
+                        ? { background: 'rgba(232,122,85,0.15)', color: P.brand, border: '1px solid rgba(232,122,85,0.5)' }
+                        : { color: P.inkMuted, border: `1px solid ${P.line}` }}
+                    >
+                      <MousePointer2 className="w-3 h-3" /> {selectiestand ? 'Klaar' : 'Selecteren'}
+                    </button>
+                  )}
+                </div>
                 {(item.blocks?.length ?? 0) === 0 ? (
                   <p className="text-xs py-2" style={{ color: P.inkMuted }}>
                     {readOnly ? 'Er stonden geen oefeningen bij deze workout.' : 'Nog geen oefeningen. Voeg de eerste toe.'}
                   </p>
                 ) : (
-                  <BlockRows
-                    sortable={readOnly ? null : item.id}
-                    blocks={item.blocks ?? []}
-                    groups={item.groups ?? {}}
-                    readOnly={readOnly}
-                    onContextMenu={onRowMenu}
-                    onEdit={onEditBlock}
-                    onRemove={onRemoveBlock}
-                    onMove={onMoveBlock}
-                    onEditGroup={onEditGroup}
-                  />
+                  <LassoSelect actief={selectiestand && !readOnly} selected={selectie} onChange={onSelectieChange}>
+                    <BlockRows
+                      sortable={readOnly ? null : item.id}
+                      blocks={item.blocks ?? []}
+                      groups={item.groups ?? {}}
+                      readOnly={readOnly}
+                      onContextMenu={onRowMenu}
+                      onEdit={onEditBlock}
+                      onRemove={onRemoveBlock}
+                      onMove={onMoveBlock}
+                      onEditGroup={onEditGroup}
+                      selectedIds={selectie}
+                      selectiestand={selectiestand}
+                      onToggleSelect={(b) => { const n = new Set(selectie); if (n.has(b.id)) n.delete(b.id); else n.add(b.id); onSelectieChange(n); onSelectiestand(true) }}
+                    />
+                  </LassoSelect>
+                )}
+                {!readOnly && selectie.size > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 rounded-lg px-2 py-1.5" style={{ background: 'rgba(232,122,85,0.08)', border: '1px solid rgba(232,122,85,0.35)' }}>
+                    <span className="athletic-mono text-[10px] mr-1" style={{ color: P.brand }}>{selectie.size} GESELECTEERD</span>
+                    <DarkButton variant="secondary" size="sm" className="text-xs" onClick={() => onGroepeer('SUPERSET')}><Layers className="w-3.5 h-3.5 mr-1" /> Superset</DarkButton>
+                    <DarkButton variant="secondary" size="sm" className="text-xs" onClick={() => onGroepeer('CIRCUIT')}><RefreshCw className="w-3.5 h-3.5 mr-1" /> Circuit</DarkButton>
+                    <DarkButton variant="secondary" size="sm" className="text-xs" onClick={onKopieerSelectie}><Copy className="w-3.5 h-3.5 mr-1" /> Kopiëren</DarkButton>
+                    <DarkButton variant="ghost" size="sm" className="text-xs" onClick={onVerwijderSelectie} style={{ color: P.danger }}><Trash2 className="w-3.5 h-3.5 mr-1" /> Verwijderen</DarkButton>
+                  </div>
                 )}
                 {!readOnly && (
                   <DarkButton variant="secondary" size="sm" onClick={onAddBlock} className="w-full text-xs">
@@ -2569,6 +2611,42 @@ function WeekPlannerContent() {
   function openDetail(d: DetailItem) {
     setPanelClosing(false)
     setDetailItem(d)
+    if (selectieItemId !== d.item.id) {
+      setSelectieItemId(d.item.id)
+      setSelectie(new Set())
+      setSelectiestand(false)
+    }
+  }
+
+  /** Shift-klik op een rij in de dagcel: paneel open en die rij in de selectie. */
+  function selecteerRijVanuitCel(item: ScheduleItem, b: PlannerBlock, date: Date, dayId: string | null, sessionId: string | null) {
+    const n = selectieItemId === item.id ? new Set(selectie) : new Set<string>()
+    if (n.has(b.id)) n.delete(b.id); else n.add(b.id)
+    setPanelClosing(false)
+    setDetailItem({ item, date, dayId, sessionId })
+    setSelectieItemId(item.id)
+    setSelectie(n)
+    setSelectiestand(true)
+  }
+
+  async function groepeerSelectie(kind: 'SUPERSET' | 'CIRCUIT') {
+    if (!liveDetail || selectie.size === 0) return
+    const item = liveDetail.item
+    const letter = await blokken.groupBlocks(item.id, item.blocks ?? [], item.groups ?? {}, [...selectie], kind)
+    if (!letter) { toast.error('Alle zes de groepsletters zijn in gebruik'); return }
+    setSelectie(new Set()); setSelectiestand(false)
+    if (kind === 'CIRCUIT') openBlockDialog(item, liveDetail.date, liveDetail.dayId, { editGroupLetter: letter })
+    else toast.success(`Superset ${letter} gemaakt`)
+  }
+  function kopieerSelectie() {
+    if (!liveDetail) return
+    const rijen = (liveDetail.item.blocks ?? []).filter(b => selectie.has(b.id)).map(b => ({ ...b, id: undefined }))
+    zetKlembord(rijen); toast.success(`${rijen.length} rij${rijen.length === 1 ? '' : 'en'} gekopieerd`)
+  }
+  async function verwijderSelectie() {
+    if (!liveDetail) return
+    await blokken.removeBlocks(liveDetail.item.id, liveDetail.item.blocks ?? [], [...selectie])
+    setSelectie(new Set()); setSelectiestand(false)
   }
   // Het zijpaneel eet breedte; klap de navigatie zolang in en zet hem daarna
   // terug zoals hij stond. Zonder dit krimpen de dagcellen tot strookjes.
@@ -2666,6 +2744,12 @@ function WeekPlannerContent() {
     insertAt: number | null
   } | null>(null)
   const blockDialogInhoud = blockDialog ? contentsByItem.get(blockDialog.itemId) : undefined
+
+  // ─ Meervoudige selectie in het zijpaneel (lasso of shift-klik) ─
+  const [selectie, setSelectie] = useState<Set<string>>(() => new Set())
+  const [selectiestand, setSelectiestand] = useState(false)
+  /** Bij welk item de selectie hoort; een ander item wist de selectie. */
+  const [selectieItemId, setSelectieItemId] = useState<string | null>(null)
 
   // ─ Rechtermuismenu en klembord (rijen kopiëren en plakken, ook naar een andere dag) ─
   const [menu, setMenu] = useState<ContextMenuState>(null)
@@ -3481,6 +3565,7 @@ function WeekPlannerContent() {
                       toonRijen={weergave === 'oefeningen'}
                       onDayMenu={openDagMenu}
                       onRowMenu={openRijMenu}
+                      onSelectBlock={selecteerRijVanuitCel}
                       krap={krap}
                       onAddTemplate={(d) => openAddModal(d, 'library')}
                       onCopyDay={(i) => setSelectedIsos(new Set([i]))}
@@ -3643,6 +3728,13 @@ function WeekPlannerContent() {
             onMoveBlock={(b, dir) => detailItem && handleMoveBlock(detailItem.item, b, dir)}
             onEditGroup={(l) => detailItem && openBlockDialog(detailItem.item, detailItem.date, detailItem.dayId, { editGroupLetter: l })}
             onRowMenu={(b, e) => detailItem && openRijMenu(detailItem.item, b, detailItem.date, detailItem.dayId, e)}
+            selectie={selectie}
+            selectiestand={selectiestand}
+            onSelectiestand={(v) => { setSelectiestand(v); if (!v) setSelectie(new Set()) }}
+            onSelectieChange={setSelectie}
+            onGroepeer={groepeerSelectie}
+            onKopieerSelectie={kopieerSelectie}
+            onVerwijderSelectie={verwijderSelectie}
             onBuildCardio={setCardioBuilderItem}
             savingTemplate={saveItemAsTemplate.isPending}
             copying={duplicateItem.isPending}
@@ -3673,6 +3765,13 @@ function WeekPlannerContent() {
                   onMoveBlock={(b, dir) => detailItem && handleMoveBlock(detailItem.item, b, dir)}
                   onEditGroup={(l) => detailItem && openBlockDialog(detailItem.item, detailItem.date, detailItem.dayId, { editGroupLetter: l })}
                   onRowMenu={(b, e) => detailItem && openRijMenu(detailItem.item, b, detailItem.date, detailItem.dayId, e)}
+                  selectie={selectie}
+                  selectiestand={selectiestand}
+                  onSelectiestand={(v) => { setSelectiestand(v); if (!v) setSelectie(new Set()) }}
+                  onSelectieChange={setSelectie}
+                  onGroepeer={groepeerSelectie}
+                  onKopieerSelectie={kopieerSelectie}
+                  onVerwijderSelectie={verwijderSelectie}
                   onBuildCardio={setCardioBuilderItem}
                   savingTemplate={saveItemAsTemplate.isPending}
                   copying={duplicateItem.isPending}
