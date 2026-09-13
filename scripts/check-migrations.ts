@@ -199,6 +199,18 @@ const checks: Check[] = [
       }
     },
   },
+  {
+    name: 'vitals_entries.daySource kolom (bronvoorrang)',
+    migration: '20260912_bron_voorrang.sql',
+    run: async () => {
+      try {
+        await prisma.$queryRaw`SELECT "daySource" FROM vitals_entries LIMIT 1`
+        return true
+      } catch {
+        return false
+      }
+    },
+  },
 ]
 
 async function main() {

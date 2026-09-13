@@ -3,9 +3,10 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 vi.mock('../strava/sync', () => ({
   syncStravaActivity: vi.fn(),
   removeStravaActivity: vi.fn(),
+  isStravaAccessRevoked: vi.fn(),
 }))
 
-import { removeStravaActivity, syncStravaActivity } from '../strava/sync'
+import { isStravaAccessRevoked, removeStravaActivity, syncStravaActivity } from '../strava/sync'
 import { handleStravaWebhookEvent, stravaSubscriptionChallenge } from '../strava/webhook'
 
 const params = (o: Record<string, string>) => new URLSearchParams(o)
@@ -40,6 +41,7 @@ describe('handleStravaWebhookEvent', () => {
   beforeEach(() => {
     vi.mocked(syncStravaActivity).mockReset()
     vi.mocked(removeStravaActivity).mockReset()
+    vi.mocked(isStravaAccessRevoked).mockReset()
   })
 
   it('onbekende owner_id → handled false, geen sync', async () => {
@@ -65,12 +67,25 @@ describe('handleStravaWebhookEvent', () => {
     expect(removeStravaActivity).toHaveBeenCalledWith(expect.anything(), 'user-1', 555)
   })
 
-  it('athlete deauthorize → koppeling verwijderd', async () => {
+  it('athlete deauthorize, door Strava bevestigd → koppeling verwijderd', async () => {
+    vi.mocked(isStravaAccessRevoked).mockResolvedValue(true)
     const d = db()
     const res = await handleStravaWebhookEvent(d as never, { object_type: 'athlete', aspect_type: 'update', object_id: 42, owner_id: 42, updates: { authorized: 'false' } })
     expect(res).toEqual({ handled: true, action: 'deauthorized' })
+    expect(isStravaAccessRevoked).toHaveBeenCalledWith(expect.anything(), 'user-1')
     expect(d.stravaConnection.deleteMany).toHaveBeenCalledWith({ where: { userId: 'user-1' } })
     expect(d.wearableConnection.deleteMany).toHaveBeenCalledWith({ where: { userId: 'user-1', provider: 'STRAVA' } })
+  })
+
+  it('athlete deauthorize terwijl het token bij Strava nog werkt → genegeerd, niets verwijderd', async () => {
+    // Events zijn ongesigneerd. Wie een atleet-id raadt, mag daarmee niet
+    // andermans koppeling kunnen slopen (audit 2026-09-13).
+    vi.mocked(isStravaAccessRevoked).mockResolvedValue(false)
+    const d = db()
+    const res = await handleStravaWebhookEvent(d as never, { object_type: 'athlete', aspect_type: 'update', object_id: 42, owner_id: 42, updates: { authorized: 'false' } })
+    expect(res).toEqual({ handled: true, action: 'ignored' })
+    expect(d.stravaConnection.deleteMany).not.toHaveBeenCalled()
+    expect(d.wearableConnection.deleteMany).not.toHaveBeenCalled()
   })
 
   it('athlete-update zonder deauthorize (bv. privacy) → handled false, niets verwijderd', async () => {

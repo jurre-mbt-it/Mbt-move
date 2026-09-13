@@ -282,3 +282,31 @@ export async function removeStravaActivity(prisma: Db, userId: string, activityI
   })
   return res.count > 0
 }
+
+/**
+ * Is de toegang van deze gebruiker bij Strava daadwerkelijk ingetrokken?
+ * Webhook-events zijn ongesigneerd, dus een "athlete deauthorize" mag pas
+ * tot verwijderen van de koppeling leiden als Strava zelf het token weigert.
+ * Een werkend token betekent: het event was vervalst of achterhaald. Bij een
+ * storing (netwerk, 5xx) zeggen we bewust "niet ingetrokken": een koppeling
+ * te lang laten staan is onschuldig, hem op een verzonnen event weghalen niet.
+ */
+export async function isStravaAccessRevoked(prisma: Db, userId: string): Promise<boolean> {
+  try {
+    const token = await getValidAccessToken(prisma, userId)
+    await stravaGet(token, '/athlete')
+    return false
+  } catch (err) {
+    return isStravaAuthError(err)
+  }
+}
+
+/**
+ * Strava-fout die betekent dat het token (of het refresh-token) niet meer
+ * geldig is: 401 op de API, of 400/401 bij het vernieuwen (invalid_grant).
+ * Alles anders (429, 5xx, netwerk) is tijdelijk en telt niet.
+ */
+export function isStravaAuthError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return /^strava_(api_401_|token_40[01]$)/.test(msg)
+}

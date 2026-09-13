@@ -9,14 +9,17 @@
  * athlete-event met updates.authorized = "false". Anders dan Polar signeert
  * Strava events NIET — de route beperkt daarom de verwerking per atleet
  * (rate-limit) en de verwerking zelf is idempotent en haalt alleen data op
- * met het eigen token van de gekoppelde gebruiker.
+ * met het eigen token van de gekoppelde gebruiker. Een deauthorize-event
+ * verwijdert de koppeling pas nadat Strava zelf het token heeft geweigerd;
+ * anders kon iedereen met een geraden atleet-id andermans koppeling slopen
+ * (gevonden in de audit van 2026-09-13).
  *
  * Strava wil binnen 2 s een 200 zien; de route antwoordt daarom meteen en
  * verwerkt het event in `after()`.
  */
 import type { PrismaClient } from '@prisma/client'
 import { timingSafeEqual } from 'crypto'
-import { removeStravaActivity, syncStravaActivity } from './sync'
+import { isStravaAccessRevoked, removeStravaActivity, syncStravaActivity } from './sync'
 
 export type StravaWebhookEvent = {
   object_type?: 'activity' | 'athlete' | string
@@ -60,7 +63,7 @@ type Db = Pick<PrismaClient, 'stravaConnection' | 'wearableConnection' | 'user' 
 export async function handleStravaWebhookEvent(
   prisma: Db,
   ev: StravaWebhookEvent,
-): Promise<{ handled: boolean; action?: 'synced' | 'skipped' | 'removed' | 'deauthorized' }> {
+): Promise<{ handled: boolean; action?: 'synced' | 'skipped' | 'removed' | 'deauthorized' | 'ignored' }> {
   if (ev.owner_id == null) return { handled: false }
   const conn = await prisma.stravaConnection.findUnique({
     where: { athleteId: String(ev.owner_id) },
@@ -72,6 +75,11 @@ export async function handleStravaWebhookEvent(
     // Gebruiker trok de toegang in bij Strava zelf → koppeling hier ook weg,
     // anders blijft een dooie tegel "gekoppeld" tonen en faalt elke sync.
     if (ev.aspect_type === 'update' && ev.updates?.authorized === 'false') {
+      // Ongesigneerd event: eerst bij Strava toetsen of het token echt dood is.
+      // Werkt het nog, dan was dit vervalst of achterhaald en blijft alles staan.
+      if (!(await isStravaAccessRevoked(prisma, conn.userId))) {
+        return { handled: true, action: 'ignored' }
+      }
       await prisma.stravaConnection.deleteMany({ where: { userId: conn.userId } })
       await prisma.wearableConnection.deleteMany({ where: { userId: conn.userId, provider: 'STRAVA' } })
       return { handled: true, action: 'deauthorized' }
