@@ -30,9 +30,11 @@ import { searchMatch } from '@/lib/exercise-search'
 import { MarkMatch } from '@/components/exercises/MarkMatch'
 import { ExerciseLibraryPanel } from './ExerciseLibraryPanel'
 import { BlockRows } from '@/components/week-planner/BlockRows'
+import { ContextMenu, type ContextMenuItem, type ContextMenuState } from '@/components/week-planner/ContextMenu'
 import { ExerciseBlockDialog } from '@/components/week-planner/ExerciseBlockDialog'
 import { DarkButton } from '@/components/dark-ui'
 import { programDayKey, type BlockDraft, type ItemGroup, type PlannerBlock } from '@/lib/planner-blocks'
+import { Coffee, CopyPlus, Dumbbell, Pencil, StickyNote } from 'lucide-react'
 import { builderToBlock, draftToBuilderPatch } from './builder-blocks'
 import { MuscleBalancePanel } from './MuscleBalancePanel'
 import { IncompletePracticeBanner } from '@/components/practice/IncompletePracticeBanner'
@@ -310,7 +312,8 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
   const dagSleutel = programDayKey(program.currentWeek, program.currentDay)
   const dagBlokken = useMemo(() => dayExercises.map((e, i) => builderToBlock(e, i)), [dayExercises])
   const dagGroepen = program.groups[dagSleutel] ?? {}
-  const [blokDialoog, setBlokDialoog] = useState<{ edit: PlannerBlock | null; letter: string | null } | null>(null)
+  const [blokDialoog, setBlokDialoog] = useState<{ edit: PlannerBlock | null; letter: string | null; insertAt?: number | null; type?: 'exercise' | 'note' | 'break' } | null>(null)
+  const [rijMenu, setRijMenu] = useState<ContextMenuState>(null)
 
   /** Verplaats een rij binnen de dag; de volgorde in `exercises` is de programmavolgorde. */
   const moveBlok = useCallback((uid: string, dir: -1 | 1) => {
@@ -335,15 +338,26 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
     if (d.id) {
       setExercises(prev => prev.map(e => (e.uid === d.id ? { ...e, ...patch } : e)))
     } else {
-      setExercises(prev => [...prev, {
+      const nieuw: BuilderExercise = {
         ...patch,
         uid: `uid-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         selected: false,
         week: program.currentWeek,
         day: program.currentDay,
-      }])
+      }
+      const at = blokDialoog?.insertAt
+      setExercises(prev => {
+        if (at == null) return [...prev, nieuw]
+        // Positie binnen de dag → positie in de hoofdlijst.
+        const dagUids = prev.filter(e => e.week === program.currentWeek && (program.flexibleSchedule || e.day === program.currentDay)).map(e => e.uid)
+        const anker = dagUids[at]
+        const idx = anker ? prev.findIndex(e => e.uid === anker) : -1
+        return idx < 0 ? [...prev, nieuw] : [...prev.slice(0, idx), nieuw, ...prev.slice(idx)]
+      })
+      if (at != null) setBlokDialoog(bd => bd ? { ...bd, insertAt: at + 1 } : bd)
     }
-  }, [libraryExercises, program.currentWeek, program.currentDay])
+  }, [libraryExercises, program.currentWeek, program.currentDay, program.flexibleSchedule, blokDialoog?.insertAt])
+
 
   const submitGroep = useCallback(async (letter: string, g: ItemGroup) => {
     setProgram(prev => ({
@@ -476,6 +490,28 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
   }, [program.currentDay, program.currentWeek])
 
   // Create superset from selected exercises
+  /** Rechtermuismenu op een rij in de builder. */
+  const openRijMenu = useCallback((b: PlannerBlock, e: React.MouseEvent) => {
+    const idx = dagBlokken.findIndex(x => x.id === b.id)
+    const invoeg = (type: 'exercise' | 'note' | 'break') => setBlokDialoog({ edit: null, letter: null, insertAt: idx + 1, type })
+    const items: ContextMenuItem[] = [
+      { label: 'Bewerken', icon: <Pencil className="w-3.5 h-3.5" />, onSelect: () => setBlokDialoog({ edit: b, letter: null }) },
+      { label: 'Dupliceren', icon: <CopyPlus className="w-3.5 h-3.5" />, onSelect: () => setExercises(prev => {
+          const i = prev.findIndex(x => x.uid === b.id)
+          if (i < 0) return prev
+          const kopie = { ...prev[i], uid: `uid-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, selected: false }
+          return [...prev.slice(0, i + 1), kopie, ...prev.slice(i + 1)]
+        }) },
+      { type: 'separator' },
+      { label: 'Oefening hieronder', icon: <Dumbbell className="w-3.5 h-3.5" />, onSelect: () => invoeg('exercise') },
+      { label: 'Notitie hieronder', icon: <StickyNote className="w-3.5 h-3.5" />, onSelect: () => invoeg('note') },
+      { label: 'Pauze hieronder', icon: <Coffee className="w-3.5 h-3.5" />, onSelect: () => invoeg('break') },
+      { type: 'separator' },
+      { label: 'Verwijderen', icon: <Trash2 className="w-3.5 h-3.5" />, danger: true, onSelect: () => removeEx(b.id) },
+    ]
+    setRijMenu({ x: e.clientX, y: e.clientY, items })
+  }, [dagBlokken, removeEx])
+
   const createSuperset = () => {
     if (selectedUids.length < 2) return
     const usedLetters = new Set(exercises.map(e => e.supersetGroup).filter(Boolean))
@@ -656,6 +692,18 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         day: targetDay, week: targetWeek,
       }
       setExercises(prev => [...prev, newEx])
+      return
+    }
+
+    // Rij (bloklijst) versleept binnen de dag: verplaats in de hoofd-array zodat
+    // de render-volgorde (dayExercises is afgeleid) meteen mee-schuift.
+    if (activeData?.type === 'block' && overData?.type === 'block' && activeData.blockId !== overData.blockId) {
+      setExercises(prev => {
+        const oldIdx = prev.findIndex(e => e.uid === activeData.blockId)
+        const newIdx = prev.findIndex(e => e.uid === overData.blockId)
+        if (oldIdx === -1 || newIdx === -1) return prev
+        return arrayMove(prev, oldIdx, newIdx)
+      })
       return
     }
 
@@ -1886,8 +1934,10 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                 {/* Dezelfde rijen en pop-up als de weekplanner: één lijn. */}
                 <div className="space-y-2">
                   <BlockRows
+                    sortable={`dag:${dagSleutel}`}
                     blocks={dagBlokken}
                     groups={dagGroepen}
+                    onContextMenu={openRijMenu}
                     onEdit={b => setBlokDialoog({ edit: b, letter: null })}
                     onRemove={b => removeEx(b.id)}
                     onMove={(b, dir) => moveBlok(b.id, dir)}
@@ -2473,13 +2523,14 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           </div>
         </DialogContent>
       </Dialog>
+      <ContextMenu state={rijMenu} onClose={() => setRijMenu(null)} />
       {blokDialoog && (
         <ExerciseBlockDialog
           open
           onClose={() => setBlokDialoog(null)}
           dayLabel={`Week ${program.currentWeek} · Dag ${program.currentDay}`}
           workoutName={program.name || 'Programma'}
-          initialType="exercise"
+          initialType={blokDialoog.type ?? 'exercise'}
           editBlock={blokDialoog.edit}
           editGroupLetter={blokDialoog.letter}
           blocks={dagBlokken}

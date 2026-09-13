@@ -14,7 +14,7 @@
  *   via weekNumber-offset binnen één patient's chain.
  */
 
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { trpc } from '@/lib/trpc/client'
 import { matchLoggedPlanned, type PlannedEntry } from '@/lib/planned-matching'
@@ -25,15 +25,15 @@ import {
   Search, Building2, Copy, CopyPlus, Pencil, BookmarkPlus, GripVertical,
   CalendarRange, Layers, Moon, CalendarPlus, StickyNote, ClipboardCheck, Flag,
   Scissors, ClipboardPaste, Archive, Check, Clock3, CornerUpRight,
-} from 'lucide-react'
+Trash2, Coffee, Dumbbell, } from 'lucide-react'
 import {
   PHASE_TYPES, PHASE_META, phaseMeta, DELOAD_LOAD_FRACTION,
   type PhaseType,
 } from '@/lib/periodization'
 import {
-  DndContext, DragOverlay, closestCenter, MouseSensor, TouchSensor,
+  DndContext, DragOverlay, closestCenter, pointerWithin, MouseSensor, TouchSensor,
   useSensor, useSensors, useDroppable, useDraggable,
-  type DragEndEvent, type DragStartEvent,
+  type CollisionDetection, type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core'
 import {
   IconStrength, IconMobility, IconPlyometrics, IconCardio, IconCore,
@@ -60,14 +60,23 @@ import { CATEGORY_COLORS, CARDIO_ACTIVITY_COLORS, textOn } from '@/lib/palette'
 import { formatWeightsPerSet } from '@/lib/session-sets'
 import { useCategoryColors } from '@/lib/useCategoryColors'
 import { CategoryIcon, CATEGORY_LABELS } from '@/components/week-planner/CategoryIcon'
-import { BlockRows } from '@/components/week-planner/BlockRows'
+import { BlockRows, blockLabel } from '@/components/week-planner/BlockRows'
+import { ContextMenu, type ContextMenuItem, type ContextMenuState } from '@/components/week-planner/ContextMenu'
 import { ExerciseBlockDialog, type BlockDialogType } from '@/components/week-planner/ExerciseBlockDialog'
 import { useBlockMutations } from '@/components/week-planner/useBlockMutations'
 import { OptionSwitch } from '@/components/week-planner/block-forms/fields'
 import { isSidebarCollapsed, setSidebarCollapsed } from '@/components/layout/TherapistSidebar'
-import type { ItemGroups, PlannerBlock } from '@/lib/planner-blocks'
+import type { BlockDraft, ItemGroups, PlannerBlock } from '@/lib/planner-blocks'
 type ItemExercise = PlannerBlock
 type Weergave = 'oefeningen' | 'trainingen'
+// Externe store voor de weergave-voorkeur (localStorage), zoals de zijbalk dat
+// doet: SSR rendert 'oefeningen', de client pakt de bewaarde stand op zonder
+// setState in een effect.
+const weergaveListeners = new Set<() => void>()
+function abonneerWeergave(cb: () => void) { weergaveListeners.add(cb); return () => { weergaveListeners.delete(cb) } }
+function leesWeergave(): Weergave {
+  try { return localStorage.getItem('planner.weergave') === 'trainingen' ? 'trainingen' : 'oefeningen' } catch { return 'oefeningen' }
+}
 import { LOAD_UITLEG } from '@/lib/training-load'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -972,7 +981,7 @@ function DayCell({
   selected, onSelectStart, onSelectEnter,
   onAddWorkout, onAddTemplate, onCopyDay,
   onItemClick, onRemoveItem, statusFor, sessionIdFor, loggedFor, movedToFor, openItemId,
-  onAddBlock, onEditBlock, onRemoveBlock, onMoveBlock, onEditGroup, toonRijen,
+  onAddBlock, onEditBlock, onRemoveBlock, onMoveBlock, onEditGroup, toonRijen, onDayMenu, onRowMenu,
   readOnly = false,
 }: {
   date: Date
@@ -995,6 +1004,8 @@ function DayCell({
   onEditGroup: (item: ScheduleItem, letter: string, date: Date, dayId: string | null) => void
   /** false = alleen de trainingspil, de rijen blijven in het zijpaneel. */
   toonRijen: boolean
+  onDayMenu: (item: ScheduleItem | null, date: Date, dayId: string | null, e: React.MouseEvent) => void
+  onRowMenu: (item: ScheduleItem, block: PlannerBlock, date: Date, dayId: string | null, e: React.MouseEvent) => void
   statusFor: (date: Date, item: ScheduleItem) => ItemStatus
   sessionIdFor: (date: Date, item: ScheduleItem) => string | null
   loggedFor: (date: Date, item: ScheduleItem) => LoggedInfo | null
@@ -1025,6 +1036,10 @@ function DayCell({
         onSelectStart(iso, e.pointerType)
       } : undefined}
       onPointerEnter={inMonth ? () => onSelectEnter(iso) : undefined}
+      onContextMenu={inMonth && !readOnly ? (e) => {
+        e.preventDefault()
+        onDayMenu(items.find(i => i.kind === 'WORKOUT' && !i.id.startsWith('legacy-')) ?? null, date, dayId, e)
+      } : undefined}
     >
       <div className="flex items-center justify-between">
         {/* Dagnummer in brand-oranje als warm accent; vandaag als gevulde chip
@@ -1108,9 +1123,11 @@ function DayCell({
                 <div data-noselect className="mt-0.5">
                   {toonRijen && <BlockRows
                     compact
+                    sortable={readOnly ? null : item.id}
                     blocks={item.blocks ?? []}
                     groups={item.groups ?? {}}
                     readOnly={readOnly}
+                    onContextMenu={(b, e) => onRowMenu(item, b, date, dayId, e)}
                     onEdit={b => onEditBlock(item, b, date, dayId)}
                     onRemove={b => onRemoveBlock(item, b)}
                     onMove={(b, dir) => onMoveBlock(item, b, dir)}
@@ -1205,7 +1222,7 @@ type DetailItem = {
 function ItemDetailContent({
   detail, onClose, showClose = false,
   onSaveTemplate, onCopy, onSaveQuick, onBuildCardio,
-  onAddBlock, onEditBlock, onRemoveBlock, onMoveBlock, onEditGroup,
+  onAddBlock, onEditBlock, onRemoveBlock, onMoveBlock, onEditGroup, onRowMenu,
   savingTemplate, copying, readOnly = false,
 }: {
   detail: DetailItem
@@ -1225,6 +1242,7 @@ function ItemDetailContent({
   onRemoveBlock: (b: PlannerBlock) => void
   onMoveBlock: (b: PlannerBlock, dir: -1 | 1) => void
   onEditGroup: (letter: string) => void
+  onRowMenu: (b: PlannerBlock, e: React.MouseEvent) => void
   /** Opent de blokken-bouwer als volledig scherm — het zijpaneel is te smal. */
   onBuildCardio: (item: ScheduleItem) => void
   savingTemplate: boolean
@@ -1490,9 +1508,11 @@ function ItemDetailContent({
                   </p>
                 ) : (
                   <BlockRows
+                    sortable={readOnly ? null : item.id}
                     blocks={item.blocks ?? []}
                     groups={item.groups ?? {}}
                     readOnly={readOnly}
+                    onContextMenu={onRowMenu}
                     onEdit={onEditBlock}
                     onRemove={onRemoveBlock}
                     onMove={onMoveBlock}
@@ -2616,13 +2636,10 @@ function WeekPlannerContent() {
   // ─ Weergave: alle oefeningen in de dagcel, of alleen de trainingspil ─
   // Onthouden per browser: wie de kalender als overzicht gebruikt wil dat
   // niet elke keer opnieuw kiezen.
-  const [weergave, setWeergave] = useState<Weergave>('oefeningen')
-  useEffect(() => {
-    try { if (localStorage.getItem('planner.weergave') === 'trainingen') setWeergave('trainingen') } catch {}
-  }, [])
+  const weergave = useSyncExternalStore(abonneerWeergave, leesWeergave, () => 'oefeningen' as Weergave)
   const zetWeergave = (w: Weergave) => {
-    setWeergave(w)
     try { localStorage.setItem('planner.weergave', w) } catch {}
+    weergaveListeners.forEach(l => l())
   }
 
   // ─ Bloklijst: "+ Oefening" opent één dialoog voor alle soorten rijen ─
@@ -2636,8 +2653,20 @@ function WeekPlannerContent() {
     editBlock: PlannerBlock | null
     editGroupLetter: string | null
     initialType: BlockDialogType
+    /** Invoegpositie ("hier invoegen" uit het rechtermuismenu); null = achteraan. */
+    insertAt: number | null
   } | null>(null)
   const blockDialogInhoud = blockDialog ? contentsByItem.get(blockDialog.itemId) : undefined
+
+  // ─ Rechtermuismenu en klembord (rijen kopiëren en plakken, ook naar een andere dag) ─
+  const [menu, setMenu] = useState<ContextMenuState>(null)
+  const [klembord, setKlembord] = useState<BlockDraft[]>(() => {
+    try { const raw = sessionStorage.getItem('planner.klembord'); return raw ? (JSON.parse(raw) as BlockDraft[]) : [] } catch { return [] }
+  })
+  const zetKlembord = (rijen: BlockDraft[]) => {
+    setKlembord(rijen)
+    try { sessionStorage.setItem('planner.klembord', JSON.stringify(rijen)) } catch {}
+  }
 
   const dagLabelLang = (date: Date) =>
     date.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -2648,7 +2677,7 @@ function WeekPlannerContent() {
    */
   async function openBlockDialog(
     item: ScheduleItem | null, date: Date, dayId: string | null,
-    extra: { editBlock?: PlannerBlock | null; editGroupLetter?: string | null } = {},
+    extra: { editBlock?: PlannerBlock | null; editGroupLetter?: string | null; insertAt?: number | null; initialType?: BlockDialogType } = {},
   ) {
     if (!selectedPatientId) { toast.error('Kies eerst een patiënt'); return }
     let itemId = item?.id ?? null
@@ -2669,8 +2698,63 @@ function WeekPlannerContent() {
       itemId, dayLabel: dagLabelLang(date), workoutName: naam, category: categorie,
       editBlock: extra.editBlock ?? null,
       editGroupLetter: extra.editGroupLetter ?? null,
-      initialType: categorie === 'CARDIO' ? 'cardio' : 'exercise',
+      initialType: extra.initialType ?? (categorie === 'CARDIO' ? 'cardio' : 'exercise'),
+      insertAt: extra.insertAt ?? null,
     })
+  }
+
+  /** Rechtermuismenu op een rij. */
+  function openRijMenu(item: ScheduleItem, b: PlannerBlock, date: Date, dayId: string | null, e: React.MouseEvent) {
+    const blocks = item.blocks ?? []
+    const idx = blocks.findIndex(x => x.id === b.id)
+    const invoeg = (type: BlockDialogType) => openBlockDialog(item, date, dayId, { insertAt: idx + 1, initialType: type })
+    const items: ContextMenuItem[] = [
+      { label: 'Bewerken', icon: <Pencil className="w-3.5 h-3.5" />, onSelect: () => openBlockDialog(item, date, dayId, { editBlock: b }) },
+      { label: 'Dupliceren', icon: <CopyPlus className="w-3.5 h-3.5" />, onSelect: () => { void blokken.duplicateBlock(item.id, blocks, b.id) } },
+      { label: 'Kopiëren', icon: <Copy className="w-3.5 h-3.5" />, onSelect: () => { zetKlembord([{ ...b, id: undefined }]); toast.success(`${blockLabel(b)} gekopieerd`) } },
+      { label: 'Knippen', icon: <Scissors className="w-3.5 h-3.5" />, onSelect: () => { zetKlembord([{ ...b, id: undefined }]); void blokken.removeBlock(item.id, blocks, b.id) } },
+      { label: 'Plakken hieronder', icon: <ClipboardPaste className="w-3.5 h-3.5" />, disabled: klembord.length === 0, hint: klembord.length ? `${klembord.length}` : undefined, onSelect: () => { void blokken.insertBlocks(item.id, blocks, klembord, idx + 1) } },
+      { type: 'separator' },
+      { label: 'Oefening hieronder', icon: <Dumbbell className="w-3.5 h-3.5" />, onSelect: () => invoeg('exercise') },
+      { label: 'Notitie hieronder', icon: <StickyNote className="w-3.5 h-3.5" />, onSelect: () => invoeg('note') },
+      { label: 'Pauze hieronder', icon: <Coffee className="w-3.5 h-3.5" />, onSelect: () => invoeg('break') },
+      { type: 'separator' },
+      { label: 'Verwijderen', icon: <Trash2 className="w-3.5 h-3.5" />, danger: true, onSelect: () => { void blokken.removeBlock(item.id, blocks, b.id) } },
+    ]
+    setMenu({ x: e.clientX, y: e.clientY, items })
+  }
+
+  /** Rechtermuismenu op een dag (buiten de rijen). `item` = de training van die dag, of null. */
+  function openDagMenu(item: ScheduleItem | null, date: Date, dayId: string | null, e: React.MouseEvent) {
+    const iso = isoDate(date)
+    const items: ContextMenuItem[] = [
+      { label: 'Oefening toevoegen', icon: <Dumbbell className="w-3.5 h-3.5" />, onSelect: () => openBlockDialog(item, date, dayId, { initialType: 'exercise' }) },
+      { label: 'Notitie toevoegen', icon: <StickyNote className="w-3.5 h-3.5" />, onSelect: () => openBlockDialog(item, date, dayId, { initialType: 'note' }) },
+      { label: 'Pauze toevoegen', icon: <Coffee className="w-3.5 h-3.5" />, onSelect: () => openBlockDialog(item, date, dayId, { initialType: 'break' }) },
+      { label: 'Plakken', icon: <ClipboardPaste className="w-3.5 h-3.5" />, disabled: klembord.length === 0, hint: klembord.length ? `${klembord.length} rij${klembord.length === 1 ? '' : 'en'}` : undefined, onSelect: () => { void plakOpDag(item, date, dayId) } },
+      { type: 'separator' },
+      { label: 'Workout toevoegen', icon: <Plus className="w-3.5 h-3.5" />, onSelect: () => openAddModal(date, 'quick') },
+      { label: 'Vanuit sjabloon', icon: <BookmarkPlus className="w-3.5 h-3.5" />, onSelect: () => openAddModal(date, 'library') },
+      { label: 'Kopieer dag', icon: <Copy className="w-3.5 h-3.5" />, onSelect: () => setSelectedIsos(new Set([iso])) },
+    ]
+    if (item && (item.blocks?.length ?? 0) > 0) {
+      items.splice(4, 0, { label: 'Alle rijen kopiëren', icon: <Copy className="w-3.5 h-3.5" />, onSelect: () => { zetKlembord((item.blocks ?? []).map(b => ({ ...b, id: undefined }))); toast.success(`${item.blocks!.length} rijen gekopieerd`) } })
+    }
+    setMenu({ x: e.clientX, y: e.clientY, items })
+  }
+
+  async function plakOpDag(item: ScheduleItem | null, date: Date, dayId: string | null) {
+    if (klembord.length === 0) return
+    let itemId = item?.id ?? null
+    if (!itemId) {
+      const id = dayId ?? await ensureDayId(date)
+      if (!id) { toast.error('Kon de dag niet aanmaken'); return }
+      const r = await ensureDayWorkout.mutateAsync({ dayId: id })
+      itemId = r.id
+      if (r.created) await utils.weekSchedules.listWithItems.invalidate()
+    }
+    const blocks = contentsByItem.get(itemId)?.blocks ?? []
+    await blokken.insertBlocks(itemId, blocks, klembord)
   }
   const handleRemoveBlock = (item: ScheduleItem, b: PlannerBlock) => blokken.removeBlock(item.id, item.blocks ?? [], b.id)
   const handleMoveBlock = (item: ScheduleItem, b: PlannerBlock, dir: -1 | 1) => blokken.moveBlock(item.id, item.blocks ?? [], b.id, dir)
@@ -2806,6 +2890,7 @@ function WeekPlannerContent() {
   )
   const [activeDrag, setActiveDrag] = useState<
     | { type: 'item'; label: string }
+    | { type: 'block'; label: string }
     | { type: 'days'; count: number }
     | null
   >(null)
@@ -2813,7 +2898,22 @@ function WeekPlannerContent() {
   function handleDragStart(e: DragStartEvent) {
     const data = e.active.data.current as { type?: string; label?: string } | undefined
     if (data?.type === 'days') setActiveDrag({ type: 'days', count: selectedIsos.size })
+    else if (data?.type === 'block') setActiveDrag({ type: 'block', label: data.label ?? 'Rij' })
     else setActiveDrag({ type: 'item', label: data?.label ?? 'Workout' })
+  }
+
+  /**
+   * Een rij die sleept mikt eerst op andere rijen (invoegpositie) en anders
+   * op een dag; een workout of dagselectie gebruikt de gewone middelpunt-
+   * detectie. Zonder dit onderscheid won de dagcel het altijd van de rij erin.
+   */
+  const botsing: CollisionDetection = (args) => {
+    if (args.active.data.current?.type === 'block') {
+      const rijen = pointerWithin({ ...args, droppableContainers: args.droppableContainers.filter(c => c.data.current?.type === 'block') })
+      if (rijen.length > 0) return rijen
+      return pointerWithin({ ...args, droppableContainers: args.droppableContainers.filter(c => String(c.id).startsWith('day:')) })
+    }
+    return closestCenter(args)
   }
 
   async function handleDragEnd(e: DragEndEvent) {
@@ -2823,6 +2923,35 @@ function WeekPlannerContent() {
     if (planningVergrendeld) return
     const over = e.over
     if (!over) return
+    const actief = e.active.data.current as { type?: string; blockId?: string; itemId?: string } | undefined
+    if (actief?.type === 'block' && actief.blockId && actief.itemId) {
+      const o = over.data.current as { type?: string; blockId?: string; itemId?: string; iso?: string } | undefined
+      const bron = contentsByItem.get(actief.itemId)
+      if (!bron) return
+      if (o?.type === 'block' && o.blockId && o.itemId) {
+        if (o.itemId === actief.itemId) {
+          if (o.blockId !== actief.blockId) await blokken.reorderBlocks(actief.itemId, bron.blocks, actief.blockId, o.blockId)
+        } else {
+          const doel = contentsByItem.get(o.itemId)
+          if (!doel) return
+          const idx = doel.blocks.findIndex(b => b.id === o.blockId)
+          await blokken.moveBlockToItem({ itemId: actief.itemId, blocks: bron.blocks }, { itemId: o.itemId, blocks: doel.blocks }, actief.blockId, idx)
+        }
+        return
+      }
+      if (o?.iso) {
+        const doelDatum = gridDateByIso.get(o.iso)
+        if (!doelDatum) return
+        const dayId = await ensureDayId(doelDatum)
+        if (!dayId) return
+        const r = await ensureDayWorkout.mutateAsync({ dayId })
+        if (r.id === actief.itemId) return
+        const doel = contentsByItem.get(r.id)
+        await blokken.moveBlockToItem({ itemId: actief.itemId, blocks: bron.blocks }, { itemId: r.id, blocks: doel?.blocks ?? [] }, actief.blockId)
+        if (r.created) utils.weekSchedules.listWithItems.invalidate()
+      }
+      return
+    }
     const overData = over.data.current as { iso?: string } | undefined
     const targetIso = overData?.iso
     if (!targetIso) return
@@ -2952,7 +3081,7 @@ function WeekPlannerContent() {
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={botsing}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
@@ -3341,6 +3470,8 @@ function WeekPlannerContent() {
                       onMoveBlock={handleMoveBlock}
                       onEditGroup={(item, l, d, dayId) => openBlockDialog(item, d, dayId, { editGroupLetter: l })}
                       toonRijen={weergave === 'oefeningen'}
+                      onDayMenu={openDagMenu}
+                      onRowMenu={openRijMenu}
                       onAddTemplate={(d) => openAddModal(d, 'library')}
                       onCopyDay={(i) => setSelectedIsos(new Set([i]))}
                       onItemClick={(item, d, dayId, sessionId) => openDetail({ item, date: d, dayId, sessionId })}
@@ -3378,6 +3509,7 @@ function WeekPlannerContent() {
           onSubmit={handleAddSubmit}
         />
 
+        <ContextMenu state={menu} onClose={() => setMenu(null)} />
         {blockDialog && (
           <ExerciseBlockDialog
             open
@@ -3391,7 +3523,11 @@ function WeekPlannerContent() {
             groups={blockDialogInhoud?.groups ?? {}}
             defaultCategory={blockDialog.category}
             saving={blokken.saving}
-            onSubmitBlock={(d) => blokken.submitBlock(blockDialog.itemId, blockDialogInhoud?.blocks ?? [], d)}
+            onSubmitBlock={async (d) => {
+              await blokken.submitBlock(blockDialog.itemId, blockDialogInhoud?.blocks ?? [], d, blockDialog.insertAt ?? undefined)
+              // Volgende rij komt onder de zojuist ingevoegde.
+              if (blockDialog.insertAt != null && !d.id) setBlockDialog(bd => bd ? { ...bd, insertAt: (bd.insertAt ?? 0) + 1 } : bd)
+            }}
             onSubmitGroup={(l, g) => blokken.setGroup(blockDialog.itemId, blockDialogInhoud?.groups ?? {}, l, g)}
           />
         )}
@@ -3496,6 +3632,7 @@ function WeekPlannerContent() {
             onRemoveBlock={(b) => detailItem && handleRemoveBlock(detailItem.item, b)}
             onMoveBlock={(b, dir) => detailItem && handleMoveBlock(detailItem.item, b, dir)}
             onEditGroup={(l) => detailItem && openBlockDialog(detailItem.item, detailItem.date, detailItem.dayId, { editGroupLetter: l })}
+            onRowMenu={(b, e) => detailItem && openRijMenu(detailItem.item, b, detailItem.date, detailItem.dayId, e)}
             onBuildCardio={setCardioBuilderItem}
             savingTemplate={saveItemAsTemplate.isPending}
             copying={duplicateItem.isPending}
@@ -3525,6 +3662,7 @@ function WeekPlannerContent() {
                   onRemoveBlock={(b) => detailItem && handleRemoveBlock(detailItem.item, b)}
                   onMoveBlock={(b, dir) => detailItem && handleMoveBlock(detailItem.item, b, dir)}
                   onEditGroup={(l) => detailItem && openBlockDialog(detailItem.item, detailItem.date, detailItem.dayId, { editGroupLetter: l })}
+                  onRowMenu={(b, e) => detailItem && openRijMenu(detailItem.item, b, detailItem.date, detailItem.dayId, e)}
                   onBuildCardio={setCardioBuilderItem}
                   savingTemplate={saveItemAsTemplate.isPending}
                   copying={duplicateItem.isPending}
