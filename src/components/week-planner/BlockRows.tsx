@@ -56,7 +56,7 @@ export function BlockRows({ blocks, groups, readOnly = false, compact = false, o
               </p>
             )}
             <div
-              className={`group/row flex items-center gap-1.5 rounded-md min-w-0 ${klikbaar ? 'cursor-pointer hover:bg-[rgba(255,255,255,0.05)]' : ''}`}
+              className={`group/row relative flex ${compact ? 'items-start' : 'items-center'} gap-1.5 rounded-md min-w-0 ${klikbaar ? 'cursor-pointer hover:bg-[rgba(255,255,255,0.05)]' : ''}`}
               style={{ padding: compact ? '2px 4px' : '6px 8px', fontStyle: b.blockKind === 'NOTE' ? 'italic' : undefined }}
               role={klikbaar ? 'button' : undefined}
               tabIndex={klikbaar ? 0 : undefined}
@@ -80,16 +80,39 @@ export function BlockRows({ blocks, groups, readOnly = false, compact = false, o
                   {b.supersetGroup}
                 </button>
               )}
-              <span className="flex-1 min-w-0 truncate" style={{ color: b.blockKind === 'NOTE' ? P.inkMuted : P.ink, fontSize: fs, fontWeight: b.blockKind === 'EXERCISE' ? 600 : 400 }}>
-                {naam}
-              </span>
-              {voorschrift && (
-                <span className="athletic-mono shrink-0" style={{ color: P.inkMuted, fontSize: fs - 1, letterSpacing: '0.02em' }}>
-                  {voorschrift}
+              {compact ? (
+                // Smal (dagcel): naam boven, voorschrift eronder. Op één regel
+                // won het voorschrift het van de naam en bleef er van "Box
+                // Squat" niets over.
+                <span className="flex-1 min-w-0">
+                  <span className="block truncate" style={{ color: b.blockKind === 'NOTE' ? P.inkMuted : P.ink, fontSize: fs, fontWeight: b.blockKind === 'EXERCISE' ? 600 : 400, lineHeight: 1.25 }}>
+                    {naam}
+                  </span>
+                  {voorschrift && (
+                    <span className="block athletic-mono truncate" style={{ color: P.inkMuted, fontSize: fs - 1, letterSpacing: '0.02em', lineHeight: 1.25 }}>
+                      {voorschrift}
+                    </span>
+                  )}
                 </span>
+              ) : (
+                <>
+                  <span className="flex-1 min-w-0 truncate" style={{ color: b.blockKind === 'NOTE' ? P.inkMuted : P.ink, fontSize: fs, fontWeight: b.blockKind === 'EXERCISE' ? 600 : 400 }}>
+                    {naam}
+                  </span>
+                  {voorschrift && (
+                    <span className="athletic-mono shrink-0" style={{ color: P.inkMuted, fontSize: fs - 1, letterSpacing: '0.02em' }}>
+                      {voorschrift}
+                    </span>
+                  )}
+                </>
               )}
               {!readOnly && (onMove || onRemove) && (
-                <span className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-60">
+                <span
+                  // In de smalle dagcel zweven de knopjes bij hover over de rij
+                  // heen; in de layout zouden ze onzichtbaar de naam wegdrukken.
+                  className={`flex items-center gap-0.5 opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-60 ${compact ? 'absolute right-0.5 top-1/2 -translate-y-1/2 rounded px-0.5' : 'shrink-0'}`}
+                  style={compact ? { background: P.surface } : undefined}
+                >
                   {onMove && (
                     <>
                       <button type="button" aria-label="Omhoog" disabled={i === 0} onClick={e => { e.stopPropagation(); onMove(b, -1) }} className="disabled:opacity-30" style={{ color: P.inkMuted }}>

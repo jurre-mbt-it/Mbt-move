@@ -63,8 +63,10 @@ import { CategoryIcon, CATEGORY_LABELS } from '@/components/week-planner/Categor
 import { BlockRows } from '@/components/week-planner/BlockRows'
 import { ExerciseBlockDialog, type BlockDialogType } from '@/components/week-planner/ExerciseBlockDialog'
 import { useBlockMutations } from '@/components/week-planner/useBlockMutations'
+import { Segmented } from '@/components/week-planner/block-forms/fields'
 import type { ItemGroups, PlannerBlock } from '@/lib/planner-blocks'
 type ItemExercise = PlannerBlock
+type Weergave = 'oefeningen' | 'trainingen'
 import { LOAD_UITLEG } from '@/lib/training-load'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -531,7 +533,7 @@ function MarkerIcon({ kind, size = 11 }: { kind: ItemKind; size?: number }) {
 }
 
 function ItemTile({
-  item, status, logged, movedTo, onRemove, onClick, readOnly, isOpen,
+  item, status, logged, movedTo, onRemove, onClick, readOnly, isOpen, toonAantal = false,
 }: {
   item: ScheduleItem
   status: ItemStatus
@@ -545,6 +547,8 @@ function ItemTile({
   readOnly?: boolean
   /** True als deze workout nu open staat in het zijpaneel → naam valt weg, alleen icoon. */
   isOpen?: boolean
+  /** Trainingen-weergave: de rijen staan niet in de cel, dus telt de pil ze. */
+  toonAantal?: boolean
 }) {
   const marker = isWorkoutKind(item.kind)
     ? null
@@ -616,6 +620,9 @@ function ItemTile({
   if (marker) {
     // Rustdag/notitie/test/doel: geen oefeningen of cardio, alleen het label.
     previewLine = marker.label
+  } else if (toonAantal && (item.blocks?.some(b => b.blockKind === 'EXERCISE') || (item.exercises?.length ?? 0) > 0)) {
+    const n = item.blocks ? item.blocks.filter(b => b.blockKind === 'EXERCISE').length : (item.exercises?.length ?? 0)
+    previewLine = `${n} oefening${n === 1 ? '' : 'en'}`
   } else if (item.quickCategory === 'CARDIO' && item.cardioParams) {
     const cp = item.cardioParams
     const parts: string[] = []
@@ -964,7 +971,7 @@ function DayCell({
   selected, onSelectStart, onSelectEnter,
   onAddWorkout, onAddTemplate, onCopyDay,
   onItemClick, onRemoveItem, statusFor, sessionIdFor, loggedFor, movedToFor, openItemId,
-  onAddBlock, onEditBlock, onRemoveBlock, onMoveBlock, onEditGroup,
+  onAddBlock, onEditBlock, onRemoveBlock, onMoveBlock, onEditGroup, toonRijen,
   readOnly = false,
 }: {
   date: Date
@@ -985,6 +992,8 @@ function DayCell({
   onRemoveBlock: (item: ScheduleItem, block: PlannerBlock) => void
   onMoveBlock: (item: ScheduleItem, block: PlannerBlock, dir: -1 | 1) => void
   onEditGroup: (item: ScheduleItem, letter: string, date: Date, dayId: string | null) => void
+  /** false = alleen de trainingspil, de rijen blijven in het zijpaneel. */
+  toonRijen: boolean
   statusFor: (date: Date, item: ScheduleItem) => ItemStatus
   sessionIdFor: (date: Date, item: ScheduleItem) => string | null
   loggedFor: (date: Date, item: ScheduleItem) => LoggedInfo | null
@@ -1084,6 +1093,7 @@ function DayCell({
               onClick={isCardioLog || !isWorkoutKind(item.kind) ? undefined : () => onItemClick(item, date, dayId, sId)}
               readOnly={readOnly || item.id.startsWith('sessionlog-') || isCardioLog}
               isOpen={item.id === openItemId}
+              toonAantal={!toonRijen}
             />
           )
           // Dag = training: onder een WORKOUT staan zijn rijen en "+ Oefening".
@@ -1095,7 +1105,7 @@ function DayCell({
                 : <div data-noselect className="w-full min-w-0">{tile}</div>}
               {toontRijen && (
                 <div data-noselect className="mt-0.5">
-                  <BlockRows
+                  {toonRijen && <BlockRows
                     compact
                     blocks={item.blocks ?? []}
                     groups={item.groups ?? {}}
@@ -1104,7 +1114,7 @@ function DayCell({
                     onRemove={b => onRemoveBlock(item, b)}
                     onMove={(b, dir) => onMoveBlock(item, b, dir)}
                     onEditGroup={l => onEditGroup(item, l, date, dayId)}
-                  />
+                  />}
                   {!readOnly && <AddBlockButton onClick={() => onAddBlock(item, date, dayId)} />}
                 </div>
               )}
@@ -2587,6 +2597,18 @@ function WeekPlannerContent() {
     setAddOpen(true)
   }
 
+  // ─ Weergave: alle oefeningen in de dagcel, of alleen de trainingspil ─
+  // Onthouden per browser: wie de kalender als overzicht gebruikt wil dat
+  // niet elke keer opnieuw kiezen.
+  const [weergave, setWeergave] = useState<Weergave>('oefeningen')
+  useEffect(() => {
+    try { if (localStorage.getItem('planner.weergave') === 'trainingen') setWeergave('trainingen') } catch {}
+  }, [])
+  const zetWeergave = (w: Weergave) => {
+    setWeergave(w)
+    try { localStorage.setItem('planner.weergave', w) } catch {}
+  }
+
   // ─ Bloklijst: "+ Oefening" opent één dialoog voor alle soorten rijen ─
   const blokken = useBlockMutations()
   const ensureDayWorkout = trpc.weekSchedules.ensureDayWorkout.useMutation()
@@ -2982,6 +3004,13 @@ function WeekPlannerContent() {
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
+        {/* Weergave: alle oefeningen per dag, of alleen de trainingspil. */}
+        <Segmented<Weergave>
+          ariaLabel="Weergave van de kalender"
+          value={weergave}
+          options={[{ value: 'oefeningen', label: 'Oefeningen' }, { value: 'trainingen', label: 'Trainingen' }]}
+          onChange={zetWeergave}
+        />
         {/* Status-legenda */}
         <div className="hidden sm:flex items-center gap-3 flex-wrap">
           {([
@@ -3296,6 +3325,7 @@ function WeekPlannerContent() {
                       onRemoveBlock={handleRemoveBlock}
                       onMoveBlock={handleMoveBlock}
                       onEditGroup={(item, l, d, dayId) => openBlockDialog(item, d, dayId, { editGroupLetter: l })}
+                      toonRijen={weergave === 'oefeningen'}
                       onAddTemplate={(d) => openAddModal(d, 'library')}
                       onCopyDay={(i) => setSelectedIsos(new Set([i]))}
                       onItemClick={(item, d, dayId, sessionId) => openDetail({ item, date: d, dayId, sessionId })}

@@ -63,11 +63,16 @@ export function ExerciseForm({ mode, draft, onChange, groups, defaultCategory, s
     // "sec" en hoort hier niet stil 10 herhalingen te worden.
     const unit = c.defaultRepUnit ?? (mode === 'cardio' ? 'min' : 'reps')
     const start = c.isUnilateral ? perSideOf(unit, true) : unit
+    // Wat de therapeut al invulde (sets, per-set-schema) blijft staan zolang
+    // de soort eenheid gelijk blijft; alleen als de oefening in tijd of
+    // afstand telt (plank in sec) vervalt een reps-schema, want dat zou dan
+    // seconden voorschrijven die niemand zo bedoelde.
+    const zelfdeSoort = start.replace('/zijde', '') === draft.repUnit.replace('/zijde', '')
     set({
       exerciseId: c.id, exerciseName: c.name, exerciseCategory: c.category,
-      repUnit: start,
-      reps: draft.reps === 10 && start.startsWith('sec') ? 30 : draft.reps,
-      repsPerSet: null,
+      repUnit: zelfdeSoort ? draft.repUnit : start,
+      reps: !zelfdeSoort && start.startsWith('sec') ? 30 : draft.reps,
+      repsPerSet: zelfdeSoort ? draft.repsPerSet : null,
     })
   }
 
