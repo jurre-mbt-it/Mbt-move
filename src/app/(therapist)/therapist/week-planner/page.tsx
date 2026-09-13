@@ -981,7 +981,7 @@ function DayCell({
   selected, onSelectStart, onSelectEnter,
   onAddWorkout, onAddTemplate, onCopyDay,
   onItemClick, onRemoveItem, statusFor, sessionIdFor, loggedFor, movedToFor, openItemId,
-  onAddBlock, onEditBlock, onRemoveBlock, onMoveBlock, onEditGroup, toonRijen, onDayMenu, onRowMenu,
+  onAddBlock, onEditBlock, onRemoveBlock, onMoveBlock, onEditGroup, toonRijen, onDayMenu, onRowMenu, krap = false,
   readOnly = false,
 }: {
   date: Date
@@ -1005,6 +1005,8 @@ function DayCell({
   /** false = alleen de trainingspil, de rijen blijven in het zijpaneel. */
   toonRijen: boolean
   onDayMenu: (item: ScheduleItem | null, date: Date, dayId: string | null, e: React.MouseEvent) => void
+  /** Weinig breedte per dag: knoppen zonder tekst. */
+  krap?: boolean
   onRowMenu: (item: ScheduleItem, block: PlannerBlock, date: Date, dayId: string | null, e: React.MouseEvent) => void
   statusFor: (date: Date, item: ScheduleItem) => ItemStatus
   sessionIdFor: (date: Date, item: ScheduleItem) => string | null
@@ -1133,7 +1135,7 @@ function DayCell({
                     onMove={(b, dir) => onMoveBlock(item, b, dir)}
                     onEditGroup={l => onEditGroup(item, l, date, dayId)}
                   />}
-                  {!readOnly && <AddBlockButton onClick={() => onAddBlock(item, date, dayId)} />}
+                  {!readOnly && <AddBlockButton compact={krap} onClick={() => onAddBlock(item, date, dayId)} />}
                 </div>
               )}
             </div>
@@ -1141,23 +1143,25 @@ function DayCell({
         })}
       </div>
       {inMonth && !readOnly && !items.some(i => i.kind === 'WORKOUT' && !i.id.startsWith('legacy-')) && (
-        <AddBlockButton onClick={() => onAddBlock(null, date, dayId)} />
+        <AddBlockButton compact={krap} onClick={() => onAddBlock(null, date, dayId)} />
       )}
     </div>
   )
 }
 
 /** "+ Oefening", altijd zichtbaar: de eerste handeling op een dag hoort geen hover te vragen. */
-function AddBlockButton({ onClick }: { onClick: () => void }) {
+function AddBlockButton({ onClick, compact = false }: { onClick: () => void; compact?: boolean }) {
   return (
     <button
       type="button"
       data-noselect
       onClick={onClick}
-      className="self-start text-[10px] flex items-center gap-1 px-1.5 py-0.5 rounded border cursor-pointer mbt-btn-hover opacity-70 hover:opacity-100 focus:opacity-100"
+      aria-label="Oefening toevoegen"
+      title="Oefening toevoegen"
+      className="self-start max-w-full min-w-0 text-[10px] flex items-center gap-1 px-1.5 py-0.5 rounded border cursor-pointer mbt-btn-hover opacity-70 hover:opacity-100 focus:opacity-100"
       style={{ color: P.brand, borderColor: 'rgba(232,122,85,0.4)', background: 'rgba(232,122,85,0.08)' }}
     >
-      <Plus className="w-3 h-3" /> Oefening
+      <Plus className="w-3 h-3 shrink-0" />{!compact && <span className="truncate">Oefening</span>}
     </button>
   )
 }
@@ -2569,9 +2573,14 @@ function WeekPlannerContent() {
   // Het zijpaneel eet breedte; klap de navigatie zolang in en zet hem daarna
   // terug zoals hij stond. Zonder dit krimpen de dagcellen tot strookjes.
   const paneelOpen = !!liveDetail && isDesktop
+  // Onder 1280 px krijgen zeven dagen naast een uitgeklapt menu en een brede
+  // weektotaal-kolom nog geen 60 px elk. Dan klapt het menu in en wordt de
+  // totaalkolom smal, net als wanneer het zijpaneel open staat.
+  const breed = useIsDesktop(1280)
+  const krap = paneelOpen || !breed
   const zijbalkVoorPaneel = useRef<boolean | null>(null)
   useEffect(() => {
-    if (paneelOpen) {
+    if (krap) {
       if (zijbalkVoorPaneel.current === null) {
         zijbalkVoorPaneel.current = isSidebarCollapsed()
         setSidebarCollapsed(true)
@@ -2580,7 +2589,7 @@ function WeekPlannerContent() {
       setSidebarCollapsed(zijbalkVoorPaneel.current)
       zijbalkVoorPaneel.current = null
     }
-  }, [paneelOpen])
+  }, [krap])
   const [addDayDate, setAddDayDate] = useState<Date | null>(null)
   const [addDayId, setAddDayId] = useState<string | null>(null)
 
@@ -3292,7 +3301,7 @@ function WeekPlannerContent() {
             eigen ding dat je kunt aanwijzen. */}
         <div className="flex flex-col gap-2">
           {/* Day-of-week header row */}
-          <div className={`grid ${paneelOpen ? 'grid-cols-[40px_repeat(7,1fr)_104px]' : 'grid-cols-[40px_repeat(7,1fr)_168px]'} gap-2 px-0.5`}>
+          <div className={`grid ${krap ? 'grid-cols-[40px_repeat(7,minmax(0,1fr))_96px]' : 'grid-cols-[40px_repeat(7,minmax(0,1fr))_168px]'} gap-2 px-0.5`}>
             <div />
             {DAY_LABELS_SHORT.map(d => (
               <div
@@ -3334,7 +3343,7 @@ function WeekPlannerContent() {
             return (
               <div
                 key={wIdx}
-                className={`grid ${paneelOpen ? 'grid-cols-[40px_repeat(7,1fr)_104px]' : 'grid-cols-[40px_repeat(7,1fr)_168px]'} gap-2`}
+                className={`grid ${krap ? 'grid-cols-[40px_repeat(7,minmax(0,1fr))_96px]' : 'grid-cols-[40px_repeat(7,minmax(0,1fr))_168px]'} gap-2`}
                 style={{
                   borderColor: P.line,
                   minHeight: 176,
@@ -3472,6 +3481,7 @@ function WeekPlannerContent() {
                       toonRijen={weergave === 'oefeningen'}
                       onDayMenu={openDagMenu}
                       onRowMenu={openRijMenu}
+                      krap={krap}
                       onAddTemplate={(d) => openAddModal(d, 'library')}
                       onCopyDay={(i) => setSelectedIsos(new Set([i]))}
                       onItemClick={(item, d, dayId, sessionId) => openDetail({ item, date: d, dayId, sessionId })}

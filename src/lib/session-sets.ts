@@ -177,3 +177,28 @@ export function prevSummaryFor(last: LastLog | undefined): string | null {
   if (unique.length === 1) return `${fmtKg(unique[0])} kg${reps ? ` × ${reps}` : ''}`
   return ws.map(w => fmtKg(w)).join(' / ') + ' kg'
 }
+
+/** Voorgeschreven parameters die de atleet zelf meet (staafsnelheid, piekvermogen): invoer, geen doelchip. */
+export const MEET_PARAM_IDS = ['bar_speed', 'peak_power'] as const
+export function isMeetParam(p: { id?: string; label?: string }): boolean {
+  return (MEET_PARAM_IDS as readonly string[]).includes(p.id ?? '') || p.label === 'Staafsnelheid' || p.label === 'Piekvermogen'
+}
+
+/**
+ * Start-parameters plus de meetvelden die de therapeut op de rij zette: die
+ * komen leeg binnen zodat de atleet ze invult (m/s, W), met de waarde van de
+ * vorige sessie als er een is.
+ */
+export function seedParamsMetMeetvelden(defaults: unknown, prescribed: unknown, memory: unknown, allowMemoryOnly: boolean): SessionParam[] {
+  const basis = seedParams(defaults, memory, allowMemoryOnly)
+  const meet = cloneParams(prescribed).filter(isMeetParam)
+  if (meet.length === 0) return basis
+  const mem = cloneParams(memory)
+  const extra = meet
+    .filter(m => !basis.some(b => b.label === m.label))
+    .map(m => {
+      const vorige = mem.find(x => x.label === m.label)
+      return { ...m, type: 'number' as const, value: vorige ? vorige.value : '' }
+    })
+  return [...basis, ...extra]
+}

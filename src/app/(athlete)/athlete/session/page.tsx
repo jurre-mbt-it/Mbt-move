@@ -21,8 +21,9 @@ import {
   prevKgFor,
   prevRepsFor,
   prevSummaryFor,
-  seedParams,
   filledParams,
+  seedParamsMetMeetvelden,
+  isMeetParam,
 } from '@/lib/session-sets'
 import {
   toPrescription,
@@ -544,7 +545,7 @@ function AthleteSessionPageInner() {
   function paramsFor(ex: LiveExercise): SessionParam[] {
     return (
       paramsByUid[ex.uid] ??
-      seedParams(ex.defaultExtraParams, lastLogs[ex.exerciseId]?.extraParams, true)
+      seedParamsMetMeetvelden(ex.defaultExtraParams, ex.programExtraParams, lastLogs[ex.exerciseId]?.extraParams, true)
     )
   }
 
@@ -1341,7 +1342,7 @@ function AthleteSessionPageInner() {
                   {prescLabel.toUpperCase()}{targetKgLabel ? ` · ${targetKgLabel.toUpperCase()}` : ''}
                 </span>
               )}
-              {(current.programExtraParams ?? []).map(p => {
+              {(current.programExtraParams ?? []).filter(p => !isMeetParam(p)).map(p => {
                 const label = formatPrescribedParam(p)
                 if (!label) return null
                 return (

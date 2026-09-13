@@ -21,8 +21,9 @@ import {
   prevKgFor,
   prevRepsFor,
   prevSummaryFor,
-  seedParams,
   filledParams,
+  seedParamsMetMeetvelden,
+  isMeetParam,
 } from '@/lib/session-sets'
 import {
   toPrescription,
@@ -1232,7 +1233,7 @@ function SessionPageInner() {
             : null
           // WYSIWYG: ook onaangeraakte (geseede) parameterwaarden loggen.
           const params = filledParams(
-            paramsByUid[e.uid] ?? seedParams(e.defaultExtraParams, lastLogs[e.exerciseId]?.extraParams, false),
+            paramsByUid[e.uid] ?? seedParamsMetMeetvelden(e.defaultExtraParams, e.programExtraParams, lastLogs[e.exerciseId]?.extraParams, false),
           )
           return {
             exerciseId: e.exerciseId,
@@ -1646,7 +1647,7 @@ function SessionPageInner() {
                   {prescLabel.toUpperCase()}{targetKgLabel ? ` · ${targetKgLabel.toUpperCase()}` : ''}
                 </span>
               )}
-              {(e.programExtraParams ?? []).map(p => {
+              {(e.programExtraParams ?? []).filter(p => !isMeetParam(p)).map(p => {
                 const label = formatPrescribedParam(p)
                 if (!label) return null
                 return (
@@ -1736,7 +1737,7 @@ function SessionPageInner() {
                 ingesteld; waarden van de vorige sessie staan er alvast in */}
             {(() => {
               const params =
-                paramsByUid[e.uid] ?? seedParams(e.defaultExtraParams, last?.extraParams, false)
+                paramsByUid[e.uid] ?? seedParamsMetMeetvelden(e.defaultExtraParams, e.programExtraParams, last?.extraParams, false)
               if (params.length === 0) return null
               return (
                 <ExtraParamsEditor
