@@ -28,11 +28,11 @@ import { CARDIO_ACTIVITIES, type CardioActivityKey } from '@/lib/cardio-constant
 import { readWorkout, type StructuredCardio } from '@/lib/cardio-workout'
 import { cardioEstimate, plannedVolume } from '@/lib/planned-load'
 import { CardioWorkoutBuilder } from '@/components/week-planner/CardioWorkoutBuilder'
-import {
-  QuickExerciseBuilder,
-  type Category,
-  type ItemExercise,
-} from '@/components/week-planner/QuickExerciseBuilder'
+import { BlockRows } from '@/components/week-planner/BlockRows'
+import { ExerciseBlockDialog } from '@/components/week-planner/ExerciseBlockDialog'
+import { useBlockMutations } from '@/components/week-planner/useBlockMutations'
+import type { Category, ItemGroups, PlannerBlock } from '@/lib/planner-blocks'
+type ItemExercise = PlannerBlock
 import { DeletePlanDialog } from '@/components/week-planner/PlanTemplateDialogs'
 import { WorkoutProfileStrip } from '@/components/week-planner/WorkoutProfileStrip'
 import { WeekVolumePanel, formatAfstand, formatDuur } from '@/components/week-planner/WeekVolumePanel'
@@ -169,11 +169,11 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
   const { data: alleInhoud = [] } = (trpc.weekSchedules.listItemContents.useQuery as any)(
     { patientId: '', planTemplateId: planId },
     { staleTime: 10_000 },
-  ) as { data: Array<{ itemId: string; exercises: ItemExercise[]; cardioParams: unknown }> }
+  ) as { data: Array<{ itemId: string; exercises: ItemExercise[]; blocks: PlannerBlock[]; groups: ItemGroups; cardioParams: unknown }> }
 
   const inhoudPerItem = useMemo(() => {
-    const m = new Map<string, { exercises: ItemExercise[]; cardioParams: unknown }>()
-    for (const c of alleInhoud) m.set(c.itemId, { exercises: c.exercises, cardioParams: c.cardioParams })
+    const m = new Map<string, { exercises: ItemExercise[]; blocks: PlannerBlock[]; groups: ItemGroups; cardioParams: unknown }>()
+    for (const c of alleInhoud) m.set(c.itemId, { exercises: c.exercises, blocks: c.blocks, groups: c.groups, cardioParams: c.cardioParams })
     return m
   }, [alleInhoud])
 
@@ -571,11 +571,16 @@ export default function PlanEditorPage({ params }: { params: Promise<{ id: strin
                               <Trash2 className="h-3 w-3" />
                             </button>
                           </div>
-                          {/* Vorm van de workout: cardio-blokken als zaagtand,
-                              kracht als balkje per oefening. */}
+                          {item.kind === 'WORKOUT' && (inhoud?.blocks?.length ?? 0) > 0 && (
+                            <div className="px-1 pb-1">
+                              <BlockRows compact readOnly blocks={inhoud!.blocks} groups={inhoud!.groups ?? {}} />
+                            </div>
+                          )}
+                          {/* Vorm van een cardio-workout: blokken als zaagtand. Kracht
+                              staat hierboven als rijen. */}
                           <WorkoutProfileStrip
                             cardioParams={inhoud?.cardioParams}
-                            exercises={inhoud?.exercises}
+                            exercises={item.quickCategory === 'CARDIO' ? inhoud?.exercises : null}
                             category={item.quickCategory}
                             height={14}
                           />
@@ -1009,12 +1014,15 @@ function PlanItemDialog({
   const [rpe, setRpe] = useState(item.plannedRpe != null ? String(item.plannedRpe) : '')
   const [notitie, setNotitie] = useState(item.notes ?? '')
   const [cardioOpen, setCardioOpen] = useState(false)
+  // "+ Oefening": dezelfde pop-up als de weekplanner, op een sjabloon-item.
+  const blokken = useBlockMutations()
+  const [blokDialoog, setBlokDialoog] = useState<{ editBlock: PlannerBlock | null; editGroupLetter: string | null } | null>(null)
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: contents = [], isFetched: contentsLoaded } = (trpc.weekSchedules.listItemContents.useQuery as any)(
     { patientId: '', planTemplateId: planId },
     { staleTime: 10_000 },
-  ) as { data: Array<{ itemId: string; exercises: ItemExercise[]; cardioParams: unknown }>; isFetched: boolean }
+  ) as { data: Array<{ itemId: string; exercises: ItemExercise[]; blocks: PlannerBlock[]; groups: ItemGroups; cardioParams: unknown }>; isFetched: boolean }
   // De server geeft `itemId` terug, geen `id` — matchen op `id` liet `inhoud`
   // altijd undefined, waardoor de builder leeg opende en opslaan bestaande
   // oefeningen/cardio wiste (setItemExercises is replace-all).
@@ -1053,10 +1061,6 @@ function PlanItemDialog({
     onSuccess: () => { ververs(); toast.success('Opgeslagen'); onClose() },
     onError: (e) => toast.error(e.message),
   })
-  const setExercises = trpc.weekSchedules.setItemExercises.useMutation({
-    onSuccess: () => { ververs(); toast.success('Oefeningen opgeslagen') },
-    onError: (e) => toast.error(e.message),
-  })
   const setCardio = trpc.weekSchedules.setItemCardio.useMutation({
     onSuccess: () => { ververs(); setCardioOpen(false); toast.success('Cardio opgeslagen') },
     onError: (e) => toast.error(e.message),
@@ -1065,7 +1069,7 @@ function PlanItemDialog({
   if (cardioOpen) {
     return (
       <CardioWorkoutBuilder
-        // Zelfde reden als bij de QuickExerciseBuilder: remount zodra de
+        // Remount zodra de inhoud geladen is: de bouwer kopieert `initial` eenmalig, dus
         // inhoud geladen is, anders opent de bouwer met lege blokken.
         key={`${item.id}:${contentsLoaded ? 'c' : 'l'}`}
         initial={workout}
@@ -1173,23 +1177,46 @@ function PlanItemDialog({
                   </DarkButton>
                 </div>
               ) : (
-                <QuickExerciseBuilder
-                  // Neem de laad-status in de key: de builder kopieert `initial`
-                  // eenmalig in useState en remount niet als listItemContents
-                  // later binnenkomt. Zonder dit opent hij leeg bij een trage query.
-                  key={`${item.id}:${contentsLoaded ? 'c' : 'l'}`}
-                  initial={inhoud?.exercises ?? []}
-                  defaultCategory={category}
-                  saving={setExercises.isPending}
-                  onSave={async (exercises) => {
-                    await setExercises.mutateAsync({ itemId: item.id, exercises })
-                  }}
-                />
+                <div className="space-y-2">
+                  <MetaLabel>Oefeningen</MetaLabel>
+                  {(inhoud?.blocks?.length ?? 0) === 0 ? (
+                    <p style={{ color: P.inkMuted, fontSize: 12 }}>Nog geen oefeningen. Voeg de eerste toe.</p>
+                  ) : (
+                    <BlockRows
+                      blocks={inhoud!.blocks}
+                      groups={inhoud!.groups ?? {}}
+                      onEdit={b => setBlokDialoog({ editBlock: b, editGroupLetter: null })}
+                      onRemove={b => blokken.removeBlock(item.id, inhoud!.blocks, b.id)}
+                      onMove={(b, dir) => blokken.moveBlock(item.id, inhoud!.blocks, b.id, dir)}
+                      onEditGroup={l => setBlokDialoog({ editBlock: null, editGroupLetter: l })}
+                    />
+                  )}
+                  <DarkButton variant="secondary" size="sm" onClick={() => setBlokDialoog({ editBlock: null, editGroupLetter: null })}>
+                    Oefening toevoegen
+                  </DarkButton>
+                </div>
               )}
             </div>
           )}
         </div>
       </DialogContent>
+      {blokDialoog && (
+        <ExerciseBlockDialog
+          open
+          onClose={() => setBlokDialoog(null)}
+          dayLabel="Sjabloondag"
+          workoutName={item.quickName ?? 'Training'}
+          initialType={category === 'CARDIO' ? 'cardio' : 'exercise'}
+          editBlock={blokDialoog.editBlock}
+          editGroupLetter={blokDialoog.editGroupLetter}
+          blocks={inhoud?.blocks ?? []}
+          groups={inhoud?.groups ?? {}}
+          defaultCategory={category}
+          saving={blokken.saving}
+          onSubmitBlock={d => blokken.submitBlock(item.id, inhoud?.blocks ?? [], d)}
+          onSubmitGroup={(l, g) => blokken.setGroup(item.id, inhoud?.groups ?? {}, l, g)}
+        />
+      )}
     </Dialog>
   )
 }
