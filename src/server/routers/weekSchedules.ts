@@ -16,8 +16,7 @@ import {
   type WeekItemKind,
   type ExerciseCategory,
   type CardioActivity,
-  type
- } from '@prisma/client'
+} from '@prisma/client'
 
 const createId = () => crypto.randomUUID()
 
