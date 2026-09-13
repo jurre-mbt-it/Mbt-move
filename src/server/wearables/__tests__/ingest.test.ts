@@ -148,7 +148,9 @@ describe('ingestWearableData · bronvoorrang', () => {
       'user-1',
       {
         ...legePayload,
-        vitals: [{ date: '2026-09-11', hrv: 41, hrvType: 'RMSSD', activeEnergyKcal: 640, steps: 8000 }],
+        vitals: [
+          { date: '2026-09-11', hrv: 41, hrvType: 'RMSSD', vo2Max: 52.3, activeEnergyKcal: 640, steps: 8000 },
+        ],
       },
       { source: 'POLAR' },
     )
@@ -156,11 +158,12 @@ describe('ingestWearableData · bronvoorrang', () => {
     expect(vitalsEntry.create.mock.calls[0][0].data).toMatchObject({
       hrv: 41,
       hrvType: 'RMSSD',
-      activeEnergyKcal: 640,
+      vo2Max: 52.3,
       source: 'POLAR',
       daySource: 'POLAR',
-      // Stappen gaan mee, maar claimen niets: de hoogste telling wint.
+      // Dagtotalen gaan mee, maar claimen niets: de hoogste waarde wint.
       steps: 8000,
+      activeEnergyKcal: 640,
     })
   })
 })

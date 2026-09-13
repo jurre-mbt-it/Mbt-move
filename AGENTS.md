@@ -227,13 +227,16 @@ Drie dingen om te onthouden als je hier komt:
   HRV, ademhaling, polstemperatuur) en `daySource` voor de daggroep (energie,
   VO2max). Zonder die splitsing kaapt een middagsync met alleen dagwaarden het
   label van een rij waarvan de HRV van een ander apparaat kwam.
-- **Stappen kennen géén eigenaar: de hoogste telling wint.** Een stappenteller
-  is een optelling over de dag, dus het apparaat dat je het langst om had telt
-  het eerlijkst. Eerste-wint pakte hier verkeerd uit: een Polar-sync van 8252
-  zette de dag vast en blokkeerde een hele dag Apple Watch. Calorieën en VO2max
-  volgen die uitzondering bewust NIET, want dat zijn schattingen en geen
-  tellingen; "hoogste wint" zou daar systematisch de meest optimistische bron
-  kiezen.
+- **Dagtotalen kennen géén eigenaar: de hoogste waarde wint.** Dat geldt voor
+  `steps` en `activeEnergyKcal`. Allebei lopen ze de hele dag op, dus het
+  apparaat dat je het langst om had heeft de volledigste telling. Eerste-wint
+  pakte hier twee keer verkeerd uit op 12-09-2026: een Polar-sync van 8252
+  blokkeerde een hele dag Apple Watch die op 14852 uitkwam, en de actieve
+  energie bleef op 647 kcal staan terwijl de hardloop van die dag er alleen al
+  566 was. `basalEnergyKcal` en `vo2Max` volgen die uitzondering bewust NIET:
+  een basaalverbruik is een formule uit lichaamsmaten en VO2max een
+  puntschatting, daar telt niets op en zou "hoogste wint" alleen de meest
+  optimistische bron kiezen.
 
 Workouts vallen hier buiten: die ontdubbelen op tijd-overlap in
 [`dedupe.ts`](src/server/wearables/dedupe.ts) en vullen elkaars lege velden

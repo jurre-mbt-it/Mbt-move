@@ -42,17 +42,16 @@ export function isUniqueViolation(err: unknown): boolean {
   )
 }
 
-/** Nachtvelden van VitalsEntry: horen bij één meting, één eigenaar. */
-export const NACHT_VELDEN = [
-  'restingHeartRate',
-  'hrv',
-  'hrvType',
-  'respiratoryRate',
-  'wristTempDeviation',
-] as const
-
-/** Dagvelden van VitalsEntry: lopen gedurende de dag op, eigen eigenaar. */
-export const DAG_VELDEN = ['steps', 'activeEnergyKcal', 'basalEnergyKcal', 'vo2Max'] as const
+/**
+ * Dagtotalen: velden die de hele dag oplopen en dus geen eigenaar kennen. Voor
+ * deze twee wint de hoogste waarde, zie `schrijfDagtotaal`.
+ *
+ * De rest van de daggroep (`basalEnergyKcal`, `vo2Max`) hoort hier NIET bij:
+ * basaalverbruik is een formule uit lichaamsmaten en VO2max een puntschatting.
+ * Daar telt niets op, dus daar zou "hoogste wint" alleen de meest optimistische
+ * bron kiezen.
+ */
+const DAGTOTALEN = new Set(['steps', 'activeEnergyKcal'])
 
 export type VitalsGroep = Record<string, unknown>
 
@@ -183,28 +182,32 @@ async function vulLegeVelden(
 }
 
 /**
- * Stappen: hoogste telling wint, ongeacht wie de daggroep bezit.
+ * Dagtotaal schrijven: de hoogste waarde wint, ongeacht wie de daggroep bezit.
  *
- * Een stappenteller is een optelling over de dag, geen momentopname. Draag je
- * twee apparaten, dan telt het apparaat dat je het langst om had het eerlijkst,
- * en dat is simpelweg het hoogste getal. Eigenaarschap zou hier juist het
- * verkeerde antwoord geven: wie toevallig als eerste synct zou de dag dan
- * vastzetten op een halve telling (afspraak met Jurre, 13-09-2026, nadat een
- * Polar-sync van 8252 de stappen van een hele dag Apple Watch blokkeerde).
+ * Stappen en actieve energie zijn optellingen over de dag, geen momentopnames.
+ * Draag je twee apparaten, dan heeft het apparaat dat je het langst om had de
+ * volledigste telling, en dat is simpelweg het hoogste getal. Eigenaarschap
+ * geeft hier juist het verkeerde antwoord: wie toevallig als eerste synct zet
+ * de dag dan vast op een halve dag.
+ *
+ * Twee keer in het echt gezien (12-09-2026): een Polar-sync van 8252 blokkeerde
+ * een hele dag Apple Watch die op 14852 stappen uitkwam, en de actieve energie
+ * bleef op 647 kcal steken terwijl de hardloop van die dag er alleen al 566 was.
  *
  * De vergelijking zit in de WHERE, zodat twee syncs die tegelijk binnenkomen
- * elkaar niet omlaag kunnen trekken. Keerzijde: corrigeert een bron zijn eigen
- * telling naar BENEDEN, dan blijft de hogere staan.
+ * elkaar niet omlaag kunnen trekken. Keerzijde, bewust geaccepteerd: corrigeert
+ * een bron zijn eigen telling naar BENEDEN, dan blijft de hogere staan.
  */
-async function schrijfStappen(
+async function schrijfDagtotaal(
   prisma: VitalsDb,
   userId: string,
   date: Date,
-  stappen: number,
+  veld: string,
+  waarde: number,
 ): Promise<void> {
   await prisma.vitalsEntry.updateMany({
-    where: { userId, date, OR: [{ steps: null }, { steps: { lt: stappen } }] },
-    data: { steps: stappen },
+    where: { userId, date, OR: [{ [veld]: null }, { [veld]: { lt: waarde } }] } as never,
+    data: { [veld]: waarde } as Prisma.VitalsEntryUpdateManyMutationInput,
   })
 }
 
@@ -221,12 +224,16 @@ export async function schrijfVitals(
   nacht: VitalsGroep,
   dag: VitalsGroep,
 ): Promise<void> {
-  // Stappen staan BUITEN het eigenaarschap: zie schrijfStappen hieronder.
-  const { steps, ...dagRest } = dag
-  const stappen = typeof steps === 'number' ? steps : null
+  // Dagtotalen staan BUITEN het eigenaarschap: zie schrijfDagtotaal hierboven.
+  const dagRest: VitalsGroep = {}
+  const totalen: [string, number][] = []
+  for (const [veld, waarde] of Object.entries(dag)) {
+    if (DAGTOTALEN.has(veld) && typeof waarde === 'number') totalen.push([veld, waarde])
+    else dagRest[veld] = waarde
+  }
   const heeftNacht = Object.keys(nacht).length > 0
   const heeftDag = Object.keys(dagRest).length > 0
-  if (!heeftNacht && !heeftDag && stappen == null) return
+  if (!heeftNacht && !heeftDag && totalen.length === 0) return
 
   // Bestaat de rij nog niet, dan maakt deze bron hem aan en claimt hij alleen
   // de groepen die hij ook echt levert. Stappen gaan mee zonder claim.
@@ -238,7 +245,7 @@ export async function schrijfVitals(
         date,
         ...nacht,
         ...dagRest,
-        ...(stappen != null ? { steps: stappen } : {}),
+        ...Object.fromEntries(totalen),
         source: heeftNacht ? source : null,
         daySource: heeftDag ? source : null,
       } as Prisma.VitalsEntryUncheckedCreateInput,
@@ -248,7 +255,7 @@ export async function schrijfVitals(
     if (!isUniqueViolation(err)) throw err
   }
 
-  if (stappen != null) await schrijfStappen(prisma, userId, date, stappen)
+  for (const [veld, waarde] of totalen) await schrijfDagtotaal(prisma, userId, date, veld, waarde)
 
   if (heeftNacht) {
     // Eigenaar werkt zijn eigen groep bij; is de groep nog van niemand, dan

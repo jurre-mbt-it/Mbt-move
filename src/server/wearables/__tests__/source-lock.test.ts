@@ -60,10 +60,10 @@ describe('vitals · twee groepen met een eigen eigenaar', () => {
     // Een middagsync met alleen dagwaarden mag de nachtgroep niet op naam zetten.
     const { db, create } = vitalsDb()
 
-    await schrijfVitals(db, 'user-1', DATUM, 'APPLE_WATCH', {}, { activeEnergyKcal: 640 })
+    await schrijfVitals(db, 'user-1', DATUM, 'APPLE_WATCH', {}, { vo2Max: 52.3 })
 
     expect(create.mock.calls[0][0].data).toMatchObject({
-      activeEnergyKcal: 640, source: null, daySource: 'APPLE_WATCH',
+      vo2Max: 52.3, source: null, daySource: 'APPLE_WATCH',
     })
   })
 
@@ -80,11 +80,38 @@ describe('vitals · twee groepen met een eigen eigenaar', () => {
   it('laat de eigenaar zijn eigen daggroep bijwerken', async () => {
     const { db, updateMany } = vitalsDb({ rijBestaat: true, counts: [1] })
 
-    await schrijfVitals(db, 'user-1', DATUM, 'APPLE_WATCH', {}, { activeEnergyKcal: 700 })
+    await schrijfVitals(db, 'user-1', DATUM, 'APPLE_WATCH', {}, { vo2Max: 52.3 })
 
     expect(updateMany.mock.calls[0][0]).toEqual({
       where: { userId: 'user-1', date: DATUM, daySource: 'APPLE_WATCH' },
-      data: { activeEnergyKcal: 700 },
+      data: { vo2Max: 52.3 },
+    })
+  })
+
+  it('actieve energie: ook een dagtotaal, dus hoogste wint', async () => {
+    // 12-09-2026: Polar bezat de dag en hield de actieve energie op 647 kcal,
+    // terwijl de hardloop van die dag alleen al 566 kcal was. Een deeldag mag
+    // een hele dag niet blokkeren.
+    const { db, updateMany } = vitalsDb({ rijBestaat: true, counts: [1] })
+
+    await schrijfVitals(db, 'user-1', DATUM, 'APPLE_WATCH', {}, { activeEnergyKcal: 980 })
+
+    expect(updateMany.mock.calls[0][0]).toEqual({
+      where: { userId: 'user-1', date: DATUM, OR: [{ activeEnergyKcal: null }, { activeEnergyKcal: { lt: 980 } }] },
+      data: { activeEnergyKcal: 980 },
+    })
+  })
+
+  it('basaalverbruik blijft WEL van de eigenaar, want dat telt niets op', async () => {
+    // Een formule uit lengte, gewicht en leeftijd. "Hoogste wint" zou daar
+    // alleen de meest optimistische bron kiezen.
+    const { db, updateMany } = vitalsDb({ rijBestaat: true, counts: [1] })
+
+    await schrijfVitals(db, 'user-1', DATUM, 'APPLE_WATCH', {}, { basalEnergyKcal: 1700 })
+
+    expect(updateMany.mock.calls[0][0]).toEqual({
+      where: { userId: 'user-1', date: DATUM, daySource: 'APPLE_WATCH' },
+      data: { basalEnergyKcal: 1700 },
     })
   })
 
