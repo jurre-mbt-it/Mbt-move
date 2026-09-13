@@ -146,12 +146,21 @@ describe('ingestWearableData · bronvoorrang', () => {
     await ingestWearableData(
       db,
       'user-1',
-      { ...legePayload, vitals: [{ date: '2026-09-11', hrv: 41, hrvType: 'RMSSD', steps: 8000 }] },
+      {
+        ...legePayload,
+        vitals: [{ date: '2026-09-11', hrv: 41, hrvType: 'RMSSD', activeEnergyKcal: 640, steps: 8000 }],
+      },
       { source: 'POLAR' },
     )
 
     expect(vitalsEntry.create.mock.calls[0][0].data).toMatchObject({
-      hrv: 41, hrvType: 'RMSSD', steps: 8000, source: 'POLAR', daySource: 'POLAR',
+      hrv: 41,
+      hrvType: 'RMSSD',
+      activeEnergyKcal: 640,
+      source: 'POLAR',
+      daySource: 'POLAR',
+      // Stappen gaan mee, maar claimen niets: de hoogste telling wint.
+      steps: 8000,
     })
   })
 })

@@ -224,11 +224,16 @@ Drie dingen om te onthouden als je hier komt:
   meer langs. Een dag die nog niemand heeft bestaat niet als rij en wordt dus
   altijd aangemaakt, dus gaten vult iedereen.
 - **`VitalsEntry` heeft twee eigenaars**, `source` voor de nachtgroep (rust-HR,
-  HRV, ademhaling, polstemperatuur) en `daySource` voor de daggroep (stappen,
-  energie, VO2max). Zonder die splitsing kaapt een middagsync met alleen
-  stappen het label van een rij waarvan de HRV van een ander apparaat kwam, en
-  kan de bron van die stappen ze daarna niet meer bijwerken terwijl ze de hele
-  dag oplopen.
+  HRV, ademhaling, polstemperatuur) en `daySource` voor de daggroep (energie,
+  VO2max). Zonder die splitsing kaapt een middagsync met alleen dagwaarden het
+  label van een rij waarvan de HRV van een ander apparaat kwam.
+- **Stappen kennen géén eigenaar: de hoogste telling wint.** Een stappenteller
+  is een optelling over de dag, dus het apparaat dat je het langst om had telt
+  het eerlijkst. Eerste-wint pakte hier verkeerd uit: een Polar-sync van 8252
+  zette de dag vast en blokkeerde een hele dag Apple Watch. Calorieën en VO2max
+  volgen die uitzondering bewust NIET, want dat zijn schattingen en geen
+  tellingen; "hoogste wint" zou daar systematisch de meest optimistische bron
+  kiezen.
 
 Workouts vallen hier buiten: die ontdubbelen op tijd-overlap in
 [`dedupe.ts`](src/server/wearables/dedupe.ts) en vullen elkaars lege velden

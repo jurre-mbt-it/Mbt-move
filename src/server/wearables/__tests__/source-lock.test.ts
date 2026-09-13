@@ -57,23 +57,47 @@ function vitalsDb(opts: { rijBestaat?: boolean; counts?: number[] } = {}) {
 
 describe('vitals · twee groepen met een eigen eigenaar', () => {
   it('claimt bij het aanmaken alleen de groepen die deze bron levert', async () => {
-    // Een middagsync met alleen stappen mag de nachtgroep niet op naam zetten.
+    // Een middagsync met alleen dagwaarden mag de nachtgroep niet op naam zetten.
     const { db, create } = vitalsDb()
 
-    await schrijfVitals(db, 'user-1', DATUM, 'APPLE_WATCH', {}, { steps: 8000 })
+    await schrijfVitals(db, 'user-1', DATUM, 'APPLE_WATCH', {}, { activeEnergyKcal: 640 })
 
     expect(create.mock.calls[0][0].data).toMatchObject({
-      steps: 8000, source: null, daySource: 'APPLE_WATCH',
+      activeEnergyKcal: 640, source: null, daySource: 'APPLE_WATCH',
     })
   })
 
-  it('laat de eigenaar zijn eigen daggroep bijwerken (stappen lopen op)', async () => {
+  it('stappen claimen de daggroep NIET, want die kennen geen eigenaar', async () => {
+    const { db, create } = vitalsDb()
+
+    await schrijfVitals(db, 'user-1', DATUM, 'POLAR', {}, { steps: 8252 })
+
+    expect(create.mock.calls[0][0].data).toMatchObject({
+      steps: 8252, source: null, daySource: null,
+    })
+  })
+
+  it('laat de eigenaar zijn eigen daggroep bijwerken', async () => {
     const { db, updateMany } = vitalsDb({ rijBestaat: true, counts: [1] })
 
-    await schrijfVitals(db, 'user-1', DATUM, 'APPLE_WATCH', {}, { steps: 12000 })
+    await schrijfVitals(db, 'user-1', DATUM, 'APPLE_WATCH', {}, { activeEnergyKcal: 700 })
 
     expect(updateMany.mock.calls[0][0]).toEqual({
       where: { userId: 'user-1', date: DATUM, daySource: 'APPLE_WATCH' },
+      data: { activeEnergyKcal: 700 },
+    })
+  })
+
+  it('stappen: de hoogste telling wint, ongeacht wie de dag bezit', async () => {
+    // Afspraak met Jurre: een stappenteller is een optelling over de dag, dus
+    // het apparaat dat je het langst om had telt het eerlijkst. Eigenaarschap
+    // zou de dag vastzetten op een halve telling.
+    const { db, updateMany } = vitalsDb({ rijBestaat: true, counts: [1] })
+
+    await schrijfVitals(db, 'user-1', DATUM, 'POLAR', {}, { steps: 12000 })
+
+    expect(updateMany.mock.calls[0][0]).toEqual({
+      where: { userId: 'user-1', date: DATUM, OR: [{ steps: null }, { steps: { lt: 12000 } }] },
       data: { steps: 12000 },
     })
   })

@@ -183,6 +183,32 @@ async function vulLegeVelden(
 }
 
 /**
+ * Stappen: hoogste telling wint, ongeacht wie de daggroep bezit.
+ *
+ * Een stappenteller is een optelling over de dag, geen momentopname. Draag je
+ * twee apparaten, dan telt het apparaat dat je het langst om had het eerlijkst,
+ * en dat is simpelweg het hoogste getal. Eigenaarschap zou hier juist het
+ * verkeerde antwoord geven: wie toevallig als eerste synct zou de dag dan
+ * vastzetten op een halve telling (afspraak met Jurre, 13-09-2026, nadat een
+ * Polar-sync van 8252 de stappen van een hele dag Apple Watch blokkeerde).
+ *
+ * De vergelijking zit in de WHERE, zodat twee syncs die tegelijk binnenkomen
+ * elkaar niet omlaag kunnen trekken. Keerzijde: corrigeert een bron zijn eigen
+ * telling naar BENEDEN, dan blijft de hogere staan.
+ */
+async function schrijfStappen(
+  prisma: VitalsDb,
+  userId: string,
+  date: Date,
+  stappen: number,
+): Promise<void> {
+  await prisma.vitalsEntry.updateMany({
+    where: { userId, date, OR: [{ steps: null }, { steps: { lt: stappen } }] },
+    data: { steps: stappen },
+  })
+}
+
+/**
  * Vitals: twee groepen, elk met een eigen eigenaar. De eigenaar mag zijn eigen
  * groep bijwerken (stappen lopen de hele dag op), een andere bron mag alleen
  * vullen wat nog leeg is.
@@ -195,12 +221,15 @@ export async function schrijfVitals(
   nacht: VitalsGroep,
   dag: VitalsGroep,
 ): Promise<void> {
+  // Stappen staan BUITEN het eigenaarschap: zie schrijfStappen hieronder.
+  const { steps, ...dagRest } = dag
+  const stappen = typeof steps === 'number' ? steps : null
   const heeftNacht = Object.keys(nacht).length > 0
-  const heeftDag = Object.keys(dag).length > 0
-  if (!heeftNacht && !heeftDag) return
+  const heeftDag = Object.keys(dagRest).length > 0
+  if (!heeftNacht && !heeftDag && stappen == null) return
 
   // Bestaat de rij nog niet, dan maakt deze bron hem aan en claimt hij alleen
-  // de groepen die hij ook echt levert.
+  // de groepen die hij ook echt levert. Stappen gaan mee zonder claim.
   try {
     await prisma.vitalsEntry.create({
       data: {
@@ -208,7 +237,8 @@ export async function schrijfVitals(
         userId,
         date,
         ...nacht,
-        ...dag,
+        ...dagRest,
+        ...(stappen != null ? { steps: stappen } : {}),
         source: heeftNacht ? source : null,
         daySource: heeftDag ? source : null,
       } as Prisma.VitalsEntryUncheckedCreateInput,
@@ -217,6 +247,8 @@ export async function schrijfVitals(
   } catch (err) {
     if (!isUniqueViolation(err)) throw err
   }
+
+  if (stappen != null) await schrijfStappen(prisma, userId, date, stappen)
 
   if (heeftNacht) {
     // Eigenaar werkt zijn eigen groep bij; is de groep nog van niemand, dan
@@ -237,14 +269,14 @@ export async function schrijfVitals(
   if (heeftDag) {
     const eigen = await prisma.vitalsEntry.updateMany({
       where: { userId, date, daySource: source },
-      data: dag as Prisma.VitalsEntryUpdateManyMutationInput,
+      data: dagRest as Prisma.VitalsEntryUpdateManyMutationInput,
     })
     if (eigen.count === 0) {
       const geclaimd = await prisma.vitalsEntry.updateMany({
         where: { userId, date, daySource: null },
-        data: { ...dag, daySource: source } as Prisma.VitalsEntryUpdateManyMutationInput,
+        data: { ...dagRest, daySource: source } as Prisma.VitalsEntryUpdateManyMutationInput,
       })
-      if (geclaimd.count === 0) await vulLegeVelden(prisma, userId, date, dag)
+      if (geclaimd.count === 0) await vulLegeVelden(prisma, userId, date, dagRest)
     }
   }
 }
