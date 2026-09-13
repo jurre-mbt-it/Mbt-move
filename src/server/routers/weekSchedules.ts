@@ -10,15 +10,14 @@ import { planningCutoffVoorPatient } from '@/server/lib/planning-cutoff'
 import { assertNotDischarged } from '@/server/lib/care-guard'
 import { mondayKey, mondayKeyOf, addDaysKey, amsMidnight, weeksBetween, isDateKey } from '@/lib/week-dates'
 import { parseStructured, legacySummaryFields, structuredLoad } from '@/lib/cardio-workout'
-import { durationFromExercises } from '@/lib/planned-load'
 import {
   Prisma,
   type PrismaClient,
   type WeekItemKind,
   type ExerciseCategory,
   type CardioActivity,
-  type IntensityType,
-} from '@prisma/client'
+  type
+ } from '@prisma/client'
 
 const createId = () => crypto.randomUUID()
 

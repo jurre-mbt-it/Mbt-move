@@ -17,6 +17,7 @@ import { useRouter } from 'next/navigation'
 import { trpc } from '@/lib/trpc/client'
 import { ChevronLeft, ChevronRight, X, Clock, Flame, MapPin, HeartPulse } from 'lucide-react'
 import { formatSetsReps } from '@/lib/prescription'
+import { formatBlockPrescription } from '@/lib/planner-blocks'
 import { P, CARD, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-ui'
 import {
   IconStrength, IconMobility, IconPlyometrics, IconCardio, IconCore, IconSleep,
@@ -822,7 +823,7 @@ function EventDetailSheet({
     { enabled: event.kind === 'planned' && event.hasExercises && !!plannedItemId, staleTime: 60_000 },
   ) as {
     data:
-      | { exercises: { exerciseId: string; name: string; sets: number; reps: number; repUnit?: string; supersetGroup?: string | null }[] }
+      | { exercises: { exerciseId: string; name: string; sets: number; setsMax?: number | null; reps: number; repsMax?: number | null; repUnit?: string; supersetGroup?: string | null; repsPerSet?: number[] | null; amrap?: boolean; completionOnly?: boolean }[] }
       | undefined
     isLoading: boolean
   }
@@ -942,7 +943,7 @@ function EventDetailSheet({
                             className="athletic-mono"
                             style={{ color: P.inkMuted, fontSize: 10, letterSpacing: '0.1em', marginTop: 2, textTransform: 'uppercase' }}
                           >
-                            {formatSetsReps(ex.sets, null, ex.reps, null, ex.repUnit)}
+                            {formatBlockPrescription({ blockKind: 'EXERCISE', sets: ex.sets, setsMax: ex.setsMax ?? null, reps: ex.reps, repsMax: ex.repsMax ?? null, repUnit: ex.repUnit ?? 'reps', repsPerSet: ex.repsPerSet ?? null, amrap: ex.amrap ?? false, completionOnly: ex.completionOnly ?? false, durationSec: null })}
                           </p>
                         </div>
                       </div>

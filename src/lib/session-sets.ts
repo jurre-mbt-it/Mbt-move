@@ -109,12 +109,11 @@ export function fmtKg(n: number): string {
 }
 
 /** Default set-rijen op basis van het programma-doel (sets × reps). */
-export function makeSetEntries(sets: number, reps: number): SetEntry[] {
-  return Array.from({ length: Math.max(1, sets) }, () => ({
-    kg: '',
-    reps: reps ? String(reps) : '',
-    done: false,
-  }))
+export function makeSetEntries(sets: number, reps: number, repsPerSet?: number[] | null): SetEntry[] {
+  return Array.from({ length: Math.max(1, sets) }, (_, i) => {
+    const doel = repsPerSet?.[i] ?? reps
+    return { kg: '', reps: doel ? String(doel) : '', done: false }
+  })
 }
 
 /** Ghost-waarde voor set i: vorige sessie per set, anders het losse gewicht. */

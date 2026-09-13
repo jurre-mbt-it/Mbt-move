@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic'
 import { trpc } from '@/lib/trpc/client'
 import {
   Search, X, Plus, Play, Heart, RotateCcw, TrendingUp,
-} from 'lucide-react'
+Check, Coffee, StickyNote, } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { P, CARD, Kicker, MetaLabel, Tile, DarkButton, DarkInput, DarkTextarea } from '@/components/dark-ui'
 import { useDraftBackup, loadDraft, clearStoredDraft } from '@/hooks/useAutosave'
@@ -30,13 +30,13 @@ import {
   computeTargetKg,
   formatTargetKg,
   formatPrescribedParam,
-  formatSetsReps,
   type PrescribedParam,
 } from '@/lib/prescription'
 import { toast } from 'sonner'
 import { RestSheet } from '@/components/session/RestSheet'
 import { WeekPhaseLine } from '@/components/schedule/WeekPhaseLine'
 import { SetRows } from '@/components/session/SetRows'
+import { fmtMmSs, formatBlockPrescription, groupLabel, parseGroups, type ItemGroups } from '@/lib/planner-blocks'
 import { ExtraParamsEditor, RepUnitPicker } from '@/components/session/ExtraParams'
 import { isRepBasedUnit, sideVolumeFactor } from '@/lib/program-constants'
 import { ExerciseProgressSheet } from '@/components/session/ExerciseProgressSheet'
@@ -97,6 +97,13 @@ type LiveExercise = {
   repUnit: string
   restTime: number
   videoUrl: string | null
+  /** Blokvelden uit de planner; een programma-oefening heeft de defaults. */
+  repsPerSet?: number[] | null
+  amrap?: boolean
+  isBodyweight?: boolean
+  completionOnly?: boolean
+  trackMax?: boolean | null
+  phase?: 'WARMUP' | 'COOLDOWN' | null
   /** Standaard extra parameters uit de oefening-library (ExtraParam[] JSON). */
   defaultExtraParams?: unknown
   /** Per-instance notitie + intensiteits-voorschrift uit het programma. */
@@ -132,7 +139,132 @@ function dbExerciseToLive(ex: DbExercise): LiveExercise {
 // Types en parse-helpers zijn gedeeld met het patiënt-scherm: src/lib/session-sets.ts
 
 function seedSets(e: LiveExercise): SetEntry[] {
-  return makeSetEntries(e.sets, e.reps)
+  return makeSetEntries(e.sets, e.reps, e.repsPerSet)
+}
+
+/** Voorschrift-regel per oefening, met per-set-schema en AMRAP als die er zijn. */
+function voorschriftVan(e: LiveExercise): string {
+  return formatBlockPrescription({
+    blockKind: 'EXERCISE', sets: e.sets, setsMax: e.setsMax ?? null, reps: e.reps, repsMax: e.repsMax ?? null,
+    repUnit: e.repUnit, repsPerSet: e.repsPerSet ?? null, amrap: e.amrap ?? false,
+    completionOnly: e.completionOnly ?? false, durationSec: null,
+  })
+}
+
+// ── Bloklijst van een geplande training: koppen, notities en pauzes ──────────
+// De planner zet oefeningen, notities en pauzes in één geordende lijst. Hier
+// wordt die lijst weer een overzicht: fase- en groepskoppen, de oefeningkaart
+// op zijn plek, een notitie als kaart, een pauze als rij met een timer.
+
+type AthleteBlock = {
+  id: string
+  order: number
+  blockKind: 'EXERCISE' | 'NOTE' | 'BREAK'
+  text: string | null
+  videoUrl: string | null
+  durationSec: number | null
+  phase: 'WARMUP' | 'COOLDOWN' | null
+  supersetGroup: string | null
+}
+
+type Regel =
+  | { soort: 'kop'; tekst: string; key: string }
+  | { soort: 'oefening'; e: LiveExercise; key: string }
+  | { soort: 'notitie'; tekst: string; videoUrl: string | null; key: string }
+  | { soort: 'pauze'; sec: number; tekst: string | null; key: string }
+
+function regelsVoor(exercises: LiveExercise[], blocks: AthleteBlock[] | undefined, groups: ItemGroups): Regel[] {
+  if (!blocks || blocks.length === 0) return exercises.map(e => ({ soort: 'oefening', e, key: e.uid }))
+  const byUid = new Map(exercises.map(e => [e.uid, e]))
+  const out: Regel[] = []
+  let vorigeFase: string | null = null
+  let vorigeGroep: string | null = null
+  for (const b of blocks) {
+    const fase = b.phase ?? 'MAIN'
+    if (fase !== vorigeFase && b.blockKind !== 'NOTE') {
+      out.push({ soort: 'kop', key: `fase-${b.id}`, tekst: fase === 'WARMUP' ? 'Warming-up' : fase === 'COOLDOWN' ? 'Cooldown' : 'Hoofddeel' })
+      vorigeFase = fase
+    }
+    const groep = b.supersetGroup ?? null
+    if (groep && groep !== vorigeGroep) {
+      const g = groups[groep]
+      const detail = g?.kind === 'CIRCUIT'
+        ? [
+            g.rounds ? `${g.rounds} ronde${g.rounds === 1 ? '' : 's'}` : null,
+            g.timeCapSec ? `binnen ${fmtMmSs(g.timeCapSec)}` : null,
+            g.restSec != null ? `rust ${g.restSec} s` : null,
+          ].filter(Boolean).join(' · ')
+        : 'afwisselend, zonder rust ertussen'
+      out.push({ soort: 'kop', key: `groep-${b.id}`, tekst: `${groupLabel(groep, groups)}${detail ? ` · ${detail}` : ''}` })
+    }
+    vorigeGroep = groep
+    if (b.blockKind === 'NOTE') out.push({ soort: 'notitie', key: b.id, tekst: b.text ?? '', videoUrl: b.videoUrl })
+    else if (b.blockKind === 'BREAK') out.push({ soort: 'pauze', key: b.id, sec: b.durationSec ?? 0, tekst: b.text })
+    else { const e = byUid.get(b.id); if (e) out.push({ soort: 'oefening', e, key: e.uid }) }
+  }
+  // Zelf toegevoegde oefeningen staan niet in de blokken: achteraan.
+  for (const e of exercises) if (!blocks.some(b => b.id === e.uid)) out.push({ soort: 'oefening', e, key: e.uid })
+  return out
+}
+
+function BlokRegel({ regel, onVideo, onTimer }: {
+  regel: Exclude<Regel, { soort: 'oefening' }>
+  onVideo: (url: string) => void
+  onTimer: (sec: number) => void
+}) {
+  if (regel.soort === 'kop') {
+    return (
+      <p className="athletic-mono pt-2" style={{ color: P.inkDim, fontSize: 9, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+        {regel.tekst}
+      </p>
+    )
+  }
+  if (regel.soort === 'notitie') {
+    return (
+      <div className="rounded-xl px-3.5 py-3 flex items-start gap-2.5" style={{ ...CARD, borderLeft: `3px solid ${P.gold}` }}>
+        <StickyNote className="w-4 h-4 shrink-0 mt-0.5" style={{ color: P.gold }} />
+        <div className="flex-1 min-w-0">
+          <p style={{ color: P.ink, fontSize: 13, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{regel.tekst}</p>
+          {regel.videoUrl && (
+            <button type="button" onClick={() => onVideo(regel.videoUrl!)} className="athletic-mono mt-1.5"
+              style={{ color: P.brand, fontSize: 10, letterSpacing: '0.12em', fontWeight: 800 }}>
+              VIDEO BEKIJKEN
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className="rounded-xl px-3.5 py-2.5 flex items-center gap-2.5" style={{ ...CARD, borderLeft: `3px solid ${P.inkDim}` }}>
+      <Coffee className="w-4 h-4 shrink-0" style={{ color: P.inkDim }} />
+      <span className="flex-1 min-w-0 truncate">
+        <span className="athletic-mono" style={{ color: P.ink, fontSize: 11, letterSpacing: '0.1em', fontWeight: 800 }}>PAUZE {fmtMmSs(regel.sec)}</span>
+        {regel.tekst && <span style={{ color: P.inkMuted, fontSize: 12 }}> · {regel.tekst}</span>}
+      </span>
+      <button type="button" onClick={() => onTimer(regel.sec)} className="athletic-mono shrink-0 rounded-lg px-2.5 py-1"
+        style={{ border: `1px solid ${P.lineStrong}`, color: P.inkMuted, fontSize: 9, letterSpacing: '0.12em', fontWeight: 800 }}>
+        TIMER
+      </button>
+    </div>
+  )
+}
+
+/** Eén knop in plaats van set-rijen: de therapeut wilde alleen een vinkje. */
+function CompletionRow({ done, onToggle }: { done: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button" onClick={onToggle} aria-pressed={done}
+      className="athletic-tap w-full flex items-center justify-center gap-2 rounded-xl"
+      style={{
+        padding: '12px', border: `1.5px solid ${done ? P.lime : P.lineStrong}`,
+        background: done ? 'rgba(95,208,138,0.12)' : 'transparent', color: done ? P.lime : P.ink,
+        fontFamily: mono, fontSize: 11, fontWeight: 900, letterSpacing: '0.12em',
+      }}
+    >
+      <Check className="w-4 h-4" strokeWidth={3} /> {done ? 'GEDAAN' : 'AFVINKEN'}
+    </button>
+  )
 }
 
 /** Concept in localStorage zodat een refresh/app-wissel de sessie niet wist. */
@@ -236,6 +368,12 @@ function AthleteSessionPageInner() {
     repUnit: e.repUnit,
     restTime: e.restTime,
     videoUrl: e.videoUrl ?? null,
+    repsPerSet: e.repsPerSet ?? null,
+    amrap: e.amrap ?? false,
+    isBodyweight: e.isBodyweight ?? false,
+    completionOnly: e.completionOnly ?? false,
+    trackMax: e.trackMax ?? null,
+    phase: e.phase ?? null,
     defaultExtraParams: e.defaultExtraParams,
     notes: e.notes ?? null,
     intensityType: e.intensityType ?? 'NONE',
@@ -244,6 +382,12 @@ function AthleteSessionPageInner() {
     intensityText: e.intensityText ?? null,
     programExtraParams: (e as { programExtraParams?: PrescribedParam[] }).programExtraParams ?? [],
   }))
+
+  // Bloklijst van het geplande item (notities, pauzes, fases, groepen); een
+  // programma-sessie heeft die niet en toont dan gewoon de oefeningen.
+  const gepland = (sessionData as { plannedItem?: { blocks?: AthleteBlock[]; groups?: unknown } } | undefined)?.plannedItem
+  const geplandeBlokken = gepland?.blocks
+  const geplandeGroepen = parseGroups(gepland?.groups)
 
   // Extra exercises added during session
   const [extraExercises, setExtraExercises] = useState<LiveExercise[]>([])
@@ -270,6 +414,7 @@ function AthleteSessionPageInner() {
 
   const baseExercises = isQuickMode ? [] : programExercises
   const exercises: LiveExercise[] = [...baseExercises, ...extraExercises]
+  const overzichtRegels = regelsVoor(exercises, geplandeBlokken, geplandeGroepen)
 
   // Vorige-sessie-waarden per exerciseId — ghost/prefill in de set-rijen.
   // Voor zelf toegevoegde oefeningen (quick workout) halen we ze apart op.
@@ -477,6 +622,15 @@ function AthleteSessionPageInner() {
       const last = arr[arr.length - 1]
       arr.push({ kg: last?.kg ?? '', reps: last?.reps ?? '', done: false })
       return { ...prev, [uid]: arr }
+    })
+  }
+
+  /** Alleen-afvinken: alle sets in één keer gedaan of ongedaan. */
+  function toggleAllDone(ex: LiveExercise, seed: SetEntry[]) {
+    setSetLog(prev => {
+      const arr = [...(prev[ex.uid] ?? seed)]
+      const alles = arr.every(s => s.done)
+      return { ...prev, [ex.uid]: arr.map(s => ({ ...s, done: !alles })) }
     })
   }
 
@@ -817,7 +971,18 @@ function AthleteSessionPageInner() {
             </div>
           ) : (
             <div className="space-y-2 mbt-stagger">
-              {exercises.map((e, i) => {
+              {overzichtRegels.map((regel, i) => {
+                if (regel.soort !== 'oefening') {
+                  return (
+                    <BlokRegel
+                      key={regel.key}
+                      regel={regel}
+                      onVideo={(url) => setVideoModal({ url, name: 'Notitie' })}
+                      onTimer={(sec) => { setRestLabel('Pauze'); startRest(sec) }}
+                    />
+                  )
+                }
+                const e = regel.e
                 const clickable = !!e.videoUrl
                 const removable = extraExercises.some(x => x.uid === e.uid)
                 const Inner = clickable ? 'button' : 'div'
@@ -873,7 +1038,7 @@ function AthleteSessionPageInner() {
                             textTransform: 'uppercase',
                           }}
                         >
-                          {CATEGORY_LABELS_NL[e.category] ?? e.category} · {formatSetsReps(e.sets, e.setsMax, e.reps, e.repsMax, e.repUnit)}
+                          {CATEGORY_LABELS_NL[e.category] ?? e.category} · {voorschriftVan(e)}
                         </div>
                       </div>
                       {clickable && (
@@ -1395,14 +1560,20 @@ function AthleteSessionPageInner() {
                     )}
                   </div>
                 </div>
-                <SetRows
-                  entries={entries}
-                  last={last}
-                  repUnit={current.repUnit}
-                  onUpdate={(i, patch) => updateSet(current.uid, seed, i, patch)}
-                  onToggle={(i) => toggleSetDone(current, seed, i)}
-                  onAdd={() => addSet(current.uid, seed)}
-                />
+                {current.completionOnly ? (
+                  <CompletionRow done={entries.every(x => x.done)} onToggle={() => toggleAllDone(current, seed)} />
+                ) : (
+                  <SetRows
+                    entries={entries}
+                    last={last}
+                    repUnit={current.repUnit}
+                    hideKg={!!current.isBodyweight}
+                    amrapMin={current.amrap ? current.reps : null}
+                    onUpdate={(i, patch) => updateSet(current.uid, seed, i, patch)}
+                    onToggle={(i) => toggleSetDone(current, seed, i)}
+                    onAdd={() => addSet(current.uid, seed)}
+                  />
+                )}
                 <div className="mt-2">
                   <ExtraParamsEditor
                     params={paramsFor(current)}

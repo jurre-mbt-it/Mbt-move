@@ -26,10 +26,16 @@ export function SetRows({
   onUpdate,
   onToggle,
   onAdd,
+  hideKg = false,
+  amrapMin = null,
 }: {
   entries: SetEntry[]
   last?: LastLog
   repUnit: string
+  /** Lichaamsgewicht: geen kilo-kolom. */
+  hideKg?: boolean
+  /** AMRAP: het voorgeschreven aantal is een minimum. */
+  amrapMin?: number | null
   onUpdate: (idx: number, patch: Partial<SetEntry>) => void
   onToggle: (idx: number) => void
   onAdd: () => void
@@ -42,9 +48,11 @@ export function SetRows({
       {/* Kolomkoppen */}
       <div className="flex items-center gap-2 px-3">
         <span style={{ width: 26 }} />
-        <span className="flex-1 athletic-mono" style={{ color: P.inkDim, fontSize: 9, letterSpacing: '0.14em' }}>
-          KG
-        </span>
+        {!hideKg && (
+          <span className="flex-1 athletic-mono" style={{ color: P.inkDim, fontSize: 9, letterSpacing: '0.14em' }}>
+            KG
+          </span>
+        )}
         <span className="flex-1 athletic-mono" style={{ color: P.inkDim, fontSize: 9, letterSpacing: '0.14em' }}>
           {/* Niet hardcoded 'REPS/ZIJDE' bij per-zijde: sinds `sec/zijde` bestaat
               zou een side plank van 30 sec de kop REPS/ZIJDE krijgen en vulde de
@@ -57,6 +65,11 @@ export function SetRows({
       {perSide && (
         <p className="px-3 mt-1 athletic-mono" style={{ color: P.gold, fontSize: 9, letterSpacing: '0.08em' }}>
           PER ZIJDE · ÉÉN VINKJE TELT LINKS + RECHTS
+        </p>
+      )}
+      {amrapMin != null && (
+        <p className="px-3 mt-1 athletic-mono" style={{ color: P.gold, fontSize: 9, letterSpacing: '0.08em' }}>
+          ZOVEEL MOGELIJK HERHALINGEN, MINIMAAL {amrapMin}
         </p>
       )}
 
@@ -99,15 +112,17 @@ export function SetRows({
               >
                 S{i + 1}
               </span>
-              <DarkInput
-                value={s.kg}
-                onChange={(ev) => onUpdate(i, { kg: ev.target.value.replace(/[^0-9.,]/g, '') })}
-                inputMode="decimal"
-                placeholder={pk != null && pk > 0 ? String(pk).replace('.', ',') : undefined}
-                aria-label={`Gewicht set ${i + 1} (kg)`}
-                className="flex-1 min-w-0"
-                style={{ padding: '8px 10px', fontSize: 16 }}
-              />
+              {!hideKg && (
+                <DarkInput
+                  value={s.kg}
+                  onChange={(ev) => onUpdate(i, { kg: ev.target.value.replace(/[^0-9.,]/g, '') })}
+                  inputMode="decimal"
+                  placeholder={pk != null && pk > 0 ? String(pk).replace('.', ',') : undefined}
+                  aria-label={`Gewicht set ${i + 1} (kg)`}
+                  className="flex-1 min-w-0"
+                  style={{ padding: '8px 10px', fontSize: 16 }}
+                />
+              )}
               <DarkInput
                 value={s.reps}
                 onChange={(ev) => onUpdate(i, { reps: ev.target.value.replace(/[^0-9]/g, '') })}
