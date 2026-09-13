@@ -31,3 +31,21 @@ Jurre 13-09: "de builder ook op deze manier, zelfde pop-ups, toevoegen simpel".
 2. Router: input, writes, get, getTodayExercises `blocks`/`groups`, list-count.
 3. Builder: types, conversies `builderToBlock`/`draftToBuilder`, dagweergave, dialoog, opslaan met `groups`, edit-page laadt `groups`.
 4. tsc + vitest + browsercheck op /therapist/programs/new; migratie op prod; commit.
+
+## Stand 13-09-2026 (nacht)
+
+Alles hierboven is gebouwd, in de browser doorgetest op de productiedatabase
+en gedeployed. Daarna, in dezelfde branch:
+
+- Ronde 2: rijen slepen (binnen een training en naar een andere dag),
+  rechtermuismenu op rij en dag met klembord (kopiëren, knippen, plakken,
+  hier invoegen), ook in de builder.
+- Ronde 3: selectiestand met lasso of shift-klik in zijpaneel en builder →
+  superset, circuit, kopiëren, verwijderen. Staafsnelheid en piekvermogen als
+  invoerveld in de runners. Smalle schermen: menu klapt in onder 1280 px,
+  smalle totaalkolom, knop alleen icoon.
+- Mobiel (mbt-gym-mobile): runner, agenda-tab en kalenderdetail lezen de
+  bloklijst; EAS-builds iOS 93 en Android versionCode 4 plus een preview-APK.
+
+Nog open: staafsnelheid per set (nu per oefening), Play-upload (geen
+service-account-sleutel lokaal).
