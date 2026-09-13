@@ -11,7 +11,7 @@
 
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
-import { isExerciseBlock } from '@/lib/planner-blocks'
+import { isExerciseBlock, parseGroups } from '@/lib/planner-blocks'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { practiceScope } from '@/server/lib/patient-access'
 import { planningCutoffVoorPatient } from '@/server/lib/planning-cutoff'
@@ -142,6 +142,12 @@ function mapProgramExercise(pe: {
   intensityMax?: number | null
   intensityText?: string | null
   extraParams?: unknown
+  repsPerSet?: unknown
+  amrap?: boolean
+  isBodyweight?: boolean
+  completionOnly?: boolean
+  trackMax?: boolean | null
+  phase?: string | null
   exercise: {
     name: string
     category: string
@@ -204,6 +210,15 @@ function mapProgramExercise(pe: {
     defaultExtraParams: Array.isArray(pe.exercise.defaultExtraParams)
       ? (pe.exercise.defaultExtraParams as Array<Record<string, unknown>>)
       : [],
+    // Blokvelden uit de planner (ProgramExercise heeft ze niet: dan de defaults).
+    repsPerSet: Array.isArray(pe.repsPerSet)
+      ? (pe.repsPerSet as unknown[]).filter((n): n is number => typeof n === 'number')
+      : null,
+    amrap: pe.amrap ?? false,
+    isBodyweight: pe.isBodyweight ?? false,
+    completionOnly: pe.completionOnly ?? false,
+    trackMax: pe.trackMax ?? null,
+    phase: (pe.phase === 'WARMUP' || pe.phase === 'COOLDOWN' ? pe.phase : null) as 'WARMUP' | 'COOLDOWN' | null,
   }
 }
 
@@ -527,6 +542,19 @@ export const patientRouter = createTRPCRouter({
             // cardioscherm van de atleet was volledig handinvoer.
             // Begrensd gecast → geen recursief Prisma JsonValue (TS2589).
             cardio: (item.cardioParams ?? null) as Record<string, unknown> | null,
+            // De volledige bloklijst (oefeningen, notities, pauzes) in volgorde.
+            // Additief: iOS negeert dit en leest `exercises`.
+            blocks: item.exercises.map(b => ({
+              id: b.id,
+              order: b.order,
+              blockKind: b.blockKind as 'EXERCISE' | 'NOTE' | 'BREAK',
+              text: b.text,
+              videoUrl: b.videoUrl,
+              durationSec: b.durationSec,
+              phase: (b.phase === 'WARMUP' || b.phase === 'COOLDOWN' ? b.phase : null) as 'WARMUP' | 'COOLDOWN' | null,
+              supersetGroup: b.supersetGroup,
+            })),
+            groups: parseGroups(item.groups),
           },
           exercises,
           lastLogs,
@@ -831,6 +859,16 @@ export const patientRouter = createTRPCRouter({
         return { id: existingDup.id, deduped: true }
       }
 
+      // Rijen waarop de therapeut "max bijhouden" uitzette: geen 1RM-schatting,
+      // ook niet de Epley-terugval hieronder.
+      const geenMax = new Set<string>()
+      if (input.weekScheduleDayItemId) {
+        const rijen = await ctx.prisma.weekScheduleDayItemExercise.findMany({
+          where: { itemId: input.weekScheduleDayItemId, trackMax: false, exerciseId: { not: null } },
+          select: { exerciseId: true },
+        })
+        for (const r of rijen) if (r.exerciseId) geenMax.add(r.exerciseId)
+      }
       const sessionLog = await ctx.prisma.sessionLog.create({
         data: {
           patientId: ctx.user.id,
@@ -870,8 +908,9 @@ export const patientRouter = createTRPCRouter({
                 // client-side berekend als program.trackOneRepMax aanstond —
                 // die vlag staat vrijwel nergens aan, dus 1RM-data bleef leeg
                 // terwijl gewicht + reps wél gelogd werden.
-                estimatedOneRepMax: ex.estimatedOneRepMax
-                  ?? estimateOneRepMax(weight, top.reps ?? ex.repsCompleted),
+                estimatedOneRepMax: geenMax.has(ex.exerciseId)
+                  ? null
+                  : ex.estimatedOneRepMax ?? estimateOneRepMax(weight, top.reps ?? ex.repsCompleted),
                 painDuring: ex.painDuring ?? null,
               }
             }),
@@ -2238,7 +2277,7 @@ export const patientRouter = createTRPCRouter({
                     // hieronder een `hasContent`-boolean mee i.p.v. de hele
                     // blokken-blob — de client hoeft alleen te weten óf er iets
                     // staat, niet wát.
-                    _count: { select: { exercises: true } },
+                    _count: { select: { exercises: { where: { blockKind: 'EXERCISE' } } } },
                     cardioParams: true,
                     // Identiteit i.p.v. de oude teller-heuristiek: hoort er al
                     // een gelogde sessie bij dit item?

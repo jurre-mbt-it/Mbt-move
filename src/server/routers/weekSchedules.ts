@@ -3,7 +3,7 @@ import { createTRPCRouter, coachStaffProcedure, protectedProcedure } from '@/ser
 import { TRPCError } from '@trpc/server'
 import { dominantCategory, durationFromBlocks, isExerciseBlock, parseGroups } from '@/lib/planner-blocks'
 import { BLOCK_SELECT, blockCreateData, copyBlockColumns, toPlannerBlock } from '@/server/lib/planner-block-columns'
-import { blockInputSchema } from '@/server/lib/planner-block-schema'
+import { blockInputSchema, itemGroupsSchema } from '@/server/lib/planner-block-schema'
 import { assertPlanAccess } from '@/server/lib/plan-access'
 import { inSamePractice } from '@/server/lib/patient-access'
 import { planningCutoffVoorPatient } from '@/server/lib/planning-cutoff'
@@ -1492,6 +1492,70 @@ export const weekSchedulesRouter = createTRPCRouter({
     }),
 
   /** Velden van een item bewerken (naam, duur, notes, order). */
+  /**
+   * Dag = training. Geeft het laatste WORKOUT-item van de dag terug of maakt
+   * er één aan, zodat "+ Oefening" op een lege dag meteen ergens in kan.
+   * De naam en duur zijn plaatsvervangers: setItemExercises leidt de duur en
+   * de soort daarna uit de inhoud af.
+   */
+  ensureDayWorkout: coachStaffProcedure
+    .input(z.object({ dayId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const day = await ctx.prisma.weekScheduleDay.findUnique({
+        where: { id: input.dayId },
+        include: { weekSchedule: { select: { creatorId: true, practiceId: true, patientId: true } } },
+      })
+      if (!day) throw new TRPCError({ code: 'NOT_FOUND' })
+      const isAdmin = ctx.user.role === 'ADMIN'
+      const isOwner = day.weekSchedule.creatorId === ctx.user.id
+      const isSamePractice = inSamePractice(ctx.user, day.weekSchedule.practiceId)
+      if (!isAdmin && !isOwner && !isSamePractice) throw new TRPCError({ code: 'FORBIDDEN' })
+      await assertMagPlannen(ctx.prisma, ctx.user, day.weekSchedule.patientId)
+
+      const bestaand = await ctx.prisma.weekScheduleDayItem.findFirst({
+        where: { dayId: input.dayId, kind: 'WORKOUT' },
+        orderBy: { order: 'desc' },
+        select: { id: true },
+      })
+      if (bestaand) return { id: bestaand.id, created: false }
+
+      const laatste = await ctx.prisma.weekScheduleDayItem.aggregate({ where: { dayId: input.dayId }, _max: { order: true } })
+      const nieuw = await ctx.prisma.weekScheduleDayItem.create({
+        data: {
+          dayId: input.dayId,
+          order: (laatste._max.order ?? -1) + 1,
+          kind: 'WORKOUT',
+          quickCategory: 'STRENGTH',
+          quickName: 'Training',
+          quickDurationSec: 45 * 60,
+        },
+        select: { id: true },
+      })
+      return { id: nieuw.id, created: true }
+    }),
+
+  /** Vervangt de groepen (superset/circuit per letter) van een workout-item. */
+  setItemGroups: coachStaffProcedure
+    .input(z.object({ itemId: z.string(), groups: itemGroupsSchema }))
+    .mutation(async ({ ctx, input }) => {
+      const item = await ctx.prisma.weekScheduleDayItem.findUnique({
+        where: { id: input.itemId },
+        include: { day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true, patientId: true } } } } },
+      })
+      if (!item) throw new TRPCError({ code: 'NOT_FOUND' })
+      const isAdmin = ctx.user.role === 'ADMIN'
+      const isOwner = item.day.weekSchedule.creatorId === ctx.user.id
+      const isSamePractice = inSamePractice(ctx.user, item.day.weekSchedule.practiceId)
+      if (!isAdmin && !isOwner && !isSamePractice) throw new TRPCError({ code: 'FORBIDDEN' })
+      await assertMagPlannen(ctx.prisma, ctx.user, item.day.weekSchedule.patientId)
+      await ctx.prisma.weekScheduleDayItem.update({
+        where: { id: input.itemId },
+        data: { groups: Object.keys(input.groups).length > 0 ? (input.groups as Prisma.InputJsonValue) : Prisma.DbNull },
+        select: { id: true },
+      })
+      return { ok: true as const }
+    }),
+
   updateItem: coachStaffProcedure
     .input(z.object({
       id: z.string(),
