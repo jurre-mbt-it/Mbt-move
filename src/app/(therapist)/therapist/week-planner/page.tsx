@@ -63,7 +63,8 @@ import { CategoryIcon, CATEGORY_LABELS } from '@/components/week-planner/Categor
 import { BlockRows } from '@/components/week-planner/BlockRows'
 import { ExerciseBlockDialog, type BlockDialogType } from '@/components/week-planner/ExerciseBlockDialog'
 import { useBlockMutations } from '@/components/week-planner/useBlockMutations'
-import { Segmented } from '@/components/week-planner/block-forms/fields'
+import { OptionSwitch } from '@/components/week-planner/block-forms/fields'
+import { isSidebarCollapsed, setSidebarCollapsed } from '@/components/layout/TherapistSidebar'
 import type { ItemGroups, PlannerBlock } from '@/lib/planner-blocks'
 type ItemExercise = PlannerBlock
 type Weergave = 'oefeningen' | 'trainingen'
@@ -2545,6 +2546,21 @@ function WeekPlannerContent() {
     setPanelClosing(false)
     setDetailItem(d)
   }
+  // Het zijpaneel eet breedte; klap de navigatie zolang in en zet hem daarna
+  // terug zoals hij stond. Zonder dit krimpen de dagcellen tot strookjes.
+  const paneelOpen = !!liveDetail && isDesktop
+  const zijbalkVoorPaneel = useRef<boolean | null>(null)
+  useEffect(() => {
+    if (paneelOpen) {
+      if (zijbalkVoorPaneel.current === null) {
+        zijbalkVoorPaneel.current = isSidebarCollapsed()
+        setSidebarCollapsed(true)
+      }
+    } else if (zijbalkVoorPaneel.current !== null) {
+      setSidebarCollapsed(zijbalkVoorPaneel.current)
+      zijbalkVoorPaneel.current = null
+    }
+  }, [paneelOpen])
   const [addDayDate, setAddDayDate] = useState<Date | null>(null)
   const [addDayId, setAddDayId] = useState<string | null>(null)
 
@@ -3005,11 +3021,10 @@ function WeekPlannerContent() {
           </button>
         </div>
         {/* Weergave: alle oefeningen per dag, of alleen de trainingspil. */}
-        <Segmented<Weergave>
-          ariaLabel="Weergave van de kalender"
-          value={weergave}
-          options={[{ value: 'oefeningen', label: 'Oefeningen' }, { value: 'trainingen', label: 'Trainingen' }]}
-          onChange={zetWeergave}
+        <OptionSwitch
+          checked={weergave === 'oefeningen'}
+          onCheckedChange={v => zetWeergave(v ? 'oefeningen' : 'trainingen')}
+          label="Oefeningen tonen"
         />
         {/* Status-legenda */}
         <div className="hidden sm:flex items-center gap-3 flex-wrap">
@@ -3148,7 +3163,7 @@ function WeekPlannerContent() {
             eigen ding dat je kunt aanwijzen. */}
         <div className="flex flex-col gap-2">
           {/* Day-of-week header row */}
-          <div className="grid grid-cols-[40px_repeat(7,1fr)_168px] gap-2 px-0.5">
+          <div className={`grid ${paneelOpen ? 'grid-cols-[40px_repeat(7,1fr)_104px]' : 'grid-cols-[40px_repeat(7,1fr)_168px]'} gap-2 px-0.5`}>
             <div />
             {DAY_LABELS_SHORT.map(d => (
               <div
@@ -3190,7 +3205,7 @@ function WeekPlannerContent() {
             return (
               <div
                 key={wIdx}
-                className="grid grid-cols-[40px_repeat(7,1fr)_168px] gap-2"
+                className={`grid ${paneelOpen ? 'grid-cols-[40px_repeat(7,1fr)_104px]' : 'grid-cols-[40px_repeat(7,1fr)_168px]'} gap-2`}
                 style={{
                   borderColor: P.line,
                   minHeight: 176,

@@ -111,6 +111,12 @@ function subscribeCollapsed(cb: () => void) {
 function getCollapsedSnapshot() {
   return localStorage.getItem(COLLAPSE_KEY) === '1'
 }
+/** Van buiten de zijbalk te zetten, bv. door de planner als het zijpaneel opent. */
+export function setSidebarCollapsed(v: boolean) { storeCollapsed(v) }
+export function isSidebarCollapsed(): boolean {
+  try { return getCollapsedSnapshot() } catch { return false }
+}
+
 function storeCollapsed(v: boolean) {
   if (getCollapsedSnapshot() === v) return
   localStorage.setItem(COLLAPSE_KEY, v ? '1' : '0')

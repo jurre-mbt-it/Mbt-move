@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense, Fragment } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { cn } from '@/lib/utils'
@@ -30,12 +30,14 @@ import {
   computeTargetKg,
   formatTargetKg,
   formatPrescribedParam,
-  formatSetsReps,
   type PrescribedParam,
 } from '@/lib/prescription'
 import { RestSheet } from '@/components/session/RestSheet'
 import { WeekPhaseLine } from '@/components/schedule/WeekPhaseLine'
 import { SetRows } from '@/components/session/SetRows'
+import { CompletionRow } from '@/components/session/CompletionRow'
+import { formatBlockPrescription, parseGroups } from '@/lib/planner-blocks'
+import { BlokRegel, geplandeBlokkenUit, regelsVoor } from '@/components/session/planned-blocks'
 import { ExtraParamsEditor } from '@/components/session/ExtraParams'
 import { ExerciseProgressSheet } from '@/components/session/ExerciseProgressSheet'
 import { MOOD_SCALE, IconCelebration, IconBeach, IconStop, IconWarning } from '@/components/icons'
@@ -68,6 +70,12 @@ type SessionExercise = {
   videoUrl: string | null
   muscleLoads: Record<string, number>
   supersetGroup: string | null
+  /** Blokvelden uit de planner; een programma-oefening heeft de defaults. */
+  repsPerSet?: number[] | null
+  amrap?: boolean
+  isBodyweight?: boolean
+  completionOnly?: boolean
+  phase?: 'WARMUP' | 'COOLDOWN' | null
   supersetOrder: number
   notes: string | null
   // Intensiteits-voorschrift uit het programma — getoond als doel-badge.
@@ -836,6 +844,9 @@ function SessionPageInner() {
 
   const exercisesRaw = sessionData?.exercises
   const exercises: SessionExercise[] = useMemo(() => exercisesRaw ?? [], [exercisesRaw])
+  const gepland = geplandeBlokkenUit(sessionData)
+  const geplandeBlokken = gepland.blocks
+  const geplandeGroepen = useMemo(() => parseGroups(gepland.groups), [gepland.groups])
 
   // Vorige-sessie-waarden per exerciseId — voor gewicht-prefill en de
   // "vorige keer"-hint per oefening.
@@ -1450,7 +1461,7 @@ function SessionPageInner() {
   const renderExercise = (e: SessionExercise) => {
     const isDone = done.has(e.uid)
     const isExpanded = expanded === e.uid
-    const seed = makeSetEntries(e.sets, e.reps)
+    const seed = makeSetEntries(e.sets, e.reps, e.repsPerSet)
     const entries = setLog[e.uid] ?? seed
     const last = lastLogs[e.exerciseId]
     const doneSets = entries.filter(s => s.done).length
@@ -1510,7 +1521,7 @@ function SessionPageInner() {
               className="athletic-mono"
               style={{ color: P.inkMuted, fontSize: 11, marginTop: 2 }}
             >
-              {formatSetsReps(e.sets, e.setsMax, e.reps, e.repsMax, e.repUnit)}
+              {formatBlockPrescription({ blockKind: 'EXERCISE', sets: e.sets, setsMax: e.setsMax ?? null, reps: e.reps, repsMax: e.repsMax ?? null, repUnit: e.repUnit, repsPerSet: e.repsPerSet ?? null, amrap: e.amrap ?? false, completionOnly: e.completionOnly ?? false, durationSec: null })}
             </p>
           </div>
           {isExpanded
@@ -1703,14 +1714,23 @@ function SessionPageInner() {
             })()}
 
             {/* Set-rijen: per set kg/reps invullen en afvinken; rust start vanzelf */}
-            <SetRows
-              entries={entries}
-              last={last}
-              repUnit={e.repUnit}
-              onUpdate={(i, patch) => updateSet(e, seed, i, patch)}
-              onToggle={(i) => toggleSetDone(e, seed, i)}
-              onAdd={() => addSet(e, seed)}
-            />
+            {e.completionOnly ? (
+              <CompletionRow
+                done={allSetsDone}
+                onToggle={() => entries.forEach((set, i) => { if (set.done === allSetsDone) toggleSetDone(e, seed, i) })}
+              />
+            ) : (
+              <SetRows
+                entries={entries}
+                last={last}
+                repUnit={e.repUnit}
+                hideKg={!!e.isBodyweight}
+                amrapMin={e.amrap ? e.reps : null}
+                onUpdate={(i, patch) => updateSet(e, seed, i, patch)}
+                onToggle={(i) => toggleSetDone(e, seed, i)}
+                onAdd={() => addSet(e, seed)}
+              />
+            )}
 
             {/* Extra parameters — alleen wat de therapeut op de oefening heeft
                 ingesteld; waarden van de vorige sessie staan er alvast in */}
@@ -2081,7 +2101,20 @@ function SessionPageInner() {
           </>
         ) : (
           <>
-            {steps.map(s => s.render())}
+            {(() => {
+              // Blokken van het geplande item (koppen, notities, pauzes) tussen de
+              // stappen; een superset-stap komt op de plek van zijn eerste oefening.
+              const gerenderd = new Set<string>()
+              return regelsVoor(exercises, geplandeBlokken, geplandeGroepen).map(regel => {
+                if (regel.soort !== 'oefening') {
+                  return <BlokRegel key={regel.key} regel={regel}   />
+                }
+                const stap = steps.find(st => st.uids.includes(regel.e.uid))
+                if (!stap || gerenderd.has(stap.key)) return null
+                gerenderd.add(stap.key)
+                return <Fragment key={stap.key}>{stap.render()}</Fragment>
+              })
+            })()}
 
             {/* Finish CTA */}
             {doneCount > 0 && (
@@ -2109,7 +2142,7 @@ function SessionPageInner() {
           nextLabel={(() => {
             const ex = exercises.find(x => x.uid === expanded)
             if (!ex) return 'Adem rustig door je neus'
-            const entries = setLog[ex.uid] ?? makeSetEntries(ex.sets, ex.reps)
+            const entries = setLog[ex.uid] ?? makeSetEntries(ex.sets, ex.reps, ex.repsPerSet)
             const nextIdx = entries.findIndex(s => !s.done)
             if (nextIdx === -1) return 'Alle sets klaar, vink de oefening af'
             const pk = prevKgFor(lastLogs[ex.exerciseId], nextIdx)
