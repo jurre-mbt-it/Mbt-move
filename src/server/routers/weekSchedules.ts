@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { createTRPCRouter, coachStaffProcedure, protectedProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
+import { isExerciseBlock } from '@/lib/planner-blocks'
 import { assertPlanAccess } from '@/server/lib/plan-access'
 import { inSamePractice } from '@/server/lib/patient-access'
 import { planningCutoffVoorPatient } from '@/server/lib/planning-cutoff'
@@ -253,8 +254,9 @@ export async function copyItemToDay(
     plannedRpe: number | null
     notes: string | null
     cardioParams: Prisma.JsonValue | null
+    groups?: Prisma.JsonValue | null
     exercises: {
-      exerciseId: string; order: number; sets: number; reps: number
+      exerciseId: string | null; order: number; sets: number; reps: number
       repUnit: string; restTime: number | null; notes: string | null
       setsMax: number | null; repsMax: number | null
       intensityType: IntensityType; intensityMin: number | null
@@ -281,6 +283,7 @@ export async function copyItemToDay(
       plannedRpe: item.plannedRpe,
       notes: item.notes,
       cardioParams: item.cardioParams ?? Prisma.DbNull,
+      groups: item.groups ?? Prisma.DbNull,
       exercises: {
         create: item.exercises.map(ex => ({
           exerciseId: ex.exerciseId,
@@ -350,7 +353,7 @@ export const weekSchedulesRouter = createTRPCRouter({
               // programId-per-dag af kunnen zonder API-wijziging. cardioParams
               // weggelaten om TS2589 te vermijden — zie listWithItems.
               items: {
-                omit: { cardioParams: true },
+                omit: { cardioParams: true, groups: true },
                 include: { program: { select: { id: true, name: true } } },
                 orderBy: { order: 'asc' },
               },
@@ -375,7 +378,7 @@ export const weekSchedulesRouter = createTRPCRouter({
               // Zie `list`: additief, zodat legacy clients naar items kunnen
               // migreren. cardioParams weggelaten (TS2589).
               items: {
-                omit: { cardioParams: true },
+                omit: { cardioParams: true, groups: true },
                 include: {
                   program: { select: { id: true, name: true, status: true } },
                   testBattery: { select: { id: true, name: true } },
@@ -1297,7 +1300,7 @@ export const weekSchedulesRouter = createTRPCRouter({
                 // cardioParams (Json) bewust weggelaten: Prisma's recursieve
                 // JsonValue-type doet react-query's setData op TS2589 lopen.
                 // Cardio + oefeningen komen via listItemContents.
-                omit: { cardioParams: true },
+                omit: { cardioParams: true, groups: true },
                 include: {
                   program: { select: { id: true, name: true, status: true } },
                   testBattery: { select: { id: true, name: true } },
@@ -1360,7 +1363,7 @@ export const weekSchedulesRouter = createTRPCRouter({
           cardioParams: true,
           exercises: {
             select: {
-              id: true, order: true, sets: true, reps: true, repUnit: true,
+              id: true, order: true, blockKind: true, sets: true, reps: true, repUnit: true,
               restTime: true, exerciseId: true, notes: true,
               setsMax: true, repsMax: true,
               intensityType: true, intensityMin: true, intensityMax: true, intensityText: true,
@@ -1374,7 +1377,8 @@ export const weekSchedulesRouter = createTRPCRouter({
       return items.map((it) => ({
         itemId: it.id,
         cardioParams: (it.cardioParams ?? null) as Record<string, unknown> | null,
-        exercises: it.exercises.map((e) => ({
+        // Tot de bloklijst-return (Taak 3): alleen oefeningsrijen, zoals voorheen.
+        exercises: it.exercises.filter(isExerciseBlock).map((e) => ({
           id: e.id,
           order: e.order,
           sets: e.sets,
@@ -1383,8 +1387,8 @@ export const weekSchedulesRouter = createTRPCRouter({
           restTime: e.restTime,
           notes: e.notes,
           exerciseId: e.exerciseId,
-          exerciseName: e.exercise.name,
-          exerciseCategory: e.exercise.category,
+          exerciseName: e.exercise!.name,
+          exerciseCategory: e.exercise!.category,
           setsMax: e.setsMax,
           repsMax: e.repsMax,
           intensityType: e.intensityType,
@@ -1531,7 +1535,7 @@ export const weekSchedulesRouter = createTRPCRouter({
         data,
         // cardioParams (recursief JsonValue) weglaten → voorkomt TS2589 op de
         // client-mutatietypes. Client leest deze return niet.
-        omit: { cardioParams: true },
+        omit: { cardioParams: true, groups: true },
         include: {
           program: { select: { id: true, name: true, status: true } },
         },
@@ -1570,7 +1574,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       return ctx.prisma.weekScheduleDayItem.update({
         where: { id },
         data: patch,
-        omit: { cardioParams: true },
+        omit: { cardioParams: true, groups: true },
       })
     }),
 
@@ -2164,10 +2168,12 @@ export const weekSchedulesRouter = createTRPCRouter({
             weeks: 1,
             daysPerWeek: 1,
             cardioParams: item.cardioParams ?? undefined,
-            ...(inline && inline.exercises.length > 0
+            // Een Program kent alleen oefeningen: notities en pauzes uit de
+            // bloklijst vallen hier bewust af.
+            ...(inline && inline.exercises.some(isExerciseBlock)
               ? {
                   exercises: {
-                    create: inline.exercises.map(ex => ({
+                    create: inline.exercises.filter(isExerciseBlock).map(ex => ({
                       id: createId(),
                       exerciseId: ex.exerciseId,
                       week: 1,

@@ -245,7 +245,7 @@ export const planTemplatesRouter = createTRPCRouter({
                 orderBy: { dayOfWeek: 'asc' },
                 include: {
                   items: {
-                    omit: { cardioParams: true },
+                    omit: { cardioParams: true, groups: true },
                     orderBy: { order: 'asc' },
                     include: { program: { select: { id: true, name: true } } },
                   },

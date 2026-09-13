@@ -1130,6 +1130,11 @@ model WeekScheduleDayItem {
   // intervallen). JSON-vorm beheerd in de UI.
   cardioParams Json?
 
+  /// Groepen (superset/circuit) per letter A..F: { kind, name?, rounds?,
+  /// timeCapSec?, restSec? }. Zie lib/planner-blocks.ts `ItemGroups`. Reist
+  /// via listItemContents, nooit via listWithItems (TS2589).
+  groups Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1144,8 +1149,12 @@ model WeekScheduleDayItemExercise {
   id         String              @id @default(cuid())
   item       WeekScheduleDayItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
   itemId     String
-  exercise   Exercise            @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
-  exerciseId String
+  /// Sinds 2026-09-13 een bloklijst: EXERCISE (oefening), NOTE (tekst voor de
+  /// atleet) of BREAK (pauze). Consumers die alleen oefeningen kennen filteren
+  /// op blockKind = EXERCISE; zie lib/planner-blocks.ts.
+  blockKind  String    @default("EXERCISE")
+  exercise   Exercise? @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  exerciseId String?
 
   order    Int     @default(0)
   sets     Int     @default(3)
@@ -1170,6 +1179,23 @@ model WeekScheduleDayItemExercise {
   supersetOrder Int           @default(0)
   /// Therapeut-doelwaarden (ExtraParam[]), zelfde vorm als ProgramExercise.
   extraParams   Json          @default("[]")
+
+  // ── Blokvelden (2026-09-13) ─────────────────────────────────────────────
+  /// number[], precies `sets` lang; null = overal `reps`. `reps` blijft set 1.
+  repsPerSet     Json?
+  /// `reps` is een minimum, de atleet doet zoveel mogelijk.
+  amrap          Boolean  @default(false)
+  /// WARMUP | COOLDOWN; null = hoofddeel. Zelfde woorden als ExerciseLog.phase.
+  phase          String?
+  isBodyweight   Boolean  @default(false)
+  completionOnly Boolean  @default(false)
+  /// null = volg Exercise.trackOneRepMax; false = geen 1RM/PR uit deze rij.
+  trackMax       Boolean?
+  /// NOTE: de tekst. BREAK: optionele tekst.
+  text           String?
+  videoUrl       String?
+  /// BREAK: lengte in seconden.
+  durationSec    Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

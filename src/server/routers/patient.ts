@@ -11,6 +11,7 @@
 
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
+import { isExerciseBlock } from '@/lib/planner-blocks'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { practiceScope } from '@/server/lib/patient-access'
 import { planningCutoffVoorPatient } from '@/server/lib/planning-cutoff'
@@ -491,9 +492,12 @@ export const patientRouter = createTRPCRouter({
       if (!item) throw new TRPCError({ code: 'NOT_FOUND', message: 'Geplande workout niet gevonden' })
 
       if (item.kind === 'WORKOUT') {
-        const exercises = item.exercises.map(e =>
+        // Alleen oefeningsrijen naar clients die alleen oefeningen kennen (iOS).
+        // Notities en pauzes uit de bloklijst komen additief mee als `blocks`.
+        const exercises = item.exercises.filter(isExerciseBlock).map(e =>
           mapProgramExercise({
             ...e,
+            exercise: e.exercise!,
             // Een planner-item hangt aan een kalenderdag, niet aan een
             // week/dag-raster. 1/1 is hier louter vormvereiste.
             week: 1,
