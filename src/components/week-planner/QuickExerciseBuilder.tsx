@@ -19,31 +19,14 @@ import { useState } from 'react'
 import { Plus, Search, SlidersHorizontal, X } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
 import { DarkButton, DarkInput, MetaLabel, P, CARD } from '@/components/dark-ui'
-import { IconStrength, IconMobility, IconPlyometrics, IconCardio, IconCore } from '@/components/icons'
+import { CategoryIcon, CATEGORY_LABELS } from './CategoryIcon'
 import { useCategoryColors } from '@/lib/useCategoryColors'
 import { PER_SIDE_UNIT, PER_SIDE_SEC_UNIT, isRepBasedUnit, isPerSideUnit } from '@/lib/program-constants'
 import { formatPrescription, toPrescription } from '@/lib/prescription'
 
 export type Category = 'STRENGTH' | 'MOBILITY' | 'PLYOMETRICS' | 'CARDIO' | 'STABILITY'
 
-export const CATEGORY_LABELS: Record<Category, string> = {
-  STRENGTH: 'Kracht',
-  MOBILITY: 'Mobiliteit',
-  PLYOMETRICS: 'Plyometrie',
-  CARDIO: 'Cardio',
-  STABILITY: 'Stabiliteit',
-}
-
-export function CategoryIcon({ category, size = 14 }: { category: Category; size?: number }) {
-  const props = { size, className: undefined as string | undefined }
-  switch (category) {
-    case 'STRENGTH': return <IconStrength {...props} />
-    case 'MOBILITY': return <IconMobility {...props} />
-    case 'PLYOMETRICS': return <IconPlyometrics {...props} />
-    case 'CARDIO': return <IconCardio {...props} />
-    case 'STABILITY': return <IconCore {...props} />
-  }
-}
+export { CategoryIcon, CATEGORY_LABELS } from './CategoryIcon'
 
 export type ItemExerciseParam = {
   id?: string
