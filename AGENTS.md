@@ -199,6 +199,18 @@ aan de mobiele app teruggeeft, en filtert daarom hard op
 verschijnen — in het verleden zelfs als "gemist", en als start-knop naar de
 sessie-runner. Ruim het filter pas op ná een mobiele release die `kind` leest.
 
+Sinds 2026-09-13 is `week_schedule_day_item_exercises` een **bloklijst**
+(`blockKind` EXERCISE/NOTE/BREAK, `exerciseId` nullable, per-set-reps, AMRAP,
+fase, opties). Het bestaande veld `exercises` in `patient.getTodayExercises`
+en de `_count.exercises` in `calendarRange` bevatten daarom **alleen
+EXERCISE-rijen**; de volledige lijst zit additief in `plannedItem.blocks` en de
+groepen (superset/circuit per letter) in `plannedItem.groups`. Nieuwe
+consumers van die tabel filteren met `isExerciseBlock()` uit
+`src/lib/planner-blocks.ts` vóór ze `exercise.name` lezen. Kopiëren van rijen
+gaat altijd via `copyBlockColumns()` in `src/server/lib/planner-block-columns.ts`,
+en `groups`/`repsPerSet` blijven buiten `listWithItems` (TS2589, zie de
+`omit`-regels daar).
+
 # Twee wearables op één dag: de eerste bron wint, en dat slot zit in de WHERE
 
 Een gebruiker kan tegelijk een Apple Watch, een Polar en Strava hebben. Die
