@@ -118,7 +118,7 @@ export function toBlockPayload(b: BlockDraft): BlockInput {
   }
 }
 
-export function isExerciseBlock<T extends { blockKind: string; exerciseId: string | null }>(
+export function isExerciseBlock<T extends { blockKind: string; exerciseId?: string | null }>(
   b: T,
 ): b is T & { exerciseId: string } {
   return b.blockKind === 'EXERCISE' && typeof b.exerciseId === 'string' && b.exerciseId.length > 0
@@ -226,7 +226,10 @@ export function dominantCategory(
 
 /** Duur van de hele lijst: oefeningen via de bestaande schatting, pauzes letterlijk. */
 export function durationFromBlocks(
-  blocks: Pick<PlannerBlock, 'blockKind' | 'sets' | 'reps' | 'repUnit' | 'restTime' | 'repsPerSet' | 'durationSec'>[],
+  blocks: {
+    blockKind: BlockKind; sets: number; reps: number; repUnit: string
+    restTime?: number | null; repsPerSet?: number[] | null; durationSec?: number | null
+  }[],
 ): number {
   const oefeningen = blocks
     .filter(b => b.blockKind === 'EXERCISE')

@@ -60,8 +60,8 @@ export type ItemExerciseParam = {
 export type ItemExercise = {
   id: string
   exerciseId: string
-  exerciseName: string
-  exerciseCategory: string
+  exerciseName: string | null
+  exerciseCategory: string | null
   sets: number
   reps: number
   repUnit: string

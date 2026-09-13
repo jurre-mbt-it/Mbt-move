@@ -1,7 +1,9 @@
 import { z } from 'zod'
 import { createTRPCRouter, coachStaffProcedure, protectedProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
-import { isExerciseBlock } from '@/lib/planner-blocks'
+import { dominantCategory, durationFromBlocks, isExerciseBlock, parseGroups } from '@/lib/planner-blocks'
+import { BLOCK_SELECT, blockCreateData, copyBlockColumns, toPlannerBlock } from '@/server/lib/planner-block-columns'
+import { blockInputSchema } from '@/server/lib/planner-block-schema'
 import { assertPlanAccess } from '@/server/lib/plan-access'
 import { inSamePractice } from '@/server/lib/patient-access'
 import { planningCutoffVoorPatient } from '@/server/lib/planning-cutoff'
@@ -255,15 +257,7 @@ export async function copyItemToDay(
     notes: string | null
     cardioParams: Prisma.JsonValue | null
     groups?: Prisma.JsonValue | null
-    exercises: {
-      exerciseId: string | null; order: number; sets: number; reps: number
-      repUnit: string; restTime: number | null; notes: string | null
-      setsMax: number | null; repsMax: number | null
-      intensityType: IntensityType; intensityMin: number | null
-      intensityMax: number | null; intensityText: string | null
-      supersetGroup: string | null; supersetOrder: number
-      extraParams: Prisma.JsonValue
-    }[]
+    exercises: Parameters<typeof copyBlockColumns>[0][]
   },
   dayId: string,
   order: number,
@@ -285,24 +279,7 @@ export async function copyItemToDay(
       cardioParams: item.cardioParams ?? Prisma.DbNull,
       groups: item.groups ?? Prisma.DbNull,
       exercises: {
-        create: item.exercises.map(ex => ({
-          exerciseId: ex.exerciseId,
-          order: ex.order,
-          sets: ex.sets,
-          reps: ex.reps,
-          repUnit: ex.repUnit,
-          restTime: ex.restTime,
-          notes: ex.notes,
-          setsMax: ex.setsMax,
-          repsMax: ex.repsMax,
-          intensityType: ex.intensityType,
-          intensityMin: ex.intensityMin,
-          intensityMax: ex.intensityMax,
-          intensityText: ex.intensityText,
-          supersetGroup: ex.supersetGroup,
-          supersetOrder: ex.supersetOrder,
-          extraParams: ex.extraParams ?? [],
-        })),
+        create: item.exercises.map(copyBlockColumns),
       },
     },
   })
@@ -1361,52 +1338,22 @@ export const weekSchedulesRouter = createTRPCRouter({
         select: {
           id: true,
           cardioParams: true,
-          exercises: {
-            select: {
-              id: true, order: true, blockKind: true, sets: true, reps: true, repUnit: true,
-              restTime: true, exerciseId: true, notes: true,
-              setsMax: true, repsMax: true,
-              intensityType: true, intensityMin: true, intensityMax: true, intensityText: true,
-              supersetGroup: true, supersetOrder: true, extraParams: true,
-              exercise: { select: { name: true, category: true } },
-            },
-            orderBy: { order: 'asc' },
-          },
+          groups: true,
+          exercises: { select: BLOCK_SELECT, orderBy: { order: 'asc' } },
         },
       })
-      return items.map((it) => ({
-        itemId: it.id,
-        cardioParams: (it.cardioParams ?? null) as Record<string, unknown> | null,
-        // Tot de bloklijst-return (Taak 3): alleen oefeningsrijen, zoals voorheen.
-        exercises: it.exercises.filter(isExerciseBlock).map((e) => ({
-          id: e.id,
-          order: e.order,
-          sets: e.sets,
-          reps: e.reps,
-          repUnit: e.repUnit,
-          restTime: e.restTime,
-          notes: e.notes,
-          exerciseId: e.exerciseId,
-          exerciseName: e.exercise!.name,
-          exerciseCategory: e.exercise!.category,
-          setsMax: e.setsMax,
-          repsMax: e.repsMax,
-          intensityType: e.intensityType,
-          intensityMin: e.intensityMin,
-          intensityMax: e.intensityMax,
-          intensityText: e.intensityText,
-          supersetGroup: e.supersetGroup,
-          supersetOrder: e.supersetOrder,
-          // Begrensd casten (geen recursief Prisma JsonValue) → geen TS2589.
-          // Volle ExtraParam-vorm: clients sturen dit 1-op-1 terug naar
-          // setItemExercises, dus een smaller type hier verleidt tot droppen.
-          extraParams: (e.extraParams ?? []) as {
-            id?: string; label: string; type?: string;
-            value?: string | number | null; valueMax?: string | number | null;
-            unit?: string; options?: string[]; min?: number; max?: number;
-          }[],
-        })),
-      }))
+      return items.map((it) => {
+        const blocks = it.exercises.map(toPlannerBlock)
+        return {
+          itemId: it.id,
+          cardioParams: (it.cardioParams ?? null) as Record<string, unknown> | null,
+          groups: parseGroups(it.groups),
+          /** De volledige geordende lijst: oefeningen, notities, pauzes. */
+          blocks,
+          /** Alleen oefeningen, voor consumers van vóór de bloklijst (profielstrip, belasting). */
+          exercises: blocks.filter(isExerciseBlock),
+        }
+      })
     }),
 
   /**
@@ -2211,40 +2158,7 @@ export const weekSchedulesRouter = createTRPCRouter({
   setItemExercises: coachStaffProcedure
     .input(z.object({
       itemId: z.string(),
-      exercises: z.array(z.object({
-        exerciseId: z.string(),
-        sets: z.number().int().min(1).max(50).default(3),
-        reps: z.number().int().min(1).max(1000).default(10),
-        repUnit: z.string().max(20).default('reps'),
-        restTime: z.number().int().min(0).max(3600).nullable().optional(),
-        notes: z.string().max(500).nullable().optional(),
-        // Voorschrift-pariteit met ProgramExercise: zonder deze velden verliest
-        // een therapeut de RPE/%1RM/superset-laag zodra hij in de kalender
-        // bouwt i.p.v. in de programma-builder.
-        setsMax: z.number().int().min(1).max(50).nullable().optional(),
-        repsMax: z.number().int().min(1).max(1000).nullable().optional(),
-        intensityType: z.enum(['NONE', 'RPE', 'PERCENT_1RM', 'RELATIVE_DAILY_MAX', 'TECHNIQUE', 'TEXT']).optional(),
-        intensityMin: z.number().min(-1000).max(1000).nullable().optional(),
-        intensityMax: z.number().min(-1000).max(1000).nullable().optional(),
-        intensityText: z.string().max(200).nullable().optional(),
-        supersetGroup: z.string().max(4).nullable().optional(),
-        supersetOrder: z.number().int().min(0).max(20).optional(),
-        // Volledige ExtraParam-vorm (zie components/programs/types.ts). Zonder
-        // id/options/min/max/valueMax strippte zod ze er stil af: een
-        // select-param ("Band kleur") verloor zijn keuzes en een range zijn
-        // bovengrens, en het veld was daarna niet meer te renderen.
-        extraParams: z.array(z.object({
-          id: z.string().max(60).optional(),
-          label: z.string().min(1).max(60),
-          type: z.string().max(20).optional(),
-          value: z.union([z.string().max(200), z.number().min(-1_000_000).max(1_000_000)]).nullable().optional(),
-          valueMax: z.union([z.string().max(200), z.number().min(-1_000_000).max(1_000_000)]).nullable().optional(),
-          unit: z.string().max(20).optional(),
-          options: z.array(z.string().max(60)).max(20).optional(),
-          min: z.number().min(-1_000_000).max(1_000_000).optional(),
-          max: z.number().min(-1_000_000).max(1_000_000).optional(),
-        })).max(20).optional(),
-      })).max(60),
+      exercises: z.array(blockInputSchema).max(60),
     }))
     .mutation(async ({ ctx, input }) => {
       const item = await ctx.prisma.weekScheduleDayItem.findUnique({
@@ -2263,19 +2177,12 @@ export const weekSchedulesRouter = createTRPCRouter({
       // de therapeut bij het toevoegen intikte ("30 min"), ook nadat hij de
       // training had uitgewerkt — dan spreken de tegel en de workout elkaar
       // tegen. Geen oefeningen meer → terug naar wat er is ingetikt.
-      const derivedDurationSec = input.exercises.length > 0
-        ? durationFromExercises(input.exercises.map(e => ({ sets: e.sets, reps: e.reps, repUnit: e.repUnit, restTime: e.restTime ?? null })))
-        : null
+      // De inhoud bepaalt de duur, inclusief pauzes. Geen rijen meer → terug
+      // naar wat er bij het toevoegen is ingetikt.
+      const derivedDurationSec = input.exercises.length > 0 ? durationFromBlocks(input.exercises) : null
 
-      // Zelfde principe voor de intensiteit: staat er een RPE-voorschrift op de
-      // oefeningen, dan is dát de geplande RPE van het item — niet de
-      // categorie-standaard (7) waar de belastingschatting anders op terugvalt.
-      // Cardio doet dit al (setItemCardio leidt 'm uit de blokken af); zonder
-      // deze tak telde een kracht-voorschrift van RPE 8-9 gewoon niet mee.
-      // Alleen overschrijven als er echt iets afgeleid kan worden: een handmatig
-      // gezette plannedRpe blijft anders staan.
       const rpes = input.exercises
-        .filter(e => e.intensityType === 'RPE' && (e.intensityMin != null || e.intensityMax != null))
+        .filter(e => e.blockKind === 'EXERCISE' && e.intensityType === 'RPE' && (e.intensityMin != null || e.intensityMax != null))
         .map(e => {
           const lo = e.intensityMin ?? e.intensityMax!
           const hi = e.intensityMax ?? e.intensityMin!
@@ -2285,36 +2192,33 @@ export const weekSchedulesRouter = createTRPCRouter({
         ? Math.min(10, Math.max(1, Math.round(rpes.reduce((a, b) => a + b, 0) / rpes.length)))
         : null
 
+      // Dag = training: de soort volgt de oefeningen, behalve bij een
+      // cardio-item met blokken (dat blijft CARDIO) en bij een gelijkspel.
+      const exerciseIds = [...new Set(input.exercises.filter(isExerciseBlock).map(e => e.exerciseId))]
+      const cats = exerciseIds.length > 0
+        ? await ctx.prisma.exercise.findMany({ where: { id: { in: exerciseIds } }, select: { id: true, category: true } })
+        : []
+      const catById = new Map(cats.map(c => [c.id, c.category as string]))
+      const derivedCategory = item.cardioParams
+        ? null
+        : dominantCategory(
+            input.exercises.map(e => ({ blockKind: e.blockKind, exerciseCategory: e.exerciseId ? catById.get(e.exerciseId) ?? null : null })),
+            (item.quickCategory ?? null) as Parameters<typeof dominantCategory>[1],
+          )
+
       await ctx.prisma.$transaction([
         ctx.prisma.weekScheduleDayItem.update({
           where: { id: input.itemId },
           data: {
             plannedDurationSec: derivedDurationSec,
             ...(derivedRpe != null ? { plannedRpe: derivedRpe } : {}),
+            ...(derivedCategory && derivedCategory !== item.quickCategory ? { quickCategory: derivedCategory } : {}),
           },
         }),
         ctx.prisma.weekScheduleDayItemExercise.deleteMany({ where: { itemId: input.itemId } }),
         ...(input.exercises.length > 0
           ? [ctx.prisma.weekScheduleDayItemExercise.createMany({
-              data: input.exercises.map((e, i) => ({
-                itemId: input.itemId,
-                exerciseId: e.exerciseId,
-                order: i,
-                sets: e.sets,
-                reps: e.reps,
-                repUnit: e.repUnit,
-                restTime: e.restTime ?? null,
-                notes: e.notes ?? null,
-                setsMax: e.setsMax ?? null,
-                repsMax: e.repsMax ?? null,
-                intensityType: e.intensityType ?? 'NONE',
-                intensityMin: e.intensityMin ?? null,
-                intensityMax: e.intensityMax ?? null,
-                intensityText: e.intensityText ?? null,
-                supersetGroup: e.supersetGroup ?? null,
-                supersetOrder: e.supersetOrder ?? 0,
-                extraParams: (e.extraParams ?? []) as object,
-              })),
+              data: input.exercises.map((e, i) => blockCreateData(e, input.itemId, i)),
             })]
           : []),
       ])
