@@ -59,13 +59,12 @@ import { cn } from '@/lib/utils'
 import { CATEGORY_COLORS, CARDIO_ACTIVITY_COLORS, textOn } from '@/lib/palette'
 import { formatWeightsPerSet } from '@/lib/session-sets'
 import { useCategoryColors } from '@/lib/useCategoryColors'
-import {
-  CATEGORY_LABELS,
-  CategoryIcon,
-  QuickExerciseBuilder,
-  toItemExercisePayload,
-  type ItemExercise,
-} from '@/components/week-planner/QuickExerciseBuilder'
+import { CategoryIcon, CATEGORY_LABELS } from '@/components/week-planner/CategoryIcon'
+import { BlockRows } from '@/components/week-planner/BlockRows'
+import { ExerciseBlockDialog, type BlockDialogType } from '@/components/week-planner/ExerciseBlockDialog'
+import { useBlockMutations } from '@/components/week-planner/useBlockMutations'
+import type { ItemGroups, PlannerBlock } from '@/lib/planner-blocks'
+type ItemExercise = PlannerBlock
 import { LOAD_UITLEG } from '@/lib/training-load'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -347,6 +346,9 @@ type ScheduleItem = {
   testBattery?: { id: string; name: string } | null
   notes: string | null
   exercises?: ItemExercise[]
+  /** Volledige bloklijst (oefeningen, notities, pauzes) uit listItemContents. */
+  blocks?: PlannerBlock[]
+  groups?: ItemGroups
   cardioParams?: PlannerCardioParams | null
 }
 
@@ -518,47 +520,6 @@ function CardioSummary({ item, onBuild }: { item: ScheduleItem; onBuild: (() => 
   )
 }
 
-/** De geplande oefeningen als leeslijst, voor wanneer de bouwer niet mag. */
-function PlannedExerciseList({ exercises }: { exercises: ItemExercise[] }) {
-  const catColors = useCategoryColors()
-  if (exercises.length === 0) {
-    return (
-      <div className="space-y-2">
-        <MetaLabel>Geplande oefeningen</MetaLabel>
-        <p className="text-xs py-2" style={{ color: P.inkMuted }}>
-          Er stonden geen oefeningen bij deze workout.
-        </p>
-      </div>
-    )
-  }
-  return (
-    <div className="space-y-2">
-      <MetaLabel>Geplande oefeningen</MetaLabel>
-      <div className="space-y-1.5">
-        {exercises.map(ex => {
-          const cat = (ex.exerciseCategory as Category) ?? 'STRENGTH'
-          const c = catColors[cat]
-          return (
-            <div
-              key={ex.id}
-              className="rounded-lg p-2.5 text-xs"
-              style={{...CARD }}
-            >
-              <div className="flex items-center gap-2">
-                <span style={{ color: c }} className="shrink-0"><CategoryIcon category={cat} size={12} /></span>
-                <span className="font-semibold flex-1 truncate" style={{ color: P.ink }}>{ex.exerciseName}</span>
-                <span className="athletic-mono font-bold" style={{ color: P.ink, fontSize: 11 }}>
-                  {ex.sets} × {ex.reps} {ex.repUnit}
-                </span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 function MarkerIcon({ kind, size = 11 }: { kind: ItemKind; size?: number }) {
   switch (kind) {
     case 'REST': return <Moon size={size} />
@@ -651,13 +612,10 @@ function ItemTile({
   // Compacte inhoud-preview onder de titel: oefeningen of cardio-samenvatting.
   // Compacte hint op de tegel (één regel) — de volledige inhoud zit in het
   // zijpaneel dat opent bij klikken. Houdt de kalender schoon.
-  const exCount = item.exercises?.length ?? 0
   let previewLine: string | null = null
   if (marker) {
     // Rustdag/notitie/test/doel: geen oefeningen of cardio, alleen het label.
     previewLine = marker.label
-  } else if (exCount > 0) {
-    previewLine = `${exCount} oefening${exCount > 1 ? 'en' : ''}`
   } else if (item.quickCategory === 'CARDIO' && item.cardioParams) {
     const cp = item.cardioParams
     const parts: string[] = []
@@ -755,7 +713,7 @@ function ItemTile({
         <>
           <WorkoutProfileStrip
             cardioParams={item.cardioParams}
-            exercises={item.exercises}
+            exercises={item.quickCategory === 'CARDIO' ? item.exercises : null}
             category={item.quickCategory}
           />
           {item.plannedRpe != null && (() => {
@@ -1006,6 +964,7 @@ function DayCell({
   selected, onSelectStart, onSelectEnter,
   onAddWorkout, onAddTemplate, onCopyDay,
   onItemClick, onRemoveItem, statusFor, sessionIdFor, loggedFor, movedToFor, openItemId,
+  onAddBlock, onEditBlock, onRemoveBlock, onMoveBlock, onEditGroup,
   readOnly = false,
 }: {
   date: Date
@@ -1021,6 +980,11 @@ function DayCell({
   onCopyDay: (iso: string) => void
   onItemClick: (item: ScheduleItem, date: Date, dayId: string | null, sessionId: string | null) => void
   onRemoveItem: (item: ScheduleItem, dayId: string | null) => void
+  onAddBlock: (item: ScheduleItem | null, date: Date, dayId: string | null) => void
+  onEditBlock: (item: ScheduleItem, block: PlannerBlock, date: Date, dayId: string | null) => void
+  onRemoveBlock: (item: ScheduleItem, block: PlannerBlock) => void
+  onMoveBlock: (item: ScheduleItem, block: PlannerBlock, dir: -1 | 1) => void
+  onEditGroup: (item: ScheduleItem, letter: string, date: Date, dayId: string | null) => void
   statusFor: (date: Date, item: ScheduleItem) => ItemStatus
   sessionIdFor: (date: Date, item: ScheduleItem) => string | null
   loggedFor: (date: Date, item: ScheduleItem) => LoggedInfo | null
@@ -1064,9 +1028,38 @@ function DayCell({
         >
           {date.getDate()}
         </span>
-        {weekLabel != null && (
-          <span className="athletic-mono text-[9px]" style={{ color: P.inkDim }}>W{weekLabel}</span>
-        )}
+        <span className="flex items-center gap-1">
+          {weekLabel != null && (
+            <span className="athletic-mono text-[9px]" style={{ color: P.inkDim }}>W{weekLabel}</span>
+          )}
+          {inMonth && !readOnly && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  data-noselect
+                  aria-label="Meer voor deze dag"
+                  className="w-5 h-5 rounded grid place-items-center transition-opacity opacity-0 group-hover/cell:opacity-100 focus:opacity-100 pointer-coarse:opacity-60"
+                  style={{ color: P.inkMuted }}
+                >
+                  <MoreHorizontal className="w-3.5 h-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onSelect={() => onAddWorkout(date)} className="gap-2 text-xs">
+                  <Plus className="w-3.5 h-3.5" /> Workout toevoegen
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => onAddTemplate(date)} className="gap-2 text-xs">
+                  <BookmarkPlus className="w-3.5 h-3.5" /> Vanuit sjabloon
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => onCopyDay(iso)} className="gap-2 text-xs">
+                  <Copy className="w-3.5 h-3.5" /> Kopieer dag
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </span>
       </div>
       <div className="flex flex-col gap-1 flex-1 min-w-0">
         {items.map(item => {
@@ -1093,45 +1086,51 @@ function DayCell({
               isOpen={item.id === openItemId}
             />
           )
-          return realItem && !readOnly
-            ? <DraggableItem key={item.id} item={item} fromIso={iso}>{tile}</DraggableItem>
-            : <div key={item.id} data-noselect className="w-full min-w-0">{tile}</div>
+          // Dag = training: onder een WORKOUT staan zijn rijen en "+ Oefening".
+          const toontRijen = realItem && item.kind === 'WORKOUT'
+          return (
+            <div key={item.id} className="w-full min-w-0">
+              {realItem && !readOnly
+                ? <DraggableItem item={item} fromIso={iso}>{tile}</DraggableItem>
+                : <div data-noselect className="w-full min-w-0">{tile}</div>}
+              {toontRijen && (
+                <div data-noselect className="mt-0.5">
+                  <BlockRows
+                    compact
+                    blocks={item.blocks ?? []}
+                    groups={item.groups ?? {}}
+                    readOnly={readOnly}
+                    onEdit={b => onEditBlock(item, b, date, dayId)}
+                    onRemove={b => onRemoveBlock(item, b)}
+                    onMove={(b, dir) => onMoveBlock(item, b, dir)}
+                    onEditGroup={l => onEditGroup(item, l, date, dayId)}
+                  />
+                  {!readOnly && <AddBlockButton onClick={() => onAddBlock(item, date, dayId)} />}
+                </div>
+              )}
+            </div>
+          )
         })}
       </div>
-      {inMonth && !readOnly && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              data-noselect
-              className={cn(
-                // Alleen tonen bij hover/focus of als de dag nog leeg is — zo
-                // is de kalender geen muur van identieke +Workout-knoppen meer.
-                'transition-opacity self-start text-[10px] flex items-center gap-1 px-1.5 py-0.5 rounded border cursor-pointer mbt-btn-hover focus:opacity-100 group-hover/cell:opacity-100',
-                // Touch (iPad) kent geen hover — daar altijd zichtbaar houden.
-                items.length === 0 ? 'opacity-40' : 'opacity-0 pointer-coarse:opacity-40',
-              )}
-              style={{ color: P.brand, borderColor: 'rgba(232,122,85,0.4)', background: 'rgba(232,122,85,0.08)' }}
-              title="Toevoegen / kopiëren"
-            >
-              <Plus className="w-3 h-3" /> Workout
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48">
-            <DropdownMenuItem onSelect={() => onAddWorkout(date)} className="gap-2 text-xs">
-              <Plus className="w-3.5 h-3.5" /> Workout toevoegen
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => onAddTemplate(date)} className="gap-2 text-xs">
-              <BookmarkPlus className="w-3.5 h-3.5" /> Vanuit sjabloon
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => onCopyDay(iso)} className="gap-2 text-xs">
-              <Copy className="w-3.5 h-3.5" /> Kopieer dag
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      {inMonth && !readOnly && !items.some(i => i.kind === 'WORKOUT' && !i.id.startsWith('legacy-')) && (
+        <AddBlockButton onClick={() => onAddBlock(null, date, dayId)} />
       )}
     </div>
+  )
+}
+
+/** "+ Oefening", altijd zichtbaar: de eerste handeling op een dag hoort geen hover te vragen. */
+function AddBlockButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      data-noselect
+      onClick={onClick}
+      className="self-start text-[10px] flex items-center gap-1 px-1.5 py-0.5 rounded border cursor-pointer mbt-btn-hover opacity-70 hover:opacity-100 focus:opacity-100"
+      style={{ color: P.brand, borderColor: 'rgba(232,122,85,0.4)', background: 'rgba(232,122,85,0.08)' }}
+    >
+      <Plus className="w-3 h-3" /> Oefening
+    </button>
   )
 }
 
@@ -1194,8 +1193,9 @@ type DetailItem = {
 
 function ItemDetailContent({
   detail, onClose, showClose = false,
-  onSaveTemplate, onCopy, onSaveQuick, onSaveExercises, onBuildCardio,
-  savingTemplate, copying, savingExercises, readOnly = false,
+  onSaveTemplate, onCopy, onSaveQuick, onBuildCardio,
+  onAddBlock, onEditBlock, onRemoveBlock, onMoveBlock, onEditGroup,
+  savingTemplate, copying, readOnly = false,
 }: {
   detail: DetailItem
   onClose: () => void
@@ -1209,12 +1209,15 @@ function ItemDetailContent({
   onSaveTemplate: () => void
   onCopy: () => void
   onSaveQuick: (patch: { quickName?: string; quickDurationSec?: number; plannedRpe?: number | null }) => Promise<void>
-  onSaveExercises: (itemId: string, exercises: ReturnType<typeof toItemExercisePayload>[]) => Promise<void>
+  onAddBlock: () => void
+  onEditBlock: (b: PlannerBlock) => void
+  onRemoveBlock: (b: PlannerBlock) => void
+  onMoveBlock: (b: PlannerBlock, dir: -1 | 1) => void
+  onEditGroup: (letter: string) => void
   /** Opent de blokken-bouwer als volledig scherm — het zijpaneel is te smal. */
   onBuildCardio: (item: ScheduleItem) => void
   savingTemplate: boolean
   copying: boolean
-  savingExercises: boolean
 }) {
   const catColors = useCategoryColors()
   const portal = usePortal()
@@ -1467,17 +1470,30 @@ function ItemDetailContent({
                 item={item}
                 onBuild={readOnly ? null : () => onBuildCardio(item)}
               />
-            ) : readOnly ? (
-              // De bouwer is één groot invoerscherm; read-only is dat een lijst.
-              <PlannedExerciseList exercises={item.exercises ?? []} />
             ) : (
-              <QuickExerciseBuilder
-                key={item.id}
-                initial={item.exercises ?? []}
-                defaultCategory={category}
-                saving={savingExercises}
-                onSave={(exercises) => onSaveExercises(item.id, exercises)}
-              />
+              <div className="space-y-2">
+                <MetaLabel>Geplande oefeningen</MetaLabel>
+                {(item.blocks?.length ?? 0) === 0 ? (
+                  <p className="text-xs py-2" style={{ color: P.inkMuted }}>
+                    {readOnly ? 'Er stonden geen oefeningen bij deze workout.' : 'Nog geen oefeningen. Voeg de eerste toe.'}
+                  </p>
+                ) : (
+                  <BlockRows
+                    blocks={item.blocks ?? []}
+                    groups={item.groups ?? {}}
+                    readOnly={readOnly}
+                    onEdit={onEditBlock}
+                    onRemove={onRemoveBlock}
+                    onMove={onMoveBlock}
+                    onEditGroup={onEditGroup}
+                  />
+                )}
+                {!readOnly && (
+                  <DarkButton variant="secondary" size="sm" onClick={onAddBlock} className="w-full text-xs">
+                    <Plus className="w-3.5 h-3.5 mr-1.5" /> Oefening toevoegen
+                  </DarkButton>
+                )}
+              </div>
             )}
             {item.notes ? (
               <Tile>
@@ -1803,10 +1819,12 @@ function WeekPlannerContent() {
     { enabled: !!selectedPatientId, staleTime: 10_000 },
   )
   const contentsByItem = useMemo(() => {
-    const m = new Map<string, { exercises: ItemExercise[]; cardioParams: PlannerCardioParams | null }>()
+    const m = new Map<string, { exercises: ItemExercise[]; blocks: PlannerBlock[]; groups: ItemGroups; cardioParams: PlannerCardioParams | null }>()
     for (const c of itemContents) {
       m.set(c.itemId, {
         exercises: c.exercises,
+        blocks: c.blocks,
+        groups: c.groups,
         cardioParams: (c.cardioParams as PlannerCardioParams | null) ?? null,
       })
     }
@@ -1921,10 +1939,6 @@ function WeekPlannerContent() {
       toast.success('Opgeslagen als schema, staat nu in Programma’s')
     },
     onError: (err) => toast.error(err.message ?? 'Opslaan als schema mislukt'),
-  })
-  const setItemExercises = trpc.weekSchedules.setItemExercises.useMutation({
-    onSuccess: () => { utils.weekSchedules.listItemContents.invalidate(); toast.success('Oefeningen opgeslagen') },
-    onError: (err) => toast.error(err.message ?? 'Opslaan mislukt'),
   })
   const setItemCardio = trpc.weekSchedules.setItemCardio.useMutation({
     onSuccess: () => { utils.weekSchedules.listItemContents.invalidate(); toast.success('Cardio opgeslagen') },
@@ -2190,6 +2204,8 @@ function WeekPlannerContent() {
               testBattery: it.testBattery ?? null,
               notes: it.notes,
               exercises: content?.exercises ?? [],
+              blocks: content?.blocks ?? [],
+              groups: content?.groups ?? {},
               cardioParams: content?.cardioParams ?? null,
             }
           })
@@ -2511,7 +2527,7 @@ function WeekPlannerContent() {
     if (!c) return detailItem
     return {
       ...detailItem,
-      item: { ...detailItem.item, exercises: c.exercises, cardioParams: c.cardioParams },
+      item: { ...detailItem.item, exercises: c.exercises, blocks: c.blocks, groups: c.groups, cardioParams: c.cardioParams },
     }
   }, [detailItem, contentsByItem])
 
@@ -2570,6 +2586,56 @@ function WeekPlannerContent() {
     setAddInitialTab(tab)
     setAddOpen(true)
   }
+
+  // ─ Bloklijst: "+ Oefening" opent één dialoog voor alle soorten rijen ─
+  const blokken = useBlockMutations()
+  const ensureDayWorkout = trpc.weekSchedules.ensureDayWorkout.useMutation()
+  const [blockDialog, setBlockDialog] = useState<{
+    itemId: string
+    dayLabel: string
+    workoutName: string
+    category: Category
+    editBlock: PlannerBlock | null
+    editGroupLetter: string | null
+    initialType: BlockDialogType
+  } | null>(null)
+  const blockDialogInhoud = blockDialog ? contentsByItem.get(blockDialog.itemId) : undefined
+
+  const dagLabelLang = (date: Date) =>
+    date.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })
+
+  /**
+   * Opent de dialoog voor een bestaande training, of maakt er eerst één aan
+   * (dag = training). `item` null = de dag heeft nog geen workout.
+   */
+  async function openBlockDialog(
+    item: ScheduleItem | null, date: Date, dayId: string | null,
+    extra: { editBlock?: PlannerBlock | null; editGroupLetter?: string | null } = {},
+  ) {
+    if (!selectedPatientId) { toast.error('Kies eerst een patiënt'); return }
+    let itemId = item?.id ?? null
+    let naam = item?.quickName ?? item?.program?.name ?? 'Training'
+    let categorie: Category = item?.quickCategory ?? 'STRENGTH'
+    if (!itemId) {
+      const id = dayId ?? await ensureDayId(date)
+      if (!id) { toast.error('Kon de dag niet aanmaken'); return }
+      try {
+        const r = await ensureDayWorkout.mutateAsync({ dayId: id })
+        itemId = r.id
+        if (r.created) await utils.weekSchedules.listWithItems.invalidate()
+      } catch { toast.error('Kon geen training aanmaken'); return }
+      naam = 'Training'
+      categorie = 'STRENGTH'
+    }
+    setBlockDialog({
+      itemId, dayLabel: dagLabelLang(date), workoutName: naam, category: categorie,
+      editBlock: extra.editBlock ?? null,
+      editGroupLetter: extra.editGroupLetter ?? null,
+      initialType: categorie === 'CARDIO' ? 'cardio' : 'exercise',
+    })
+  }
+  const handleRemoveBlock = (item: ScheduleItem, b: PlannerBlock) => blokken.removeBlock(item.id, item.blocks ?? [], b.id)
+  const handleMoveBlock = (item: ScheduleItem, b: PlannerBlock, dir: -1 | 1) => blokken.moveBlock(item.id, item.blocks ?? [], b.id, dir)
 
   // ─ Cardio-blokkenbouwer (volledig scherm) ─
   const [cardioBuilderItem, setCardioBuilderItem] = useState<ScheduleItem | null>(null)
@@ -2778,12 +2844,6 @@ function WeekPlannerContent() {
     if (!detailItem) return
     await updateItem.mutateAsync({ id: detailItem.item.id, ...patch })
     setDetailItem(d => d ? { ...d, item: { ...d.item, ...patch } } : d)
-  }
-  async function handleSaveItemExercises(
-    itemId: string,
-    exercises: ReturnType<typeof toItemExercisePayload>[],
-  ) {
-    await setItemExercises.mutateAsync({ itemId, exercises })
   }
   async function handleSaveItemCardio(itemId: string, params: PlannerCardioParams | null) {
     await setItemCardio.mutateAsync({ itemId, cardioParams: params })
@@ -3231,6 +3291,11 @@ function WeekPlannerContent() {
                       onSelectStart={startSelection}
                       onSelectEnter={extendSelection}
                       onAddWorkout={(d) => openAddModal(d, 'quick')}
+                      onAddBlock={(item, d, dayId) => openBlockDialog(item, d, dayId)}
+                      onEditBlock={(item, b, d, dayId) => openBlockDialog(item, d, dayId, { editBlock: b })}
+                      onRemoveBlock={handleRemoveBlock}
+                      onMoveBlock={handleMoveBlock}
+                      onEditGroup={(item, l, d, dayId) => openBlockDialog(item, d, dayId, { editGroupLetter: l })}
                       onAddTemplate={(d) => openAddModal(d, 'library')}
                       onCopyDay={(i) => setSelectedIsos(new Set([i]))}
                       onItemClick={(item, d, dayId, sessionId) => openDetail({ item, date: d, dayId, sessionId })}
@@ -3267,6 +3332,24 @@ function WeekPlannerContent() {
           initialTab={addInitialTab}
           onSubmit={handleAddSubmit}
         />
+
+        {blockDialog && (
+          <ExerciseBlockDialog
+            open
+            onClose={() => setBlockDialog(null)}
+            dayLabel={blockDialog.dayLabel}
+            workoutName={blockDialog.workoutName}
+            initialType={blockDialog.initialType}
+            editBlock={blockDialog.editBlock}
+            editGroupLetter={blockDialog.editGroupLetter}
+            blocks={blockDialogInhoud?.blocks ?? []}
+            groups={blockDialogInhoud?.groups ?? {}}
+            defaultCategory={blockDialog.category}
+            saving={blokken.saving}
+            onSubmitBlock={(d) => blokken.submitBlock(blockDialog.itemId, blockDialogInhoud?.blocks ?? [], d)}
+            onSubmitGroup={(l, g) => blokken.setGroup(blockDialog.itemId, blockDialogInhoud?.groups ?? {}, l, g)}
+          />
+        )}
 
         {/* Week-instellingen (fase/deload/target/notitie) */}
         {weekMetaOpen !== null && selectedPatientId && (
@@ -3363,11 +3446,14 @@ function WeekPlannerContent() {
             onSaveTemplate={handleSaveTemplate}
             onCopy={handleCopyItem}
             onSaveQuick={handleSaveQuick}
-            onSaveExercises={handleSaveItemExercises}
+            onAddBlock={() => detailItem && openBlockDialog(detailItem.item, detailItem.date, detailItem.dayId)}
+            onEditBlock={(b) => detailItem && openBlockDialog(detailItem.item, detailItem.date, detailItem.dayId, { editBlock: b })}
+            onRemoveBlock={(b) => detailItem && handleRemoveBlock(detailItem.item, b)}
+            onMoveBlock={(b, dir) => detailItem && handleMoveBlock(detailItem.item, b, dir)}
+            onEditGroup={(l) => detailItem && openBlockDialog(detailItem.item, detailItem.date, detailItem.dayId, { editGroupLetter: l })}
             onBuildCardio={setCardioBuilderItem}
             savingTemplate={saveItemAsTemplate.isPending}
             copying={duplicateItem.isPending}
-            savingExercises={setItemExercises.isPending}
             readOnly={planningVergrendeld}
           />
         </aside>
@@ -3389,11 +3475,14 @@ function WeekPlannerContent() {
                   onSaveTemplate={handleSaveTemplate}
                   onCopy={handleCopyItem}
                   onSaveQuick={handleSaveQuick}
-                  onSaveExercises={handleSaveItemExercises}
+                  onAddBlock={() => detailItem && openBlockDialog(detailItem.item, detailItem.date, detailItem.dayId)}
+                  onEditBlock={(b) => detailItem && openBlockDialog(detailItem.item, detailItem.date, detailItem.dayId, { editBlock: b })}
+                  onRemoveBlock={(b) => detailItem && handleRemoveBlock(detailItem.item, b)}
+                  onMoveBlock={(b, dir) => detailItem && handleMoveBlock(detailItem.item, b, dir)}
+                  onEditGroup={(l) => detailItem && openBlockDialog(detailItem.item, detailItem.date, detailItem.dayId, { editGroupLetter: l })}
                   onBuildCardio={setCardioBuilderItem}
                   savingTemplate={saveItemAsTemplate.isPending}
                   copying={duplicateItem.isPending}
-                  savingExercises={setItemExercises.isPending}
                   readOnly={planningVergrendeld}
                 />
               )}
