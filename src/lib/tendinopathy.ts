@@ -191,6 +191,7 @@ export async function getTendinopathyReminderState(
   let exercisesRemaining = 0
   let remaining = 0
   for (const ex of program.exercises) {
+    if (!ex.exerciseId) continue
     const done = doneByExercise.get(ex.exerciseId) ?? 0
     const left = Math.max(0, program.dailyTarget - done)
     if (left > 0) exercisesRemaining++

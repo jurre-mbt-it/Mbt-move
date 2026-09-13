@@ -772,6 +772,9 @@ model Program {
   // De klok telt vanaf `updatedAt`: elke aanpassing reset 'm.
   reviewAfterWeeks Int?
   cardioParams     Json? // CardioParams JSONB for cardio programs
+  /// Groepen (superset/circuit) per week-dag: { "w1d2": { A: {...} } }. Zie
+  /// lib/planner-blocks.ts ItemGroups. Nooit ongecast door een tRPC-return.
+  groups           Json?
 
   tendinopathyMode Boolean @default(false)
   trackOneRepMax   Boolean @default(false)
@@ -1229,8 +1232,11 @@ model ProgramExercise {
   id            String   @id @default(cuid())
   program       Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
   programId     String
-  exercise      Exercise @relation(fields: [exerciseId], references: [id])
-  exerciseId    String
+  /// Sinds 2026-09-13 een bloklijst zoals de planner-rijen: EXERCISE, NOTE of
+  /// BREAK. Consumers filteren met isExerciseBlock() vóór ze exercise.name lezen.
+  blockKind     String    @default("EXERCISE")
+  exercise      Exercise? @relation(fields: [exerciseId], references: [id])
+  exerciseId    String?
   week          Int      @default(1)
   day           Int      @default(1)
   order         Int      @default(0)
@@ -1262,6 +1268,17 @@ model ProgramExercise {
   intensityMin  Float?
   intensityMax  Float?
   intensityText String?
+
+  // ── Blokvelden (2026-09-13), zelfde betekenis als op WeekScheduleDayItemExercise ──
+  repsPerSet     Json?
+  amrap          Boolean  @default(false)
+  phase          String?
+  isBodyweight   Boolean  @default(false)
+  completionOnly Boolean  @default(false)
+  trackMax       Boolean?
+  text           String?
+  videoUrl       String?
+  durationSec    Int?
 
   @@map("program_exercises")
 }

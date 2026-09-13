@@ -156,17 +156,19 @@ export default function ScheduleDayPage({ params }: Props) {
 
             <div className="space-y-2">
               {(day.program.exercises ?? []).map((pe, idx) => {
-                const color = CAT_COLOR[pe.exercise.category] ?? P.lime
+                if (!pe.exercise) return null
+                const ex = pe.exercise
+                const color = CAT_COLOR[ex.category] ?? P.lime
                 return (
                   <button
                     key={pe.id}
                     className="athletic-tap w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all"
                     style={{...CARD }}
                     onClick={() => setModalExercise({
-                      id: pe.exercise.id,
-                      name: pe.exercise.name,
-                      category: pe.exercise.category,
-                      videoUrl: pe.exercise.videoUrl,
+                      id: ex.id,
+                      name: ex.name,
+                      category: ex.category,
+                      videoUrl: ex.videoUrl,
                       sets: pe.sets,
                       reps: pe.reps,
                       repUnit: pe.repUnit,
@@ -180,7 +182,7 @@ export default function ScheduleDayPage({ params }: Props) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="truncate" style={{ color: P.ink, fontSize: 14, fontWeight: 700 }}>
-                        {pe.exercise.name}
+                        {ex.name}
                       </p>
                       <p
                         className="athletic-mono"
@@ -189,7 +191,7 @@ export default function ScheduleDayPage({ params }: Props) {
                         {formatSetsReps(pe.sets, pe.setsMax, pe.reps, pe.repsMax, pe.repUnit)} · {pe.restTime}s rust
                       </p>
                     </div>
-                    {pe.exercise.videoUrl && (
+                    {ex.videoUrl && (
                       <div
                         className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
                         style={{ background: `${color}22` }}

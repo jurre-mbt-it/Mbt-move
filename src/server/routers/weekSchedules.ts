@@ -4,6 +4,7 @@ import { TRPCError } from '@trpc/server'
 import { dominantCategory, durationFromBlocks, isExerciseBlock, parseGroups } from '@/lib/planner-blocks'
 import { BLOCK_SELECT, blockCreateData, copyBlockColumns, toPlannerBlock } from '@/server/lib/planner-block-columns'
 import { blockInputSchema, itemGroupsSchema } from '@/server/lib/planner-block-schema'
+import { programBlockColumns } from '@/server/lib/program-block-columns'
 import { assertPlanAccess } from '@/server/lib/plan-access'
 import { inSamePractice } from '@/server/lib/patient-access'
 import { planningCutoffVoorPatient } from '@/server/lib/planning-cutoff'
@@ -1016,7 +1017,7 @@ export const weekSchedulesRouter = createTRPCRouter({
                     // extraParams (recursieve JsonValue) weglaten: deze kalender-
                     // view gebruikt 'm niet, en meenemen tipt de tRPC-inferentie
                     // in de consumer over de TS2589-grens (te diepe type-instantie).
-                    omit: { extraParams: true },
+                    omit: { extraParams: true, repsPerSet: true },
                     include: { exercise: { select: { id: true, name: true, category: true, videoUrl: true } } },
                     orderBy: [{ week: 'asc' }, { day: 'asc' }, { order: 'asc' }],
                   },
@@ -2179,12 +2180,16 @@ export const weekSchedulesRouter = createTRPCRouter({
             cardioParams: item.cardioParams ?? undefined,
             // Een Program kent alleen oefeningen: notities en pauzes uit de
             // bloklijst vallen hier bewust af.
-            ...(inline && inline.exercises.some(isExerciseBlock)
+            // Een programma draagt sinds 13-09 dezelfde bloklijst: notities en
+            // pauzes gaan mee, en de groepen van deze dag als week 1, dag 1.
+            ...(item.groups ? { groups: { w1d1: item.groups } as Prisma.InputJsonValue } : {}),
+            ...(inline && inline.exercises.length > 0
               ? {
                   exercises: {
-                    create: inline.exercises.filter(isExerciseBlock).map(ex => ({
+                    create: inline.exercises.map(ex => ({
                       id: createId(),
                       exerciseId: ex.exerciseId,
+                      ...programBlockColumns(ex),
                       week: 1,
                       day: 1,
                       order: ex.order,

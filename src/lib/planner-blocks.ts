@@ -285,3 +285,17 @@ export function groupLabel(letter: string, groups: ItemGroups): string {
   const rondeTekst = `${rondes} ronde${rondes === 1 ? '' : 's'}`
   return g.name ? `${letter} · ${g.name}, ${rondeTekst}` : `${letter} · Circuit ${rondeTekst}`
 }
+
+/** Groepen van een programma: per week-dag ("w1d2") een ItemGroups. */
+export type ProgramGroups = Record<string, ItemGroups>
+export const programDayKey = (week: number, day: number) => `w${week}d${day}`
+export function parseProgramGroups(raw: unknown): ProgramGroups {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const out: ProgramGroups = {}
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^w\d+d\d+$/.test(k)) continue
+    const g = parseGroups(v)
+    if (Object.keys(g).length > 0) out[k] = g
+  }
+  return out
+}

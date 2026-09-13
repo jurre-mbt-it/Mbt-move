@@ -10,6 +10,7 @@ import { trpc } from '@/lib/trpc/client'
 import { usePortal } from '@/lib/portal'
 import { notFound } from 'next/navigation'
 import type { BuilderExercise, BuilderResource } from '@/components/programs/types'
+import type { ItemGroups } from '@/lib/planner-blocks'
 import {
   readWorkout, summarize, structuredLoad, totalDurationSec, targetColor, isRepeat,
   type WorkoutBlock,
@@ -49,6 +50,8 @@ type EditExercise = {
   }
 }
 type EditProgram = {
+  /** Supersets/circuits per week-dag (zie lib/planner-blocks.ts). */
+  groups?: Record<string, ItemGroups> | null
   name: string
   description: string | null
   weeks: number
@@ -248,16 +251,26 @@ export default function EditProgramPage({ params }: Props) {
 
   const exercises: BuilderExercise[] = program.exercises.map(pe => ({
     uid: pe.id,
-    exerciseId: pe.exerciseId,
-    name: pe.exercise.name,
-    category: pe.exercise.category,
-    difficulty: pe.exercise.difficulty,
-    muscleLoads: Object.fromEntries(pe.exercise.muscleLoads.map(ml => [ml.muscle, ml.load])),
-    easierVariantId: pe.exercise.easierVariantId ?? null,
-    harderVariantId: pe.exercise.harderVariantId ?? null,
-    videoUrl: pe.exercise.videoUrl ?? null,
+    // Bloklijst: een notitie of pauze heeft geen oefening.
+    blockKind: ((pe as { blockKind?: string }).blockKind ?? 'EXERCISE') as BuilderExercise['blockKind'],
+    exerciseId: pe.exerciseId ?? '',
+    name: pe.exercise?.name ?? ((pe as { blockKind?: string }).blockKind === 'BREAK' ? 'Pauze' : 'Notitie'),
+    category: pe.exercise?.category ?? 'STRENGTH',
+    difficulty: pe.exercise?.difficulty ?? '',
+    muscleLoads: Object.fromEntries((pe.exercise?.muscleLoads ?? []).map(ml => [ml.muscle, ml.load])),
+    easierVariantId: pe.exercise?.easierVariantId ?? null,
+    harderVariantId: pe.exercise?.harderVariantId ?? null,
+    videoUrl: pe.exercise?.videoUrl ?? (pe as { videoUrl?: string | null }).videoUrl ?? null,
+    repsPerSet: (() => { const r = (pe as unknown as { repsPerSet?: unknown }).repsPerSet; return Array.isArray(r) ? r.filter((n): n is number => typeof n === 'number') : null })(),
+    amrap: (pe as { amrap?: boolean }).amrap ?? false,
+    phase: ((pe as { phase?: string | null }).phase ?? null) as BuilderExercise['phase'],
+    isBodyweight: (pe as { isBodyweight?: boolean }).isBodyweight ?? false,
+    completionOnly: (pe as { completionOnly?: boolean }).completionOnly ?? false,
+    trackMax: (pe as { trackMax?: boolean | null }).trackMax ?? null,
+    text: (pe as { text?: string | null }).text ?? null,
+    durationSec: (pe as { durationSec?: number | null }).durationSec ?? null,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    trackOneRepMax: (pe.exercise as any).trackOneRepMax ?? false,
+    trackOneRepMax: (pe.exercise as any)?.trackOneRepMax ?? false,
     sets: pe.sets,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setsMax: (pe as any).setsMax ?? null,
@@ -322,6 +335,7 @@ export default function EditProgramPage({ params }: Props) {
           reviewAfterWeeks: program.reviewAfterWeeks ?? null,
           exercises,
           resources,
+          groups: program.groups ?? {},
         }}
       />
     </Suspense>

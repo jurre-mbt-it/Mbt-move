@@ -1,6 +1,9 @@
 import { z } from 'zod'
 import { createTRPCRouter, coachStaffProcedure, creatorProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
+import { programBlockColumns } from '@/server/lib/program-block-columns'
+import { programGroupsSchema } from '@/server/lib/planner-block-schema'
+import { parseProgramGroups } from '@/lib/planner-blocks'
 import { Prisma } from '@prisma/client'
 import type { PrismaClient } from '@prisma/client'
 import { maskMuscleLoadsArray } from '@/server/lib/muscle-loads'
@@ -51,7 +54,18 @@ async function assertCanAssignPatient(
 // geen functionele grens. setItemExercises hanteert hetzelfde patroon.
 const ProgramExerciseInput = z.object({
   id: z.string().max(60).optional(), // existing id for updates
-  exerciseId: z.string().max(60),
+  // Bloklijst (2026-09-13): een rij is een oefening, notitie of pauze.
+  blockKind: z.enum(['EXERCISE', 'NOTE', 'BREAK']).default('EXERCISE'),
+  exerciseId: z.string().max(60).nullable().optional(),
+  repsPerSet: z.array(z.number().int().min(1).max(1000)).max(50).nullable().optional(),
+  amrap: z.boolean().default(false),
+  phase: z.enum(['WARMUP', 'COOLDOWN']).nullable().optional(),
+  isBodyweight: z.boolean().default(false),
+  completionOnly: z.boolean().default(false),
+  trackMax: z.boolean().nullable().optional(),
+  text: z.string().max(500).nullable().optional(),
+  videoUrl: z.string().max(500).regex(/^https?:\/\/\S+$/i, 'Alleen een http(s)-link').nullable().optional(),
+  durationSec: z.number().int().min(10).max(3600).nullable().optional(),
   week: z.number().int().min(1).default(1),
   day: z.number().int().min(1).default(1),
   order: z.number().int().default(0),
@@ -91,6 +105,11 @@ const ProgramExerciseInput = z.object({
     .max(20)
     .nullable()
     .optional(),
+}).superRefine((b, ctx) => {
+  if (b.blockKind === 'EXERCISE' && !b.exerciseId) ctx.addIssue({ code: 'custom', path: ['exerciseId'], message: 'Kies een oefening' })
+  if (b.blockKind === 'NOTE' && !(b.text ?? '').trim()) ctx.addIssue({ code: 'custom', path: ['text'], message: 'De notitie is leeg' })
+  if (b.blockKind === 'BREAK' && b.durationSec == null) ctx.addIssue({ code: 'custom', path: ['durationSec'], message: 'Geef de pauze een duur' })
+  if (b.repsPerSet && b.repsPerSet.length !== b.sets) ctx.addIssue({ code: 'custom', path: ['repsPerSet'], message: 'Vul voor elke set een aantal in' })
 })
 
 // Educatie-blok (de "Leer"-items) gekoppeld aan een dag/week van het programma.
@@ -151,6 +170,7 @@ export const programsRouter = createTRPCRouter({
       // programma's tenzij explicitly opt-in via includeAssigned.
       const hideAssigned = !includeAssigned && input?.isTemplate !== true
       const programs = await ctx.prisma.program.findMany({
+        omit: { groups: true },
         where: {
           ...ownership,
           ...(input?.patientId !== undefined ? { patientId: input.patientId } : {}),
@@ -159,7 +179,7 @@ export const programsRouter = createTRPCRouter({
         },
         include: {
           patient: { select: { id: true, name: true, email: true } },
-          _count: { select: { exercises: true } },
+          _count: { select: { exercises: { where: { blockKind: 'EXERCISE' } } } },
           exercises: {
             select: { day: true, exercise: { select: { category: true } } },
           },
@@ -229,15 +249,17 @@ export const programsRouter = createTRPCRouter({
       }
       return {
         ...program,
+        groups: parseProgramGroups(program.groups),
         exercises: program.exercises.map(pe => ({
           ...pe,
-          exercise: maskMuscleLoadsArray(pe.exercise),
+          exercise: pe.exercise ? maskMuscleLoadsArray(pe.exercise) : null,
         })),
       }
     }),
 
   create: creatorProcedure
     .input(z.object({
+      groups: programGroupsSchema.nullable().optional(),
       name: z.string().min(1),
       description: z.string().optional(),
       patientId: z.string().nullable().optional(),
@@ -266,7 +288,7 @@ export const programsRouter = createTRPCRouter({
       dailyTarget: z.number().int().min(1).max(10).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const { patientId, cardioParams, ...rest } = input
+      const { patientId, cardioParams, groups, ...rest } = input
       await assertCanAssignPatient(ctx.prisma, ctx.user!, patientId)
       // Een programma zonder patiënt is een sjabloon en raakt niemands
       // behandeling; alleen directe toewijzing is nieuwe planning, en die
@@ -277,6 +299,7 @@ export const programsRouter = createTRPCRouter({
           id: createId(),
           ...rest,
           cardioParams: (cardioParams ?? null) as never,
+          groups: (groups ?? undefined) as Prisma.InputJsonValue | undefined,
           patientId: patientId ?? null,
           creatorId: ctx.user!.id,
           practiceId: ctx.user!.practiceId ?? null,
@@ -306,6 +329,7 @@ export const programsRouter = createTRPCRouter({
       startDate: z.string().nullable().optional(),
       endDate: z.string().nullable().optional(),
       exercises: z.array(ProgramExerciseInput).optional(),
+      groups: programGroupsSchema.nullable().optional(),
       resources: z.array(ProgramResourceInput).optional(),
       flexibleSchedule: z.boolean().optional(),
       weeklyTarget: z.number().int().min(1).max(14).nullable().optional(),
@@ -321,7 +345,7 @@ export const programsRouter = createTRPCRouter({
         .optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const { id, exercises, resources, startDate, endDate, cardioParams, ...data } = input
+      const { id, groups, exercises, resources, startDate, endDate, cardioParams, ...data } = input
 
       const existing = await ctx.prisma.program.findUnique({ where: { id } })
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
@@ -363,6 +387,7 @@ export const programsRouter = createTRPCRouter({
       if (startDate !== undefined) updateData.startDate = startDate ? new Date(startDate) : null
       if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null
       if (cardioParams !== undefined) updateData.cardioParams = cardioParams
+      if (groups !== undefined) updateData.groups = groups ?? Prisma.DbNull
 
       // Deploy-moment: programma wordt (of is) patient-gebonden en gaat ACTIVE
       // zonder expliciete startDate → klok start nu. Voorkomt de fallback op
@@ -380,7 +405,8 @@ export const programsRouter = createTRPCRouter({
         updateData.exercises = {
           create: exercises.map((ex, i) => ({
             id: createId(),
-            exerciseId: ex.exerciseId,
+            exerciseId: ex.blockKind && ex.blockKind !== 'EXERCISE' ? null : (ex.exerciseId ?? null),
+            ...programBlockColumns(ex),
             week: ex.week,
             day: ex.day,
             order: ex.order ?? i,
@@ -428,9 +454,10 @@ export const programsRouter = createTRPCRouter({
       })
       return {
         ...saved,
+        groups: parseProgramGroups(saved.groups),
         exercises: saved.exercises.map(pe => ({
           ...pe,
-          exercise: maskMuscleLoadsArray(pe.exercise),
+          exercise: pe.exercise ? maskMuscleLoadsArray(pe.exercise) : null,
         })),
       }
     }),
@@ -469,6 +496,7 @@ export const programsRouter = createTRPCRouter({
           isTemplate: input.isTemplate ?? source.isTemplate,
           type: source.type,
           cardioParams: (source.cardioParams ?? null) as never,
+          groups: (source.groups ?? undefined) as Prisma.InputJsonValue | undefined,
           flexibleSchedule: source.flexibleSchedule,
           weeklyTarget: source.weeklyTarget,
           reviewAfterWeeks: source.reviewAfterWeeks,
@@ -486,7 +514,8 @@ export const programsRouter = createTRPCRouter({
           exercises: {
             create: source.exercises.map(ex => ({
               id: createId(),
-              exerciseId: ex.exerciseId,
+              exerciseId: ex.blockKind && ex.blockKind !== 'EXERCISE' ? null : (ex.exerciseId ?? null),
+              ...programBlockColumns(ex),
               week: ex.week,
               day: ex.day,
               order: ex.order,

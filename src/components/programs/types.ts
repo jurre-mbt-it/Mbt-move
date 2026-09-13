@@ -1,4 +1,5 @@
 import type { IntensityType } from '@/lib/prescription'
+import type { ItemGroups } from '@/lib/planner-blocks'
 
 export type RepUnit = 'reps' | 'reps/zijde' | 'sec' | 'sec/zijde' | 'min' | 'm'
 export type ParamType = 'number' | 'text' | 'select' | 'slider'
@@ -56,6 +57,18 @@ export interface BuilderExercise {
   supersetGroup: string | null  // null | 'A' | 'B' | 'C' …
   supersetOrder: number
 
+  // ── Bloklijst (2026-09-13): een rij is een oefening, notitie of pauze ──
+  blockKind?: 'EXERCISE' | 'NOTE' | 'BREAK'
+  repsPerSet?: number[] | null
+  amrap?: boolean
+  phase?: 'WARMUP' | 'COOLDOWN' | null
+  isBodyweight?: boolean
+  completionOnly?: boolean
+  trackMax?: boolean | null
+  /** NOTE: de tekst; BREAK: optionele tekst. */
+  text?: string | null
+  durationSec?: number | null
+
   // Selection
   selected: boolean
 
@@ -100,6 +113,8 @@ export interface ProgramState {
   currentDay: number
   exercises: BuilderExercise[]
   resources: BuilderResource[]
+  /** Supersets/circuits per week-dag, sleutel "w1d2" (zie lib/planner-blocks.ts). */
+  groups: Record<string, ItemGroups>
   isTemplate: boolean
   tendinopathyMode: boolean
   trackOneRepMax: boolean

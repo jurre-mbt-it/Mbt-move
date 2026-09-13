@@ -358,13 +358,14 @@ export const shopRouter = createTRPCRouter({
             day: d,
             items: pes
               .filter((p) => p.week === w && p.day === d)
+              .filter((p) => !!p.exercise)
               .map((p) => ({
                 id: p.id,
-                name: p.exercise.name,
+                name: p.exercise!.name,
                 // De video's zijn het product. In een publieke preview alleen
                 // de naam en het schema, geen speelbare media.
-                videoUrl: isAdminCaller ? p.exercise.videoUrl : null,
-                mediaType: p.exercise.mediaType,
+                videoUrl: isAdminCaller ? p.exercise!.videoUrl : null,
+                mediaType: p.exercise!.mediaType,
                 sets: p.sets,
                 setsMax: p.setsMax,
                 reps: p.reps,

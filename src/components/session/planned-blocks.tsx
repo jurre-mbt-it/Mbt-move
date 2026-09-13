@@ -69,8 +69,9 @@ export function regelsVoor<T extends { uid: string }>(
 
 /** Leest het geplande item uit de getTodayExercises-uitvoer zonder de diepe tRPC-typen. */
 export function geplandeBlokkenUit(sessionData: unknown): { blocks: AthleteBlock[] | undefined; groups: unknown } {
-  const pi = (sessionData as { plannedItem?: { blocks?: AthleteBlock[]; groups?: unknown } } | null | undefined)?.plannedItem
-  return { blocks: pi?.blocks, groups: pi?.groups }
+  const top = sessionData as { blocks?: AthleteBlock[]; groups?: unknown; plannedItem?: { blocks?: AthleteBlock[]; groups?: unknown } } | null | undefined
+  if (top?.blocks) return { blocks: top.blocks, groups: top.groups }
+  return { blocks: top?.plannedItem?.blocks, groups: top?.plannedItem?.groups }
 }
 
 export function BlokRegel<T>({ regel, onVideo, onTimer }: {

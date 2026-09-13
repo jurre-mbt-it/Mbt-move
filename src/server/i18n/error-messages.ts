@@ -15,6 +15,11 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // Toegang en koppelingen
   'Geen actieve behandelrelatie met deze patiënt': 'No active treatment relationship with this patient',
   'Geen actieve koppeling met deze patiënt': 'No active link with this patient',
+  // Bloklijst-validatie (planner en programma-builder).
+  'Kies een oefening': 'Choose an exercise',
+  'De notitie is leeg': 'The note is empty',
+  'Geef de pauze een duur': 'Give the break a duration',
+  'Vul voor elke set een aantal in': 'Enter a number for every set',
   'Geen toegang tot deze patiënt': 'No access to this patient',
   'Geen toegang tot dit item': 'No access to this item',
   'Patiënt niet gevonden of geen toegang.': 'Patient not found or no access.',

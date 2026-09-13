@@ -13,7 +13,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import {
-  SortableContext, arrayMove, verticalListSortingStrategy,
+  arrayMove,
 } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core'
 
@@ -29,8 +29,11 @@ import {
 import { searchMatch } from '@/lib/exercise-search'
 import { MarkMatch } from '@/components/exercises/MarkMatch'
 import { ExerciseLibraryPanel } from './ExerciseLibraryPanel'
-import { ProgramExerciseBlock } from './ProgramExerciseBlock'
-import { SupersetGroupBlock } from './SupersetGroupBlock'
+import { BlockRows } from '@/components/week-planner/BlockRows'
+import { ExerciseBlockDialog } from '@/components/week-planner/ExerciseBlockDialog'
+import { DarkButton } from '@/components/dark-ui'
+import { programDayKey, type BlockDraft, type ItemGroup, type PlannerBlock } from '@/lib/planner-blocks'
+import { builderToBlock, draftToBuilderPatch } from './builder-blocks'
 import { MuscleBalancePanel } from './MuscleBalancePanel'
 import { IncompletePracticeBanner } from '@/components/practice/IncompletePracticeBanner'
 import type { BuilderExercise, BuilderResource, ProgramState } from './types'
@@ -135,6 +138,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
     reviewAfterWeeks: (initialState as Partial<ProgramState> | undefined)?.reviewAfterWeeks ?? null,
     exercises: initialState?.exercises ?? [],
     resources: (initialState as Partial<ProgramState> | undefined)?.resources ?? [],
+    groups: (initialState as Partial<ProgramState> | undefined)?.groups ?? {},
   }))
   // Houdt bij of de gebruiker zelf de naam heeft aangeraakt. Zo niet, mag de
   // auto-suggestie de naam blijven bijwerken als patient/oefeningen wijzigen.
@@ -302,6 +306,52 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
   }, [dayExercises])
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
+  // ── Bloklijst van deze dag voor de gedeelde rijen en pop-up ──
+  const dagSleutel = programDayKey(program.currentWeek, program.currentDay)
+  const dagBlokken = useMemo(() => dayExercises.map((e, i) => builderToBlock(e, i)), [dayExercises])
+  const dagGroepen = program.groups[dagSleutel] ?? {}
+  const [blokDialoog, setBlokDialoog] = useState<{ edit: PlannerBlock | null; letter: string | null } | null>(null)
+
+  /** Verplaats een rij binnen de dag; de volgorde in `exercises` is de programmavolgorde. */
+  const moveBlok = useCallback((uid: string, dir: -1 | 1) => {
+    setExercises(prev => {
+      const dagUids = prev
+        .filter(e => e.week === program.currentWeek && (program.flexibleSchedule || e.day === program.currentDay))
+        .map(e => e.uid)
+      const pos = dagUids.indexOf(uid)
+      const buur = dagUids[pos + dir]
+      if (pos < 0 || !buur) return prev
+      const a = prev.findIndex(e => e.uid === uid)
+      const b = prev.findIndex(e => e.uid === buur)
+      const next = [...prev]
+      ;[next[a], next[b]] = [next[b], next[a]]
+      return next
+    })
+  }, [program.currentWeek, program.currentDay, program.flexibleSchedule])
+
+  const submitBlok = useCallback(async (d: BlockDraft) => {
+    const lib = d.exerciseId ? (libraryExercises as Array<{ id: string }>).find(le => le.id === d.exerciseId) : undefined
+    const patch = draftToBuilderPatch(d, lib as Parameters<typeof draftToBuilderPatch>[1])
+    if (d.id) {
+      setExercises(prev => prev.map(e => (e.uid === d.id ? { ...e, ...patch } : e)))
+    } else {
+      setExercises(prev => [...prev, {
+        ...patch,
+        uid: `uid-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        selected: false,
+        week: program.currentWeek,
+        day: program.currentDay,
+      }])
+    }
+  }, [libraryExercises, program.currentWeek, program.currentDay])
+
+  const submitGroep = useCallback(async (letter: string, g: ItemGroup) => {
+    setProgram(prev => ({
+      ...prev,
+      groups: { ...prev.groups, [dagSleutel]: { ...(prev.groups[dagSleutel] ?? {}), [letter]: g } },
+    }))
+  }, [dagSleutel])
+
   const updateEx = useCallback((uid: string, patch: Partial<BuilderExercise>) => {
     setExercises(prev => {
       // Wijzigingen aan extraParams syncen we naar alle andere instances van
@@ -660,6 +710,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       flexibleSchedule: boolean
       weeklyTarget: number | null
       reviewAfterWeeks: number | null
+      groups: ProgramState['groups']
     }
     exercises: BuilderExercise[]
     resources: BuilderResource[]
@@ -678,6 +729,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       flexibleSchedule: program.flexibleSchedule ?? false,
       weeklyTarget: program.weeklyTarget ?? null,
       reviewAfterWeeks: program.reviewAfterWeeks ?? null,
+      groups: program.groups,
     },
     exercises,
     resources,
@@ -758,7 +810,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
     // suggestie 'm vult, wordt deze save automatisch opnieuw getriggerd.
     if (!val.program.name.trim()) return
     const exercisePayload = val.exercises.map((ex, i) => ({
-      exerciseId: ex.exerciseId,
+      exerciseId: ex.blockKind && ex.blockKind !== 'EXERCISE' ? null : ex.exerciseId,
       week: ex.week,
       day: ex.day,
       order: i,
@@ -776,6 +828,16 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       intensityMax: ex.intensityMax ?? null,
       intensityText: ex.intensityText?.trim() ? ex.intensityText : null,
       extraParams: ex.extraParams && ex.extraParams.length > 0 ? ex.extraParams : null,
+      blockKind: ex.blockKind ?? 'EXERCISE',
+      repsPerSet: ex.repsPerSet ?? null,
+      amrap: !!ex.amrap,
+      phase: ex.phase ?? null,
+      isBodyweight: !!ex.isBodyweight,
+      completionOnly: !!ex.completionOnly,
+      trackMax: ex.trackMax ?? null,
+      text: ex.text ?? null,
+      videoUrl: ex.blockKind === 'NOTE' ? (ex.videoUrl ?? null) : null,
+      durationSec: ex.durationSec ?? null,
     }))
     const resourcePayload = val.resources.map((r, i) => ({
       resourceId: r.resourceId,
@@ -802,6 +864,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         trackOneRepMax: val.program.trackOneRepMax,
         dailyTarget: val.program.tendinopathyMode ? val.program.dailyTarget : null,
         exercises: exercisePayload,
+        groups: val.program.groups,
         resources: resourcePayload,
       })
     } else {
@@ -823,6 +886,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         await saveProgram.mutateAsync({
           id: created.id,
           exercises: exercisePayload,
+          groups: val.program.groups,
           resources: resourcePayload,
         })
       }
@@ -1046,6 +1110,16 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       intensityText: ex.intensityText?.trim() ? ex.intensityText : null,
       // Voorschrift-parameters horen wél in het sjabloon (niet patiënt-specifiek).
       extraParams: ex.extraParams && ex.extraParams.length > 0 ? ex.extraParams : null,
+      blockKind: ex.blockKind ?? 'EXERCISE',
+      repsPerSet: ex.repsPerSet ?? null,
+      amrap: !!ex.amrap,
+      phase: ex.phase ?? null,
+      isBodyweight: !!ex.isBodyweight,
+      completionOnly: !!ex.completionOnly,
+      trackMax: ex.trackMax ?? null,
+      text: ex.text ?? null,
+      videoUrl: ex.blockKind === 'NOTE' ? (ex.videoUrl ?? null) : null,
+      durationSec: ex.durationSec ?? null,
     }))
     const resourcePayload = resources.map((r, i) => ({
       resourceId: r.resourceId, week: r.week, day: r.day, order: i,
@@ -1074,6 +1148,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           await saveProgram.mutateAsync({
             id: created.id,
             exercises: exercisePayload,
+            groups: program.groups,
             resources: resourcePayload,
           })
         }
@@ -1780,18 +1855,6 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                     />
                   </div>
                 )}
-
-                {selectedUids.length >= 2 && (
-                  <div className={cn('flex items-center gap-2 shrink-0', dayExercises.length > 0 ? '' : 'ml-auto')}>
-                    <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={createSuperset}>
-                      <Layers className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">Superset</span>
-                    </Button>
-                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={clearSelection}>
-                      ✕
-                    </Button>
-                  </div>
-                )}
               </div>
             ) : (
               (
@@ -1809,17 +1872,6 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                       onCopyWeek={copyWeekTo}
                     />
                   )}
-                  {selectedUids.length >= 2 && (
-                    <>
-                      <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={createSuperset}>
-                        <Layers className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Superset</span>
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={clearSelection}>
-                        ✕
-                      </Button>
-                    </>
-                  )}
                 </div>
               )
             )}
@@ -1831,54 +1883,20 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                   nodig. BuilderDemo beslist zelf of hij mag verschijnen. */}
               {exercises.length === 0 && <BuilderDemo />}
               <DayDropZone day={program.currentDay} week={program.currentWeek} isEmpty={dayExercises.length === 0}>
-                <SortableContext
-                  items={orderedItems.flatMap(i => i.type === 'free' ? [i.ex.uid] : [])}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <div className="space-y-2">
-                    {orderedItems.map(item => {
-                      if (item.type === 'superset') {
-                        const groupExercises = supersetGroups[item.group] ?? []
-                        return (
-                          <div key={`ss-${item.group}`}>
-                            <SupersetGroupBlock
-                              groupLetter={item.group}
-                              exercises={groupExercises}
-                              onUpdate={updateEx}
-                              onRemove={removeEx}
-                              onToggleSelect={toggleSelect}
-                              onSwapVariant={swapVariant}
-                              allExercises={libraryExercises as never}
-                              customParams={customParams}
-                              expandedUids={expandedUids}
-                              onToggleExpanded={toggleExpanded}
-                            />
-                            <button
-                              onClick={() => dissolveSuperset(item.group)}
-                              className="text-xs text-muted-foreground hover:text-destructive ml-2 mt-0.5"
-                            >
-                              Groep opheffen
-                            </button>
-                          </div>
-                        )
-                      }
-                      return (
-                        <ProgramExerciseBlock
-                          key={item.ex.uid}
-                          exercise={item.ex}
-                          onUpdate={updateEx}
-                          onRemove={removeEx}
-                          onToggleSelect={toggleSelect}
-                          onSwapVariant={swapVariant}
-                          allExercises={libraryExercises as never}
-                          customParams={customParams}
-                          expanded={expandedUids.has(item.ex.uid)}
-                          onToggleExpanded={toggleExpanded}
-                        />
-                      )
-                    })}
-                  </div>
-                </SortableContext>
+                {/* Dezelfde rijen en pop-up als de weekplanner: één lijn. */}
+                <div className="space-y-2">
+                  <BlockRows
+                    blocks={dagBlokken}
+                    groups={dagGroepen}
+                    onEdit={b => setBlokDialoog({ edit: b, letter: null })}
+                    onRemove={b => removeEx(b.id)}
+                    onMove={(b, dir) => moveBlok(b.id, dir)}
+                    onEditGroup={l => setBlokDialoog({ edit: null, letter: l })}
+                  />
+                  <DarkButton variant="secondary" size="sm" className="w-full text-xs" onClick={() => setBlokDialoog({ edit: null, letter: null })}>
+                    <Plus className="w-3.5 h-3.5 mr-1.5" /> Oefening toevoegen
+                  </DarkButton>
+                </div>
               </DayDropZone>
 
               {/* Educatie-blokken voor deze dag ("Leer") */}
@@ -2455,6 +2473,23 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           </div>
         </DialogContent>
       </Dialog>
+      {blokDialoog && (
+        <ExerciseBlockDialog
+          open
+          onClose={() => setBlokDialoog(null)}
+          dayLabel={`Week ${program.currentWeek} · Dag ${program.currentDay}`}
+          workoutName={program.name || 'Programma'}
+          initialType="exercise"
+          editBlock={blokDialoog.edit}
+          editGroupLetter={blokDialoog.letter}
+          blocks={dagBlokken}
+          groups={dagGroepen}
+          defaultCategory="STRENGTH"
+          saving={false}
+          onSubmitBlock={submitBlok}
+          onSubmitGroup={submitGroep}
+        />
+      )}
     </DndContext>
   )
 }

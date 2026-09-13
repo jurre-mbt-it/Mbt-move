@@ -145,6 +145,7 @@ export const exercisesRouter = createTRPCRouter({
         : []
       const lastUsedMap = new Map<string, Date>()
       for (const u of usages) {
+        if (!u.exerciseId) continue
         const cur = lastUsedMap.get(u.exerciseId)
         if (!cur || u.program.updatedAt > cur) {
           lastUsedMap.set(u.exerciseId, u.program.updatedAt)

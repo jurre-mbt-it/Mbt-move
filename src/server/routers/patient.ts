@@ -11,7 +11,7 @@
 
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
-import { isExerciseBlock, parseGroups } from '@/lib/planner-blocks'
+import { isExerciseBlock, parseGroups, parseProgramGroups, programDayKey } from '@/lib/planner-blocks'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { practiceScope } from '@/server/lib/patient-access'
 import { planningCutoffVoorPatient } from '@/server/lib/planning-cutoff'
@@ -120,6 +120,23 @@ function computeCurrentWeekDay(
   const day = daysAvailable[dayIndex] ?? 1
 
   return { week, day }
+}
+
+/** Rij uit een bloklijst → wat de runners nodig hebben voor koppen, notities en pauzes. */
+function toAthleteBlock(b: {
+  id: string; order: number; blockKind: string; text: string | null; videoUrl: string | null
+  durationSec: number | null; phase: string | null; supersetGroup: string | null
+}) {
+  return {
+    id: b.id,
+    order: b.order,
+    blockKind: b.blockKind as 'EXERCISE' | 'NOTE' | 'BREAK',
+    text: b.text,
+    videoUrl: b.videoUrl,
+    durationSec: b.durationSec,
+    phase: (b.phase === 'WARMUP' || b.phase === 'COOLDOWN' ? b.phase : null) as 'WARMUP' | 'COOLDOWN' | null,
+    supersetGroup: b.supersetGroup,
+  }
 }
 
 function mapProgramExercise(pe: {
@@ -260,7 +277,7 @@ export const patientRouter = createTRPCRouter({
 
     if (!program) return null
 
-    const exercises = program.exercises.map(mapProgramExercise)
+    const exercises = program.exercises.filter(isExerciseBlock).map(pe => mapProgramExercise({ ...pe, exercise: pe.exercise! }))
 
     // Educatie-blokken — PDF's krijgen een tijdelijke signed URL.
     const resources = await Promise.all(program.resources.map(async pr => ({
@@ -544,18 +561,11 @@ export const patientRouter = createTRPCRouter({
             cardio: (item.cardioParams ?? null) as Record<string, unknown> | null,
             // De volledige bloklijst (oefeningen, notities, pauzes) in volgorde.
             // Additief: iOS negeert dit en leest `exercises`.
-            blocks: item.exercises.map(b => ({
-              id: b.id,
-              order: b.order,
-              blockKind: b.blockKind as 'EXERCISE' | 'NOTE' | 'BREAK',
-              text: b.text,
-              videoUrl: b.videoUrl,
-              durationSec: b.durationSec,
-              phase: (b.phase === 'WARMUP' || b.phase === 'COOLDOWN' ? b.phase : null) as 'WARMUP' | 'COOLDOWN' | null,
-              supersetGroup: b.supersetGroup,
-            })),
+            blocks: item.exercises.map(toAthleteBlock),
             groups: parseGroups(item.groups),
           },
+          blocks: item.exercises.map(toAthleteBlock),
+          groups: parseGroups(item.groups),
           exercises,
           lastLogs,
         }
@@ -600,7 +610,7 @@ export const patientRouter = createTRPCRouter({
     // is de union voor de client niet te narrowen.
     if (!program) return { program: null, plannedItem: null, exercises: [], lastLogs: {} as Record<string, LastExerciseLog> }
 
-    const allExercises = program.exercises.map(mapProgramExercise)
+    const allExercises = program.exercises.filter(isExerciseBlock).map(pe => mapProgramExercise({ ...pe, exercise: pe.exercise! }))
 
     // Vorige-sessie-hints: meest recente gelogde waarden per oefening, zodat
     // de sessie-runner "vorige keer 22,5 kg × 10" kan tonen en prefillen.
@@ -746,6 +756,15 @@ export const patientRouter = createTRPCRouter({
         weeklyTargetReached: false,
       },
       exercises: todayExercises,
+      // Bloklijst van de dag (oefeningen, notities, pauzes) en de groepen van
+      // die dag; de web-runners tonen ze, iOS negeert ze.
+      blocks: effectiveDay === -1
+        ? []
+        : program.exercises
+            .filter(pe => pe.week === week && pe.day === effectiveDay)
+            .sort((a, b) => a.order - b.order)
+            .map(toAthleteBlock),
+      groups: parseProgramGroups(program.groups)[programDayKey(week, effectiveDay)] ?? {},
       lastLogs,
     }
   }),
@@ -1901,6 +1920,7 @@ export const patientRouter = createTRPCRouter({
     // volgen we een eventuele week-progressie netjes.
     const byExercise = new Map<string, (typeof program.exercises)[number]>()
     for (const pe of program.exercises) {
+      if (!pe.exerciseId || !pe.exercise) continue
       const cur = byExercise.get(pe.exerciseId)
       if (!cur) { byExercise.set(pe.exerciseId, pe); continue }
       const curDist = Math.abs(cur.week - progress.currentWeek)
@@ -1954,9 +1974,9 @@ export const patientRouter = createTRPCRouter({
 
     const exercises = program.exercises.length
       ? Array.from(byExercise.values()).map(pe => ({
-          exerciseId: pe.exerciseId,
-          name: pe.exercise.name,
-          videoUrl: pe.exercise.videoUrl ?? null,
+          exerciseId: pe.exerciseId!,
+          name: pe.exercise!.name,
+          videoUrl: pe.exercise!.videoUrl ?? null,
           sets: pe.sets,
           reps: pe.reps,
           repsMax: pe.repsMax ?? null,
@@ -1964,7 +1984,7 @@ export const patientRouter = createTRPCRouter({
           restTime: pe.restTime,
           notes: pe.notes ?? null,
           target,
-          doneToday: doneToday.get(pe.exerciseId) ?? 0,
+          doneToday: doneToday.get(pe.exerciseId!) ?? 0,
         }))
       : []
 

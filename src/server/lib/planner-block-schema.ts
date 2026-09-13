@@ -72,3 +72,6 @@ export const itemGroupSchema = z.object({
 })
 
 export const itemGroupsSchema = z.record(z.string().regex(/^[A-F]$/), itemGroupSchema)
+
+/** Programma-groepen per week-dag, sleutel "w1d2". */
+export const programGroupsSchema = z.record(z.string().regex(/^w\d+d\d+$/), itemGroupsSchema)
