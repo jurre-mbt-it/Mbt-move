@@ -87,7 +87,7 @@ export function formatAsymmetry(pct: number | null): string {
   return pct < 0 ? `rechts ${abs}% lager` : `links ${abs}% lager`
 }
 
-const JUMP_LABEL: Record<string, string> = { CMJ: 'CMJ', SJ: 'Squat jump', DROP: 'Drop jump', MULTIPLE_JUMPS: 'Herhaalde sprongen' }
+const JUMP_LABEL: Record<string, string> = { CMJ: 'CMJ', SJ: 'Squat jump', DROP: 'Drop jump', MULTIPLE_JUMPS: 'Multiple jumps' }
 const JUMP_VOLGORDE = ['CMJ', 'SJ', 'DROP', 'MULTIPLE_JUMPS']
 
 function tijd(d: Date | string): number {
@@ -108,7 +108,7 @@ export function besteSprong(reps: JumpRepRij[]): JumpRepRij | null {
 export function metingLabel(keuze: MetingKeuze): string {
   if (keuze.soort === 'kracht') return kinventLabel(keuze.title)
   const naam = JUMP_LABEL[keuze.jumpType] ?? keuze.jumpType
-  return keuze.jumpType === 'MULTIPLE_JUMPS' ? naam : `${naam} ${keuze.eenbenig ? 'eenbenig' : 'tweebenig'}`
+  return keuze.jumpType === 'MULTIPLE_JUMPS' ? naam : `${naam} ${keuze.eenbenig ? 'unilateral' : 'bilateral'}`
 }
 
 export function metingSleutel(keuze: MetingKeuze): string {
@@ -146,10 +146,10 @@ export function trendSeries(keuze: MetingKeuze, maat: Maat, jumps: JumpMeting[],
     if (maat === 'piek') {
       const links = punten(rijen.map((k) => ({ t: tijd(k.performedAt), v: k.leftMaxKg ?? k.singleMaxKg })))
       const rechts = punten(rijen.map((k) => ({ t: tijd(k.performedAt), v: k.rightMaxKg })))
-      return { unit: 'kg', series: rechts.length ? [{ key: 'L', label: 'Links', points: links }, { key: 'R', label: 'Rechts', points: rechts }] : [{ key: 'S', label: 'Piek', points: links }] }
+      return { unit: 'kg', series: rechts.length ? [{ key: 'L', label: 'Links', points: links }, { key: 'R', label: 'Rechts', points: rechts }] : [{ key: 'S', label: 'Peak force', points: links }] }
     }
     if (maat === 'verschil') {
-      return { unit: '%', series: [{ key: 'V', label: 'Verschil', points: punten(rijen.map((k) => ({ t: tijd(k.performedAt), v: asymmetryPct(k.leftMaxKg, k.rightMaxKg) }))) }] }
+      return { unit: '%', series: [{ key: 'V', label: 'Asymmetry', points: punten(rijen.map((k) => ({ t: tijd(k.performedAt), v: asymmetryPct(k.leftMaxKg, k.rightMaxKg) }))) }] }
     }
     return { unit: '', series: [] }
   }
@@ -179,14 +179,14 @@ export function trendSeries(keuze: MetingKeuze, maat: Maat, jumps: JumpMeting[],
         if (r !== null) cur.R = Math.max(cur.R ?? 0, r)
         perDag.set(dag, cur)
       }
-      return { unit, series: [{ key: 'V', label: 'Verschil', points: punten([...perDag.values()].map((d) => ({ t: d.t, v: asymmetryPct(d.L, d.R) }))) }] }
+      return { unit, series: [{ key: 'V', label: 'Asymmetry', points: punten([...perDag.values()].map((d) => ({ t: d.t, v: asymmetryPct(d.L, d.R) }))) }] }
     }
     return { unit, series: [{ key: 'L', label: 'Links', points: perZijde('LEFT') }, { key: 'R', label: 'Rechts', points: perZijde('RIGHT') }] }
   }
 
   const beste = rijen.map((m) => ({ m, b: besteSprong(m.reps) }))
   if (maat === 'hoogte') {
-    return { unit, series: [{ key: 'H', label: 'Hoogte', points: punten(beste.map(({ m, b }) => ({ t: tijd(m.performedAt), v: m.peakJumpHeightCm ?? b?.jumpHeightCm ?? null }))) }] }
+    return { unit, series: [{ key: 'H', label: 'Jump height', points: punten(beste.map(({ m, b }) => ({ t: tijd(m.performedAt), v: m.peakJumpHeightCm ?? b?.jumpHeightCm ?? null }))) }] }
   }
   if (maat === 'piek') {
     return {
@@ -198,7 +198,7 @@ export function trendSeries(keuze: MetingKeuze, maat: Maat, jumps: JumpMeting[],
     }
   }
   if (maat === 'verschil') {
-    return { unit, series: [{ key: 'V', label: 'Verschil', points: punten(beste.map(({ m, b }) => ({ t: tijd(m.performedAt), v: asymmetryPct(b?.peakForceLeftN ?? null, b?.peakForceRightN ?? null) }))) }] }
+    return { unit, series: [{ key: 'V', label: 'Asymmetry', points: punten(beste.map(({ m, b }) => ({ t: tijd(m.performedAt), v: asymmetryPct(b?.peakForceLeftN ?? null, b?.peakForceRightN ?? null) }))) }] }
   }
   return { unit, series: [{ key: 'RSI', label: 'RSI', points: punten(beste.map(({ m, b }) => ({ t: tijd(m.performedAt), v: m.rsi ?? b?.rsi ?? null }))) }] }
 }

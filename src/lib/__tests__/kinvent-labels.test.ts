@@ -7,12 +7,12 @@ import { kinventCategory, kinventLabel, kinventSource } from '@/lib/kinvent/labe
  * naam. Eigen oefeningen komen wél als gewone tekst.
  */
 describe('kinventLabel', () => {
-  it('vertaalt de ingebouwde sleutels van Kinvent', () => {
-    expect(kinventLabel('exercise_template_builtin_leg_knee_extension_60_text')).toBe('Knie-extensie 60°')
-    expect(kinventLabel('exercise_template_builtin_leg_supine_hip_add_title')).toBe('Heupadductie (rugligging)')
-    expect(kinventLabel('unipodal_counter_movement_jump_cmj')).toBe('CMJ eenbenig')
+  it('geeft de ingebouwde sleutels van Kinvent hun vakterm', () => {
+    expect(kinventLabel('exercise_template_builtin_leg_knee_extension_60_text')).toBe('Knee extension 60°')
+    expect(kinventLabel('exercise_template_builtin_leg_supine_hip_add_title')).toBe('Hip adduction (supine)')
+    expect(kinventLabel('unipodal_counter_movement_jump_cmj')).toBe('CMJ unilateral')
     expect(kinventLabel('imtp_title')).toBe('IMTP')
-    expect(kinventLabel('exercise_template_builtin_leg_jump_analysis_sj_dynamic_bw_title')).toBe('Squat jump (dynamisch)')
+    expect(kinventLabel('exercise_template_builtin_leg_jump_analysis_sj_dynamic_bw_title')).toBe('Squat jump (dynamic)')
   })
 
   it('maakt van een onbekende sleutel leesbare tekst', () => {

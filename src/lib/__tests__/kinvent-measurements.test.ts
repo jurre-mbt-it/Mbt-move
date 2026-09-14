@@ -47,7 +47,7 @@ describe('metingOpties', () => {
     ]
     const strength = [kracht('k', '2025-06-10', 'exercise_template_builtin_leg_knee_extension_60_text', 40, 38)]
     const opties = metingOpties(jumps, strength)
-    expect(opties.map((o) => o.label)).toEqual(['CMJ tweebenig', 'CMJ eenbenig', 'Drop jump tweebenig', 'Knie-extensie 60°'])
+    expect(opties.map((o) => o.label)).toEqual(['CMJ bilateral', 'CMJ unilateral', 'Drop jump bilateral', 'Knee extension 60°'])
   })
 })
 

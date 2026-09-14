@@ -29,7 +29,7 @@ const n2 = (v: number | null | undefined) => (v == null ? '–' : v.toFixed(2))
 
 const KLEUR: Record<string, string> = { L: P.brand, R: P.lime, S: P.brand, H: P.brand, V: P.gold, RSI: P.brand }
 
-const MAAT_LABEL: Record<Maat, string> = { hoogte: 'Sprongthoogte', piek: 'Piekkracht links / rechts', verschil: 'Verschil links-rechts', rsi: 'RSI' }
+const MAAT_LABEL: Record<Maat, string> = { hoogte: 'Jump height', piek: 'Peak force L / R', verschil: 'Asymmetry L / R', rsi: 'RSI' }
 
 /**
  * Kinvent-metingen van één patiënt: grafiek over de tijd bovenaan, daaronder
@@ -266,21 +266,21 @@ function SprongRij({ m, open, onToggle, toonNaam }: { m: JumpMeting; open: boole
           <thead>
             <tr className="athletic-mono" style={{ color: P.inkDim, fontSize: 10, letterSpacing: '0.1em' }}>
               <th className="text-left py-1 pr-3 font-normal">#</th>
-              <th className={th}>HOOGTE</th>
-              <th className={th}>VLUCHT</th>
-              <th className={th}>CONTACT</th>
-              <th className={th}>PIEK L</th>
-              <th className={th}>PIEK R</th>
-              <th className={th}>PIEK</th>
-              <th className={th}>NETTO</th>
-              <th className={th}>VERMOGEN</th>
+              <th className={th}>JUMP HEIGHT</th>
+              <th className={th}>FLIGHT TIME</th>
+              <th className={th}>CONTACT TIME</th>
+              <th className={th}>PEAK L</th>
+              <th className={th}>PEAK R</th>
+              <th className={th}>PEAK FORCE</th>
+              <th className={th}>NET FORCE</th>
+              <th className={th}>PEAK POWER</th>
               <th className={th}>RFD</th>
               <th className={th}>RFD L</th>
               <th className={th}>RFD R</th>
               <th className={th}>RSI</th>
-              <th className={th}>STABILISATIE</th>
-              <th className={th}>IMPULS 1</th>
-              <th className={th}>IMPULS 2</th>
+              <th className={th}>TIME TO STAB.</th>
+              <th className={th}>IMPULSE 1</th>
+              <th className={th}>IMPULSE 2</th>
             </tr>
           </thead>
           <tbody>
@@ -343,12 +343,12 @@ function KrachtRij({ k, open, onToggle, toonNaam }: { k: KrachtMeting; open: boo
             <tr className="athletic-mono" style={{ color: P.inkDim, fontSize: 10, letterSpacing: '0.1em' }}>
               <th className="text-left py-1 pr-3 font-normal">#</th>
               <th className="text-left py-1 pr-3 font-normal">ZIJDE</th>
-              <th className={th}>PIEK</th>
-              <th className={th}>GEMIDDELD</th>
-              <th className={th}>RFD TOT PIEK</th>
-              <th className={th}>RFD GEM.</th>
-              <th className={th}>TIJD TOT PIEK</th>
-              <th className={th}>IMPULS</th>
+              <th className={th}>PEAK FORCE</th>
+              <th className={th}>MEAN FORCE</th>
+              <th className={th}>RFD TO PEAK</th>
+              <th className={th}>MEAN RFD</th>
+              <th className={th}>TIME TO PEAK</th>
+              <th className={th}>IMPULSE</th>
             </tr>
           </thead>
           <tbody>

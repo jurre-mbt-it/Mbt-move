@@ -6,28 +6,32 @@
  * oefeningen van de praktijk komen wél als gewone tekst. Hieronder de sleutels
  * die in onze praktijkdata voorkomen; de rest wordt netjes leesbaar gemaakt
  * en kan de therapeut in het rapport zelf hernoemen.
+ *
+ * Bewust in de Engelse vakterminologie, zoals de KINVENT-app en de literatuur
+ * ze gebruiken (Jurre, 2026-09-14): "flight time" is voor een fysiotherapeut
+ * een begrip, "vluchttijd" niet.
  */
 
 const BEKEND: Record<string, string> = {
-  exercise_template_builtin_leg_supine_hip_add_title: 'Heupadductie (rugligging)',
-  exercise_template_builtin_leg_supine_abd_title: 'Heupabductie (rugligging)',
-  exercise_template_builtin_leg_sitting_knee_extension_90_title: 'Knie-extensie 90° (zittend)',
-  exercise_template_builtin_leg_knee_90_flexion_text: 'Knieflexie 90°',
-  exercise_template_builtin_leg_knee_45_flexion_text: 'Knieflexie 45°',
-  exercise_template_builtin_leg_knee_flexion_30_text: 'Knieflexie 30°',
-  exercise_template_builtin_leg_knee_flexion_30_endurance_text: 'Knieflexie 30° (uithouding)',
-  exercise_template_builtin_leg_knee_extension_60_text: 'Knie-extensie 60°',
-  exercise_template_builtin_leg_knee_extension_60_endurance_text: 'Knie-extensie 60° (uithouding)',
+  exercise_template_builtin_leg_supine_hip_add_title: 'Hip adduction (supine)',
+  exercise_template_builtin_leg_supine_abd_title: 'Hip abduction (supine)',
+  exercise_template_builtin_leg_sitting_knee_extension_90_title: 'Knee extension 90° (seated)',
+  exercise_template_builtin_leg_knee_90_flexion_text: 'Knee flexion 90°',
+  exercise_template_builtin_leg_knee_45_flexion_text: 'Knee flexion 45°',
+  exercise_template_builtin_leg_knee_flexion_30_text: 'Knee flexion 30°',
+  exercise_template_builtin_leg_knee_flexion_30_endurance_text: 'Knee flexion 30° (endurance)',
+  exercise_template_builtin_leg_knee_extension_60_text: 'Knee extension 60°',
+  exercise_template_builtin_leg_knee_extension_60_endurance_text: 'Knee extension 60° (endurance)',
   exercise_template_builtin_leg_jump_analysis_cmj_title: 'CMJ',
   exercise_template_builtin_leg_jump_analysis_sj_title: 'Squat jump',
   exercise_template_builtin_leg_jump_analysis_drop_title: 'Drop jump',
-  exercise_template_builtin_leg_jump_analysis_sj_dynamic_bw_title: 'Squat jump (dynamisch)',
-  exercise_template_builtin_leg_jump_analysis_sj_dynamic_bw_text: 'Squat jump (dynamisch)',
-  unipodal_counter_movement_jump_cmj: 'CMJ eenbenig',
-  unipodal_squat_jump_sj: 'Squat jump eenbenig',
-  unipodal_drop_jump_dj: 'Drop jump eenbenig',
-  multiple_jumps_activity_title: 'Herhaalde sprongen',
-  exercise_template_builtin_body_weight_calculation: 'Lichaamsgewicht',
+  exercise_template_builtin_leg_jump_analysis_sj_dynamic_bw_title: 'Squat jump (dynamic)',
+  exercise_template_builtin_leg_jump_analysis_sj_dynamic_bw_text: 'Squat jump (dynamic)',
+  unipodal_counter_movement_jump_cmj: 'CMJ unilateral',
+  unipodal_squat_jump_sj: 'Squat jump unilateral',
+  unipodal_drop_jump_dj: 'Drop jump unilateral',
+  multiple_jumps_activity_title: 'Multiple jumps',
+  exercise_template_builtin_body_weight_calculation: 'Body weight',
   imtp_title: 'IMTP',
   exercise_template_builtin_aclrsi_text: 'ACL-RSI',
 }
