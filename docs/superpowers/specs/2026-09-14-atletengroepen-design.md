@@ -197,6 +197,13 @@ met vaste voorbeelddata in de test; de router haalt alleen data op.
 
 - Twee groepen op één dag: twee trainingen; een verzending raakt alleen de
   eigen `groupId`.
+- **Persoonlijk en groep bijten elkaar niet, in beide richtingen.** Verzenden
+  laat persoonlijke programma's, losse trainingen en items van andere groepen
+  staan. Andersom: een persoonlijk programma of plan toepassen bij de atleet
+  laat groepstrainingen staan. Concreet: `planTemplates.applyToPatient` in de
+  stand "vervangen" verwijdert voortaan alleen items zónder `groupId` (nu
+  maakt hij de hele week leeg), en de UI zegt dat erbij. Programma's koppelen
+  (PROGRAM-item) voegt al toe zonder iets te verwijderen.
 - Lid verwijderd of groep verwijderd: trainingen blijven, verwijzing leeg.
 - Einddatum: alleen informatief en de grens van het verzendvenster.
 - Verzenden buiten het zichtbare venster van de atleet: agenda's halen per
