@@ -22,11 +22,13 @@ dashboard met de status van elke atleet in één oogopslag.
   en items met een gelogde sessie blijven altijd staan.
 - **Kalendergebonden (keuze A).** De groep heeft een startdatum (maandag van
   week 1); week 3 is voor iedereen dezelfde kalenderweek. Einddatum optioneel.
-- **Coach is eigenaar.** De coach maakt de groep en beheert de staf. Een
-  toegevoegde therapeut mag plannen, verzenden en leden beheren (keuze C);
-  alleen de groep verwijderen en staf beheren blijft bij de coach. Therapeuten
-  buiten de groep zien niets van de groep; een atleet die ook hun patiënt is,
-  zien zij via de gewone behandelkoppeling.
+- **Coach is eigenaar.** De coach maakt de groep en beheert de staf. Per
+  toegevoegde therapeut kiest de coach een rol, later te wijzigen:
+  **Meekijken** (dashboard en kalender lezen), **Meeplannen** (ook de
+  groepskalender bewerken) of **Beheren** (ook verzenden en leden beheren).
+  Alleen de groep verwijderen en staf beheren blijft altijd bij de coach.
+  Therapeuten buiten de groep zien niets van de groep; een atleet die ook hun
+  patiënt is, zien zij via de gewone behandelkoppeling.
 - **Meerdere groepen per atleet mag.** Twee groepen op één dag geven twee
   trainingen naast elkaar.
 - **De atleet ziet de programmanaam.** Elke verzonden training draagt
@@ -45,8 +47,19 @@ default deny op de nieuwe tabellen (alle toegang via de server).
 - **`athlete_group_members`**: `groupId`, `patientId` (User), `addedAt`,
   `lastSentAt?`. Uniek op (groep, atleet).
 - **`athlete_group_staff`**: `groupId`, `userId` (therapeut of coach),
-  `role` = `OWNER` | `STAFF`, `addedAt`. De eigenaar staat hier ook, zodat
-  één query "mijn groepen" oplevert.
+  `role` = `OWNER` | `VIEWER` | `PLANNER` | `MANAGER`, `addedAt`. De eigenaar
+  staat hier ook, zodat één query "mijn groepen" oplevert. Rechten per rol:
+
+  | Handeling                          | VIEWER | PLANNER | MANAGER | OWNER |
+  |------------------------------------|:------:|:-------:|:-------:|:-----:|
+  | Dashboard en kalender bekijken     |   ja   |   ja    |   ja    |  ja   |
+  | Notitie per lid schrijven          |   ja   |   ja    |   ja    |  ja   |
+  | Groepskalender bewerken            |        |   ja    |   ja    |  ja   |
+  | Stuur naar iedereen                |        |         |   ja    |  ja   |
+  | Leden toevoegen en verwijderen     |        |         |   ja    |  ja   |
+  | Naam, programmanaam, periode       |        |         |   ja    |  ja   |
+  | Staf toevoegen, rol wijzigen       |        |         |         |  ja   |
+  | Groep verwijderen                  |        |         |         |  ja   |
 - **`week_schedules.groupId?`**: de groepskalender bestaat uit gewone
   weekschema's met `groupId` gevuld, `patientId` leeg, `isTemplate` false,
   `weekNumber` 1..N en `startDate` op de echte maandag, net als
@@ -69,8 +82,10 @@ extra `omit`-werk; de nieuwe kolommen zijn scalars.
 ## Server: router `athleteGroups`
 
 Alle procedures via `coachStaffProcedure` (coach, therapeut, admin), met een
-helper `assertGroupStaff(groupId, { owner?: true })` die eigenaar of staf
-controleert (admin mag altijd meekijken, zoals overal in het coachportaal).
+helper `assertGroupRole(groupId, minimaal: 'VIEWER' | 'PLANNER' | 'MANAGER' |
+'OWNER')` die de rol van de handelende gebruiker tegen de tabel hierboven
+legt (admin leest altijd mee, zoals overal in het coachportaal; schrijven
+doet een admin niet).
 
 - `list` (mijn groepen, met ledenaantal en laatst verzonden),
   `get`, `create` (naam, programmanaam, startdatum, einddatum), `update`,
@@ -78,9 +93,10 @@ controleert (admin mag altijd meekijken, zoals overal in het coachportaal).
 - `addMembers` / `removeMember`: leden moeten aan de handelende gebruiker
   gekoppelde atleten zijn (coach: directe koppeling; therapeut: eigen
   patiënt). `setMemberNote`.
-- `addStaff` / `removeStaff` (alleen eigenaar): therapeuten uit dezelfde
-  praktijk als de coach werkt zonder praktijk niet; daarom zoeken op
-  e-mailadres van een bestaande therapeut, zoals uitnodigen nu werkt.
+- `addStaff({ email, role })` / `setStaffRole` / `removeStaff` (alleen
+  eigenaar): de coach werkt zonder praktijk, dus een therapeut wordt gezocht
+  op het e-mailadres van een bestaand therapeutaccount, zoals uitnodigen nu
+  werkt. De eigenaar kan zichzelf niet verwijderen of degraderen.
 - `weeks(groupId)`: de weken van de groep (nummer, maandag, aantal items) voor
   het verzendvenster.
 - `send({ groupId, weekIds, memberIds })`: zie hieronder.
@@ -137,7 +153,9 @@ met vaste voorbeelddata in de test; de router haalt alleen data op.
   waar hij staf van is): lijst met naam, programmanaam, leden, startdatum,
   laatst verzonden. Aanmaken alleen voor de coach.
 - **Groepspagina**: kop (namen, periode, knoppen "Plannen" en "Stuur naar
-  iedereen"), tabblad **Dashboard** (standaard) en tabblad **Leden en staf**.
+  iedereen"; knoppen verschijnen alleen bij voldoende rol), tabblad
+  **Dashboard** (standaard) en tabblad **Leden en staf** (staf met rolkeuze
+  Meekijken / Meeplannen / Beheren, alleen voor de eigenaar bewerkbaar).
   Dashboard: tellers (aandacht nodig, geblesseerd, geen wearable), filter
   "alleen wie aandacht vraagt", tabel met de kolommen hierboven, naam opent de
   atleetpagina, notitieveld per rij (opslaan bij verlaten van het veld).
@@ -163,7 +181,9 @@ met vaste voorbeelddata in de test; de router haalt alleen data op.
 
 ## Rechten en veiligheid
 
-- Groep zichtbaar en bewerkbaar voor eigenaar en staf; admin leest mee.
+- Groep zichtbaar voor eigenaar en staf; wat iemand mag volgt de roltabel
+  en wordt op de server per procedure afgedwongen, niet alleen in de UI.
+  Admin leest mee.
 - Leden toevoegen alleen uit eigen gekoppelde atleten of patiënten.
 - Verzenden controleert per lid opnieuw de koppeling en de uitbehandeld-status
   (zelfde `assertPatientLink`/`assertNotDischarged` als plan toepassen).
@@ -193,7 +213,8 @@ met vaste voorbeelddata in de test; de router haalt alleen data op.
   deze-week-telling) met vaste data.
 - Router: `athleteGroups.send` tegen de testdatabase met twee leden en twee
   verzendingen (tweede verzending vervangt alleen de gekozen week en laat een
-  individueel aangepaste andere week staan).
+  individueel aangepaste andere week staan); rollen: een VIEWER die probeert
+  te plannen of te verzenden krijgt FORBIDDEN.
 - i18n: nieuwe validatiemeldingen in `error-messages.ts` en de bestaande test.
 - Keten: na de bouw met de testatleet "Jurre test" doorlopen: groep maken,
   plannen, verzenden, kalender van de atleet op het web, en de
