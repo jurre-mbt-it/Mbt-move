@@ -1355,18 +1355,23 @@ export const weekSchedulesRouter = createTRPCRouter({
    */
   listItemContents: coachStaffProcedure
     .input(z.object({
-      patientId: z.string(),
+      patientId: z.string().optional(),
       planTemplateId: z.string().optional(),
+      /** Groepskalender van een atletengroep; toegang via de groepsrol. */
+      groupId: z.string().optional(),
       /** Zelfde optionele datumvenster als listWithItems (alleen patiënt-tak). */
       from: z.string().optional(),
       to: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      // Twee bronnen: de weken van een patiënt, of de sjabloon-weken van een
-      // trainingsplan. Elk met zijn eigen toegangscheck.
+      // Drie bronnen: de weken van een patiënt, de sjabloon-weken van een
+      // trainingsplan, of de kalender van een groep. Elk met zijn eigen toegangscheck.
       if (input.planTemplateId) {
         await assertPlanAccess(ctx.prisma, ctx.user, input.planTemplateId)
+      } else if (input.groupId) {
+        await assertGroupRole(ctx.prisma, ctx.user, input.groupId, 'VIEWER')
       } else {
+        if (!input.patientId) return []
         await assertPatientLink(ctx.prisma, ctx.user, input.patientId)
       }
       // NULL-startDate (legacy) blijft meekomen, zie listWithItems.
@@ -1387,7 +1392,9 @@ export const weekSchedulesRouter = createTRPCRouter({
         : {}
       const where = input.planTemplateId
         ? { day: { weekSchedule: { planTemplateId: input.planTemplateId } } }
-        : { day: { weekSchedule: { patientId: input.patientId, ...scheduleWindow } } }
+        : input.groupId
+          ? { day: { weekSchedule: { groupId: input.groupId, ...scheduleWindow } } }
+          : { day: { weekSchedule: { patientId: input.patientId, ...scheduleWindow } } }
       const items = await ctx.prisma.weekScheduleDayItem.findMany({
         where,
         select: {

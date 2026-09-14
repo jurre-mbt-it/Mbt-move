@@ -25,7 +25,7 @@ import {
   Search, Building2, Copy, CopyPlus, Pencil, BookmarkPlus, GripVertical,
   CalendarRange, Layers, Moon, CalendarPlus, StickyNote, ClipboardCheck, Flag,
   Scissors, ClipboardPaste, Archive, Check, Clock3, CornerUpRight,
-Trash2, Coffee, Dumbbell, RefreshCw, MousePointer2, HeartPulse } from 'lucide-react'
+Trash2, Coffee, Dumbbell, RefreshCw, MousePointer2, HeartPulse, Send } from 'lucide-react'
 import {
   PHASE_TYPES, PHASE_META, phaseMeta, DELOAD_LOAD_FRACTION,
   type PhaseType,
@@ -47,6 +47,7 @@ import {
 import { ApplyPlanDialog, SavePlanDialog } from '@/components/week-planner/PlanTemplateDialogs'
 import { sumPlannedLoad, loadVerdict, cardioEstimate } from '@/lib/planned-load'
 import { CardioWorkoutBuilder } from '@/components/week-planner/CardioWorkoutBuilder'
+import { GroupSendDialog } from '@/components/week-planner/GroupSendDialog'
 import { readWorkout, summarize as summarizeWorkout, totalDurationSec as workoutDuration, structuredLoad, type StructuredCardio } from '@/lib/cardio-workout'
 import { AddItemModal, type AddItemPayload } from '@/components/week-planner/AddItemModal'
 import { WorkoutProfileStrip } from '@/components/week-planner/WorkoutProfileStrip'
@@ -189,9 +190,18 @@ function ArchiefBadge() {
 }
 
 function PatientPicker({
-  patients, selectedId, onSelect,
-}: { patients: Patient[]; selectedId: string | null; onSelect: (id: string | null) => void }) {
+  patients, selectedId, onSelect, groups = [], selectedGroupId = null, onSelectGroup,
+}: {
+  patients: Patient[]
+  selectedId: string | null
+  onSelect: (id: string | null) => void
+  /** Atletengroepen bovenaan het menu; kiezen opent de groepskalender. */
+  groups?: { id: string; name: string; planName: string | null }[]
+  selectedGroupId?: string | null
+  onSelectGroup?: (id: string | null) => void
+}) {
   const current = patients.find(p => p.id === selectedId) ?? null
+  const currentGroup = groups.find(g => g.id === selectedGroupId) ?? null
   const actief = patients.filter(p => !p.dischargedAt)
   const archief = patients.filter(p => p.dischargedAt)
   return (
@@ -202,12 +212,26 @@ function PatientPicker({
           className="mbt-btn-hover inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors"
           style={{...CARD, color: P.ink}}
         >
-          <span>{current ? (current.name ?? current.email ?? 'Patiënt') : 'Kies patiënt…'}</span>
+          <span>{currentGroup ? `Groep · ${currentGroup.name}` : current ? (current.name ?? current.email ?? 'Patiënt') : 'Kies patiënt…'}</span>
           {current?.dischargedAt ? <ArchiefBadge /> : null}
           <ChevronRight className="w-3.5 h-3.5 rotate-90 opacity-60" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-72 max-h-80 overflow-y-auto">
+        {groups.length > 0 && onSelectGroup && (
+          <>
+            <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              Groepen
+            </DropdownMenuLabel>
+            {groups.map(g => (
+              <DropdownMenuItem key={g.id} onSelect={() => onSelectGroup(g.id)} className="flex flex-col items-start gap-0 text-sm">
+                <span className="truncate">{g.name}</span>
+                {g.planName && <span className="text-[10px]" style={{ color: P.inkMuted }}>{g.planName}</span>}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
           Patiënten
         </DropdownMenuLabel>
@@ -1820,6 +1844,10 @@ function WeekPlannerContent() {
   const [selectedPatientId, setSelectedPatientIdState] = useState(
     () => searchParams.get('patientId') || '',
   )
+  /** Groepskalender (atletengroep) in beeld in plaats van een atleet. */
+  const [selectedGroupId, setSelectedGroupIdState] = useState(
+    () => searchParams.get('groupId') || '',
+  )
   const [monthState, setMonthState] = useState<[number, number]>(() => {
     const monthParam = searchParams.get('month')
     if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
@@ -1830,8 +1858,9 @@ function WeekPlannerContent() {
   })
   const [year, month0] = monthState
 
-  function setUrl(patch: { patientId?: string; month?: string }) {
+  function setUrl(patch: { patientId?: string; month?: string; groupId?: string }) {
     if (patch.patientId !== undefined) setSelectedPatientIdState(patch.patientId)
+    if (patch.groupId !== undefined) setSelectedGroupIdState(patch.groupId)
     if (patch.month !== undefined && /^\d{4}-\d{2}$/.test(patch.month)) {
       const [y, m] = patch.month.split('-').map(Number)
       setMonthState([y, m - 1])
@@ -1841,6 +1870,10 @@ function WeekPlannerContent() {
     if (patch.patientId !== undefined) {
       if (patch.patientId) p.set('patientId', patch.patientId)
       else p.delete('patientId')
+    }
+    if (patch.groupId !== undefined) {
+      if (patch.groupId) p.set('groupId', patch.groupId)
+      else p.delete('groupId')
     }
     if (patch.month !== undefined) {
       if (patch.month) p.set('month', patch.month)
@@ -1865,6 +1898,18 @@ function WeekPlannerContent() {
     id: p.id, name: p.name, email: p.email, dischargedAt: p.dischargedAt,
   }))
   const selectedPatient = patients.find(p => p.id === selectedPatientId) ?? null
+
+  // ─ Wiens kalender staat er: een atleet of een atletengroep. Eén van beide. ─
+  const eigenaar = selectedGroupId
+    ? { soort: 'groep' as const, id: selectedGroupId }
+    : selectedPatientId
+      ? { soort: 'atleet' as const, id: selectedPatientId }
+      : null
+  const { data: groepen = [] } = trpc.athleteGroups.list.useQuery(undefined, { staleTime: 30_000 })
+  const selectedGroup = groepen.find(g => g.id === selectedGroupId) ?? null
+  const groepMagPlannen = !!selectedGroup && (selectedGroup.role === 'PLANNER' || selectedGroup.role === 'MANAGER' || selectedGroup.role === 'OWNER')
+  const groepMagVerzenden = !!selectedGroup && (selectedGroup.role === 'MANAGER' || selectedGroup.role === 'OWNER')
+  const [sendOpen, setSendOpen] = useState(false)
 
   /**
    * Planning aanpassen kan niet meer voor een gearchiveerde patiënt.
@@ -1898,7 +1943,9 @@ function WeekPlannerContent() {
    * De uitleg-banner hangt bewust aan `patientGearchiveerd` en niet hieraan:
    * zolang de lijst laadt weten we niet of "staat in je archief" waar is.
    */
-  const planningVergrendeld = patientGearchiveerd || (!!selectedPatientId && !selectedPatient)
+  const planningVergrendeld = eigenaar?.soort === 'groep'
+    ? !groepMagPlannen
+    : patientGearchiveerd || (!!selectedPatientId && !selectedPatient)
 
   // Datumvenster voor de planner-queries: de zichtbare maand + 2 weken marge
   // aan beide kanten (het grid toont aanloop-/uitloopdagen van aangrenzende
@@ -1912,19 +1959,23 @@ function WeekPlannerContent() {
   // Eén gedeelde key: ook de optimistic updates (reorderItems) en de
   // fetch-na-create moeten op exact deze cache-entry werken.
   const schedulesKey = useMemo(
-    () => ({ patientId: selectedPatientId, isTemplate: false, ...plannerWindow }),
-    [selectedPatientId, plannerWindow],
+    () => (eigenaar?.soort === 'groep'
+      ? { groupId: eigenaar.id, isTemplate: false, ...plannerWindow }
+      : { patientId: selectedPatientId, isTemplate: false, ...plannerWindow }),
+    [eigenaar, selectedPatientId, plannerWindow],
   )
 
   const { data: schedules = [] } = trpc.weekSchedules.listWithItems.useQuery(
-    selectedPatientId ? schedulesKey : undefined,
-    { enabled: !!selectedPatientId, staleTime: 10_000 },
+    eigenaar ? schedulesKey : undefined,
+    { enabled: !!eigenaar, staleTime: 10_000 },
   )
   // Oefeningen + cardio-params per item (apart van listWithItems om TS2589 te
   // vermijden). Gegroepeerd op itemId voor merge in dateMap.
   const { data: itemContents = [], isFetched: contentsLoaded } = trpc.weekSchedules.listItemContents.useQuery(
-    selectedPatientId ? { patientId: selectedPatientId, ...plannerWindow } : { patientId: '' },
-    { enabled: !!selectedPatientId, staleTime: 10_000 },
+    eigenaar?.soort === 'groep'
+      ? { groupId: eigenaar.id, ...plannerWindow }
+      : selectedPatientId ? { patientId: selectedPatientId, ...plannerWindow } : { patientId: '' },
+    { enabled: !!eigenaar, staleTime: 10_000 },
   )
   const contentsByItem = useMemo(() => {
     const m = new Map<string, { exercises: ItemExercise[]; blocks: PlannerBlock[]; groups: ItemGroups; cardioParams: PlannerCardioParams | null }>()
@@ -2185,6 +2236,8 @@ function WeekPlannerContent() {
   }
 
   function statusFor(date: Date, item: ScheduleItem): ItemStatus {
+    // Een groepskalender heeft geen sessies: niets is 'gemist'.
+    if (eigenaar?.soort === 'groep') return 'scheduled'
     // Markeringen zijn geen workout: een notitie kan niet "gemist" zijn.
     if (!isWorkoutKind(item.kind)) return 'scheduled'
     // Exacte koppeling wint van elke heuristiek.
@@ -2716,14 +2769,14 @@ function WeekPlannerContent() {
    * drag-drop/copy.
    */
   async function ensureDayId(date: Date): Promise<string | null> {
-    if (!selectedPatientId) return null
+    if (!eigenaar) return null
     const existing = dateMap.get(isoDate(date))
     if (existing?.dayId) return existing.dayId
     const monday = mondayOf(date)
     try {
       const created = await ensureWeek.mutateAsync({
         name: `Week van ${monday.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`,
-        patientId: selectedPatientId,
+        ...(eigenaar.soort === 'groep' ? { groupId: eigenaar.id } : { patientId: eigenaar.id }),
         startDate: monday.toISOString(),
         isTemplate: false,
         days: Array.from({ length: 7 }, (_, i) => ({ dayOfWeek: i })),
@@ -2803,7 +2856,7 @@ function WeekPlannerContent() {
     item: ScheduleItem | null, date: Date, dayId: string | null,
     extra: { editBlock?: PlannerBlock | null; editGroupLetter?: string | null; insertAt?: number | null; initialType?: BlockDialogType } = {},
   ) {
-    if (!selectedPatientId) { toast.error('Kies eerst een patiënt'); return }
+    if (!eigenaar) { toast.error('Kies eerst een atleet of groep'); return }
     let itemId = item?.id ?? null
     let naam = item?.quickName ?? item?.program?.name ?? 'Training'
     let categorie: Category = item?.quickCategory ?? 'STRENGTH'
@@ -3239,10 +3292,24 @@ function WeekPlannerContent() {
               Plan toepassen
             </DarkButton>
           )}
+          {selectedGroup && (
+            <span className="athletic-mono rounded px-2 py-1" style={{ fontSize: 10, background: 'rgba(232,122,85,0.12)', color: P.brand, border: '1px solid rgba(232,122,85,0.4)' }}>
+              GROEP · {(selectedGroup.planName ?? selectedGroup.name).toUpperCase()}
+            </span>
+          )}
+          {selectedGroup && groepMagVerzenden && (
+            <DarkButton variant="primary" onClick={() => setSendOpen(true)} className="text-xs">
+              <Send className="w-3.5 h-3.5 mr-1.5" />
+              Stuur naar iedereen
+            </DarkButton>
+          )}
           <PatientPicker
             patients={patients}
+            groups={groepen}
             selectedId={selectedPatientId || null}
-            onSelect={(id) => setUrl({ patientId: id ?? '' })}
+            selectedGroupId={selectedGroupId || null}
+            onSelect={(id) => setUrl({ patientId: id ?? '', groupId: '' })}
+            onSelectGroup={(id) => setUrl({ groupId: id ?? '', patientId: '' })}
           />
         </div>
       </div>
@@ -3301,7 +3368,7 @@ function WeekPlannerContent() {
         </div>
       </div>
 
-      {!selectedPatientId ? (
+      {!eigenaar ? (
         <Tile>
           <div className="flex flex-col sm:flex-row items-center gap-4 py-5 px-2">
             <div
@@ -3707,6 +3774,10 @@ function WeekPlannerContent() {
               setCardioBuilderItem(null)
             }}
           />
+        )}
+
+        {selectedGroup && sendOpen && (
+          <GroupSendDialog groupId={selectedGroup.id} open onClose={() => setSendOpen(false)} />
         )}
 
         {/* Plan-sjabloon toepassen vanaf een datum */}
