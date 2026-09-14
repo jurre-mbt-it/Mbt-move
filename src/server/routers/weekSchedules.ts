@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { assertGroupRole } from '@/server/lib/group-access'
 import { createTRPCRouter, coachStaffProcedure, protectedProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
 import { dominantCategory, durationFromBlocks, isExerciseBlock, parseGroups } from '@/lib/planner-blocks'
@@ -76,6 +77,34 @@ async function assertPatientLink(
 type WeekUser = { id: string; role: string; practiceId: string | null }
 
 /**
+ * Eén ingang voor "mag ik deze kalender bewerken?": een groepskalender loopt
+ * langs de groepsrol (minimaal PLANNER), een atletenkalender langs de
+ * patiëntkoppeling. `assertPatientLink(null)` gaf altijd al door (sjablonen),
+ * dus zonder deze tak kon elke staf een groepskalender op id bewerken.
+ */
+async function assertMagKalenderBewerken(
+  prisma: PrismaClient,
+  user: WeekUser,
+  kalender: { patientId: string | null | undefined; groupId?: string | null },
+) {
+  if (kalender.groupId) {
+    await assertGroupRole(prisma, user, kalender.groupId, 'PLANNER')
+    return
+  }
+  await assertPatientLink(prisma, user, kalender.patientId)
+}
+
+/** Staf van de groep met minimaal PLANNER mag in een groepskalender werken. */
+async function isGroepsPlanner(prisma: PrismaClient, user: WeekUser, groupId: string | null | undefined): Promise<boolean> {
+  if (!groupId) return false
+  const rij = await prisma.athleteGroupStaff.findFirst({
+    where: { groupId, userId: user.id, role: { in: ['PLANNER', 'MANAGER', 'OWNER'] } },
+    select: { id: true },
+  })
+  return !!rij
+}
+
+/**
  * Welke week-schema's mag deze gebruiker bewerken? Eigen schema's, plus die van
  * praktijk-collega's.
  *
@@ -100,7 +129,12 @@ function bewerkbareWeken(user: WeekUser): Prisma.WeekScheduleWhereInput {
     (user.role === 'THERAPIST' || user.role === 'ADMIN') && user.practiceId
       ? [{ practiceId: user.practiceId }]
       : []
-  return { OR: [{ creatorId: user.id }, ...praktijkTak] }
+  // Groepskalender: staf met minimaal de rol PLANNER mag erin werken, ook als
+  // een ander de week aanmaakte (de coach maakt ze meestal, de therapeut plant mee).
+  const groepsTak: Prisma.WeekScheduleWhereInput = {
+    group: { is: { staff: { some: { userId: user.id, role: { in: ['PLANNER', 'MANAGER', 'OWNER'] } } } } },
+  }
+  return { OR: [{ creatorId: user.id }, ...praktijkTak, groepsTak] }
 }
 
 /**
@@ -173,7 +207,7 @@ function mondagVan(iso: string): string | null {
 async function assertMagWeekBewerken(
   prisma: PrismaClient,
   user: WeekUser,
-  week: { creatorId: string; isTemplate: boolean; patientId: string | null },
+  week: { creatorId: string; isTemplate: boolean; patientId: string | null; groupId?: string | null },
 ) {
   if (week.isTemplate) {
     if (week.creatorId !== user.id && user.role !== 'ADMIN') {
@@ -184,7 +218,7 @@ async function assertMagWeekBewerken(
     }
     return
   }
-  await assertPatientLink(prisma, user, week.patientId)
+  await assertMagKalenderBewerken(prisma, user, week)
 }
 
 /**
@@ -382,6 +416,8 @@ export const weekSchedulesRouter = createTRPCRouter({
       name: z.string().min(1).max(200),
       description: z.string().max(2000).optional(),
       patientId: z.string().optional(),
+      /** Groepskalender: week van een atletengroep (patientId leeg). */
+      groupId: z.string().optional(),
       startDate: z.string().optional(),
       endDate: z.string().optional(),
       isTemplate: z.boolean().default(false),
@@ -389,7 +425,21 @@ export const weekSchedulesRouter = createTRPCRouter({
     }))
     .mutation(async ({ ctx, input }) => {
       const id = createId()
-      const { patientId, days, startDate, endDate, ...rest } = input
+      const { patientId, groupId, days, startDate, endDate, ...rest } = input
+      if (groupId) {
+        await assertGroupRole(ctx.prisma, ctx.user, groupId, 'PLANNER')
+        // Idempotent per (groep, maandag), zoals hieronder per (patiënt, maandag).
+        if (startDate) {
+          const monday = mondayKeyOf(new Date(startDate))
+          const bestaande = await ctx.prisma.weekSchedule.findMany({
+            where: { groupId, startDate: { not: null } },
+            include: { days: { include: { program: { select: { id: true, name: true } } }, orderBy: { dayOfWeek: 'asc' } } },
+            orderBy: { createdAt: 'asc' },
+          })
+          const match = bestaande.find(w => w.startDate && mondayKeyOf(w.startDate) === monday)
+          if (match) return match
+        }
+      }
       await assertPatientLink(ctx.prisma, ctx.user, patientId)
       // Zonder patiënt is dit een sjabloon of een losse week zonder dossier;
       // dan is er niets uit te behandelen.
@@ -423,6 +473,7 @@ export const weekSchedulesRouter = createTRPCRouter({
           id,
           ...rest,
           ...(patientId ? { patientId } : {}),
+          ...(groupId ? { groupId } : {}),
           ...(startDate ? { startDate: new Date(startDate) } : {}),
           ...(endDate ? { endDate: new Date(endDate) } : {}),
           creatorId: ctx.user.id,
@@ -459,7 +510,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       // gevaarlijk wordt.
       const existing = await ctx.prisma.weekSchedule.findFirst({
         where: { id, ...bewerkbareWeken(ctx.user) },
-        select: { id: true, patientId: true, isTemplate: true, creatorId: true },
+        select: { id: true, patientId: true, isTemplate: true, creatorId: true, groupId: true },
       })
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
       // De bestaande rij: sjabloon = alleen de maker, patiënt-week = link-check.
@@ -574,7 +625,7 @@ export const weekSchedulesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const existing = await ctx.prisma.weekSchedule.findFirst({
         where: { id: input.id, ...bewerkbareWeken(ctx.user) },
-        select: { id: true, patientId: true, isTemplate: true, creatorId: true },
+        select: { id: true, patientId: true, isTemplate: true, creatorId: true, groupId: true },
       })
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
       // Verwijderen cascadeert via WeekScheduleDay naar items en oefeningen, dus
@@ -1228,6 +1279,8 @@ export const weekSchedulesRouter = createTRPCRouter({
       isTemplate: z.boolean().optional(),
       /** Sjabloon-weken van één trainingsplan (planTemplates.createEmpty). */
       planTemplateId: z.string().optional(),
+      /** Groepskalender van een atletengroep; toegang via de groepsrol. */
+      groupId: z.string().optional(),
       /**
        * Optioneel datumvenster (ISO) op startDate. Zonder venster komt de hele
        * patiënt-historie mee — dat groeit elke behandelweek. Weken zónder
@@ -1259,9 +1312,12 @@ export const weekSchedulesRouter = createTRPCRouter({
             ],
           }]
         : []
+      // Staf van een groep is niet altijd de maker van de weken; daar is de
+      // groepsrol de toegang, niet het eigenaarschap.
+      if (input?.groupId) await assertGroupRole(ctx.prisma, ctx.user, input.groupId, 'VIEWER')
       return ctx.prisma.weekSchedule.findMany({
         where: {
-          ...ownership,
+          ...(input?.groupId ? { groupId: input.groupId } : ownership),
           ...(input?.patientId !== undefined ? { patientId: input.patientId } : {}),
           ...(input?.isTemplate !== undefined ? { isTemplate: input.isTemplate } : {}),
           ...(input?.planTemplateId !== undefined ? { planTemplateId: input.planTemplateId } : {}),
@@ -1410,13 +1466,14 @@ export const weekSchedulesRouter = createTRPCRouter({
         where: { id: input.dayId },
         // patientId komt mee op de rij die we toch al ophalen voor de
         // toegangscheck; null bij een sjabloon-week.
-        include: { weekSchedule: { select: { creatorId: true, practiceId: true, patientId: true } } },
+        include: { weekSchedule: { select: { creatorId: true, practiceId: true, groupId: true, patientId: true } } },
       })
       if (!day) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user.role === 'ADMIN'
       const isOwner = day.weekSchedule.creatorId === ctx.user.id
       const isSamePractice = inSamePractice(ctx.user, day.weekSchedule.practiceId)
-      if (!isAdmin && !isOwner && !isSamePractice) {
+      const isGroepsStaf = await isGroepsPlanner(ctx.prisma, ctx.user, day.weekSchedule.groupId)
+      if (!isAdmin && !isOwner && !isSamePractice && !isGroepsStaf) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
       await assertMagPlannen(ctx.prisma, ctx.user, day.weekSchedule.patientId)
@@ -1502,13 +1559,14 @@ export const weekSchedulesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const day = await ctx.prisma.weekScheduleDay.findUnique({
         where: { id: input.dayId },
-        include: { weekSchedule: { select: { creatorId: true, practiceId: true, patientId: true } } },
+        include: { weekSchedule: { select: { creatorId: true, practiceId: true, groupId: true, patientId: true } } },
       })
       if (!day) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user.role === 'ADMIN'
       const isOwner = day.weekSchedule.creatorId === ctx.user.id
       const isSamePractice = inSamePractice(ctx.user, day.weekSchedule.practiceId)
-      if (!isAdmin && !isOwner && !isSamePractice) throw new TRPCError({ code: 'FORBIDDEN' })
+      const isGroepsStaf = await isGroepsPlanner(ctx.prisma, ctx.user, day.weekSchedule.groupId)
+      if (!isAdmin && !isOwner && !isSamePractice && !isGroepsStaf) throw new TRPCError({ code: 'FORBIDDEN' })
       await assertMagPlannen(ctx.prisma, ctx.user, day.weekSchedule.patientId)
 
       const bestaand = await ctx.prisma.weekScheduleDayItem.findFirst({
@@ -1539,13 +1597,14 @@ export const weekSchedulesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const item = await ctx.prisma.weekScheduleDayItem.findUnique({
         where: { id: input.itemId },
-        include: { day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true, patientId: true } } } } },
+        include: { day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true, groupId: true, patientId: true } } } } },
       })
       if (!item) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user.role === 'ADMIN'
       const isOwner = item.day.weekSchedule.creatorId === ctx.user.id
       const isSamePractice = inSamePractice(ctx.user, item.day.weekSchedule.practiceId)
-      if (!isAdmin && !isOwner && !isSamePractice) throw new TRPCError({ code: 'FORBIDDEN' })
+      const isGroepsStaf = await isGroepsPlanner(ctx.prisma, ctx.user, item.day.weekSchedule.groupId)
+      if (!isAdmin && !isOwner && !isSamePractice && !isGroepsStaf) throw new TRPCError({ code: 'FORBIDDEN' })
       await assertMagPlannen(ctx.prisma, ctx.user, item.day.weekSchedule.patientId)
       await ctx.prisma.weekScheduleDayItem.update({
         where: { id: input.itemId },
@@ -1570,13 +1629,14 @@ export const weekSchedulesRouter = createTRPCRouter({
       const item = await ctx.prisma.weekScheduleDayItem.findUnique({
         where: { id: input.id },
         // patientId erbij op de rij die de toegangscheck toch al ophaalt.
-        include: { day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true, patientId: true } } } } },
+        include: { day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true, groupId: true, patientId: true } } } } },
       })
       if (!item) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user.role === 'ADMIN'
       const isOwner = item.day.weekSchedule.creatorId === ctx.user.id
       const isSamePractice = inSamePractice(ctx.user, item.day.weekSchedule.practiceId)
-      if (!isAdmin && !isOwner && !isSamePractice) {
+      const isGroepsStaf = await isGroepsPlanner(ctx.prisma, ctx.user, item.day.weekSchedule.groupId)
+      if (!isAdmin && !isOwner && !isSamePractice && !isGroepsStaf) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
       await assertMagPlannen(ctx.prisma, ctx.user, item.day.weekSchedule.patientId)
@@ -1601,7 +1661,7 @@ export const weekSchedulesRouter = createTRPCRouter({
         where: { id: input.itemId },
         include: {
           ...COPY_ITEM_INCLUDE,
-          day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true, patientId: true } } } },
+          day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true, groupId: true, patientId: true } } } },
         },
       })
       if (!item) throw new TRPCError({ code: 'NOT_FOUND' })
@@ -1616,7 +1676,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       if (targetDayId !== item.dayId) {
         const target = await ctx.prisma.weekScheduleDay.findUnique({
           where: { id: targetDayId },
-          include: { weekSchedule: { select: { creatorId: true, practiceId: true, patientId: true } } },
+          include: { weekSchedule: { select: { creatorId: true, practiceId: true, groupId: true, patientId: true } } },
         })
         if (!target) throw new TRPCError({ code: 'NOT_FOUND' })
         if (!canTouch(target.weekSchedule)) throw new TRPCError({ code: 'FORBIDDEN' })
@@ -1642,13 +1702,14 @@ export const weekSchedulesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const item = await ctx.prisma.weekScheduleDayItem.findUnique({
         where: { id: input.id },
-        include: { day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true } } } } },
+        include: { day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true, groupId: true } } } } },
       })
       if (!item) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user.role === 'ADMIN'
       const isOwner = item.day.weekSchedule.creatorId === ctx.user.id
       const isSamePractice = inSamePractice(ctx.user, item.day.weekSchedule.practiceId)
-      if (!isAdmin && !isOwner && !isSamePractice) {
+      const isGroepsStaf = await isGroepsPlanner(ctx.prisma, ctx.user, item.day.weekSchedule.groupId)
+      if (!isAdmin && !isOwner && !isSamePractice && !isGroepsStaf) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
       await ctx.prisma.weekScheduleDayItem.delete({ where: { id: input.id } })
@@ -1667,13 +1728,14 @@ export const weekSchedulesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const day = await ctx.prisma.weekScheduleDay.findUnique({
         where: { id: input.dayId },
-        include: { weekSchedule: { select: { creatorId: true, practiceId: true } } },
+        include: { weekSchedule: { select: { creatorId: true, practiceId: true, groupId: true } } },
       })
       if (!day) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user.role === 'ADMIN'
       const isOwner = day.weekSchedule.creatorId === ctx.user.id
       const isSamePractice = inSamePractice(ctx.user, day.weekSchedule.practiceId)
-      if (!isAdmin && !isOwner && !isSamePractice) {
+      const isGroepsStaf = await isGroepsPlanner(ctx.prisma, ctx.user, day.weekSchedule.groupId)
+      if (!isAdmin && !isOwner && !isSamePractice && !isGroepsStaf) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
       await ctx.prisma.weekScheduleDay.update({
@@ -1714,7 +1776,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       const itemIds = input.moves.map(m => m.itemId)
       const items = await ctx.prisma.weekScheduleDayItem.findMany({
         where: { id: { in: itemIds } },
-        include: { day: { include: { weekSchedule: { select: { id: true, creatorId: true, practiceId: true } } } } },
+        include: { day: { include: { weekSchedule: { select: { id: true, creatorId: true, practiceId: true, groupId: true } } } } },
       })
       if (items.length !== itemIds.length) throw new TRPCError({ code: 'NOT_FOUND' })
       for (const it of items) {
@@ -1727,7 +1789,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       const destDayIds = [...new Set(input.moves.map(m => m.dayId))]
       const destDays = await ctx.prisma.weekScheduleDay.findMany({
         where: { id: { in: destDayIds } },
-        include: { weekSchedule: { select: { creatorId: true, practiceId: true, patientId: true } } },
+        include: { weekSchedule: { select: { creatorId: true, practiceId: true, groupId: true, patientId: true } } },
       })
       if (destDays.length !== destDayIds.length) throw new TRPCError({ code: 'NOT_FOUND' })
       for (const d of destDays) {
@@ -2004,7 +2066,7 @@ export const weekSchedulesRouter = createTRPCRouter({
       const days = await ctx.prisma.weekScheduleDay.findMany({
         where: { id: { in: dayIds } },
         include: {
-          weekSchedule: { select: { creatorId: true, practiceId: true, patientId: true } },
+          weekSchedule: { select: { creatorId: true, practiceId: true, groupId: true, patientId: true } },
           // exercises meeladen: copyItemToDay kopieert ze mee.
           items: { orderBy: { order: 'asc' }, include: COPY_ITEM_INCLUDE },
         },
@@ -2014,7 +2076,8 @@ export const weekSchedulesRouter = createTRPCRouter({
       for (const d of days) {
         const isOwner = d.weekSchedule.creatorId === ctx.user.id
         const isSamePractice = inSamePractice(ctx.user, d.weekSchedule.practiceId)
-        if (!isAdmin && !isOwner && !isSamePractice) {
+        const isGroepsStaf = await isGroepsPlanner(ctx.prisma, ctx.user, d.weekSchedule.groupId)
+        if (!isAdmin && !isOwner && !isSamePractice && !isGroepsStaf) {
           throw new TRPCError({ code: 'FORBIDDEN' })
         }
       }
@@ -2077,14 +2140,15 @@ export const weekSchedulesRouter = createTRPCRouter({
       const item = await ctx.prisma.weekScheduleDayItem.findUnique({
         where: { id: input.itemId },
         include: {
-          day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true } } } },
+          day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true, groupId: true } } } },
         },
       })
       if (!item) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user.role === 'ADMIN'
       const isOwner = item.day.weekSchedule.creatorId === ctx.user.id
       const isSamePractice = inSamePractice(ctx.user, item.day.weekSchedule.practiceId)
-      if (!isAdmin && !isOwner && !isSamePractice) {
+      const isGroepsStaf = await isGroepsPlanner(ctx.prisma, ctx.user, item.day.weekSchedule.groupId)
+      if (!isAdmin && !isOwner && !isSamePractice && !isGroepsStaf) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
 
@@ -2232,13 +2296,14 @@ export const weekSchedulesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const item = await ctx.prisma.weekScheduleDayItem.findUnique({
         where: { id: input.itemId },
-        include: { day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true, patientId: true } } } } },
+        include: { day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true, groupId: true, patientId: true } } } } },
       })
       if (!item) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user.role === 'ADMIN'
       const isOwner = item.day.weekSchedule.creatorId === ctx.user.id
       const isSamePractice = inSamePractice(ctx.user, item.day.weekSchedule.practiceId)
-      if (!isAdmin && !isOwner && !isSamePractice) {
+      const isGroepsStaf = await isGroepsPlanner(ctx.prisma, ctx.user, item.day.weekSchedule.groupId)
+      if (!isAdmin && !isOwner && !isSamePractice && !isGroepsStaf) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
       await assertMagPlannen(ctx.prisma, ctx.user, item.day.weekSchedule.patientId)
@@ -2314,13 +2379,14 @@ export const weekSchedulesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const item = await ctx.prisma.weekScheduleDayItem.findUnique({
         where: { id: input.itemId },
-        include: { day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true, patientId: true } } } } },
+        include: { day: { include: { weekSchedule: { select: { creatorId: true, practiceId: true, groupId: true, patientId: true } } } } },
       })
       if (!item) throw new TRPCError({ code: 'NOT_FOUND' })
       const isAdmin = ctx.user.role === 'ADMIN'
       const isOwner = item.day.weekSchedule.creatorId === ctx.user.id
       const isSamePractice = inSamePractice(ctx.user, item.day.weekSchedule.practiceId)
-      if (!isAdmin && !isOwner && !isSamePractice) {
+      const isGroepsStaf = await isGroepsPlanner(ctx.prisma, ctx.user, item.day.weekSchedule.groupId)
+      if (!isAdmin && !isOwner && !isSamePractice && !isGroepsStaf) {
         throw new TRPCError({ code: 'FORBIDDEN' })
       }
       await assertMagPlannen(ctx.prisma, ctx.user, item.day.weekSchedule.patientId)

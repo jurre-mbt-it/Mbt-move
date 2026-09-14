@@ -545,8 +545,10 @@ export const planTemplatesRouter = createTRPCRouter({
           if (hit) {
             targetId = hit.id
             if (input.mode === 'replace') {
-              // Cascade ruimt items + item-exercises op.
-              await tx.weekScheduleDay.deleteMany({ where: { weekScheduleId: targetId } })
+              // Alleen eigen items weg; trainingen die een groep hier neerzette
+              // blijven staan (spec atletengroepen: beide richtingen raken elkaar niet).
+              // De dagen blijven bestaan; hieronder worden ze hergebruikt.
+              await tx.weekScheduleDayItem.deleteMany({ where: { day: { weekScheduleId: targetId }, groupId: null } })
               replacedWeeks++
             }
             await tx.weekSchedule.update({
