@@ -6,6 +6,7 @@ import { ScrambleText } from './ScrambleText'
 import { IpadScene } from './IpadScene'
 import { BuildScene } from './BuildScene'
 import { PhoneScene } from './PhoneScene'
+import { Koppelingen } from './Koppelingen'
 
 /**
  * Publieke BASE-site.
@@ -246,6 +247,9 @@ export function BaseLanding() {
 
       {/* ── Plakscene: de telefoon met de gezondheidsfuncties ─────────── */}
       <PhoneScene />
+
+      {/* ── Koppelingen: wearables en KINVENT ─────────────────────────── */}
+      <Koppelingen />
 
       {/* ── De twee accounts ──────────────────────────────────────────── */}
       <section id="voor-praktijken" className={`${styles.sec} ${styles.secBand}`}>
