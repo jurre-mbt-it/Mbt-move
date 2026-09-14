@@ -275,9 +275,13 @@ export function ExerciseForm({ mode, draft, onChange, groups, defaultCategory, s
           {mode === 'exercise' && (
             <>
               <OptionSwitch checked={hasParam(draft.extraParams, 'bar_speed')} onCheckedChange={v => set({ extraParams: withParam(draft.extraParams, 'bar_speed', v ? 0 : null) })} label="Staafsnelheid" hint="Voegt een m/s-veld toe voor de atleet." />
-              <OptionSwitch checked={hasParam(draft.extraParams, 'peak_power')} onCheckedChange={v => set({ extraParams: withParam(draft.extraParams, 'peak_power', v ? 0 : null) })} label="Piekvermogen" hint="Voegt een watt-veld toe voor de atleet." />
               <OptionSwitch checked={draft.trackMax !== false} onCheckedChange={v => set({ trackMax: v ? null : false })} label="Max bijhouden" hint="Gelogde sets tellen mee voor 1RM en records." />
             </>
+          )}
+          {/* Vermogen in watt hoort bij cardio (fiets, roeier, loopband). Bij kracht
+              alleen nog zichtbaar als een oude rij hem al aan had, om hem uit te zetten. */}
+          {(mode === 'cardio' || hasParam(draft.extraParams, 'peak_power')) && (
+            <OptionSwitch checked={hasParam(draft.extraParams, 'peak_power')} onCheckedChange={v => set({ extraParams: withParam(draft.extraParams, 'peak_power', v ? 0 : null) })} label="Vermogen" hint="Voegt een watt-veld per set toe voor de atleet." />
           )}
         </div>
       </Field>

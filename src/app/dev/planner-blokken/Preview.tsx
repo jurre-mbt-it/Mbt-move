@@ -36,7 +36,7 @@ const START_GROEPEN: ItemGroups = {
 
 /** Set-rijen van de runner met meetkolommen (staafsnelheid, piekvermogen). */
 function RunnerVoorbeeld() {
-  const kolommen = [{ label: 'Staafsnelheid', unit: 'm/s' }, { label: 'Piekvermogen', unit: 'W' }]
+  const kolommen = [{ label: 'Staafsnelheid', unit: 'm/s' }]
   const [entries, setEntries] = useState<SetEntry[]>(() => makeSetEntries(4, 5, [5, 5, 3, 3]))
   const vorige = {
     weight: 100, weightsPerSet: [90, 100, 105, 105], repsPerSet: [5, 5, 3, 3], repsCompleted: 5, setsCompleted: 4, completedAt: null,
