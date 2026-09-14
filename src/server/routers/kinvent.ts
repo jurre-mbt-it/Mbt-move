@@ -33,13 +33,15 @@ import {
   KinventError,
   analyzeProtocols,
   completeSecondFactor,
-  fetchParticipants,
+  fetchDeletedProtocolCodes,
   fetchProtocolsForParticipant,
   requestSecondFactor,
+  searchParticipants,
 } from '@/lib/kinvent/client'
 import { decryptToken, encryptToken, jwtExpiry } from '@/lib/kinvent/crypto'
-import { parseActivityResults, parseJump, parseStrength } from '@/lib/kinvent/parse'
-import { checkUnit, lsi, type UnitCheck } from '@/lib/kinvent/units'
+import { buildCandidates, type ImportCandidate } from '@/lib/kinvent/candidates'
+
+export type { ImportCandidate } from '@/lib/kinvent/candidates'
 
 type Prisma = typeof import('@/lib/prisma').prisma
 type Ctx = { prisma: Prisma; user: { id: string; role: string; practiceId: string | null } }
@@ -113,24 +115,6 @@ async function noteError(ctx: Ctx, err: unknown) {
   }
 }
 
-export type ImportCandidate = {
-  protocolCode: string
-  activityCode: string
-  performedAt: Date
-  exerciseType: string | null
-  title: string | null
-  deviceType: string | null
-  kind: 'STRENGTH' | 'JUMP'
-  /** Waarden zoals Kinvent ze gaf, in kilogram. */
-  left: number | null
-  right: number | null
-  single: number | null
-  lsi: number | null
-  jumpHeight: number | null
-  unit: UnitCheck
-  /** Al eerder geïmporteerd in een rapport van deze patiënt. */
-  alreadyImported: boolean
-}
 
 export const kinventRouter = createTRPCRouter({
   // ── Aanmelding van de praktijk ─────────────────────────────────────────────
@@ -203,24 +187,23 @@ export const kinventRouter = createTRPCRouter({
   /**
    * Zoek een Kinvent-profiel op naam, voor het koppelmoment.
    *
-   * Filtert server-side zodat niet de hele praktijklijst over de lijn gaat, en
-   * geeft alleen terug wat nodig is om de juiste persoon aan te wijzen. Bij
+   * Kinvent filtert zelf op naam, dus alleen de treffers gaan over de lijn.
+   * We geven alleen terug wat nodig is om de juiste persoon aan te wijzen; bij
    * naamgenoten is het geboortejaar het enige onderscheid, dus dat gaat mee.
    */
   searchParticipants: therapistProcedure
     .input(z.object({ query: z.string().min(2).max(60) }))
     .query(async ({ ctx, input }) => {
-      const needle = input.query.trim().toLowerCase()
       try {
-        const all = await fetchParticipants(await tokenFor(ctx))
-        return all
-          .filter((p) => `${p.firstName ?? ''} ${p.lastName ?? ''}`.toLowerCase().includes(needle))
-          .slice(0, 25)
-          .map((p) => ({
-            code: p.code,
-            name: `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim(),
-            birthYear: p.dateOfBirth ? new Date(p.dateOfBirth).getUTCFullYear() : null,
-          }))
+        const hits = await searchParticipants(await tokenFor(ctx), input.query.trim())
+        return hits.map((p) => ({
+          code: p.code,
+          name: `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim(),
+          birthYear: p.dateOfBirth ? new Date(p.dateOfBirth).getUTCFullYear() : null,
+          // Kinvent legt het toezien op consent bij ons. Zonder vastgelegde
+          // consent koppelen mag, maar de therapeut moet het zien.
+          consentRecorded: p.consentRecorded,
+        }))
       } catch (err) {
         await noteError(ctx, err)
         toTRPC(err)
@@ -296,7 +279,7 @@ export const kinventRouter = createTRPCRouter({
    */
   pullForPatient: therapistProcedure
     .input(z.object({ patientId: z.string(), all: z.boolean().default(false) }))
-    .mutation(async ({ ctx, input }): Promise<{ candidates: ImportCandidate[] }> => {
+    .mutation(async ({ ctx, input }): Promise<{ candidates: ImportCandidate[]; removedProtocolCodes: string[] }> => {
       await assertAccess(ctx.prisma, ctx.user, input.patientId)
       const patient = await ctx.prisma.user.findUnique({
         where: { id: input.patientId },
@@ -318,12 +301,17 @@ export const kinventRouter = createTRPCRouter({
       const since = input.all ? 0 : Number(sync?.lastUpdatedAfter ?? 0)
 
       let protocols
+      let deletedProtocolCodes
       let analyses
       try {
         const token = await tokenFor(ctx)
-        protocols = await fetchProtocolsForParticipant(token, patient.kinventParticipantCode, since)
-        if (protocols.length === 0) return { candidates: [] }
-        analyses = await analyzeProtocols(token, protocols.map((p) => p.code))
+        // De lichte lijst is klein (geen ruwe curves), dus we halen alles op en
+        // houden lokaal alleen over wat sinds de vorige ronde is gewijzigd.
+        // Verwijderde sessies staan er niet in; die vragen we apart als codes.
+        const alle = await fetchProtocolsForParticipant(token, patient.kinventParticipantCode)
+        protocols = alle.filter((p) => (p.updatedOn ?? 0) > since)
+        deletedProtocolCodes = await fetchDeletedProtocolCodes(token, patient.kinventParticipantCode)
+        analyses = protocols.length ? await analyzeProtocols(token, protocols.map((p) => p.code)) : []
         await ctx.prisma.kinventConnection.updateMany({
           where: { practiceId: ctx.user.practiceId ?? '' },
           data: { lastUsedAt: new Date() },
@@ -336,76 +324,36 @@ export const kinventRouter = createTRPCRouter({
         })
         toTRPC(err)
       }
-      const byProtocol = new Map(analyses.map((a) => [a.protocolCode, a]))
 
       // Wat al eens is geïmporteerd, markeren we in plaats van te verbergen:
       // de therapeut ziet zo dat een meting bekend is en kan hem overslaan.
-      const known = new Set(
-        (
-          await ctx.prisma.testReportEntry.findMany({
-            where: { report: { patientId: input.patientId }, kinventActivityCode: { not: null } },
-            select: { kinventActivityCode: true },
-          })
-        ).map((e) => e.kinventActivityCode as string),
-      )
+      const [entries, jumps] = await Promise.all([
+        ctx.prisma.testReportEntry.findMany({
+          where: { report: { patientId: input.patientId }, kinventActivityCode: { not: null } },
+          select: { kinventActivityCode: true, kinventProtocolCode: true },
+        }),
+        ctx.prisma.kinventJumpResult.findMany({
+          where: { patientId: input.patientId },
+          select: { protocolCode: true, activityCode: true },
+        }),
+      ])
+      const knownActivityCodes = new Set<string>([
+        ...entries.flatMap((e) => (e.kinventActivityCode ? [e.kinventActivityCode] : [])),
+        ...jumps.map((j) => j.activityCode),
+      ])
+      const knownProtocolCodes = new Set<string>([
+        ...entries.flatMap((e) => (e.kinventProtocolCode ? [e.kinventProtocolCode] : [])),
+        ...jumps.map((j) => j.protocolCode),
+      ])
 
-      const candidates: ImportCandidate[] = []
-      for (const protocol of protocols) {
-        const analysis = byProtocol.get(protocol.code)
-        for (const activity of analysis?.activitiesResults ?? []) {
-          const activityCode = activity.activityCode
-          if (!activityCode) continue
-          const exerciseType = activity.config?.exerciseType ?? null
-          const parsed = parseActivityResults(activity.activityResults)
-          const performedAt = new Date(activity.startTime ?? protocol.createdOn ?? Date.now())
-
-          if (exerciseType === 'JUMP_ANALYSIS') {
-            const jump = parseJump(parsed)
-            if (!jump) continue
-            candidates.push({
-              protocolCode: protocol.code,
-              activityCode,
-              performedAt,
-              exerciseType,
-              title: activity.config?.title ?? null,
-              deviceType: 'K-DELTA',
-              kind: 'JUMP',
-              left: null,
-              right: null,
-              single: null,
-              lsi: null,
-              jumpHeight: jump.peakJumpHeight ?? jump.reps[0]?.jumpHeight ?? null,
-              unit: checkUnit(jump.bodyWeightKg, referenceWeight),
-              alreadyImported: known.has(activityCode),
-            })
-            continue
-          }
-
-          const strength = parseStrength(exerciseType, parsed)
-          if (!strength) continue
-          candidates.push({
-            protocolCode: protocol.code,
-            activityCode,
-            performedAt,
-            exerciseType,
-            title: activity.config?.title ?? null,
-            deviceType: strength.deviceType,
-            kind: 'STRENGTH',
-            left: strength.left,
-            right: strength.right,
-            single: strength.single,
-            lsi: lsi(strength.left, strength.right),
-            jumpHeight: null,
-            // Een krachtmeting draagt zelf geen lichaamsgewicht, dus deze
-            // controle blijft hier onbeslist. De sprongen van dezelfde patiënt
-            // zijn wel te ijken, en dat is het signaal waar we op sturen.
-            unit: checkUnit(null),
-            alreadyImported: known.has(activityCode),
-          })
-        }
-      }
-
-      candidates.sort((a, b) => b.performedAt.getTime() - a.performedAt.getTime())
-      return { candidates }
+      const { candidates, removedProtocolCodes } = buildCandidates({
+        protocols,
+        analyses,
+        knownActivityCodes,
+        knownProtocolCodes,
+        deletedProtocolCodes,
+        referenceWeightKg: referenceWeight,
+      })
+      return { candidates, removedProtocolCodes }
     }),
 })

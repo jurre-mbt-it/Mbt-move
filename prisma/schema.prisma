@@ -1015,13 +1015,13 @@ enum AthleteGroupRole {
 /// groupId). "Stuur naar iedereen" kopieert gekozen weken naar de leden; de
 /// kopie draagt groupId + sourceItemId. Zie docs/superpowers/specs/2026-09-14-atletengroepen-design.md.
 model AthleteGroup {
-  id          String    @id @default(cuid())
+  id          String                @id @default(cuid())
   name        String
   /// Programmanaam die de atleet ziet ("Periodisering 2026/27"); leeg = name.
   planName    String?
   description String?
   ownerId     String
-  owner       User      @relation("AthleteGroupOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  owner       User                  @relation("AthleteGroupOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   /// Maandag van week 1.
   startDate   DateTime
   endDate     DateTime?
@@ -1030,8 +1030,8 @@ model AthleteGroup {
   staff       AthleteGroupStaff[]
   schedules   WeekSchedule[]
   sentItems   WeekScheduleDayItem[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
 
   @@index([ownerId])
   @@map("athlete_groups")
@@ -1248,8 +1248,8 @@ model WeekScheduleDayItemExercise {
   /// Sinds 2026-09-13 een bloklijst: EXERCISE (oefening), NOTE (tekst voor de
   /// atleet) of BREAK (pauze). Consumers die alleen oefeningen kennen filteren
   /// op blockKind = EXERCISE; zie lib/planner-blocks.ts.
-  blockKind  String    @default("EXERCISE")
-  exercise   Exercise? @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  blockKind  String              @default("EXERCISE")
+  exercise   Exercise?           @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
   exerciseId String?
 
   order    Int     @default(0)
@@ -1322,28 +1322,28 @@ enum IntensityType {
 }
 
 model ProgramExercise {
-  id            String   @id @default(cuid())
-  program       Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  id            String    @id @default(cuid())
+  program       Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
   programId     String
   /// Sinds 2026-09-13 een bloklijst zoals de planner-rijen: EXERCISE, NOTE of
   /// BREAK. Consumers filteren met isExerciseBlock() vóór ze exercise.name lezen.
   blockKind     String    @default("EXERCISE")
   exercise      Exercise? @relation(fields: [exerciseId], references: [id])
   exerciseId    String?
-  week          Int      @default(1)
-  day           Int      @default(1)
-  order         Int      @default(0)
-  sets          Int      @default(3)
+  week          Int       @default(1)
+  day           Int       @default(1)
+  order         Int       @default(0)
+  sets          Int       @default(3)
   // Optionele bovengrens voor sets-range. NULL = `sets` als vaste waarde,
   // ingevuld = "sets..setsMax" als range (bv. 3-5 sets).
   setsMax       Int?
-  reps          Int      @default(10)
+  reps          Int       @default(10)
   // Optionele bovengrens voor reps-range. NULL = enkele waarde, ingevuld = range.
   repsMax       Int?
-  repUnit       String   @default("reps")
-  restTime      Int      @default(60)
+  repUnit       String    @default("reps")
+  restTime      Int       @default(60)
   supersetGroup String?
-  supersetOrder Int      @default(0)
+  supersetOrder Int       @default(0)
   notes         String?
 
   // Extra voorschrift-parameters per oefening in dit programma (Tempo, Gewicht,
@@ -2738,8 +2738,8 @@ model SleepEntry {
 
 /// Dagelijkse fysiologische metingen (meestal nachtmeting). 1 per user per dag.
 model VitalsEntry {
-  id                 String        @id @default(cuid())
-  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String         @id @default(cuid())
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId             String
   date               DateTime
   restingHeartRate   Int? // bpm
@@ -2759,8 +2759,8 @@ model VitalsEntry {
   /// omdat een middagsync met alleen stappen anders het label kaapt van een
   /// rij waarvan de HRV van een ander apparaat kwam.
   daySource          WorkoutSource?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
   @@unique([userId, date])
   @@index([userId, date])
@@ -2982,11 +2982,12 @@ model KinventSync {
 }
 
 /// Eén sprongmeting (JUMP_ANALYSIS) uit Kinvent. Past niet op TestReportEntry,
-/// dat op links/rechts-kracht is gebouwd. v1 slaat alleen op en toont; de
-/// klinische score komt later en heeft Jurre's definitie nodig.
+/// dus een eigen tabel. Alleen opslaan en tonen, geen oordeel: de CMJ-score
+/// komt later, als Jurre de klinische definitie heeft gegeven.
 ///
-/// Let op: "readiness" betekent in BASE al wellness/herstel uit de Apple Watch.
-/// Kies voor de sprongscore straks een andere naam.
+/// Eenheden volgen Kinvents gedocumenteerde sprongmodel (`_resultsModels`):
+/// kracht in Newton, vermogen in Watt, hoogte in centimeter, tijd in
+/// milliseconden, massa in kilogram. Geen omrekening bij import.
 model KinventJumpResult {
   id        String @id @default(cuid())
   patientId String
@@ -2996,17 +2997,21 @@ model KinventJumpResult {
   activityCode String
   performedAt  DateTime
   jumpType     String?
-  /// Zoals Kinvent hem gaf, in kg. Dubbelt als eenheidscontrole: wijkt dit ver
-  /// af van het gewicht dat BASE van de patiënt kent, dan staat de KINVENT-app
-  /// vermoedelijk op een andere eenheid en is de meting niet te vertrouwen.
+  /// SINGLE = CMJ/SJ/DROP (twee- of eenbenig), MULTIPLE = herhaald springen.
+  variant      String   @default("SINGLE")
+  /// Massa uit het sprongmodel (`mass`), in kg. Dit is meteen het ijkpunt voor
+  /// de eenheidscontrole van latere metingen van dezelfde patiënt.
   bodyWeightKg Float?
+  /// `weight / mass` uit het model. Hoort 9,81 te zijn; we bewaren hem als
+  /// bewijs dat de eenheidscontrole op deze meting is gedaan.
+  gravityRatio Float?
 
-  numberOfJumps  Int?
-  peakJumpHeight Float?
-  heightAverage  Float?
-  rsi            Float?
-  mrsi           Float?
-  fatigueIndex   Float?
+  numberOfJumps    Int?
+  peakJumpHeightCm Float?
+  heightAverageCm  Float?
+  rsi              Float?
+  mrsi             Float?
+  fatigueIndex     Float?
 
   reps       KinventJumpRep[]
   importedAt DateTime         @default(now())
@@ -3016,42 +3021,39 @@ model KinventJumpResult {
 }
 
 /// Eén sprong binnen een meting. Kinvent levert deze per rep, en het verloop
-/// binnen een set zegt meer over vermoeidheid dan alleen de beste sprong.
+/// binnen een meting (vermoeidheid, uitschieters) zegt meer dan het gemiddelde.
 model KinventJumpRep {
   id       String            @id @default(cuid())
   resultId String
   result   KinventJumpResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
 
-  ordinal                    Int
-  jumpHeight                 Float?
-  jumpHeightByVelocity       Float?
-  peakForceLeft              Float?
-  peakForceRight             Float?
-  peakForceTotal             Float?
-  peakPowerTotal             Float?
-  decelRfdTotal              Float?
-  landingTimeToStabilization Float?
-  propulsiveImpulsePhaseOne  Float?
-  propulsiveImpulsePhaseTwo  Float?
-  contactTime                Float?
-  flightTime                 Float?
-  reactiveStrengthIndex      Float?
+  ordinal Int
+  /// Kinvents rep-code, zodat een tweede import dezelfde sprong herkent.
+  repCode String?
+  /// LEFT, RIGHT of BOTH.
+  side    String?
+
+  jumpHeightCm            Float?
+  jumpHeightByVelocityCm  Float?
+  flightTimeMs            Float?
+  contactTimeMs           Float?
+  /// Bruto piekkracht in Newton, beide platen samen (of het ene been).
+  peakForceN              Float?
+  peakForceLeftN          Float?
+  peakForceRightN         Float?
+  /// Piekkracht min lichaamsgewicht, Newton.
+  netMaxForceN            Float?
+  maxPowerW               Float?
+  rsi                     Float?
+  timeToStabilizeMs       Float?
+  /// N·s
+  propulsiveImpulsePhase1 Float?
+  propulsiveImpulsePhase2 Float?
 
   @@unique([resultId, ordinal])
   @@map("kinvent_jump_reps")
 }
 
-/// De aanmelding bij Kinvent, één per praktijk.
-///
-/// Kinvent kent geen service-credential. Inloggen gaat met het praktijkaccount
-/// (e-mail en wachtwoord in env) plus een tweede factor die per mail of sms
-/// komt en die een mens moet overtikken. Het JWT dat daaruit rolt is 31 dagen
-/// geldig, en dát bewaren we hier: versleuteld, want het is een maandlange
-/// sleutel tot het hele Kinvent-account inclusief hun schrijf-endpoints.
-///
-/// Eén rij per praktijk, niet per therapeut: dan blijft de koppeling werken als
-/// degene die hem aanmeldde vrij is, en hoeft niet iedereen apart te koppelen.
-/// `connectedById` legt wél vast wie het was.
 model KinventConnection {
   id         String   @id @default(cuid())
   practiceId String   @unique

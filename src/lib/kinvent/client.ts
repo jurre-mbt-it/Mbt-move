@@ -22,12 +22,21 @@
  *
  * De leesfuncties krijgen het token als argument. Waar het vandaan komt (de
  * database, via de router) hoort hier niet thuis.
+ *
+ * Endpoints volgens Kinvents documentatie van september 2026 (kopie in
+ * ~/kinvent-koppeling/docs-2026-09/). We gebruiken uitsluitend de lichte
+ * "common"-projectie van protocollen, zonder de ruwe sensorcurves die de oude
+ * v1-lijst 253 KB per protocol maakten, en de gepagineerde zoekcall voor
+ * participants, zodat alleen de treffers op een naam over de lijn gaan.
  */
 
 const BASE_URL = process.env.KINVENT_BASE_URL ?? 'https://api.k-invent.com'
 
-/** Kinvent kapt de brede lijst af; analyse in blokken van 25 gaat wel goed. */
-export const ANALYZE_BATCH_SIZE = 25
+/** Kinvent staat 1000 codes per analyse-call toe; honderd houdt de respons hanteerbaar. */
+export const ANALYZE_BATCH_SIZE = 100
+
+/** Kinvents eigen foutcodes, voor zover we erop reageren. */
+export const ERR_NO_ANALYZER = 'ERR_4090'
 
 export class KinventError extends Error {
   constructor(
@@ -35,44 +44,58 @@ export class KinventError extends Error {
     readonly status?: number,
     /** Het bewaarde token is niet (meer) geldig; iemand moet opnieuw aanmelden. */
     readonly needsSignIn = false,
+    /** Kinvents `errorCode`, als de respons er een droeg. */
+    readonly code?: string,
   ) {
     super(message)
     this.name = 'KinventError'
   }
 }
 
-export type KinventParticipant = {
+/**
+ * Wat we van een participant overhouden na het zoeken: genoeg om de juiste
+ * persoon aan te wijzen, en of er consent is vastgelegd. E-mail, foto,
+ * gewicht en de rest blijven bij Kinvent.
+ */
+export type KinventParticipantHit = {
   code: string
-  firstName?: string | null
-  lastName?: string | null
-  dateOfBirth?: number | null
+  firstName: string | null
+  lastName: string | null
+  dateOfBirth: number | null
+  /** `dateConsentToKeepData` gezet. Kinvent legt het toezien hierop bij ons. */
+  consentRecorded: boolean
 }
 
-export type KinventActivityRep = {
-  code: string
-  ordinal: number
-  maxValue?: number | null
-  averageValue?: number | null
-  maxLeftRatio?: number | null
+export type KinventMeasurement = {
+  deviceType?: string | null
+  bodyPart?: string | null
   bodyPartSide?: string | null
-  startTime?: number | null
+  serialCode?: string | null
 }
 
+export type KinventActivityConfig = {
+  exerciseType?: string | null
+  activityType?: string | null
+  title?: string | null
+  /** Ingebouwde configuratie waarvan deze afstamt; groepeert dezelfde oefening over patiënten. */
+  baseConfigCode?: string | null
+}
+
+/** `ProtocolCommon`: licht, zonder ruwe curves en zonder opgeslagen rep-waarden. */
 export type KinventProtocol = {
   code: string
-  participantCode: string
+  participantCode?: string | null
   createdOn?: number | null
   updatedOn?: number | null
+  deleted?: boolean | null
+  singleActivity?: boolean | null
+  config?: { title?: string | null; baseConfigCode?: string | null } | null
   activities?: Array<{
-    code: string
+    code?: string | null
     startTime?: number | null
-    config?: {
-      exerciseType?: string | null
-      activityType?: string | null
-      title?: string | null
-      name?: string | null
-    } | null
-    repetitions?: KinventActivityRep[] | null
+    deleted?: boolean | null
+    config?: KinventActivityConfig | null
+    activityReps?: Array<{ deleted?: boolean | null; measurements?: KinventMeasurement[] | null }> | null
   }> | null
 }
 
@@ -84,7 +107,7 @@ export type KinventAnalysis = {
     startTime?: number | null
     /** Stringified JSON, vorm verschilt per exerciseType. Zie parse.ts. */
     activityResults?: string | null
-    config?: { exerciseType?: string | null; title?: string | null } | null
+    config?: KinventActivityConfig | null
   }> | null
 }
 
@@ -149,65 +172,131 @@ export async function completeSecondFactor(code: string): Promise<string> {
 
 // ── Lezen ────────────────────────────────────────────────────────────────────
 
-async function get<T>(token: string, path: string): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, { headers: { 'X-Auth-Token': token } })
+type ErrorBody = { errorCode?: string; message?: string }
+
+async function errorFrom(res: Response, path: string): Promise<KinventError> {
   if (res.status === 401) {
-    throw new KinventError('De Kinvent-aanmelding is verlopen. Meld opnieuw aan.', 401, true)
+    return new KinventError('De Kinvent-aanmelding is verlopen. Meld opnieuw aan.', 401, true)
   }
-  if (!res.ok) {
-    throw new KinventError(`Kinvent gaf HTTP ${res.status} op ${path}.`, res.status)
+  let body: ErrorBody = {}
+  try {
+    body = (await res.json()) as ErrorBody
+  } catch {
+    // Geen JSON-body; de status zegt genoeg.
   }
+  const code = typeof body.errorCode === 'string' ? body.errorCode : undefined
+  return new KinventError(
+    `Kinvent gaf HTTP ${res.status}${code ? ` (${code})` : ''} op ${path}.`,
+    res.status,
+    false,
+    code,
+  )
+}
+
+async function request<T>(token: string, method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method,
+    headers: {
+      'X-Auth-Token': token,
+      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  })
+  if (!res.ok) throw await errorFrom(res, path)
   return (await res.json()) as T
 }
 
-/**
- * Alle participants van dit account. Wordt alleen op het koppelmoment gebruikt
- * zodat de therapeut de juiste persoon kan aanwijzen; we slaan hier niets van
- * op behalve de gekozen `code`. Bevat namen en geboortedata, dus niet loggen.
- */
-export async function fetchParticipants(token: string): Promise<KinventParticipant[]> {
-  return get<KinventParticipant[]>(token, '/api/participants/v1?includeDeleted=false')
+type ParticipantPage = {
+  content?: Array<{
+    code?: string
+    firstName?: string | null
+    lastName?: string | null
+    dateOfBirth?: number | null
+    dateConsentToKeepData?: number | null
+  }> | null
 }
 
 /**
- * Protocollen van één patiënt sinds `updatedAfter` (epoch-milliseconden).
- *
- * Bewust per patiënt en niet via de brede lijst: die heeft geen paginering,
- * sleept ruwe sensorcurves mee (~253 KB per protocol) en geeft boven ongeveer
- * een jaar een 504. Per patiënt vragen levert bovendien dataminimalisatie op,
- * want metingen van patiënten zonder BASE-dossier bereiken ons niet.
+ * Zoekt participants op naam. Het filteren gebeurt bij Kinvent, dus alleen
+ * de treffers komen over de lijn. Wordt alleen op het koppelmoment gebruikt;
+ * we slaan hier niets van op behalve de gekozen `code`. Bevat namen en
+ * geboortedata, dus niet loggen.
  */
-export async function fetchProtocolsForParticipant(
-  token: string,
-  participantCode: string,
-  updatedAfter = 0,
-): Promise<KinventProtocol[]> {
-  const params = new URLSearchParams({
-    participantCode,
-    updatedAfter: String(updatedAfter),
-    includeDeleted: 'false',
+export async function searchParticipants(token: string, query: string, size = 25): Promise<KinventParticipantHit[]> {
+  const page = await request<ParticipantPage>(token, 'POST', '/api/participants/v2/paginated', {
+    query,
+    page: 0,
+    size,
   })
-  return get<KinventProtocol[]>(token, `/api/protocols/v1/findByParticipantCode?${params}`)
+  return (page.content ?? [])
+    .filter((p): p is typeof p & { code: string } => typeof p.code === 'string')
+    .map((p) => ({
+      code: p.code,
+      firstName: p.firstName ?? null,
+      lastName: p.lastName ?? null,
+      dateOfBirth: p.dateOfBirth ?? null,
+      consentRecorded: (p.dateConsentToKeepData ?? 0) > 0,
+    }))
 }
 
-/** Berekende uitkomsten. Schrijft niets, ondanks de POST. */
+/**
+ * Alle niet-verwijderde protocollen van één patiënt, in de lichte projectie.
+ *
+ * Bewust per patiënt en niet via de brede lijst: dataminimalisatie, want
+ * metingen van patiënten zonder BASE-dossier bereiken ons niet. De call kent
+ * geen `updatedAfter`; wie alleen het verschil wil, vergelijkt `updatedOn`.
+ */
+export async function fetchProtocolsForParticipant(token: string, participantCode: string): Promise<KinventProtocol[]> {
+  const params = new URLSearchParams({ participantCode })
+  return request<KinventProtocol[]>(token, 'POST', `/api/protocols/common/v1/findByParticipantCode?${params}`)
+}
+
+/**
+ * Codes van sessies die in Kinvent verwijderd zijn. De lichte lijst hierboven
+ * laat verwijderde records weg, dus dit is de enige manier om te zien dat een
+ * eerder geïmporteerde meting bij Kinvent niet meer bestaat.
+ */
+export async function fetchDeletedProtocolCodes(token: string, participantCode: string): Promise<string[]> {
+  const params = new URLSearchParams({ participantCode, deleted: 'true' })
+  return request<string[]>(token, 'GET', `/api/protocols/v2/protocolInfoByParticipantCode?${params}`)
+}
+
+async function analyzeBatch(token: string, codes: string[]): Promise<KinventAnalysis[]> {
+  const body = await request<{ protocolsResults?: KinventAnalysis[] }>(
+    token,
+    'POST',
+    '/api/protocols/v2/analyze?detailed=false',
+    codes,
+  )
+  return body.protocolsResults ?? []
+}
+
+/**
+ * Berekende uitkomsten, samenvattingen alleen. Schrijft niets, ondanks de POST.
+ *
+ * Eén activity type zonder analyzer laat bij Kinvent de hele batch falen
+ * (ERR_4090). Dan proberen we per protocol opnieuw en slaan we alleen dat ene
+ * over, zodat één exotische meting niet de hele ophaalronde blokkeert.
+ * Protocollen waar het account niet bij mag laat Kinvent stil weg; de
+ * aanroeper vergelijkt daarom zelf wat er terugkwam.
+ */
 export async function analyzeProtocols(token: string, protocolCodes: string[]): Promise<KinventAnalysis[]> {
   const out: KinventAnalysis[] = []
   for (let i = 0; i < protocolCodes.length; i += ANALYZE_BATCH_SIZE) {
     const chunk = protocolCodes.slice(i, i + ANALYZE_BATCH_SIZE)
-    const res = await fetch(`${BASE_URL}/api/protocols/v2/analyze`, {
-      method: 'POST',
-      headers: { 'X-Auth-Token': token, 'Content-Type': 'application/json' },
-      body: JSON.stringify(chunk),
-    })
-    if (res.status === 401) {
-      throw new KinventError('De Kinvent-aanmelding is verlopen. Meld opnieuw aan.', 401, true)
+    try {
+      out.push(...(await analyzeBatch(token, chunk)))
+    } catch (err) {
+      if (!(err instanceof KinventError) || err.code !== ERR_NO_ANALYZER) throw err
+      if (chunk.length === 1) continue
+      for (const code of chunk) {
+        try {
+          out.push(...(await analyzeBatch(token, [code])))
+        } catch (single) {
+          if (!(single instanceof KinventError) || single.code !== ERR_NO_ANALYZER) throw single
+        }
+      }
     }
-    if (!res.ok) {
-      throw new KinventError(`Analyse mislukt (HTTP ${res.status}) voor ${chunk.length} protocollen.`, res.status)
-    }
-    const body = (await res.json()) as { protocolsResults?: KinventAnalysis[] }
-    out.push(...(body.protocolsResults ?? []))
   }
   return out
 }

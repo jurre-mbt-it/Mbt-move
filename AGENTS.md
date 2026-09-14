@@ -325,3 +325,31 @@ Bij het schrijven of herschrijven van tekst voor dit product (UI-copy, notificat
 marketing, blogs, patiëntadviezen, e-mails): volg `docs/tone-of-voice.md` en match
 het juiste register. De AI-taal-blacklist daarin is hard (o.a. geen em-dashes, geen
 holle marketingwoorden, geen slogan-antitheses).
+
+# Kinvent: lees sprongen uit `_resultsModels`, nooit uit de samenvatting
+
+De koppeling met Kinvent (`src/lib/kinvent/`, router `kinvent.ts`) leest
+uitsluitend Kinvents lichte "common"-endpoints en de analyse met
+`detailed=false`; de kopie van hun documentatie ligt buiten de repo in
+`~/kinvent-koppeling/docs-2026-09/`. Twee dingen die uit die documentatie en
+uit eigen praktijkdata kwamen en die je niet aan de payload ziet:
+
+- **Een sprong (JUMP_ANALYSIS) heeft drie lagen.** De velden bovenin zijn
+  relatief (piekkracht in veelvouden lichaamsgewicht, vermogen in W/kg) en
+  `jumpHeight` daar is meestal een gemiddelde. `_repResults` is een
+  ongedocumenteerde kg-laag die bij eenbenige sprongen ontbreekt; de eerste
+  parser las die en liet daardoor 47 van de 162 praktijksprongen vallen.
+  `_resultsModels` is het gedocumenteerde model per sprong, in Newton, met
+  `mass` (kg) en `weight` (N) ernaast. `parseJump` leest alleen die laag, en
+  `weight / mass` hoort 9,81 te zijn: dat is de eenheidscontrole.
+- **Krachttests komen in kilogram, IMTP zonder rechterwaarde.** K-Pull, K-Grip,
+  IMTP en Nordic staan in kgf (gedocumenteerd). Bij een IMTP serialiseert
+  Kinvent alleen `_maxValue` (beide platen) en `_maxLeftValue`; rechts is het
+  verschil. De variant met alleen `weight` is een weging op de platen, geen
+  krachtmeting: `parseBodyWeight` maakt er het ijkpunt van voor de
+  eenheidscontrole, want BASE legt zelf geen lichaamsgewicht vast.
+
+Importeren blijft altijd een voorstel (`buildCandidates`) dat de therapeut
+bevestigt; een geïmporteerde waarde overschrijft nooit een handmatig
+ingevoerde. Nieuwe Kinvent-tabellen: migratie
+`20260914_kinvent_koppeling.sql`, met RLS, nog niet op productie gedraaid.

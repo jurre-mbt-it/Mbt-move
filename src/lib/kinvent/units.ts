@@ -1,38 +1,41 @@
 /**
  * Eenheden uit Kinvent.
  *
- * Kinvent levert krachten in kilogram. Dat is niet uit hun documentatie
- * gehaald maar gemeten op 261 sprongen uit onze eigen praktijk: het
- * lichaamsgewicht had een mediaan van 65,6 met een spreiding van 46,9 tot
- * 123,2, en de piekkracht gedeeld door dat gewicht een mediaan van 2,28 met
- * alles tussen 1,74 en 6,60. Stonden de krachten in Newton en het gewicht in
- * kg, dan lag die verhouding rond 22. Er zit geen enkele meting in dat gebied.
+ * Wat vastligt sinds Kinvents documentatie van september 2026:
  *
- * Het probleem: de eenheid is in de KINVENT-app per gebruiker om te zetten en
- * staat nergens in de respons. De schakelaar zet gewicht én kracht tegelijk om,
- * dus aan de verhouding kracht/gewicht is een omzetting niet te zien.
+ *   - Krachttests (K-Pull, K-Grip, IMTP, Nordic) komen in kilogramkracht.
+ *   - Het sprongmodel (`_resultsModels`) komt in Newton, met de massa in kg
+ *     ernaast als `mass` en het gewicht in N als `weight`. Die twee horen
+ *     zich te verhouden als 9,81 (Kinvent rekent met g = 9,81). Op alle 454
+ *     praktijksprongen was dat exact zo.
+ *   - Kinvent legt zelf het lichaamsgewicht vast: de "Body weight"-variant van
+ *     TOTAL_EVALUATION, 36 keer in onze praktijkdata. BASE hoeft dus geen
+ *     eigen gewicht te kennen; de vorige Kinvent-meting is het ijkpunt.
  *
- * De voor de hand liggende controle, het gewicht uit Kinvent naast dat uit
- * BASE leggen, kan niet: BASE legt het lichaamsgewicht van een patiënt nergens
- * vast. Wat overblijft zijn twee controles die wél werken:
+ * Wat nog niet zwart op wit staat: of de kg/lbs-instelling in de KINVENT-app
+ * ook de API beïnvloedt. De documentatie noemt die instelling nergens, dus
+ * waarschijnlijk is het alleen weergave. Tot Kinvent dat bevestigt houden we
+ * drie controles aan, en importeren we bij twijfel niet stil:
  *
- *   1. Plausibiliteit. Een volwassene weegt tussen ongeveer 25 en 250 kg. Komt
- *      er 650 terug, dan staat de app op Newton.
- *   2. Sprong ten opzichte van de vorige meting van dezelfde patiënt. Iemand
- *      wordt tussen twee metingen niet 2,2 keer zwaarder; die factor is de
- *      omschakeling van kilogram naar ponden.
+ *   1. Zwaartekracht. `weight / mass` in het sprongmodel moet 9,81 zijn.
+ *      Elke andere verhouding betekent een andere eenheid in het model.
+ *   2. Plausibiliteit. Een volwassene weegt tussen ongeveer 25 en 250 kg.
+ *      Komt er 650 terug, dan is dat Newton.
+ *   3. Sprong ten opzichte van de vorige gewichtsmeting van dezelfde patiënt.
+ *      Iemand wordt tussen twee metingen niet 2,2 keer zwaarder; die factor
+ *      is de omschakeling van kilogram naar ponden.
  *
- * Ponden zijn met alleen controle 1 niet te betrappen (145 lb is 66 kg, en
- * allebei zijn plausibel). Daarom is controle 2 de belangrijkste, en daarom
- * bewaren we `bodyWeightKg` bij elke sprongmeting: die reeks ís het ijkpunt.
- *
- * We importeren nooit blind. Een meting die de controle niet haalt gaat met een
- * waarschuwing naar de therapeut in plaats van stil in het dossier te belanden
- * met waarden die een factor 2,2 of 9,8 verkeerd staan.
+ * Een meting die de controle niet haalt gaat met een waarschuwing naar de
+ * therapeut in plaats van stil in het dossier te belanden met waarden die een
+ * factor 2,2 of 9,8 verkeerd staan.
  */
 
 /** Standaardzwaartekracht. 1 kgf = 9,80665 N. */
 export const G = 9.80665
+
+/** De g waarmee Kinvent zelf rekent; `weight / mass` in het sprongmodel. */
+const KINVENT_G = 9.81
+const GRAVITY_TOLERANCE = 0.02
 
 /** Een volwassene valt hierbinnen. Daarbuiten is het geen kilogrammen. */
 const PLAUSIBLE_KG = { min: 25, max: 250 }
@@ -49,8 +52,9 @@ export type UnitCheck =
  * Toetst of een meting werkelijk in kilogram staat.
  *
  * `kinventWeight`  het lichaamsgewicht uit deze meting.
- * `previousWeight` het gewicht uit de vorige geïmporteerde meting van dezelfde
+ * `previousWeight` het gewicht uit de vorige Kinvent-meting van dezelfde
  *                  patiënt, als die er is.
+ * `gravityRatio`   `weight / mass` uit het sprongmodel, als het een sprong is.
  *
  * `ok`          plausibel, en in lijn met de vorige meting.
  * `unverified`  geen gewicht in de meting (krachttests dragen er geen).
@@ -58,7 +62,21 @@ export type UnitCheck =
  * `suspect`     onwaarschijnlijk gewicht, of een sprong ten opzichte van de
  *               vorige keer die geen mens maakt. Niet automatisch importeren.
  */
-export function checkUnit(kinventWeight: number | null, previousWeight: number | null = null): UnitCheck {
+export function checkUnit(
+  kinventWeight: number | null,
+  previousWeight: number | null = null,
+  gravityRatio: number | null = null,
+): UnitCheck {
+  if (gravityRatio !== null && Math.abs(gravityRatio - KINVENT_G) > KINVENT_G * GRAVITY_TOLERANCE) {
+    return {
+      status: 'suspect',
+      unit: 'kg',
+      ratio: gravityRatio,
+      reason:
+        `Gewicht gedeeld door massa is ${gravityRatio.toFixed(2)} in plaats van 9,81. ` +
+        'Het sprongmodel staat dan niet in Newton en kilogram.',
+    }
+  }
   if (!kinventWeight) {
     return { status: 'unverified', unit: 'kg', reason: 'Deze meting draagt geen lichaamsgewicht.' }
   }
