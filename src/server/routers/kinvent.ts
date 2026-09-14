@@ -46,6 +46,7 @@ import { kinventCategory, kinventLabel, kinventSource } from '@/lib/kinvent/labe
 import { kgToNewton, rond } from '@/lib/kinvent/units'
 import { syncCriteriaVoorEntry } from '@/server/lib/rehab-criterion-sync'
 import { specFromCatalog } from './testReports'
+import { hqRatio, kiesHqPaar } from '@/lib/kinvent/hq-ratio'
 import type { TestCatalogItem } from '@prisma/client'
 
 export type { ImportCandidate } from '@/lib/kinvent/candidates'
@@ -99,6 +100,52 @@ function entryFromCatalog(reportId: string, c: ImportCandidate, order: number, i
     importedAt: new Date(),
     importedUnit: isJump ? 'cm' : 'kg',
   }
+}
+
+/**
+ * H:Q-ratio in het rapport bijwerken zodra er een quadriceps- én een
+ * hamstringregel staan: per zijde hamstring / quadriceps in de catalogusregel
+ * "H:Q ratio". Bestaat die regel al, dan worden alleen de waarden ververst;
+ * een handmatig ingevulde H:Q-regel zonder catalogus blijft met rust.
+ */
+async function syncHqRatio(prisma: Prisma, reportId: string, practiceId: string | null, therapistId: string): Promise<boolean> {
+  const regels = await prisma.testReportEntry.findMany({
+    where: { reportId, catalogItemId: { not: null } },
+    select: { id: true, leftPrimary: true, rightPrimary: true, unitPrimary: true, importedAt: true, catalogItem: { select: { name: true } } },
+  })
+  const paar = kiesHqPaar(
+    regels.map((r) => ({
+      id: r.id,
+      catalogItemName: r.catalogItem?.name ?? '',
+      leftPrimary: r.leftPrimary,
+      rightPrimary: r.rightPrimary,
+      unitPrimary: r.unitPrimary,
+      importedAt: r.importedAt,
+    })),
+  )
+  if (!paar) return false
+  const hq = hqRatio({ left: paar.quad.leftPrimary, right: paar.quad.rightPrimary }, { left: paar.ham.leftPrimary, right: paar.ham.rightPrimary })
+  if (hq.left === null && hq.right === null) return false
+  const item = await prisma.testCatalogItem.findFirst({
+    where: { name: { contains: 'H:Q', mode: 'insensitive' }, isActive: true, OR: practiceId ? [{ practiceId: null }, { practiceId }] : [{ practiceId: null }] },
+  })
+  if (!item) return false
+  const notes = 'Berekend uit hamstrings en quadriceps (Kinvent): hamstring gedeeld door quadriceps, per zijde.'
+  const bestaand = await prisma.testReportEntry.findFirst({ where: { reportId, catalogItemId: item.id }, select: { id: true } })
+  let id: string
+  if (bestaand) {
+    await prisma.testReportEntry.update({ where: { id: bestaand.id }, data: { leftPrimary: hq.left, rightPrimary: hq.right, notes, importedAt: new Date() } })
+    id = bestaand.id
+  } else {
+    const max = await prisma.testReportEntry.aggregate({ where: { reportId }, _max: { order: true } })
+    const e = await prisma.testReportEntry.create({
+      data: { reportId, catalogItemId: item.id, order: (max._max.order ?? -1) + 1, ...specFromCatalog(item), leftPrimary: hq.left, rightPrimary: hq.right, notes, importedAt: new Date() },
+      select: { id: true },
+    })
+    id = e.id
+  }
+  void syncCriteriaVoorEntry(prisma, id, therapistId).catch((err) => console.error('[kinvent] criteria-sync H:Q mislukt', err))
+  return true
 }
 
 /** Sprongen en krachttests met herhalingen, nieuwste eerst. */
@@ -701,6 +748,11 @@ export const kinventRouter = createTRPCRouter({
         strength++
       }
 
+      let hqRatioBijgewerkt = false
+      if (input.reportId && entries > 0) {
+        hqRatioBijgewerkt = await syncHqRatio(ctx.prisma, input.reportId, ctx.user.practiceId, ctx.user.id)
+      }
+
       await ctx.prisma.kinventSync.upsert({
         where: { patientId: input.patientId },
         create: { patientId: input.patientId, lastSyncAt: new Date() },
@@ -708,7 +760,7 @@ export const kinventRouter = createTRPCRouter({
       })
       await ctx.prisma.kinventSync.updateMany({ where: { patientId: input.patientId, pendingCount: { lt: 0 } }, data: { pendingCount: 0 } })
       await auditLog({ event: 'KINVENT_IMPORTED', userId: ctx.user.id, resource: 'user', resourceId: input.patientId })
-      return { entries, jumps, strength, skipped }
+      return { entries, jumps, strength, skipped, hqRatioBijgewerkt }
     }),
 
   /** Geïmporteerde sprongen en krachttests van een patiënt, nieuwste eerst. Alleen tonen. */

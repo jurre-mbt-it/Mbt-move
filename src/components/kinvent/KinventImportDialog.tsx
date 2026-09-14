@@ -59,6 +59,7 @@ export function KinventImportDialog({
         r.jumps > 0 ? `${r.jumps} sprongmeting${r.jumps === 1 ? '' : 'en'}` : null,
         r.strength > 0 ? `${r.strength} krachtmeting${r.strength === 1 ? '' : 'en'} met details` : null,
         r.skipped > 0 ? `${r.skipped} stond${r.skipped === 1 ? '' : 'en'} al in het rapport` : null,
+        r.hqRatioBijgewerkt ? 'H:Q-ratio bijgewerkt' : null,
       ].filter(Boolean)
       toast.success(delen.length ? `Geïmporteerd: ${delen.join(', ')}` : 'Niets geïmporteerd')
       onImported()
