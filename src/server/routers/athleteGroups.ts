@@ -280,7 +280,11 @@ export const athleteGroupsRouter = createTRPCRouter({
       if (bronWeken.length === 0) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Kies minstens één week van de groep' })
       const groepsWeken: GroepsWeek[] = bronWeken.map(w => ({
         id: w.id, monday: mondayKeyOf(w.startDate!),
-        days: w.days.map(d => ({ dayOfWeek: d.dayOfWeek, items: d.items.map(it => ({ id: it.id })) })),
+        days: w.days.map(d => ({
+          dayOfWeek: d.dayOfWeek,
+          // Een training zonder oefeningen, cardio of programma gaat niet mee.
+          items: d.items.map(it => ({ id: it.id, leeg: it.kind === 'WORKOUT' && it.exercises.length === 0 && it.cardioParams == null && !it.programId })),
+        })),
       }))
       const bronItem = new Map(bronWeken.flatMap(w => w.days.flatMap(d => d.items.map(it => [it.id, it] as const))))
       const vandaag = dateKey(new Date())

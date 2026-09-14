@@ -52,4 +52,10 @@ describe('planVerzending', () => {
     const [stap] = planVerzending({ groupId: G, vandaag: '2026-10-07', groepsWeken: [week('2026-10-05', [[2, 'b']])], lidWeken: [] })
     expect(stap.kopieren).toEqual([{ bronItemId: 'b', dayOfWeek: 2 }])
   })
+
+  it('slaat lege trainingen over', () => {
+    const gw: GroepsWeek = { id: 'gw', monday: '2026-10-05', days: [{ dayOfWeek: 0, items: [{ id: 'vol' }, { id: 'leeg', leeg: true }] }] }
+    const [stap] = planVerzending({ groupId: G, vandaag: '2026-10-05', groepsWeken: [gw], lidWeken: [] })
+    expect(stap.kopieren).toEqual([{ bronItemId: 'vol', dayOfWeek: 0 }])
+  })
 })

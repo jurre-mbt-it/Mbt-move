@@ -2826,8 +2826,14 @@ function WeekPlannerContent() {
     initialType: BlockDialogType
     /** Invoegpositie ("hier invoegen" uit het rechtermuismenu); null = achteraan. */
     insertAt: number | null
+    /** De training is zojuist voor deze pop-up aangemaakt: blijft hij leeg, dan gaat hij weer weg. */
+    created: boolean
   } | null>(null)
   const blockDialogInhoud = blockDialog ? contentsByItem.get(blockDialog.itemId) : undefined
+  // Is er in deze pop-up iets toegevoegd? Zo niet en de training was net
+  // aangemaakt, dan ruimen we hem bij sluiten op: een lege "Training" op de
+  // dag is alleen ruis, ook bij de atleet.
+  const dialoogToegevoegd = useRef(false)
 
   // ─ Meervoudige selectie in het zijpaneel (lasso of shift-klik) ─
   const [selectie, setSelectie] = useState<Set<string>>(() => new Set())
@@ -2860,12 +2866,14 @@ function WeekPlannerContent() {
     let itemId = item?.id ?? null
     let naam = item?.quickName ?? item?.program?.name ?? 'Training'
     let categorie: Category = item?.quickCategory ?? 'STRENGTH'
+    let aangemaakt = false
     if (!itemId) {
       const id = dayId ?? await ensureDayId(date)
       if (!id) { toast.error('Kon de dag niet aanmaken'); return }
       try {
         const r = await ensureDayWorkout.mutateAsync({ dayId: id })
         itemId = r.id
+        aangemaakt = r.created
         if (r.created) await utils.weekSchedules.listWithItems.invalidate()
       } catch { toast.error('Kon geen training aanmaken'); return }
       naam = 'Training'
@@ -2877,7 +2885,16 @@ function WeekPlannerContent() {
       editGroupLetter: extra.editGroupLetter ?? null,
       initialType: extra.initialType ?? (categorie === 'CARDIO' ? 'cardio' : 'exercise'),
       insertAt: extra.insertAt ?? null,
+      created: aangemaakt,
     })
+    dialoogToegevoegd.current = false
+  }
+
+  /** Pop-up dicht: een net aangemaakte, nog lege training gaat weer weg. */
+  function sluitBlockDialog() {
+    const bd = blockDialog
+    setBlockDialog(null)
+    if (bd?.created && !dialoogToegevoegd.current) removeItem.mutate({ id: bd.itemId })
   }
 
   /** Rechtermuismenu op een rij. */
@@ -3709,7 +3726,7 @@ function WeekPlannerContent() {
         {blockDialog && (
           <ExerciseBlockDialog
             open
-            onClose={() => setBlockDialog(null)}
+            onClose={sluitBlockDialog}
             dayLabel={blockDialog.dayLabel}
             workoutName={blockDialog.workoutName}
             initialType={blockDialog.initialType}
@@ -3721,15 +3738,17 @@ function WeekPlannerContent() {
             saving={blokken.saving}
             onOpenCardio={() => {
               const bd = blockDialog
+              dialoogToegevoegd.current = true
               setBlockDialog(null)
               setCardioBuilderItem({ id: bd.itemId, cardioParams: blockDialogInhoud?.cardioParams ?? null, quickActivity: null, quickName: bd.workoutName })
             }}
             onSubmitBlock={async (d) => {
+              dialoogToegevoegd.current = true
               await blokken.submitBlock(blockDialog.itemId, blockDialogInhoud?.blocks ?? [], d, blockDialog.insertAt ?? undefined)
               // Volgende rij komt onder de zojuist ingevoegde.
               if (blockDialog.insertAt != null && !d.id) setBlockDialog(bd => bd ? { ...bd, insertAt: (bd.insertAt ?? 0) + 1 } : bd)
             }}
-            onSubmitGroup={(l, g) => blokken.setGroup(blockDialog.itemId, blockDialogInhoud?.groups ?? {}, l, g)}
+            onSubmitGroup={(l, g) => (dialoogToegevoegd.current = true, blokken.setGroup(blockDialog.itemId, blockDialogInhoud?.groups ?? {}, l, g))}
           />
         )}
 
