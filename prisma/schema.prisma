@@ -385,6 +385,10 @@ model User {
   careStatusesDischarged  PatientCareStatus[] @relation("CareStatusDischarger")
   careStatusesReactivated PatientCareStatus[] @relation("CareStatusReactivator")
 
+  athleteGroupsOwned      AthleteGroup[]       @relation("AthleteGroupOwner")
+  athleteGroupMemberships AthleteGroupMember[] @relation("AthleteGroupMemberships")
+  athleteGroupStaff       AthleteGroupStaff[]  @relation("AthleteGroupStaff")
+
   // Educatie-content (admin-beheerd)
   educationalResources EducationalResource[] @relation("EducationalResourceCreator")
 
@@ -987,6 +991,69 @@ model WeekPlanTemplate {
   @@map("week_plan_templates")
 }
 
+enum AthleteGroupRole {
+  OWNER
+  VIEWER
+  PLANNER
+  MANAGER
+}
+
+/// Groep atleten van een coach met één gedeelde kalender (week_schedules met
+/// groupId). "Stuur naar iedereen" kopieert gekozen weken naar de leden; de
+/// kopie draagt groupId + sourceItemId. Zie docs/superpowers/specs/2026-09-14-atletengroepen-design.md.
+model AthleteGroup {
+  id          String    @id @default(cuid())
+  name        String
+  /// Programmanaam die de atleet ziet ("Periodisering 2026/27"); leeg = name.
+  planName    String?
+  description String?
+  ownerId     String
+  owner       User      @relation("AthleteGroupOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  /// Maandag van week 1.
+  startDate   DateTime
+  endDate     DateTime?
+  lastSentAt  DateTime?
+  members     AthleteGroupMember[]
+  staff       AthleteGroupStaff[]
+  schedules   WeekSchedule[]
+  sentItems   WeekScheduleDayItem[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([ownerId])
+  @@map("athlete_groups")
+}
+
+model AthleteGroupMember {
+  id         String       @id @default(cuid())
+  groupId    String
+  group      AthleteGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  patientId  String
+  patient    User         @relation("AthleteGroupMemberships", fields: [patientId], references: [id], onDelete: Cascade)
+  /// Notitie van de staf over dit lid; nooit voor de atleet.
+  note       String?
+  addedAt    DateTime     @default(now())
+  lastSentAt DateTime?
+
+  @@unique([groupId, patientId])
+  @@index([patientId])
+  @@map("athlete_group_members")
+}
+
+model AthleteGroupStaff {
+  id      String           @id @default(cuid())
+  groupId String
+  group   AthleteGroup     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId  String
+  user    User             @relation("AthleteGroupStaff", fields: [userId], references: [id], onDelete: Cascade)
+  role    AthleteGroupRole @default(VIEWER)
+  addedAt DateTime         @default(now())
+
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@map("athlete_group_staff")
+}
+
 model WeekSchedule {
   id             String            @id
   name           String
@@ -998,6 +1065,9 @@ model WeekSchedule {
   /// kopie, geen verwijzing.
   planTemplateId String?
   planTemplate   WeekPlanTemplate? @relation(fields: [planTemplateId], references: [id], onDelete: Cascade)
+  /// Groepskalender: gevuld op de weken van een atletengroep (patientId leeg).
+  groupId        String?
+  group          AthleteGroup?     @relation(fields: [groupId], references: [id], onDelete: Cascade)
   patientId      String?
   patient        User?             @relation("PatientWeekSchedules", fields: [patientId], references: [id], onDelete: Cascade)
   startDate      DateTime?
@@ -1031,6 +1101,7 @@ model WeekSchedule {
   @@index([practiceId])
   @@index([creatorId, practiceId])
   @@index([planTemplateId, weekNumber])
+  @@index([groupId, weekNumber])
   @@map("week_schedules")
 }
 
@@ -1140,10 +1211,17 @@ model WeekScheduleDayItem {
   /// via listItemContents, nooit via listWithItems (TS2589).
   groups Json?
 
+  /// Herkomst: gezet door athleteGroups.send. Null = eigen item van de atleet.
+  groupId      String?
+  group        AthleteGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  /// Het groepsitem waarvan dit een kopie is (geen FK: het bronitem mag weg).
+  sourceItemId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([dayId, order])
+  @@index([groupId])
   @@map("week_schedule_day_items")
 }
 
