@@ -11,6 +11,8 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { trpc } from '@/lib/trpc/client'
 import { IconSparkle } from '@/components/icons'
+import { usePortal } from '@/lib/portal'
+import { KinventImportDialog } from '@/components/kinvent/KinventImportDialog'
 import {
   DarkButton,
   DarkInput,
@@ -131,6 +133,8 @@ export default function TestReportEditorPage({
   const [bewerkOverride, setBewerkOverride] = useState<boolean | null>(null)
   const [pickCatalog, setPickCatalog] = useState('')
   const [pickBattery, setPickBattery] = useState('')
+  const [kinventOpen, setKinventOpen] = useState(false)
+  const portal = usePortal()
 
   const saveMeta = (status?: 'DRAFT' | 'FINAL') => {
     updateMeta.mutate({
@@ -324,11 +328,27 @@ export default function TestReportEditorPage({
                 Voeg toe
               </DarkButton>
             </div>
-            <DarkButton variant="ghost" size="sm" onClick={() => addEntry.mutate({ reportId: id })}>
-              + Lege test
-            </DarkButton>
+            <div className="flex gap-2 flex-wrap">
+              <DarkButton variant="ghost" size="sm" onClick={() => addEntry.mutate({ reportId: id })}>
+                + Lege test
+              </DarkButton>
+              {!portal.isCoach && (
+                <DarkButton variant="ghost" size="sm" onClick={() => setKinventOpen(true)}>
+                  Haal op uit Kinvent
+                </DarkButton>
+              )}
+            </div>
           </div>
         </Tile>
+        {!portal.isCoach && (
+          <KinventImportDialog
+            reportId={id}
+            patientId={report.patientId}
+            open={kinventOpen}
+            onClose={() => setKinventOpen(false)}
+            onImported={() => void refetch()}
+          />
+        )}
 
         {/* Tests */}
         <div className="space-y-3">

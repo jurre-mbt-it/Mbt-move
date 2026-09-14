@@ -2,8 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   KinventError,
   analyzeProtocols,
+  completeSecondFactor,
   fetchDeletedProtocolCodes,
   fetchProtocolsForParticipant,
+  requestSecondFactor,
   searchParticipants,
 } from '@/lib/kinvent/client'
 
@@ -36,6 +38,33 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 const TOKEN = 'jwt-token'
+
+describe('aanmelden', () => {
+  const creds = { email: 'praktijk@voorbeeld.nl', password: 'geheim' }
+
+  it('logt in met de ingetypte gegevens en meldt via welk kanaal de code komt', async () => {
+    responder = () => json(200, { token: 'abc', twoFaPreferredMethod: 'EMAIL' })
+    const r = await requestSecondFactor(creds)
+    expect(calls[0].url).toMatch(/\/api\/authorization\/login$/)
+    expect(new Headers(calls[0].init.headers).get('Authorization')).toBe(
+      `Basic ${Buffer.from('praktijk@voorbeeld.nl:geheim').toString('base64')}`,
+    )
+    expect(r).toEqual({ kind: 'code-sent', method: 'EMAIL' })
+  })
+
+  it('is meteen klaar als het account geen tweede factor heeft', async () => {
+    responder = () => json(200, { token: 'a.b.c' })
+    expect(await requestSecondFactor(creds)).toEqual({ kind: 'signed-in', token: 'a.b.c' })
+  })
+
+  it('wisselt de code in voor het token', async () => {
+    responder = () => json(200, { token: 'a.b.c' })
+    const t = await completeSecondFactor(creds, ' 123456 ')
+    expect(calls[0].url).toMatch(/\/api\/authorization\/twoFaLogin$/)
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ token: '123456' })
+    expect(t).toBe('a.b.c')
+  })
+})
 
 describe('searchParticipants', () => {
   it('zoekt server-side via de gepagineerde v2-call en houdt alleen het nodige over', async () => {

@@ -65,6 +65,22 @@ describe('buildCandidates', () => {
     expect(c.performedAt.getTime()).toBe(T0)
   })
 
+  it('draagt de sprongmeting zelf mee, zodat het wegschrijven niets hoeft te herberekenen', () => {
+    const out = buildCandidates({
+      ...leeg,
+      protocols: [protocol('p1', 'a1', 'JUMP_ANALYSIS', T0), protocol('p2', 'a2', 'METER', T0)],
+      analyses: [
+        analysis('p1', 'a1', 'JUMP_ANALYSIS', T0, { _resultsModels: [sprongModel(64.6), sprongModel(64.6, { _repCode: 'rep-2', repOrdinal: 2 })] }),
+        analysis('p2', 'a2', 'METER', T0, kracht),
+      ],
+    })
+    const sprong = out.candidates.find((c) => c.kind === 'JUMP')
+    const meting = out.candidates.find((c) => c.kind === 'STRENGTH')
+    expect(sprong?.jump?.reps).toHaveLength(2)
+    expect(sprong?.jump?.bodyWeightKg).toBe(64.6)
+    expect(meting?.jump).toBeNull()
+  })
+
   it('maakt van een krachtmeting een kandidaat met LSI', () => {
     const out = buildCandidates({
       ...leeg,

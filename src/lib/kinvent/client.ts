@@ -17,8 +17,10 @@
  *
  * Een onbemande sync kan stap 2 niet doen. Daarom bewaart BASE het JWT
  * (versleuteld, zie crypto.ts en KinventConnection) en meldt een therapeut
- * zich één keer per maand opnieuw aan. Eind 2026 komt Kinvent met API-sleutels;
- * dan vervangt dat alleen dit bestand en niets daarbuiten.
+ * zich één keer per maand opnieuw aan. De inloggegevens van het
+ * praktijkaccount typt hij daarbij in; ze gaan één keer naar Kinvent en
+ * worden nergens bewaard, alleen het JWT. Eind 2026 komt Kinvent met
+ * API-sleutels; dan vervangt dat alleen dit bestand en niets daarbuiten.
  *
  * De leesfuncties krijgen het token als argument. Waar het vandaan komt (de
  * database, via de router) hoort hier niet thuis.
@@ -113,12 +115,10 @@ export type KinventAnalysis = {
 
 // ── Aanmelden ────────────────────────────────────────────────────────────────
 
-function basicAuth(): string {
-  const email = process.env.KINVENT_EMAIL
-  const password = process.env.KINVENT_PASSWORD
-  if (!email || !password) {
-    throw new KinventError('KINVENT_EMAIL en KINVENT_PASSWORD ontbreken in de omgeving.')
-  }
+/** Het KINVENT-praktijkaccount. Gaat naar Kinvent, wordt nergens bewaard. */
+export type KinventCredentials = { email: string; password: string }
+
+function basicAuth({ email, password }: KinventCredentials): string {
   return `Basic ${Buffer.from(`${email}:${password}`).toString('base64')}`
 }
 
@@ -133,15 +133,20 @@ const isJwt = (t: string | undefined): t is string => !!t && t.split('.').length
  * moet kijken. Staat 2FA uit op het account, dan komt hier meteen een JWT
  * terug en is stap 2 niet nodig.
  */
-export async function requestSecondFactor(): Promise<
-  { kind: 'code-sent'; method: string } | { kind: 'signed-in'; token: string }
-> {
+export async function requestSecondFactor(
+  creds: KinventCredentials,
+): Promise<{ kind: 'code-sent'; method: string } | { kind: 'signed-in'; token: string }> {
   const res = await fetch(`${BASE_URL}/api/authorization/login`, {
     method: 'POST',
-    headers: { Authorization: basicAuth() },
+    headers: { Authorization: basicAuth(creds) },
   })
   if (!res.ok) {
-    throw new KinventError(`Inloggen bij Kinvent mislukt (HTTP ${res.status}).`, res.status)
+    throw new KinventError(
+      res.status === 401
+        ? 'Kinvent accepteerde het e-mailadres of wachtwoord niet.'
+        : `Inloggen bij Kinvent mislukt (HTTP ${res.status}).`,
+      res.status,
+    )
   }
   const body = (await res.json()) as LoginBody
   if (isJwt(body.token)) return { kind: 'signed-in', token: body.token }
@@ -149,10 +154,10 @@ export async function requestSecondFactor(): Promise<
 }
 
 /** Stap 2: wisselt de code uit mail of sms in voor het JWT. */
-export async function completeSecondFactor(code: string): Promise<string> {
+export async function completeSecondFactor(creds: KinventCredentials, code: string): Promise<string> {
   const res = await fetch(`${BASE_URL}/api/authorization/twoFaLogin`, {
     method: 'POST',
-    headers: { Authorization: basicAuth(), 'Content-Type': 'application/json' },
+    headers: { Authorization: basicAuth(creds), 'Content-Type': 'application/json' },
     body: JSON.stringify({ token: code.trim() }),
   })
   if (!res.ok) {

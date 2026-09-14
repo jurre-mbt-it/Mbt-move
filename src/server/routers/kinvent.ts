@@ -7,7 +7,9 @@
  *
  * De aanmelding is één per praktijk (KinventConnection). Kinvent kent geen
  * service-credential en het JWT is niet te verversen zonder de tweede factor,
- * dus elke 31 dagen tikt een therapeut een code over. Wie dat doet staat in
+ * dus elke 31 dagen typt een therapeut e-mail, wachtwoord en code van het
+ * praktijkaccount over. Die gegevens gaan één keer door naar Kinvent en worden
+ * niet bewaard; alleen het JWT, versleuteld. Wie aanmeldde staat in
  * `connectedById`; de rest van de praktijk werkt op dezelfde verbinding.
  *
  * Twee dingen die dit bestand bewust NIET doet:
@@ -40,6 +42,7 @@ import {
 } from '@/lib/kinvent/client'
 import { decryptToken, encryptToken, jwtExpiry } from '@/lib/kinvent/crypto'
 import { buildCandidates, type ImportCandidate } from '@/lib/kinvent/candidates'
+import { kinventCategory, kinventLabel, kinventSource } from '@/lib/kinvent/labels'
 
 export type { ImportCandidate } from '@/lib/kinvent/candidates'
 
@@ -48,6 +51,60 @@ type Ctx = { prisma: Prisma; user: { id: string; role: string; practiceId: strin
 
 /** Zoveel dagen vóór het verlopen begint de vraag om opnieuw aan te melden. */
 const RENEW_WARNING_DAYS = 5
+
+/** Inloggegevens van het praktijkaccount; alleen doorgeven, nooit opslaan of loggen. */
+const credentialsInput = z.object({
+  email: z.string().trim().email().max(200),
+  password: z.string().min(1).max(200),
+})
+
+/** Laatst bekende lichaamsgewicht van deze patiënt uit Kinvent, als ijkpunt. */
+async function referenceWeightFor(prisma: Prisma, patientId: string): Promise<number | null> {
+  const last = await prisma.kinventJumpResult.findFirst({
+    where: { patientId, bodyWeightKg: { not: null } },
+    orderBy: { performedAt: 'desc' },
+    select: { bodyWeightKg: true },
+  })
+  return last?.bodyWeightKg ?? null
+}
+
+/**
+ * Een krachtkandidaat als rapportregel. Bilateraal met LSI waar links én
+ * rechts er zijn, anders een enkele waarde in kg. Drempels zijn de standaard
+ * van het rapport; de therapeut past ze aan zoals bij een handmatige regel.
+ */
+function entryFromCandidate(reportId: string, c: ImportCandidate, order: number) {
+  const bilateral = c.left !== null && c.right !== null
+  const value = c.single ?? Math.max(c.left ?? 0, c.right ?? 0)
+  return {
+    reportId,
+    order,
+    category: kinventCategory(c.exerciseType),
+    categoryOrder: 10,
+    name: kinventLabel(c.title),
+    subtitle: null,
+    source: kinventSource(c.deviceType, c.exerciseType),
+    kind: bilateral ? ('BILATERAL' as const) : ('SINGLE' as const),
+    metric: bilateral ? ('LSI' as const) : ('VALUE' as const),
+    unitPrimary: 'kg',
+    unitSecondary: null,
+    plotUnit: bilateral ? '%' : 'kg',
+    axisMin: bilateral ? 60 : 0,
+    axisMax: bilateral ? 100 : Math.max(10, Math.ceil((value * 1.25) / 5) * 5),
+    zoneOrangeMin: bilateral ? 80 : 0,
+    zoneGreenMin: bilateral ? 90 : 0,
+    higherIsBetter: true,
+    leftPrimary: c.left,
+    rightPrimary: c.right,
+    singleValue: bilateral ? null : value,
+    notes: c.unit.status === 'suspect' ? `Eenheidscontrole: ${c.unit.reason}` : null,
+    kinventProtocolCode: c.protocolCode,
+    kinventActivityCode: c.activityCode,
+    kinventRepCode: null,
+    importedAt: new Date(),
+    importedUnit: 'kg',
+  }
+}
 
 /** Zet een Kinvent-fout om in iets dat de therapeut kan lezen. */
 function toTRPC(err: unknown): never {
@@ -148,10 +205,10 @@ export const kinventRouter = createTRPCRouter({
    * Stap 1: laat Kinvent de code versturen. Staat 2FA uit op het account, dan
    * is de aanmelding hiermee meteen rond.
    */
-  startSignIn: therapistProcedure.mutation(async ({ ctx }) => {
+  startSignIn: therapistProcedure.input(credentialsInput).mutation(async ({ ctx, input }) => {
     practiceOf(ctx.user)
     try {
-      const result = await requestSecondFactor()
+      const result = await requestSecondFactor(input)
       if (result.kind === 'signed-in') {
         const { expiresAt } = await storeToken(ctx, result.token)
         return { done: true as const, expiresAt }
@@ -164,11 +221,11 @@ export const kinventRouter = createTRPCRouter({
 
   /** Stap 2: de code uit mail of sms. */
   completeSignIn: therapistProcedure
-    .input(z.object({ code: z.string().trim().min(4).max(12) }))
+    .input(credentialsInput.extend({ code: z.string().trim().min(4).max(12) }))
     .mutation(async ({ ctx, input }) => {
       practiceOf(ctx.user)
       try {
-        const token = await completeSecondFactor(input.code)
+        const token = await completeSecondFactor({ email: input.email, password: input.password }, input.code)
         return await storeToken(ctx, token)
       } catch (err) {
         toTRPC(err)
@@ -289,15 +346,9 @@ export const kinventRouter = createTRPCRouter({
         throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Deze patiënt is niet gekoppeld aan Kinvent.' })
       }
       const sync = await ctx.prisma.kinventSync.findUnique({ where: { patientId: input.patientId } })
-      // BASE legt het lichaamsgewicht van een patiënt nergens vast, dus ijken
-      // we op de vorige sprongmeting van dezelfde persoon. Een sprong van een
-      // factor 2,2 daarin is de omschakeling naar ponden, geen gewichtstoename.
-      const lastJump = await ctx.prisma.kinventJumpResult.findFirst({
-        where: { patientId: input.patientId, bodyWeightKg: { not: null } },
-        orderBy: { performedAt: 'desc' },
-        select: { bodyWeightKg: true },
-      })
-      const referenceWeight = lastJump?.bodyWeightKg ?? null
+      // BASE legt zelf geen lichaamsgewicht vast; de vorige Kinvent-meting van
+      // dezelfde persoon is het ijkpunt voor de eenheidscontrole.
+      const referenceWeight = await referenceWeightFor(ctx.prisma, input.patientId)
       const since = input.all ? 0 : Number(sync?.lastUpdatedAfter ?? 0)
 
       let protocols
@@ -355,5 +406,168 @@ export const kinventRouter = createTRPCRouter({
         referenceWeightKg: referenceWeight,
       })
       return { candidates, removedProtocolCodes }
+    }),
+
+  /**
+   * Schrijft gekozen kandidaten weg, ná bevestiging door de therapeut.
+   *
+   * We vertrouwen geen cijfers van de client: de gekozen protocollen worden
+   * opnieuw bij Kinvent opgehaald en het voorstel wordt opnieuw opgebouwd,
+   * zodat wat in het dossier komt altijd rechtstreeks van Kinvent komt.
+   * Krachttests worden regels in het opgegeven testrapport, sprongen gaan
+   * naar de sprongtabel. Wat al in het rapport staat wordt overgeslagen,
+   * nooit overschreven.
+   */
+  commitImport: therapistProcedure
+    .input(
+      z.object({
+        patientId: z.string(),
+        reportId: z.string().nullable(),
+        items: z.array(z.object({ protocolCode: z.string(), activityCode: z.string() })).min(1).max(200),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertAccess(ctx.prisma, ctx.user, input.patientId)
+      const patient = await ctx.prisma.user.findUnique({
+        where: { id: input.patientId },
+        select: { kinventParticipantCode: true },
+      })
+      if (!patient?.kinventParticipantCode) {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Deze patiënt is niet gekoppeld aan Kinvent.' })
+      }
+      if (input.reportId) {
+        const report = await ctx.prisma.testReport.findUnique({
+          where: { id: input.reportId },
+          select: { patientId: true },
+        })
+        if (!report || report.patientId !== input.patientId) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Testrapport niet gevonden bij deze patiënt.' })
+        }
+      }
+
+      const gekozen = new Set(input.items.map((i) => `${i.protocolCode}/${i.activityCode}`))
+      const codes = new Set(input.items.map((i) => i.protocolCode))
+      const referenceWeight = await referenceWeightFor(ctx.prisma, input.patientId)
+
+      let candidates: ImportCandidate[]
+      try {
+        const token = await tokenFor(ctx)
+        const alle = await fetchProtocolsForParticipant(token, patient.kinventParticipantCode)
+        const protocols = alle.filter((p) => codes.has(p.code))
+        const analyses = await analyzeProtocols(token, protocols.map((p) => p.code))
+        candidates = buildCandidates({
+          protocols,
+          analyses,
+          knownActivityCodes: new Set(),
+          knownProtocolCodes: new Set(),
+          deletedProtocolCodes: [],
+          referenceWeightKg: referenceWeight,
+        }).candidates.filter((c) => gekozen.has(`${c.protocolCode}/${c.activityCode}`))
+      } catch (err) {
+        await noteError(ctx, err)
+        toTRPC(err)
+      }
+
+      let entries = 0
+      let jumps = 0
+      let skipped = 0
+
+      const kracht = candidates.filter((c) => c.kind === 'STRENGTH')
+      if (kracht.length > 0) {
+        if (!input.reportId) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Kies een testrapport voor de krachttests.' })
+        }
+        const reportId = input.reportId
+        const bestaand = new Set(
+          (
+            await ctx.prisma.testReportEntry.findMany({
+              where: { reportId, kinventActivityCode: { in: kracht.map((c) => c.activityCode) } },
+              select: { kinventActivityCode: true },
+            })
+          ).map((e) => e.kinventActivityCode),
+        )
+        const max = await ctx.prisma.testReportEntry.aggregate({ where: { reportId }, _max: { order: true } })
+        let order = (max._max.order ?? -1) + 1
+        const nieuw = kracht.filter((c) => !bestaand.has(c.activityCode))
+        skipped += kracht.length - nieuw.length
+        if (nieuw.length > 0) {
+          await ctx.prisma.testReportEntry.createMany({
+            data: nieuw.map((c) => entryFromCandidate(reportId, c, order++)),
+            skipDuplicates: true,
+          })
+          entries = nieuw.length
+        }
+      }
+
+      for (const c of candidates) {
+        if (c.kind !== 'JUMP' || !c.jump) continue
+        const j = c.jump
+        await ctx.prisma.$transaction(async (tx) => {
+          const data = {
+            patientId: input.patientId,
+            activityCode: c.activityCode,
+            performedAt: c.performedAt,
+            jumpType: j.jumpType,
+            variant: j.variant,
+            bodyWeightKg: j.bodyWeightKg,
+            gravityRatio: j.gravityRatio,
+            numberOfJumps: j.numberOfJumps,
+            peakJumpHeightCm: j.peakJumpHeightCm ?? c.jumpHeightCm,
+            heightAverageCm: j.heightAverageCm,
+            rsi: j.rsi ?? c.rsi,
+            mrsi: j.mrsi,
+            fatigueIndex: j.fatigueIndex,
+          }
+          const result = await tx.kinventJumpResult.upsert({
+            where: { protocolCode: c.protocolCode },
+            create: { protocolCode: c.protocolCode, ...data },
+            update: data,
+          })
+          await tx.kinventJumpRep.deleteMany({ where: { resultId: result.id } })
+          await tx.kinventJumpRep.createMany({
+            data: j.reps.map((r, i) => ({
+              resultId: result.id,
+              ordinal: i + 1,
+              repCode: r.repCode,
+              side: r.side,
+              jumpHeightCm: r.jumpHeightCm,
+              jumpHeightByVelocityCm: r.jumpHeightByVelocityCm,
+              flightTimeMs: r.flightTimeMs,
+              contactTimeMs: r.contactTimeMs,
+              peakForceN: r.peakForceN,
+              peakForceLeftN: r.peakForceLeftN,
+              peakForceRightN: r.peakForceRightN,
+              netMaxForceN: r.netMaxForceN,
+              maxPowerW: r.maxPowerW,
+              rsi: r.rsi,
+              timeToStabilizeMs: r.timeToStabilizeMs,
+              propulsiveImpulsePhase1: r.propulsiveImpulsePhase1,
+              propulsiveImpulsePhase2: r.propulsiveImpulsePhase2,
+            })),
+          })
+        })
+        jumps++
+      }
+
+      await ctx.prisma.kinventSync.upsert({
+        where: { patientId: input.patientId },
+        create: { patientId: input.patientId, lastSyncAt: new Date() },
+        update: { lastSyncAt: new Date(), lastError: null },
+      })
+      await auditLog({ event: 'KINVENT_IMPORTED', userId: ctx.user.id, resource: 'user', resourceId: input.patientId })
+      return { entries, jumps, skipped }
+    }),
+
+  /** Geïmporteerde sprongen van een patiënt, nieuwste eerst. Alleen tonen. */
+  jumpsForPatient: therapistProcedure
+    .input(z.object({ patientId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await assertAccess(ctx.prisma, ctx.user, input.patientId)
+      return ctx.prisma.kinventJumpResult.findMany({
+        where: { patientId: input.patientId },
+        orderBy: { performedAt: 'desc' },
+        take: 60,
+        include: { reps: { orderBy: { ordinal: 'asc' } } },
+      })
     }),
 })

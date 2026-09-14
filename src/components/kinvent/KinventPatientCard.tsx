@@ -1,0 +1,226 @@
+'use client'
+
+import { useState } from 'react'
+import { toast } from 'sonner'
+import { trpc } from '@/lib/trpc/client'
+import {
+  DarkButton,
+  DarkDialog,
+  DarkDialogContent,
+  DarkDialogDescription,
+  DarkDialogHeader,
+  DarkDialogTitle,
+  DarkInput,
+  MetaLabel,
+  P,
+  Tile,
+} from '@/components/dark-ui'
+import { KinventSignIn } from './KinventSignIn'
+import { kinventLabel } from '@/lib/kinvent/labels'
+
+const fmtDatum = (d: Date | string) =>
+  new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
+
+/**
+ * Kinvent op de patiëntpagina (tab Tests): koppelen aan het Kinvent-profiel,
+ * de aanmelding van de praktijk, en de geïmporteerde sprongen. Krachttests
+ * staan niet hier maar in het testrapport waar ze in geïmporteerd zijn.
+ */
+export function KinventPatientCard({ patientId }: { patientId: string }) {
+  const utils = trpc.useUtils()
+  const { data: link } = trpc.kinvent.linkStatus.useQuery({ patientId })
+  const { data: status } = trpc.kinvent.connectionStatus.useQuery()
+  const { data: jumps = [] } = trpc.kinvent.jumpsForPatient.useQuery({ patientId }, { enabled: !!link?.linked })
+  const [open, setOpen] = useState(false)
+  const [ontkoppelVraag, setOntkoppelVraag] = useState(false)
+
+  const unlink = trpc.kinvent.unlink.useMutation({
+    onSuccess: () => {
+      toast.success('Ontkoppeld van Kinvent')
+      setOntkoppelVraag(false)
+      void utils.kinvent.linkStatus.invalidate({ patientId })
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  return (
+    <Tile>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <MetaLabel>Kinvent</MetaLabel>
+          {link?.linked ? (
+            <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 4 }}>
+              Gekoppeld aan het Kinvent-profiel{link.linkedAt ? ` sinds ${fmtDatum(link.linkedAt)}` : ''}
+              {link.lastSyncAt ? ` · laatst opgehaald ${fmtDatum(link.lastSyncAt)}` : ''}
+            </p>
+          ) : (
+            <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 4 }}>
+              Niet gekoppeld. Koppel deze patiënt aan zijn profiel in Kinvent om metingen op te halen.
+            </p>
+          )}
+          {link?.lastError && <p style={{ color: P.gold, fontSize: 12, marginTop: 4 }}>{link.lastError}</p>}
+        </div>
+        <div className="flex gap-2">
+          {link?.linked ? (
+            ontkoppelVraag ? (
+              <>
+                <DarkButton variant="danger" size="sm" onClick={() => unlink.mutate({ patientId })} loading={unlink.isPending}>
+                  Ja, ontkoppelen
+                </DarkButton>
+                <DarkButton variant="ghost" size="sm" onClick={() => setOntkoppelVraag(false)}>Nee</DarkButton>
+              </>
+            ) : (
+              <DarkButton variant="ghost" size="sm" onClick={() => setOntkoppelVraag(true)}>Ontkoppelen</DarkButton>
+            )
+          ) : (
+            <DarkButton size="sm" onClick={() => setOpen(true)}>Koppelen aan Kinvent</DarkButton>
+          )}
+        </div>
+      </div>
+
+      {!status?.connected && (
+        <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${P.line}` }}>
+          <KinventSignIn />
+        </div>
+      )}
+
+      {link?.linked && (
+        <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${P.line}` }}>
+          <MetaLabel>Sprongen · {jumps.length}</MetaLabel>
+          {jumps.length === 0 ? (
+            <p style={{ color: P.inkMuted, fontSize: 12, marginTop: 4 }}>
+              Nog geen sprongen geïmporteerd. Haal ze op vanuit een testrapport.
+            </p>
+          ) : (
+            <div className="mt-2 overflow-x-auto">
+              <table className="w-full" style={{ fontSize: 12, borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr className="athletic-mono" style={{ color: P.inkDim, fontSize: 10, letterSpacing: '0.1em' }}>
+                    <th className="text-left py-1 pr-3 font-normal">DATUM</th>
+                    <th className="text-left py-1 pr-3 font-normal">SPRONG</th>
+                    <th className="text-right py-1 pr-3 font-normal">HOOGTE</th>
+                    <th className="text-right py-1 pr-3 font-normal">RSI</th>
+                    <th className="text-right py-1 pr-3 font-normal">PIEK L / R</th>
+                    <th className="text-right py-1 font-normal">MASSA</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {jumps.map((j) => {
+                    const beste = j.reps.reduce<(typeof j.reps)[number] | null>(
+                      (top, r) => ((r.jumpHeightCm ?? -1) > (top?.jumpHeightCm ?? -1) ? r : top),
+                      null,
+                    )
+                    const enkel = beste?.side === 'LEFT' || beste?.side === 'RIGHT'
+                    return (
+                      <tr key={j.id} style={{ borderTop: `1px solid ${P.line}`, color: P.ink }}>
+                        <td className="py-1.5 pr-3 whitespace-nowrap" style={{ color: P.inkMuted }}>{fmtDatum(j.performedAt)}</td>
+                        <td className="py-1.5 pr-3">
+                          {j.jumpType ? kinventLabel(j.jumpType === 'CMJ' ? 'exercise_template_builtin_leg_jump_analysis_cmj_title' : j.jumpType) : 'Sprong'}
+                          {enkel ? ` · ${beste?.side === 'LEFT' ? 'links' : 'rechts'}` : ''}
+                          {j.variant === 'MULTIPLE' ? ` · ${j.numberOfJumps ?? j.reps.length}×` : ''}
+                        </td>
+                        <td className="py-1.5 pr-3 text-right athletic-mono">
+                          {j.peakJumpHeightCm != null ? `${j.peakJumpHeightCm.toFixed(1)} cm` : '–'}
+                        </td>
+                        <td className="py-1.5 pr-3 text-right athletic-mono">{j.rsi != null ? j.rsi.toFixed(2) : '–'}</td>
+                        <td className="py-1.5 pr-3 text-right athletic-mono whitespace-nowrap">
+                          {enkel
+                            ? beste?.peakForceN != null ? `${Math.round(beste.peakForceN)} N` : '–'
+                            : beste?.peakForceLeftN != null && beste?.peakForceRightN != null
+                              ? `${Math.round(beste.peakForceLeftN)} / ${Math.round(beste.peakForceRightN)} N`
+                              : beste?.peakForceN != null ? `${Math.round(beste.peakForceN)} N` : '–'}
+                        </td>
+                        <td className="py-1.5 text-right athletic-mono">{j.bodyWeightKg != null ? `${j.bodyWeightKg.toFixed(1)} kg` : '–'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      <KinventLinkDialog patientId={patientId} open={open} onClose={() => setOpen(false)} />
+    </Tile>
+  )
+}
+
+/** Zoeken op naam in Kinvent en de juiste persoon aanwijzen. */
+function KinventLinkDialog({ patientId, open, onClose }: { patientId: string; open: boolean; onClose: () => void }) {
+  const utils = trpc.useUtils()
+  const { data: status } = trpc.kinvent.connectionStatus.useQuery(undefined, { enabled: open })
+  const [query, setQuery] = useState('')
+  const [zoek, setZoek] = useState('')
+  const { data: hits = [], isFetching, error } = trpc.kinvent.searchParticipants.useQuery(
+    { query: zoek },
+    { enabled: open && zoek.trim().length >= 2, retry: false },
+  )
+  const link = trpc.kinvent.link.useMutation({
+    onSuccess: () => {
+      toast.success('Gekoppeld aan Kinvent')
+      void utils.kinvent.linkStatus.invalidate({ patientId })
+      setQuery('')
+      setZoek('')
+      onClose()
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  return (
+    <DarkDialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DarkDialogContent className="max-w-md">
+        <DarkDialogHeader>
+          <DarkDialogTitle>Koppelen aan Kinvent</DarkDialogTitle>
+          <DarkDialogDescription>
+            Zoek de naam zoals die in Kinvent staat. Alleen de koppeling wordt bewaard; naam, geboortedatum en foto
+            blijven bij Kinvent.
+          </DarkDialogDescription>
+        </DarkDialogHeader>
+
+        {!status?.connected ? (
+          <KinventSignIn compact />
+        ) : (
+          <div className="space-y-3">
+            <form
+              className="flex gap-2"
+              onSubmit={(e) => {
+                e.preventDefault()
+                setZoek(query.trim())
+              }}
+            >
+              <DarkInput placeholder="Naam in Kinvent" value={query} onChange={(e) => setQuery(e.target.value)} autoFocus />
+              <DarkButton type="submit" size="sm" disabled={query.trim().length < 2} loading={isFetching}>
+                Zoek
+              </DarkButton>
+            </form>
+            {error && <p style={{ color: P.danger, fontSize: 12 }}>{error.message}</p>}
+            {zoek && !isFetching && hits.length === 0 && !error && (
+              <p style={{ color: P.inkMuted, fontSize: 12 }}>Niets gevonden in Kinvent op &lsquo;{zoek}&rsquo;.</p>
+            )}
+            <div className="space-y-1">
+              {hits.map((h) => (
+                <div
+                  key={h.code}
+                  className="flex items-center justify-between gap-3 rounded-lg px-3 py-2"
+                  style={{ background: P.surfaceHi, border: `1px solid ${P.line}` }}
+                >
+                  <div className="min-w-0">
+                    <p style={{ color: P.ink, fontSize: 13, fontWeight: 600 }}>{h.name || 'Zonder naam'}</p>
+                    <p style={{ color: P.inkMuted, fontSize: 11 }}>
+                      {h.birthYear ? `Geboren ${h.birthYear}` : 'Geboortejaar onbekend'}
+                      {!h.consentRecorded ? ' · geen consent vastgelegd in Kinvent' : ''}
+                    </p>
+                  </div>
+                  <DarkButton size="sm" onClick={() => link.mutate({ patientId, participantCode: h.code })} loading={link.isPending}>
+                    Koppel
+                  </DarkButton>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </DarkDialogContent>
+    </DarkDialog>
+  )
+}

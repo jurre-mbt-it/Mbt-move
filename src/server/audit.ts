@@ -75,6 +75,7 @@ export type AuditEvent =
   // mogen landen, dus wie dat aanzet of uitzet hoort in de trail.
   | 'KINVENT_LINKED'
   | 'KINVENT_UNLINKED'
+  | 'KINVENT_IMPORTED'
   // Aanmelding van het praktijkaccount (31 dagen geldig JWT, versleuteld
   // bewaard). Wie hem zet of weghaalt hoort in de trail.
   | 'KINVENT_SIGNED_IN'
