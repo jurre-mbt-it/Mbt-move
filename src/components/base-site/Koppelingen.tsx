@@ -10,10 +10,11 @@ import { ScrambleText } from './ScrambleText'
  * en daaronder een tweekoloms blok voor KINVENT. Dat is bewust een ander ritme
  * dan de kolommen elders op de pagina (zie de kop van BaseLanding.tsx).
  *
- * Logo's: zolang er geen officiële bestanden zijn staat het merk als woordmerk
- * in onze eigen letter. Zet je een logo in /public/base-site/koppelingen/ en
- * vul je `logo` in, dan wint dat automatisch. Gebruik alleen bestanden die het
- * merk zelf voor partners uitgeeft.
+ * Logo's (/public/base-site/koppelingen/): Strava en Polar als officieel
+ * woordmerk (Wikimedia Commons, wit gerenderd), Apple Health en KINVENT als
+ * app-icoon naast de naam in onze letter (Apple Health via Commons, KINVENT
+ * via de openbare App Store-API). Krijgen we van KINVENT een partnerbestand,
+ * dan vervangt dat het icoon via het `logo`-veld.
  *
  * Mint is meting (ontwerpsysteem regel 2): de KINVENT-cel krijgt daarom de
  * mintlijn, de andere drie niet.
@@ -22,7 +23,10 @@ type Merk = {
   naam: string
   tag: string
   tekst: string
+  /** Woordmerk van het merk zelf (svg), wit gerenderd zodat de strook één toon houdt. */
   logo?: { src: string; breedte: number; hoogte: number }
+  /** App-icoon naast de naam, voor merken zonder los woordmerk. */
+  icoon?: { src: string }
   meet?: boolean
 }
 
@@ -30,22 +34,26 @@ const MERKEN: Merk[] = [
   {
     naam: 'Apple Health',
     tag: 'Apple Watch',
-    tekst: 'Slaap, hartslag, HRV en workouts komen rechtstreeks van het toestel, per gegevenssoort met toestemming.',
+    tekst: 'Slaap, hartslag, HRV en workouts, rechtstreeks van het horloge.',
+    icoon: { src: '/base-site/koppelingen/apple-health.png' },
   },
   {
     naam: 'Strava',
     tag: 'Trainingen',
-    tekst: 'Een training staat in BASE zodra hij op Strava staat, met hartslag en tempo per minuut.',
+    tekst: 'Elke training met hartslag en tempo per minuut, zodra hij op Strava staat.',
+    logo: { src: '/base-site/koppelingen/strava.svg', breedte: 432, hoogte: 91 },
   },
   {
     naam: 'Polar',
     tag: 'Horloge',
-    tekst: 'Trainingen, slaap en Nightly Recharge via Polar Flow, ook naast een Apple Watch.',
+    tekst: 'Trainingen, slaap en Nightly Recharge uit Polar Flow.',
+    logo: { src: '/base-site/koppelingen/polar.svg', breedte: 727, hoogte: 120 },
   },
   {
     naam: 'KINVENT',
-    tag: 'Krachtmeting',
-    tekst: 'Kracht- en sprongmetingen van K-Push, K-Pull en K-Deltas, rechtstreeks in het testrapport.',
+    tag: 'Force plate',
+    tekst: 'Kracht- en sprongtests van K-Push, K-Pull en K-Deltas, in het testrapport.',
+    icoon: { src: '/base-site/koppelingen/kinvent.png' },
     meet: true,
   },
 ]
@@ -57,13 +65,13 @@ export function Koppelingen() {
         <Reveal>
           <p className={styles.eyebrow}><ScrambleText text="Koppelingen" /></p>
           <h2 className={styles.head}>
-            <span className={styles.ln}>Werkt met wat</span>
-            <span className={styles.ln}>je al gebruikt</span>
+            <span className={styles.ln}>Wearables en de force plate</span>
+            <span className={styles.ln}>lezen we rechtstreeks uit</span>
           </h2>
           <p className={styles.lede}>
-            Metingen en trainingen hoef je niet over te typen. BASE haalt ze op bij de bron, met
-            toestemming van de gebruiker, en zet ze in hetzelfde dossier als het programma en de
-            criteria.
+            Een training van de Apple Watch, Strava of Polar staat in het dossier zodra hij gelogd
+            is, en een test op de KINVENT force plate komt in het testrapport terecht. Je hoeft
+            niets over te typen, en de gebruiker geeft per koppeling zelf toestemming.
           </p>
 
           <div className={styles.brands}>
@@ -79,7 +87,12 @@ export function Koppelingen() {
                     className={styles.brandLogo}
                   />
                 ) : (
-                  <p className={`${styles.brandMark} ${merk.meet ? styles.brandMarkMeet : ''}`}>{merk.naam.toUpperCase()}</p>
+                  <p className={`${styles.brandMark} ${merk.meet ? styles.brandMarkMeet : ''}`}>
+                    {merk.icoon && (
+                      <Image src={merk.icoon.src} alt="" width={64} height={64} className={styles.brandIcon} />
+                    )}
+                    {merk.naam.toUpperCase()}
+                  </p>
                 )}
                 <p className={styles.brandNote}>{merk.tekst}</p>
               </article>
@@ -88,31 +101,31 @@ export function Koppelingen() {
         </Reveal>
       </div>
 
-      {/* ── KINVENT apart: de koppeling die alleen BASE heeft ───────────── */}
+      {/* ── KINVENT apart ─────────────────────────────────────────────── */}
       <div className={`${styles.shell} ${styles.block}`} style={{ paddingTop: 0 }}>
         <Reveal>
           <div className={styles.duo}>
             <div>
               <p className={styles.eyebrow}><ScrambleText text="KINVENT" /></p>
               <h2 className={styles.head}>
-                <span className={styles.ln}>Van de krachtplaat</span>
-                <span className={styles.ln}>naar het dossier</span>
+                <span className={styles.ln}>Een test op de force plate</span>
+                <span className={styles.ln}>staat direct in het rapport</span>
               </h2>
               <p className={styles.lede}>
-                Meet je met KINVENT, dan haalt BASE de metingen op bij KINVENT zelf en zet ze in het
-                testrapport. Quadriceps en hamstrings in Newton, <em>links en rechts naast elkaar</em>,
-                de sprong in centimeters. Jij bevestigt wat het dossier in mag; een handmatig
-                ingevulde waarde wordt nooit overschreven.
+                Meet je met KINVENT, dan haalt BASE de test op en zet hem in het testrapport:
+                quadriceps en hamstrings in Newton, links en rechts naast elkaar, de CMJ in
+                centimeters. Jij bevestigt wat het dossier in gaat, en een waarde die je zelf hebt
+                ingevuld wordt nooit overschreven.
               </p>
             </div>
             <div className={styles.kinventBox}>
               <p className={styles.brandTag}>Wat de koppeling doet</p>
               <ul className={styles.trioList}>
-                <li>Rehab-criteria kleuren mee met de nieuwste meting, per fase van het protocol</li>
-                <li>Kracht, symmetrie en sprongthoogte als verloop over maanden en jaren</li>
-                <li>Rate of force development, stabilisatietijd en impuls per herhaling terug te vinden</li>
-                <li>De sporter ziet dezelfde metingen in de app</li>
-                <li>Eenheidscontrole op elke meting, zodat een verkeerde instelling op de plaat niet in het dossier komt</li>
+                <li>Rehab-criteria kleuren mee met de nieuwste test, per fase van het protocol</li>
+                <li>Kracht, links-rechtsverschil en sprongthoogte als verloop over maanden en jaren</li>
+                <li>RFD, time to stabilisation en impuls per herhaling terug te vinden</li>
+                <li>De sporter ziet dezelfde tests in de app</li>
+                <li>Elke test wordt op eenheid gecontroleerd voordat hij het dossier in gaat</li>
               </ul>
             </div>
           </div>
