@@ -99,16 +99,30 @@ describe('buildCandidates', () => {
   it('gebruikt een gewichtsmeting van Kinvent als ijkpunt en maakt er geen kandidaat van', () => {
     const out = buildCandidates({
       ...leeg,
-      protocols: [protocol('p1', 'a1', 'TOTAL_EVALUATION', T0), protocol('p2', 'a2', 'TOTAL_EVALUATION', T0 + DAG)],
+      protocols: [protocol('p1', 'a1', 'TOTAL_EVALUATION', T0), protocol('p2', 'a2', 'JUMP_ANALYSIS', T0 + DAG)],
       analyses: [
         analysis('p1', 'a1', 'TOTAL_EVALUATION', T0, { includeAllFields: false, weight: 64.6 }),
-        // IMTP een dag later met een gewicht dat precies de omrekening naar ponden is.
-        analysis('p2', 'a2', 'TOTAL_EVALUATION', T0 + DAG, { _resultsPerRep: [{ _repSide: 'BOTH', _maxValue: 300, _maxLeftValue: 140, _weight: 142.4 }] }),
+        // Sprong een dag later met een massa die precies de omrekening naar ponden is.
+        analysis('p2', 'a2', 'JUMP_ANALYSIS', T0 + DAG, { _resultsModels: [sprongModel(142.4)] }),
       ],
     })
     expect(out.candidates.map((c) => c.protocolCode)).toEqual(['p2'])
     expect(out.candidates[0].unit.status).toBe('suspect')
     expect(out.referenceWeightKg).toBe(64.6)
+  })
+
+  it('laat het gewicht dat bij een IMTP meekomt buiten de eenheidscontrole', () => {
+    // In de praktijk stond daar 24,4 en 55,8 bij iemand van 78 kg: geen
+    // lichaamsgewicht, dus geen ijkpunt en geen reden om de meting af te keuren.
+    const out = buildCandidates({
+      ...leeg,
+      referenceWeightKg: 78.2,
+      protocols: [protocol('p1', 'a1', 'TOTAL_EVALUATION', T0)],
+      analyses: [analysis('p1', 'a1', 'TOTAL_EVALUATION', T0, { _resultsPerRep: [{ _repSide: 'BOTH', _maxValue: 139, _maxLeftValue: 68.7, _weight: 24.4 }] })],
+    })
+    expect(out.candidates[0].kind).toBe('STRENGTH')
+    expect(out.candidates[0].unit.status).toBe('unverified')
+    expect(out.referenceWeightKg).toBe(78.2)
   })
 
   it('laat het gewicht van een geslaagde sprong het ijkpunt worden', () => {

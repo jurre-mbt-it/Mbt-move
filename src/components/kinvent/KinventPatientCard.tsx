@@ -29,7 +29,6 @@ const fmtDatum = (d: Date | string) =>
 export function KinventPatientCard({ patientId }: { patientId: string }) {
   const utils = trpc.useUtils()
   const { data: link } = trpc.kinvent.linkStatus.useQuery({ patientId })
-  const { data: status } = trpc.kinvent.connectionStatus.useQuery()
   const { data: jumps = [] } = trpc.kinvent.jumpsForPatient.useQuery({ patientId }, { enabled: !!link?.linked })
   const [open, setOpen] = useState(false)
   const [ontkoppelVraag, setOntkoppelVraag] = useState(false)
@@ -84,11 +83,11 @@ export function KinventPatientCard({ patientId }: { patientId: string }) {
         </div>
       </div>
 
-      {!status?.connected && (
-        <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${P.line}` }}>
-          <KinventSignIn />
-        </div>
-      )}
+      {/* De aanmelding van de praktijk: status, opnieuw aanmelden en afmelden.
+          Altijd zichtbaar, ook als alles goed staat, zodat afmelden vindbaar is. */}
+      <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${P.line}` }}>
+        <KinventSignIn />
+      </div>
 
       {link?.linked && (
         <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${P.line}` }}>

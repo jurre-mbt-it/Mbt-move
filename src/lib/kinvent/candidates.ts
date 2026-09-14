@@ -126,10 +126,11 @@ export function buildCandidates(input: CandidateInput): CandidateOutput {
 
       const strength = parseStrength(exerciseType, parsed)
       if (!strength) continue
-      // Alleen een IMTP draagt een gewicht; de andere krachttests blijven
-      // onbeslist en leunen op de sprongen en wegingen van dezelfde patiënt.
-      const unit = strength.bodyWeightKg ? checkUnit(strength.bodyWeightKg, reference) : checkUnit(null)
-      if (unit.status === 'ok' && strength.bodyWeightKg) reference = strength.bodyWeightKg
+      // Krachttests blijven onbeslist over de eenheid en leunen op de wegingen
+      // en sprongen van dezelfde patiënt. Het `_weight` dat bij een IMTP
+      // meekomt is daar bewust niet bij: in de praktijk stond daar 24,4 en
+      // 55,8 bij iemand van 78 kg, dus dat is geen lichaamsgewicht.
+      const unit = checkUnit(null)
       candidates.push({
         ...base,
         deviceType: strength.deviceType,

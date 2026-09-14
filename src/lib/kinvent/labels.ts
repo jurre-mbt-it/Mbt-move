@@ -21,6 +21,8 @@ const BEKEND: Record<string, string> = {
   exercise_template_builtin_leg_jump_analysis_cmj_title: 'CMJ',
   exercise_template_builtin_leg_jump_analysis_sj_title: 'Squat jump',
   exercise_template_builtin_leg_jump_analysis_drop_title: 'Drop jump',
+  exercise_template_builtin_leg_jump_analysis_sj_dynamic_bw_title: 'Squat jump (dynamisch)',
+  exercise_template_builtin_leg_jump_analysis_sj_dynamic_bw_text: 'Squat jump (dynamisch)',
   unipodal_counter_movement_jump_cmj: 'CMJ eenbenig',
   unipodal_squat_jump_sj: 'Squat jump eenbenig',
   unipodal_drop_jump_dj: 'Drop jump eenbenig',

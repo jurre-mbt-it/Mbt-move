@@ -12,6 +12,7 @@ describe('kinventLabel', () => {
     expect(kinventLabel('exercise_template_builtin_leg_supine_hip_add_title')).toBe('Heupadductie (rugligging)')
     expect(kinventLabel('unipodal_counter_movement_jump_cmj')).toBe('CMJ eenbenig')
     expect(kinventLabel('imtp_title')).toBe('IMTP')
+    expect(kinventLabel('exercise_template_builtin_leg_jump_analysis_sj_dynamic_bw_title')).toBe('Squat jump (dynamisch)')
   })
 
   it('maakt van een onbekende sleutel leesbare tekst', () => {
