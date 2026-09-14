@@ -137,7 +137,7 @@ const valuesInput = z.object({
 })
 
 // Catalog → entry spec mapping (gedeelde velden hebben dezelfde namen).
-function specFromCatalog(c: {
+export function specFromCatalog(c: {
   category: string; categoryOrder: number; name: string; subtitle: string | null
   source: string | null; kind: string; metric: string; unitPrimary: string | null
   unitSecondary: string | null; plotUnit: string; axisMin: number; axisMax: number

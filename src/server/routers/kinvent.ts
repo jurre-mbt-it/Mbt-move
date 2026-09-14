@@ -43,6 +43,10 @@ import {
 import { decryptToken, encryptToken, jwtExpiry } from '@/lib/kinvent/crypto'
 import { buildCandidates, type ImportCandidate } from '@/lib/kinvent/candidates'
 import { kinventCategory, kinventLabel, kinventSource } from '@/lib/kinvent/labels'
+import { kgToNewton } from '@/lib/kinvent/units'
+import { syncCriteriaVoorEntry } from '@/server/lib/rehab-criterion-sync'
+import { specFromCatalog } from './testReports'
+import type { TestCatalogItem } from '@prisma/client'
 
 export type { ImportCandidate } from '@/lib/kinvent/candidates'
 
@@ -57,6 +61,45 @@ const credentialsInput = z.object({
   email: z.string().trim().email().max(200),
   password: z.string().min(1).max(200),
 })
+
+const sleutel = (c: { protocolCode: string; activityCode: string }) => `${c.protocolCode}/${c.activityCode}`
+
+/**
+ * Een kandidaat als rapportregel die aan een catalogustest hangt. De regel
+ * neemt de spec van de catalogus over (zones, eenheid, metric), zodat het
+ * gekoppelde rehab-criterium erop kan rekenen. Staat de catalogustest in
+ * Newton, dan rekenen we Kinvents kilogrammen om; dat is de enige plek waar
+ * dat gebeurt.
+ */
+function entryFromCatalog(reportId: string, c: ImportCandidate, order: number, item: TestCatalogItem) {
+  const spec = specFromCatalog(item)
+  const inNewton = /^n(ewton)?$/i.test(item.unitPrimary ?? '')
+  const omzet = (v: number | null) => (v === null ? null : inNewton ? kgToNewton(v) : v)
+  const isJump = c.kind === 'JUMP'
+  const enkel = c.single ?? (c.left === null || c.right === null ? Math.max(c.left ?? 0, c.right ?? 0) : null)
+  const notes =
+    [
+      c.unit.status === 'suspect' ? `Eenheidscontrole: ${c.unit.reason}` : null,
+      !isJump && inNewton ? 'Uit Kinvent in kg, omgerekend naar N (×9,80665).' : null,
+    ]
+      .filter(Boolean)
+      .join(' ') || null
+  return {
+    reportId,
+    order,
+    catalogItemId: item.id,
+    ...spec,
+    leftPrimary: isJump ? null : omzet(c.left),
+    rightPrimary: isJump ? null : omzet(c.right),
+    singleValue: isJump ? c.jumpHeightCm : spec.kind === 'SINGLE' ? omzet(enkel) : null,
+    notes,
+    kinventProtocolCode: c.protocolCode,
+    kinventActivityCode: c.activityCode,
+    kinventRepCode: null,
+    importedAt: new Date(),
+    importedUnit: isJump ? 'cm' : 'kg',
+  }
+}
 
 /** Laatst bekende lichaamsgewicht van deze patiënt uit Kinvent, als ijkpunt. */
 async function referenceWeightFor(prisma: Prisma, patientId: string): Promise<number | null> {
@@ -277,13 +320,16 @@ export const kinventRouter = createTRPCRouter({
       })
       const sync = await ctx.prisma.kinventSync.findUnique({
         where: { patientId: input.patientId },
-        select: { lastSyncAt: true, lastError: true },
+        select: { lastSyncAt: true, lastError: true, pendingCount: true, lastCheckedAt: true },
       })
       return {
         linked: !!patient?.kinventParticipantCode,
         linkedAt: patient?.kinventLinkedAt ?? null,
         lastSyncAt: sync?.lastSyncAt ?? null,
         lastError: sync?.lastError ?? null,
+        /** Protocollen bij Kinvent waarvan nog niets in BASE staat. */
+        pendingCount: sync?.pendingCount ?? 0,
+        lastCheckedAt: sync?.lastCheckedAt ?? null,
       }
     }),
 
@@ -405,6 +451,12 @@ export const kinventRouter = createTRPCRouter({
         deletedProtocolCodes,
         referenceWeightKg: referenceWeight,
       })
+      const pending = new Set(candidates.filter((c) => !c.alreadyImported).map((c) => c.protocolCode)).size
+      await ctx.prisma.kinventSync.upsert({
+        where: { patientId: input.patientId },
+        create: { patientId: input.patientId, pendingCount: pending, lastCheckedAt: new Date() },
+        update: { pendingCount: pending, lastCheckedAt: new Date(), lastError: null },
+      })
       return { candidates, removedProtocolCodes }
     }),
 
@@ -423,7 +475,17 @@ export const kinventRouter = createTRPCRouter({
       z.object({
         patientId: z.string(),
         reportId: z.string().nullable(),
-        items: z.array(z.object({ protocolCode: z.string(), activityCode: z.string() })).min(1).max(200),
+        items: z
+          .array(
+            z.object({
+              protocolCode: z.string(),
+              activityCode: z.string(),
+              /** Catalogustest waar de regel aan moet hangen; dan werkt het rehab-criterium mee. */
+              catalogItemId: z.string().nullable().optional(),
+            }),
+          )
+          .min(1)
+          .max(200),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -435,6 +497,20 @@ export const kinventRouter = createTRPCRouter({
       if (!patient?.kinventParticipantCode) {
         throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Deze patiënt is niet gekoppeld aan Kinvent.' })
       }
+      // Catalogustests alleen uit de eigen praktijk of de globale seed, anders
+      // is elke catalogus-id van elke praktijk via een geraden id te gebruiken.
+      const gekozenCatalogus = new Map(
+        input.items.flatMap((i) => (i.catalogItemId ? [[sleutel(i), i.catalogItemId] as const] : [])),
+      )
+      const catalogusItems = gekozenCatalogus.size
+        ? await ctx.prisma.testCatalogItem.findMany({
+            where: {
+              id: { in: [...new Set(gekozenCatalogus.values())] },
+              OR: ctx.user.practiceId ? [{ practiceId: null }, { practiceId: ctx.user.practiceId }] : [{ practiceId: null }],
+            },
+          })
+        : []
+      const catalogusById = new Map(catalogusItems.map((c) => [c.id, c]))
       if (input.reportId) {
         const report = await ctx.prisma.testReport.findUnique({
           where: { id: input.reportId },
@@ -472,8 +548,10 @@ export const kinventRouter = createTRPCRouter({
       let jumps = 0
       let skipped = 0
 
-      const kracht = candidates.filter((c) => c.kind === 'STRENGTH')
-      if (kracht.length > 0) {
+      // Naar het rapport: elke krachttest, plus een sprong als hij aan een
+      // catalogustest (CMJ-hoogte) hangt.
+      const naarRapport = candidates.filter((c) => c.kind === 'STRENGTH' || gekozenCatalogus.has(sleutel(c)))
+      if (naarRapport.length > 0) {
         if (!input.reportId) {
           throw new TRPCError({ code: 'BAD_REQUEST', message: 'Kies een testrapport voor de krachttests.' })
         }
@@ -481,21 +559,31 @@ export const kinventRouter = createTRPCRouter({
         const bestaand = new Set(
           (
             await ctx.prisma.testReportEntry.findMany({
-              where: { reportId, kinventActivityCode: { in: kracht.map((c) => c.activityCode) } },
+              where: { reportId, kinventActivityCode: { in: naarRapport.map((c) => c.activityCode) } },
               select: { kinventActivityCode: true },
             })
           ).map((e) => e.kinventActivityCode),
         )
         const max = await ctx.prisma.testReportEntry.aggregate({ where: { reportId }, _max: { order: true } })
         let order = (max._max.order ?? -1) + 1
-        const nieuw = kracht.filter((c) => !bestaand.has(c.activityCode))
-        skipped += kracht.length - nieuw.length
-        if (nieuw.length > 0) {
-          await ctx.prisma.testReportEntry.createMany({
-            data: nieuw.map((c) => entryFromCandidate(reportId, c, order++)),
-            skipDuplicates: true,
+        for (const c of naarRapport) {
+          if (bestaand.has(c.activityCode)) {
+            skipped++
+            continue
+          }
+          const item = catalogusById.get(gekozenCatalogus.get(sleutel(c)) ?? '') ?? null
+          const e = await ctx.prisma.testReportEntry.create({
+            data: item ? entryFromCatalog(reportId, c, order++, item) : entryFromCandidate(reportId, c, order++),
+            select: { id: true },
           })
-          entries = nieuw.length
+          entries++
+          // Zelfde doorwerking als bij een handmatig opgeslagen regel: het
+          // gekoppelde criterium in het lopende traject kleurt mee.
+          if (item) {
+            void syncCriteriaVoorEntry(ctx.prisma, e.id, ctx.user.id).catch((err) =>
+              console.error('[kinvent] criteria-sync mislukt', err),
+            )
+          }
         }
       }
 
@@ -552,8 +640,9 @@ export const kinventRouter = createTRPCRouter({
       await ctx.prisma.kinventSync.upsert({
         where: { patientId: input.patientId },
         create: { patientId: input.patientId, lastSyncAt: new Date() },
-        update: { lastSyncAt: new Date(), lastError: null },
+        update: { lastSyncAt: new Date(), lastError: null, pendingCount: { decrement: new Set(candidates.map((c) => c.protocolCode)).size } },
       })
+      await ctx.prisma.kinventSync.updateMany({ where: { patientId: input.patientId, pendingCount: { lt: 0 } }, data: { pendingCount: 0 } })
       await auditLog({ event: 'KINVENT_IMPORTED', userId: ctx.user.id, resource: 'user', resourceId: input.patientId })
       return { entries, jumps, skipped }
     }),

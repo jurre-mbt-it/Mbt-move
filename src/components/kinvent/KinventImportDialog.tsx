@@ -13,14 +13,16 @@ import {
   DarkDialogFooter,
   DarkDialogHeader,
   DarkDialogTitle,
+  DarkSelect,
   MetaLabel,
   P,
 } from '@/components/dark-ui'
 import { KinventSignIn } from './KinventSignIn'
 import { kinventLabel, kinventSource } from '@/lib/kinvent/labels'
+import { suggestCatalogItem, type CatalogusOptie } from '@/lib/kinvent/catalog-match'
 import type { ImportCandidate } from '@/lib/kinvent/candidates'
 
-type Kandidaat = Omit<ImportCandidate, 'performedAt' | 'jump'> & { performedAt: string | Date }
+type Kandidaat = Omit<ImportCandidate, 'performedAt'> & { performedAt: string | Date }
 
 const sleutel = (c: { protocolCode: string; activityCode: string }) => `${c.protocolCode}/${c.activityCode}`
 const fmtDatum = (d: string | Date) => new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -48,6 +50,7 @@ export function KinventImportDialog({
   const portal = usePortal()
   const { data: status } = trpc.kinvent.connectionStatus.useQuery(undefined, { enabled: open })
   const { data: link } = trpc.kinvent.linkStatus.useQuery({ patientId }, { enabled: open })
+  const { data: catalogus = [] } = trpc.testReports.catalog.useQuery(undefined, { enabled: open })
   const pull = trpc.kinvent.pullForPatient.useMutation({ onError: (e) => toast.error(e.message) })
   const commit = trpc.kinvent.commitImport.useMutation({
     onSuccess: (r) => {
@@ -63,6 +66,8 @@ export function KinventImportDialog({
     onError: (e) => toast.error(e.message),
   })
   const [keuze, setKeuze] = useState<Set<string> | null>(null)
+  // Per meting de catalogustest; null = nog niets aangepast, dan geldt het voorstel.
+  const [catalogKeuze, setCatalogKeuze] = useState<Record<string, string> | null>(null)
 
   const kanOphalen = !!status?.connected && !!link?.linked
   const candidates = useMemo(() => (pull.data?.candidates ?? []) as Kandidaat[], [pull.data])
@@ -77,9 +82,35 @@ export function KinventImportDialog({
   // keer vers bij Kinvent wordt gekeken.
   const sluit = () => {
     setKeuze(null)
+    setCatalogKeuze(null)
     pull.reset()
     onClose()
   }
+
+  const opties: CatalogusOptie[] = useMemo(
+    () => catalogus.map((c) => ({ id: c.id, name: c.name, category: c.category, kind: c.kind, unitPrimary: c.unitPrimary })),
+    [catalogus],
+  )
+  const voorstel = useMemo(
+    () =>
+      new Map(
+        candidates.map((c) => [
+          sleutel(c),
+          suggestCatalogItem(
+            {
+              kind: c.kind,
+              exerciseType: c.exerciseType,
+              title: c.title,
+              bilateral: c.kind === 'JUMP' ? (c.jump?.reps[0]?.side ?? 'BOTH') === 'BOTH' : c.left !== null && c.right !== null,
+              jumpType: c.jump?.jumpType ?? null,
+            },
+            opties,
+          ),
+        ]),
+      ),
+    [candidates, opties],
+  )
+  const catalogVoor = (k: string) => catalogKeuze?.[k] ?? voorstel.get(k) ?? ''
 
   const standaard = useMemo(
     () => new Set(candidates.filter((c) => !c.alreadyImported && c.unit.status !== 'suspect').map(sleutel)),
@@ -104,7 +135,8 @@ export function KinventImportDialog({
           <DarkDialogTitle>Ophalen uit Kinvent</DarkDialogTitle>
           <DarkDialogDescription>
             Vink aan wat in dit rapport mag. Krachttests komen als regels in het rapport; sprongen komen op de
-            patiëntpagina. Handmatig ingevulde regels blijven altijd staan.
+            patiëntpagina. Hangt een meting aan een catalogustest, dan werkt het gekoppelde rehab-criterium mee.
+            Handmatig ingevulde regels blijven altijd staan.
           </DarkDialogDescription>
         </DarkDialogHeader>
 
@@ -142,7 +174,15 @@ export function KinventImportDialog({
                 <MetaLabel>Krachttests · {kracht.length}</MetaLabel>
                 <div className="mt-2 space-y-1">
                   {kracht.map((c) => (
-                    <Rij key={sleutel(c)} c={c} aan={gekozen.has(sleutel(c))} onToggle={() => toggle(sleutel(c))}>
+                    <Rij
+                      key={sleutel(c)}
+                      c={c}
+                      aan={gekozen.has(sleutel(c))}
+                      onToggle={() => toggle(sleutel(c))}
+                      opties={opties}
+                      catalogId={catalogVoor(sleutel(c))}
+                      onCatalog={(id) => setCatalogKeuze({ ...(catalogKeuze ?? {}), [sleutel(c)]: id })}
+                    >
                       <span className="athletic-mono whitespace-nowrap">
                         {c.left !== null && c.right !== null
                           ? `${c.left.toFixed(1)} / ${c.right.toFixed(1)} kg · LSI ${c.lsi !== null ? Math.round(c.lsi) : '–'}%`
@@ -158,7 +198,15 @@ export function KinventImportDialog({
                 <MetaLabel>Sprongen · {sprongen.length}</MetaLabel>
                 <div className="mt-2 space-y-1">
                   {sprongen.map((c) => (
-                    <Rij key={sleutel(c)} c={c} aan={gekozen.has(sleutel(c))} onToggle={() => toggle(sleutel(c))}>
+                    <Rij
+                      key={sleutel(c)}
+                      c={c}
+                      aan={gekozen.has(sleutel(c))}
+                      onToggle={() => toggle(sleutel(c))}
+                      opties={opties}
+                      catalogId={catalogVoor(sleutel(c))}
+                      onCatalog={(id) => setCatalogKeuze({ ...(catalogKeuze ?? {}), [sleutel(c)]: id })}
+                    >
                       <span className="athletic-mono whitespace-nowrap">
                         {c.jumpHeightCm !== null ? `${c.jumpHeightCm.toFixed(1)} cm` : '–'}
                         {c.rsi !== null ? ` · RSI ${c.rsi.toFixed(2)}` : ''}
@@ -182,7 +230,9 @@ export function KinventImportDialog({
                 commit.mutate({
                   patientId,
                   reportId,
-                  items: candidates.filter((c) => gekozen.has(sleutel(c))).map((c) => ({ protocolCode: c.protocolCode, activityCode: c.activityCode })),
+                  items: candidates
+                    .filter((c) => gekozen.has(sleutel(c)))
+                    .map((c) => ({ protocolCode: c.protocolCode, activityCode: c.activityCode, catalogItemId: catalogVoor(sleutel(c)) || null })),
                 })
               }
             >
@@ -195,15 +245,31 @@ export function KinventImportDialog({
   )
 }
 
-function Rij({ c, aan, onToggle, children }: { c: Kandidaat; aan: boolean; onToggle: () => void; children: React.ReactNode }) {
+function Rij({
+  c,
+  aan,
+  onToggle,
+  opties,
+  catalogId,
+  onCatalog,
+  children,
+}: {
+  c: Kandidaat
+  aan: boolean
+  onToggle: () => void
+  opties: CatalogusOptie[]
+  catalogId: string
+  onCatalog: (id: string) => void
+  children: React.ReactNode
+}) {
   const twijfel = c.unit.status === 'suspect'
   const reden = c.unit.status === 'ok' ? null : c.unit.reason
   return (
-    <label
-      className="flex items-center gap-3 rounded-lg px-3 py-2 cursor-pointer"
+    <div
+      className="flex items-center gap-3 rounded-lg px-3 py-2"
       style={{ background: P.surfaceHi, border: `1px solid ${twijfel ? P.gold : P.line}`, opacity: c.alreadyImported && !aan ? 0.6 : 1 }}
     >
-      <input type="checkbox" checked={aan} onChange={onToggle} className="accent-[color:var(--p-brand)]" />
+      <input type="checkbox" checked={aan} onChange={onToggle} className="accent-[color:var(--p-brand)] cursor-pointer" aria-label="Meenemen" />
       <div className="min-w-0 flex-1">
         <p style={{ color: P.ink, fontSize: 13, fontWeight: 600 }}>
           {kinventLabel(c.title)}
@@ -215,8 +281,24 @@ function Rij({ c, aan, onToggle, children }: { c: Kandidaat; aan: boolean; onTog
           {fmtDatum(c.performedAt)} · {kinventSource(c.deviceType, c.exerciseType)}
         </p>
         {twijfel && reden && <p style={{ color: P.gold, fontSize: 11, marginTop: 2 }}>{reden}</p>}
+        {aan && (
+          <DarkSelect
+            value={catalogId}
+            onChange={(e) => onCatalog(e.target.value)}
+            className="mt-1"
+            style={{ fontSize: 12, padding: '4px 8px', maxWidth: 360 }}
+            aria-label="Catalogustest"
+          >
+            <option value="">Losse regel, geen catalogustest</option>
+            {opties.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.category} · {o.name}
+              </option>
+            ))}
+          </DarkSelect>
+        )}
       </div>
       <div style={{ color: P.ink, fontSize: 12 }}>{children}</div>
-    </label>
+    </div>
   )
 }

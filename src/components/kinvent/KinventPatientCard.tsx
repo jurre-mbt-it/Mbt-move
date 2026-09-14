@@ -58,6 +58,12 @@ export function KinventPatientCard({ patientId }: { patientId: string }) {
               Niet gekoppeld. Koppel deze patiënt aan zijn profiel in Kinvent om metingen op te halen.
             </p>
           )}
+          {link?.linked && link.pendingCount > 0 && (
+            <p style={{ color: P.gold, fontSize: 12, marginTop: 4 }}>
+              {link.pendingCount} {link.pendingCount === 1 ? 'meting' : 'metingen'} bij Kinvent nog niet in BASE
+              {link.lastCheckedAt ? ` (gecontroleerd ${fmtDatum(link.lastCheckedAt)})` : ''}. Haal ze op vanuit een testrapport.
+            </p>
+          )}
           {link?.lastError && <p style={{ color: P.gold, fontSize: 12, marginTop: 4 }}>{link.lastError}</p>}
         </div>
         <div className="flex gap-2">

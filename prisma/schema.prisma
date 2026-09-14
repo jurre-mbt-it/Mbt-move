@@ -2975,6 +2975,10 @@ model KinventSync {
   lastUpdatedAfter BigInt    @default(0)
   lastSyncAt       DateTime?
   lastError        String?
+  /// Protocollen bij Kinvent waarvan nog niets in BASE staat. Bijgewerkt door
+  /// de nachtelijke controle (cron kinvent-check) en bij elke ophaalronde.
+  pendingCount     Int       @default(0)
+  lastCheckedAt    DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -3066,11 +3070,13 @@ model KinventConnection {
   /// opnieuw moet aanmelden, anders valt de sync stil zonder dat het opvalt.
   tokenExpiresAt DateTime
 
-  connectedById String
-  connectedAt   DateTime  @default(now())
-  lastUsedAt    DateTime?
-  lastError     String?
-  updatedAt     DateTime  @updatedAt
+  connectedById   String
+  connectedAt     DateTime  @default(now())
+  lastUsedAt      DateTime?
+  /// Wanneer de waarschuwing "aanmelding verloopt" is gemaild, zodat hij één keer gaat.
+  renewalWarnedAt DateTime?
+  lastError       String?
+  updatedAt       DateTime  @updatedAt
 
   @@map("kinvent_connections")
 }
