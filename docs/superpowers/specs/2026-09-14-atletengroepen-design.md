@@ -188,7 +188,8 @@ met vaste voorbeelddata in de test; de router haalt alleen data op.
 - Verzenden controleert per lid opnieuw de koppeling en de uitbehandeld-status
   (zelfde `assertPatientLink`/`assertNotDischarged` als plan toepassen).
 - Nieuwe tabellen: RLS + default deny in dezelfde migratie.
-- Auditlog-regel bij verzenden (groep, aantal leden, weken), zonder PII.
+- Verzenden legt `lastSentAt` vast op groep en lid; een aparte auditlog-regel
+  is er niet (de repo heeft daar geen helper voor).
 - AVG-docs: verwerkersregister en DPIA krijgen de groepsnotitie erbij als
   nieuw gegeven van de coach over de atleet (geen medische inhoud bedoeld,
   wel vrije tekst; zelfde behandeling als `weekNote`).
