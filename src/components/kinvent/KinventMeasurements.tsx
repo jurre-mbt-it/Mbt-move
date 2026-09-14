@@ -215,9 +215,16 @@ const td = 'py-1 pr-3 text-right athletic-mono whitespace-nowrap'
 function SprongRij({ m, open, onToggle, toonNaam }: { m: JumpMeting; open: boolean; onToggle: () => void; toonNaam: boolean }) {
   const eenbenig = isEenbenig(m)
   const beste = besteSprong(m.reps)
-  const zijde = beste?.side === 'LEFT' ? 'links' : beste?.side === 'RIGHT' ? 'rechts' : null
+  const besteL = eenbenig ? besteSprong(m.reps.filter((r) => r.side === 'LEFT')) : null
+  const besteR = eenbenig ? besteSprong(m.reps.filter((r) => r.side === 'RIGHT')) : null
+  const beideBenen = !!besteL && !!besteR
+  const zijde = !eenbenig || beideBenen ? null : besteL ? 'links' : 'rechts'
   const keuze: MetingKeuze = { soort: 'sprong', jumpType: m.jumpType ?? '?', eenbenig }
-  const verschil = eenbenig ? null : asymmetryPct(beste?.peakForceLeftN ?? null, beste?.peakForceRightN ?? null)
+  // Verschil: tweebenig uit de twee platen van de beste sprong; eenbenig met
+  // beide benen in één meting uit de beste sprong per been.
+  const verschil = eenbenig
+    ? beideBenen ? asymmetryPct(besteL?.peakForceN ?? null, besteR?.peakForceN ?? null) : null
+    : asymmetryPct(beste?.peakForceLeftN ?? null, beste?.peakForceRightN ?? null)
   return (
     <Rij
       open={open}
@@ -231,18 +238,27 @@ function SprongRij({ m, open, onToggle, toonNaam }: { m: JumpMeting; open: boole
           </p>
           <p style={{ color: P.inkMuted, fontSize: 11 }}>
             {m.reps.length} sprong{m.reps.length === 1 ? '' : 'en'}
+            {beideBenen ? ' · links en rechts' : ''}
             {m.bodyWeightKg != null ? ` · ${n1(m.bodyWeightKg)} kg` : ''}
           </p>
         </>
       }
       hoofd={
         <>
-          <span className="athletic-mono" style={{ color: P.ink }}>{n1(m.peakJumpHeightCm ?? beste?.jumpHeightCm)} cm</span>
-          <span className="athletic-mono" style={{ color: P.inkMuted }}>
-            {eenbenig ? `${n0(beste?.peakForceN)} N` : `${n0(beste?.peakForceLeftN)} / ${n0(beste?.peakForceRightN)} N`}
+          <span className="athletic-mono" style={{ color: P.ink }}>
+            {beideBenen ? `${n1(besteL?.jumpHeightCm)} / ${n1(besteR?.jumpHeightCm)} cm` : `${n1(m.peakJumpHeightCm ?? beste?.jumpHeightCm)} cm`}
           </span>
-          {!eenbenig && <span style={{ color: verschil !== null && Math.abs(verschil) >= 10 ? P.gold : P.inkMuted }}>{formatAsymmetry(verschil)}</span>}
-          <span className="athletic-mono" style={{ color: P.inkMuted }}>RSI {n2(m.rsi ?? beste?.rsi)}</span>
+          <span className="athletic-mono" style={{ color: P.inkMuted }}>
+            {beideBenen
+              ? `${n0(besteL?.peakForceN)} / ${n0(besteR?.peakForceN)} N`
+              : eenbenig
+                ? `${n0(beste?.peakForceN)} N`
+                : `${n0(beste?.peakForceLeftN)} / ${n0(beste?.peakForceRightN)} N`}
+          </span>
+          {verschil !== null && <span style={{ color: Math.abs(verschil) >= 10 ? P.gold : P.inkMuted }}>{formatAsymmetry(verschil)}</span>}
+          <span className="athletic-mono" style={{ color: P.inkMuted }}>
+            RSI {beideBenen ? `${n2(besteL?.rsi)} / ${n2(besteR?.rsi)}` : n2(m.rsi ?? beste?.rsi)}
+          </span>
         </>
       }
       detail={
