@@ -136,6 +136,16 @@ function summarizeParams(extraParams: unknown): string | null {
     const value = p.value
     if (label === '' || value === undefined || value === null || value === '' || value === 0) continue
     const unit = typeof p.unit === 'string' && p.unit.trim() !== '' ? ` ${p.unit.trim()}` : ''
+    // Per set gemeten (staafsnelheid, piekvermogen): elke set in het dossier,
+    // niet alleen de samenvatting; lege sets aan het eind vallen weg.
+    if (Array.isArray(p.perSet)) {
+      const cells = p.perSet.map(v => (typeof v === 'number' && Number.isFinite(v) ? String(Math.round(v * 100) / 100).replace('.', ',') : null))
+      while (cells.length > 0 && cells[cells.length - 1] === null) cells.pop()
+      if (cells.some(c => c !== null)) {
+        parts.push(`${label} ${cells.map(c => c ?? '—').join('-')}${unit}`)
+        continue
+      }
+    }
     parts.push(`${label} ${value}${unit}`)
   }
   return parts.length ? parts.join(' · ') : null

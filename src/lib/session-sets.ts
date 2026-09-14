@@ -4,8 +4,9 @@
  * komma-tolerant ("12,5" en "12.5" zijn allebei geldig).
  */
 
-/** Eén set in de actieve sessie: kg/reps als string (vrije invoer) + afvink. */
-export type SetEntry = { kg: string; reps: string; done: boolean }
+/** Eén set in de actieve sessie: kg/reps als string (vrije invoer) + afvink.
+ *  `meet` = gemeten waarden per set (staafsnelheid, piekvermogen), op label. */
+export type SetEntry = { kg: string; reps: string; done: boolean; meet?: Record<string, string> }
 
 /** Laatst gelogde waarden per oefening — uit getTodayExercises.lastLogs. */
 export type LastLog = {
@@ -30,6 +31,8 @@ export type SessionParam = {
   options?: string[]
   min?: number
   max?: number
+  /** Per set gemeten (staafsnelheid, piekvermogen); `value` is dan de samenvatting. */
+  perSet?: Array<number | null>
 }
 
 /** Parse onbekende JSON (defaultExtraParams / gelogde extraParams) naar een
@@ -55,6 +58,9 @@ export function cloneParams(input: unknown): SessionParam[] {
       options: Array.isArray(p.options) ? p.options.filter((o): o is string => typeof o === 'string') : undefined,
       min: typeof p.min === 'number' ? p.min : undefined,
       max: typeof p.max === 'number' ? p.max : undefined,
+      perSet: Array.isArray(p.perSet)
+        ? p.perSet.map(v => (typeof v === 'number' && Number.isFinite(v) ? v : null))
+        : undefined,
     })
   }
   return out
@@ -82,10 +88,11 @@ export function filledParams(params: SessionParam[] | undefined): Array<{
   type: string
   value: string | number
   unit?: string
+  perSet?: Array<number | null>
 }> {
   return (params ?? [])
     .filter(p => (typeof p.value === 'string' ? p.value.trim() !== '' : p.value !== 0))
-    .map(p => ({ label: p.label, type: p.type, value: p.value, unit: p.unit }))
+    .map(p => ({ label: p.label, type: p.type, value: p.value, unit: p.unit, ...(p.perSet ? { perSet: p.perSet } : {}) }))
 }
 
 /** Parse "12,5" én "12.5" naar kg; lege of onleesbare invoer → null. */
@@ -178,27 +185,103 @@ export function prevSummaryFor(last: LastLog | undefined): string | null {
   return ws.map(w => fmtKg(w)).join(' / ') + ' kg'
 }
 
-/** Voorgeschreven parameters die de atleet zelf meet (staafsnelheid, piekvermogen): invoer, geen doelchip. */
+/** Voorgeschreven parameters die de atleet zelf meet (staafsnelheid, piekvermogen): invoer per set, geen doelchip. */
 export const MEET_PARAM_IDS = ['bar_speed', 'peak_power'] as const
 export function isMeetParam(p: { id?: string; label?: string }): boolean {
   return (MEET_PARAM_IDS as readonly string[]).includes(p.id ?? '') || p.label === 'Staafsnelheid' || p.label === 'Piekvermogen'
 }
 
+/** Een meetkolom in de set-rijen: label is de sleutel in `SetEntry.meet`. */
+export type MeetKolom = { label: string; unit: string }
+
+/** De meetkolommen die de therapeut op deze rij zette, in voorschrift-volgorde. */
+export function meetKolommenVoor(prescribed: unknown): MeetKolom[] {
+  const uit: MeetKolom[] = []
+  for (const p of cloneParams(prescribed)) {
+    if (!isMeetParam(p) || uit.some(k => k.label === p.label)) continue
+    uit.push({ label: p.label, unit: p.unit ?? (p.label === 'Piekvermogen' ? 'W' : 'm/s') })
+  }
+  return uit
+}
+
+/** Parse een gemeten waarde ("0,45" of "0.45"); leeg of onleesbaar → null. */
+export function parseMeet(v: string | undefined): number | null {
+  if (v == null) return null
+  const t = v.replace(',', '.').trim()
+  if (t === '') return null
+  const n = Number(t)
+  return Number.isFinite(n) && n >= 0 ? n : null
+}
+
 /**
- * Start-parameters plus de meetvelden die de therapeut op de rij zette: die
- * komen leeg binnen zodat de atleet ze invult (m/s, W), met de waarde van de
- * vorige sessie als er een is.
+ * De per-set-metingen als log-parameters: `perSet` bewaart elke set, `value`
+ * is de samenvatting waar oudere schermen mee verder kunnen. Piekvermogen is
+ * per definitie het maximum; snelheid het gemiddelde van de ingevulde sets.
+ * Zonder één ingevulde set komt de kolom niet mee.
  */
-export function seedParamsMetMeetvelden(defaults: unknown, prescribed: unknown, memory: unknown, allowMemoryOnly: boolean): SessionParam[] {
-  const basis = seedParams(defaults, memory, allowMemoryOnly)
-  const meet = cloneParams(prescribed).filter(isMeetParam)
-  if (meet.length === 0) return basis
-  const mem = cloneParams(memory)
-  const extra = meet
-    .filter(m => !basis.some(b => b.label === m.label))
-    .map(m => {
-      const vorige = mem.find(x => x.label === m.label)
-      return { ...m, type: 'number' as const, value: vorige ? vorige.value : '' }
-    })
-  return [...basis, ...extra]
+export function meetParamsUitSets(kolommen: MeetKolom[], entries: SetEntry[]): Array<{
+  label: string
+  type: string
+  value: number
+  unit: string
+  perSet: Array<number | null>
+}> {
+  const uit: Array<{ label: string; type: string; value: number; unit: string; perSet: Array<number | null> }> = []
+  for (const k of kolommen) {
+    const perSet = entries.map(s => parseMeet(s.meet?.[k.label]))
+    const gevuld = perSet.filter((v): v is number => v !== null)
+    if (gevuld.length === 0) continue
+    const samenvatting = k.label === 'Piekvermogen'
+      ? Math.max(...gevuld)
+      : Math.round((gevuld.reduce((a, b) => a + b, 0) / gevuld.length) * 100) / 100
+    uit.push({ label: k.label, type: 'number', value: samenvatting, unit: k.unit, perSet })
+  }
+  return uit
+}
+
+/** Ghost-waarde voor meetkolom `label` in set i: vorige sessie per set, anders de samenvatting. */
+export function prevMeetFor(last: LastLog | undefined, label: string, i: number): number | null {
+  if (!last) return null
+  const p = cloneParams(last.extraParams).find(x => x.label === label)
+  if (!p) return null
+  const perSet = p.perSet?.[i]
+  if (perSet != null) return perSet
+  return typeof p.value === 'number' && p.value > 0 ? p.value : null
+}
+
+/**
+ * Start-parameters zonder de meetvelden: die staan sinds 14-09-2026 als kolom
+ * in de set-rijen, dus een los "Staafsnelheid"-veld ernaast zou dubbel zijn.
+ * Oude sessies met zo'n los veld in het geheugen worden ook uitgefilterd.
+ */
+export function seedParamsZonderMeetvelden(defaults: unknown, memory: unknown, allowMemoryOnly: boolean): SessionParam[] {
+  return seedParams(defaults, memory, allowMemoryOnly).filter(p => !isMeetParam(p))
+}
+
+/** Toon een meting zoals hij getypt is: komma, hooguit twee decimalen. */
+function fmtMeet(n: number): string {
+  return String(Math.round(n * 100) / 100).replace('.', ',')
+}
+
+/**
+ * Gelogde metingen als één regel voor historie en dossier, per set als die
+ * er zijn: "Staafsnelheid 0,45-0,42-0,4 m/s · Piekvermogen 610 W".
+ * Niet-ingevulde sets aan het eind vallen weg, gaten middenin worden "—".
+ */
+export function formatMeetParams(extraParams: unknown): string | null {
+  const delen: string[] = []
+  for (const p of cloneParams(extraParams)) {
+    if (!isMeetParam(p)) continue
+    const unit = p.unit ? ` ${p.unit}` : ''
+    if (p.perSet && p.perSet.length > 0) {
+      const cells = p.perSet.map(v => (v != null ? fmtMeet(v) : null))
+      while (cells.length > 0 && cells[cells.length - 1] === null) cells.pop()
+      if (cells.some(c => c !== null)) {
+        delen.push(`${p.label} ${cells.map(c => c ?? '—').join('-')}${unit}`)
+        continue
+      }
+    }
+    if (typeof p.value === 'number' && p.value > 0) delen.push(`${p.label} ${fmtMeet(p.value)}${unit}`)
+  }
+  return delen.length ? delen.join(' · ') : null
 }

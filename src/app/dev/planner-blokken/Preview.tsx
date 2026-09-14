@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { DarkButton, MetaLabel, P, CARD } from '@/components/dark-ui'
+import { SetRows } from '@/components/session/SetRows'
+import { makeSetEntries, meetParamsUitSets, formatMeetParams, type SetEntry } from '@/lib/session-sets'
 import { BlockRows } from '@/components/week-planner/BlockRows'
 import { ExerciseBlockDialog, type BlockDialogType } from '@/components/week-planner/ExerciseBlockDialog'
 import { newBlock, type BlockDraft, type ItemGroup, type ItemGroups, type PlannerBlock } from '@/lib/planner-blocks'
@@ -30,6 +32,35 @@ const START: PlannerBlock[] = [
 
 const START_GROEPEN: ItemGroups = {
   B: { kind: 'CIRCUIT', name: 'Finisher', rounds: 3, timeCapSec: 720, restSec: 60 },
+}
+
+/** Set-rijen van de runner met meetkolommen (staafsnelheid, piekvermogen). */
+function RunnerVoorbeeld() {
+  const kolommen = [{ label: 'Staafsnelheid', unit: 'm/s' }, { label: 'Piekvermogen', unit: 'W' }]
+  const [entries, setEntries] = useState<SetEntry[]>(() => makeSetEntries(4, 5, [5, 5, 3, 3]))
+  const vorige = {
+    weight: 100, weightsPerSet: [90, 100, 105, 105], repsPerSet: [5, 5, 3, 3], repsCompleted: 5, setsCompleted: 4, completedAt: null,
+    extraParams: [{ label: 'Staafsnelheid', type: 'number', value: 0.44, unit: 'm/s', perSet: [0.52, 0.46, 0.41, 0.38] }],
+  }
+  const gelogd = meetParamsUitSets(kolommen, entries)
+  return (
+    <div>
+      <MetaLabel>Runner: metingen per set</MetaLabel>
+      <div className="rounded-xl p-3 mt-2 max-w-sm" style={CARD}>
+        <p className="text-sm font-bold">Back Squat</p>
+        <p className="athletic-mono mt-0.5 mb-2" style={{ fontSize: 10, color: P.inkMuted, letterSpacing: '0.08em' }}>4 × 5/5/3/3 · VORIGE KEER PER SET ALS GHOST</p>
+        <SetRows
+          entries={entries} last={vorige} repUnit="reps" meetKolommen={kolommen}
+          onUpdate={(i, patch) => setEntries(prev => prev.map((s, j) => (j === i ? { ...s, ...patch } : s)))}
+          onToggle={i => setEntries(prev => prev.map((s, j) => (j === i ? { ...s, done: !s.done } : s)))}
+          onAdd={() => setEntries(prev => [...prev, { kg: '', reps: '', done: false }])}
+        />
+        <p className="text-xs mt-3" style={{ color: P.inkMuted }} data-testid="meet-log">
+          Historie: {formatMeetParams(gelogd) ?? 'nog niets gemeten'}
+        </p>
+      </div>
+    </div>
+  )
 }
 
 export function Preview() {
@@ -112,6 +143,8 @@ export function Preview() {
             </div>
           </div>
         </div>
+
+        <RunnerVoorbeeld />
       </div>
 
       {dialoog && (

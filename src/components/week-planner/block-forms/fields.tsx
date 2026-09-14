@@ -197,11 +197,21 @@ export function ExerciseCombobox({ value, onChange, defaultCategory, categories,
   const ref = inputRef ?? eigenRef
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: raw = [] } = (trpc.exercises.list.useQuery as any)(
+  const { data: raw = [], isFetched } = (trpc.exercises.list.useQuery as any)(
     { query: search || undefined, category: catFilter ?? undefined },
     { staleTime: 30_000 },
+  ) as { data: ExerciseCandidate[]; isFetched: boolean }
+  // Levert het categoriefilter niets op bij een zoekterm ("deadlift" op een
+  // core-dag), zoek dan alsnog in alle categorieën en zeg dat erbij. Anders
+  // lijkt de bibliotheek leeg terwijl alleen de chip in de weg zit.
+  const buitenFilter = !!catFilter && search.trim().length >= 2 && isFetched && raw.length === 0
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: rawAlles = [] } = (trpc.exercises.list.useQuery as any)(
+    { query: search || undefined },
+    { staleTime: 30_000, enabled: buitenFilter },
   ) as { data: ExerciseCandidate[] }
-  const kandidaten = (categories ? raw.filter(c => (categories as string[]).includes(c.category)) : raw).slice(0, 40)
+  const bron = buitenFilter ? rawAlles : raw
+  const kandidaten = (categories ? bron.filter(c => (categories as string[]).includes(c.category)) : bron).slice(0, 40)
 
   useEffect(() => { setCursor(0) }, [search, catFilter])
 
@@ -262,6 +272,11 @@ export function ExerciseCombobox({ value, onChange, defaultCategory, categories,
       {open && kandidaten.length > 0 && (
         <ul role="listbox" className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto rounded-lg p-1 z-20 space-y-0.5"
           style={{ background: P.surface, border: `1px solid ${P.lineStrong}`, boxShadow: '0 12px 30px rgba(0,0,0,0.45)' }}>
+          {buitenFilter && catFilter && (
+            <li className="px-2 py-1 text-[10px]" style={{ color: P.inkMuted }} aria-live="polite">
+              Niets in {CATEGORY_LABELS[catFilter]}; dit zijn alle categorieën.
+            </li>
+          )}
           {kandidaten.map((c, i) => {
             const cat = (c.category as Category) ?? 'STRENGTH'
             return (

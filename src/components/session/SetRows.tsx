@@ -5,8 +5,10 @@ import { P, DarkInput } from '@/components/dark-ui'
 import {
   type SetEntry,
   type LastLog,
+  type MeetKolom,
   prevKgFor,
   prevRepsFor,
+  prevMeetFor,
 } from '@/lib/session-sets'
 import { isPerSideUnit } from '@/lib/program-constants'
 
@@ -28,6 +30,7 @@ export function SetRows({
   onAdd,
   hideKg = false,
   amrapMin = null,
+  meetKolommen = [],
 }: {
   entries: SetEntry[]
   last?: LastLog
@@ -36,12 +39,17 @@ export function SetRows({
   hideKg?: boolean
   /** AMRAP: het voorgeschreven aantal is een minimum. */
   amrapMin?: number | null
+  /** Meetkolommen per set (staafsnelheid in m/s, piekvermogen in W). */
+  meetKolommen?: MeetKolom[]
   onUpdate: (idx: number, patch: Partial<SetEntry>) => void
   onToggle: (idx: number) => void
   onAdd: () => void
 }) {
   const activeIdx = entries.findIndex(s => !s.done)
   const perSide = isPerSideUnit(repUnit)
+  // Met meetkolommen erbij moet alles op één regel blijven passen (375 px).
+  const velden = (hideKg ? 1 : 2) + meetKolommen.length
+  const veldStijl = { padding: velden > 2 ? '8px 6px' : '8px 10px', fontSize: 16 } as const
 
   return (
     <div>
@@ -60,6 +68,11 @@ export function SetRows({
               al 'reps/zijde' of 'sec/zijde', dus die is leidend. */}
           {repUnit === 'reps' ? 'REPS' : repUnit.toUpperCase()}
         </span>
+        {meetKolommen.map(k => (
+          <span key={k.label} className="flex-1 athletic-mono truncate" title={k.label} style={{ color: P.inkDim, fontSize: 9, letterSpacing: '0.14em' }}>
+            {k.unit.toUpperCase()}
+          </span>
+        ))}
         <span style={{ width: 44 }} />
       </div>
       {perSide && (
@@ -120,7 +133,7 @@ export function SetRows({
                   placeholder={pk != null && pk > 0 ? String(pk).replace('.', ',') : undefined}
                   aria-label={`Gewicht set ${i + 1} (kg)`}
                   className="flex-1 min-w-0"
-                  style={{ padding: '8px 10px', fontSize: 16 }}
+                  style={veldStijl}
                 />
               )}
               <DarkInput
@@ -130,8 +143,23 @@ export function SetRows({
                 placeholder={pr != null ? String(pr) : undefined}
                 aria-label={`Reps set ${i + 1}`}
                 className="flex-1 min-w-0"
-                style={{ padding: '8px 10px', fontSize: 16 }}
+                style={veldStijl}
               />
+              {meetKolommen.map(k => {
+                const pm = prevMeetFor(last, k.label, i)
+                return (
+                  <DarkInput
+                    key={k.label}
+                    value={s.meet?.[k.label] ?? ''}
+                    onChange={(ev) => onUpdate(i, { meet: { ...(s.meet ?? {}), [k.label]: ev.target.value.replace(/[^0-9.,]/g, '') } })}
+                    inputMode="decimal"
+                    placeholder={pm != null ? String(pm).replace('.', ',') : undefined}
+                    aria-label={`${k.label} set ${i + 1} (${k.unit})`}
+                    className="flex-1 min-w-0"
+                    style={veldStijl}
+                  />
+                )
+              })}
               <button
                 type="button"
                 onClick={() => onToggle(i)}

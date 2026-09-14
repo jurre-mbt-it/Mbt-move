@@ -26,7 +26,7 @@ import { isReviewDue, weeksSince } from '@/lib/program-review'
 import { CARDIO_ACTIVITIES, CARDIO_PROTOCOLS, type CardioActivityKey, type CardioProtocolKey } from '@/lib/cardio-constants'
 import { cardioLabel } from '@/lib/cardio-labels'
 import { formatPaceFromSecPerKm } from '@/lib/cardio-zones'
-import { formatWeightsPerSet } from '@/lib/session-sets'
+import { formatWeightsPerSet, formatMeetParams } from '@/lib/session-sets'
 import { formatCardioForDossier, formatSessionForDossier } from '@/lib/dossier-report'
 import { CopyForDossierButton } from '@/components/patients/CopyForDossierButton'
 import { CARDIO_ICON_MAP, IconMail, IconCalendar, IconClipboard } from '@/components/icons'
@@ -982,6 +982,7 @@ export default function PatientDetailPage({
                           // Per set, want alleen `weight` toont de zwaarste set:
                           // 40/50/60/60 kg kwam langs als kaal "60 kg".
                           const weightLabel = formatWeightsPerSet(ex.weightsPerSet, ex.weight)
+                          const meetLabel = formatMeetParams(ex.extraParams)
                           return (
                           <div
                             key={ex.id}
@@ -996,6 +997,7 @@ export default function PatientDetailPage({
                                   ? `${ex.sets} sets`
                                   : '—'}
                               {weightLabel != null && ` · ${weightLabel}`}
+                              {meetLabel != null && ` · ${meetLabel}`}
                               {ex.painLevel != null && ` · NRS ${ex.painLevel}`}
                             </span>
                           </div>

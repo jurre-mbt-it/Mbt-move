@@ -810,6 +810,8 @@ export const patientRouter = createTRPCRouter({
               type: z.string().max(20).optional(),
               value: z.union([z.string().max(200), z.number().min(-1_000_000).max(1_000_000)]),
               unit: z.string().max(20).optional(),
+              // Per set gemeten (staafsnelheid, piekvermogen); `value` is de samenvatting.
+              perSet: z.array(z.number().min(-1_000_000).max(1_000_000).nullable()).max(50).optional(),
             })).max(20).nullable().optional(),
             estimatedOneRepMax: z.number().min(0).max(100_000).nullable().optional(),
             painDuring: z.number().int().min(0).max(10).nullable().optional(),
@@ -996,6 +998,8 @@ export const patientRouter = createTRPCRouter({
               type: z.string().max(20).optional(),
               value: z.union([z.string().max(200), z.number().min(-1_000_000).max(1_000_000)]),
               unit: z.string().max(20).optional(),
+              // Per set gemeten (staafsnelheid, piekvermogen); `value` is de samenvatting.
+              perSet: z.array(z.number().min(-1_000_000).max(1_000_000).nullable()).max(50).optional(),
             })).max(20).nullable().optional(),
             estimatedOneRepMax: z.number().min(0).max(100_000).nullable().optional(),
           })

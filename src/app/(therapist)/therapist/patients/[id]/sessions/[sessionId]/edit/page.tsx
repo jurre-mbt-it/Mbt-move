@@ -40,6 +40,8 @@ type EditExtraParam = {
   options?: string[]
   min?: number
   max?: number
+  /** Per set gemeten (staafsnelheid, piekvermogen); gaat ongewijzigd mee terug. */
+  perSet?: Array<number | null>
 }
 
 type EditRow = {
@@ -80,6 +82,9 @@ function fromServerParams(raw: unknown): EditExtraParam[] {
       options: Array.isArray(p.options) ? p.options.filter((o): o is string => typeof o === 'string') : undefined,
       min: typeof p.min === 'number' ? p.min : undefined,
       max: typeof p.max === 'number' ? p.max : undefined,
+      perSet: Array.isArray(p.perSet)
+        ? p.perSet.map(v => (typeof v === 'number' && Number.isFinite(v) ? v : null))
+        : undefined,
     })
   }
   return out

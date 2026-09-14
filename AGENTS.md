@@ -211,6 +211,14 @@ gaat altijd via `copyBlockColumns()` in `src/server/lib/planner-block-columns.ts
 en `groups`/`repsPerSet` blijven buiten `listWithItems` (TS2589, zie de
 `omit`-regels daar).
 
+Staafsnelheid en piekvermogen (`bar_speed`, `peak_power`) zijn **metingen per
+set**, geen doelchips: de runners tonen ze als kolom naast kg/reps (`SetRows`
+`meetKolommen`) en loggen ze als `extraParams`-entry met `perSet` plus een
+samenvatting in `value` (snelheid gemiddeld, vermogen maximaal), zodat oudere
+schermen en het dossier er niets van merken. De helpers staan in
+`src/lib/session-sets.ts` (`meetKolommenVoor`, `meetParamsUitSets`,
+`formatMeetParams`); de mobiele app spiegelt ze in `lib/session-payload.ts`.
+
 # Twee wearables op één dag: de eerste bron wint, en dat slot zit in de WHERE
 
 Een gebruiker kan tegelijk een Apple Watch, een Polar en Strava hebben. Die

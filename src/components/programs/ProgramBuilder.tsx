@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Label } from '@/components/ui/label'
 import { useCustomParams } from '@/hooks/useCustomParams'
-import { useAutosave, loadDraft } from '@/hooks/useAutosave'
+import { useAutosave, loadDraft, clearStoredDraft } from '@/hooks/useAutosave'
 import { IconWarning } from '@/components/icons'
 import {
   DndContext, DragOverlay, closestCenter, PointerSensor,
@@ -59,6 +59,7 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
+import { OptionSwitch } from '@/components/week-planner/block-forms/fields'
 
 // ─── Drop zone for a single day column ────────────────────────────────────────
 function DayDropZone({
@@ -765,7 +766,15 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
     if (draft.program?.name && draft.program.name.trim().length > 0) {
       setNameUserEdited(true)
     }
-    toast.info('Concept hersteld', { duration: 2000 })
+    // Met een uitweg: wie een oud concept niet terug wil, begint leeg. Het
+    // concept weggooien en herladen geeft de kale server-stand terug.
+    toast.info('Concept hersteld', {
+      duration: 6000,
+      action: {
+        label: 'Leeg beginnen',
+        onClick: () => { clearStoredDraft(draftKey); window.location.reload() },
+      },
+    })
     // We intentionally only run this once per mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -2536,24 +2545,13 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                 niet voor "stuur update-mail" op een al-actief programma waar het
                 originele programma al een patient-kopie is. */}
             {currentStatus === 'DRAFT' && !program.isTemplate && (
-              <label className="flex items-start gap-2 cursor-pointer select-none rounded-lg p-2 -mx-2 hover:bg-[rgba(212,232,230,0.03)]">
-                <input
-                  type="checkbox"
-                  checked={deploySaveAsTemplate}
-                  onChange={(e) => setDeploySaveAsTemplate(e.target.checked)}
-                  disabled={deployBusy}
-                  className="mt-0.5 w-4 h-4 accent-[var(--p-brand)] shrink-0"
-                />
-                <div className="flex-1 text-xs">
-                  <p className="font-semibold">Ook opslaan als sjabloon in bibliotheek</p>
-                  <p className="text-muted-foreground mt-0.5">
-                    Standaard verschijnt dit programma alleen bij {(() => {
-                      const target = patientsList.find(p => p.id === deployPatientId)
-                      return target?.name?.split(' ')[0] ?? 'de patiënt'
-                    })()}. Vink aan om óók een herbruikbare kopie in je hoofd-bibliotheek te bewaren.
-                  </p>
-                </div>
-              </label>
+              <OptionSwitch
+                checked={deploySaveAsTemplate}
+                onCheckedChange={setDeploySaveAsTemplate}
+                disabled={deployBusy}
+                label="Ook opslaan als sjabloon in bibliotheek"
+                hint={`Standaard verschijnt dit programma alleen bij ${patientsList.find(p => p.id === deployPatientId)?.name?.split(' ')[0] ?? 'de patiënt'}. Zet aan om ook een herbruikbare kopie in je hoofdbibliotheek te bewaren.`}
+              />
             )}
 
             <div className="flex gap-2 pt-1">

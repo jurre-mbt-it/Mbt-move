@@ -22,7 +22,9 @@ import {
   prevRepsFor,
   prevSummaryFor,
   filledParams,
-  seedParamsMetMeetvelden,
+  seedParamsZonderMeetvelden,
+  meetKolommenVoor,
+  meetParamsUitSets,
   isMeetParam,
 } from '@/lib/session-sets'
 import {
@@ -545,7 +547,7 @@ function AthleteSessionPageInner() {
   function paramsFor(ex: LiveExercise): SessionParam[] {
     return (
       paramsByUid[ex.uid] ??
-      seedParamsMetMeetvelden(ex.defaultExtraParams, ex.programExtraParams, lastLogs[ex.exerciseId]?.extraParams, true)
+      seedParamsZonderMeetvelden(ex.defaultExtraParams, lastLogs[ex.exerciseId]?.extraParams, true)
     )
   }
 
@@ -630,6 +632,10 @@ function AthleteSessionPageInner() {
           const firstReps = rs.find(n => n !== null) ?? null
           // WYSIWYG: ook onaangeraakte (geseede) parameterwaarden loggen.
           const params = filledParams(paramsByUid[e.uid] ?? paramsFor(e))
+          // Per set gemeten (staafsnelheid, piekvermogen) gaat als parameter
+          // met `perSet` mee; een los veld met hetzelfde label wijkt.
+          const meet = meetParamsUitSets(meetKolommenVoor(e.programExtraParams), entries)
+          const alleParams = [...params.filter(p => !meet.some(m => m.label === p.label)), ...meet]
           return {
             exerciseId: e.exerciseId,
             // Niets afgevinkt maar wél ingevuld = alsnog alle sets tellen.
@@ -639,7 +645,7 @@ function AthleteSessionPageInner() {
             weight: lastFilled,
             weightsPerSet: ws,
             repsPerSet: rs,
-            extraParams: params.length > 0 ? params : undefined,
+            extraParams: alleParams.length > 0 ? alleParams : undefined,
             painLevel,
           }
         }),
@@ -1458,6 +1464,7 @@ function AthleteSessionPageInner() {
                     repUnit={current.repUnit}
                     hideKg={!!current.isBodyweight}
                     amrapMin={current.amrap ? current.reps : null}
+                    meetKolommen={meetKolommenVoor(current.programExtraParams)}
                     onUpdate={(i, patch) => updateSet(current.uid, seed, i, patch)}
                     onToggle={(i) => toggleSetDone(current, seed, i)}
                     onAdd={() => addSet(current.uid, seed)}

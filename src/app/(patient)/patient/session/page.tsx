@@ -22,7 +22,9 @@ import {
   prevRepsFor,
   prevSummaryFor,
   filledParams,
-  seedParamsMetMeetvelden,
+  seedParamsZonderMeetvelden,
+  meetKolommenVoor,
+  meetParamsUitSets,
   isMeetParam,
 } from '@/lib/session-sets'
 import {
@@ -1233,8 +1235,12 @@ function SessionPageInner() {
             : null
           // WYSIWYG: ook onaangeraakte (geseede) parameterwaarden loggen.
           const params = filledParams(
-            paramsByUid[e.uid] ?? seedParamsMetMeetvelden(e.defaultExtraParams, e.programExtraParams, lastLogs[e.exerciseId]?.extraParams, false),
+            paramsByUid[e.uid] ?? seedParamsZonderMeetvelden(e.defaultExtraParams, lastLogs[e.exerciseId]?.extraParams, false),
           )
+          // Per set gemeten (staafsnelheid, piekvermogen) gaat als parameter
+          // met `perSet` mee; een los veld met hetzelfde label wijkt.
+          const meet = meetParamsUitSets(meetKolommenVoor(e.programExtraParams), entries)
+          const alleParams = [...params.filter(p => !meet.some(m => m.label === p.label)), ...meet]
           return {
             exerciseId: e.exerciseId,
             setsCompleted: doneCount,
@@ -1244,7 +1250,7 @@ function SessionPageInner() {
             weight: finalWeight,
             weightsPerSet: entries.length ? ws : undefined,
             repsPerSet: entries.length ? rs : undefined,
-            extraParams: params.length > 0 ? params : undefined,
+            extraParams: alleParams.length > 0 ? alleParams : undefined,
             estimatedOneRepMax: estimated1rm,
             painDuring: tendinopathyMode ? (feedback[e.uid]?.painDuring ?? null) : null,
           }
@@ -1727,6 +1733,7 @@ function SessionPageInner() {
                 repUnit={e.repUnit}
                 hideKg={!!e.isBodyweight}
                 amrapMin={e.amrap ? e.reps : null}
+                meetKolommen={meetKolommenVoor(e.programExtraParams)}
                 onUpdate={(i, patch) => updateSet(e, seed, i, patch)}
                 onToggle={(i) => toggleSetDone(e, seed, i)}
                 onAdd={() => addSet(e, seed)}
@@ -1737,7 +1744,7 @@ function SessionPageInner() {
                 ingesteld; waarden van de vorige sessie staan er alvast in */}
             {(() => {
               const params =
-                paramsByUid[e.uid] ?? seedParamsMetMeetvelden(e.defaultExtraParams, e.programExtraParams, last?.extraParams, false)
+                paramsByUid[e.uid] ?? seedParamsZonderMeetvelden(e.defaultExtraParams, last?.extraParams, false)
               if (params.length === 0) return null
               return (
                 <ExtraParamsEditor

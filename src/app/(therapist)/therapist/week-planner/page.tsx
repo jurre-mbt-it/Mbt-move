@@ -1465,7 +1465,7 @@ function ItemDetailContent({
                 )}
                 {!rpeIsDerived && (
                   <p className="text-[10px] mt-1" style={{ color: P.inkDim }}>
-                    Bepaalt samen met de duur de weekbelasting (duur × RPE). &quot;Schat&quot; leidt 'm af uit het type.
+                    Bepaalt samen met de duur de weekbelasting (duur × RPE). &quot;Schat&quot; leidt &#39;m af uit het type.
                   </p>
                 )}
               </div>

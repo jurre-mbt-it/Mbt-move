@@ -12,11 +12,10 @@
  * WeekSchedule.startDate = maandag van die week, fallback via weekNumber.
  */
 
-import { useMemo, useState } from 'react'
+import { createElement, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { trpc } from '@/lib/trpc/client'
 import { ChevronLeft, ChevronRight, X, Clock, Flame, MapPin, HeartPulse } from 'lucide-react'
-import { formatSetsReps } from '@/lib/prescription'
 import { formatBlockPrescription } from '@/lib/planner-blocks'
 import { P, CARD, Kicker, MetaLabel, Tile, DarkButton } from '@/components/dark-ui'
 import {
@@ -756,9 +755,12 @@ function EventCard({ event, onClick }: { event: CalEvent; onClick: () => void })
           color: ink,
         }}
       >
-        {(() => { const A = eventIcon(event); return A
-          ? <A size={18} />
-          : <CategoryIcon category={event.category} size={18} /> })()}
+        {(() => {
+          // createElement i.p.v. een JSX-tag uit een variabele: de linter ziet
+          // dat anders als een component die tijdens het renderen ontstaat.
+          const A = eventIcon(event)
+          return A ? createElement(A, { size: 18 }) : <CategoryIcon category={event.category} size={18} />
+        })()}
       </div>
       <div className="flex-1 min-w-0">
         <p
