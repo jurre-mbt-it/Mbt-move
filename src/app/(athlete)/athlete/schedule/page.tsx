@@ -158,6 +158,8 @@ type CalEvent =
       itemId: string | null
       /** Heeft de therapeut oefeningen klaargezet? Zo niet: lege ad-hoc sessie. */
       hasExercises: boolean
+      /** Verzonden door een atletengroep: programmanaam die de atleet ziet. */
+      groupPlanName?: string | null
     }
 
 /**
@@ -360,6 +362,7 @@ export default function AthleteSchedulePage() {
           notes: item.notes,
           itemId: isRealItem ? item.id : null,
           hasExercises: item.hasContent ?? ((item._count?.exercises ?? 0) > 0),
+          groupPlanName: item.groupPlanName ?? null,
         })
       }
     }
@@ -685,6 +688,7 @@ type CalendarData = {
         /** Server-signaal: oefeningen, cardio-blokken óf een programma. Cardio
          *  heeft géén oefeningen, dus op _count alleen gaan is fout. */
         hasContent?: boolean
+        groupPlanName?: string | null
         /** Gevuld = al afgevinkt tegen dit item (identiteit, geen heuristiek). */
         sessionLogs?: Array<{ id: string; completedAt: string | Date | null; completedAll: boolean }>
         /** Idem voor cardio — dat logt een CardioLog, geen SessionLog. */
@@ -769,6 +773,11 @@ function EventCard({ event, onClick }: { event: CalEvent; onClick: () => void })
         >
           {event.name}
         </p>
+        {event.kind === 'planned' && event.groupPlanName && (
+          <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: '0.08em', color: ink, opacity: 0.7 }}>
+            ONDERDEEL VAN {event.groupPlanName.toUpperCase()}
+          </p>
+        )}
         <div
           style={{
             fontFamily: mono,

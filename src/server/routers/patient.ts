@@ -504,6 +504,7 @@ export const patientRouter = createTRPCRouter({
           day: { weekSchedule: { patientId: targetPatientId, isTemplate: false } },
         },
         include: {
+          group: { select: { name: true, planName: true } },
           exercises: {
             orderBy: [{ order: 'asc' }],
             include: {
@@ -549,6 +550,8 @@ export const patientRouter = createTRPCRouter({
           plannedItem: {
             id: item.id,
             name: item.quickName ?? 'Workout',
+            // Verzonden door een atletengroep: "Onderdeel van <programmanaam>".
+            groupPlanName: item.group ? (item.group.planName ?? item.group.name) : null,
             category: item.quickCategory ?? null,
             activity: item.quickActivity ?? null,
             durationSec: item.plannedDurationSec ?? item.quickDurationSec ?? null,
@@ -2296,6 +2299,8 @@ export const patientRouter = createTRPCRouter({
                     // zodat de patiënt dezelfde duur ziet als de therapeut.
                     plannedDurationSec: true,
                     notes: true,
+                    // Verzonden door een atletengroep: de atleet ziet de programmanaam.
+                    group: { select: { name: true, planName: true } },
                     // Kan de patiënt dit item überhaupt uitvoeren? Zonder dit
                     // toont de kalender een start-knop die op een leeg scherm
                     // uitkomt. Het aantal volstaat — de oefeningen zelf komen
@@ -2356,8 +2361,9 @@ export const patientRouter = createTRPCRouter({
           ...ws,
           days: ws.days.map(d => ({
             ...d,
-            items: d.items.map(({ cardioParams, ...it }) => ({
+            items: d.items.map(({ cardioParams, group, ...it }) => ({
               ...it,
+              groupPlanName: group ? (group.planName ?? group.name) : null,
               hasContent:
                 it._count.exercises > 0 || it.programId !== null || cardioParams != null,
             })),
