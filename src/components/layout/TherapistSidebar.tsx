@@ -24,6 +24,7 @@ import {
   PanelLeftClose,
   ArrowLeftRight,
   Rocket,
+  UsersRound,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -42,6 +43,7 @@ const THERAPIST_NAV: SidebarNavItem[] = [
   { href: '/therapist/programs/new', label: 'Builder', icon: Blocks },
   { href: '/therapist/week-planner', label: 'Weekschema', icon: CalendarDays },
   { href: '/therapist/plans', label: 'Trainingsplannen', icon: FileText },
+  { href: '/therapist/groups', label: 'Groepen', icon: UsersRound },
   { href: '/therapist/exercises', label: 'Oefeningen', icon: Dumbbell },
   { href: '/therapist/tests', label: 'Tests', icon: Stethoscope },
   { href: '/therapist/test-reports', label: 'Testrapport', icon: FileText },
@@ -61,6 +63,7 @@ const COACH_NAV: SidebarNavItem[] = [
   { href: '/coach/programs/new', label: 'Builder', icon: Blocks },
   { href: '/coach/week-planner', label: 'Weekschema', icon: CalendarDays },
   { href: '/coach/plans', label: 'Trainingsplannen', icon: FileText },
+  { href: '/coach/groups', label: 'Groepen', icon: UsersRound },
   { href: '/coach/exercises', label: 'Oefeningen', icon: Dumbbell },
 ]
 
