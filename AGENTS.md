@@ -234,6 +234,22 @@ geeft de cardio van de dag top-level terug als `cardio` in
 `patient.getTodayExercises`, voor trainingen én programmadagen. Nieuwe
 Json-kolom op `programs` = ook in de `omit` van `programs.list` (TS2589).
 
+# Atletengroepen: de groepskalender is een gewoon weekschema met `groupId`
+
+Een atletengroep (`athlete_groups`) heeft leden, staf met een rol
+(`src/server/lib/group-access.ts`, tabel in de spec) en een kalender van
+`week_schedules` met `groupId` gevuld en `patientId` leeg. Daardoor werkt de
+hele planner erop; de kiezer bovenin toont groepen boven de atleten.
+"Stuur naar iedereen" (`athleteGroups.send`) vervangt per lid en per gekozen
+week alleen items met deze `groupId`; de regels staan als pure functie in
+`src/server/lib/group-send.ts` en de kopie draagt `groupId` + `sourceItemId`.
+Andersom laat `planTemplates.applyToPatient` in de stand "vervangen" items mét
+`groupId` staan. Bewerkrechten op een kalender lopen via
+`assertMagKalenderBewerken` en de groepstak in `bewerkbareWeken` in
+`weekSchedules.ts`: groepskalender → groepsrol PLANNER, atleet →
+patiëntkoppeling. De atleet ziet `groupPlanName` op kalenderitems en op
+`plannedItem` in `getTodayExercises`.
+
 # Twee wearables op één dag: de eerste bron wint, en dat slot zit in de WHERE
 
 Een gebruiker kan tegelijk een Apple Watch, een Polar en Strava hebben. Die
