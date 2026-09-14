@@ -15,6 +15,19 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // Toegang en koppelingen
   'Geen actieve behandelrelatie met deze patiënt': 'No active treatment relationship with this patient',
   'Geen actieve koppeling met deze patiënt': 'No active link with this patient',
+  // Atletengroepen
+  'Groep niet gevonden': 'Group not found',
+  'Als beheerder kijk je alleen mee in een groep': 'As an admin you can only view a group',
+  'Onvoldoende rechten in deze groep': 'Insufficient rights in this group',
+  'Geen actieve koppeling met deze atleet': 'No active link with this athlete',
+  'Alleen een coach maakt een groep aan': 'Only a coach can create a group',
+  'De einddatum ligt vóór de startdatum': 'The end date is before the start date',
+  'Geen therapeut of coach met dit e-mailadres': 'No therapist or coach with this email address',
+  'De eigenaar houdt altijd de eigenaarsrol': 'The owner always keeps the owner role',
+  'De eigenaar kan zichzelf niet verwijderen': 'The owner cannot remove themselves',
+  'Kies minstens één week van de groep': 'Choose at least one week of the group',
+  'Ongeldige startdatum': 'Invalid start date',
+  'Ongeldige einddatum': 'Invalid end date',
   // Bloklijst-validatie (planner en programma-builder).
   'Kies een oefening': 'Choose an exercise',
   'De notitie is leeg': 'The note is empty',
