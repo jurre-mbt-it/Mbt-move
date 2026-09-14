@@ -40,7 +40,7 @@ import { WeekPhaseLine } from '@/components/schedule/WeekPhaseLine'
 import { SetRows } from '@/components/session/SetRows'
 import { CompletionRow } from '@/components/session/CompletionRow'
 import { formatBlockPrescription, parseGroups } from '@/lib/planner-blocks'
-import { BlokRegel, geplandeBlokkenUit, regelsVoor } from '@/components/session/planned-blocks'
+import { BlokRegel, CardioPlanRow, geplandeBlokkenUit, regelsVoor } from '@/components/session/planned-blocks'
 import { ExtraParamsEditor } from '@/components/session/ExtraParams'
 import { ExerciseProgressSheet } from '@/components/session/ExerciseProgressSheet'
 import { MOOD_SCALE, IconCelebration, IconBeach, IconStop, IconWarning } from '@/components/icons'
@@ -2109,6 +2109,8 @@ function SessionPageInner() {
           </>
         ) : (
           <>
+            {/* Cardio-workout uit de blokkenbouwer: voor de patiënt als samenvatting. */}
+            <CardioPlanRow cardio={(sessionData as { plannedItem?: { cardio?: unknown } | null } | undefined)?.plannedItem?.cardio ?? null} startHref={null} />
             {(() => {
               // Blokken van het geplande item (koppen, notities, pauzes) tussen de
               // stappen; een superset-stap komt op de plek van zijn eerste oefening.

@@ -7,9 +7,12 @@
  * oefening op zijn plek, een notitie als kaart, een pauze als rij met timer.
  */
 
-import { Coffee, StickyNote } from 'lucide-react'
-import { CARD, P } from '@/components/dark-ui'
+import Link from 'next/link'
+import { Coffee, HeartPulse, StickyNote } from 'lucide-react'
+import { CARD, DarkButton, P } from '@/components/dark-ui'
 import { fmtMmSs, groupLabel, type ItemGroups } from '@/lib/planner-blocks'
+import { readWorkout, summarize, totalDurationSec } from '@/lib/cardio-workout'
+import { CARDIO_ACTIVITIES } from '@/lib/cardio-constants'
 
 export type AthleteBlock = {
   id: string
@@ -120,6 +123,38 @@ export function BlokRegel<T>({ regel, onVideo, onTimer }: {
           style={{ border: `1px solid ${P.lineStrong}`, color: P.inkMuted, fontSize: 9, letterSpacing: '0.12em', fontWeight: 800 }}>
           TIMER
         </button>
+      )}
+    </div>
+  )
+}
+
+// ─── Cardio-workout uit de blokkenbouwer ─────────────────────────────────────
+
+/**
+ * De cardio-workout van het geplande item (warming-up, intervallen, cooldown)
+ * bovenaan de sessie. De atleet start hem in de cardio-runner via `startHref`;
+ * zonder link (patiënt) is het een leesbare samenvatting.
+ */
+export function CardioPlanRow({ cardio, startHref }: { cardio: unknown; startHref: string | null }) {
+  const w = readWorkout(cardio ?? null)
+  if (!w) return null
+  const dur = Math.round(totalDurationSec(w.blocks) / 60)
+  return (
+    <div className="rounded-xl p-3" style={{ background: P.surfaceLow, border: `1px solid ${P.line}` }}>
+      <div className="flex items-center gap-2">
+        <span className="flex shrink-0" style={{ color: P.danger }}><HeartPulse className="w-4 h-4" /></span>
+        <span className="text-sm font-bold flex-1 min-w-0 truncate" style={{ color: P.ink }}>
+          {CARDIO_ACTIVITIES[w.activity]?.label ?? 'Cardio'}
+        </span>
+        <span className="athletic-mono shrink-0" style={{ fontSize: 10, color: P.inkMuted, letterSpacing: '0.08em' }}>
+          {dur} MIN
+        </span>
+      </div>
+      <p className="text-xs mt-1.5 leading-relaxed" style={{ color: P.inkDim }}>{summarize(w.blocks)}</p>
+      {startHref && (
+        <Link href={startHref} className="mt-2.5 inline-flex">
+          <DarkButton variant="secondary" size="sm">Cardio starten</DarkButton>
+        </Link>
       )}
     </div>
   )

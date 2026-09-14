@@ -40,7 +40,7 @@ import { RestSheet } from '@/components/session/RestSheet'
 import { WeekPhaseLine } from '@/components/schedule/WeekPhaseLine'
 import { SetRows } from '@/components/session/SetRows'
 import { CompletionRow } from '@/components/session/CompletionRow'
-import { BlokRegel, geplandeBlokkenUit, regelsVoor } from '@/components/session/planned-blocks'
+import { BlokRegel, CardioPlanRow, geplandeBlokkenUit, regelsVoor } from '@/components/session/planned-blocks'
 import { formatBlockPrescription, parseGroups } from '@/lib/planner-blocks'
 import { ExtraParamsEditor, RepUnitPicker } from '@/components/session/ExtraParams'
 import { isRepBasedUnit, sideVolumeFactor } from '@/lib/program-constants'
@@ -866,6 +866,10 @@ function AthleteSessionPageInner() {
             </div>
           ) : (
             <div className="space-y-2 mbt-stagger">
+              <CardioPlanRow
+                cardio={sessionData?.plannedItem?.cardio ?? null}
+                startHref={plannedItemId ? `/athlete/cardio/new?itemId=${plannedItemId}` : null}
+              />
               {overzichtRegels.map((regel, i) => {
                 if (regel.soort !== 'oefening') {
                   return (

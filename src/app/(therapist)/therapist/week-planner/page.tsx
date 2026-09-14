@@ -25,7 +25,7 @@ import {
   Search, Building2, Copy, CopyPlus, Pencil, BookmarkPlus, GripVertical,
   CalendarRange, Layers, Moon, CalendarPlus, StickyNote, ClipboardCheck, Flag,
   Scissors, ClipboardPaste, Archive, Check, Clock3, CornerUpRight,
-Trash2, Coffee, Dumbbell, RefreshCw, MousePointer2, } from 'lucide-react'
+Trash2, Coffee, Dumbbell, RefreshCw, MousePointer2, HeartPulse } from 'lucide-react'
 import {
   PHASE_TYPES, PHASE_META, phaseMeta, DELOAD_LOAD_FRACTION,
   type PhaseType,
@@ -493,6 +493,27 @@ function WeekLoadBar({
  * blokken zelf bewerk je in een volledig scherm — 360px is te smal voor een
  * workout met herhalingen.
  */
+/** Compacte rij in de dagcel: de cardio-workout uit de blokkenbouwer. Klik = bouwer. */
+function CardioRij({ item, onClick }: { item: ScheduleItem; onClick: (() => void) | null }) {
+  const w = readWorkout(item.cardioParams)
+  if (!w) return null
+  const min = Math.round(workoutDuration(w.blocks) / 60)
+  return (
+    <button
+      type="button"
+      onClick={onClick ?? undefined}
+      disabled={!onClick}
+      title={summarizeWorkout(w.blocks)}
+      className="w-full flex items-center gap-1.5 px-1.5 py-1 rounded-md text-left mbt-btn-hover"
+      style={{ color: P.ink, cursor: onClick ? 'pointer' : 'default' }}
+    >
+      <span className="flex shrink-0" style={{ color: P.danger }}><HeartPulse size={11} /></span>
+      <span className="flex-1 min-w-0 truncate" style={{ fontSize: 11 }}>{CARDIO_ACTIVITIES[w.activity]?.label ?? 'Cardio'}</span>
+      <span className="athletic-mono shrink-0" style={{ fontSize: 9, color: P.inkMuted, letterSpacing: '0.06em' }}>{min} MIN</span>
+    </button>
+  )
+}
+
 function CardioSummary({ item, onBuild }: { item: ScheduleItem; onBuild: (() => void) | null }) {
   const w = readWorkout(item.cardioParams)
   const dur = w ? workoutDuration(w.blocks) : 0
@@ -982,7 +1003,8 @@ function DayCell({
   selected, onSelectStart, onSelectEnter,
   onAddWorkout, onAddTemplate, onCopyDay,
   onItemClick, onRemoveItem, statusFor, sessionIdFor, loggedFor, movedToFor, openItemId,
-  onAddBlock, onEditBlock, onRemoveBlock, onMoveBlock, onEditGroup, toonRijen, onDayMenu, onRowMenu, onSelectBlock, krap = false,
+  onAddBlock, onEditBlock, onRemoveBlock, onMoveBlock, onEditGroup, toonRijen, onDayMenu,
+  onBuildCardio, onRowMenu, onSelectBlock, krap = false,
   readOnly = false,
 }: {
   date: Date
@@ -1006,6 +1028,8 @@ function DayCell({
   /** false = alleen de trainingspil, de rijen blijven in het zijpaneel. */
   toonRijen: boolean
   onDayMenu: (item: ScheduleItem | null, date: Date, dayId: string | null, e: React.MouseEvent) => void
+  /** Cardio-workout (blokkenbouwer) van de training openen. */
+  onBuildCardio: (item: ScheduleItem) => void
   /** Weinig breedte per dag: knoppen zonder tekst. */
   krap?: boolean
   onRowMenu: (item: ScheduleItem, block: PlannerBlock, date: Date, dayId: string | null, e: React.MouseEvent) => void
@@ -1125,6 +1149,9 @@ function DayCell({
                 : <div data-noselect className="w-full min-w-0">{tile}</div>}
               {toontRijen && (
                 <div data-noselect className="mt-0.5">
+                  {toonRijen && readWorkout(item.cardioParams) && (
+                    <CardioRij item={item} onClick={readOnly ? null : () => onBuildCardio(item)} />
+                  )}
                   {toonRijen && <BlockRows
                     compact
                     sortable={readOnly ? null : item.id}
@@ -1517,6 +1544,10 @@ function ItemDetailContent({
               />
             ) : (
               <div className="space-y-2">
+                {/* Kracht mét een cardio-workout uit de blokkenbouwer: die staat bovenaan. */}
+                {readWorkout(item.cardioParams) && (
+                  <CardioSummary item={item} onBuild={readOnly ? null : () => onBuildCardio(item)} />
+                )}
                 <div className="flex items-center justify-between gap-2">
                   <MetaLabel>Geplande oefeningen</MetaLabel>
                   {!readOnly && (item.blocks?.length ?? 0) > 1 && (
@@ -2853,7 +2884,9 @@ function WeekPlannerContent() {
   const handleMoveBlock = (item: ScheduleItem, b: PlannerBlock, dir: -1 | 1) => blokken.moveBlock(item.id, item.blocks ?? [], b.id, dir)
 
   // ─ Cardio-blokkenbouwer (volledig scherm) ─
-  const [cardioBuilderItem, setCardioBuilderItem] = useState<ScheduleItem | null>(null)
+  // Alleen wat de bouwer nodig heeft: zo kan ook een net aangemaakte training
+  // (nog niet in de lijst) meteen een cardio-workout krijgen.
+  const [cardioBuilderItem, setCardioBuilderItem] = useState<Pick<ScheduleItem, 'id' | 'cardioParams' | 'quickActivity' | 'quickName'> | null>(null)
 
   // ─ Plan-sjablonen ─
   const [applyPlanOpen, setApplyPlanOpen] = useState(false)
@@ -3564,6 +3597,7 @@ function WeekPlannerContent() {
                       onEditGroup={(item, l, d, dayId) => openBlockDialog(item, d, dayId, { editGroupLetter: l })}
                       toonRijen={weergave === 'oefeningen'}
                       onDayMenu={openDagMenu}
+                      onBuildCardio={setCardioBuilderItem}
                       onRowMenu={openRijMenu}
                       onSelectBlock={selecteerRijVanuitCel}
                       krap={krap}
@@ -3618,6 +3652,11 @@ function WeekPlannerContent() {
             groups={blockDialogInhoud?.groups ?? {}}
             defaultCategory={blockDialog.category}
             saving={blokken.saving}
+            onOpenCardio={() => {
+              const bd = blockDialog
+              setBlockDialog(null)
+              setCardioBuilderItem({ id: bd.itemId, cardioParams: blockDialogInhoud?.cardioParams ?? null, quickActivity: null, quickName: bd.workoutName })
+            }}
             onSubmitBlock={async (d) => {
               await blokken.submitBlock(blockDialog.itemId, blockDialogInhoud?.blocks ?? [], d, blockDialog.insertAt ?? undefined)
               // Volgende rij komt onder de zojuist ingevoegde.
@@ -3664,6 +3703,7 @@ function WeekPlannerContent() {
                 itemId: cardioBuilderItem.id,
                 cardioParams: w as unknown as Record<string, unknown>,
               })
+              await Promise.all([utils.weekSchedules.listWithItems.invalidate(), utils.weekSchedules.listItemContents.invalidate()])
               setCardioBuilderItem(null)
             }}
           />

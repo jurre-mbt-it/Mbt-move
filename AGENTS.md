@@ -219,6 +219,16 @@ schermen en het dossier er niets van merken. De helpers staan in
 `src/lib/session-sets.ts` (`meetKolommenVoor`, `meetParamsUitSets`,
 `formatMeetParams`); de mobiele app spiegelt ze in `lib/session-payload.ts`.
 
+Cardio in de `+ Oefening`-pop-up is **geen rij** maar de blokkenbouwer
+(`CardioWorkoutBuilder`, `WeekScheduleDayItem.cardioParams`): het tabblad
+Cardio roept `onOpenCardio` aan en de training krijgt één cardio-workout naast
+zijn krachtrijen. `setItemCardio` zet `quickCategory` alleen op CARDIO als de
+training geen oefeningrijen heeft; met rijen blijft de soort van de rijen
+leidend en tonen de runners de cardio-workout als kaart bovenaan
+(`CardioPlanRow`, atleet start hem in `/athlete/cardio/new?itemId=`). Zonder
+`onOpenCardio` (programma-builder) blijft een kort activiteitsformulier over,
+zonder per-set en AMRAP.
+
 # Twee wearables op één dag: de eerste bron wint, en dat slot zit in de WHERE
 
 Een gebruiker kan tegelijk een Apple Watch, een Polar en Strava hebben. Die

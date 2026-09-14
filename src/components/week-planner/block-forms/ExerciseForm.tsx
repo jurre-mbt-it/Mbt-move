@@ -145,9 +145,14 @@ export function ExerciseForm({ mode, draft, onChange, groups, defaultCategory, s
       </div>
 
       <div className="flex flex-wrap gap-x-6 gap-y-3">
-        <OptionSwitch checked={perSet} onCheckedChange={togglePerSet} label="Per set" hint="Ander aantal per set, bijv. 8/6/6/4." disabled={draft.completionOnly} />
-        <OptionSwitch checked={draft.amrap} onCheckedChange={v => set({ amrap: v })} label="AMRAP" hint="Zoveel mogelijk, het getal is de ondergrens." disabled={draft.completionOnly} />
-        {(repBased || draft.repUnit.startsWith('sec')) && (
+        {/* Per set en AMRAP zijn krachtbegrippen; een cardio-activiteit heeft ze niet. */}
+        {mode === 'exercise' && (
+          <>
+            <OptionSwitch checked={perSet} onCheckedChange={togglePerSet} label="Per set" hint="Ander aantal per set, bijv. 8/6/6/4." disabled={draft.completionOnly} />
+            <OptionSwitch checked={draft.amrap} onCheckedChange={v => set({ amrap: v })} label="AMRAP" hint="Zoveel mogelijk, het getal is de ondergrens." disabled={draft.completionOnly} />
+          </>
+        )}
+        {mode === 'exercise' && (repBased || draft.repUnit.startsWith('sec')) && (
           <OptionSwitch checked={perSide} onCheckedChange={v => set({ repUnit: perSideOf(draft.repUnit, v) })} label="Per zijde" hint="Het aantal geldt links én rechts." />
         )}
       </div>

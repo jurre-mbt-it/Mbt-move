@@ -2266,7 +2266,10 @@ export const weekSchedulesRouter = createTRPCRouter({
         ? await ctx.prisma.exercise.findMany({ where: { id: { in: exerciseIds } }, select: { id: true, category: true } })
         : []
       const catById = new Map(cats.map(c => [c.id, c.category as string]))
-      const derivedCategory = item.cardioParams
+      // Met oefeningrijen volgt de soort de rijen; een training met alleen een
+      // cardio-workout (blokkenbouwer) blijft CARDIO, zodat de agenda hem naar
+      // de cardio-runner stuurt.
+      const derivedCategory = exerciseIds.length === 0 && item.cardioParams
         ? null
         : dominantCategory(
             input.exercises.map(e => ({ blockKind: e.blockKind, exerciseCategory: e.exerciseId ? catById.get(e.exerciseId) ?? null : null })),
@@ -2353,10 +2356,19 @@ export const weekSchedulesRouter = createTRPCRouter({
         derived = { plannedDurationSec: null, plannedRpe: null }
       }
 
+      // Cardio op een training zonder oefeningrijen: dan ís de training cardio
+      // en hoort de agenda hem als cardio te openen. Staan er wel rijen, dan
+      // blijft de soort van de rijen leidend (kracht met een cardio-blok).
+      const rijen = await ctx.prisma.weekScheduleDayItemExercise.count({
+        where: { itemId: input.itemId, blockKind: 'EXERCISE' },
+      })
+      const soort = payload && payload.version === 1 && rijen === 0 ? { quickCategory: 'CARDIO' as const } : {}
+
       await ctx.prisma.weekScheduleDayItem.update({
         where: { id: input.itemId },
         data: {
           ...derived,
+          ...soort,
           cardioParams: payload === null
             ? Prisma.JsonNull
             : (payload as Prisma.InputJsonValue),

@@ -44,7 +44,9 @@ const TITLES: Record<BlockDialogType, string> = {
 function typeOf(b: PlannerBlock): BlockDialogType {
   if (b.blockKind === 'NOTE') return 'note'
   if (b.blockKind === 'BREAK') return 'break'
-  return b.exerciseCategory === 'CARDIO' || b.exerciseCategory === 'PLYOMETRICS' ? 'cardio' : 'exercise'
+  // Een oefeningrij is een oefeningrij, ook als de bibliotheek-oefening cardio
+  // heet: het cardio-tabblad is sinds 14-09-2026 de blokkenbouwer, niet dit formulier.
+  return 'exercise'
 }
 
 function draftFor(type: BlockDialogType, group: string | null): BlockDraft {
@@ -58,7 +60,7 @@ function draftFor(type: BlockDialogType, group: string | null): BlockDraft {
 
 export function ExerciseBlockDialog({
   open, onClose, dayLabel, workoutName, initialType = 'exercise',
-  editBlock, editGroupLetter = null, blocks, groups, defaultCategory, saving, onSubmitBlock, onSubmitGroup,
+  editBlock, editGroupLetter = null, blocks, groups, defaultCategory, saving, onSubmitBlock, onSubmitGroup, onOpenCardio,
 }: {
   open: boolean
   onClose: () => void
@@ -75,6 +77,10 @@ export function ExerciseBlockDialog({
   saving: boolean
   onSubmitBlock: (draft: BlockDraft) => Promise<void>
   onSubmitGroup: (letter: string, group: ItemGroup) => Promise<void>
+  /** Cardio hoort in de blokkenbouwer (warming-up, intervallen, cooldown), niet in
+   *  een sets/reps-formulier. Geef dit mee en het tabblad Cardio opent die bouwer;
+   *  zonder (programma-builder) blijft een kort activiteitsformulier over. */
+  onOpenCardio?: () => void
 }) {
   const catColors = useCategoryColors()
   const [type, setType] = useState<BlockDialogType>(initialType)
@@ -91,7 +97,9 @@ export function ExerciseBlockDialog({
   useEffect(() => {
     if (!open) return
     const groep = editGroupLetter ? groups[editGroupLetter] : undefined
-    const t: BlockDialogType = editBlock ? typeOf(editBlock) : groep ? 'circuit' : initialType
+    const t0: BlockDialogType = editBlock ? typeOf(editBlock) : groep ? 'circuit' : initialType
+    if (t0 === 'cardio' && onOpenCardio) { onOpenCardio(); return }
+    const t = t0
     setType(t)
     setDraft(editBlock ? { ...editBlock } : draftFor(t, null))
     setCircuit(groep && editGroupLetter ? circuitFromGroup(editGroupLetter, groep) : emptyCircuit())
@@ -103,6 +111,7 @@ export function ExerciseBlockDialog({
   }, [open, editBlock, editGroupLetter, initialType])
 
   function kiesType(t: BlockDialogType) {
+    if (t === 'cardio' && onOpenCardio) { onOpenCardio(); return }
     setType(t)
     setDraft(draftFor(t, stickyGroup))
     setFout(null)

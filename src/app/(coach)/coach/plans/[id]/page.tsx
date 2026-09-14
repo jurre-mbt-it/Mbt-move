@@ -1206,7 +1206,7 @@ function PlanItemDialog({
           onClose={() => setBlokDialoog(null)}
           dayLabel="Sjabloondag"
           workoutName={item.quickName ?? 'Training'}
-          initialType={category === 'CARDIO' ? 'cardio' : 'exercise'}
+          initialType="exercise"
           editBlock={blokDialoog.editBlock}
           editGroupLetter={blokDialoog.editGroupLetter}
           blocks={inhoud?.blocks ?? []}
@@ -1215,6 +1215,7 @@ function PlanItemDialog({
           saving={blokken.saving}
           onSubmitBlock={d => blokken.submitBlock(item.id, inhoud?.blocks ?? [], d)}
           onSubmitGroup={(l, g) => blokken.setGroup(item.id, inhoud?.groups ?? {}, l, g)}
+          onOpenCardio={() => { setBlokDialoog(null); setCardioOpen(true) }}
         />
       )}
     </Dialog>
