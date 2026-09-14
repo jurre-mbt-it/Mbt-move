@@ -12,7 +12,7 @@
  * naar ponden op, ook als BASE zelf geen gewicht kent.
  */
 import type { KinventAnalysis, KinventProtocol } from './client'
-import { parseActivityResults, parseBodyWeight, parseJump, parseStrength, type JumpReading } from './parse'
+import { parseActivityResults, parseBodyWeight, parseJump, parseStrength, type JumpReading, type StrengthReading } from './parse'
 import { checkUnit, lsi, type UnitCheck } from './units'
 
 export type ImportCandidate = {
@@ -34,6 +34,8 @@ export type ImportCandidate = {
   rsi: number | null
   /** De volledige sprongmeting, voor het wegschrijven na bevestiging. */
   jump: JumpReading | null
+  /** De volledige krachtmeting met herhalingen, idem. */
+  strength: StrengthReading | null
   unit: UnitCheck
   /** Al eerder geïmporteerd voor deze patiënt. */
   alreadyImported: boolean
@@ -111,6 +113,7 @@ export function buildCandidates(input: CandidateInput): CandidateOutput {
           jumpHeightCm: best.jumpHeightCm,
           rsi: best.rsi,
           jump,
+          strength: null,
           unit,
         })
         continue
@@ -142,6 +145,7 @@ export function buildCandidates(input: CandidateInput): CandidateOutput {
         jumpHeightCm: null,
         rsi: null,
         jump: null,
+        strength,
         unit,
       })
     }

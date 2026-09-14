@@ -28,7 +28,7 @@
  */
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
-import { createTRPCRouter, therapistProcedure } from '@/server/trpc'
+import { createTRPCRouter, protectedProcedure, therapistProcedure } from '@/server/trpc'
 import { hasPatientAccess } from '@/server/lib/patient-access'
 import { auditLog } from '@/server/audit'
 import {
@@ -99,6 +99,25 @@ function entryFromCatalog(reportId: string, c: ImportCandidate, order: number, i
     importedAt: new Date(),
     importedUnit: isJump ? 'cm' : 'kg',
   }
+}
+
+/** Sprongen en krachttests met herhalingen, nieuwste eerst. */
+async function metingenVan(prisma: Prisma, patientId: string) {
+  const [jumps, strength] = await Promise.all([
+    prisma.kinventJumpResult.findMany({
+      where: { patientId },
+      orderBy: { performedAt: 'desc' },
+      take: 300,
+      include: { reps: { orderBy: { ordinal: 'asc' } } },
+    }),
+    prisma.kinventStrengthResult.findMany({
+      where: { patientId },
+      orderBy: { performedAt: 'desc' },
+      take: 300,
+      include: { reps: { orderBy: { ordinal: 'asc' } } },
+    }),
+  ])
+  return { jumps, strength }
 }
 
 /** Laatst bekende lichaamsgewicht van deze patiënt uit Kinvent, als ijkpunt. */
@@ -546,6 +565,7 @@ export const kinventRouter = createTRPCRouter({
 
       let entries = 0
       let jumps = 0
+      let strength = 0
       let skipped = 0
 
       // Naar het rapport: elke krachttest, plus een sprong als hij aan een
@@ -631,10 +651,54 @@ export const kinventRouter = createTRPCRouter({
               timeToStabilizeMs: r.timeToStabilizeMs,
               propulsiveImpulsePhase1: r.propulsiveImpulsePhase1,
               propulsiveImpulsePhase2: r.propulsiveImpulsePhase2,
+              rfdTotal: r.rfdTotal,
+              rfdLeft: r.rfdLeft,
+              rfdRight: r.rfdRight,
             })),
           })
         })
         jumps++
+      }
+
+      // Krachtdetails altijd, ook als de rapportregel al bestond: zo is een
+      // eerdere import aan te vullen zonder het rapport te raken.
+      for (const c of candidates) {
+        if (c.kind !== 'STRENGTH' || !c.strength) continue
+        const st = c.strength
+        await ctx.prisma.$transaction(async (tx) => {
+          const data = {
+            patientId: input.patientId,
+            protocolCode: c.protocolCode,
+            performedAt: c.performedAt,
+            exerciseType: c.exerciseType,
+            title: c.title,
+            deviceType: c.deviceType,
+            leftMaxKg: rond(st.left),
+            rightMaxKg: rond(st.right),
+            singleMaxKg: rond(st.single),
+          }
+          const result = await tx.kinventStrengthResult.upsert({
+            where: { activityCode: c.activityCode },
+            create: { activityCode: c.activityCode, ...data },
+            update: data,
+          })
+          await tx.kinventStrengthRep.deleteMany({ where: { resultId: result.id } })
+          await tx.kinventStrengthRep.createMany({
+            data: st.reps.map((r, i) => ({
+              resultId: result.id,
+              ordinal: i + 1,
+              repCode: r.repCode,
+              side: r.side,
+              maxKg: r.maxKg,
+              averageKg: r.averageKg,
+              rfdToMax: r.rfdToMax,
+              rfdAverage: r.rfdAverage,
+              timeToMaxMs: r.timeToMaxMs,
+              impulseNs: r.impulseNs,
+            })),
+          })
+        })
+        strength++
       }
 
       await ctx.prisma.kinventSync.upsert({
@@ -644,19 +708,22 @@ export const kinventRouter = createTRPCRouter({
       })
       await ctx.prisma.kinventSync.updateMany({ where: { patientId: input.patientId, pendingCount: { lt: 0 } }, data: { pendingCount: 0 } })
       await auditLog({ event: 'KINVENT_IMPORTED', userId: ctx.user.id, resource: 'user', resourceId: input.patientId })
-      return { entries, jumps, skipped }
+      return { entries, jumps, strength, skipped }
     }),
 
-  /** Geïmporteerde sprongen van een patiënt, nieuwste eerst. Alleen tonen. */
-  jumpsForPatient: therapistProcedure
+  /** Geïmporteerde sprongen en krachttests van een patiënt, nieuwste eerst. Alleen tonen. */
+  measurementsForPatient: therapistProcedure
     .input(z.object({ patientId: z.string() }))
     .query(async ({ ctx, input }) => {
       await assertAccess(ctx.prisma, ctx.user, input.patientId)
-      return ctx.prisma.kinventJumpResult.findMany({
-        where: { patientId: input.patientId },
-        orderBy: { performedAt: 'desc' },
-        take: 60,
-        include: { reps: { orderBy: { ordinal: 'asc' } } },
-      })
+      return metingenVan(ctx.prisma, input.patientId)
     }),
+
+  /** Dezelfde metingen voor de ingelogde patiënt of atleet zelf (app en atleetportaal). */
+  myMeasurements: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.user.role !== 'PATIENT' && ctx.user.role !== 'ATHLETE') {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Alleen voor de patiënt of atleet zelf.' })
+    }
+    return metingenVan(ctx.prisma, ctx.user.id)
+  }),
 })

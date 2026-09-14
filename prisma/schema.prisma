@@ -298,11 +298,12 @@ model User {
   // geboortedatum en foto blijven bij Kinvent. Niet elke Kinvent-patiënt heeft
   // een BASE-dossier en dat hoort ook niet zo te zijn, dus dit veld is de
   // enige plek waar de twee systemen elkaar raken.
-  kinventParticipantCode String?             @unique
+  kinventParticipantCode String?                 @unique
   kinventLinkedAt        DateTime?
   kinventLinkedById      String? // therapeut die koppelde (audit)
-  kinventSync            KinventSync?        @relation("KinventSyncPatient")
-  kinventJumpResults     KinventJumpResult[] @relation("KinventJumpPatient")
+  kinventSync            KinventSync?            @relation("KinventSyncPatient")
+  kinventJumpResults     KinventJumpResult[]     @relation("KinventJumpPatient")
+  kinventStrengthResults KinventStrengthResult[] @relation("KinventStrengthPatient")
 
   // Cardio HR-profiel — voor het auto-berekenen van hartslagzones (1-5) als
   // bpm-bereiken. maxHeartRate ontbreekt → fallback op leeftijd (208 - 0.7·jaar)
@@ -3053,9 +3054,62 @@ model KinventJumpRep {
   /// N·s
   propulsiveImpulsePhase1 Float?
   propulsiveImpulsePhase2 Float?
+  /// Rate of force development, N/s (Kinvents totalRfd/leftRfd/rightRfd).
+  rfdTotal                Float?
+  rfdLeft                 Float?
+  rfdRight                Float?
 
   @@unique([resultId, ordinal])
   @@map("kinvent_jump_reps")
+}
+
+/// Eén krachttest (METER, METER_ENDURANCE, TOTAL_EVALUATION, NORDIC) uit
+/// Kinvent, met alle herhalingen. Het testrapport houdt alleen de piek per
+/// zijde; hier staan RFD, gemiddelde, tijd tot piek en impuls, zodat die
+/// terug te vinden zijn. Eenheden zoals Kinvent ze geeft: kg, kg/s, ms, N·s.
+model KinventStrengthResult {
+  id        String @id @default(cuid())
+  patientId String
+  patient   User   @relation("KinventStrengthPatient", fields: [patientId], references: [id], onDelete: Cascade)
+
+  protocolCode String
+  activityCode String   @unique
+  performedAt  DateTime
+  exerciseType String?
+  /// Kinvents titel (i18n-sleutel of eigen tekst); leesbaar via kinventLabel().
+  title        String?
+  deviceType   String?
+  leftMaxKg    Float?
+  rightMaxKg   Float?
+  singleMaxKg  Float?
+
+  reps       KinventStrengthRep[]
+  importedAt DateTime             @default(now())
+
+  @@index([patientId, performedAt])
+  @@map("kinvent_strength_results")
+}
+
+model KinventStrengthRep {
+  id       String                @id @default(cuid())
+  resultId String
+  result   KinventStrengthResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+
+  ordinal     Int
+  repCode     String?
+  /// LEFT, RIGHT of BOTH.
+  side        String?
+  maxKg       Float?
+  averageKg   Float?
+  /// kg/s
+  rfdToMax    Float?
+  rfdAverage  Float?
+  timeToMaxMs Float?
+  /// N·s, door Kinvent al omgerekend.
+  impulseNs   Float?
+
+  @@unique([resultId, ordinal])
+  @@map("kinvent_strength_reps")
 }
 
 model KinventConnection {

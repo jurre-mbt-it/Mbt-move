@@ -79,6 +79,8 @@ describe('buildCandidates', () => {
     expect(sprong?.jump?.reps).toHaveLength(2)
     expect(sprong?.jump?.bodyWeightKg).toBe(64.6)
     expect(meting?.jump).toBeNull()
+    expect(meting?.strength?.reps).toHaveLength(2)
+    expect(sprong?.strength).toBeNull()
   })
 
   it('maakt van een krachtmeting een kandidaat met LSI', () => {

@@ -57,7 +57,8 @@ export function KinventImportDialog({
       const delen = [
         r.entries > 0 ? `${r.entries} test${r.entries === 1 ? '' : 's'} in het rapport` : null,
         r.jumps > 0 ? `${r.jumps} sprongmeting${r.jumps === 1 ? '' : 'en'}` : null,
-        r.skipped > 0 ? `${r.skipped} stond er al` : null,
+        r.strength > 0 ? `${r.strength} krachtmeting${r.strength === 1 ? '' : 'en'} met details` : null,
+        r.skipped > 0 ? `${r.skipped} stond${r.skipped === 1 ? '' : 'en'} al in het rapport` : null,
       ].filter(Boolean)
       toast.success(delen.length ? `Geïmporteerd: ${delen.join(', ')}` : 'Niets geïmporteerd')
       onImported()
@@ -169,6 +170,18 @@ export function KinventImportDialog({
                 regels in BASE blijven staan.
               </p>
             )}
+            <div className="flex items-center gap-3">
+              <MetaLabel>Selectie</MetaLabel>
+              <button type="button" className="text-xs underline" style={{ color: P.brand }} onClick={() => setKeuze(new Set(candidates.map(sleutel)))}>
+                alles
+              </button>
+              <button type="button" className="text-xs underline" style={{ color: P.inkMuted }} onClick={() => setKeuze(new Set())}>
+                niets
+              </button>
+              <button type="button" className="text-xs underline" style={{ color: P.inkMuted }} onClick={() => setKeuze(null)}>
+                voorstel
+              </button>
+            </div>
             {kracht.length > 0 && (
               <section>
                 <MetaLabel>Krachttests · {kracht.length}</MetaLabel>
@@ -274,7 +287,7 @@ function Rij({
         <p style={{ color: P.ink, fontSize: 13, fontWeight: 600 }}>
           {kinventLabel(c.title)}
           {c.alreadyImported && (
-            <span className="athletic-mono ml-2" style={{ color: P.inkDim, fontSize: 10, letterSpacing: '0.1em' }}>AL GEÏMPORTEERD</span>
+            <span className="athletic-mono ml-2" style={{ color: P.inkDim, fontSize: 10, letterSpacing: '0.1em' }}>AL IN RAPPORT · DETAILS WORDEN VERVERST</span>
           )}
         </p>
         <p style={{ color: P.inkMuted, fontSize: 11 }}>

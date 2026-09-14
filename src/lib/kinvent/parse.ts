@@ -22,6 +22,20 @@
 
 export type StrengthSide = 'LEFT' | 'RIGHT' | 'BOTH'
 
+export type StrengthRep = {
+  repCode: string | null
+  ordinal: number
+  side: StrengthSide
+  maxKg: number | null
+  averageKg: number | null
+  /** kg/s */
+  rfdToMax: number | null
+  rfdAverage: number | null
+  timeToMaxMs: number | null
+  /** N·s, door Kinvent al omgerekend. */
+  impulseNs: number | null
+}
+
 export type StrengthReading = {
   /** Hoogste waarde per zijde, in de eenheid die Kinvent gaf (kg). */
   left: number | null
@@ -32,6 +46,8 @@ export type StrengthReading = {
   repCount: number
   /** Alleen bij tests die het gewicht meenemen (IMTP). In kg. */
   bodyWeightKg: number | null
+  /** Elke herhaling, voor de detailweergave. */
+  reps: StrengthRep[]
 }
 
 export type JumpRep = {
@@ -57,6 +73,10 @@ export type JumpRep = {
   /** N·s */
   propulsiveImpulsePhase1: number | null
   propulsiveImpulsePhase2: number | null
+  /** Rate of force development, N/s. */
+  rfdTotal: number | null
+  rfdLeft: number | null
+  rfdRight: number | null
 }
 
 export type JumpReading = {
@@ -136,18 +156,27 @@ export function parseStrength(
   let deviceType: string | null = null
   let bodyWeightKg: number | null = null
   let counted = 0
+  const out: StrengthRep[] = []
+
+  const repCode = (rep: Record<string, unknown>) => (typeof rep._repCode === 'string' ? rep._repCode : null)
 
   if (exerciseType === 'NORDIC_HAMSTRING') {
-    // Per rep allebei de benen, in kg. Geen `_repSide`.
+    // Per rep allebei de benen, in kg. Geen `_repSide`; we splitsen zelf.
     for (const rep of reps) {
       const l = positive(rep._leftMaxForce)
       const r = positive(rep._rightMaxForce)
       if (l === null && r === null) continue
       counted++
-      if (l !== null) left = max(left, l)
-      if (r !== null) right = max(right, r)
+      if (l !== null) {
+        left = max(left, l)
+        out.push({ repCode: repCode(rep), ordinal: out.length + 1, side: 'LEFT', maxKg: l, averageKg: positive(rep._averageLeft), rfdToMax: num(rep._rfdLeft), rfdAverage: null, timeToMaxMs: positive(rep._timeToMaxLeft), impulseNs: null })
+      }
+      if (r !== null) {
+        right = max(right, r)
+        out.push({ repCode: repCode(rep), ordinal: out.length + 1, side: 'RIGHT', maxKg: r, averageKg: positive(rep._averageRight), rfdToMax: num(rep._rfdRight), rfdAverage: null, timeToMaxMs: positive(rep._timeToMaxRight), impulseNs: null })
+      }
     }
-    return counted === 0 ? null : { left, right, single, deviceType, repCount: counted, bodyWeightKg }
+    return counted === 0 ? null : { left, right, single, deviceType, repCount: counted, bodyWeightKg, reps: out }
   }
 
   if (exerciseType === 'TOTAL_EVALUATION') {
@@ -158,6 +187,7 @@ export function parseStrength(
       if (total === null) continue
       counted++
       bodyWeightKg ??= positive(rep._weight)
+      out.push({ repCode: repCode(rep), ordinal: out.length + 1, side: 'BOTH', maxKg: total, averageKg: positive(rep._averageValue), rfdToMax: num(rep._rfdToMax), rfdAverage: num(rep._averageRfd), timeToMaxMs: positive(rep._timeToMax), impulseNs: num(rep._impulse) })
       const l = positive(rep._maxLeftValue)
       if (l === null) {
         single = max(single, total)
@@ -166,7 +196,7 @@ export function parseStrength(
       left = max(left, l)
       right = max(right, total - l)
     }
-    return counted === 0 ? null : { left, right, single, deviceType, repCount: counted, bodyWeightKg }
+    return counted === 0 ? null : { left, right, single, deviceType, repCount: counted, bodyWeightKg, reps: out }
   }
 
   for (const rep of reps) {
@@ -178,6 +208,7 @@ export function parseStrength(
     if (side === 'LEFT') left = max(left, value)
     else if (side === 'RIGHT') right = max(right, value)
     else single = max(single, value)
+    out.push({ repCode: repCode(rep), ordinal: num(rep._repOrdinal) ?? out.length + 1, side, maxKg: value, averageKg: positive(rep._averageValue), rfdToMax: num(rep._rfdToMax), rfdAverage: num(rep._averageRfd), timeToMaxMs: positive(rep._timeToMax), impulseNs: num(rep._impulse) })
   }
   if (counted === 0) return null
 
@@ -185,9 +216,9 @@ export function parseStrength(
   // als bilateraal doorgaan; bij de rest vouwen we terug naar één waarde.
   if (!PER_SIDE_REP_TYPES.has(exerciseType ?? '') && (left !== null || right !== null)) {
     single = max(single, Math.max(left ?? 0, right ?? 0))
-    return { left: null, right: null, single, deviceType, repCount: counted, bodyWeightKg }
+    return { left: null, right: null, single, deviceType, repCount: counted, bodyWeightKg, reps: out }
   }
-  return { left, right, single, deviceType, repCount: counted, bodyWeightKg }
+  return { left, right, single, deviceType, repCount: counted, bodyWeightKg, reps: out }
 }
 
 /**
@@ -233,6 +264,9 @@ function singleJumps(models: Record<string, unknown>[]): JumpRep[] {
       timeToStabilizeMs: positive(model.timeToStabilize),
       propulsiveImpulsePhase1: positive(model.propulsiveImpulsePhase1),
       propulsiveImpulsePhase2: positive(model.propulsiveImpulsePhase2),
+      rfdTotal: positive(model.totalRfd),
+      rfdLeft: positive(model.leftRfd),
+      rfdRight: positive(model.rightRfd),
     })
   }
   return out
@@ -263,6 +297,9 @@ function multipleJumps(jumps: Record<string, unknown>[]): JumpRep[] {
       timeToStabilizeMs: null,
       propulsiveImpulsePhase1: null,
       propulsiveImpulsePhase2: null,
+      rfdTotal: null,
+      rfdLeft: null,
+      rfdRight: null,
     })
   }
   return out

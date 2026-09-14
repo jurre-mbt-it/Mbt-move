@@ -13,9 +13,9 @@ import { checkUnit, kgToNewton, lsi, rond, type UnitCheck } from '@/lib/kinvent/
 const meterEndurance = JSON.stringify({
   includeAllFields: false,
   _resultsPerRep: [
-    { _repOrdinal: 1, _repSide: 'LEFT', _maxValue: 17.95, _netMaxForce: 17.95, _device: 'MUSCLE_CONTROLLER' },
-    { _repOrdinal: 2, _repSide: 'LEFT', _maxValue: 20.75, _netMaxForce: 20.75, _device: 'MUSCLE_CONTROLLER' },
-    { _repOrdinal: 1, _repSide: 'RIGHT', _maxValue: 22.4, _netMaxForce: 22.4, _device: 'MUSCLE_CONTROLLER' },
+    { _repCode: 'r1', _repOrdinal: 1, _repSide: 'LEFT', _maxValue: 17.95, _averageValue: 12.1, _rfdToMax: 50.3, _averageRfd: 31.2, _timeToMax: 1092, _impulse: 88.4, _netMaxForce: 17.95, _device: 'MUSCLE_CONTROLLER' },
+    { _repCode: 'r2', _repOrdinal: 2, _repSide: 'LEFT', _maxValue: 20.75, _averageValue: 14.0, _rfdToMax: 61.0, _averageRfd: 35.5, _timeToMax: 980, _impulse: 95.1, _netMaxForce: 20.75, _device: 'MUSCLE_CONTROLLER' },
+    { _repCode: 'r3', _repOrdinal: 1, _repSide: 'RIGHT', _maxValue: 22.4, _averageValue: 15.2, _rfdToMax: 70.2, _averageRfd: 40.1, _timeToMax: 900, _impulse: 101.0, _netMaxForce: 22.4, _device: 'MUSCLE_CONTROLLER' },
   ],
 })
 
@@ -55,6 +55,9 @@ function sprong(over: Record<string, unknown>) {
     timeToStabilize: 894.1,
     propulsiveImpulsePhase1: 20.5,
     propulsiveImpulsePhase2: 63.9,
+    totalRfd: 8123.4,
+    leftRfd: 4100.2,
+    rightRfd: 4023.2,
     jump: {
       _ordinal: 1,
       _jumpHeight: 0.06487,
@@ -129,6 +132,24 @@ describe('parseStrength', () => {
     expect(r!.repCount).toBe(3)
   })
 
+  it('bewaart elke herhaling met RFD, gemiddelde, tijd tot piek en impuls', () => {
+    const r = parseStrength('METER_ENDURANCE', parseActivityResults(meterEndurance))
+    expect(r!.reps).toHaveLength(3)
+    expect(r!.reps[1]).toEqual({ repCode: 'r2', ordinal: 2, side: 'LEFT', maxKg: 20.75, averageKg: 14.0, rfdToMax: 61.0, rfdAverage: 35.5, timeToMaxMs: 980, impulseNs: 95.1 })
+  })
+
+  it('geeft een Nordic per been als aparte herhalingen terug', () => {
+    const r = parseStrength('NORDIC_HAMSTRING', parseActivityResults(nordic))
+    expect(r!.reps.map((x) => `${x.side}:${x.maxKg}`)).toEqual(['LEFT:13.965', 'RIGHT:7.214', 'LEFT:12.1', 'RIGHT:8.4'])
+  })
+
+  it('geeft een IMTP-herhaling terug als beide platen samen', () => {
+    const r = parseStrength('TOTAL_EVALUATION', parseActivityResults(totalEvaluation))
+    expect(r!.reps).toHaveLength(2)
+    expect(r!.reps[0].side).toBe('BOTH')
+    expect(r!.reps[0].maxKg).toBe(135.7)
+  })
+
   it('splitst een IMTP in links en rechts, met rechts als totaal min links', () => {
     const r = parseStrength('TOTAL_EVALUATION', parseActivityResults(totalEvaluation))
     expect(r).not.toBeNull()
@@ -189,6 +210,9 @@ describe('parseJump', () => {
     expect(eerste.rsi).toBe(0.665)
     expect(eerste.timeToStabilizeMs).toBe(894.1)
     expect(eerste.propulsiveImpulsePhase1).toBe(20.5)
+    expect(eerste.rfdTotal).toBe(8123.4)
+    expect(eerste.rfdLeft).toBe(4100.2)
+    expect(eerste.rfdRight).toBe(4023.2)
   })
 
   it('laat afgebroken sprongen buiten de reeks', () => {
