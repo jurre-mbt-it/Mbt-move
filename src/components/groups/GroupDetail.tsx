@@ -12,6 +12,7 @@ import {
   DarkDialog, DarkDialogContent, DarkDialogHeader, DarkDialogTitle,
 } from '@/components/dark-ui'
 import { GroupSendDialog } from '@/components/week-planner/GroupSendDialog'
+import { GroupDashboard } from '@/components/groups/GroupDashboard'
 
 type Rol = 'OWNER' | 'VIEWER' | 'PLANNER' | 'MANAGER'
 const ROL_LABEL: Record<Rol, string> = { OWNER: 'Eigenaar', VIEWER: 'Meekijken', PLANNER: 'Meeplannen', MANAGER: 'Beheren' }
@@ -113,11 +114,7 @@ export function GroupDetail({ groupId }: { groupId: string }) {
       </div>
 
       {tab === 'dashboard' ? (
-        <Tile>
-          <p style={{ color: P.inkMuted, fontSize: 14, lineHeight: 1.6 }}>
-            Het dashboard met de status van elke atleet komt in deel 2. Tot die tijd vind je de atleten onder Leden en staf.
-          </p>
-        </Tile>
+        <GroupDashboard groupId={groupId} />
       ) : (
         <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
           <Tile>

@@ -8,6 +8,9 @@ import { assertNotDischarged } from '@/server/lib/care-guard'
 import { notifyNewSchedule } from '@/server/push/notify'
 import { copyItemToDay, COPY_ITEM_INCLUDE } from './weekSchedules'
 import { mondayKeyOf, addDaysKey, amsMidnight, dateKey, isDateKey } from '@/lib/week-dates'
+import { beoordeelLid, sorteerRijen, tellers, type LidInvoer } from '@/lib/group-dashboard'
+import { computeReadinessFor } from '@/server/readiness'
+import { computeLoadCurve } from '@/server/load-curve'
 
 const createId = () => crypto.randomUUID()
 const rolEnum = z.enum(['VIEWER', 'PLANNER', 'MANAGER'])
@@ -367,5 +370,94 @@ export const athleteGroupsRouter = createTRPCRouter({
 
       await ctx.prisma.athleteGroup.update({ where: { id: g.id }, data: { lastSentAt: new Date() } })
       return { members: verzondenLeden, weeks: groepsWeken.length, items: trainingen, skipped: overgeslagen }
+    }),
+
+  /**
+   * Groepsdashboard: per lid de status in één oogopslag, samengesteld uit
+   * bestaande bouwstenen (pijnmeldingen, readiness, belastingscurve, sessies,
+   * planning). Het oordeel zelf zit in lib/group-dashboard.ts.
+   */
+  dashboard: coachStaffProcedure
+    .input(z.object({ groupId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await assertGroupRole(ctx.prisma, ctx.user, input.groupId, 'VIEWER')
+      const leden = await ctx.prisma.athleteGroupMember.findMany({
+        where: { groupId: input.groupId },
+        select: { patientId: true, note: true, patient: { select: { name: true, email: true, injuryInfo: true } } },
+        orderBy: { addedAt: 'asc' },
+      })
+      const nu = new Date()
+      const vandaag = dateKey(nu)
+      const maandag = mondayKeyOf(nu)
+      const weekStart = amsMidnight(maandag)
+      const weekEind = amsMidnight(addDaysKey(maandag, 7))
+      const planningEind = amsMidnight(addDaysKey(maandag, 28))
+      const zevenDagen = new Date(nu.getTime() - 7 * 864e5)
+      const veertienDagen = new Date(nu.getTime() - 14 * 864e5)
+      const prisma = ctx.prisma
+
+      const rijen = await Promise.all(leden.map(async lid => {
+        const id = lid.patientId
+        const [pijn, vitals, sessies, cardio, laatsteSessie, laatsteCardio, weken] = await Promise.all([
+          prisma.painEntry.findMany({ where: { userId: id, reportedAt: { gte: zevenDagen } }, orderBy: { reportedAt: 'desc' }, select: { nrs: true, location: true, reportedAt: true } }),
+          prisma.vitalsEntry.count({ where: { userId: id, date: { gte: veertienDagen } } }),
+          prisma.sessionLog.count({ where: { patientId: id, completedAt: { gte: weekStart, lt: weekEind } } }),
+          prisma.cardioLog.count({ where: { patientId: id, completedAt: { gte: weekStart, lt: weekEind } } }),
+          prisma.sessionLog.findFirst({ where: { patientId: id, completedAt: { not: null } }, orderBy: { completedAt: 'desc' }, select: { id: true, completedAt: true, exertionLevel: true, feelScore: true } }),
+          prisma.cardioLog.findFirst({ where: { patientId: id }, orderBy: { completedAt: 'desc' }, select: { id: true, completedAt: true, rpe: true, feelScore: true } }),
+          prisma.weekSchedule.findMany({
+            where: { patientId: id, isTemplate: false, startDate: { gte: weekStart, lt: planningEind } },
+            select: {
+              startDate: true,
+              days: { select: { dayOfWeek: true, items: { where: { kind: { in: ['PROGRAM', 'WORKOUT'] } }, select: { quickName: true, program: { select: { name: true } } }, orderBy: { order: 'asc' } } } },
+            },
+          }),
+        ])
+        let gepland = 0
+        let volgende: LidInvoer['volgende'] = null
+        for (const w of weken) {
+          if (!w.startDate) continue
+          const mk = mondayKeyOf(w.startDate)
+          for (const d of w.days) {
+            const dk = addDaysKey(mk, d.dayOfWeek)
+            for (const it of d.items) {
+              if (mk === maandag) gepland++
+              if (dk >= vandaag && (!volgende || dk < volgende.at)) volgende = { at: dk, name: it.quickName ?? it.program?.name ?? 'Training' }
+            }
+          }
+        }
+        const readiness = vitals > 0
+          ? await computeReadinessFor(prisma, id).then(r => ({ band: r.band, score: r.score })).catch(() => null)
+          : null
+        const curve = await computeLoadCurve(prisma, id, 28).catch(() => null)
+        const vorm: LidInvoer['vorm'] = curve && curve.today && curve.sessionCount > 0
+          ? {
+              form: Math.round(curve.today.form),
+              statusKey: curve.status.key,
+              statusLabel: curve.status.label,
+              weekLoad: Math.round(curve.points.slice(-7).reduce((n, p) => n + p.load, 0)),
+              calibrated: curve.calibration.status === 'ready',
+            }
+          : null
+        const kandidaten: NonNullable<LidInvoer['laatste']>[] = []
+        if (laatsteSessie?.completedAt) kandidaten.push({ at: laatsteSessie.completedAt.toISOString(), rpe: laatsteSessie.exertionLevel, feel: laatsteSessie.feelScore, soort: 'kracht', sessionId: laatsteSessie.id })
+        if (laatsteCardio) kandidaten.push({ at: laatsteCardio.completedAt.toISOString(), rpe: laatsteCardio.rpe, feel: laatsteCardio.feelScore, soort: 'cardio', sessionId: null })
+        kandidaten.sort((a, b) => b.at.localeCompare(a.at))
+        return beoordeelLid({
+          patientId: id,
+          naam: lid.patient.name ?? lid.patient.email,
+          pijn: pijn.map(p => ({ nrs: p.nrs, location: p.location, reportedAt: p.reportedAt.toISOString() })),
+          injuryInfo: lid.patient.injuryInfo,
+          readiness,
+          vorm,
+          gepland,
+          gedaan: sessies + cardio,
+          laatste: kandidaten[0] ?? null,
+          volgende,
+          notitie: lid.note,
+        }, vandaag)
+      }))
+      const gesorteerd = sorteerRijen(rijen)
+      return { vandaag, rijen: gesorteerd, tellers: tellers(gesorteerd) }
     }),
 })
