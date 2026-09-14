@@ -123,6 +123,15 @@ export function kgToNewton(kg: number): number {
   return kg * G
 }
 
+/**
+ * Eén decimaal voor het dossier. Kinvent levert tien decimalen; in een
+ * invoerveld leest dat als ruis en het suggereert een precisie die een
+ * krachtplaat niet heeft.
+ */
+export function rond(value: number | null): number | null {
+  return value === null ? null : Math.round(value * 10) / 10
+}
+
 /** Limb Symmetry Index: de zwakste zijde als percentage van de sterkste. */
 export function lsi(left: number | null, right: number | null): number | null {
   if (!left || !right) return null

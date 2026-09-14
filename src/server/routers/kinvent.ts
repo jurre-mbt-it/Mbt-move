@@ -43,7 +43,7 @@ import {
 import { decryptToken, encryptToken, jwtExpiry } from '@/lib/kinvent/crypto'
 import { buildCandidates, type ImportCandidate } from '@/lib/kinvent/candidates'
 import { kinventCategory, kinventLabel, kinventSource } from '@/lib/kinvent/labels'
-import { kgToNewton } from '@/lib/kinvent/units'
+import { kgToNewton, rond } from '@/lib/kinvent/units'
 import { syncCriteriaVoorEntry } from '@/server/lib/rehab-criterion-sync'
 import { specFromCatalog } from './testReports'
 import type { TestCatalogItem } from '@prisma/client'
@@ -74,7 +74,7 @@ const sleutel = (c: { protocolCode: string; activityCode: string }) => `${c.prot
 function entryFromCatalog(reportId: string, c: ImportCandidate, order: number, item: TestCatalogItem) {
   const spec = specFromCatalog(item)
   const inNewton = /^n(ewton)?$/i.test(item.unitPrimary ?? '')
-  const omzet = (v: number | null) => (v === null ? null : inNewton ? kgToNewton(v) : v)
+  const omzet = (v: number | null) => rond(v === null ? null : inNewton ? kgToNewton(v) : v)
   const isJump = c.kind === 'JUMP'
   const enkel = c.single ?? (c.left === null || c.right === null ? Math.max(c.left ?? 0, c.right ?? 0) : null)
   const notes =
@@ -91,7 +91,7 @@ function entryFromCatalog(reportId: string, c: ImportCandidate, order: number, i
     ...spec,
     leftPrimary: isJump ? null : omzet(c.left),
     rightPrimary: isJump ? null : omzet(c.right),
-    singleValue: isJump ? c.jumpHeightCm : spec.kind === 'SINGLE' ? omzet(enkel) : null,
+    singleValue: isJump ? rond(c.jumpHeightCm) : spec.kind === 'SINGLE' ? omzet(enkel) : null,
     notes,
     kinventProtocolCode: c.protocolCode,
     kinventActivityCode: c.activityCode,
@@ -137,9 +137,9 @@ function entryFromCandidate(reportId: string, c: ImportCandidate, order: number)
     zoneOrangeMin: bilateral ? 80 : 0,
     zoneGreenMin: bilateral ? 90 : 0,
     higherIsBetter: true,
-    leftPrimary: c.left,
-    rightPrimary: c.right,
-    singleValue: bilateral ? null : value,
+    leftPrimary: rond(c.left),
+    rightPrimary: rond(c.right),
+    singleValue: bilateral ? null : rond(value),
     notes: c.unit.status === 'suspect' ? `Eenheidscontrole: ${c.unit.reason}` : null,
     kinventProtocolCode: c.protocolCode,
     kinventActivityCode: c.activityCode,

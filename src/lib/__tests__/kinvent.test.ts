@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseActivityResults, parseStrength, parseJump, parseBodyWeight } from '@/lib/kinvent/parse'
-import { checkUnit, kgToNewton, lsi, type UnitCheck } from '@/lib/kinvent/units'
+import { checkUnit, kgToNewton, lsi, rond, type UnitCheck } from '@/lib/kinvent/units'
 
 /**
  * De vormen hieronder volgen Kinvents "Analysis response reference" (september
@@ -285,6 +285,12 @@ describe('checkUnit', () => {
 describe('rekenhulpjes', () => {
   it('rekent kilogramkracht om naar Newton', () => {
     expect(kgToNewton(10)).toBeCloseTo(98.0665, 4)
+  })
+
+  it('rondt een meetwaarde af op één decimaal voor het dossier', () => {
+    expect(rond(236.44862501)).toBe(236.4)
+    expect(rond(111.05)).toBe(111.1)
+    expect(rond(null)).toBeNull()
   })
 
   it('berekent LSI als zwakste gedeeld door sterkste', () => {
