@@ -9,6 +9,7 @@
  * Ontwerp: docs/superpowers/specs/2026-09-13-planner-blokken-design.md
  */
 import { durationFromExercises } from '@/lib/planned-load'
+import { parseStructured, type StructuredCardio } from './cardio-workout'
 import { isPerSideUnit, isRepBasedUnit } from '@/lib/program-constants'
 
 export type BlockKind = 'EXERCISE' | 'NOTE' | 'BREAK'
@@ -288,6 +289,18 @@ export function groupLabel(letter: string, groups: ItemGroups): string {
 
 /** Groepen van een programma: per week-dag ("w1d2") een ItemGroups. */
 export type ProgramGroups = Record<string, ItemGroups>
+/** Cardio-workout (blokkenbouwer) per programmadag, sleutel "w1d2". */
+export type ProgramCardio = Record<string, StructuredCardio>
+export function parseProgramCardio(raw: unknown): ProgramCardio {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const out: ProgramCardio = {}
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^w\d+d\d+$/.test(k)) continue
+    const w = parseStructured(v)
+    if (w) out[k] = w
+  }
+  return out
+}
 export const programDayKey = (week: number, day: number) => `w${week}d${day}`
 export function parseProgramGroups(raw: unknown): ProgramGroups {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}

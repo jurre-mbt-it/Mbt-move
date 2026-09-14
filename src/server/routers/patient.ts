@@ -11,7 +11,7 @@
 
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
-import { isExerciseBlock, parseGroups, parseProgramGroups, programDayKey } from '@/lib/planner-blocks'
+import { isExerciseBlock, parseGroups, parseProgramGroups, parseProgramCardio, programDayKey } from '@/lib/planner-blocks'
 import { createTRPCRouter, protectedProcedure } from '@/server/trpc'
 import { practiceScope } from '@/server/lib/patient-access'
 import { planningCutoffVoorPatient } from '@/server/lib/planning-cutoff'
@@ -566,6 +566,9 @@ export const patientRouter = createTRPCRouter({
           },
           blocks: item.exercises.map(toAthleteBlock),
           groups: parseGroups(item.groups),
+          // Zelfde cardio-workout ook top-level, zodat runners één leespad hebben
+          // voor trainingen én programmadagen.
+          cardio: (item.cardioParams ?? null) as Record<string, unknown> | null,
           exercises,
           lastLogs,
         }
@@ -608,7 +611,7 @@ export const patientRouter = createTRPCRouter({
 
     // plannedItem: null meegeven zodat alle takken dezelfde vorm hebben — anders
     // is de union voor de client niet te narrowen.
-    if (!program) return { program: null, plannedItem: null, exercises: [], lastLogs: {} as Record<string, LastExerciseLog> }
+    if (!program) return { program: null, plannedItem: null, cardio: null, exercises: [], lastLogs: {} as Record<string, LastExerciseLog> }
 
     const allExercises = program.exercises.filter(isExerciseBlock).map(pe => mapProgramExercise({ ...pe, exercise: pe.exercise! }))
 
@@ -663,6 +666,7 @@ export const patientRouter = createTRPCRouter({
       return {
         // plannedItem hoort in elke tak te zitten (uniforme union).
         plannedItem: null,
+        cardio: null,
         program: {
           id: program.id,
           name: program.name,
@@ -765,6 +769,8 @@ export const patientRouter = createTRPCRouter({
             .sort((a, b) => a.order - b.order)
             .map(toAthleteBlock),
       groups: parseProgramGroups(program.groups)[programDayKey(week, effectiveDay)] ?? {},
+      // Cardio-workout (blokkenbouwer) van deze programmadag; null = geen.
+      cardio: (parseProgramCardio(program.cardioByDay)[programDayKey(week, effectiveDay)] ?? null) as Record<string, unknown> | null,
       lastLogs,
     }
   }),

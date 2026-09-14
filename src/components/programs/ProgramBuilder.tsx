@@ -60,6 +60,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import { OptionSwitch } from '@/components/week-planner/block-forms/fields'
+import { CardioWorkoutBuilder } from '@/components/week-planner/CardioWorkoutBuilder'
+import { CardioRow } from '@/components/week-planner/CardioRow'
+import type { StructuredCardio } from '@/lib/cardio-workout'
 
 // ─── Drop zone for a single day column ────────────────────────────────────────
 function DayDropZone({
@@ -143,6 +146,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
     exercises: initialState?.exercises ?? [],
     resources: (initialState as Partial<ProgramState> | undefined)?.resources ?? [],
     groups: (initialState as Partial<ProgramState> | undefined)?.groups ?? {},
+    cardioByDay: (initialState as Partial<ProgramState> | undefined)?.cardioByDay ?? {},
   }))
   // Houdt bij of de gebruiker zelf de naam heeft aangeraakt. Zo niet, mag de
   // auto-suggestie de naam blijven bijwerken als patient/oefeningen wijzigen.
@@ -314,6 +318,9 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
   const dagSleutel = programDayKey(program.currentWeek, program.currentDay)
   const dagBlokken = useMemo(() => dayExercises.map((e, i) => builderToBlock(e, i)), [dayExercises])
   const dagGroepen = program.groups[dagSleutel] ?? {}
+  // Cardio-workout (blokkenbouwer) van deze dag; het tabblad Cardio in de pop-up opent de bouwer.
+  const dagCardio = program.cardioByDay[dagSleutel] ?? null
+  const [cardioOpen, setCardioOpen] = useState(false)
   const [blokDialoog, setBlokDialoog] = useState<{ edit: PlannerBlock | null; letter: string | null; insertAt?: number | null; type?: 'exercise' | 'note' | 'break' } | null>(null)
   const [rijMenu, setRijMenu] = useState<ContextMenuState>(null)
   // Meervoudige selectie (lasso of shift-klik) → superset of circuit.
@@ -795,6 +802,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       weeklyTarget: number | null
       reviewAfterWeeks: number | null
       groups: ProgramState['groups']
+      cardioByDay: ProgramState['cardioByDay']
     }
     exercises: BuilderExercise[]
     resources: BuilderResource[]
@@ -814,6 +822,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
       weeklyTarget: program.weeklyTarget ?? null,
       reviewAfterWeeks: program.reviewAfterWeeks ?? null,
       groups: program.groups,
+      cardioByDay: program.cardioByDay,
     },
     exercises,
     resources,
@@ -949,6 +958,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
         dailyTarget: val.program.tendinopathyMode ? val.program.dailyTarget : null,
         exercises: exercisePayload,
         groups: val.program.groups,
+        cardioByDay: val.program.cardioByDay,
         resources: resourcePayload,
       })
     } else {
@@ -971,6 +981,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           id: created.id,
           exercises: exercisePayload,
           groups: val.program.groups,
+          cardioByDay: val.program.cardioByDay,
           resources: resourcePayload,
         })
       }
@@ -1233,6 +1244,7 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
             id: created.id,
             exercises: exercisePayload,
             groups: program.groups,
+            cardioByDay: program.cardioByDay,
             resources: resourcePayload,
           })
         }
@@ -1985,6 +1997,15 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
                       </button>
                     </div>
                   )}
+                  {dagCardio && (
+                    <div className="mb-1.5">
+                      <CardioRow
+                        workout={dagCardio}
+                        onClick={() => setCardioOpen(true)}
+                        onRemove={() => setProgram(prev => { const rest = { ...prev.cardioByDay }; delete rest[dagSleutel]; return { ...prev, cardioByDay: rest } })}
+                      />
+                    </div>
+                  )}
                   <LassoSelect actief={selectiestand} selected={selectie} onChange={setSelectie}>
                     <BlockRows
                       sortable={`dag:${dagSleutel}`}
@@ -2593,6 +2614,20 @@ export function ProgramBuilder({ initialState, programId, initialStatus, initial
           saving={false}
           onSubmitBlock={submitBlok}
           onSubmitGroup={submitGroep}
+          onOpenCardio={() => { setBlokDialoog(null); setCardioOpen(true) }}
+        />
+      )}
+      {cardioOpen && (
+        <CardioWorkoutBuilder
+          initial={dagCardio}
+          activity={dagCardio?.activity ?? 'RUNNING'}
+          itemName={program.name || 'Programma'}
+          saving={false}
+          onClose={() => setCardioOpen(false)}
+          onSave={async (w: StructuredCardio) => {
+            setProgram(prev => ({ ...prev, cardioByDay: { ...prev.cardioByDay, [dagSleutel]: w } }))
+            setCardioOpen(false)
+          }}
         />
       )}
     </DndContext>

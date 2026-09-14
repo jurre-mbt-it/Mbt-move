@@ -10,7 +10,7 @@ import { inSamePractice } from '@/server/lib/patient-access'
 import { planningCutoffVoorPatient } from '@/server/lib/planning-cutoff'
 import { assertNotDischarged } from '@/server/lib/care-guard'
 import { mondayKey, mondayKeyOf, addDaysKey, amsMidnight, weeksBetween, isDateKey } from '@/lib/week-dates'
-import { parseStructured, legacySummaryFields, structuredLoad } from '@/lib/cardio-workout'
+import { parseStructured, legacySummaryFields, structuredLoad, readWorkout } from '@/lib/cardio-workout'
 import {
   Prisma,
   type PrismaClient,
@@ -2183,6 +2183,8 @@ export const weekSchedulesRouter = createTRPCRouter({
             // Een programma draagt sinds 13-09 dezelfde bloklijst: notities en
             // pauzes gaan mee, en de groepen van deze dag als week 1, dag 1.
             ...(item.groups ? { groups: { w1d1: item.groups } as Prisma.InputJsonValue } : {}),
+            // De cardio-workout van de training wordt de cardio van dag 1.
+            ...(readWorkout(item.cardioParams) ? { cardioByDay: { w1d1: item.cardioParams } as Prisma.InputJsonValue } : {}),
             ...(inline && inline.exercises.length > 0
               ? {
                   exercises: {

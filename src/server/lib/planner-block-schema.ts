@@ -4,6 +4,7 @@
  * zodat het te testen is zonder Prisma.
  */
 import { z } from 'zod'
+import { parseStructured } from '@/lib/cardio-workout'
 
 export const blockParamSchema = z.object({
   id: z.string().max(60).optional(),
@@ -75,3 +76,9 @@ export const itemGroupsSchema = z.record(z.string().regex(/^[A-F]$/), itemGroupS
 
 /** Programma-groepen per week-dag, sleutel "w1d2". */
 export const programGroupsSchema = z.record(z.string().regex(/^w\d+d\d+$/), itemGroupsSchema)
+
+/** Cardio-workout per programmadag: alleen de gestructureerde vorm (version 1), max 8 kB per dag. */
+export const programCardioSchema = z.record(
+  z.string().regex(/^w\d+d\d+$/),
+  z.record(z.string(), z.unknown()).refine(v => parseStructured(v) !== null && JSON.stringify(v).length <= 8000, 'Ongeldige cardio-workout'),
+)

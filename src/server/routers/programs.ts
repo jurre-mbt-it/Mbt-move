@@ -2,8 +2,8 @@ import { z } from 'zod'
 import { createTRPCRouter, coachStaffProcedure, creatorProcedure } from '@/server/trpc'
 import { TRPCError } from '@trpc/server'
 import { programBlockColumns } from '@/server/lib/program-block-columns'
-import { programGroupsSchema } from '@/server/lib/planner-block-schema'
-import { parseProgramGroups } from '@/lib/planner-blocks'
+import { programGroupsSchema, programCardioSchema } from '@/server/lib/planner-block-schema'
+import { parseProgramGroups, parseProgramCardio } from '@/lib/planner-blocks'
 import { Prisma } from '@prisma/client'
 import type { PrismaClient } from '@prisma/client'
 import { maskMuscleLoadsArray } from '@/server/lib/muscle-loads'
@@ -170,7 +170,7 @@ export const programsRouter = createTRPCRouter({
       // programma's tenzij explicitly opt-in via includeAssigned.
       const hideAssigned = !includeAssigned && input?.isTemplate !== true
       const programs = await ctx.prisma.program.findMany({
-        omit: { groups: true },
+        omit: { groups: true, cardioByDay: true },
         where: {
           ...ownership,
           ...(input?.patientId !== undefined ? { patientId: input.patientId } : {}),
@@ -250,6 +250,7 @@ export const programsRouter = createTRPCRouter({
       return {
         ...program,
         groups: parseProgramGroups(program.groups),
+        cardioByDay: parseProgramCardio(program.cardioByDay),
         exercises: program.exercises.map(pe => ({
           ...pe,
           exercise: pe.exercise ? maskMuscleLoadsArray(pe.exercise) : null,
@@ -260,6 +261,7 @@ export const programsRouter = createTRPCRouter({
   create: creatorProcedure
     .input(z.object({
       groups: programGroupsSchema.nullable().optional(),
+      cardioByDay: programCardioSchema.nullable().optional(),
       name: z.string().min(1),
       description: z.string().optional(),
       patientId: z.string().nullable().optional(),
@@ -288,7 +290,7 @@ export const programsRouter = createTRPCRouter({
       dailyTarget: z.number().int().min(1).max(10).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const { patientId, cardioParams, groups, ...rest } = input
+      const { patientId, cardioParams, groups, cardioByDay, ...rest } = input
       await assertCanAssignPatient(ctx.prisma, ctx.user!, patientId)
       // Een programma zonder patiënt is een sjabloon en raakt niemands
       // behandeling; alleen directe toewijzing is nieuwe planning, en die
@@ -300,6 +302,7 @@ export const programsRouter = createTRPCRouter({
           ...rest,
           cardioParams: (cardioParams ?? null) as never,
           groups: (groups ?? undefined) as Prisma.InputJsonValue | undefined,
+          cardioByDay: (cardioByDay ?? undefined) as Prisma.InputJsonValue | undefined,
           patientId: patientId ?? null,
           creatorId: ctx.user!.id,
           practiceId: ctx.user!.practiceId ?? null,
@@ -330,6 +333,7 @@ export const programsRouter = createTRPCRouter({
       endDate: z.string().nullable().optional(),
       exercises: z.array(ProgramExerciseInput).optional(),
       groups: programGroupsSchema.nullable().optional(),
+      cardioByDay: programCardioSchema.nullable().optional(),
       resources: z.array(ProgramResourceInput).optional(),
       flexibleSchedule: z.boolean().optional(),
       weeklyTarget: z.number().int().min(1).max(14).nullable().optional(),
@@ -345,7 +349,7 @@ export const programsRouter = createTRPCRouter({
         .optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const { id, groups, exercises, resources, startDate, endDate, cardioParams, ...data } = input
+      const { id, groups, cardioByDay, exercises, resources, startDate, endDate, cardioParams, ...data } = input
 
       const existing = await ctx.prisma.program.findUnique({ where: { id } })
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' })
@@ -388,6 +392,7 @@ export const programsRouter = createTRPCRouter({
       if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null
       if (cardioParams !== undefined) updateData.cardioParams = cardioParams
       if (groups !== undefined) updateData.groups = groups ?? Prisma.DbNull
+      if (cardioByDay !== undefined) updateData.cardioByDay = cardioByDay ?? Prisma.DbNull
 
       // Deploy-moment: programma wordt (of is) patient-gebonden en gaat ACTIVE
       // zonder expliciete startDate → klok start nu. Voorkomt de fallback op
@@ -455,6 +460,7 @@ export const programsRouter = createTRPCRouter({
       return {
         ...saved,
         groups: parseProgramGroups(saved.groups),
+        cardioByDay: parseProgramCardio(saved.cardioByDay),
         exercises: saved.exercises.map(pe => ({
           ...pe,
           exercise: pe.exercise ? maskMuscleLoadsArray(pe.exercise) : null,
@@ -497,6 +503,7 @@ export const programsRouter = createTRPCRouter({
           type: source.type,
           cardioParams: (source.cardioParams ?? null) as never,
           groups: (source.groups ?? undefined) as Prisma.InputJsonValue | undefined,
+          cardioByDay: (source.cardioByDay ?? undefined) as Prisma.InputJsonValue | undefined,
           flexibleSchedule: source.flexibleSchedule,
           weeklyTarget: source.weeklyTarget,
           reviewAfterWeeks: source.reviewAfterWeeks,

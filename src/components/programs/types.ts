@@ -1,4 +1,5 @@
 import type { IntensityType } from '@/lib/prescription'
+import type { StructuredCardio } from '@/lib/cardio-workout'
 import type { ItemGroups } from '@/lib/planner-blocks'
 
 export type RepUnit = 'reps' | 'reps/zijde' | 'sec' | 'sec/zijde' | 'min' | 'm'
@@ -115,6 +116,8 @@ export interface ProgramState {
   resources: BuilderResource[]
   /** Supersets/circuits per week-dag, sleutel "w1d2" (zie lib/planner-blocks.ts). */
   groups: Record<string, ItemGroups>
+  /** Cardio-workout (blokkenbouwer) per week-dag, zelfde sleutel. */
+  cardioByDay: Record<string, StructuredCardio>
   isTemplate: boolean
   tendinopathyMode: boolean
   trackOneRepMax: boolean

@@ -226,8 +226,13 @@ zijn krachtrijen. `setItemCardio` zet `quickCategory` alleen op CARDIO als de
 training geen oefeningrijen heeft; met rijen blijft de soort van de rijen
 leidend en tonen de runners de cardio-workout als kaart bovenaan
 (`CardioPlanRow`, atleet start hem in `/athlete/cardio/new?itemId=`). Zonder
-`onOpenCardio` (programma-builder) blijft een kort activiteitsformulier over,
-zonder per-set en AMRAP.
+`onOpenCardio` (dev-voorvertoning) blijft een kort activiteitsformulier over,
+zonder per-set en AMRAP. In de programma-builder leeft dezelfde bouwer per
+programmadag in `programs.cardioByDay` (sleutel `w1d2`, migratie
+`20260914_programma_cardio.sql`, schema `programCardioSchema`); de runner
+geeft de cardio van de dag top-level terug als `cardio` in
+`patient.getTodayExercises`, voor trainingen én programmadagen. Nieuwe
+Json-kolom op `programs` = ook in de `omit` van `programs.list` (TS2589).
 
 # Twee wearables op één dag: de eerste bron wint, en dat slot zit in de WHERE
 

@@ -775,6 +775,8 @@ model Program {
   /// Groepen (superset/circuit) per week-dag: { "w1d2": { A: {...} } }. Zie
   /// lib/planner-blocks.ts ItemGroups. Nooit ongecast door een tRPC-return.
   groups           Json?
+  /// Cardio-workout (blokkenbouwer) per week-dag, sleutel "w1d2"; zie lib/planner-blocks.ts.
+  cardioByDay      Json?
 
   tendinopathyMode Boolean @default(false)
   trackOneRepMax   Boolean @default(false)

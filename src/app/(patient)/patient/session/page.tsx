@@ -2110,7 +2110,7 @@ function SessionPageInner() {
         ) : (
           <>
             {/* Cardio-workout uit de blokkenbouwer: voor de patiënt als samenvatting. */}
-            <CardioPlanRow cardio={(sessionData as { plannedItem?: { cardio?: unknown } | null } | undefined)?.plannedItem?.cardio ?? null} startHref={null} />
+            <CardioPlanRow cardio={(sessionData as { cardio?: unknown; plannedItem?: { cardio?: unknown } | null } | undefined)?.cardio ?? (sessionData as { plannedItem?: { cardio?: unknown } | null } | undefined)?.plannedItem?.cardio ?? null} startHref={null} />
             {(() => {
               // Blokken van het geplande item (koppen, notities, pauzes) tussen de
               // stappen; een superset-stap komt op de plek van zijn eerste oefening.

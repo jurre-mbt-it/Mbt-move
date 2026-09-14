@@ -867,8 +867,10 @@ function AthleteSessionPageInner() {
           ) : (
             <div className="space-y-2 mbt-stagger">
               <CardioPlanRow
-                cardio={sessionData?.plannedItem?.cardio ?? null}
-                startHref={plannedItemId ? `/athlete/cardio/new?itemId=${plannedItemId}` : null}
+                cardio={sessionData?.cardio ?? sessionData?.plannedItem?.cardio ?? null}
+                startHref={plannedItemId
+                  ? `/athlete/cardio/new?itemId=${plannedItemId}`
+                  : sessionData?.program?.id ? `/athlete/cardio/new?programId=${sessionData.program.id}` : null}
               />
               {overzichtRegels.map((regel, i) => {
                 if (regel.soort !== 'oefening') {

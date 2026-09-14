@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Layers } from 'lucide-react'
 import { ProgramBuilder } from '@/components/programs/ProgramBuilder'
 import { CardioWorkoutBuilder } from '@/components/week-planner/CardioWorkoutBuilder'
+import type { StructuredCardio } from '@/lib/cardio-workout'
 import { trpc } from '@/lib/trpc/client'
 import { usePortal } from '@/lib/portal'
 import { notFound } from 'next/navigation'
@@ -52,6 +53,7 @@ type EditExercise = {
 type EditProgram = {
   /** Supersets/circuits per week-dag (zie lib/planner-blocks.ts). */
   groups?: Record<string, ItemGroups> | null
+  cardioByDay?: Record<string, StructuredCardio> | null
   name: string
   description: string | null
   weeks: number
@@ -336,6 +338,7 @@ export default function EditProgramPage({ params }: Props) {
           exercises,
           resources,
           groups: program.groups ?? {},
+          cardioByDay: program.cardioByDay ?? {},
         }}
       />
     </Suspense>

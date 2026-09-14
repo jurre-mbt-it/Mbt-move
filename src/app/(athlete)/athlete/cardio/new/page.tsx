@@ -76,12 +76,14 @@ function AthleteCardioLogPageInner() {
   // volledig handinvoer: wat de therapeut voorschreef kwam hier nooit aan.
   const searchParams = useSearchParams()
   const plannedItemId = searchParams.get('itemId')
+  // ?programId=… → de cardio-workout van de programmadag van vandaag.
+  const plannedProgramId = searchParams.get('programId')
   const { data: planned } = trpc.patient.getTodayExercises.useQuery(
-    plannedItemId ? { itemId: plannedItemId } : undefined,
-    { enabled: !!plannedItemId },
+    plannedItemId ? { itemId: plannedItemId } : plannedProgramId ? { programId: plannedProgramId } : undefined,
+    { enabled: !!plannedItemId || !!plannedProgramId },
   )
   const plannedWorkout = useMemo(
-    () => readWorkout(planned?.plannedItem?.cardio ?? null),
+    () => readWorkout(planned?.cardio ?? planned?.plannedItem?.cardio ?? null),
     [planned],
   )
 
@@ -161,7 +163,7 @@ function AthleteCardioLogPageInner() {
     const completedAt = new Date(yy, mm - 1, dd, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString()
     try {
       await logCardio.mutateAsync({
-        programId: null,
+        programId: plannedProgramId ?? null,
         // Vinkt exact deze geplande workout af i.p.v. "er is die dag cardio
         // gelogd".
         weekScheduleDayItemId: plannedItemId,
