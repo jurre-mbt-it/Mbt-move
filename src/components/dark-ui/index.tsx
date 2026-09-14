@@ -1367,7 +1367,7 @@ function DarkSearchSelect({
   const [activeIndex, setActiveIndex] = React.useState(0)
   // Portal-positie (viewport-coördinaten) t.o.v. de trigger. `above` flipt het
   // paneel omhoog als er onder te weinig ruimte is.
-  const [pos, setPos] = React.useState<{ left: number; width: number; top?: number; bottom?: number; above: boolean; maxHeight: number } | null>(null)
+  const [pos, setPos] = React.useState<{ left: number; width: number; top?: number; bottom?: number; above: boolean; maxHeight: number; host: HTMLElement } | null>(null)
   const rootRef = React.useRef<HTMLDivElement>(null)
   const triggerRef = React.useRef<HTMLButtonElement>(null)
   const panelRef = React.useRef<HTMLDivElement>(null)
@@ -1385,6 +1385,14 @@ function DarkSearchSelect({
   // Outside-click + Escape sluiten het paneel. Het paneel hangt in een portal
   // buiten rootRef (om de overflow-hidden van bv. een Tile te ontsnappen), dus
   // een klik erin telt niet als "buiten".
+  //
+  // Waar die portal heen gaat hangt af van de omgeving. Op een gewone pagina:
+  // document.body, met viewport-coördinaten. Binnen een open Radix-dialoog
+  // NIET: die zet `pointer-events: none` op de body en vangt de focus, dus een
+  // paneel op de body is dan wel zichtbaar maar niet aan te klikken (de klik
+  // ging door het paneel heen en sloot het alleen). Daarom gaat het paneel
+  // dan in de dialoog zelf, met coördinaten t.o.v. de dialoog, die zelf
+  // `position: fixed` is en dus als referentie dient.
   React.useEffect(() => {
     if (!open) return
     function onPointer(e: MouseEvent) {
@@ -1410,13 +1418,19 @@ function DarkSearchSelect({
       const spaceAbove = r.top - gap - 8
       const above = spaceBelow < 220 && spaceAbove > spaceBelow
       const maxHeight = Math.max(160, Math.min(340, (above ? spaceAbove : spaceBelow)))
+      const dialog = el.closest<HTMLElement>('[role="dialog"]')
+      // In een dialoog: positie t.o.v. de dialoog (position: absolute erin);
+      // anders t.o.v. de viewport (position: fixed op de body).
+      const host = dialog ?? document.body
+      const ref = dialog ? dialog.getBoundingClientRect() : { left: 0, top: 0, bottom: window.innerHeight }
       setPos({
-        left: r.left,
+        left: r.left - ref.left,
         width: r.width,
-        top: above ? undefined : r.bottom + gap,
-        bottom: above ? window.innerHeight - (r.top - gap) : undefined,
+        top: above ? undefined : r.bottom + gap - ref.top,
+        bottom: above ? ref.bottom - (r.top - gap) : undefined,
         above,
         maxHeight,
+        host,
       })
     }
     place()
@@ -1505,7 +1519,8 @@ function DarkSearchSelect({
         <div
           ref={panelRef}
           className={cn(
-            'fixed z-[9999] flex flex-col overflow-hidden rounded-xl border shadow-xl duration-150 ease-out animate-in fade-in-0 zoom-in-95',
+            pos.host === document.body ? 'fixed' : 'absolute',
+            'z-[9999] flex flex-col overflow-hidden rounded-xl border shadow-xl duration-150 ease-out animate-in fade-in-0 zoom-in-95',
             pos.above ? 'slide-in-from-bottom-1' : 'slide-in-from-top-1',
           )}
           style={{
@@ -1582,7 +1597,7 @@ function DarkSearchSelect({
             )}
           </div>
         </div>,
-        document.body,
+        pos.host,
       )}
     </div>
   )
