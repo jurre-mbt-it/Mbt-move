@@ -1,0 +1,371 @@
+import { z } from 'zod'
+import { TRPCError } from '@trpc/server'
+import type { PrismaClient } from '@prisma/client'
+import { createTRPCRouter, coachStaffProcedure } from '@/server/trpc'
+import { assertGroupRole, groupsWhereForUser, type GroupRole } from '@/server/lib/group-access'
+import { planVerzending, type GroepsWeek, type LidWeek } from '@/server/lib/group-send'
+import { assertNotDischarged } from '@/server/lib/care-guard'
+import { notifyNewSchedule } from '@/server/push/notify'
+import { copyItemToDay, COPY_ITEM_INCLUDE } from './weekSchedules'
+import { mondayKeyOf, addDaysKey, amsMidnight, dateKey, isDateKey } from '@/lib/week-dates'
+
+const createId = () => crypto.randomUUID()
+const rolEnum = z.enum(['VIEWER', 'PLANNER', 'MANAGER'])
+
+/**
+ * Atletengroepen: verzendlijst plus één gedeelde kalender (week_schedules met
+ * groupId). Rechten per rol staan in lib/group-access.ts; elke procedure
+ * dwingt zijn minimum af op de server, de UI verbergt alleen knoppen.
+ */
+
+/** Mag deze staf dit lid toevoegen? Coach: directe koppeling; therapeut: eigen patiënt of praktijk. */
+async function assertLidKoppeling(prisma: PrismaClient, user: { id: string; role: string; practiceId: string | null }, patientId: string) {
+  if (user.role === 'ADMIN') return
+  const viaPractice = user.role === 'THERAPIST' && user.practiceId ? [{ practiceId: user.practiceId }] : []
+  const ok = await prisma.user.findFirst({
+    where: {
+      id: patientId,
+      OR: [
+        { patientTherapists: { some: { therapistId: user.id, isActive: true, status: { in: ['APPROVED', 'PENDING'] } } } },
+        ...viaPractice,
+      ],
+    },
+    select: { id: true },
+  })
+  if (!ok) throw new TRPCError({ code: 'FORBIDDEN', message: 'Geen actieve koppeling met deze atleet' })
+}
+
+const groepSelect = {
+  id: true, name: true, planName: true, description: true, ownerId: true,
+  startDate: true, endDate: true, lastSentAt: true, createdAt: true,
+  owner: { select: { id: true, name: true, email: true } },
+  _count: { select: { members: true, schedules: true } },
+} as const
+
+export const athleteGroupsRouter = createTRPCRouter({
+  /** Mijn groepen (staf of eigenaar; admin alles) met ledenaantal en rol. */
+  list: coachStaffProcedure.query(async ({ ctx }) => {
+    const groepen = await ctx.prisma.athleteGroup.findMany({
+      where: groupsWhereForUser(ctx.user),
+      select: { ...groepSelect, staff: { where: { userId: ctx.user.id }, select: { role: true } } },
+      orderBy: [{ startDate: 'desc' }, { name: 'asc' }],
+    })
+    return groepen.map(g => ({
+      ...g,
+      // Admin zonder stafrij kijkt mee als VIEWER.
+      role: (g.staff[0]?.role ?? 'VIEWER') as GroupRole,
+      memberCount: g._count.members,
+      weekCount: g._count.schedules,
+    }))
+  }),
+
+  get: coachStaffProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const mijn = await assertGroupRole(ctx.prisma, ctx.user, input.id, 'VIEWER')
+      const g = await ctx.prisma.athleteGroup.findUniqueOrThrow({
+        where: { id: input.id },
+        select: {
+          ...groepSelect,
+          members: {
+            select: {
+              id: true, patientId: true, note: true, addedAt: true, lastSentAt: true,
+              patient: { select: { id: true, name: true, email: true } },
+            },
+            orderBy: { addedAt: 'asc' },
+          },
+          staff: {
+            select: { id: true, userId: true, role: true, addedAt: true, user: { select: { id: true, name: true, email: true, role: true } } },
+            orderBy: { addedAt: 'asc' },
+          },
+        },
+      })
+      return { ...g, role: mijn.role, memberCount: g._count.members, weekCount: g._count.schedules }
+    }),
+
+  create: coachStaffProcedure
+    .input(z.object({
+      name: z.string().trim().min(1).max(80),
+      planName: z.string().trim().max(120).optional(),
+      description: z.string().trim().max(500).optional(),
+      /** Datumsleutel YYYY-MM-DD; wordt afgerond naar de maandag van die week. */
+      startDate: z.string().refine(isDateKey, 'Ongeldige startdatum'),
+      endDate: z.string().refine(isDateKey, 'Ongeldige einddatum').nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== 'COACH' && ctx.user.role !== 'ADMIN') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Alleen een coach maakt een groep aan' })
+      }
+      const startKey = mondayKeyOf(amsMidnight(input.startDate))
+      if (input.endDate && input.endDate < startKey) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'De einddatum ligt vóór de startdatum' })
+      }
+      const id = createId()
+      await ctx.prisma.athleteGroup.create({
+        data: {
+          id,
+          name: input.name,
+          planName: input.planName || null,
+          description: input.description || null,
+          ownerId: ctx.user.id,
+          startDate: amsMidnight(startKey),
+          endDate: input.endDate ? amsMidnight(input.endDate) : null,
+          staff: { create: { id: createId(), userId: ctx.user.id, role: 'OWNER' } },
+        },
+      })
+      return { id }
+    }),
+
+  update: coachStaffProcedure
+    .input(z.object({
+      id: z.string(),
+      name: z.string().trim().min(1).max(80).optional(),
+      planName: z.string().trim().max(120).nullable().optional(),
+      description: z.string().trim().max(500).nullable().optional(),
+      startDate: z.string().refine(isDateKey, 'Ongeldige startdatum').optional(),
+      endDate: z.string().refine(isDateKey, 'Ongeldige einddatum').nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertGroupRole(ctx.prisma, ctx.user, input.id, 'MANAGER')
+      const { id, startDate, endDate, ...rest } = input
+      await ctx.prisma.athleteGroup.update({
+        where: { id },
+        data: {
+          ...rest,
+          ...(startDate ? { startDate: amsMidnight(mondayKeyOf(amsMidnight(startDate))) } : {}),
+          ...(endDate !== undefined ? { endDate: endDate ? amsMidnight(endDate) : null } : {}),
+        },
+      })
+      return { ok: true }
+    }),
+
+  delete: coachStaffProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertGroupRole(ctx.prisma, ctx.user, input.id, 'OWNER')
+      // Kopieën bij de leden houden hun rij: de FK op items staat op SET NULL,
+      // de groepskalender zelf cascadeert mee.
+      await ctx.prisma.athleteGroup.delete({ where: { id: input.id } })
+      return { ok: true }
+    }),
+
+  addMembers: coachStaffProcedure
+    .input(z.object({ groupId: z.string(), patientIds: z.array(z.string()).min(1).max(200) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertGroupRole(ctx.prisma, ctx.user, input.groupId, 'MANAGER')
+      for (const pid of input.patientIds) await assertLidKoppeling(ctx.prisma, ctx.user, pid)
+      const bestaand = await ctx.prisma.athleteGroupMember.findMany({ where: { groupId: input.groupId }, select: { patientId: true } })
+      const al = new Set(bestaand.map(b => b.patientId))
+      const nieuw = input.patientIds.filter(p => !al.has(p))
+      await ctx.prisma.athleteGroupMember.createMany({
+        data: nieuw.map(patientId => ({ id: createId(), groupId: input.groupId, patientId })),
+      })
+      return { added: nieuw.length }
+    }),
+
+  removeMember: coachStaffProcedure
+    .input(z.object({ groupId: z.string(), patientId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertGroupRole(ctx.prisma, ctx.user, input.groupId, 'MANAGER')
+      await ctx.prisma.$transaction([
+        ctx.prisma.athleteGroupMember.deleteMany({ where: { groupId: input.groupId, patientId: input.patientId } }),
+        // Zijn trainingen blijven, alleen de verwijzing naar de groep vervalt.
+        ctx.prisma.weekScheduleDayItem.updateMany({
+          where: { groupId: input.groupId, day: { weekSchedule: { patientId: input.patientId } } },
+          data: { groupId: null, sourceItemId: null },
+        }),
+      ])
+      return { ok: true }
+    }),
+
+  setMemberNote: coachStaffProcedure
+    .input(z.object({ groupId: z.string(), patientId: z.string(), note: z.string().trim().max(500).nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertGroupRole(ctx.prisma, ctx.user, input.groupId, 'VIEWER')
+      await ctx.prisma.athleteGroupMember.update({
+        where: { groupId_patientId: { groupId: input.groupId, patientId: input.patientId } },
+        data: { note: input.note || null },
+      })
+      return { ok: true }
+    }),
+
+  addStaff: coachStaffProcedure
+    .input(z.object({ groupId: z.string(), email: z.string().trim().email(), role: rolEnum }))
+    .mutation(async ({ ctx, input }) => {
+      await assertGroupRole(ctx.prisma, ctx.user, input.groupId, 'OWNER')
+      const user = await ctx.prisma.user.findFirst({
+        where: { email: { equals: input.email, mode: 'insensitive' }, role: { in: ['THERAPIST', 'COACH'] } },
+        select: { id: true },
+      })
+      if (!user) throw new TRPCError({ code: 'NOT_FOUND', message: 'Geen therapeut of coach met dit e-mailadres' })
+      await ctx.prisma.athleteGroupStaff.upsert({
+        where: { groupId_userId: { groupId: input.groupId, userId: user.id } },
+        create: { id: createId(), groupId: input.groupId, userId: user.id, role: input.role },
+        update: { role: input.role },
+      })
+      return { ok: true }
+    }),
+
+  setStaffRole: coachStaffProcedure
+    .input(z.object({ groupId: z.string(), userId: z.string(), role: rolEnum }))
+    .mutation(async ({ ctx, input }) => {
+      const g = await assertGroupRole(ctx.prisma, ctx.user, input.groupId, 'OWNER')
+      if (input.userId === g.ownerId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'De eigenaar houdt altijd de eigenaarsrol' })
+      await ctx.prisma.athleteGroupStaff.update({
+        where: { groupId_userId: { groupId: input.groupId, userId: input.userId } },
+        data: { role: input.role },
+      })
+      return { ok: true }
+    }),
+
+  removeStaff: coachStaffProcedure
+    .input(z.object({ groupId: z.string(), userId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const g = await assertGroupRole(ctx.prisma, ctx.user, input.groupId, 'OWNER')
+      if (input.userId === g.ownerId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'De eigenaar kan zichzelf niet verwijderen' })
+      await ctx.prisma.athleteGroupStaff.deleteMany({ where: { groupId: input.groupId, userId: input.userId } })
+      return { ok: true }
+    }),
+
+  /** Weken van de groepskalender voor het verzendvenster. */
+  weeks: coachStaffProcedure
+    .input(z.object({ groupId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await assertGroupRole(ctx.prisma, ctx.user, input.groupId, 'VIEWER')
+      const weken = await ctx.prisma.weekSchedule.findMany({
+        where: { groupId: input.groupId, startDate: { not: null } },
+        select: { id: true, weekNumber: true, startDate: true, days: { select: { _count: { select: { items: true } } } } },
+        orderBy: { startDate: 'asc' },
+      })
+      return weken.map(w => ({
+        id: w.id,
+        weekNumber: w.weekNumber,
+        monday: mondayKeyOf(w.startDate!),
+        itemCount: w.days.reduce((n, d) => n + d._count.items, 0),
+      }))
+    }),
+
+  /**
+   * Stuur naar iedereen: per lid en per gekozen week de groepsitems vervangen
+   * (zie lib/group-send.ts voor de regels). Eén transactie per lid, daarna
+   * één push per lid. Overgeslagen leden (uitbehandeld) komen terug in het
+   * resultaat, ze blijven gewoon lid.
+   */
+  send: coachStaffProcedure
+    .input(z.object({
+      groupId: z.string(),
+      weekIds: z.array(z.string()).min(1).max(104),
+      memberIds: z.array(z.string()).min(1).max(200),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const g = await assertGroupRole(ctx.prisma, ctx.user, input.groupId, 'MANAGER')
+      const groep = await ctx.prisma.athleteGroup.findUniqueOrThrow({ where: { id: g.id }, select: { name: true, planName: true } })
+      const leden = await ctx.prisma.athleteGroupMember.findMany({
+        where: { groupId: g.id, patientId: { in: input.memberIds } },
+        select: { patientId: true, patient: { select: { name: true, email: true } } },
+      })
+      const bronWeken = await ctx.prisma.weekSchedule.findMany({
+        where: { id: { in: input.weekIds }, groupId: g.id, startDate: { not: null } },
+        include: {
+          days: {
+            include: { items: { include: COPY_ITEM_INCLUDE, orderBy: { order: 'asc' } } },
+            orderBy: { dayOfWeek: 'asc' },
+          },
+        },
+        orderBy: { startDate: 'asc' },
+      })
+      if (bronWeken.length === 0) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Kies minstens één week van de groep' })
+      const groepsWeken: GroepsWeek[] = bronWeken.map(w => ({
+        id: w.id, monday: mondayKeyOf(w.startDate!),
+        days: w.days.map(d => ({ dayOfWeek: d.dayOfWeek, items: d.items.map(it => ({ id: it.id })) })),
+      }))
+      const bronItem = new Map(bronWeken.flatMap(w => w.days.flatMap(d => d.items.map(it => [it.id, it] as const))))
+      const vandaag = dateKey(new Date())
+
+      // Zelfde scope als planTemplates.applyToPatient: eigen weken of praktijk.
+      const isAdmin = ctx.user.role === 'ADMIN'
+      const scope = isAdmin ? {} : { OR: [{ creatorId: ctx.user.id }, ...(ctx.user.practiceId ? [{ practiceId: ctx.user.practiceId }] : [])] }
+
+      const overgeslagen: string[] = []
+      let trainingen = 0
+      let verzondenLeden = 0
+
+      for (const lid of leden) {
+        const label = lid.patient.name ?? lid.patient.email
+        try {
+          await assertNotDischarged(ctx.prisma, ctx.user, lid.patientId)
+        } catch {
+          overgeslagen.push(label)
+          continue
+        }
+        const lidWekenRaw = await ctx.prisma.weekSchedule.findMany({
+          where: { patientId: lid.patientId, isTemplate: false, ...scope },
+          select: {
+            id: true, weekNumber: true, startDate: true,
+            days: { select: { id: true, dayOfWeek: true, items: { select: { id: true, groupId: true, _count: { select: { sessionLogs: true, cardioLogs: true } } } } } },
+          },
+        })
+        const lidWeken: LidWeek[] = lidWekenRaw
+          .filter(w => w.startDate)
+          .map(w => ({
+            id: w.id, monday: mondayKeyOf(w.startDate!),
+            items: w.days.flatMap(d => d.items.map(it => ({ id: it.id, dayOfWeek: d.dayOfWeek, groupId: it.groupId, gelogd: it._count.sessionLogs + it._count.cardioLogs > 0 }))),
+          }))
+        let maxWeekNumber = lidWekenRaw.reduce((m, w) => Math.max(m, w.weekNumber), 0)
+        const stappen = planVerzending({ groupId: g.id, groepsWeken, lidWeken, vandaag })
+
+        await ctx.prisma.$transaction(async tx => {
+          for (const stap of stappen) {
+            let weekId = stap.lidWeekId
+            if (!weekId) {
+              weekId = createId()
+              maxWeekNumber++
+              await tx.weekSchedule.create({
+                data: {
+                  id: weekId,
+                  name: `${groep.planName ?? groep.name} · week van ${stap.monday}`,
+                  creatorId: ctx.user.id,
+                  practiceId: ctx.user.practiceId ?? null,
+                  patientId: lid.patientId,
+                  isTemplate: false,
+                  weekNumber: maxWeekNumber,
+                  startDate: amsMidnight(stap.monday),
+                  endDate: amsMidnight(addDaysKey(stap.monday, 6)),
+                  days: { create: [0, 1, 2, 3, 4, 5, 6].map(dayOfWeek => ({ id: createId(), dayOfWeek })) },
+                },
+              })
+            }
+            if (stap.verwijderen.length) {
+              await tx.weekScheduleDayItem.deleteMany({ where: { id: { in: stap.verwijderen } } })
+            }
+            const dagen = await tx.weekScheduleDay.findMany({ where: { weekScheduleId: weekId }, select: { id: true, dayOfWeek: true } })
+            const dagId = new Map(dagen.map(d => [d.dayOfWeek, d.id]))
+            for (const k of stap.kopieren) {
+              let dayId = dagId.get(k.dayOfWeek)
+              if (!dayId) {
+                dayId = createId()
+                await tx.weekScheduleDay.create({ data: { id: dayId, weekScheduleId: weekId, dayOfWeek: k.dayOfWeek } })
+                dagId.set(k.dayOfWeek, dayId)
+              }
+              const laatste = await tx.weekScheduleDayItem.findFirst({ where: { dayId }, orderBy: { order: 'desc' }, select: { order: true } })
+              const bron = bronItem.get(k.bronItemId)!
+              await copyItemToDay(tx, bron, dayId, laatste ? laatste.order + 1 : 0)
+              // Herkomst op de zojuist gemaakte kopie (copyItemToDay kent geen groepen).
+              const kopie = await tx.weekScheduleDayItem.findFirst({ where: { dayId }, orderBy: { order: 'desc' }, select: { id: true } })
+              if (kopie) await tx.weekScheduleDayItem.update({ where: { id: kopie.id }, data: { groupId: g.id, sourceItemId: k.bronItemId } })
+              trainingen++
+            }
+          }
+          await tx.athleteGroupMember.update({
+            where: { groupId_patientId: { groupId: g.id, patientId: lid.patientId } },
+            data: { lastSentAt: new Date() },
+          })
+        }, { timeout: 60_000 })
+        verzondenLeden++
+        await notifyNewSchedule(lid.patientId).catch(() => {})
+      }
+
+      await ctx.prisma.athleteGroup.update({ where: { id: g.id }, data: { lastSentAt: new Date() } })
+      return { members: verzondenLeden, weeks: groepsWeken.length, items: trainingen, skipped: overgeslagen }
+    }),
+})

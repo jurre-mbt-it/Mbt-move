@@ -4,6 +4,7 @@ import { exercisesRouter } from './exercises'
 import { patientsRouter } from './patients'
 import { programsRouter } from './programs'
 import { weekSchedulesRouter } from './weekSchedules'
+import { athleteGroupsRouter } from './athleteGroups'
 import { planTemplatesRouter } from './planTemplates'
 import { researchRouter } from './research'
 import { patientRouter } from './patient'
@@ -41,6 +42,7 @@ export const appRouter = createTRPCRouter({
   practice: practiceRouter,
   programs: programsRouter,
   weekSchedules: weekSchedulesRouter,
+  athleteGroups: athleteGroupsRouter,
   planTemplates: planTemplatesRouter,
   research: researchRouter,
   patient: patientRouter,
