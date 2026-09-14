@@ -65,7 +65,7 @@ export function Koppelingen() {
         <Reveal>
           <p className={styles.eyebrow}><ScrambleText text="Koppelingen" /></p>
           <h2 className={styles.head}>
-            <span className={styles.ln}>Wearables en de force plate</span>
+            <span className={styles.ln}>Horloge en force plate</span>
             <span className={styles.ln}>lezen we rechtstreeks uit</span>
           </h2>
           <p className={styles.lede}>
@@ -108,8 +108,9 @@ export function Koppelingen() {
             <div>
               <p className={styles.eyebrow}><ScrambleText text="KINVENT" /></p>
               <h2 className={styles.head}>
-                <span className={styles.ln}>Een test op de force plate</span>
-                <span className={styles.ln}>staat direct in het rapport</span>
+                <span className={styles.ln}>Force plate-tests</span>
+                <span className={styles.ln}>staan direct</span>
+                <span className={styles.ln}>in het rapport</span>
               </h2>
               <p className={styles.lede}>
                 Meet je met KINVENT, dan haalt BASE de test op en zet hem in het testrapport:
