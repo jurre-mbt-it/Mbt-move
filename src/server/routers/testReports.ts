@@ -11,7 +11,8 @@
  */
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
-import { createTRPCRouter, therapistProcedure } from '@/server/trpc'
+import { createTRPCRouter, protectedProcedure, therapistProcedure } from '@/server/trpc'
+import { laadTestVerloop } from '@/server/lib/test-verloop'
 import { auditLog } from '@/server/audit'
 import {
   computePlottedValue,
@@ -271,6 +272,26 @@ export const testReportsRouter = createTRPCRouter({
     }),
 
   // ── Rapporten ────────────────────────────────────────────────────────────
+  /**
+   * Verloop per test van de ingelogde patiënt of atleet zelf: alleen
+   * DEFINITIEVE rapporten, een concept komt nooit op het toestel van de
+   * patiënt. Geen patientId in de input.
+   */
+  myTestHistory: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.user.role !== 'PATIENT' && ctx.user.role !== 'ATHLETE') {
+      throw new TRPCError({ code: 'FORBIDDEN', message: 'Alleen voor de patiënt of atleet zelf.' })
+    }
+    return laadTestVerloop(ctx.prisma, ctx.user.id, { alleenDefinitief: true })
+  }),
+
+  /** Hetzelfde verloop voor de behandelaar, inclusief conceptrapporten (per punt gemarkeerd). */
+  historyForPatient: therapistProcedure
+    .input(z.object({ patientId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await assertTreating(ctx.prisma, ctx.user, input.patientId)
+      return laadTestVerloop(ctx.prisma, input.patientId, { alleenDefinitief: false })
+    }),
+
   listForPatient: therapistProcedure
     .input(z.object({ patientId: z.string() }))
     .query(async ({ ctx, input }) => {

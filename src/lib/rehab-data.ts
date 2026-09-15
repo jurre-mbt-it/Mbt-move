@@ -190,6 +190,9 @@ export async function getRehabTrackerDataById(
         targetUnit: c.targetUnit,
         inputType: c.inputType,
         isBonus: c.isBonus,
+        // Additief: de catalogustest achter dit criterium, zodat de app vanaf
+        // het criterium het verloop van die test kan openen.
+        catalogItemId: c.catalogItemId,
         isBilateral: c.isBilateral,
         newtonMinGreen: c.newtonMinGreen,
         newtonMinOrange: c.newtonMinOrange,
