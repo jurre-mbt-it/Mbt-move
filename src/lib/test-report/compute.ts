@@ -142,10 +142,28 @@ export function formatNumber(value: number | null | undefined, maxDecimals = 2):
   return rounded.toLocaleString('nl-NL', { maximumFractionDigits: maxDecimals })
 }
 
+/**
+ * Testwaarden staan als hele getallen in rapport, criteria en app: kg, N, cm,
+ * graden, seconden en herhalingen. Kinvent levert tien decimalen en dat leest
+ * als ruis. Twee uitzonderingen houden twee decimalen, omdat een heel getal
+ * daar niets meer zegt: een verhouding zonder eenheid (H:Q-ratio 0,62) en een
+ * waarde per kilo lichaamsgewicht (3,12 Nm/kg).
+ */
+export function decimalenVoorEenheid(unit: string | null | undefined): number {
+  const u = (unit ?? '').trim()
+  return u === '' || /\/\s*kg$/i.test(u) ? 2 : 0
+}
+
+export function roundTestValue(value: number | null | undefined, unit: string | null | undefined): number | null {
+  if (value == null || Number.isNaN(value)) return null
+  const factor = 10 ** decimalenVoorEenheid(unit)
+  return Math.round(value * factor) / factor
+}
+
 /** Geplotte waarde + plot-eenheid, bv "82%", "0,75", "28 cm", "138°". */
 export function formatPlotted(spec: TestSpec, plotted: number | null): string {
   if (plotted == null) return '—'
-  const num = formatNumber(spec.metric === 'LSI' ? Math.round(plotted) : plotted)
+  const num = formatNumber(spec.metric === 'LSI' ? Math.round(plotted) : plotted, decimalenVoorEenheid(spec.plotUnit))
   const unit = spec.plotUnit
   if (!unit) return num
   // Spatie vóór letter-eenheden ("28 cm"), niet vóór symbolen ("82%", "138°").

@@ -127,7 +127,7 @@ export function KinventPatientCard({ patientId }: { patientId: string }) {
                         {beste?.side === 'LEFT' ? ' · links' : beste?.side === 'RIGHT' ? ' · rechts' : ''}
                       </span>
                       <span className="athletic-mono whitespace-nowrap" style={{ color: P.ink }}>
-                        {(m.peakJumpHeightCm ?? beste?.jumpHeightCm)?.toFixed(1) ?? '–'} cm
+                        {(m.peakJumpHeightCm ?? beste?.jumpHeightCm)?.toFixed(0) ?? '–'} cm
                         {verschil !== null ? ` · ${formatAsymmetry(verschil)}` : ''}
                       </span>
                     </div>
@@ -141,7 +141,7 @@ export function KinventPatientCard({ patientId }: { patientId: string }) {
                       {fmtDatum(k.performedAt)} · {metingLabel({ soort: 'kracht', title: k.title ?? '' })}
                     </span>
                     <span className="athletic-mono whitespace-nowrap" style={{ color: P.ink }}>
-                      {bilateraal ? `${k.leftMaxKg!.toFixed(1)} / ${k.rightMaxKg!.toFixed(1)} kg · ${formatAsymmetry(asymmetryPct(k.leftMaxKg, k.rightMaxKg))}` : `${(k.singleMaxKg ?? k.leftMaxKg ?? k.rightMaxKg)?.toFixed(1) ?? '–'} kg`}
+                      {bilateraal ? `${k.leftMaxKg!.toFixed(0)} / ${k.rightMaxKg!.toFixed(0)} kg · ${formatAsymmetry(asymmetryPct(k.leftMaxKg, k.rightMaxKg))}` : `${(k.singleMaxKg ?? k.leftMaxKg ?? k.rightMaxKg)?.toFixed(0) ?? '–'} kg`}
                     </span>
                   </div>
                 )

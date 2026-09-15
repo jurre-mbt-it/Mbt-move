@@ -24,7 +24,6 @@ import { kinventSource } from '@/lib/kinvent/labels'
 const fmtDatum = (d: Date | string) => new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
 const fmtKort = (t: number) => new Date(t).toLocaleDateString('nl-NL', { month: 'short', year: '2-digit' })
 const n0 = (v: number | null | undefined) => (v == null ? '–' : Math.round(v).toString())
-const n1 = (v: number | null | undefined) => (v == null ? '–' : v.toFixed(1))
 const n2 = (v: number | null | undefined) => (v == null ? '–' : v.toFixed(2))
 
 const KLEUR: Record<string, string> = { L: P.brand, R: P.lime, S: P.brand, H: P.brand, V: P.gold, RSI: P.brand }
@@ -140,7 +139,7 @@ export function KinventMeasurements({ patientId }: { patientId: string }) {
                         <Tooltip
                           {...DARK_CHART_STYLES.tooltip}
                           labelFormatter={(t) => fmtDatum(new Date(Number(t)))}
-                          formatter={(v, name) => [`${typeof v === 'number' ? (trend.unit === '%' ? v.toFixed(1) : n1(v)) : v}${trend.unit ? ` ${trend.unit}` : ''}`, String(name)]}
+                          formatter={(v, name) => [`${typeof v === 'number' ? (maat === 'rsi' ? n2(v) : n0(v)) : v}${trend.unit ? ` ${trend.unit}` : ''}`, String(name)]}
                         />
                         {trend.series.map((serie) => (
                           <Line
@@ -239,14 +238,14 @@ function SprongRij({ m, open, onToggle, toonNaam }: { m: JumpMeting; open: boole
           <p style={{ color: P.inkMuted, fontSize: 11 }}>
             {m.reps.length} sprong{m.reps.length === 1 ? '' : 'en'}
             {beideBenen ? ' · links en rechts' : ''}
-            {m.bodyWeightKg != null ? ` · ${n1(m.bodyWeightKg)} kg` : ''}
+            {m.bodyWeightKg != null ? ` · ${n0(m.bodyWeightKg)} kg` : ''}
           </p>
         </>
       }
       hoofd={
         <>
           <span className="athletic-mono" style={{ color: P.ink }}>
-            {beideBenen ? `${n1(besteL?.jumpHeightCm)} / ${n1(besteR?.jumpHeightCm)} cm` : `${n1(m.peakJumpHeightCm ?? beste?.jumpHeightCm)} cm`}
+            {beideBenen ? `${n0(besteL?.jumpHeightCm)} / ${n0(besteR?.jumpHeightCm)} cm` : `${n0(m.peakJumpHeightCm ?? beste?.jumpHeightCm)} cm`}
           </span>
           <span className="athletic-mono" style={{ color: P.inkMuted }}>
             {beideBenen
@@ -287,7 +286,7 @@ function SprongRij({ m, open, onToggle, toonNaam }: { m: JumpMeting; open: boole
             {m.reps.map((r) => (
               <tr key={r.ordinal} style={{ borderTop: `1px solid ${P.line}`, color: P.ink }}>
                 <td className="py-1 pr-3" style={{ color: P.inkMuted }}>{r.ordinal}{r.side === 'LEFT' ? ' L' : r.side === 'RIGHT' ? ' R' : ''}</td>
-                <td className={td}>{n1(r.jumpHeightCm)} cm</td>
+                <td className={td}>{n0(r.jumpHeightCm)} cm</td>
                 <td className={td}>{n0(r.flightTimeMs)} ms</td>
                 <td className={td}>{r.contactTimeMs ? `${n0(r.contactTimeMs)} ms` : '–'}</td>
                 <td className={td}>{n0(r.peakForceLeftN)}</td>
@@ -300,8 +299,8 @@ function SprongRij({ m, open, onToggle, toonNaam }: { m: JumpMeting; open: boole
                 <td className={td}>{n0(r.rfdRight)} N/s</td>
                 <td className={td}>{n2(r.rsi)}</td>
                 <td className={td}>{r.timeToStabilizeMs ? `${n0(r.timeToStabilizeMs)} ms` : '–'}</td>
-                <td className={td}>{n1(r.propulsiveImpulsePhase1)}</td>
-                <td className={td}>{n1(r.propulsiveImpulsePhase2)} N·s</td>
+                <td className={td}>{n0(r.propulsiveImpulsePhase1)}</td>
+                <td className={td}>{n0(r.propulsiveImpulsePhase2)} N·s</td>
               </tr>
             ))}
           </tbody>
@@ -332,7 +331,7 @@ function KrachtRij({ k, open, onToggle, toonNaam }: { k: KrachtMeting; open: boo
       hoofd={
         <>
           <span className="athletic-mono" style={{ color: P.ink }}>
-            {bilateraal ? `${n1(k.leftMaxKg)} / ${n1(k.rightMaxKg)} kg` : `${n1(k.singleMaxKg ?? k.leftMaxKg ?? k.rightMaxKg)} kg`}
+            {bilateraal ? `${n0(k.leftMaxKg)} / ${n0(k.rightMaxKg)} kg` : `${n0(k.singleMaxKg ?? k.leftMaxKg ?? k.rightMaxKg)} kg`}
           </span>
           {bilateraal && <span style={{ color: verschil !== null && Math.abs(verschil) >= 10 ? P.gold : P.inkMuted }}>{formatAsymmetry(verschil)}</span>}
         </>
@@ -356,12 +355,12 @@ function KrachtRij({ k, open, onToggle, toonNaam }: { k: KrachtMeting; open: boo
               <tr key={r.ordinal} style={{ borderTop: `1px solid ${P.line}`, color: P.ink }}>
                 <td className="py-1 pr-3" style={{ color: P.inkMuted }}>{r.ordinal}</td>
                 <td className="py-1 pr-3">{r.side === 'LEFT' ? 'links' : r.side === 'RIGHT' ? 'rechts' : 'beide'}</td>
-                <td className={td}>{n1(r.maxKg)} kg</td>
-                <td className={td}>{n1(r.averageKg)} kg</td>
-                <td className={td}>{n1(r.rfdToMax)} kg/s</td>
-                <td className={td}>{n1(r.rfdAverage)} kg/s</td>
+                <td className={td}>{n0(r.maxKg)} kg</td>
+                <td className={td}>{n0(r.averageKg)} kg</td>
+                <td className={td}>{n0(r.rfdToMax)} kg/s</td>
+                <td className={td}>{n0(r.rfdAverage)} kg/s</td>
                 <td className={td}>{n0(r.timeToMaxMs)} ms</td>
-                <td className={td}>{n1(r.impulseNs)} N·s</td>
+                <td className={td}>{n0(r.impulseNs)} N·s</td>
               </tr>
             ))}
           </tbody>

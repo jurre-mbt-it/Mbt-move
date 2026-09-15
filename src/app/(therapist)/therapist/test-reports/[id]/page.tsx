@@ -26,7 +26,10 @@ import {
 import {
   computePlottedValue,
   computeZone,
+  decimalenVoorEenheid,
+  formatNumber,
   formatPlotted,
+  roundTestValue,
   ZONE_LABEL,
   ZONE_COLOR,
   type TestSpec,
@@ -517,6 +520,7 @@ function LeesEntry({ entry }: { entry: Entry }) {
   const plotted = computePlottedValue(spec, values)
   const zone = computeZone(spec, plotted)
   const eenheid = entry.unitPrimary ? ` ${entry.unitPrimary}` : ''
+  const waarde = (v: number | null) => formatNumber(v, decimalenVoorEenheid(entry.unitPrimary))
 
   return (
     <div className="base-flat-rule grid items-baseline gap-x-4 gap-y-1 py-4"
@@ -535,11 +539,11 @@ function LeesEntry({ entry }: { entry: Entry }) {
       <div className="athletic-mono text-right" style={{ fontSize: 14, color: P.ink, lineHeight: 1.5 }}>
         {entry.kind === 'BILATERAL' ? (
           <>
-            <span className="block">L {entry.leftPrimary ?? '—'}{eenheid}</span>
-            <span className="block">R {entry.rightPrimary ?? '—'}{eenheid}</span>
+            <span className="block">L {waarde(entry.leftPrimary)}{eenheid}</span>
+            <span className="block">R {waarde(entry.rightPrimary)}{eenheid}</span>
           </>
         ) : entry.singleValue != null ? (
-          <span className="block">{entry.singleValue}{eenheid}</span>
+          <span className="block">{waarde(entry.singleValue)}{eenheid}</span>
         ) : (
           <span className="block">{entry.textValue ?? '—'}</span>
         )}
@@ -575,11 +579,11 @@ function EntryCard({ entry, onChanged }: { entry: RouterEntry; onChanged: () => 
     zoneOrangeMin: str(entry.zoneOrangeMin),
     zoneGreenMin: str(entry.zoneGreenMin),
     higherIsBetter: entry.higherIsBetter,
-    leftPrimary: str(entry.leftPrimary),
-    rightPrimary: str(entry.rightPrimary),
+    leftPrimary: str(roundTestValue(entry.leftPrimary, entry.unitPrimary)),
+    rightPrimary: str(roundTestValue(entry.rightPrimary, entry.unitPrimary)),
     leftSecondary: str(entry.leftSecondary),
     rightSecondary: str(entry.rightSecondary),
-    singleValue: str(entry.singleValue),
+    singleValue: str(roundTestValue(entry.singleValue, entry.unitPrimary)),
     textValue: entry.textValue ?? '',
     plottedValueOverride: str(entry.plottedValueOverride),
     zoneOverride: (entry.zoneOverride ?? '') as '' | TestZone,

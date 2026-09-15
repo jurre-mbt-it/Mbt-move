@@ -199,8 +199,8 @@ export function KinventImportDialog({
                     >
                       <span className="athletic-mono whitespace-nowrap">
                         {c.left !== null && c.right !== null
-                          ? `${c.left.toFixed(1)} / ${c.right.toFixed(1)} kg · LSI ${c.lsi !== null ? Math.round(c.lsi) : '–'}%`
-                          : `${(c.single ?? c.left ?? c.right ?? 0).toFixed(1)} kg`}
+                          ? `${c.left.toFixed(0)} / ${c.right.toFixed(0)} kg · LSI ${c.lsi !== null ? Math.round(c.lsi) : '–'}%`
+                          : `${(c.single ?? c.left ?? c.right ?? 0).toFixed(0)} kg`}
                       </span>
                     </Rij>
                   ))}
@@ -222,7 +222,7 @@ export function KinventImportDialog({
                       onCatalog={(id) => setCatalogKeuze({ ...(catalogKeuze ?? {}), [sleutel(c)]: id })}
                     >
                       <span className="athletic-mono whitespace-nowrap">
-                        {c.jumpHeightCm !== null ? `${c.jumpHeightCm.toFixed(1)} cm` : '–'}
+                        {c.jumpHeightCm !== null ? `${c.jumpHeightCm.toFixed(0)} cm` : '–'}
                         {c.rsi !== null ? ` · RSI ${c.rsi.toFixed(2)}` : ''}
                       </span>
                     </Rij>

@@ -94,7 +94,7 @@ export async function syncCriteriaVoorEntry(
   }
 
   for (const criterion of criteria) {
-    const uitkomst = bepaalCriteriumStatus(criterion, spec, values)
+    const uitkomst = bepaalCriteriumStatus(criterion, spec, values, entry.unitPrimary)
     if (!uitkomst) continue
 
     // Nieuwste meting wint. measurementDate is bij handmatige statussen vaak

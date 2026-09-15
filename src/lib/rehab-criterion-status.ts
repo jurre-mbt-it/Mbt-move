@@ -12,6 +12,7 @@ import {
   computeLsi,
   computePlottedValue,
   computeZone,
+  decimalenVoorEenheid,
   formatNumber,
   formatPlotted,
   type TestSpec,
@@ -40,6 +41,8 @@ export function bepaalCriteriumStatus(
   drempels: CriteriumDrempels,
   spec: TestSpec,
   values: TestValues,
+  /** unitPrimary van de rapportregel; bepaalt de afronding van L en R. */
+  eenheid: string | null = null,
 ): { status: RehabStatusWaarde; samenvatting: string } | null {
   const links = values.leftPrimary ?? null
   const rechts = values.rightPrimary ?? null
@@ -50,7 +53,7 @@ export function bepaalCriteriumStatus(
   if (values.zoneOverride) {
     return {
       status: ZONE_NAAR_STATUS[values.zoneOverride],
-      samenvatting: samenvatting(spec, values, lsi),
+      samenvatting: samenvatting(spec, values, lsi, eenheid),
     }
   }
 
@@ -63,7 +66,7 @@ export function bepaalCriteriumStatus(
     let status: RehabStatusWaarde = 'NOT_MET'
     if (minZijde >= drempels.newtonMinGreen && lsi >= lsiGroen) status = 'MET'
     else if (minZijde >= drempels.newtonMinOrange && lsi >= lsiOranje) status = 'IN_PROGRESS'
-    return { status, samenvatting: samenvatting(spec, values, lsi) }
+    return { status, samenvatting: samenvatting(spec, values, lsi, eenheid) }
   }
 
   // 2. Alleen LSI-drempels.
@@ -72,21 +75,22 @@ export function bepaalCriteriumStatus(
     let status: RehabStatusWaarde = 'NOT_MET'
     if (lsi >= drempels.lsiMinGreen) status = 'MET'
     else if (lsi >= drempels.lsiMinOrange) status = 'IN_PROGRESS'
-    return { status, samenvatting: samenvatting(spec, values, lsi) }
+    return { status, samenvatting: samenvatting(spec, values, lsi, eenheid) }
   }
 
   // 3. Catalogus-zones op de geplotte waarde.
   const zone = computeZone(spec, values)
   if (zone == null) return null
-  return { status: ZONE_NAAR_STATUS[zone], samenvatting: samenvatting(spec, values, lsi) }
+  return { status: ZONE_NAAR_STATUS[zone], samenvatting: samenvatting(spec, values, lsi, eenheid) }
 }
 
 /** Leesbare meetwaarde voor RehabCriterionStatus.measurementValue. */
-function samenvatting(spec: TestSpec, values: TestValues, lsi: number | null): string {
+function samenvatting(spec: TestSpec, values: TestValues, lsi: number | null, eenheid: string | null): string {
   const links = values.leftPrimary ?? null
   const rechts = values.rightPrimary ?? null
   if (spec.kind === 'BILATERAL' && links != null && rechts != null) {
-    const delen = [`L ${formatNumber(links)}`, `R ${formatNumber(rechts)}`]
+    const d = decimalenVoorEenheid(eenheid)
+    const delen = [`L ${formatNumber(links, d)}`, `R ${formatNumber(rechts, d)}`]
     if (lsi != null) delen.push(`LSI ${Math.round(lsi)}%`)
     return delen.join(' · ')
   }

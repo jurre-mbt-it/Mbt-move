@@ -46,6 +46,7 @@ import { kinventCategory, kinventLabel, kinventSource } from '@/lib/kinvent/labe
 import { kgToNewton, rond } from '@/lib/kinvent/units'
 import { syncCriteriaVoorEntry } from '@/server/lib/rehab-criterion-sync'
 import { specFromCatalog } from './testReports'
+import { roundTestValue } from '@/lib/test-report/compute'
 import { hqRatio, kiesHqPaar } from '@/lib/kinvent/hq-ratio'
 import type { TestCatalogItem } from '@prisma/client'
 
@@ -75,7 +76,7 @@ const sleutel = (c: { protocolCode: string; activityCode: string }) => `${c.prot
 function entryFromCatalog(reportId: string, c: ImportCandidate, order: number, item: TestCatalogItem) {
   const spec = specFromCatalog(item)
   const inNewton = /^n(ewton)?$/i.test(item.unitPrimary ?? '')
-  const omzet = (v: number | null) => rond(v === null ? null : inNewton ? kgToNewton(v) : v)
+  const omzet = (v: number | null) => roundTestValue(v === null ? null : inNewton ? kgToNewton(v) : v, item.unitPrimary)
   const isJump = c.kind === 'JUMP'
   const enkel = c.single ?? (c.left === null || c.right === null ? Math.max(c.left ?? 0, c.right ?? 0) : null)
   const notes =
@@ -92,7 +93,7 @@ function entryFromCatalog(reportId: string, c: ImportCandidate, order: number, i
     ...spec,
     leftPrimary: isJump ? null : omzet(c.left),
     rightPrimary: isJump ? null : omzet(c.right),
-    singleValue: isJump ? rond(c.jumpHeightCm) : spec.kind === 'SINGLE' ? omzet(enkel) : null,
+    singleValue: isJump ? roundTestValue(c.jumpHeightCm, 'cm') : spec.kind === 'SINGLE' ? omzet(enkel) : null,
     notes,
     kinventProtocolCode: c.protocolCode,
     kinventActivityCode: c.activityCode,
@@ -203,9 +204,9 @@ function entryFromCandidate(reportId: string, c: ImportCandidate, order: number)
     zoneOrangeMin: bilateral ? 80 : 0,
     zoneGreenMin: bilateral ? 90 : 0,
     higherIsBetter: true,
-    leftPrimary: rond(c.left),
-    rightPrimary: rond(c.right),
-    singleValue: bilateral ? null : rond(value),
+    leftPrimary: roundTestValue(c.left, 'kg'),
+    rightPrimary: roundTestValue(c.right, 'kg'),
+    singleValue: bilateral ? null : roundTestValue(value, 'kg'),
     notes: c.unit.status === 'suspect' ? `Eenheidscontrole: ${c.unit.reason}` : null,
     kinventProtocolCode: c.protocolCode,
     kinventActivityCode: c.activityCode,
