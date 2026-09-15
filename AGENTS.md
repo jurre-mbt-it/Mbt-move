@@ -353,3 +353,32 @@ Importeren blijft altijd een voorstel (`buildCandidates`) dat de therapeut
 bevestigt; een geïmporteerde waarde overschrijft nooit een handmatig
 ingevoerde. Nieuwe Kinvent-tabellen: migratie
 `20260914_kinvent_koppeling.sql`, met RLS, nog niet op productie gedraaid.
+
+# Verloop per test: koppelen via de catalogustest, en de patiënt ziet alleen definitief
+
+Een patiënt ziet zijn testuitslagen als reeks per test (app `test-verloop`,
+web `/patient/tests` en `/athlete/tests`), de behandelaar dezelfde weergave op
+de patiëntpagina, tab Tests. De bundeling zit in
+`src/lib/test-report/verloop.ts` (`bouwTestVerloop`, getest), de database-kant
+in `src/server/lib/test-verloop.ts`.
+
+- **Twee regels horen bij dezelfde test als ze hetzelfde `catalogItemId`
+  hebben.** Niet op naam: een therapeut hernoemt een regel. Regels zonder
+  catalogustest bundelen op naam + soort + eenheid, en die twee gaan nooit in
+  één reeks. Wie koppelt op naam, zet een catalogus-Quadriceps in N en een
+  losse "Quadriceps" in kg in één lijn.
+- **`testReports.myTestHistory` filtert op `status = FINAL`, in de query én
+  in de rekenlaag.** Een concept mag nooit op het toestel van de patiënt
+  komen. `historyForPatient` (behandelaar) toont ook concepten, per punt
+  gemarkeerd.
+- **Een Kinvent-regel krijgt de datum van de meting**, uit
+  `kinvent_jump_results`/`kinvent_strength_results` op protocolcode, niet die
+  van het rapport. Een import zet metingen van jaren terug in een rapport van
+  vandaag; op rapportdatum lagen achttien CMJ's op één dag.
+- De grafiek toont per kalenderdag de beste poging, de lijst alles; "laatste
+  uitslag" is de beste poging van de laatste testdag.
+- De doellijn komt van het criterium (`lsiMinGreen` op LSI, `newtonMinGreen`
+  op links/rechts), anders van de groene zonegrens van de catalogustest.
+  Regels zonder catalogustest krijgen geen doellijn.
+
+Ontwerp: `docs/superpowers/specs/2026-09-15-test-verloop-design.md`.

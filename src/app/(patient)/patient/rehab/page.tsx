@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { trpc } from '@/lib/trpc/client'
 import {
   DarkHeader,
@@ -39,6 +40,11 @@ function formatDate(d: Date | string | null): string {
 
 export default function PatientRehabPage() {
   const { data: tracker, isLoading } = trpc.rehab.getMyTracker.useQuery()
+  // Catalogustest → reeks, zodat een criterium met metingen naar zijn grafiek linkt.
+  const { data: testVerloop } = trpc.testReports.myTestHistory.useQuery(undefined, { retry: false })
+  const reeksPerTest = new Map(
+    (testVerloop?.reeksen ?? []).flatMap((r) => (r.catalogItemId ? [[r.catalogItemId, r.key] as const] : [])),
+  )
 
   if (isLoading) {
     return (
@@ -287,6 +293,15 @@ export default function PatientRehabPage() {
                                 </span>
                               )}
                             </p>
+                          )}
+                          {c.catalogItemId && reeksPerTest.has(c.catalogItemId) && (
+                            <Link
+                              href={`/patient/tests?test=${encodeURIComponent(reeksPerTest.get(c.catalogItemId) ?? '')}&criterium=${c.id}`}
+                              className="athletic-mono inline-block"
+                              style={{ color: P.brand, fontSize: 11, letterSpacing: '0.06em', marginTop: 3 }}
+                            >
+                              Verloop bekijken ›
+                            </Link>
                           )}
                         </div>
                         <span

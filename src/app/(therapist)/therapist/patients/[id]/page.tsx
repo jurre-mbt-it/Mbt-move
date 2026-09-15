@@ -21,6 +21,7 @@ import { TrajectChecklist } from '@/components/rehab/TrajectChecklist'
 import { RehabTracker } from '@/components/rehab/RehabTracker'
 import { PatientClinicalTests } from '@/components/clinical-tests/PatientClinicalTests'
 import { KinventPatientCard } from '@/components/kinvent/KinventPatientCard'
+import { PatientTestVerloopCard } from '@/components/test-verloop/PatientTestVerloopCard'
 import { PatientWearablesTab } from '@/components/wearables/PatientWearablesTab'
 import { wearablesEnabledForRole } from '@/lib/wearables-access'
 import { isReviewDue, weeksSince } from '@/lib/program-review'
@@ -1045,6 +1046,7 @@ export default function PatientDetailPage({
 
           {/* ── TAB: Tests (losse klinische tests) ────────────────── */}
           <TabsContent value="tests" className="space-y-4">
+            {!portal.isCoach && <PatientTestVerloopCard patientId={patient.id} />}
             <PatientClinicalTests patientId={patient.id} />
             {!portal.isCoach && <KinventPatientCard patientId={patient.id} />}
           </TabsContent>

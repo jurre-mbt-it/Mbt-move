@@ -15,6 +15,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // Toegang en koppelingen
   'Geen actieve behandelrelatie met deze patiënt': 'No active treatment relationship with this patient',
   'Geen actieve koppeling met deze patiënt': 'No active link with this patient',
+  'Alleen voor de patiënt of atleet zelf.': 'Only for the patient or athlete themselves.',
   // Atletengroepen
   'Groep niet gevonden': 'Group not found',
   'Als beheerder kijk je alleen mee in een groep': 'As an admin you can only view a group',

@@ -97,6 +97,7 @@ export type TestReeks = {
   punten: VerloopPunt[]
   /** Beste uitslag per kalenderdag, oud naar nieuw; alleen punten met een getal. Voor de grafiek. */
   perDag: VerloopPunt[]
+  /** Beste poging van de laatste testdag. */
   laatste: VerloopPunt
   maten: VerloopMaat[]
   standaardMaat: VerloopMaat
@@ -105,6 +106,13 @@ export type TestReeks = {
   standaardCriteriumId: string | null
   /** Groene zonegrens van de catalogustest. Null zonder catalogustest. */
   zoneDoel: { maat: VerloopMaat; waarde: number } | null
+}
+
+/** Wat testReports.myTestHistory en historyForPatient teruggeven. */
+export type TestVerloopData = {
+  reeksen: TestReeks[]
+  /** Er staan Kinvent-sprongen of -krachttests klaar op de metingenpagina. */
+  heeftKinvent: boolean
 }
 
 const ZONES: TestZone[] = ['RED', 'ORANGE', 'GREEN']
@@ -229,6 +237,14 @@ export function bouwTestVerloop(
     const gesorteerd = [...lijst].sort((a, b) => new Date(a.datum).getTime() - new Date(b.datum).getTime())
     const nieuwste = gesorteerd[gesorteerd.length - 1]
     const punten = gesorteerd.map(naarPunt)
+    const perDag = bestePerDag(punten, nieuwste.higherIsBetter)
+    // Laatste uitslag = de beste poging van de laatste testdag, net als het
+    // laatste punt in de grafiek. Heeft die dag alleen een tekstuitslag, dan
+    // die tekst.
+    const laatstePunt = punten[punten.length - 1]
+    const besteLaatsteDag = perDag[perDag.length - 1]
+    const laatste =
+      besteLaatsteDag && dagSleutel(besteLaatsteDag.datum) === dagSleutel(laatstePunt.datum) ? besteLaatsteDag : laatstePunt
     const maten: VerloopMaat[] =
       nieuwste.kind === 'SINGLE' ? ['waarde'] : nieuwste.metric === 'LSI' ? ['lsi', 'zijden'] : ['zijden']
     const eigenCriteria = nieuwste.catalogItemId
@@ -250,8 +266,8 @@ export function bouwTestVerloop(
       plotEenheid: nieuwste.plotUnit,
       hogerIsBeter: nieuwste.higherIsBetter,
       punten,
-      perDag: bestePerDag(punten, nieuwste.higherIsBetter),
-      laatste: punten[punten.length - 1],
+      perDag,
+      laatste,
       maten,
       standaardMaat: maten[0],
       criteria: eigenCriteria,
@@ -276,4 +292,40 @@ export function doelLijn(reeks: TestReeks, maat: VerloopMaat, criterium: Verloop
     if (v != null) return v
   }
   return reeks.zoneDoel && reeks.zoneDoel.maat === maat ? reeks.zoneDoel.waarde : null
+}
+
+// ─── Weergave (gespiegeld in mbt-gym-mobile lib/test-verloop.ts) ─────────────
+
+/** "0,62" in plaats van "0.62". De waarden zijn al afgerond. */
+export function formatGetal(v: number): string {
+  return String(v).replace('.', ',')
+}
+
+/** Getal met eenheid: "31 cm", "91%", "138°", "0,62". */
+export function metEenheid(v: number | null, eenheid: string | null | undefined): string {
+  if (v == null) return '–'
+  const u = (eenheid ?? '').trim()
+  if (!u) return formatGetal(v)
+  return /^[%°]/.test(u) ? `${formatGetal(v)}${u}` : `${formatGetal(v)} ${u}`
+}
+
+/** De eenheid van een maat in de grafiek. */
+export function maatEenheid(reeks: TestReeks, maat: VerloopMaat): string {
+  if (maat === 'lsi') return '%'
+  if (maat === 'waarde') return reeks.eenheid ?? reeks.plotEenheid
+  return reeks.eenheid ?? ''
+}
+
+/** De uitslag die een test samenvat: de geplotte waarde, anders de tekst. */
+export function hoofdUitslag(reeks: TestReeks, p: VerloopPunt): string {
+  if (p.geplot != null) return metEenheid(p.geplot, reeks.metric === 'LSI' ? '%' : reeks.plotEenheid)
+  if (p.waarde != null) return metEenheid(p.waarde, reeks.eenheid)
+  return p.tekst ?? '–'
+}
+
+/** "L 403 · R 444 N" bij een bilaterale test, anders null. */
+export function zijdenTekst(reeks: TestReeks, p: VerloopPunt): string | null {
+  if (reeks.soort !== 'BILATERAL' || (p.links == null && p.rechts == null)) return null
+  const u = reeks.eenheid ? ` ${reeks.eenheid}` : ''
+  return `L ${p.links == null ? '–' : formatGetal(p.links)} · R ${p.rechts == null ? '–' : formatGetal(p.rechts)}${u}`
 }

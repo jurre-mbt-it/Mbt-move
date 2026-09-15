@@ -11,16 +11,10 @@ import type { PrismaClient } from '@prisma/client'
 import { getPatientRehabTrackerData } from '@/lib/rehab-data'
 import {
   bouwTestVerloop,
-  type TestReeks,
+  type TestVerloopData,
   type VerloopCriterium,
   type VerloopRegel,
 } from '@/lib/test-report/verloop'
-
-export type TestVerloopData = {
-  reeksen: TestReeks[]
-  /** Er staan Kinvent-sprongen of -krachttests klaar op de metingenpagina. */
-  heeftKinvent: boolean
-}
 
 export async function laadTestVerloop(
   prisma: PrismaClient,

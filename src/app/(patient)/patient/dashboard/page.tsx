@@ -33,6 +33,8 @@ export default function PatientDashboard() {
   const multiProgram = (activePrograms?.length ?? 0) > 1
   const { data: todayWellness } = trpc.wellness.today.useQuery()
   const { data: rehabTracker } = trpc.rehab.getMyTracker.useQuery()
+  // Tests-tegel alleen als er definitieve uitslagen zijn.
+  const { data: testVerloop } = trpc.testReports.myTestHistory.useQuery(undefined, { retry: false })
   const { data: me } = trpc.auth.getMe.useQuery()
 
 
@@ -305,6 +307,15 @@ export default function PatientDashboard() {
             label="Mijn revalidatie"
             sub={`${rehabTracker.protocol.name} · ${rehabTracker.progress.pct}% behaald`}
             bar={P.brand}
+          />
+        )}
+
+        {(testVerloop?.reeksen.length ?? 0) > 0 && (
+          <ActionTile
+            href="/patient/tests"
+            label="Mijn tests"
+            sub={`${testVerloop?.reeksen.length} test${testVerloop?.reeksen.length === 1 ? '' : 's'} · verloop per test`}
+            bar={P.lime}
           />
         )}
 

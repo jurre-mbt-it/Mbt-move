@@ -49,6 +49,11 @@ export default function AthleteDashboard() {
   })
   const { data: rehabTracker } = trpc.rehab.getMyTracker.useQuery()
   const { data: me } = trpc.auth.getMe.useQuery()
+  // Tests-tegel alleen voor de sporter zelf en alleen met definitieve uitslagen.
+  const { data: testVerloop } = trpc.testReports.myTestHistory.useQuery(undefined, {
+    enabled: me?.role === 'ATHLETE' || me?.role === 'PATIENT',
+    retry: false,
+  })
   // Ongelezen berichten van de coach — badge op de Berichten-tegel.
   const { data: unreadMessages = 0 } = trpc.messages.unreadCount.useQuery(undefined, {
     refetchInterval: 60_000,
@@ -275,6 +280,14 @@ export default function AthleteDashboard() {
               sub={`${rehabTracker.protocol.name} · ${rehabTracker.progress.pct}% behaald`}
               href="/athlete/rehab"
               bar={P.lime}
+            />
+          )}
+          {(testVerloop?.reeksen.length ?? 0) > 0 && (
+            <ActionTile
+              label="TESTS"
+              sub={`${testVerloop?.reeksen.length} test${testVerloop?.reeksen.length === 1 ? '' : 's'} · verloop per test`}
+              href="/athlete/tests"
+              bar={P.brand}
             />
           )}
           {/* Berichten zijn atleet-only; therapeuten in personal mode hebben

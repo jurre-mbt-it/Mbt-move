@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest'
 import {
   bouwTestVerloop,
   doelLijn,
+  hoofdUitslag,
+  metEenheid,
+  zijdenTekst,
   type VerloopCriterium,
   type VerloopRegel,
 } from '@/lib/test-report/verloop'
@@ -166,6 +169,17 @@ describe('beste uitslag per dag voor de grafiek', () => {
     expect(r.perDag.map((p) => p.waarde)).toEqual([31, 30])
   })
 
+  it('neemt als laatste uitslag de beste poging van de laatste testdag', () => {
+    const [r] = bouwTestVerloop(
+      [
+        regel({ catalogItemId: 'cat-cmj', kind: 'SINGLE', metric: 'VALUE', unitPrimary: 'cm', plotUnit: 'cm', leftPrimary: null, rightPrimary: null, singleValue: 35, datum: '2026-07-01T08:00:00.000Z' }),
+        regel({ catalogItemId: 'cat-cmj', kind: 'SINGLE', metric: 'VALUE', unitPrimary: 'cm', plotUnit: 'cm', leftPrimary: null, rightPrimary: null, singleValue: 30, datum: '2026-07-01T08:10:00.000Z' }),
+      ],
+      [],
+    )
+    expect(r.laatste.waarde).toBe(35)
+  })
+
   it('neemt de laagste waarde als lager beter is', () => {
     const [r] = bouwTestVerloop(
       [
@@ -197,5 +211,26 @@ describe('doelLijn', () => {
   it('tekent geen doellijn voor een regel zonder catalogustest', () => {
     const [los] = bouwTestVerloop([regel({ catalogItemId: null, unitPrimary: 'kg' })], [])
     expect(doelLijn(los, 'lsi', null)).toBeNull()
+  })
+})
+
+describe('weergave', () => {
+  it('zet getal en eenheid neer zoals in het rapport', () => {
+    expect(metEenheid(31, 'cm')).toBe('31 cm')
+    expect(metEenheid(91, '%')).toBe('91%')
+    expect(metEenheid(0.62, '')).toBe('0,62')
+    expect(metEenheid(null, 'kg')).toBe('–')
+  })
+
+  it('vat een bilaterale test samen met LSI en zijden', () => {
+    const [r] = bouwTestVerloop([regel({ leftPrimary: 403, rightPrimary: 444 })], [])
+    expect(hoofdUitslag(r, r.laatste)).toBe('91%')
+    expect(zijdenTekst(r, r.laatste)).toBe('L 403 · R 444 N')
+  })
+
+  it('valt terug op de tekstuitslag', () => {
+    const [r] = bouwTestVerloop([regel({ kind: 'SINGLE', metric: 'VALUE', leftPrimary: null, rightPrimary: null, textValue: 'negatief' })], [])
+    expect(hoofdUitslag(r, r.laatste)).toBe('negatief')
+    expect(zijdenTekst(r, r.laatste)).toBeNull()
   })
 })
