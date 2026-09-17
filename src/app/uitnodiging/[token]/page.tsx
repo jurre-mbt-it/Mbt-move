@@ -41,15 +41,10 @@ export default function UitnodigingPage() {
     setMobiel(isMobiel())
   }, [])
 
-  // Op een telefoon meteen de app proberen. Heeft de gebruiker de app niet,
-  // dan gebeurt er niets en staan de knoppen er nog.
-  useEffect(() => {
-    if (!mobiel || data?.status !== 'ok') return
-    const id = setTimeout(() => {
-      window.location.href = appUrl
-    }, 400)
-    return () => clearTimeout(id)
-  }, [mobiel, data?.status, appUrl])
+  // Bewust GEEN automatische sprong naar de app. Wie een oudere versie van de
+  // app heeft, belandt daar op een leeg "Unmatched Route"-scherm zonder te
+  // begrijpen waarom; dat mag niet vanzelf gebeuren. De knop hieronder doet
+  // het, en de tekst ernaast vertelt wat te doen als de app te oud is.
 
   async function inBrowser() {
     setBezig(true)
@@ -113,7 +108,8 @@ export default function UitnodigingPage() {
                     OPEN IN DE BASE-APP
                   </DarkButton>
                   <p style={{ color: P.inkMuted, fontSize: 12, lineHeight: 1.5 }}>
-                    Opent de app niet? Dan staat hij nog niet op je telefoon.
+                    Opent de app niet, of zie je daar een leeg scherm? Dan staat hij nog niet op je
+                    telefoon of is hij nog niet bijgewerkt.
                   </p>
                   <DarkButton href={APP_STORE_URL} variant="secondary" className="w-full">
                     DOWNLOAD IN DE APP STORE

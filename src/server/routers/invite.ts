@@ -3,7 +3,8 @@
  *
  * Flow:
  *   1. Therapeut: `invite.create({ email, name, dateOfBirth, role })`
- *      → slaat een `InviteCode` record op (whitelist-entry, 24u TTL).
+ *      → slaat een `InviteCode` record op (whitelist-entry, 7 dagen TTL; die
+ *        termijn geldt ook voor het geboortejaar-terugvalpad hieronder).
  *      → geen eigen code — Supabase verstuurt de 6-digit OTP via z'n eigen
  *        mail-infrastructuur (template: "Your login code is ...").
  *   2. Patient opent `/login/code`, stap 1:
@@ -278,11 +279,16 @@ export const inviteRouter = createTRPCRouter({
         req: ctx.req,
       })
 
+      // `instructionUrl` gaat BEWUST niet terug naar de aanroeper. Sinds de
+      // link een ondertekend inlogtoken is, zou teruggeven betekenen dat de
+      // uitnodiger zelf als de patiënt kan inloggen (en dat de link in appjes
+      // en screenshots belandt). De mailbox van de patiënt is het enige
+      // kanaal; mislukt de mail, dan is opnieuw versturen de weg, of de
+      // patiënt logt in met e-mail plus geboortejaar via /login/code.
       return {
         id: invite.id,
         email,
         expiresAt: invite.expiresAt,
-        instructionUrl,
         mailDelivered: mailResult.ok,
         mailProvider: mailResult.provider,
         patientUserId,
@@ -426,11 +432,11 @@ export const inviteRouter = createTRPCRouter({
         req: ctx.req,
       })
 
+      // Geen `instructionUrl` in de respons; zie de toelichting bij `create`.
       return {
         id: invite.id,
         email,
         expiresAt: invite.expiresAt,
-        instructionUrl,
         mailDelivered: mailResult.ok,
         mailProvider: mailResult.provider,
         mailError: mailResult.ok ? null : mailResult.error ?? 'Onbekende fout',
@@ -572,6 +578,46 @@ export const inviteRouter = createTRPCRouter({
           code: 'UNAUTHORIZED',
           message: 'Deze uitnodiging is verlopen. Vraag je therapeut om een nieuwe uitnodiging.',
         })
+      }
+
+      // Tweede slot, voor het geval de link uit de mailbox wegloopt
+      // (doorgestuurd, gedeelde mailbox, oud archief). Hoort het adres al bij
+      // een account dat écht heeft ingelogd, dan geeft deze link alleen een
+      // sessie als de uitnodiger die patiënt al mag zien. Anders terug naar
+      // het pad met e-mail plus geboortejaar, precies de bescherming die
+      // `invite.create` beschrijft: de patiënt geeft zelf akkoord.
+      const bestaande = await ctx.prisma.user.findUnique({
+        where: { email: invite.email },
+        select: { id: true, role: true, practiceId: true, supabaseUserId: true },
+      })
+      if (bestaande?.supabaseUserId) {
+        const isPatient = bestaande.role === 'PATIENT' || bestaande.role === 'ATHLETE'
+        const gekoppeld = isPatient
+          ? await ctx.prisma.patientTherapist.findFirst({
+              where: {
+                patientId: bestaande.id,
+                therapistId: invite.invitedById,
+                isActive: true,
+                status: { in: ['APPROVED', 'PENDING'] },
+              },
+              select: { id: true },
+            })
+          : null
+        const zelfdePraktijk = isPatient && !!invite.practiceId && bestaande.practiceId === invite.practiceId
+        if (!isPatient || (!gekoppeld && !zelfdePraktijk)) {
+          void auditLog({
+            event: 'INVITE_FAILED',
+            actorEmail: invite.email,
+            resource: 'InviteCode',
+            resourceId: invite.id,
+            metadata: { reason: 'claim-bestaand-account' },
+            req: ctx.req,
+          })
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Dit e-mailadres heeft al een account. Log in met je e-mailadres en geboortejaar.',
+          })
+        }
       }
 
       const admin = getSupabaseAdmin()

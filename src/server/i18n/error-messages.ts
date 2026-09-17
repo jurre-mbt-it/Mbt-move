@@ -21,6 +21,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'Deze uitnodiging is verlopen. Vraag je therapeut om een nieuwe uitnodiging.': 'This invitation has expired. Ask your therapist for a new invitation.',
   'Inloggen is op dit moment niet mogelijk. Probeer het straks opnieuw.': 'Signing in is not possible right now. Please try again later.',
   'Deze link is niet geldig.': 'This link is not valid.',
+  'Dit e-mailadres heeft al een account. Log in met je e-mailadres en geboortejaar.': 'This email address already has an account. Sign in with your email address and year of birth.',
   // Atletengroepen
   'Groep niet gevonden': 'Group not found',
   'Als beheerder kijk je alleen mee in een groep': 'As an admin you can only view a group',

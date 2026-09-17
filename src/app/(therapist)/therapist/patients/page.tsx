@@ -67,7 +67,7 @@ function PatientsPageInner() {
   const [inviteRole, setInviteRole] = useState<'PATIENT' | 'ATHLETE'>('PATIENT')
   const [inviteLoading, setInviteLoading] = useState(false)
   const [inviteResult, setInviteResult] = useState<{
-    url: string
+    mailDelivered: boolean
     expiresAt: Date
     patientUserId: string | null
   } | null>(null)
@@ -126,11 +126,12 @@ function PatientsPageInner() {
         role: inviteRole,
       })
       setInviteResult({
-        url: res.instructionUrl,
+        mailDelivered: res.mailDelivered,
         expiresAt: new Date(res.expiresAt),
         patientUserId: res.patientUserId,
       })
-      toast.success('Uitnodiging verstuurd.')
+      if (res.mailDelivered) toast.success('Uitnodiging verstuurd.')
+      else toast.warning('Uitnodiging aangemaakt, maar de mail is niet verstuurd.')
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Er ging iets mis')
     } finally {
@@ -406,44 +407,31 @@ function PatientsPageInner() {
               <div className="space-y-4 mt-2">
                 <div
                   className="rounded-lg p-4 space-y-3"
-                  style={{ border: `1px solid ${P.lime}`, background: 'rgba(232,122,85,0.08)' }}
+                  style={{
+                    border: `1px solid ${inviteResult.mailDelivered ? P.lime : P.gold}`,
+                    background: 'rgba(232,122,85,0.08)',
+                  }}
                 >
-                  <div>
-                    <MetaLabel style={{ color: P.lime }}>INVITE AANGEMAAKT</MetaLabel>
-                    <p style={{ color: P.ink, fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>
-                      De mail is onderweg naar <strong>{inviteEmail}</strong>. Dit is dezelfde link: op een telefoon opent hij de app en logt hij meteen in, op een computer gaat hij naar het portaal. Deel hem alleen met de patiënt zelf.
-                    </p>
-                  </div>
-                  <div
-                    className="rounded-md p-2 flex items-center gap-2"
-                    style={{ background: P.surfaceLow, border: `1px solid ${P.line}` }}
-                  >
-                    <code
-                      className="athletic-mono flex-1 truncate"
-                      style={{ fontSize: 11, color: P.ink, letterSpacing: '0.02em' }}
-                    >
-                      {inviteResult.url}
-                    </code>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(inviteResult.url)
-                        toast.success('Gekopieerd')
-                      }}
-                      className="athletic-tap athletic-mono"
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: 6,
-                        background: P.brand,
-                        color: P.bg,
-                        fontSize: 10,
-                        fontWeight: 900,
-                        letterSpacing: '0.12em',
-                      }}
-                    >
-                      COPY
-                    </button>
-                  </div>
+                  <MetaLabel style={{ color: inviteResult.mailDelivered ? P.lime : P.gold }}>
+                    {inviteResult.mailDelivered ? 'UITNODIGING VERSTUURD' : 'MAIL NIET VERSTUURD'}
+                  </MetaLabel>
+                  {/* De link zelf staat hier bewust niet. Hij is een inlog op
+                      het account van de patiënt en hoort alleen in zijn eigen
+                      mailbox; zie de toelichting bij invite.create. */}
+                  <p style={{ color: P.ink, fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>
+                    {inviteResult.mailDelivered ? (
+                      <>
+                        <strong>{inviteEmail}</strong> krijgt een mail met een link die de BASE-app opent en
+                        meteen inlogt. Komt die mail niet aan, stuur de uitnodiging dan opnieuw vanaf de
+                        patiëntpagina. De patiënt kan ook inloggen met zijn e-mailadres en geboortejaar.
+                      </>
+                    ) : (
+                      <>
+                        De uitnodiging voor <strong>{inviteEmail}</strong> staat klaar, maar de mail ging niet
+                        de deur uit. Stuur hem opnieuw vanaf de patiëntpagina.
+                      </>
+                    )}
+                  </p>
                   <p style={{ color: P.inkMuted, fontSize: 11 }}>
                     Verloopt op {new Date(inviteResult.expiresAt).toLocaleString('nl-NL')}
                   </p>

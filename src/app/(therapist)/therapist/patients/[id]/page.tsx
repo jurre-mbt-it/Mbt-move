@@ -162,7 +162,6 @@ export default function PatientDetailPage({
   const recentSessions = recentSessionsRaw as RecentSession[]
   const utils = trpc.useUtils()
   const [inviteFallback, setInviteFallback] = useState<{
-    url: string
     email: string
     expiresAt: string | Date
     error: string | null
@@ -215,12 +214,11 @@ export default function PatientDetailPage({
         setInviteFallback(null)
       } else {
         setInviteFallback({
-          url: res.instructionUrl,
           email: res.email,
           expiresAt: res.expiresAt,
           error: res.mailError,
         })
-        toast.error('Mail kon niet bezorgd worden, kopieer de link hieronder.')
+        toast.error('Mail kon niet bezorgd worden. Probeer het opnieuw.')
       }
     },
     onError: (e) => toast.error(e.message),
@@ -478,8 +476,10 @@ export default function PatientDetailPage({
                 <div>
                   <MetaLabel style={{ color: P.gold }}>MAIL NIET BEZORGD</MetaLabel>
                   <p style={{ color: P.ink, fontSize: 13, marginTop: 4, lineHeight: 1.45 }}>
-                    De invite-code voor <strong>{inviteFallback.email}</strong> is wel aangemaakt.
-                    Stuur de link hieronder handmatig (WhatsApp, sms, eigen mail).
+                    De uitnodiging voor <strong>{inviteFallback.email}</strong> is wel aangemaakt.
+                    Probeer het over een paar minuten opnieuw. De link zelf is een inlog op dit
+                    account en kan daarom alleen naar de eigen mailbox; wil de patiënt niet wachten,
+                    dan logt hij in met zijn e-mailadres en geboortejaar.
                   </p>
                   {inviteFallback.error && (
                     <p
@@ -498,36 +498,6 @@ export default function PatientDetailPage({
                   aria-label="Sluiten"
                 >
                   ✕
-                </button>
-              </div>
-              <div
-                className="rounded-md p-2 flex items-center gap-2"
-                style={{ background: P.surfaceLow, border: `1px solid ${P.line}` }}
-              >
-                <code
-                  className="athletic-mono flex-1 truncate"
-                  style={{ fontSize: 11, color: P.ink, letterSpacing: '0.02em' }}
-                >
-                  {inviteFallback.url}
-                </code>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(inviteFallback.url)
-                    toast.success('Link gekopieerd')
-                  }}
-                  className="athletic-tap athletic-mono"
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: 6,
-                    background: P.brand,
-                    color: P.bg,
-                    fontSize: 10,
-                    fontWeight: 900,
-                    letterSpacing: '0.12em',
-                  }}
-                >
-                  COPY
                 </button>
               </div>
               <p style={{ color: P.inkMuted, fontSize: 11 }}>

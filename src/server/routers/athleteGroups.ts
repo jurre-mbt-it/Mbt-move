@@ -230,22 +230,23 @@ export const athleteGroupsRouter = createTRPCRouter({
         if (groep && actor) {
           const sender = resolveSender({ therapist: actor, practice: actor.practice ?? null })
           const byName = naamVan(actor)
-          const uitkomsten = await Promise.allSettled(
-            leden.map(async (lid) => {
-              const mail = groupAddedMail({
-                recipientName: lid.patient.name ?? lid.patient.email,
-                groupName: groep.name,
-                planName: groep.planName,
-                byName,
-                leaveUrl: `${getAppUrl()}/groep/verlaten/${signLink('group-leave', lid.id)}`,
-                sender,
-              })
-              mail.to = lid.patient.email
-              const r = await sendMail(mail)
-              if (!r.ok) throw new Error(r.error ?? 'mail')
-            }),
-          )
-          mailed = uitkomsten.filter((u) => u.status === 'fulfilled').length
+          // Serieel, niet parallel: Resend knijpt op een paar verzoeken per
+          // seconde, en een burst van twintig leden liet het merendeel stil
+          // sneuvelen terwijl de coach "toegevoegd" te zien kreeg.
+          for (const lid of leden) {
+            const mail = groupAddedMail({
+              recipientName: lid.patient.name ?? lid.patient.email,
+              groupName: groep.name,
+              planName: groep.planName,
+              byName,
+              leaveUrl: `${getAppUrl()}/groep/verlaten/${signLink('group-leave', lid.id)}`,
+              sender,
+            })
+            mail.to = lid.patient.email
+            const r = await sendMail(mail)
+            if (r.ok) mailed++
+            else console.warn('[groups] groepsmail niet verstuurd', { groupId: input.groupId, error: r.error })
+          }
           if (mailed < leden.length) console.warn('[groups] niet alle groepsmails verstuurd', { groupId: input.groupId, mislukt: leden.length - mailed })
         }
         await auditLog({
