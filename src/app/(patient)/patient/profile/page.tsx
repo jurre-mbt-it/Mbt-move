@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { MyGroups } from '@/components/groups/MyGroups'
 import {
   DarkButton,
   DarkHeader,
@@ -88,6 +89,9 @@ export default function PatientProfilePage() {
             <InfoRow label="E-mail" value={user?.email || '—'} />
           </div>
         </Tile>
+
+        {/* Groepen waar je therapeut of coach je in heeft gezet, met de knop om eruit te stappen. */}
+        <MyGroups />
 
         <DarkButton variant="danger" onClick={handleSignOut}>
           UITLOGGEN

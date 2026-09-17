@@ -49,8 +49,12 @@ import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
 import { inviteMail, sendMail } from '@/server/mail'
 import { resolveSender } from '@/server/email/sender'
 import { getAppUrl } from '@/lib/app-url'
+import { signLink, verifyLink } from '@/server/lib/signed-link'
 
-const CODE_TTL_HOURS = 24
+// Zeven dagen. De link in de mail is sinds 17-09-2026 de gewone ingang; een
+// patiënt opent die mail niet altijd dezelfde dag. De teller op pogingen en de
+// ratelimits blijven het geboortejaarpad beschermen.
+const CODE_TTL_HOURS = 24 * 7
 const MAX_REDEEM_ATTEMPTS = 5
 const PENDING_INVITE_NOTE = 'Aangemaakt via invite, wacht op acceptatie'
 
@@ -232,10 +236,10 @@ export const inviteRouter = createTRPCRouter({
         }
       }
 
-      // Stuur een branded invite-mail via Resend (als geconfigureerd). Bevat
-      // de URL naar /login/code. De 6-cijfer code zelf komt later via
-      // Supabase's OTP-mail wanneer de patiënt op de URL "Stuur code" klikt.
-      const instructionUrl = `${getAppUrl()}/login/code?email=${encodeURIComponent(email)}`
+      // Stuur een branded invite-mail via Resend (als geconfigureerd). De link
+      // is ondertekend en opent op een telefoon de app, die hem via
+      // `invite.claim` inwisselt voor een sessie. Zie de toelichting bij claim.
+      const instructionUrl = `${getAppUrl()}/uitnodiging/${signLink('invite', invite.id)}`
 
       const actor = await ctx.prisma.user.findUnique({
         where: { id: ctx.user!.id },
@@ -380,7 +384,7 @@ export const inviteRouter = createTRPCRouter({
         return rij
       })
 
-      const instructionUrl = `${getAppUrl()}/login/code?email=${encodeURIComponent(email)}`
+      const instructionUrl = `${getAppUrl()}/uitnodiging/${signLink('invite', invite.id)}`
 
       // Afzender is degene die de resend uitvoert (ctx.user, hierboven al
       // geautoriseerd), niet per se de oorspronkelijke uitnodiger.
@@ -477,6 +481,135 @@ export const inviteRouter = createTRPCRouter({
         data: { expiresAt: new Date(0) },
       })
       return { ok: true }
+    }),
+
+  /**
+   * Wat de landingspagina van een uitnodigingslink mag tonen vóór er iets
+   * gebeurt: is de link nog goed, voor wie is hij, van wie komt hij. Bewust
+   * zonder e-mailadres: de pagina is publiek en het token staat in de URL.
+   */
+  peek: publicProcedure
+    .input(z.object({ token: z.string().min(1).max(300) }))
+    .query(async ({ ctx, input }) => {
+      const ip = ctx.req?.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+      const ipLimit = await rateLimit('invite.requestIp', ip, RATE_LIMITS.inviteRequestIp)
+      if (!ipLimit.ok) throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: ipLimit.message })
+
+      const inviteId = verifyLink('invite', input.token)
+      const invite = inviteId
+        ? await ctx.prisma.inviteCode.findUnique({
+            where: { id: inviteId },
+            select: {
+              name: true,
+              usedAt: true,
+              expiresAt: true,
+              invitedBy: { select: { firstName: true, lastName: true, name: true } },
+              practice: { select: { name: true } },
+            },
+          })
+        : null
+      if (!invite) return { status: 'invalid' as const }
+      const uitnodiger =
+        [invite.invitedBy.firstName, invite.invitedBy.lastName].filter(Boolean).join(' ').trim() ||
+        invite.invitedBy.name ||
+        null
+      const status = invite.usedAt ? ('used' as const) : invite.expiresAt < new Date() ? ('expired' as const) : ('ok' as const)
+      return {
+        status,
+        firstName: invite.name.trim().split(' ')[0] || invite.name,
+        therapistName: uitnodiger,
+        practiceName: invite.practice?.name ?? null,
+      }
+    }),
+
+  /**
+   * De uitnodigingslink inwisselen voor een sessie, zonder code en zonder
+   * geboortejaar. De handtekening op het token is het bewijs van bezit van de
+   * mail, net als de magiclink van Supabase dat vóór 17-09-2026 was. De
+   * client (app of browser) doet daarna `verifyOtp({ token_hash, type })` en
+   * `invite.finalize`; die laatste zet `usedAt`, waarna deze link dood is.
+   *
+   * De auth-user wordt hier aangemaakt als hij nog niet bestaat, om dezelfde
+   * reden en op dezelfde manier als in `request` hieronder.
+   */
+  claim: publicProcedure
+    .input(z.object({ token: z.string().min(1).max(300) }))
+    .mutation(async ({ ctx, input }) => {
+      const ip = ctx.req?.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+      const ipLimit = await rateLimit('invite.requestIp', ip, RATE_LIMITS.inviteRequestIp)
+      if (!ipLimit.ok) throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: ipLimit.message })
+
+      const ongeldig = () =>
+        new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Deze uitnodigingslink is niet geldig. Vraag je therapeut om een nieuwe uitnodiging.',
+        })
+
+      const inviteId = verifyLink('invite', input.token)
+      if (!inviteId) throw ongeldig()
+      const invite = await ctx.prisma.inviteCode.findUnique({ where: { id: inviteId } })
+      if (!invite) throw ongeldig()
+
+      const rl = await rateLimit('invite.claim', invite.id, RATE_LIMITS.inviteClaim)
+      if (!rl.ok) throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
+
+      if (invite.usedAt) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Deze uitnodiging is al gebruikt. Log in met je e-mailadres.',
+        })
+      }
+      if (invite.expiresAt < new Date()) {
+        void auditLog({
+          event: 'INVITE_FAILED',
+          actorEmail: invite.email,
+          resource: 'InviteCode',
+          resourceId: invite.id,
+          metadata: { reason: 'link-expired' },
+          req: ctx.req,
+        })
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Deze uitnodiging is verlopen. Vraag je therapeut om een nieuwe uitnodiging.',
+        })
+      }
+
+      const admin = getSupabaseAdmin()
+      if (!admin) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Inloggen is op dit moment niet mogelijk. Probeer het straks opnieuw.' })
+      }
+
+      const createRes = await admin.auth.admin.createUser({
+        email: invite.email,
+        email_confirm: true,
+        user_metadata: { name: invite.name, practiceId: invite.practiceId, inviteId: invite.id },
+      })
+      if (createRes.error && !/already|exists|registered|duplicate/i.test(createRes.error.message ?? '')) {
+        console.warn('[invite.claim] supabase createUser error', {
+          status: (createRes.error as { status?: number }).status ?? null,
+        })
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Inloggen is op dit moment niet mogelijk. Probeer het straks opnieuw.' })
+      }
+
+      const link = await admin.auth.admin.generateLink({ type: 'magiclink', email: invite.email })
+      const tokenHash = link.data?.properties?.hashed_token
+      if (link.error || !tokenHash) {
+        console.warn('[invite.claim] supabase generateLink error', {
+          status: (link.error as { status?: number } | null)?.status ?? null,
+        })
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Inloggen is op dit moment niet mogelijk. Probeer het straks opnieuw.' })
+      }
+
+      await ctx.prisma.inviteCode.update({ where: { id: invite.id }, data: { lastAttemptAt: new Date() } })
+      await auditLog({
+        event: 'INVITE_LINK_CLAIMED',
+        actorEmail: invite.email,
+        resource: 'InviteCode',
+        resourceId: invite.id,
+        req: ctx.req,
+      })
+
+      return { email: invite.email, tokenHash, type: 'magiclink' as const }
     }),
 
   /**

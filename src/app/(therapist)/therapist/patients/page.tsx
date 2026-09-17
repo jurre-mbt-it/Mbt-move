@@ -130,7 +130,7 @@ function PatientsPageInner() {
         expiresAt: new Date(res.expiresAt),
         patientUserId: res.patientUserId,
       })
-      toast.success('Invite aangemaakt, deel de code-URL met je patiënt.')
+      toast.success('Uitnodiging verstuurd.')
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Er ging iets mis')
     } finally {
@@ -398,7 +398,7 @@ function PatientsPageInner() {
             <DialogHeader>
               <DialogTitle style={{ color: P.ink }}>Patiënt uitnodigen</DialogTitle>
               <DialogDescription style={{ color: P.inkMuted }}>
-                Patiënt logt in met e-mail + geboortejaar + 6-cijfer code.
+                De patiënt krijgt een mail met een link die de BASE-app opent en meteen inlogt. Het geboortejaar is de terugvaloptie als de mail kwijt is.
               </DialogDescription>
             </DialogHeader>
 
@@ -411,8 +411,7 @@ function PatientsPageInner() {
                   <div>
                     <MetaLabel style={{ color: P.lime }}>INVITE AANGEMAAKT</MetaLabel>
                     <p style={{ color: P.ink, fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>
-                      Deel deze URL met <strong>{inviteEmail}</strong>. Bij openen ziet de patiënt het code-scherm.
-                      Supabase stuurt de 6-cijfer code vanzelf zodra de patiënt z&apos;n geboortejaar invult.
+                      De mail is onderweg naar <strong>{inviteEmail}</strong>. Dit is dezelfde link: op een telefoon opent hij de app en logt hij meteen in, op een computer gaat hij naar het portaal. Deel hem alleen met de patiënt zelf.
                     </p>
                   </div>
                   <div

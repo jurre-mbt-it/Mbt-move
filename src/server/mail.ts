@@ -86,10 +86,12 @@ export async function sendMail(msg: MailMessage): Promise<MailResult> {
 // ─── Branded templates ──────────────────────────────────────────────────────
 
 /**
- * Invite-mail die de patiënt verwijst naar `/login/code`. De 6-cijfer code
- * zelf komt uit Supabase's eigen OTP-mail (apart kanaal); deze mail is
- * puur onboarding-instructie + branding. Loopt over de gedeelde shell, zodat
- * de therapeut en praktijk consistent met de andere app-mails getoond worden.
+ * Uitnodigingsmail met één ondertekende link (`/uitnodiging/<token>`). Op een
+ * telefoon opent die de BASE-app en logt de patiënt meteen in; op een
+ * computer kan hij in de browser verder. Geen code en geen geboortejaar meer
+ * in dit pad: dat bleef als terugvaloptie bestaan op `/login/code`.
+ * Loopt over de gedeelde shell, zodat de therapeut en praktijk consistent met
+ * de andere app-mails getoond worden.
  */
 export function inviteMail({
   recipientName,
@@ -117,7 +119,7 @@ export function inviteMail({
     </td></tr>
     <tr><td style="padding:20px 28px 0 28px;">
       <p style="margin:0;color:${EMAIL_PALETTE.inkMuted};font-size:13px;line-height:19px;">
-        Klik op de knop en vul je geboortejaar in. Je krijgt daarna een code van zes cijfers in deze mailbox. Met die code log je in.
+        Open deze mail op je telefoon en klik op de knop. De link opent de BASE-app en je bent meteen ingelogd. Nog geen app? De pagina achter de knop wijst je naar de App Store. Op een computer kun je in de browser verder.
       </p>
     </td></tr>
     <tr><td style="padding:16px 28px 0 28px;">
@@ -149,7 +151,7 @@ export function inviteMail({
       sender,
       heading: `Hallo ${firstName}`,
       bodyHtml: body,
-      cta: { url: codeUrl, label: 'Start onboarding' },
+      cta: { url: codeUrl, label: 'Open de uitnodiging' },
     }),
     text:
       `Hallo ${firstName},\n\n` +
@@ -160,9 +162,118 @@ export function inviteMail({
             ? `${sender.displayName} heeft`
             : 'Er is'
       } een account voor je klaargezet in BASE.\n\n` +
-      `Open deze link en vul je geboortejaar in:\n${codeUrl}\n\n` +
-      `Je krijgt daarna een code van zes cijfers in deze mailbox.\n\n` +
+      `Open deze link op je telefoon; hij opent de BASE-app en logt je meteen in:\n${codeUrl}\n\n` +
+      `Op een computer kun je in de browser verder.\n\n` +
       `Verloopt: ${formatDate(expiresAt)}`,
+  }
+}
+
+/**
+ * Mail aan een atleet die aan een groep is toegevoegd. Eén knop: eruit
+ * stappen. Wie erin wil blijven hoeft niets te doen. De knop werkt zonder
+ * login (ondertekende link), en in de app en het portaal kan het later ook.
+ */
+export function groupAddedMail({
+  recipientName,
+  groupName,
+  planName,
+  byName,
+  leaveUrl,
+  sender,
+}: {
+  recipientName: string
+  groupName: string
+  planName: string | null
+  byName: string
+  leaveUrl: string
+  sender: EmailSender
+}): MailMessage {
+  const firstName = recipientName.trim().split(' ')[0] || recipientName.trim()
+  const kalenderNaam = (planName ?? '').trim() || groupName
+  const door = byName.replace(/[\r\n]+/g, ' ').trim()
+
+  const body = `
+    <tr><td style="padding:16px 28px 0 28px;">
+      <p style="margin:0;color:${EMAIL_PALETTE.inkMuted};font-size:15px;line-height:22px;">
+        ${escapeHtml(door)} heeft je toegevoegd aan de groep <strong style="color:${EMAIL_PALETTE.ink};">${escapeHtml(groupName)}</strong>.
+      </p>
+    </td></tr>
+    <tr><td style="padding:16px 28px 0 28px;">
+      <p style="margin:0;color:${EMAIL_PALETTE.inkMuted};font-size:13px;line-height:19px;">
+        Trainingen die voor deze groep worden gepland, komen in je kalender te staan als
+        <strong style="color:${EMAIL_PALETTE.ink};">Onderdeel van ${escapeHtml(kalenderNaam)}</strong>.
+        Je eigen schema blijft gewoon staan.
+      </p>
+    </td></tr>
+    <tr><td style="padding:16px 28px 0 28px;">
+      <p style="margin:0;color:${EMAIL_PALETTE.inkMuted};font-size:13px;line-height:19px;">
+        Wil je niet in deze groep? Dan haal je jezelf eruit met de knop hieronder. Dat kan later ook altijd via je profiel in de app. Wil je erin blijven, dan hoef je niets te doen.
+      </p>
+    </td></tr>
+    <tr><td style="padding:16px 28px 0 28px;">
+      <p style="margin:0;color:${EMAIL_PALETTE.inkMuted};font-size:11px;line-height:17px;">
+        Werkt de knop niet? Kopieer deze link:<br/>
+        <span style="color:${EMAIL_PALETTE.ink};word-break:break-all;">${escapeHtml(leaveUrl)}</span>
+      </p>
+    </td></tr>`
+
+  return {
+    to: '',
+    subject: `${door} heeft je toegevoegd aan ${groupName.replace(/[\r\n]+/g, ' ').trim()}`,
+    sender,
+    html: emailShell({
+      sender,
+      heading: `Hallo ${firstName}`,
+      bodyHtml: body,
+      cta: { url: leaveUrl, label: 'Uit de groep stappen' },
+    }),
+    text:
+      `Hallo ${firstName},\n\n` +
+      `${door} heeft je toegevoegd aan de groep ${groupName}.\n\n` +
+      `Trainingen die voor deze groep worden gepland, komen in je kalender te staan als "Onderdeel van ${kalenderNaam}". Je eigen schema blijft gewoon staan.\n\n` +
+      `Wil je niet in deze groep? Haal jezelf eruit via deze link:\n${leaveUrl}\n\n` +
+      `Dat kan later ook altijd via je profiel in de app. Wil je erin blijven, dan hoef je niets te doen.`,
+  }
+}
+
+/** Korte melding aan de eigenaar van de groep als een lid zichzelf eruit haalt. Altijd namens BASE. */
+export function groupLeftMail({
+  ownerName,
+  memberName,
+  groupName,
+  groupUrl,
+}: {
+  ownerName: string
+  memberName: string
+  groupName: string
+  groupUrl: string
+}): MailMessage {
+  const firstName = ownerName.trim().split(' ')[0] || ownerName.trim()
+  const lid = memberName.replace(/[\r\n]+/g, ' ').trim()
+  const groep = groupName.replace(/[\r\n]+/g, ' ').trim()
+  const sender: EmailSender = { kind: 'base', displayName: 'BASE' }
+
+  const body = `
+    <tr><td style="padding:16px 28px 0 28px;">
+      <p style="margin:0;color:${EMAIL_PALETTE.inkMuted};font-size:15px;line-height:22px;">
+        ${escapeHtml(lid)} heeft zichzelf uit de groep <strong style="color:${EMAIL_PALETTE.ink};">${escapeHtml(groep)}</strong> gehaald.
+      </p>
+    </td></tr>
+    <tr><td style="padding:16px 28px 0 28px;">
+      <p style="margin:0;color:${EMAIL_PALETTE.inkMuted};font-size:13px;line-height:19px;">
+        De trainingen die al in de kalender stonden, blijven staan. Nieuwe groepsverzendingen gaan niet meer naar dit lid.
+      </p>
+    </td></tr>`
+
+  return {
+    to: '',
+    subject: `${lid} is uit ${groep} gestapt`,
+    sender,
+    html: emailShell({ sender, heading: `Hallo ${firstName}`, bodyHtml: body, cta: { url: groupUrl, label: 'Bekijk de groep' } }),
+    text:
+      `Hallo ${firstName},\n\n` +
+      `${lid} heeft zichzelf uit de groep ${groep} gehaald. De trainingen die al in de kalender stonden, blijven staan. Nieuwe groepsverzendingen gaan niet meer naar dit lid.\n\n` +
+      `Bekijk de groep: ${groupUrl}`,
   }
 }
 

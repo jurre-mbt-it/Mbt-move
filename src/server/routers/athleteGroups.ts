@@ -1,7 +1,13 @@
 import { z } from 'zod'
 import { TRPCError } from '@trpc/server'
 import type { PrismaClient } from '@prisma/client'
-import { createTRPCRouter, coachStaffProcedure } from '@/server/trpc'
+import { createTRPCRouter, coachStaffProcedure, protectedProcedure, publicProcedure } from '@/server/trpc'
+import { auditLog } from '@/server/audit'
+import { rateLimit, RATE_LIMITS } from '@/server/ratelimit'
+import { groupAddedMail, groupLeftMail, sendMail } from '@/server/mail'
+import { resolveSender } from '@/server/email/sender'
+import { signLink, verifyLink } from '@/server/lib/signed-link'
+import { getAppUrl } from '@/lib/app-url'
 import { assertGroupRole, groupsWhereForUser, type GroupRole } from '@/server/lib/group-access'
 import { planVerzending, type GroepsWeek, type LidWeek } from '@/server/lib/group-send'
 import { assertNotDischarged } from '@/server/lib/care-guard'
@@ -36,6 +42,47 @@ async function assertLidKoppeling(prisma: PrismaClient, user: { id: string; role
     select: { id: true },
   })
   if (!ok) throw new TRPCError({ code: 'FORBIDDEN', message: 'Geen actieve koppeling met deze atleet' })
+}
+
+/**
+ * Lid uit de groep. Eén helper voor de staf (`removeMember`), het lid zelf
+ * (`leave`) en de knop in de mail (`leaveByToken`): lidmaatschap weg, de al
+ * verstuurde trainingen blijven staan zonder groepsverwijzing.
+ */
+async function verwijderLid(prisma: PrismaClient, groupId: string, patientId: string) {
+  await prisma.$transaction([
+    prisma.athleteGroupMember.deleteMany({ where: { groupId, patientId } }),
+    prisma.weekScheduleDayItem.updateMany({
+      where: { groupId, day: { weekSchedule: { patientId } } },
+      data: { groupId: null, sourceItemId: null },
+    }),
+  ])
+}
+
+function naamVan(u: { firstName?: string | null; lastName?: string | null; name?: string | null; email?: string | null }): string {
+  return [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || u.name?.trim() || u.email || 'Je coach'
+}
+
+const eigenaarSelect = { select: { email: true, firstName: true, lastName: true, name: true, role: true } } as const
+
+/** De eigenaar hoort het als een lid zelf uit de groep stapt. Nooit blokkerend. */
+async function meldVertrekAanEigenaar(prisma: PrismaClient, groupId: string, lidNaam: string) {
+  try {
+    const g = await prisma.athleteGroup.findUnique({ where: { id: groupId }, select: { name: true, owner: eigenaarSelect } })
+    if (!g) return
+    const portaal = g.owner.role === 'COACH' ? '/coach/groups' : '/therapist/groups'
+    const mail = groupLeftMail({
+      ownerName: naamVan(g.owner),
+      memberName: lidNaam,
+      groupName: g.name,
+      groupUrl: `${getAppUrl()}${portaal}/${groupId}`,
+    })
+    mail.to = g.owner.email
+    const r = await sendMail(mail)
+    if (!r.ok) console.warn('[groups] vertrekmail niet verstuurd', { groupId, error: r.error })
+  } catch (err) {
+    console.warn('[groups] vertrekmail mislukt', { groupId, error: (err as Error).message })
+  }
 }
 
 const groepSelect = {
@@ -163,22 +210,152 @@ export const athleteGroupsRouter = createTRPCRouter({
       await ctx.prisma.athleteGroupMember.createMany({
         data: nieuw.map(patientId => ({ id: createId(), groupId: input.groupId, patientId })),
       })
-      return { added: nieuw.length }
+
+      // Elk nieuw lid hoort het van ons: wie, welke groep, en één knop om er
+      // weer uit te stappen. Een mail die niet aankomt laat het toevoegen
+      // niet mislukken; het lid kan altijd nog via zijn profiel.
+      let mailed = 0
+      if (nieuw.length > 0) {
+        const [groep, leden, actor] = await Promise.all([
+          ctx.prisma.athleteGroup.findUnique({ where: { id: input.groupId }, select: { name: true, planName: true } }),
+          ctx.prisma.athleteGroupMember.findMany({
+            where: { groupId: input.groupId, patientId: { in: nieuw } },
+            select: { id: true, patient: { select: { email: true, name: true } } },
+          }),
+          ctx.prisma.user.findUnique({
+            where: { id: ctx.user.id },
+            select: { firstName: true, lastName: true, name: true, jobTitle: true, email: true, practice: true },
+          }),
+        ])
+        if (groep && actor) {
+          const sender = resolveSender({ therapist: actor, practice: actor.practice ?? null })
+          const byName = naamVan(actor)
+          const uitkomsten = await Promise.allSettled(
+            leden.map(async (lid) => {
+              const mail = groupAddedMail({
+                recipientName: lid.patient.name ?? lid.patient.email,
+                groupName: groep.name,
+                planName: groep.planName,
+                byName,
+                leaveUrl: `${getAppUrl()}/groep/verlaten/${signLink('group-leave', lid.id)}`,
+                sender,
+              })
+              mail.to = lid.patient.email
+              const r = await sendMail(mail)
+              if (!r.ok) throw new Error(r.error ?? 'mail')
+            }),
+          )
+          mailed = uitkomsten.filter((u) => u.status === 'fulfilled').length
+          if (mailed < leden.length) console.warn('[groups] niet alle groepsmails verstuurd', { groupId: input.groupId, mislukt: leden.length - mailed })
+        }
+        await auditLog({
+          event: 'GROUP_MEMBER_ADDED',
+          userId: ctx.user.id,
+          actorEmail: ctx.user.email,
+          resource: 'AthleteGroup',
+          resourceId: input.groupId,
+          metadata: { added: nieuw.length, mailed },
+          req: ctx.req,
+        })
+      }
+      return { added: nieuw.length, mailed }
     }),
 
   removeMember: coachStaffProcedure
     .input(z.object({ groupId: z.string(), patientId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await assertGroupRole(ctx.prisma, ctx.user, input.groupId, 'MANAGER')
-      await ctx.prisma.$transaction([
-        ctx.prisma.athleteGroupMember.deleteMany({ where: { groupId: input.groupId, patientId: input.patientId } }),
-        // Zijn trainingen blijven, alleen de verwijzing naar de groep vervalt.
-        ctx.prisma.weekScheduleDayItem.updateMany({
-          where: { groupId: input.groupId, day: { weekSchedule: { patientId: input.patientId } } },
-          data: { groupId: null, sourceItemId: null },
-        }),
-      ])
+      await verwijderLid(ctx.prisma, input.groupId, input.patientId)
       return { ok: true }
+    }),
+
+  // ── Het lid zelf ───────────────────────────────────────────────────────────
+
+  /** Groepen waar ik zelf in zit, voor het profiel in app en portaal. */
+  mine: protectedProcedure.query(async ({ ctx }) => {
+    const rijen = await ctx.prisma.athleteGroupMember.findMany({
+      where: { patientId: ctx.user.id },
+      orderBy: { addedAt: 'desc' },
+      select: {
+        addedAt: true,
+        group: { select: { id: true, name: true, planName: true, owner: { select: { firstName: true, lastName: true, name: true } } } },
+      },
+    })
+    return rijen.map((r) => ({
+      groupId: r.group.id,
+      name: r.group.name,
+      planName: r.group.planName,
+      ownerName: naamVan(r.group.owner),
+      addedAt: r.addedAt,
+    }))
+  }),
+
+  /** Zelf uit een groep stappen. Raakt alleen het eigen lidmaatschap. */
+  leave: protectedProcedure
+    .input(z.object({ groupId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const lid = await ctx.prisma.athleteGroupMember.findUnique({
+        where: { groupId_patientId: { groupId: input.groupId, patientId: ctx.user.id } },
+        select: { id: true, patient: { select: { name: true, email: true } } },
+      })
+      if (!lid) return { ok: true, already: true }
+      await verwijderLid(ctx.prisma, input.groupId, ctx.user.id)
+      await auditLog({
+        event: 'GROUP_MEMBER_LEFT',
+        userId: ctx.user.id,
+        actorEmail: ctx.user.email,
+        resource: 'AthleteGroup',
+        resourceId: input.groupId,
+        metadata: { via: 'account' },
+        req: ctx.req,
+      })
+      void meldVertrekAanEigenaar(ctx.prisma, input.groupId, lid.patient.name ?? lid.patient.email)
+      return { ok: true, already: false }
+    }),
+
+  /** Wat de pagina achter de knop in de mail toont vóór de bevestiging. Publiek; het token is de toegang. */
+  leavePreview: publicProcedure
+    .input(z.object({ token: z.string().min(1).max(300) }))
+    .query(async ({ ctx, input }) => {
+      const ip = ctx.req?.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+      const rl = await rateLimit('groups.leaveLink', ip, RATE_LIMITS.groupLeaveLink)
+      if (!rl.ok) throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
+      const lidId = verifyLink('group-leave', input.token)
+      if (!lidId) return { status: 'invalid' as const }
+      const lid = await ctx.prisma.athleteGroupMember.findUnique({
+        where: { id: lidId },
+        select: { group: { select: { name: true, planName: true, owner: { select: { firstName: true, lastName: true, name: true } } } } },
+      })
+      if (!lid) return { status: 'gone' as const }
+      return { status: 'ok' as const, groupName: lid.group.name, planName: lid.group.planName, ownerName: naamVan(lid.group.owner) }
+    }),
+
+  /** De knop in de mail: uit de groep zonder in te loggen. Idempotent. */
+  leaveByToken: publicProcedure
+    .input(z.object({ token: z.string().min(1).max(300) }))
+    .mutation(async ({ ctx, input }) => {
+      const ip = ctx.req?.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+      const rl = await rateLimit('groups.leaveLink', ip, RATE_LIMITS.groupLeaveLink)
+      if (!rl.ok) throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: rl.message })
+      const lidId = verifyLink('group-leave', input.token)
+      if (!lidId) throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Deze link is niet geldig.' })
+      const lid = await ctx.prisma.athleteGroupMember.findUnique({
+        where: { id: lidId },
+        select: { groupId: true, patientId: true, group: { select: { name: true } }, patient: { select: { name: true, email: true } } },
+      })
+      if (!lid) return { ok: true, already: true, groupName: null }
+      await verwijderLid(ctx.prisma, lid.groupId, lid.patientId)
+      await auditLog({
+        event: 'GROUP_MEMBER_LEFT',
+        userId: lid.patientId,
+        actorEmail: lid.patient.email,
+        resource: 'AthleteGroup',
+        resourceId: lid.groupId,
+        metadata: { via: 'mail' },
+        req: ctx.req,
+      })
+      void meldVertrekAanEigenaar(ctx.prisma, lid.groupId, lid.patient.name ?? lid.patient.email)
+      return { ok: true, already: false, groupName: lid.group.name }
     }),
 
   setMemberNote: coachStaffProcedure

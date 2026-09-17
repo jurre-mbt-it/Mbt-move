@@ -16,6 +16,11 @@ export const ERROR_MESSAGES: Record<string, string> = {
   'Geen actieve behandelrelatie met deze patiënt': 'No active treatment relationship with this patient',
   'Geen actieve koppeling met deze patiënt': 'No active link with this patient',
   'Alleen voor de patiënt of atleet zelf.': 'Only for the patient or athlete themselves.',
+  'Deze uitnodigingslink is niet geldig. Vraag je therapeut om een nieuwe uitnodiging.': 'This invitation link is not valid. Ask your therapist for a new invitation.',
+  'Deze uitnodiging is al gebruikt. Log in met je e-mailadres.': 'This invitation has already been used. Sign in with your email address.',
+  'Deze uitnodiging is verlopen. Vraag je therapeut om een nieuwe uitnodiging.': 'This invitation has expired. Ask your therapist for a new invitation.',
+  'Inloggen is op dit moment niet mogelijk. Probeer het straks opnieuw.': 'Signing in is not possible right now. Please try again later.',
+  'Deze link is niet geldig.': 'This link is not valid.',
   // Atletengroepen
   'Groep niet gevonden': 'Group not found',
   'Als beheerder kijk je alleen mee in een groep': 'As an admin you can only view a group',

@@ -382,3 +382,36 @@ in `src/server/lib/test-verloop.ts`.
   Regels zonder catalogustest krijgen geen doellijn.
 
 Ontwerp: `docs/superpowers/specs/2026-09-15-test-verloop-design.md`.
+
+# Ondertekende links in mails: het token is de toegang, de scope zit in de handtekening
+
+Twee mails sturen de ontvanger naar een publieke pagina die zonder login iets
+doet met een rij uit de database: de uitnodiging (`/uitnodiging/<token>`, logt
+in) en "uit de groep stappen" (`/groep/verlaten/<token>`). Beide tokens zijn
+`<id>.<hmac>` uit `src/server/lib/signed-link.ts`, sleutel afgeleid van de
+service-role-key van Supabase. Geen tabel, geen migratie.
+
+- **Maak nooit een publiek pad op een kaal id.** Ids zijn te raden of te lezen
+  uit andere schermen. Onderteken met de juiste scope en controleer met
+  `verifyLink(scope, token)`; een uitnodigingstoken gaat nooit als
+  groepstoken door.
+- **De uitnodigingslink logt in zonder code en zonder geboortejaar.**
+  `invite.claim` geeft een `token_hash` (Supabase `generateLink` magiclink),
+  de client doet `verifyOtp({ token_hash })` en daarna `invite.finalize`. De
+  app vangt `mbtgym://uitnodiging?token=…` op in `app/uitnodiging.tsx`.
+  Het geboortejaarpad (`/login/code`, `invite.request`) blijft als
+  terugvaloptie; haal het niet weg.
+- **De uitnodiging is zeven dagen geldig** (`CODE_TTL_HOURS`). Was 24 uur,
+  maar de link in de mail is nu de gewone ingang en een patiënt opent die
+  niet altijd dezelfde dag.
+- Lokaal testen zonder mail: maak een `InviteCode`-rij en onderteken het id
+  met dezelfde sleutel; `invite.peek` laat zien wat de pagina toont.
+
+# Groepen: het lid hoort het en kan er altijd zelf uit
+
+`athleteGroups.addMembers` mailt elk nieuw lid (`groupAddedMail`) met één knop:
+eruit stappen. `verwijderLid` is de enige weg eruit, voor staf
+(`removeMember`), het lid zelf (`leave`, app en portaal) en de knop in de mail
+(`leaveByToken`): lidmaatschap weg, verstuurde trainingen blijven staan zonder
+`groupId`. De eigenaar krijgt een korte mail bij vertrek. Een mail die niet
+aankomt laat het toevoegen niet mislukken.

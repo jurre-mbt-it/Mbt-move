@@ -25,6 +25,13 @@ export type AuditEvent =
   | 'INVITE_REDEEMED'
   | 'INVITE_FAILED'
   | 'INVITE_RESENT'
+  // De ondertekende link uit de uitnodigingsmail is ingewisseld voor een
+  // sessie (app of browser). Het gebruik zelf staat op INVITE_REDEEMED.
+  | 'INVITE_LINK_CLAIMED'
+  // Groepslidmaatschap: toegevoegd door staf, of zelf eruit gestapt (app,
+  // portaal of de knop in de mail).
+  | 'GROUP_MEMBER_ADDED'
+  | 'GROUP_MEMBER_LEFT'
   // Data access
   | 'PATIENT_VIEWED'
   | 'PROGRAM_VIEWED'

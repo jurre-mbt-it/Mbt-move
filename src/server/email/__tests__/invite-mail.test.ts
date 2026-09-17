@@ -22,7 +22,7 @@ const sender = resolveSender({
 
 const basis = {
   recipientName: 'Sam de Vries',
-  codeUrl: 'https://getbase.coach/login/code?email=sam%40voorbeeld.nl',
+  codeUrl: 'https://getbase.coach/uitnodiging/clx1.abc',
   expiresAt: new Date('2026-09-01T10:00:00Z'),
 }
 
@@ -41,7 +41,17 @@ describe('inviteMail', () => {
 
   it('zet de code-URL in de knop en als terugvallink', () => {
     const mail = inviteMail({ ...basis, sender })
-    expect(mail.html).toContain('href="https://getbase.coach/login/code?email=sam%40voorbeeld.nl"')
+    expect(mail.html).toContain('href="https://getbase.coach/uitnodiging/clx1.abc"')
+  })
+
+  it('legt uit dat de link de app opent en meteen inlogt, zonder code of geboortejaar', () => {
+    // De oude mail stuurde naar het webportaal, waar de patiënt een code
+    // aanvroeg die hij in de app nog een keer moest aanvragen. Eén mail te veel.
+    const mail = inviteMail({ ...basis, sender })
+    expect(mail.html).toContain('opent de BASE-app')
+    expect(mail.html).not.toContain('geboortejaar')
+    expect(mail.html).not.toContain('zes cijfers')
+    expect(mail.text).toContain('opent de BASE-app')
   })
 
   it('werkt zonder praktijk, zoals bij een coach', () => {
@@ -53,7 +63,7 @@ describe('inviteMail', () => {
 
   it('levert een tekstversie die de link bevat', () => {
     const mail = inviteMail({ ...basis, sender })
-    expect(mail.text).toContain('https://getbase.coach/login/code')
+    expect(mail.text).toContain('https://getbase.coach/uitnodiging/clx1.abc')
   })
 
   it('escapet de naam van de ontvanger', () => {

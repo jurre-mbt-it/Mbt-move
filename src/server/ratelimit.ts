@@ -171,6 +171,11 @@ export const RATE_LIMITS = {
   // store in productie liever blokkeren dan ongelimiteerd doorlaten.
   inviteCreate:       { max: 20, windowSec: 3600, message: 'Max 20 uitnodigingen per uur.', failClosedInProd: true },
   inviteRedeem:       { max: 5,  windowSec: 900,  message: 'Te vaak geprobeerd. Wacht 15 minuten.', failClosedInProd: true },
+  // `invite.claim` per uitnodiging: de link opent de app en die kan bij een
+  // netwerkhik opnieuw proberen, dus ruimer dan het geboortejaarpad.
+  inviteClaim:        { max: 10, windowSec: 900,  message: 'Te vaak geprobeerd. Wacht 15 minuten.', failClosedInProd: true },
+  // De uitstapknop in de groepsmail, per IP. Publiek pad met een ondertekend token.
+  groupLeaveLink:     { max: 30, windowSec: 900,  message: 'Te veel aanvragen. Wacht 15 minuten.', failClosedInProd: true },
   dataExport:         { max: 3,  windowSec: 3600, message: 'Max 3 data-exports per uur.', failClosedInProd: true },
   accountDeletion:    { max: 3,  windowSec: 86400, message: 'Max 3 verwijder-verzoeken per dag.', failClosedInProd: true },
   consentChange:      { max: 10, windowSec: 3600, message: 'Max 10 consent-wijzigingen per uur.', failClosedInProd: true },

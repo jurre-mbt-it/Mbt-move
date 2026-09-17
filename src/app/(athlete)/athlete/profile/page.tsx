@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { trpc } from '@/lib/trpc/client'
 import { AccessRelations } from '@/components/access/AccessRelations'
+import { MyGroups } from '@/components/groups/MyGroups'
 import { computeHrZones } from '@/lib/cardio-zones'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -206,6 +207,9 @@ export default function AthleteProfilePage() {
           <Kicker>Wie mag jouw gegevens zien</Kicker>
           <AccessRelations />
         </div>
+
+        {/* Groepen waar de coach je in heeft gezet, met de knop om eruit te stappen. */}
+        <MyGroups />
 
         <DarkButton variant="secondary" onClick={handleSignOut} className="w-full">
           UITLOGGEN
