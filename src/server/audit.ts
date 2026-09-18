@@ -71,6 +71,7 @@ export type AuditEvent =
   // trail en niet alleen in de serverlogs: er loopt een AVG-termijn door
   // terwijl het account blijft staan, en niemand leest die logs uit zichzelf.
   | 'ACCOUNT_DELETE_FAILED'
+  | 'MESSAGES_PURGED'
   | 'ACCOUNT_DELETION_CANCELLED'
   // Admin
   | 'ROLE_CHANGED'

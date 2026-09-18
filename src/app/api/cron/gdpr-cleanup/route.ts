@@ -10,6 +10,10 @@
  * meer dan GRACE_PERIOD_DAYS dagen terug is. Verwijdert Supabase-auth user +
  * cascade-delete in Prisma.
  *
+ * Daarnaast (sinds 2026-09-18) de bewaartermijn van berichten in de app:
+ * alles ouder dan MESSAGE_RETENTION_DAYS wordt gewist, los van de
+ * account-verwijdering, zie `src/server/lib/message-retention.ts`.
+ *
  * Veiligheid:
  *   - Vereist Bearer-token check (alleen Vercel cron mag dit aanroepen).
  *   - Elke succesvolle/gefaalde delete wordt naar audit_logs geschreven.
@@ -23,6 +27,7 @@ import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
 import { prisma } from '@/lib/prisma'
 import { auditLog } from '@/server/audit'
 import { authorizeCron } from '@/server/lib/cron-auth'
+import { purgeExpiredMessages, MESSAGE_RETENTION_DAYS } from '@/server/lib/message-retention'
 
 const GRACE_PERIOD_DAYS = 30
 
@@ -46,6 +51,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 
+  // Berichten eerst: klein, onafhankelijk van de account-lus en mag die lus
+  // nooit blokkeren. Een fout hier wordt gelogd en meegegeven in het antwoord.
+  let messagesPurged: number | null = null
+  try {
+    const purged = await purgeExpiredMessages(prisma)
+    messagesPurged = purged.deleted
+    if (purged.deleted > 0) {
+      await auditLog({
+        event: 'MESSAGES_PURGED',
+        resource: 'Message',
+        actorEmail: 'cron:gdpr-cleanup',
+        metadata: { deleted: purged.deleted, retentionDays: MESSAGE_RETENTION_DAYS, cutoff: purged.cutoff.toISOString(), source: 'cron' },
+        req,
+      })
+    }
+  } catch (err) {
+    console.error('[cron/gdpr-cleanup] message purge failed', (err as Error).message)
+  }
+
   const cutoff = new Date(Date.now() - GRACE_PERIOD_DAYS * 86400 * 1000)
   const toDelete = await prisma.user.findMany({
     where: {
@@ -56,7 +80,7 @@ export async function GET(req: NextRequest) {
   })
 
   if (toDelete.length === 0) {
-    return NextResponse.json({ ok: true, processed: 0, cutoff: cutoff.toISOString() })
+    return NextResponse.json({ ok: true, processed: 0, messagesPurged, cutoff: cutoff.toISOString() })
   }
 
   const admin = getSupabaseAdmin()
@@ -146,6 +170,7 @@ export async function GET(req: NextRequest) {
     processed: toDelete.length,
     succeeded: results.filter((r) => r.ok).length,
     failed: results.filter((r) => !r.ok).length,
+    messagesPurged,
     cutoff: cutoff.toISOString(),
   })
 }

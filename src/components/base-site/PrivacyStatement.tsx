@@ -430,6 +430,12 @@ export function PrivacyStatement() {
                 dan wissen we alles 30 dagen later.
               </li>
               <li>
+                <strong>Berichten in de app</strong> (tussen jou en je behandelaar of coach):
+                30 dagen na verzending, daarna wissen we ze automatisch. Ze zijn bedoeld voor
+                kort contact over een sessie of oefening. Wat belangrijk is voor je behandeling
+                zet je behandelaar in je dossier, en dat valt onder de termijn hierboven.
+              </li>
+              <li>
                 <strong>Toegangslogboek:</strong> 5 jaar.
               </li>
               <li>

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { trpc } from '@/lib/trpc/client'
 import { Plus, X, Send, Dumbbell, CalendarCheck } from 'lucide-react'
 import { P, MetaLabel, DarkTextarea } from '@/components/dark-ui'
+import { MESSAGE_RETENTION_DAYS } from '@/lib/message-retention'
 
 const mono =
   'var(--font-mono-athletic)'
@@ -115,6 +116,12 @@ export function MessageThread({
                 ? 'Stel een vraag over je programma of een oefening, koppel er met de +-knop een sessie aan.'
                 : 'Stuur een reactie op een sessie of beantwoord vragen van de patiënt.'}
             </p>
+            <p style={{ color: P.inkDim, fontSize: 12, lineHeight: 1.5 }}>
+              Berichten worden na {MESSAGE_RETENTION_DAYS} dagen automatisch gewist.
+              {viewerSide === 'patient'
+                ? ' Wat belangrijk is voor je behandeling zet je behandelaar in je dossier.'
+                : ' Wat in het dossier hoort, leg je vast in een notitie of sessie.'}
+            </p>
           </div>
         ) : (
           messages.map(m => {
@@ -188,6 +195,11 @@ export function MessageThread({
         className="px-4 pt-3 pb-[max(env(safe-area-inset-bottom),12px)]"
         style={{ borderTop: `1px solid ${P.line}`, background: P.bg }}
       >
+        {messages && messages.length > 0 && (
+          <p className="athletic-mono mb-2" style={{ color: P.inkDim, fontSize: 11 }}>
+            BERICHTEN WORDEN NA {MESSAGE_RETENTION_DAYS} DAGEN GEWIST
+          </p>
+        )}
         {/* Koppel-kiezer: recente sessies + hun oefeningen */}
         {pickerOpen && (
           <div
