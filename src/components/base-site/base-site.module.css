@@ -1093,3 +1093,163 @@
   flex-direction: column;
   gap: 14px;
 }
+
+/* ── Juridische pagina's (/privacy) ───────────────────────────────────
+   Zelfde grond, zelfde tokens, maar een leestekst in plaats van scenes. Links
+   een plakkende inhoudsopgave in mono, rechts de tekst op een leesbreedte van
+   ongeveer 68 tekens. Koppen in het lettertype van de tekst (geen Big
+   Shoulders): een privacyverklaring is geen statement. */
+.legalHero { padding-block: clamp(44px, 6vw, 88px) clamp(28px, 4vw, 48px); }
+.legalMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin: clamp(18px, 2.4vw, 28px) 0 0;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.legalMeta b { font-weight: 500; color: var(--ink); }
+
+.legalGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
+  gap: clamp(28px, 5vw, 80px);
+  padding-block: clamp(36px, 5vw, 72px) clamp(64px, 8vw, 120px);
+  align-items: start;
+}
+@media (max-width: 900px) { .legalGrid { grid-template-columns: minmax(0, 1fr); } }
+
+.legalToc {
+  position: sticky;
+  top: 80px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--hair);
+}
+@media (max-width: 900px) { .legalToc { position: static; } }
+.legalToc li { border-bottom: 1px solid var(--hair); }
+.legalTocLink {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  text-decoration: none;
+  transition: color 200ms ease;
+}
+.legalTocLink:hover { color: var(--orange); }
+.legalTocLink i { font-style: normal; color: var(--ink-dim); min-width: 2ch; }
+
+.legalSummary {
+  border: 1px solid var(--hair-strong);
+  padding: clamp(18px, 2.4vw, 28px);
+  margin: 0 0 clamp(36px, 5vw, 60px);
+  background: var(--panel);
+}
+.legalSummary p { margin: 0 0 10px; }
+.legalSummary ul { margin: 0; padding: 0; list-style: none; }
+.legalSummary li {
+  position: relative;
+  padding-left: 18px;
+  margin-top: 8px;
+  color: var(--ink);
+  font-size: 15.5px;
+  line-height: 1.5;
+}
+.legalSummary li::before {
+  content: '+';
+  position: absolute;
+  left: 0;
+  color: var(--orange);
+}
+
+.legalBody { max-width: 68ch; }
+.legalBody h2 {
+  font-family: var(--body);
+  font-weight: 500;
+  font-size: clamp(22px, 2.4vw, 30px);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  margin: clamp(44px, 5vw, 64px) 0 14px;
+  padding-top: 18px;
+  border-top: 1px solid var(--hair);
+  scroll-margin-top: 84px;
+}
+.legalBody h2:first-of-type { margin-top: 0; }
+.legalBody h2 i { font-style: normal; font-family: var(--mono); font-size: 0.6em; color: var(--ink-dim); margin-right: 12px; letter-spacing: 0.02em; vertical-align: 0.15em; }
+.legalBody h3 {
+  font-family: var(--body);
+  font-weight: 500;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+  margin: 26px 0 6px;
+  color: var(--ink);
+}
+.legalBody p { margin: 0 0 14px; color: var(--ink-soft); font-size: 16px; line-height: 1.62; }
+.legalBody p strong, .legalBody li strong { color: var(--ink); font-weight: 500; }
+.legalBody a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--hair-strong); }
+.legalBody a:hover { color: var(--orange); text-decoration-color: var(--orange); }
+.legalBody ul { margin: 0 0 16px; padding: 0; list-style: none; }
+.legalBody li {
+  position: relative;
+  padding-left: 18px;
+  margin-top: 6px;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1.55;
+}
+.legalBody li::before { content: '+'; position: absolute; left: 0; color: var(--orange); }
+
+/* Tabel op haarlijnen; op smal scherm stapelt hij tot kaartjes. */
+.legalTable { width: 100%; border-collapse: collapse; margin: 6px 0 20px; font-size: 14.5px; }
+.legalTable th {
+  text-align: left;
+  font-family: var(--mono);
+  font-weight: 400;
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  padding: 0 14px 8px 0;
+  border-bottom: 1px solid var(--hair-strong);
+}
+.legalTable td {
+  vertical-align: top;
+  padding: 10px 14px 10px 0;
+  border-bottom: 1px solid var(--hair);
+  color: var(--ink-soft);
+  line-height: 1.45;
+}
+.legalTable td:first-child { color: var(--ink); font-weight: 500; white-space: nowrap; }
+@media (max-width: 640px) {
+  .legalTable thead { display: none; }
+  .legalTable tr { display: block; padding: 10px 0; border-bottom: 1px solid var(--hair); }
+  .legalTable td { display: block; border: 0; padding: 2px 0; }
+  .legalTable td:first-child { white-space: normal; }
+  .legalTable td[data-label]::before {
+    content: attr(data-label) ' ';
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-right: 6px;
+  }
+}
+
+.legalContact {
+  border: 1px solid var(--hair-strong);
+  padding: clamp(18px, 2.4vw, 28px);
+  margin-top: 28px;
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+.legalContact b { display: block; color: var(--ink); font-weight: 500; }

@@ -326,9 +326,9 @@ export function BaseLanding() {
               <a className={styles.footLink} href="https://www.movementbasedtherapy.nl">
                 <ScrambleText text="Praktijk-site" />
               </a>
-              <a className={styles.footLink} href="https://movementbasedtherapy.nl/privacy-policy.html">
+              <Link className={styles.footLink} href="/privacy">
                 <ScrambleText text="Privacyverklaring" />
-              </a>
+              </Link>
             </div>
           </div>
         </div>
